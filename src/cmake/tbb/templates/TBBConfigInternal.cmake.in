@@ -24,13 +24,11 @@ if (NOT TBB_IMPORTED_TARGETS)
 endif()
 
 if (NOT TBB_FIND_COMPONENTS)
-    set(TBB_FIND_COMPONENTS "tbb;tbbmalloc;tbbmalloc_proxy")
+    set(TBB_FIND_COMPONENTS "@TBB_DEFAULT_COMPONENTS@")
     foreach (_tbb_component ${TBB_FIND_COMPONENTS})
         set(TBB_FIND_REQUIRED_${_tbb_component} 1)
     endforeach()
 endif()
-
-set(TBB_INTERFACE_VERSION @TBB_INTERFACE_VERSION@)
 
 # Add components with internal dependencies: tbbmalloc_proxy -> tbbmalloc
 list(FIND TBB_FIND_COMPONENTS tbbmalloc_proxy _tbbmalloc_proxy_ix)
@@ -40,37 +38,37 @@ if (NOT _tbbmalloc_proxy_ix EQUAL -1)
         list(APPEND TBB_FIND_COMPONENTS tbbmalloc)
         set(TBB_FIND_REQUIRED_tbbmalloc ${TBB_FIND_REQUIRED_tbbmalloc_proxy})
     endif()
-    unset(_tbbmalloc_ix)
 endif()
-unset(_tbbmalloc_proxy_ix)
 
+set(TBB_INTERFACE_VERSION @TBB_INTERFACE_VERSION@)
+
+get_filename_component(_tbb_root "${CMAKE_CURRENT_LIST_FILE}" PATH)
+get_filename_component(_tbb_root "${_tbb_root}" PATH)
+@TBB_CHOOSE_ARCH_AND_COMPILER@
 foreach (_tbb_component ${TBB_FIND_COMPONENTS})
     set(TBB_${_tbb_component}_FOUND 0)
 
-    get_filename_component(_tbb_release_lib "${CMAKE_CURRENT_LIST_DIR}/@TBB_LIB_REL_PATH@/@TBB_LIB_PREFIX@${_tbb_component}.@TBB_LIB_EXT@" ABSOLUTE)
+    set(_tbb_release_lib "@TBB_RELEASE_LIB_PATH@/@TBB_LIB_PREFIX@${_tbb_component}.@TBB_LIB_EXT@")
 
     if (NOT TBB_FIND_RELEASE_ONLY)
-        get_filename_component(_tbb_debug_lib "${CMAKE_CURRENT_LIST_DIR}/@TBB_LIB_REL_PATH@/@TBB_LIB_PREFIX@${_tbb_component}_debug.@TBB_LIB_EXT@" ABSOLUTE)
+        set(_tbb_debug_lib "@TBB_DEBUG_LIB_PATH@/@TBB_LIB_PREFIX@${_tbb_component}_debug.@TBB_LIB_EXT@")
     endif()
 
     if (EXISTS "${_tbb_release_lib}" OR EXISTS "${_tbb_debug_lib}")
         if (NOT TARGET TBB::${_tbb_component})
             add_library(TBB::${_tbb_component} SHARED IMPORTED)
-
-            get_filename_component(_tbb_include_dir "${CMAKE_CURRENT_LIST_DIR}/@TBB_INC_REL_PATH@" ABSOLUTE)
             set_target_properties(TBB::${_tbb_component} PROPERTIES
-                                  INTERFACE_INCLUDE_DIRECTORIES "${_tbb_include_dir}")
-            unset(_tbb_include_dir)
+                                INTERFACE_INCLUDE_DIRECTORIES "${_tbb_root}/include"@TBB_COMPILE_DEFINITIONS@)
 
             if (EXISTS "${_tbb_release_lib}")
                 set_target_properties(TBB::${_tbb_component} PROPERTIES
-                                      IMPORTED_LOCATION_RELEASE "${_tbb_release_lib}"@TBB_IMPLIB_RELEASE@)
+                                    IMPORTED_LOCATION_RELEASE "${_tbb_release_lib}"@TBB_IMPLIB_RELEASE@)
                 set_property(TARGET TBB::${_tbb_component} APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
             endif()
 
             if (EXISTS "${_tbb_debug_lib}")
                 set_target_properties(TBB::${_tbb_component} PROPERTIES
-                                      IMPORTED_LOCATION_DEBUG "${_tbb_debug_lib}"@TBB_IMPLIB_DEBUG@)
+                                    IMPORTED_LOCATION_DEBUG "${_tbb_debug_lib}"@TBB_IMPLIB_DEBUG@)
                 set_property(TARGET TBB::${_tbb_component} APPEND PROPERTY IMPORTED_CONFIGURATIONS DEBUG)
             endif()
 
@@ -92,5 +90,9 @@ foreach (_tbb_component ${TBB_FIND_COMPONENTS})
     endif()
 endforeach()
 list(REMOVE_DUPLICATES TBB_IMPORTED_TARGETS)
+@TBB_UNSET_ADDITIONAL_VARIABLES@
+unset(_tbbmalloc_proxy_ix)
+unset(_tbbmalloc_ix)
+unset(_tbb_lib_path)
 unset(_tbb_release_lib)
 unset(_tbb_debug_lib)

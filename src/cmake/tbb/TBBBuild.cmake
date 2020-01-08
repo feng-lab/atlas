@@ -1,4 +1,4 @@
-# Copyright (c) 2017-2018 Intel Corporation
+# Copyright (c) 2017-2019 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,15 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
-#
-#
-#
 
 #
 # Usage:
 #  include(TBBBuild.cmake)
-#  tbb_build(ROOT <tbb_root> MAKE_ARGS <arg1> [... <argN>])
+#  tbb_build(TBB_ROOT <tbb_root> CONFIG_DIR <config_dir> MAKE_ARGS <arg1> [... <argN>])
 #  find_package(TBB <options>)
 #
 
@@ -76,6 +72,10 @@ function(tbb_build)
             endif()
 
             set(result "compiler=${compiler}" ${result})
+        endif()
+
+        if (NOT tbb_GMA_USER_DEFINED_ARGS MATCHES "stdver=" AND DEFINED CMAKE_CXX_STANDARD)
+            set(result "stdver=c++${CMAKE_CXX_STANDARD}" ${result})
         endif()
 
         if (NOT tbb_GMA_USER_DEFINED_ARGS MATCHES "tbb_build_dir=")
