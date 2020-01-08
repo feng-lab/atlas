@@ -42,8 +42,9 @@ endif()
 
 set(TBB_INTERFACE_VERSION @TBB_INTERFACE_VERSION@)
 
-get_filename_component(_tbb_root "${CMAKE_CURRENT_LIST_FILE}" PATH)
-get_filename_component(_tbb_root "${_tbb_root}" PATH)
+#get_filename_component(_tbb_root "${CMAKE_CURRENT_LIST_FILE}" PATH)
+#get_filename_component(_tbb_root "${_tbb_root}" PATH)
+get_filename_component(_tbb_root "@tbb_MK_TBB_ROOT@" ABSOLUTE)
 @TBB_CHOOSE_ARCH_AND_COMPILER@
 foreach (_tbb_component ${TBB_FIND_COMPONENTS})
     set(TBB_${_tbb_component}_FOUND 0)
