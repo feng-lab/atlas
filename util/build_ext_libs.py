@@ -1488,7 +1488,8 @@ def parse_inputs(argv: list):
     libs_reverse_depends = {'eigen': ['opencv'],
                             'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc'],
                             'gflags': ['glog', 'grpc'],
-                            'benchmark': ['grpc']
+                            'benchmark': ['grpc'],
+                            'tbb': ['itk', 'opencv'],
                             }
 
     print('current interpreter: ' + sys.executable)
