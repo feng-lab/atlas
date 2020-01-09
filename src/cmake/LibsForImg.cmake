@@ -25,6 +25,8 @@ find_package(TBB REQUIRED tbb)
 # message(STATUS "TBB_INCLUDE_DIRS:" ${TBB_INCLUDE_DIRS})
 get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
 message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
+get_target_property(TBB_IMPORTED_IMPLIB_RELEASE TBB::tbb IMPORTED_IMPLIB_RELEASE)
+message(STATUS "TBB_IMPORTED_IMPLIB_RELEASE: ${TBB_IMPORTED_IMPLIB_RELEASE}")
 
 if (BUILD_WITH_CONDA)
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} $ENV{PREFIX}/include $ENV{PREFIX}/include/fftw)
@@ -46,9 +48,10 @@ else ()
   endif (WIN32)
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
   if (WIN32)
+    # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
     set(MKL_LIBRARIES ${MKL_LIBRARIES}
         ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-        ${MKL_PATH}/lib/intel64/mkl_tbb_thread.lib
+        ${MKL_PATH}/lib/intel64/mkl_sequential.lib
         ${MKL_PATH}/lib/intel64/mkl_core.lib)
   elseif (APPLE)
     set(MKL_LIBRARIES ${MKL_LIBRARIES}
