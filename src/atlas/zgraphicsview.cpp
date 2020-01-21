@@ -195,12 +195,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
+        m_startPtItem->setZValue(5000);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         scene()->addItem(m_startPtItem.get());
         m_spline.clear();
         m_spline << m_startScenePt << m_startScenePt;  // pt and next potential pt
         m_splineItem = std::make_unique<QGraphicsPathItem>(ZROI::splineToPainterPath(m_spline));
+        m_splineItem->setZValue(5000);
         m_splineItem->setPen(QPen(QColor(255, 255, 0), 0));
         scene()->addItem(m_splineItem.get());
       } else {
@@ -221,6 +223,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         } else if (!isScenePtOverlap(m_spline.last(), m_spline[m_spline.size() - 2])) {
           QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
           auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
+          ctrlPtItem->setZValue(5000);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           scene()->addItem(ctrlPtItem.get());
@@ -270,6 +273,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
+        m_startPtItem->setZValue(5000);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         scene()->addItem(m_startPtItem.get());
@@ -280,6 +284,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = std::make_unique<QGraphicsPathItem>(path);
+        m_polygonItem->setZValue(5000);
         m_polygonItem->setPen(QPen(QColor(255, 255, 0), 0));
         scene()->addItem(m_polygonItem.get());
       } else {
@@ -330,6 +335,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
 
           QPolygonF ctrlPoly = mapToScene(event->x() - 4, event->y() - 4, 8, 8);
           auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
+          ctrlPtItem->setZValue(5000);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           scene()->addItem(ctrlPtItem.get());
@@ -380,10 +386,12 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
     }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
+    m_startPtItem->setZValue(5000);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     scene()->addItem(m_startPtItem.get());
     m_rectItem = std::make_unique<QGraphicsRectItem>(QRectF(scenePt, QSizeF(0, 0)));
+    m_rectItem->setZValue(5000);
     m_rectItem->setPen(QPen(QColor(255, 255, 0), 0));
     scene()->addItem(m_rectItem.get());
   } else if (m_view->state() == ZView::State::ROIEllipse && event->button() == Qt::LeftButton && canUpdateROI) {
@@ -408,10 +416,12 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
     }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
+    m_startPtItem->setZValue(5000);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     scene()->addItem(m_startPtItem.get());
     m_ellipseItem = std::make_unique<QGraphicsEllipseItem>(QRectF(m_startScenePt, QSizeF(0, 0)));
+    m_ellipseItem->setZValue(5000);
     m_ellipseItem->setPen(QPen(QColor(255, 255, 0), 0));
     scene()->addItem(m_ellipseItem.get());
   } else {
