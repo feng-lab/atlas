@@ -385,7 +385,7 @@ endif (WIN32)
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
                       ${GEOMETRICTOOLS_LIBRARIES}
-                      hdf5::hdf5_cpp-static hdf5::hdf5-static
+                      hdf5_cpp-static hdf5-static
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

@@ -785,7 +785,7 @@ def build_hdf5(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=OFF',
+                         '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON',
                          '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
                          '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
                          '-DHDF5_BUILD_EXAMPLES:BOOL=OFF'])
@@ -951,7 +951,11 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DModule_ITKReview:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          '-DModule_ITKTBB:BOOL=ON',
-                         '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake'])
+                         '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake',
+                         '-DITK_USE_SYSTEM_HDF5:BOOL=ON',
+                         '-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
+                         ],
+                        )
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
@@ -1490,6 +1494,7 @@ def parse_inputs(argv: list):
                             'gflags': ['glog', 'grpc'],
                             'benchmark': ['grpc'],
                             'tbb': ['itk', 'opencv'],
+                            'hdf5': ['itk'],
                             }
 
     print('current interpreter: ' + sys.executable)

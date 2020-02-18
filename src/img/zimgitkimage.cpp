@@ -83,7 +83,7 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
+                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
@@ -113,7 +113,7 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
+                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
@@ -146,7 +146,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::FileModeEnum::ReadMode);
+                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
     if (imageIO.IsNull())
       throw ZIOException("can not create reader");
@@ -420,43 +420,43 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
     info.numChannels = imageIO->GetNumberOfComponents();
   }
   switch (imageIO->GetComponentType()) {
-    case itk::ImageIOBase::CHAR:
+    case itk::IOComponentEnum::CHAR:
       info.bytesPerVoxel = 1;
       info.voxelFormat = VoxelFormat::Signed;
       break;
-    case itk::ImageIOBase::UCHAR:
+    case itk::IOComponentEnum::UCHAR:
       info.bytesPerVoxel = 1;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
-    case itk::ImageIOBase::SHORT:
+    case itk::IOComponentEnum::SHORT:
       info.bytesPerVoxel = 2;
       info.voxelFormat = VoxelFormat::Signed;
       break;
-    case itk::ImageIOBase::USHORT:
+    case itk::IOComponentEnum::USHORT:
       info.bytesPerVoxel = 2;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
-    case itk::ImageIOBase::INT:
+    case itk::IOComponentEnum::INT:
       info.bytesPerVoxel = 4;
       info.voxelFormat = VoxelFormat::Signed;
       break;
-    case itk::ImageIOBase::UINT:
+    case itk::IOComponentEnum::UINT:
       info.bytesPerVoxel = 4;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
-    case itk::ImageIOBase::LONG:
+    case itk::IOComponentEnum::LONG:
       info.bytesPerVoxel = 8;
       info.voxelFormat = VoxelFormat::Signed;
       break;
-    case itk::ImageIOBase::ULONG:
+    case itk::IOComponentEnum::ULONG:
       info.bytesPerVoxel = 8;
       info.voxelFormat = VoxelFormat::Unsigned;
       break;
-    case itk::ImageIOBase::FLOAT:
+    case itk::IOComponentEnum::FLOAT:
       info.bytesPerVoxel = 4;
       info.voxelFormat = VoxelFormat::Float;
       break;
-    case itk::ImageIOBase::DOUBLE:
+    case itk::IOComponentEnum::DOUBLE:
       info.bytesPerVoxel = 8;
       info.voxelFormat = VoxelFormat::Float;
       break;

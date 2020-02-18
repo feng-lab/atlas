@@ -256,7 +256,7 @@ std::string SCIFIOImageIO::RemoveFinalSlash(std::string path) const
 
 SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
 {
-  this->m_FileType = Binary;
+  this->m_FileType = IOFileEnum::Binary;
 
   // determine Java classpath from SCIFIO_PATH environment variable
   std::string scifioPath = nim::ZGlobal::jarsDIR.toStdString();
@@ -755,13 +755,13 @@ void SCIFIOImageIO::ReadImageInformation()
   // number of components
   const long rgbChannelCount = GetTypedMetaData<long>(dict, "RGBChannelCount");
   if (rgbChannelCount == 1) {
-    this->SetPixelType(SCALAR);
+    this->SetPixelType(IOPixelEnum::SCALAR);
   } else if (rgbChannelCount == 3) {
-    this->SetPixelType(RGB);
+    this->SetPixelType(IOPixelEnum::RGB);
   } else if (rgbChannelCount == 4) {
-    this->SetPixelType(RGBA);
+    this->SetPixelType(IOPixelEnum::RGBA);
   } else {
-    this->SetPixelType(VECTOR);
+    this->SetPixelType(IOPixelEnum::VECTOR);
   }
 
   this->SetNumberOfComponents(rgbChannelCount);
@@ -882,10 +882,10 @@ void SCIFIOImageIO::Write(const void* buffer)
   command += "\t";
   VLOG(1) << "Byte Order: " << this->GetByteOrderAsString(GetByteOrder());
   switch (GetByteOrder()) {
-    case BigEndian:
+    case IOByteOrderEnum::BigEndian:
       command += toString(1);
       break;
-    case LittleEndian:
+    case IOByteOrderEnum::LittleEndian:
     default:
       command += toString(0);
   }

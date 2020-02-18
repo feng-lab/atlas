@@ -203,6 +203,7 @@ endif ()
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/hdf5/share/cmake/hdf5 ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
+message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)

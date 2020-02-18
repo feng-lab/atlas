@@ -712,7 +712,7 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
-                      hdf5::hdf5_cpp-static hdf5::hdf5-static
+                      hdf5_cpp-static hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
                       ${ASSIMP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
