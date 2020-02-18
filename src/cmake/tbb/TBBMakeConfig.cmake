@@ -1,4 +1,4 @@
-# Copyright (c) 2017-2019 Intel Corporation
+# Copyright (c) 2017-2020 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -145,7 +145,11 @@ endif()
 
 ${TBB_CHOOSE_COMPILER_SUBDIR}
 
+if (NOT MSVC)
 get_filename_component(_tbb_lib_path \"\${_tbb_root}/${TBB_SHARED_LIB_DIR}/\${_tbb_arch_subdir}/\${_tbb_compiler_subdir}\" ABSOLUTE)
+else()
+get_filename_component(_tbb_lib_path \"\${_tbb_root}/../redist/\${_tbb_arch_subdir}/tbb/\${_tbb_compiler_subdir}\" ABSOLUTE)
+endif()
 ")
 
     set(TBB_RELEASE_LIB_PATH "\${_tbb_lib_path}")
