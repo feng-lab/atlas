@@ -953,13 +953,17 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DModule_ITKTBB:BOOL=ON',
                          '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake',
                          '-DITK_USE_SYSTEM_HDF5:BOOL=ON',
-                         '-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
                          ],
                         )
 
         if is_windows():
             cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
+                             '-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/cmake/hdf5',
+                             ])
+        else:
+            cmakecmd.extend(['-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
+                             ])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
