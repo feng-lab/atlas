@@ -1029,7 +1029,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     bak_file_3 = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_opencv_videoio:BOOL=OFF',
+        cmakecmd.extend(['-DBUILD_opencv_videoio:BOOL=ON',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_PROTOBUF:BOOL=OFF',
                          '-DBUILD_opencv_python2:BOOL=OFF',
@@ -1081,7 +1081,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                          '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
                          '-DBUILD_JAVA:BOOL=OFF',
                          '-DBUILD_OPENEXR:BOOL=OFF',
-                         '-DWITH_JPEG:BOOL=OFF',
+                         '-DWITH_JPEG:BOOL=ON',
                          '-DWITH_OPENEXR:BOOL=OFF',
                          '-DBUILD_PACKAGE:BOOL=OFF',
                          '-DWITH_JASPER:BOOL=OFF',
@@ -1096,12 +1096,18 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                              '-DWITH_WIN32UI:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'])
+                             '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
+                             '-DJPEG_INCLUDE_DIR:PATH=' + ext_dir() + '\\libjpeg-turbo\\include/',
+                             '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '\\libjpeg-turbo\\lib\\jpeg.lib',
+                             ])
         else:
             cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
                              '-DEIGEN_INCLUDE_PATH:PATH=' + ext_dir() + '/eigen',
                              '-DWITH_QUICKTIME:BOOL=OFF',
-                             '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules'])
+                             '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
+                             '-DJPEG_INCLUDE_DIR:PATH=' + ext_dir() + '/libjpeg-turbo/include/',
+                             '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '/libjpeg-turbo/lib/libjpeg.a',
+                             ])
 
             if is_linux():
                 orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
