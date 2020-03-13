@@ -36,35 +36,35 @@ public:
 
   void makeMatrix();
 
-  double translationX() const
+  [[nodiscard]] double translationX() const
   { return m_translationX; }
 
-  double translationY() const
+  [[nodiscard]] double translationY() const
   { return m_translationY; }
 
-  double rotationAngle() const
+  [[nodiscard]] double rotationAngle() const
   { return m_rotateAngle; }
 
-  double scaleX() const
+  [[nodiscard]] double scaleX() const
   { return m_scaleX; }
 
-  double scaleY() const
+  [[nodiscard]] double scaleY() const
   { return m_scaleY; }
 
-  double shearXY() const
+  [[nodiscard]] double shearXY() const
   { return m_shearXY; }
 
-  double shearYX() const
+  [[nodiscard]] double shearYX() const
   { return m_shearYX; }
 
   //
   void setMatrix(double m11, double m12, double m13, double m21, double m22, double m23);
 
   // access
-  const Eigen::Matrix3d& transformMatrix() const
+  [[nodiscard]] const Eigen::Matrix3d& transformMatrix() const
   { return m_matrix; }
 
-  const Eigen::Matrix3d& inverseTransformMatrix() const
+  [[nodiscard]] const Eigen::Matrix3d& inverseTransformMatrix() const
   { return m_inverseMatrix; }
 
   //
@@ -76,10 +76,10 @@ public:
 
   void transformPointsInverse(double x, double y, double& u, double& v) const;
 
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
 protected:
-  Eigen::Matrix3d getInverseTransformMatrix() const;
+  [[nodiscard]] Eigen::Matrix3d getInverseTransformMatrix() const;
 
 private:
   Eigen::Matrix3d m_matrix = Eigen::Matrix3d::Identity();

@@ -1,5 +1,7 @@
 #include "zassignpuncta.h"
 
+#include <utility>
+
 #include "zimg.h"
 #include "zlog.h"
 #include "zglmutils.h"
@@ -12,8 +14,6 @@ ZAssignPuncta::ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t)
   : m_img(&img)
   , m_dendriteChannel(dendriteChannel)
   , m_t(t)
-  , m_maxDistToBranch(2.5)
-  , m_ambiguousFactor(1.0)
 {
   if (!m_img->isType<uint8_t>()) {
     throw ZImgException("puncta assign only support uint8_t img");
@@ -21,9 +21,9 @@ ZAssignPuncta::ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t)
   m_imgInfo = m_img->info();
 }
 
-ZAssignPuncta::ZAssignPuncta(const QString& filename, double minValue, double maxValue, size_t dendriteChannel,
+ZAssignPuncta::ZAssignPuncta(QString  filename, double minValue, double maxValue, size_t dendriteChannel,
                              size_t t, size_t scene)
-  : m_filename(filename)
+  : m_filename(std::move(filename))
   , m_minValue(minValue)
   , m_maxValue(maxValue)
   , m_dendriteChannel(dendriteChannel)
@@ -36,9 +36,9 @@ ZAssignPuncta::ZAssignPuncta(const QString& filename, double minValue, double ma
   }
 }
 
-ZAssignPuncta::ZAssignPuncta(const QString& filename, const nim::ZImgInfo& imgInfo, double minValue, double maxValue,
+ZAssignPuncta::ZAssignPuncta(QString filename, const nim::ZImgInfo& imgInfo, double minValue, double maxValue,
                              size_t dendriteChannel, size_t t, size_t scene)
-  : ZAssignPuncta(filename, minValue, maxValue, dendriteChannel, t, scene)
+  : ZAssignPuncta(std::move(filename), minValue, maxValue, dendriteChannel, t, scene)
 {
   auto infos = ZImg::readImgInfos(m_filename);
   m_imgInfo = infos[scene];
@@ -68,8 +68,8 @@ void ZAssignPuncta::addSwcTree(const ZSwc* tree)
 
 void ZAssignPuncta::addSwcTrees(const std::vector<ZSwc>& trees)
 {
-  for (size_t i = 0; i < trees.size(); ++i)
-    addSwcTree(&trees[i]);
+  for (const auto & tree : trees)
+    addSwcTree(&tree);
 }
 
 void ZAssignPuncta::doWork()
@@ -100,7 +100,7 @@ void ZAssignPuncta::doWork()
   m_ambiguousPuncta.clear();
 
   //
-  if (m_swcTreeToPuncta.size() > 0) {
+  if (!m_swcTreeToPuncta.empty()) {
     separateSomaPuncta();
     separatePuncta();
   }
@@ -144,9 +144,9 @@ void ZAssignPuncta::separatePuncta()
       std::vector<ZSwc::ConstSwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first);
       if (!tmpNodes.empty()) {
         ++numTreeInRange;
-        for (size_t tmpNodesIdx = 0; tmpNodesIdx < tmpNodes.size(); ++tmpNodesIdx) {
-          nodeToTree[tmpNodes[tmpNodesIdx]] = treePuncta.first;
-          nodes.push_back(tmpNodes[tmpNodesIdx]);
+        for (auto tmpNode : tmpNodes) {
+          nodeToTree[tmpNode] = treePuncta.first;
+          nodes.push_back(tmpNode);
         }
       }
     }
@@ -307,14 +307,14 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, dou
   int down = roundTo<int>(y);
   int zup = roundTo<int>(z);
   int zdown = roundTo<int>(z);
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    auto parent = ZSwc::parent(nodes[i]);
-    left = std::min(std::min(left, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
-    right = std::max(std::max(right, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
-    up = std::min(std::min(up, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
-    down = std::max(std::max(down, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
-    zup = std::min(std::min(zup, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
-    zdown = std::max(std::max(zdown, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
+  for (auto node : nodes) {
+    auto parent = ZSwc::parent(node);
+    left = std::min(std::min(left, roundTo<int>(node->x)), roundTo<int>(parent->x));
+    right = std::max(std::max(right, roundTo<int>(node->x)), roundTo<int>(parent->x));
+    up = std::min(std::min(up, roundTo<int>(node->y)), roundTo<int>(parent->y));
+    down = std::max(std::max(down, roundTo<int>(node->y)), roundTo<int>(parent->y));
+    zup = std::min(std::min(zup, roundTo<int>(node->z)), roundTo<int>(parent->z));
+    zdown = std::max(std::max(zdown, roundTo<int>(node->z)), roundTo<int>(parent->z));
   }
 
   left = std::max(0, left);
@@ -339,7 +339,7 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, dou
   ZImgAutoThreshold<> imgAutoThre;
   double cent1 = 0;
   double cent2 = 0;
-  double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, img);
+  auto thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, img);
   double scale = cent2 - cent1;
   if (scale < 1.0)
     scale = 1.0;
@@ -379,8 +379,7 @@ ZAssignPuncta::nearestNode(double x, double y, double z, const std::vector<ZSwc:
 {
   double dist = std::numeric_limits<double>::max();
   ZSwc::ConstSwcTreeNode res;
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    const ZSwc::ConstSwcTreeNode& node = nodes[i];
+  for (auto node : nodes) {
     double nodeDist = pointFrustumConeDist(x, y, z, node, ZSwc::parent(node));
     if (nodeDist < dist) {
       dist = nodeDist;

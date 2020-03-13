@@ -1,7 +1,6 @@
 #include "zchooseobjdialog.h"
 
 #include "zobjdoc.h"
-#include "zdoc.h"
 #include <QPushButton>
 #include <QLabel>
 #include <QDialogButtonBox>
@@ -20,9 +19,9 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
 
   for (int i = 0; i < objs.size(); ++i) {
     size_t id = objs[i];
-    QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget,
-                                                QStringList() << m_doc.objName(id)
-                                                              << QDir::toNativeSeparators(m_doc.objPath(id)));
+    auto item = new QTreeWidgetItem(m_treeWidget,
+                                    QStringList() << m_doc.objName(id)
+                                                  << QDir::toNativeSeparators(m_doc.objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
     item->setSelected(i == 0);
   }
@@ -35,7 +34,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
 
 void ZChooseObjDialog::createWidget()
 {
-  QVBoxLayout* lo = new QVBoxLayout(this);
+  auto lo = new QVBoxLayout(this);
   m_label = new QLabel(QString("Choose one %1:").arg(m_doc.typeName()), this);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);

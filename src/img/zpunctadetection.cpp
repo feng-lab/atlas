@@ -30,6 +30,7 @@
 #include <boost/geometry/multi/geometries/multi_polygon.hpp>
 #include <algorithm>
 #include <limits>
+#include <cmath>
 
 namespace {
 
@@ -241,7 +242,7 @@ void ZPunctaDetection::doWork()
   double dendriteChannelMaxValue = std::numeric_limits<double>::lowest();
   ZImgRegion punctaChannelRegion(0, -1, 0, -1, 0, -1, m_punctaChannel, m_punctaChannel + 1, m_t, m_t + 1);
   ZImgRegion dendriteChannelRegion(0, -1, 0, -1, 0, -1, m_dendriteChannel, m_dendriteChannel + 1, m_t, m_t + 1);
-  if (ZCpuInfo::instance().nPhysicalRAM >= 1.25 * m_imgInfo.channelByteNumber()) { // enough memory
+  if (ZCpuInfo::instance().nPhysicalRAM >= (1.25 * m_imgInfo.channelByteNumber())) { // enough memory
     ZImg cimg(m_filename, punctaChannelRegion, m_scene);
     cimg.computeMinMax(punctaChannelMinValue, punctaChannelMaxValue);
     if (m_dendriteChannel != -1) {
@@ -271,7 +272,7 @@ void ZPunctaDetection::doWork()
         dendriteChannelMaxValue = std::max(dendriteChannelMaxValue, blockmax);
       }
     }
-  };
+  }
 
   bool imageTooBig = ZCpuInfo::instance().nPhysicalRAM < m_imgInfo.channelVoxelNumber() * 7;
   size_t tileSize = 4096;

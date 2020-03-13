@@ -50,49 +50,49 @@ public:
 
   void makeMatrix();
 
-  double translationX() const
+  [[nodiscard]] double translationX() const
   { return m_translationX; }
 
-  double translationY() const
+  [[nodiscard]] double translationY() const
   { return m_translationY; }
 
-  double translationZ() const
+  [[nodiscard]] double translationZ() const
   { return m_translationZ; }
 
-  double rotationAngleXY() const
+  [[nodiscard]] double rotationAngleXY() const
   { return m_rotateAngleXY; }
 
-  double rotationAngleXZ() const
+  [[nodiscard]] double rotationAngleXZ() const
   { return m_rotateAngleXZ; }
 
-  double rotationAngleYZ() const
+  [[nodiscard]] double rotationAngleYZ() const
   { return m_rotateAngleYZ; }
 
-  double scaleX() const
+  [[nodiscard]] double scaleX() const
   { return m_scaleX; }
 
-  double scaleY() const
+  [[nodiscard]] double scaleY() const
   { return m_scaleY; }
 
-  double scaleZ() const
+  [[nodiscard]] double scaleZ() const
   { return m_scaleZ; }
 
-  double shearXY() const
+  [[nodiscard]] double shearXY() const
   { return m_shearXY; }
 
-  double shearXZ() const
+  [[nodiscard]] double shearXZ() const
   { return m_shearXZ; }
 
-  double shearYX() const
+  [[nodiscard]] double shearYX() const
   { return m_shearYX; }
 
-  double shearYZ() const
+  [[nodiscard]] double shearYZ() const
   { return m_shearYZ; }
 
-  double shearZX() const
+  [[nodiscard]] double shearZX() const
   { return m_shearZX; }
 
-  double shearZY() const
+  [[nodiscard]] double shearZY() const
   { return m_shearZY; }
 
   //
@@ -101,10 +101,10 @@ public:
                  double m31, double m32, double m33, double m34);
 
   // access
-  const Eigen::Matrix4d& transformMatrix() const
+  [[nodiscard]] const Eigen::Matrix4d& transformMatrix() const
   { return m_matrix; }
 
-  const Eigen::Matrix4d& inverseTransformMatrix() const
+  [[nodiscard]] const Eigen::Matrix4d& inverseTransformMatrix() const
   { return m_inverseMatrix; }
 
   //
@@ -116,10 +116,10 @@ public:
 
   void transformPointsInverse(double x, double y, double z, double& u, double& v, double& w) const;
 
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
 protected:
-  Eigen::Matrix4d getInverseTransformMatrix() const;
+  [[nodiscard]] Eigen::Matrix4d getInverseTransformMatrix() const;
 
 private:
   Eigen::Matrix4d m_matrix = Eigen::Matrix4d::Identity();

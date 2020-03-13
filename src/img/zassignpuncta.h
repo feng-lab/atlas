@@ -17,11 +17,11 @@ public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
 
   // for big image, minValue and maxValue are used to convert image into uint8_t if it is not
-  ZAssignPuncta(const QString& filename, double minValue, double maxValue,
+  ZAssignPuncta(QString  filename, double minValue, double maxValue,
                 size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
 
   // only image resolution in imgInfo is used
-  ZAssignPuncta(const QString& filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
+  ZAssignPuncta(QString filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
                 size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
 
   ~ZAssignPuncta() override;
@@ -53,7 +53,7 @@ public:
 
   ZPuncta getSomaPunctaOfTree(const ZSwc* tree) const;
 
-  ZPuncta getAmbiguousPuncta() const
+  [[nodiscard]] ZPuncta getAmbiguousPuncta() const
   { return m_ambiguousPuncta; }
 
 protected:
@@ -76,8 +76,8 @@ private:
 
   double punctaSomaDist(const ZPunctum& punctum, const ZSwc* tree) const;
 
-  double pointFrustumConeDist(double x, double y, double z, const ZSwc::ConstSwcTreeNode& tn,
-                              const ZSwc::ConstSwcTreeNode& ptn) const;
+  [[nodiscard]] double pointFrustumConeDist(double x, double y, double z, const ZSwc::ConstSwcTreeNode& tn,
+                                            const ZSwc::ConstSwcTreeNode& ptn) const;
 
   ZSwc::ConstSwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
                                                       const std::vector<ZSwc::ConstSwcTreeNode>& nodes,
@@ -90,17 +90,17 @@ private:
   const ZImg* m_img = nullptr;
   QString m_filename;
   ZImgInfo m_imgInfo;
-  double m_minValue;
-  double m_maxValue;
+  double m_minValue{};
+  double m_maxValue{};
   size_t m_dendriteChannel;
   size_t m_t;
-  size_t m_scene;
+  size_t m_scene{};
   ZPuncta m_puncta;
   ZPuncta m_somaPuncta;
   // image info
-  double m_maxDistToBranch; // in um
+  double m_maxDistToBranch = 2.5; // in um
 
-  double m_ambiguousFactor;
+  double m_ambiguousFactor = 1.0;
 
   // input trees and results
   ZPuncta m_ambiguousPuncta;

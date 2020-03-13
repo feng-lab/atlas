@@ -19,7 +19,7 @@ Q_OBJECT
 public:
   explicit ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent = nullptr);
 
-  size_t selectedID() const
+  [[nodiscard]] size_t selectedID() const
   { return m_selectedID; }
 
 protected:
@@ -32,9 +32,9 @@ private:
   const ZObjDoc& m_doc;
   size_t m_selectedID = 0;
 
-  QLabel* m_label;
-  QTreeWidget* m_treeWidget;
-  QDialogButtonBox* m_buttonBox;
+  QLabel* m_label = nullptr;
+  QTreeWidget* m_treeWidget = nullptr;
+  QDialogButtonBox* m_buttonBox = nullptr;
 };
 
 } // namespace nim

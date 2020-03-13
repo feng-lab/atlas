@@ -127,9 +127,9 @@ private:
   // remove all detected punctum
   void cleanup();
 
-  QString getPunctaOutputFilename(const QString& swcPath);
+  static QString getPunctaOutputFilename(const QString& swcPath);
 
-  QString getSomaPunctaOutputFilename(const QString& swcPath);
+  static QString getSomaPunctaOutputFilename(const QString& swcPath);
 
   QString getAmbiguousPunctaOutputFileName();
 
@@ -141,23 +141,25 @@ private:
   // typical soma diameter would be 10-15um
   void detectSomaMask(const ZImg& dendriteImg, Eigen::MatrixXi& small, Eigen::MatrixXi& big, double totalWeight);
 
-  std::vector<Eigen::MatrixXi> watershedSplit(const ZImg& img) const;
+  [[nodiscard]] std::vector<Eigen::MatrixXi> watershedSplit(const ZImg& img) const;
 
-  void getVoxelRange(const Eigen::MatrixXi& voxelLocations, Eigen::RowVectorXi& minLoc, Eigen::RowVectorXi& size);
+  static void getVoxelRange(const Eigen::MatrixXi& voxelLocations,
+                            Eigen::RowVectorXi& minLoc, Eigen::RowVectorXi& size);
 
-  Eigen::VectorXd getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t);
+  static Eigen::VectorXd getVoxelIntensities(const Eigen::MatrixXi& voxelLocations,
+                                             const ZImg& rawimg, size_t c, size_t t);
 
   // crop with minLoc and size, then set any voxel other than voxels in voxelLocations as zero
   // both img and res are uint8_t type
-  ZImg cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t,
-                const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
+  static ZImg cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t,
+                       const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
 
-  ZImg cropZImg(const ZImg& rawimg, size_t c, size_t t,
-                const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
+  static ZImg cropZImg(const ZImg& rawimg, size_t c, size_t t,
+                       const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
 
-  size_t getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
-                       const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
-                       const ZImg& locmax, double saturatedIntensity, const Eigen::RowVectorXi& minLoc);
+  static size_t getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
+                              const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
+                              const ZImg& locmax, double saturatedIntensity, const Eigen::RowVectorXi& minLoc);
 
   // split voxels use vbgmm and save result puncta into detectedPunctaList
   // voxelLocs is coordinates of voxels in stack, voxelIntens is intensities of these voxels.
