@@ -613,74 +613,6 @@ def build_jxrlib(src_dir: str, install_dir: str):
                        cwd=src_dir, shell=False, check=True)
 
 
-def build_geometrictools(src_dir: str, install_dir: str):
-    shutil.rmtree(install_dir, ignore_errors=True)
-
-    orig_file = None
-    bak_file = None
-    orig_file2 = None
-    bak_file2 = None
-    orig_file3 = None
-    bak_file3 = None
-    try:
-        if is_windows():
-            env = get_vcvars_environment()
-            subprocess.run(['MSBuild', 'GTEngine.v15.vcxproj', '/property:Platform=x64',
-                            '/property:Configuration=Release', '/maxcpucount',
-                            '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  # like 10.0.16299.0
-                            '/property:PlatformToolset=v142',
-                            '/property:ForceImportBeforeCppTargets=' + ext_dir() + '\\no_warning_as_error.props'],
-                           cwd=src_dir, shell=True, check=True, env=env)
-            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.lib'),
-                      os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.pch'),
-                      os.path.join(install_dir, 'lib'))
-            glob_copy(os.path.join(src_dir, '_Output', 'v142', 'x64', 'Release', 'GTEngine.v15.pdb'),
-                      os.path.join(install_dir, 'lib'))
-        elif is_linux():
-            orig_file = os.path.join(src_dir, 'makeengine.gte')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'$(SRC_APPLICATIONS_GLX)/*.cpp',
-                                              r'$(SRC_APPLICATIONS_GLX)/%.cpp',
-                                              r'$(SRC_GRAPHICS_GLX)/*.cpp',
-                                              r'$(SRC_GRAPHICS_GLX)/%.cpp'
-                                              ],
-                                  to_texts=[r'$(SRC_APPLICATIONS_GLX)/*.nonono',
-                                            r'$(SRC_APPLICATIONS_GLX)/%.nonono',
-                                            r'$(SRC_GRAPHICS_GLX)/*.nonono',
-                                            r'$(SRC_GRAPHICS_GLX)/%.nonono'
-                                            ])
-
-            subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.gte'],
-                           cwd=src_dir, shell=False, check=True)
-            shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
-        else:
-            orig_file = os.path.join(src_dir, 'Source', 'Mathematics', 'GteGenerateMeshUV.cpp')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'#include <Mathematics/GteGenerateMeshUV.h>'],
-                                  to_texts=['#include <Mathematics/GteGenerateMeshUV.h>\n#include <string>'])
-            orig_file2 = os.path.join(src_dir, 'Source', 'Mathematics', 'GteIEEEBinary16.cpp')
-            bak_file2 = patch_file(orig_file2, from_texts=[r'_Float16'], to_texts=[r'___Float16'])
-            orig_file3 = os.path.join(src_dir, 'Include', 'Mathematics', 'GteIEEEBinary16.h')
-            bak_file3 = patch_file(orig_file3, from_texts=[r'_Float16'], to_texts=[r'___Float16'])
-
-            shutil.copy2(os.path.join(ext_dir(), 'makeengine.macos.gte'), src_dir)
-            subprocess.run(['make', '-j' + str(os.cpu_count()), 'CFG=Release', '-f', 'makeengine.macos.gte'],
-                           cwd=src_dir, shell=False, check=True)
-            shutil.copytree(os.path.join(src_dir, 'lib', 'Release'), os.path.join(install_dir, 'lib'))
-
-        shutil.copytree(os.path.join(src_dir, 'Include'), os.path.join(install_dir, 'include'))
-    finally:
-        shutil.rmtree(os.path.join(src_dir, 'lib'), ignore_errors=True)  # macOS/linux
-        shutil.rmtree(os.path.join(src_dir, 'obj'), ignore_errors=True)  # macOS/linux
-        shutil.rmtree(os.path.join(src_dir, '_Output'), ignore_errors=True)  # win
-        if is_linux() or is_mac():
-            os.replace(bak_file, orig_file)
-        if is_mac():
-            os.replace(bak_file2, orig_file2)
-            os.replace(bak_file3, orig_file3)
-
-
 def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
@@ -1364,7 +1296,8 @@ def build_libs(libs: dict, update_src: bool):
             shutil.rmtree(src_dir, ignore_errors=True)
             unpack_file_to_folder(package_name, base_dir())
         assert os.path.exists(src_dir)
-        build_geometrictools(src_dir, os.path.join(ext_dir(), 'geometrictools'))
+        shutil.rmtree(os.path.join(ext_dir(), 'geometrictools'), ignore_errors=True)
+        shutil.copytree(src_dir, os.path.join(ext_dir(), 'geometrictools'))
 
     if libs['assimp']:
         src_dir = os.path.join(base_dir(), 'assimp')

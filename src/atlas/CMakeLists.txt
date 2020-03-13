@@ -46,17 +46,7 @@ message(STATUS "VTK_DIR: ${VTK_DIR}")
 message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
 
 set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/include)
-if (WIN32)
-  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/GTEngine.v15.lib)
-elseif (APPLE)
-  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libGTEngine.a)
-else ()
-  set(GEOMETRICTOOLS_LIBRARIES ${GEOMETRICTOOLS_LIBRARIES}
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools/lib/libgtengine.a)
-endif ()
+    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools)
 
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
@@ -713,7 +703,7 @@ endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
                       hdf5_cpp-static hdf5-static
-                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg ${GEOMETRICTOOLS_LIBRARIES}
+                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg
                       ${ASSIMP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)

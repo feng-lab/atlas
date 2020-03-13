@@ -1,7 +1,7 @@
 #include "zroiutils.h"
 
 #include "zglobal.h"
-#include <Mathematics/GteNaturalSplineCurve.h>
+#include <Mathematics/NaturalSplineCurve.h>
 #include <QImage>
 #include <QPainter>
 #include <cmath>

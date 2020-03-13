@@ -1,7 +1,7 @@
 #include "z3dboundedfilter.h"
 
 #include "zlog.h"
-#include <Mathematics/GteDistLineRay.h>
+#include <Mathematics/DistLineRay.h>
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {

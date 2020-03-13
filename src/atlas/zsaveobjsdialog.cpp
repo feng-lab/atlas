@@ -20,7 +20,7 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWi
     ZObjDoc* odoc = m_doc.idToDoc(id);
     QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget, QStringList()
       << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
-    item->setData(0, Qt::UserRole, qVariantFromValue(id));
+    item->setData(0, Qt::UserRole, QVariant::fromValue(id));
   }
 
   m_treeWidget->resizeColumnToContents(0);

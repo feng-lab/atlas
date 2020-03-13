@@ -23,7 +23,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
     QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget,
                                                 QStringList() << m_doc.objName(id)
                                                               << QDir::toNativeSeparators(m_doc.objPath(id)));
-    item->setData(0, Qt::UserRole, qVariantFromValue(id));
+    item->setData(0, Qt::UserRole, QVariant::fromValue(id));
     item->setSelected(i == 0);
   }
 

@@ -13,8 +13,11 @@ ZColorMapWidget::ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent) 
   setFocusPolicy(Qt::StrongFocus);
 
   setMinimumHeight(minimumHeight() + m_sliderHeight - 1);
-  int l, t, r, b;
-  getContentsMargins(&l, &t, &r, &b);
+  auto margins = contentsMargins();
+  int l = margins.left();
+  int t = margins.top();
+  int r = margins.right();
+  int b = margins.bottom();
   int margin = 15;
   setContentsMargins(l + margin, t + margin, r + margin, b + m_sliderHeight - 1 + margin);
   connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapWidget::updateIntensityScreenWidth);
