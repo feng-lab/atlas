@@ -1,18 +1,8 @@
 if (BUILD_WITH_CONDA)
   # qt
   set(QT_PATHS $ENV{PREFIX})
-
   # tbb
-  include(${CMAKE_CURRENT_LIST_DIR}/../cmake/tbb/TBBMakeConfig.cmake)
-  FIND_PATH(TBBROOT include/tbb/task_scheduler_init.h
-            DOC "Root of TBB installation"
-            HINTS ${TBBROOT}
-            PATHS
-            $ENV{PREFIX}
-            )
-  tbb_make_config(TBB_ROOT ${TBBROOT} SAVE_TO ${CMAKE_CURRENT_LIST_DIR}/../python/cmake)
-  # tbb
-  set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR}/../python/cmake)
+  set(TBB_DIR $ENV{PREFIX}/lib/cmake/tbb)
 else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/QtInfo.cmake)
