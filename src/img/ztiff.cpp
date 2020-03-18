@@ -1822,11 +1822,12 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
   if (c >= 0 || img.numChannels() == 1) {
     planarconfigSeparate = false;  // only one channel
   }
-#ifdef Q_OS_MACOS // macOS mojave bug
-  if (z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 && img.numChannels() == 4) {
+
+  // for 2D image with 3 or 4 channel, save it without planarconfigSeparate so Pillow can read it correctly
+  if (z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
+      (img.numChannels() == 4 || img.numChannels() == 3)) {
     planarconfigSeparate = false;
   }
-#endif
 
   uint16_t photo = PHOTOMETRIC_MINISBLACK;
   TIFFSetField(m_tif.get(), TIFFTAG_IMAGEWIDTH, img.width());
@@ -1871,7 +1872,8 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
       for (size_t ch = 0; ch < img.numChannels(); ++ch)
         TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(img.planeData(z, ch, t)), img.planeByteNumber());
     } else {
-      CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 && img.numChannels() == 4);
+      CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
+            (img.numChannels() == 4 || img.numChannels() == 3));
       ZImg tmp = img;
       ZImgFormat::XYZCtoCXYZ(img, tmp);
       TIFFWriteEncodedStrip(m_tif.get(), 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
