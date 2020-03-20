@@ -55,7 +55,7 @@
 
 ## Python Package Build
 ```bash
-conda install conda-build cmake ninja qt mkl-devel tbb-devel numpy pybind11
+conda install conda-build cmake ninja qt numpy
 conda build purge-all
 conda build conda
 conda remove zimg -y
