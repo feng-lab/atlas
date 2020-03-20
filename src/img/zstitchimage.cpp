@@ -11,7 +11,7 @@
 #include <QRegularExpression>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
-#include <tbb/task_scheduler_init.h>
+#include <tbb/global_control.h>
 #include <fftw3.h>
 #include <algorithm>
 #include <limits>
@@ -656,12 +656,14 @@ void ZStitchImage::doWork()
     };
 
     if (m_useMultithreading) {
-      int nthread =
-        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+//      int nthread =
+//        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+//                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      int nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1, nthread);
-      LOG(INFO) << "using " << nthread << " threads to stitch.";
-      tbb::task_scheduler_init init(nthread);
+      LOG(INFO) << "using maximum " << nthread << " threads to stitch.";
+      // tbb::task_scheduler_init init(nthread);
+      tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
       tbb::parallel_for(
         tbb::blocked_range<size_t>(0, allPairs.size()),
@@ -1029,12 +1031,14 @@ void ZStitchImage::doRestitch()
     };
 
     if (m_useMultithreading) {
-      int nthread =
-        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+//      int nthread =
+//        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+//                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      int nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1, nthread);
-      LOG(INFO) << "using " << nthread << " threads to stitch " << rgns.size() << " regions.";
-      tbb::task_scheduler_init init(nthread);
+      LOG(INFO) << "using maximum " << nthread << " threads to stitch " << rgns.size() << " regions.";
+      // tbb::task_scheduler_init init(nthread);
+      tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
       tbb::parallel_for(
         tbb::blocked_range<size_t>(0, allPairs.size()),

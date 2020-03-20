@@ -32,7 +32,7 @@
 #include <itkMath.h>
 #include <QDir>
 #include <QApplication>
-#include <tbb/task_scheduler_init.h>
+#include <tbb/global_control.h>
 #include <grpcpp/grpcpp.h>
 
 namespace nim {
@@ -351,7 +351,7 @@ void stnTrajectory()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_energy");
   QString resolution = "50";
-  tbb::task_scheduler_init init(8);
+  tbb::global_control gc(tbb::global_control::max_allowed_parallelism, 8);
 
   ZTree<RegionNode> ontology;
   readMouseBrainAtlasOntology(ontology);

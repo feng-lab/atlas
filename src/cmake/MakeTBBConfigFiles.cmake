@@ -25,7 +25,7 @@ if (WIN32)
   IF (NOT PROGRAMFILES32)
     SET(PROGRAMFILES32 "C:/Program Files (x86)")
   ENDIF ()
-  FIND_PATH(TBBROOT include/tbb/task_scheduler_init.h
+  FIND_PATH(TBBROOT include/tbb/tbb.h
             DOC "Root of TBB installation"
             HINTS ${TBBROOT}
             PATHS
@@ -36,7 +36,7 @@ if (WIN32)
             "${PROGRAMFILES32}/Intel/compilers_and_libraries/windows/tbb"
             )
 else (WIN32)
-  FIND_PATH(TBBROOT include/tbb/task_scheduler_init.h
+  FIND_PATH(TBBROOT include/tbb/tbb.h
             DOC "Root of TBB installation"
             HINTS ${TBBROOT}
             PATHS
