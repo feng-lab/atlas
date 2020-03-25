@@ -16,6 +16,7 @@
 #include <QTextOption>
 #include <QTextDocument>
 #include <QPainter>
+#include <QInputDialog>
 #include <cmath>
 
 namespace nim {
@@ -137,6 +138,7 @@ void ParameterKeysItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
   QGraphicsRectItem::mouseReleaseEvent(event);
   if (m_itemMoved && m_itemOldTime != m_paraKey.time()) {
     m_updateValueLock = true;
+    m_paraAnimation.sortKeys();
     m_paraAnimation.emitKeyChangedSignal(&m_paraKey);
     m_updateValueLock = false;
   }
@@ -345,6 +347,45 @@ void ZTimelineEventScene::deleteKeyItem(ZParameterKey* paraKey)
       removeItem(it->second);
       delete it->second;
       m_ObjParaKeyToItem.erase(it);
+    }
+  }
+}
+
+void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+  auto allSelectedItems = selectedItems();
+  if (allSelectedItems.empty()) {
+    QGraphicsScene::contextMenuEvent(event);
+  } else {
+    QMenu menu;
+
+    QAction* setKeysTimeAction = menu.addAction("Set Time of Selected Keys");
+    QAction* selectedAction = menu.exec(event->screenPos());
+
+    if (selectedAction == setKeysTimeAction) {
+      bool ok;
+      double time = QInputDialog::getDouble(m_view, tr("Set Time of Selected Keys"),
+                                            tr("Time:"), 0.0, 0.0, m_timeline.animation().duration(), 3,
+                                            &ok);
+      if (ok) {
+        //LOG(INFO) << time;
+        std::set<ZParameterKey*> keys;
+        std::set<ZParameterAnimation*> anis;
+        for (auto itm : allSelectedItems) {
+          auto item = qgraphicsitem_cast<ParameterKeysItem*>(itm);
+          if (item) {
+            keys.insert(&item->paraKey());
+            anis.insert(&item->paraAnimation());
+          }
+        }
+        for (auto key : keys) {
+          key->setTime(time);
+        }
+        for (auto ani : anis) {
+          ani->sortKeys();
+          ani->emitKeysChangedSignal();
+        }
+      }
     }
   }
 }

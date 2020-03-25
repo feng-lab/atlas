@@ -56,8 +56,13 @@ public:
   int numKeys() const
   { return m_keys.size(); }
 
+  void sortKeys();
+
   void emitKeyChangedSignal(ZParameterKey* key)
   { emit keyChanged(key); }
+
+  void emitKeysChangedSignal()
+  { emit keysChanged(); }
 
   QString jsonKey() const;
 

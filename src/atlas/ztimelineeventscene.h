@@ -117,6 +117,8 @@ protected:
 
   void deleteKeyItem(ZParameterKey* paraKey);
 
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
 private:
   ZTimelineWidget& m_timeline;
   ZTimelineEventView* m_view;
