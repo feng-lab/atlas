@@ -360,13 +360,28 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
     QMenu menu;
 
     QAction* setKeysTimeAction = menu.addAction("Set Time of Selected Keys");
+    QAction* addKeysTimeAction = menu.addAction("Add Time to Selected Keys");
+    QAction* subtractKeysTimeAction = menu.addAction("Subtract Time to Selected Keys");
     QAction* selectedAction = menu.exec(event->screenPos());
 
-    if (selectedAction == setKeysTimeAction) {
-      bool ok;
-      double time = QInputDialog::getDouble(m_view, tr("Set Time of Selected Keys"),
-                                            tr("Time:"), 0.0, 0.0, m_timeline.animation().duration(), 3,
-                                            &ok);
+    if (selectedAction) {
+      bool ok = false;
+      double time = 0.0;
+      if (selectedAction == setKeysTimeAction) {
+        time = QInputDialog::getDouble(m_view, tr("Set Time of Selected Keys"),
+                                       tr("Set Time:"), 0.0, 0.0, m_timeline.animation().duration(), 3,
+                                       &ok);
+      } else if (selectedAction == addKeysTimeAction) {
+        time = QInputDialog::getDouble(m_view, tr("Add Time to Selected Keys"),
+                                       tr("Add Time:"), 0.0, 0.0, 2147483647., 3,
+                                       &ok);
+      } else if (selectedAction == subtractKeysTimeAction) {
+        time = QInputDialog::getDouble(m_view, tr("Subtract Time to Selected Keys"),
+                                       tr("Subtract Time:"), 0.0, 0.0, 2147483647., 3,
+                                       &ok);
+      } else {
+        LOG(FATAL) << "wrong selected action";
+      }
       if (ok) {
         //LOG(INFO) << time;
         std::set<ZParameterKey*> keys;
@@ -378,8 +393,18 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
             anis.insert(&item->paraAnimation());
           }
         }
-        for (auto key : keys) {
-          key->setTime(time);
+        if (selectedAction == setKeysTimeAction) {
+          for (auto key : keys) {
+            key->setTime(time);
+          }
+        } else if (selectedAction == addKeysTimeAction) {
+          for (auto key : keys) {
+            key->setTime(key->time() + time);
+          }
+        } else if (selectedAction == subtractKeysTimeAction) {
+          for (auto key : keys) {
+            key->setTime(std::max(0.0, key->time() - time));
+          }
         }
         for (auto ani : anis) {
           ani->sortKeys();
