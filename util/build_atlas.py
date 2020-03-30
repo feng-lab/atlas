@@ -49,6 +49,9 @@ def build_atlas():
 
     if is_windows():
         env = build_ext_libs.get_vcvars_environment()
+        env['caexcludepath'] = ';'.join([os.path.join(atlas_repository_dir(), 'src', '3rdparty'),
+                                         intel_sw_dir(),
+                                         ])
         subprocess.run(cmakecmd,
                        cwd=atlas_build_dir(), shell=False, check=True, env=env)
         if use_ninja():
