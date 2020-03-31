@@ -1157,23 +1157,8 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['eigen']:
         src_dir = os.path.join(base_dir(), 'eigen')
-        update_or_clone_git_repository(src_dir, 'git@github.com:eigenteam/eigen-git-mirror.git')
+        update_or_clone_git_repository(src_dir, 'https://gitlab.com/libeigen/eigen.git')
         export_git_repository(src_dir, os.path.join(ext_dir(), 'eigen'))
-        orig_file = os.path.join(ext_dir(), 'eigen', 'Eigen', 'src', 'Core', 'arch', 'SSE', 'PacketMath.h')
-        bak_file = os.path.join(ext_dir(), 'eigen', 'Eigen', 'src', 'Core', 'arch', 'SSE', 'PacketMath.h.bak')
-        if not os.path.exists(bak_file):
-            os.rename(orig_file, bak_file)
-            with open(bak_file, mode='r', encoding='utf-8') as f:
-                from_lines = f.readlines()
-            with open(orig_file, mode='w', encoding='utf-8') as f:
-                to_lines = []
-                for line in from_lines:
-                    line = line.replace(
-                        r'#if EIGEN_COMP_PGI < 1900',
-                        r'#if EIGEN_COMP_PGI')
-                    f.write(line)
-                    to_lines.append(line)
-            print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
 
     if libs['pybind11']:
         src_dir = os.path.join(base_dir(), 'pybind11')
