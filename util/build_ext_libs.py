@@ -424,14 +424,7 @@ def build_glbinding(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
     shutil.rmtree(install_dir, ignore_errors=True)
 
-    orig_file = None
-    bak_file = None
     try:
-        orig_file = os.path.join(src_dir, 'source', 'glbinding', 'include', 'glbinding', 'glbinding.h')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'#include <set>'],
-                              to_texts=['#include <set>\n#include <string>'])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -440,7 +433,6 @@ def build_glbinding(src_dir: str, install_dir: str):
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        os.replace(bak_file, orig_file)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
