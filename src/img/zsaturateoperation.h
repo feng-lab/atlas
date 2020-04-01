@@ -26,7 +26,7 @@ inline T roundTo(Float x)
     return 0;
 
   return x <= std::numeric_limits<T>::lowest() ? std::numeric_limits<T>::lowest()
-                                               : x >= std::numeric_limits<T>::max() ? std::numeric_limits<T>::max()
+                                               : x >= static_cast<Float>(std::numeric_limits<T>::max()) ? std::numeric_limits<T>::max()
                                                                                     : static_cast<T>(std::round(x));
 }
 

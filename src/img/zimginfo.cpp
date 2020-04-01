@@ -353,10 +353,10 @@ TValue ZImgInfo::dataRangeMax() const
         return std::numeric_limits<int16_t>::max();
         break;
       case 4:
-        return std::numeric_limits<int32_t>::max();
+        return static_cast<TValue>(std::numeric_limits<int32_t>::max());
         break;
       case 8:
-        return std::numeric_limits<int64_t>::max();
+        return static_cast<TValue>(std::numeric_limits<int64_t>::max());
         break;
       default:
         break;
@@ -370,10 +370,10 @@ TValue ZImgInfo::dataRangeMax() const
         return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint16_t>::max();
         break;
       case 4:
-        return std::numeric_limits<uint32_t>::max();
+        return static_cast<TValue>(std::numeric_limits<uint32_t>::max());
         break;
       case 8:
-        return std::numeric_limits<uint64_t>::max();
+        return static_cast<TValue>(std::numeric_limits<uint64_t>::max());
         break;
       default:
         break;

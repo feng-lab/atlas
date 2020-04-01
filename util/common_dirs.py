@@ -11,6 +11,10 @@ import stat
 import subprocess
 
 
+def use_clang_cl() -> bool:
+    return is_windows() and False
+
+
 def use_ninja() -> bool:
     return True
 

@@ -104,6 +104,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
         remove_path_contains('miniconda', env)
         remove_path_contains('anaconda', env)
     remove_path_contains('mingw', env)
+    env['PATH'] += r';C:\Program Files\LLVM\bin'
     return env
 
 
@@ -126,11 +127,16 @@ def get_tbb_env():
 def get_cmake_cmd_common_part(install_dir: str):
     if is_windows():
         if use_ninja():
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-DCMAKE_BUILD_TYPE=Release',
-                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
-                    '-DCMAKE_INSTALL_PREFIX=' + install_dir
-                    ]
+            res = [get_cmake_binary(),  # '-E', 'echo',
+                   '-DCMAKE_BUILD_TYPE=Release',
+                   '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
+                   '-DCMAKE_INSTALL_PREFIX=' + install_dir
+                   ]
+            if use_clang_cl():
+                res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
+                            '-DCMAKE_C_COMPILER=clang-cl',
+                            ])
+            return res
         else:
             return [get_cmake_binary(),  # '-E', 'echo',
                     '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64',
@@ -312,7 +318,7 @@ def build_benchmark(src_dir: str, install_dir: str):
         cmakecmd.extend(['-DBENCHMARK_ENABLE_TESTING:BOOL=OFF',
                          '-DBENCHMARK_ENABLE_GTEST_TESTS:BOOL=OFF'])
 
-        if is_windows():
+        if is_windows() and not use_clang_cl():
             cmakecmd.extend(['-DBENCHMARK_ENABLE_LTO:BOOL=ON'])
         elif is_mac():
             cmakecmd.extend(['-DBENCHMARK_USE_LIBCXX:BOOL=ON'])
@@ -1022,7 +1028,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                              '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
                              '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
                              '-DJPEG_INCLUDE_DIR:PATH=' + ext_dir() + '\\libjpeg-turbo\\include/',
-                             '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '\\libjpeg-turbo\\lib\\jpeg.lib',
+                             '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '\\libjpeg-turbo\\lib\\jpeg-static.lib',
                              ])
         else:
             cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
