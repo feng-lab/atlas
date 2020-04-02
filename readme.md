@@ -27,6 +27,7 @@
 
 ### All:
 * `atlas_others` folder and repository folder should be in same directory
+* `git submodule update --init`
 * (setup SSH credential for github), run `python3 util/build_ext_libs.py all` to build external libraries
 * run `python3 util/build_and_deploy_atlas.py all` or build CMakeLists.txt
 
