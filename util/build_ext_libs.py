@@ -47,6 +47,14 @@ def export_git_repository(repository_folder: str, target_folder: str, branch: st
     shutil.rmtree(os.path.join(target_folder, '.git'), ignore_errors=False)
 
 
+def update_git_submodule(target_folder: str, tag: str = None):
+    assert os.path.exists(target_folder)
+    print('git', 'pull', Path(target_folder).name)
+    subprocess.run(['git', 'pull'], cwd=target_folder, shell=False, check=True)
+    if tag is not None:
+        subprocess.run(['git', 'checkout', tag], cwd=target_folder, shell=False, check=True)
+
+
 def create_build_dir(src_dir: str):
     build_dir = os.path.normpath(os.path.join(src_dir, '..', '__' + Path(src_dir).name + '-build'))
     shutil.rmtree(build_dir, ignore_errors=True)
@@ -1162,30 +1170,24 @@ def build_libs(libs: dict, update_src: bool):
         os.rename(src_dir, os.path.join(ext_dir(), 'boost'))
 
     if libs['eigen']:
-        src_dir = os.path.join(base_dir(), 'eigen')
-        update_or_clone_git_repository(src_dir, 'https://gitlab.com/libeigen/eigen.git')
-        export_git_repository(src_dir, os.path.join(ext_dir(), 'eigen'))
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'eigen'))
 
     if libs['pybind11']:
-        src_dir = os.path.join(base_dir(), 'pybind11')
-        update_or_clone_git_repository(src_dir, 'git@github.com:pybind/pybind11.git')
-        export_git_repository(src_dir, os.path.join(ext_dir(), 'pybind11'))
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'pybind11'))
 
     if libs['cppitertools']:
-        src_dir = os.path.join(base_dir(), 'cppitertools')
-        update_or_clone_git_repository(src_dir, 'git@github.com:ryanhaining/cppitertools.git')
-        export_git_repository(src_dir, os.path.join(ext_dir(), 'cppitertools'))
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'cppitertools'))
 
     if libs['glm']:
-        src_dir = os.path.join(base_dir(), 'glm')
-        update_or_clone_git_repository(src_dir, 'git@github.com:g-truc/glm.git')
-        export_git_repository(src_dir, os.path.join(ext_dir(), 'glm'))
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'glm'))
 
     if libs['googletest']:
-        src_dir = os.path.join(base_dir(), 'googletest')
-        update_or_clone_git_repository(src_dir, 'git@github.com:google/googletest.git')
-        shutil.rmtree(os.path.join(ext_dir(), 'googletest'), ignore_errors=True)
-        shutil.copytree(os.path.join(src_dir, 'googletest'), os.path.join(ext_dir(), 'googletest'))
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'googletest'))
 
     if libs['folly']:
         src_dir = os.path.join(base_dir(), 'folly')

@@ -2,7 +2,7 @@ add_definitions(-DATLAS_WITH_TESTS)
 set(TESTS
     ${CMAKE_CURRENT_LIST_DIR}/zrunbenchmark.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zrunbenchmark.h
-    ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/src/gtest-all.cc
+    ${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest/src/gtest-all.cc
     ${CMAKE_CURRENT_LIST_DIR}/zunittest.h
     ${CMAKE_CURRENT_LIST_DIR}/zunittest.cpp
     ${CMAKE_CURRENT_LIST_DIR}/zimggraphtest.h
@@ -21,16 +21,16 @@ set(TESTS
     ${CMAKE_CURRENT_LIST_DIR}/zimgregionalextrematest.h
     ${CMAKE_CURRENT_LIST_DIR}/ztreetest.h
     )
-include_directories(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/include)
+include_directories(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest/include)
 include_directories(${BENCHMARK_INCLUDE_DIRS})
 
 if (WIN32)
-  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/src/gtest-all.cc
-                              PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest)
+  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest/src/gtest-all.cc
+                              PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest)
 else (WIN32)
-  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/src/gtest-all.cc
+  set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest/src/gtest-all.cc
                               PROPERTIES COMPILE_FLAGS
-                              "-I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest -Wno-deprecated -Wno-missing-field-initializers")
+                              "-I${CMAKE_CURRENT_LIST_DIR}/../src/3rdparty/googletest/googletest -Wno-deprecated -Wno-missing-field-initializers")
   set_source_files_properties(${CMAKE_CURRENT_LIST_DIR}/zunittest.cpp PROPERTIES COMPILE_FLAGS
                               "-Wno-deprecated -Wmissing-field-initializers")
 endif (WIN32)
