@@ -57,6 +57,7 @@ def build_atlas():
         print(env['PATH'])
         env['caexcludepath'] = ';'.join([os.path.join(atlas_repository_dir(), 'src', '3rdparty'),
                                          intel_sw_dir(),
+                                         r'C:\Program Files (x86)\Windows Kits',
                                          ])
         subprocess.run(cmakecmd,
                        cwd=atlas_build_dir(), shell=False, check=True, env=env)
