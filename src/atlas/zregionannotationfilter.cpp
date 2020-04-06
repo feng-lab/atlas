@@ -107,6 +107,13 @@ void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
   }
 }
 
+void ZRegionAnnotationFilter::mouseMoved(const QPointF& scenePos)
+{
+  for (const auto& idFilter : m_idToROIFilters) {
+    idFilter.second->mouseMoved(scenePos);
+  }
+}
+
 void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 {
   for (const auto& idFilter : m_idToROIFilters) {

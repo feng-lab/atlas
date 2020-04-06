@@ -46,6 +46,8 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_scene = new ZGraphicsScene(this);
   connect(m_scene, &ZGraphicsScene::mousePressed,
           this, &ZView::mousePressed);
+  connect(m_scene, &ZGraphicsScene::mouseMoved,
+          this, &ZView::mouseMoved);
   connect(m_scene, &ZGraphicsScene::mouseReleased,
           this, &ZView::mouseReleased);
   connect(m_scene, &ZGraphicsScene::selectionChanged,
@@ -415,6 +417,13 @@ void ZView::mousePressed(QPointF scenePos)
 {
   for (const auto& view : m_objViews) {
     view->mousePressed(scenePos);
+  }
+}
+
+void ZView::mouseMoved(QPointF scenePos)
+{
+  for (const auto& view : m_objViews) {
+    view->mouseMoved(scenePos);
   }
 }
 

@@ -44,6 +44,8 @@ public:
   // called if mouse is pressed in a scene pos
   virtual void mousePressed(const QPointF& scenePos) = 0;
 
+  virtual void mouseMoved(const QPointF& scenePos) = 0;
+
   virtual void mouseReleased(const QPointF& scenePos) = 0;
 
   // called if selection changed from view

@@ -33,6 +33,8 @@ public:
 
   void mousePressed(const QPointF& scenePos) override;
 
+  void mouseMoved(const QPointF& scenePos) override;
+
   void mouseReleased(const QPointF& scenePos) override;
 
   void rotateClockwise() override;

@@ -31,7 +31,7 @@ def update_or_clone_git_repository_with_submodules(repository_folder: str, repos
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
         subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
-        subprocess.run(['git', 'submodule', 'update', '--init'], cwd=repository_folder, shell=False, check=False)
+        subprocess.run(['git', 'submodule', 'update', '--init', '--recursive'], cwd=repository_folder, shell=False, check=False)
     else:
         subprocess.run(['git', 'clone', '--recursive', repository_url, repository_folder], shell=False, check=True)
 

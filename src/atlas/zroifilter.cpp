@@ -21,8 +21,8 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem*
 {
   // setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
-  //setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
-  //         QGraphicsItem::ItemIsSelectable);
+//  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
+//           QGraphicsItem::ItemIsSelectable);
   QPainterPath path = m_roi.shapePainterPath(m_slice, m_id);
   QPointF topLeft = path.boundingRect().topLeft();
   path.translate(-topLeft);
@@ -53,10 +53,14 @@ void ROIGraphicsItem::setOffset(double x, double y)
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
-//void ROIGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
+//void ROIGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 //{
-//  setCursor(Qt::ClosedHandCursor);
-//  QGraphicsPathItem::mousePressEvent(event);
+////  setCursor(Qt::ClosedHandCursor);
+//  if (event->button() == Qt::LeftButton) {
+//    emit m_roi.selectShape(m_slice, m_id, event->modifiers() == Qt::ControlModifier);
+//  } else {
+//    QGraphicsPathItem::mouseDoubleClickEvent(event);
+//  }
 //}
 
 //void ROIGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
@@ -64,16 +68,16 @@ void ROIGraphicsItem::setOffset(double x, double y)
 //  setCursor(Qt::OpenHandCursor);
 //  QGraphicsPathItem::mouseReleaseEvent(event);
 //}
-
+//
 //QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 //{
 //  if (change == ItemPositionChange && scene()) {
 //    QPointF newPos = value.toPointF() - m_offset;
-//    QRectF boundRect = path().boundingRect();
-//    QRectF rect = scene()->sceneRect();
-//    // Keep the item inside the scene rect.
-//    newPos.setX(qMin(rect.right() - boundRect.width(), qMax(newPos.x(), rect.left())));
-//    newPos.setY(qMin(rect.bottom() - boundRect.height(), qMax(newPos.y(), rect.top())));
+////    QRectF boundRect = path().boundingRect();
+////    QRectF rect = scene()->sceneRect();
+////    // Keep the item inside the scene rect.
+////    newPos.setX(qMin(rect.right() - boundRect.width(), qMax(newPos.x(), rect.left())));
+////    newPos.setY(qMin(rect.bottom() - boundRect.height(), qMax(newPos.y(), rect.top())));
 //    m_roi.sliceSetTopLeft(m_slice, newPos.x(), newPos.y());
 //    return newPos + m_offset;
 //  }
@@ -100,13 +104,14 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
   , m_viewScale(viewScale)
   , m_shapeOp(m_roi.controlPointShapeOp(m_controlPoint))
 {
-  if (m_shapeOp.type == ROIType::Polygon || m_shapeOp.type == ROIType::Spline) {
-    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
-             QGraphicsItem::ItemIsSelectable);
-  } else {
-    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
-             QGraphicsItem::ItemIsSelectable);
-  }
+//  if (m_shapeOp.type == ROIType::Polygon || m_shapeOp.type == ROIType::Spline) {
+//    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
+//             QGraphicsItem::ItemIsSelectable);
+//  } else {
+//    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
+//             QGraphicsItem::ItemIsSelectable);
+//  }
+  setFlags(QGraphicsItem::ItemIsSelectable);
 
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
   setPos(m_basePos + m_offset);
@@ -167,27 +172,44 @@ void ROICtrlPtGraphicsItem::setOffset(double x, double y)
 
 QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
-  if (change == ItemPositionChange && scene()) {
-    QPointF newPos = value.toPointF() - m_offset;
-    QRectF sceneRect = scene()->sceneRect();
-    if (true) {
-      // Keep the item inside the scene rect.
-      if (m_controlPoint.pos == ZROIControlPoint::Pos::Center) {
-        newPos.setX(qMin(sceneRect.right() - m_shapeOp.rect().width() / 2,
-                         qMax(newPos.x(), sceneRect.left() + m_shapeOp.rect().width() / 2)));
-        newPos.setY(qMin(sceneRect.bottom() - m_shapeOp.rect().height() / 2,
-                         qMax(newPos.y(), sceneRect.top() + m_shapeOp.rect().height() / 2)));
-      } else {
-        newPos.setX(qMin(sceneRect.right(), qMax(newPos.x(), sceneRect.left())));
-        newPos.setY(qMin(sceneRect.bottom(), qMax(newPos.y(), sceneRect.top())));
-      }
-    }
-    return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
-  } else if (change == ItemSelectedHasChanged && scene()) {
+//  if (change == ItemPositionChange && scene()) {
+//    QPointF newPos = value.toPointF() - m_offset;
+////    QRectF sceneRect = scene()->sceneRect();
+////    if (true) {
+////      // Keep the item inside the scene rect.
+////      if (m_controlPoint.pos == ZROIControlPoint::Pos::Center) {
+////        newPos.setX(qMin(sceneRect.right() - m_shapeOp.rect().width() / 2,
+////                         qMax(newPos.x(), sceneRect.left() + m_shapeOp.rect().width() / 2)));
+////        newPos.setY(qMin(sceneRect.bottom() - m_shapeOp.rect().height() / 2,
+////                         qMax(newPos.y(), sceneRect.top() + m_shapeOp.rect().height() / 2)));
+////      } else {
+////        newPos.setX(qMin(sceneRect.right(), qMax(newPos.x(), sceneRect.left())));
+////        newPos.setY(qMin(sceneRect.bottom(), qMax(newPos.y(), sceneRect.top())));
+////      }
+////    }
+//    return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
+//  } else
+  if (change == ItemSelectedHasChanged && scene()) {
     updateRectSize();
     return value;
   }
   return QGraphicsRectItem::itemChange(change, value);
+}
+
+void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
+{
+  if (event->button() != Qt::LeftButton) {
+    QGraphicsRectItem::mouseReleaseEvent(event);
+  }
+}
+
+void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
+{
+  if (event->button() == Qt::LeftButton) {
+    emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeOperationID, event->modifiers() == Qt::ControlModifier);
+  } else {
+    QGraphicsRectItem::mouseDoubleClickEvent(event);
+  }
 }
 
 void ROICtrlPtGraphicsItem::updateRectSize()
@@ -267,6 +289,7 @@ void ZROIFilter::setData(ZROI& roi)
   connect(m_ROI, &ZROI::roiChanged, this, &ZROIFilter::onRoiChanged);
   connect(m_ROI, &ZROI::roiMoved, this, &ZROIFilter::onRoiMoved);
   connect(m_ROI, &ZROI::roiDeleted, this, &ZROIFilter::onRoiDeleted);
+  connect(m_ROI, &ZROI::selectShape, this, &ZROIFilter::selectCtrlPtItems);
 }
 
 void ZROIFilter::releaseItemsOwnership()
@@ -445,7 +468,7 @@ void ZROIFilter::deleteKeyPressed()
     m_ROI->deleteROIControlPoints(controlPoints);
 }
 
-void ZROIFilter::mousePressed(const QPointF& /*scenePos*/)
+void ZROIFilter::mousePressed(const QPointF& scenePos)
 {
   m_hasSelectedItems = false;
   if (m_view.isMaxZProjView()) {
@@ -477,6 +500,27 @@ void ZROIFilter::mousePressed(const QPointF& /*scenePos*/)
   }
   if (m_hasSelectedItems) {
     m_ROI->startMoveSelectedControlPointsCommand();
+    m_startPoint = scenePos;
+  }
+}
+
+void ZROIFilter::mouseMoved(const QPointF &scenePos)
+{
+  if (m_hasSelectedItems && scenePos != m_startPoint) {
+    std::vector<ZROIControlPoint> controlPoints;
+    for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+      for (auto&[id, ctrlItems] : sliceItem) {
+        for (auto& item : ctrlItems) {
+          if (item->isSelected()) {
+            controlPoints.push_back(item->controlPoint());
+          }
+        }
+      }
+    }
+    if (!controlPoints.empty()) {
+      m_ROI->shiftControlPointsCoords(controlPoints, scenePos - m_startPoint);
+      m_startPoint = scenePos;
+    }
   }
 }
 
@@ -614,6 +658,20 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
   }
 
   m_sliceToCtrlPtItems[slice][shapeID].swap(items);
+}
+
+void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
+{
+  //LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
+  if (!append) {
+    for (auto& item : m_view.scene().selectedItems()) {
+      item->setSelected(false);
+    }
+  }
+  for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
+    item->setSelected(true);
+  }
+  //LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
 }
 
 void ZROIFilter::visibleChanged()

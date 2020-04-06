@@ -16,6 +16,8 @@ signals:
 
   void mousePressed(QPointF);
 
+  void mouseMoved(QPointF);
+
   void mouseReleased(QPointF);
 
 protected:

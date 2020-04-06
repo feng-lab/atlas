@@ -107,6 +107,18 @@ public:
     }
   }
 
+  void mouseMoved(const QPointF& scenePos) override
+  {
+    for (const auto& idFilter : m_idToFilter) {
+      try {
+        idFilter.second->mouseMoved(scenePos);
+      }
+      catch (const ZException& e) {
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+      }
+    }
+  }
+
   void mouseReleased(const QPointF& scenePos) override
   {
     for (const auto& idFilter : m_idToFilter) {

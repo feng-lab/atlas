@@ -29,6 +29,9 @@ public:
   virtual void mousePressed(const QPointF& scenePos)
   { Q_UNUSED(scenePos) }
 
+  virtual void mouseMoved(const QPointF& scenePos)
+  { Q_UNUSED(scenePos) }
+
   virtual void mouseReleased(const QPointF& scenePos)
   { Q_UNUSED(scenePos) }
 

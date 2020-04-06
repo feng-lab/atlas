@@ -37,6 +37,9 @@ void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
   double y = event->scenePos().y();
   m_view->setInfo(x, y);
   QGraphicsScene::mouseMoveEvent(event);
+  if (!selectedItems().empty()) {
+    emit mouseMoved(event->scenePos());
+  }
 }
 
 } // namespace nim

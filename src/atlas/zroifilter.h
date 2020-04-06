@@ -8,6 +8,7 @@
 #include <QGraphicsRectItem>
 #include <QGraphicsPathItem>
 #include <QList>
+#include <QPointF>
 #include <map>
 #include <vector>
 
@@ -33,9 +34,11 @@ public:
   void setOffset(double x, double y);
 
 protected:
-  //void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
-  //void mouseReleaseEvent(QGraphicsSceneMouseEvent *event) override;
-  // QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+  //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
+
+  // void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+//
+//  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
@@ -77,6 +80,10 @@ public:
 
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
+
+  void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+
+  void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
   void updateRectSize();
 
@@ -127,6 +134,8 @@ public:
 
   void mousePressed(const QPointF& scenePos) override;
 
+  void mouseMoved(const QPointF& scenePos) override;
+
   void mouseReleased(const QPointF& scenePos) override;
 
   void rotateClockwise() override;
@@ -152,6 +161,8 @@ protected:
   void createShapeItem(int slice, size_t shapeID);
 
   void createCtrlPtItems(int slice, size_t shapeID);
+
+  void selectCtrlPtItems(int slice, size_t shapeID, bool append);
 
 private:
   void visibleChanged();
@@ -191,6 +202,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_hasSelectedItems = false;
+  QPointF m_startPoint;
 
   bool m_lazyRendering = true;
 };

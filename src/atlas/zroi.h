@@ -68,6 +68,9 @@ public:
   bool isEmpty() const
   { return m_idToShapeOperations.empty(); }
 
+  void updatePaintPath(size_t id)
+  { m_idToPainterPath[id] = m_idToShapeOperations.at(id).toPainterPath(); }
+
   void addRect(const QRectF& rect, size_t id);
 
   void addEllipse(const QRectF& ellipse, size_t id);
@@ -269,6 +272,8 @@ public:
 
   QPointF controlPointCoord(const ZROIControlPoint& ctrlPt) const;
 
+  void shiftControlPointsCoords(const std::vector<ZROIControlPoint>& controlPoints, const QPointF& coordShift);
+
   QPointF setControlPointCoord(const ZROIControlPoint& ctrlPt, const QPointF& coord);
 
   const ZROIShapeOperation& controlPointShapeOp(const ZROIControlPoint& ctrlPt) const;
@@ -333,6 +338,8 @@ signals:
   void roiMoved(int slice, const std::vector<size_t>& changedShapes);
 
   void boundBoxChanged();
+
+  void selectShape(int slice, size_t shapeID, bool append);
 
 protected:
   void resetBoundBox();

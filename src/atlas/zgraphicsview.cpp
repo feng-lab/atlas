@@ -469,7 +469,7 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
     } else {
       QPointF scenePt = mapToScene(event->x(), event->y());
       LOG(INFO) << "d " << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
-      QGraphicsView::mousePressEvent(event);
+      QGraphicsView::mouseDoubleClickEvent(event);
       //viewport()->setCursor(Qt::ArrowCursor);
     }
   }

@@ -181,6 +181,8 @@ private:
 
   void mousePressed(QPointF scenePos);
 
+  void mouseMoved(QPointF scenePos);
+
   void mouseReleased(QPointF scenePos);
 
   void selectionChanged();
