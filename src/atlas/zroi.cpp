@@ -99,8 +99,8 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> >& shap
         glm::dvec2 rPt = glm::rotate(glm::dvec2(startPt.x(), startPt.y()), angle);
         QPointF resPt = QPointF(rPt.x, rPt.y) + center;
         poly[idx] = resPt;
-        if (idx == 0 || idx == static_cast<size_t>(poly.size()) - 1) {
-          poly[0] = resPt;
+        CHECK(idx < static_cast<size_t>(poly.size()) - 1);
+        if (idx == 0) {
           poly[poly.size() - 1] = resPt;
         }
       }
@@ -129,7 +129,8 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shape
       for (auto pointIndex : pointIndices) {
         size_t idx = pointIndex - pointIndexSubtract;
         ++pointIndexSubtract;
-        if ((idx == 0 || idx == static_cast<size_t>(shapeOp.poly.size() - 1))) {
+        CHECK(idx < static_cast<size_t>(shapeOp.poly.size() - 1));
+        if (idx == 0) {
           shapeOp.poly.removeFirst();
           shapeOp.poly.removeLast();
           shapeOp.poly.push_back(shapeOp.poly.first());
