@@ -9,9 +9,53 @@
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
 #include <QPushButton>
+#include <QGraphicsItemGroup>
 #include <boost/math/constants/constants.hpp>
 
 namespace nim {
+
+SliceROIGraphicsItem::SliceROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent)
+  : QGraphicsPathItem(parent)
+  , m_roi(roi)
+  , m_slice(slice)
+{
+  // setFlags(QGraphicsItem::ItemIsSelectable);
+  //todo: uncomment this when we have undo
+//  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
+//           QGraphicsItem::ItemIsSelectable);
+  QPainterPath path = m_roi.slicePaintPath(m_slice);
+  QPointF topLeft = path.boundingRect().topLeft();
+  path.translate(-topLeft);
+  setPath(path);
+  m_basePos = topLeft;
+  setPos(m_basePos);
+  //todo: uncomment this when we have undo
+  //setCursor(Qt::OpenHandCursor);
+}
+
+void SliceROIGraphicsItem::updateValue()
+{
+  QPainterPath path = m_roi.slicePaintPath(m_slice);
+  QPointF topLeft = path.boundingRect().topLeft();
+  path.translate(-topLeft);
+  setPath(path);
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
+  m_basePos = topLeft;
+  setPos(m_basePos);
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
+void SliceROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+  if (m_roi.sliceHasPolyOrSpline(m_slice)) {
+    QMenu menu;
+    QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+    QAction* selectedAction = menu.exec(event->screenPos());
+    if (selectedAction == addCtrlPointAction) {
+      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos());
+    }
+  }
+}
 
 ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem* parent)
   : QGraphicsPathItem(parent)
@@ -28,7 +72,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem*
   path.translate(-topLeft);
   setPath(path);
   m_basePos = topLeft;
-  setPos(m_basePos + m_offset);
+  setPos(m_basePos);
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
 }
@@ -41,15 +85,7 @@ void ROIGraphicsItem::updateValue()
   setPath(path);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = topLeft;
-  setPos(m_basePos + m_offset);
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
-}
-
-void ROIGraphicsItem::setOffset(double x, double y)
-{
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  m_offset = QPointF(x, y);
-  setPos(m_basePos + m_offset);
+  setPos(m_basePos);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -86,12 +122,13 @@ void ROIGraphicsItem::setOffset(double x, double y)
 
 void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  if (m_roi.sliceHasPolyOrSpline(m_slice)) {
+  const auto& shapeOp = m_roi.shapeOperations(m_slice, m_id);
+  if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
     QMenu menu;
     QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
     QAction* selectedAction = menu.exec(event->screenPos());
     if (selectedAction == addCtrlPointAction) {
-      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos() - m_offset);
+      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
     }
   }
 }
@@ -114,9 +151,9 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
   setFlags(QGraphicsItem::ItemIsSelectable);
 
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
-  setPos(m_basePos + m_offset);
+  setPos(m_basePos);
   setToolTip(
-    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+    QString("Coord:(%1,%2)").arg(m_basePos.x()).arg(m_basePos.y()));
   setPen(QPen(QColor(0, 0, 0), 0));
   setBrush(QBrush(QColor(255, 255, 255)));
   setCursor(Qt::PointingHandCursor);
@@ -126,9 +163,9 @@ void ROICtrlPtGraphicsItem::updateValue()
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_roi.controlPointCoord(m_controlPoint);
-  setPos(m_basePos + m_offset);
+  setPos(m_basePos);
   setToolTip(
-    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
+    QString("Coord:(%1,%2)").arg(m_basePos.x()).arg(m_basePos.y()));
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -159,16 +196,6 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
 //  }
 //  QGraphicsRectItem::paint(painter, option, widget);
 //}
-
-void ROICtrlPtGraphicsItem::setOffset(double x, double y)
-{
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
-  m_offset = QPointF(x, y);
-  setPos(m_basePos + m_offset);
-  setToolTip(
-    QString("Coord:(%1,%2), Offset:(%3,%4)").arg(m_basePos.x()).arg(m_basePos.y()).arg(m_offset.x()).arg(m_offset.y()));
-  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
-}
 
 QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
@@ -587,22 +614,41 @@ void ZROIFilter::viewPrecedenceChanged()
 
 void ZROIFilter::transformChanged()
 {
-  QTransform trans = getQTransform();
-
-  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
-    for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setTransform(trans);
-    }
-  }
-  if (m_showControlPoints.get()) {
-    for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
-      for (auto&[id, ctrlItems] : sliceItem) {
-        for (auto& item : ctrlItems) {
-          item->setTransform(trans);
-        }
+  m_sliceToROIItem.clear();
+  m_sliceToCtrlPtItems.clear();
+  if (!m_ROI->isEmpty()) {
+    for (const auto& sliceROI : *m_ROI) {
+      int slice = sliceROI.first;
+      for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
+        createShapeItem(slice, shapeID);
+        createCtrlPtItems(slice, shapeID);
       }
     }
   }
+
+//  QTransform trans = getQTransform();
+//  QList<QGraphicsItem*> items;
+//  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
+//    for (auto&[id, shapeItem] : sliceItem) {
+//      shapeItem->resetTransform();
+//      items.push_back(shapeItem.get());
+//    }
+//  }
+//  if (m_showControlPoints.get()) {
+//    for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+//      for (auto&[id, ctrlItems] : sliceItem) {
+//        for (auto& item : ctrlItems) {
+//          item->resetTransform();
+//          items.push_back(item.get());
+//        }
+//      }
+//    }
+//  }
+//
+//  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items);
+//  gr->setTransform(trans);
+//  m_view.scene().destroyItemGroup(gr);
+
   ZObjFilter::transformChanged();
 }
 
@@ -629,9 +675,14 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
                            m_regionColor.get().z * 255,
                            m_opacity.get() * 255));
   //roiItem->setOpacity(m_opacity.get());
-  roiItem->setTransform(getQTransform());
   roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
   m_view.scene().addItem(roiItem);
+
+  QTransform trans = getQTransform();
+  QList<QGraphicsItem*> items{roiItem};
+  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items);
+  gr->setTransform(trans);
+  m_view.scene().destroyItemGroup(gr);
 
   m_sliceToROIItem[slice][shapeID] = std::unique_ptr<ROIGraphicsItem>(roiItem);
 }
@@ -644,6 +695,8 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
     }
   }
 
+  QList<QGraphicsItem*> items_all;
+
   std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>> items;
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice, shapeID);
   for (const auto& controlPoint : controlPoints) {
@@ -651,11 +704,16 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
                                                                 m_view.graphicsView().currentScale());
     rectItem->setZValue(m_viewPrecedencePara.get());
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
-    rectItem->setTransform(getQTransform());
     rectItem->setFixedSize(m_fixedControlPointsSize.get());
     m_view.scene().addItem(rectItem);
     items.emplace_back(rectItem);
+    items_all.push_front(rectItem);
   }
+
+  QTransform trans = getQTransform();
+  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items_all);
+  gr->setTransform(trans);
+  m_view.scene().destroyItemGroup(gr);
 
   m_sliceToCtrlPtItems[slice][shapeID].swap(items);
 }

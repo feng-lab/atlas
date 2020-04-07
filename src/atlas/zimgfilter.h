@@ -5,8 +5,8 @@
 #include "znumericparameter.h"
 #include "zparameter.h"
 #include "zgraphicsitemtype.h"
+#include "zgraphicsitemgroup.h"
 #include <QGraphicsPixmapItem>
-#include <QGraphicsItemGroup>
 #include <QPen>
 #include <QList>
 #include <vector>
@@ -14,22 +14,6 @@
 namespace nim {
 
 class ZDoubleSpanParameter;
-
-class ZGraphicsItemGroup : public QGraphicsItemGroup
-{
-public:
-  enum
-  {
-    Type = GraphicsItemType::ZGraphicsItemGroup
-  };
-
-  int type() const override
-  { return Type; }
-
-  explicit ZGraphicsItemGroup(QGraphicsItem* parent = nullptr);
-
-  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
-};
 
 class ZImgScaleBarGraphicsItem : public QGraphicsRectItem
 {

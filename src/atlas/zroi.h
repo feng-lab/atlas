@@ -95,6 +95,8 @@ public:
 
   bool addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes);
 
+  void addCtrlPointToShape(const QPointF& pt, size_t id);
+
   size_t mergeWith(const ZSliceROI& other, size_t id, std::vector<size_t>& newShapes);
 
   void setTopLeft(double x, double y);
@@ -262,6 +264,11 @@ public:
     return m_sliceROIs.at(slice).m_idToPainterPath.at(id);
   }
 
+  const ZROIShapeOperation& shapeOperations(int slice, size_t id) const
+  {
+    return m_sliceROIs.at(slice).m_idToShapeOperations.at(id);
+  }
+
   void rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints, double angle);
 
   std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle);
@@ -284,13 +291,18 @@ public:
   QPainterPath slicePaintPath(int slice) const
   { return m_sliceROIs.at(slice).paintPath(); }
 
-  void sliceAddCtrlPoint(int slice, const QPointF& pt);
+  void sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID = -1);
 
-  void sliceAddCtrlPoint_Impl(int slice, const QPointF& pt)
+  void sliceAddCtrlPoint_Impl(int slice, const QPointF& pt, int shapeID = -1)
   {
     std::vector<size_t> shapes;
-    if (m_sliceROIs.at(slice).addCtrlPoint(pt, shapes))
+    if (shapeID >= 0) {
+      shapes.push_back(shapeID);
+      m_sliceROIs.at(slice).addCtrlPointToShape(pt, shapeID);
       onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+    } else if (m_sliceROIs.at(slice).addCtrlPoint(pt, shapes)) {
+      onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+    }
   }
 
   void sliceSetTopLeft(int slice, double x, double y)
@@ -435,21 +447,22 @@ protected:
 class ZROISliceAddControlPointCommand : public ZROICommand
 {
 public:
-  ZROISliceAddControlPointCommand(ZROI& roi, int slice, const QPointF& pt)
-    : ZROICommand(roi), m_slice(slice), m_controlPoint(pt)
+  ZROISliceAddControlPointCommand(ZROI& roi, int slice, const QPointF& pt, int shapeID = -1)
+    : ZROICommand(roi), m_slice(slice), m_controlPoint(pt), m_shapeID(shapeID)
   {
     setText("Add Control Points");
   }
 
   void redo() override
   {
-    m_roi.sliceAddCtrlPoint_Impl(m_slice, m_controlPoint);
+    m_roi.sliceAddCtrlPoint_Impl(m_slice, m_controlPoint, m_shapeID);
     m_changedSlices.insert(m_slice);
   }
 
 protected:
   int m_slice;
   QPointF m_controlPoint;
+  int m_shapeID;
 };
 
 class ZROISliceMoveSelectedControlPointsCommand : public ZROICommand

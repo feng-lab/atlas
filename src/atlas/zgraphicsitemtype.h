@@ -7,6 +7,7 @@ namespace GraphicsItemType {
 enum Type
 {
   ZPunctaGraphicsItem = QGraphicsItem::UserType + 1,
+  SliceROIGraphicsItem,
   ROIGraphicsItem,
   ROICtrlPtGraphicsItem,
   ZSwcGraphicsItem,

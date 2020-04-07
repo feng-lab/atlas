@@ -449,7 +449,11 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
       if (m_spline.size() > 3) {
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-          m_view->roi().addSpline(i, m_spline);
+          //m_view->roi().addSpline(i, m_spline);
+          if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+            m_view->roi().addSpline(i, m_spline);
+          else if (m_roiAction == ROIAction::Subtract)
+            m_view->roi().subtractSpline(i, m_spline);
         }
       }
       m_startPtItem.reset();
@@ -460,7 +464,11 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
       if (m_polygon.size() > 3) {
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-          m_view->roi().addPolygon(i, m_polygon);
+          //m_view->roi().addPolygon(i, m_polygon);
+          if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+            m_view->roi().addPolygon(i, m_polygon);
+          else if (m_roiAction == ROIAction::Subtract)
+            m_view->roi().subtractPolygon(i, m_polygon);
         }
       }
       m_startPtItem.reset();

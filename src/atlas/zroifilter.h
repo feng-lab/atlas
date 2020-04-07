@@ -16,6 +16,32 @@ class ZWidgetsGroup;
 
 namespace nim {
 
+class SliceROIGraphicsItem : public QGraphicsPathItem
+{
+public:
+  enum
+  {
+    Type = GraphicsItemType::SliceROIGraphicsItem
+  };
+
+  int type() const override
+  { return Type; }
+
+  SliceROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent = nullptr);
+
+  void updateValue();
+
+protected:
+
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+private:
+  ZROI& m_roi;
+  int m_slice;
+
+  QPointF m_basePos;
+};
+
 class ROIGraphicsItem : public QGraphicsPathItem
 {
 public:
@@ -30,8 +56,6 @@ public:
   ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem* parent = nullptr);
 
   void updateValue();
-
-  void setOffset(double x, double y);
 
 protected:
   //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
@@ -48,7 +72,6 @@ private:
   size_t m_id;
 
   QPointF m_basePos;
-  QPointF m_offset;
 };
 
 class ROICtrlPtGraphicsItem : public QGraphicsRectItem
@@ -76,8 +99,6 @@ public:
 
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
-  void setOffset(double x, double y);
-
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
@@ -96,7 +117,6 @@ private:
   const ZROIShapeOperation& m_shapeOp;
 
   QPointF m_basePos;
-  QPointF m_offset;
 };
 
 class ZROIFilter : public ZObjFilter

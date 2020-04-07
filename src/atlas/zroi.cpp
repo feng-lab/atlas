@@ -174,6 +174,27 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShape
   return false;
 }
 
+void ZSliceROI::addCtrlPointToShape(const QPointF &pt, size_t shapeID)
+{
+  int pos = -1;
+  double minDist = std::numeric_limits<double>::max();
+  const auto& shape = m_idToShapeOperations[shapeID];
+  if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+    const QPolygonF& poly = shape.poly;
+    for (int j = 0; j < poly.size() - 1; ++j) {
+      double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
+      if (dist < minDist) {
+        minDist = dist;
+        pos = j + 1;
+      }
+    }
+  }
+  if (pos >= 0) {
+    m_idToShapeOperations.at(shapeID).poly.insert(pos, pt);
+    updatePaintPath(shapeID);
+  }
+}
+
 size_t ZSliceROI::mergeWith(const ZSliceROI& other, size_t id, std::vector<size_t>& newShapes)
 {
   for (const auto&[ido, shape] : other.m_idToShapeOperations) {
@@ -893,9 +914,9 @@ const ZROIShapeOperation& ZROI::controlPointShapeOp(const ZROIControlPoint& ctrl
   return m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations.at(ctrlPt.shapeOperationID);
 }
 
-void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt)
+void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID)
 {
-  m_undoStack->push(new ZROISliceAddControlPointCommand(*this, slice, pt));
+  m_undoStack->push(new ZROISliceAddControlPointCommand(*this, slice, pt, shapeID));
 }
 
 void ZROI::startMoveSelectedControlPointsCommand()
