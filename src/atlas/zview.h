@@ -29,6 +29,8 @@ class ZActionGroup;
 
 class ZROI;
 
+class ZRegionAnnotation;
+
 class ZIntParameter;
 
 class ZBoolParameter;
@@ -119,6 +121,8 @@ public:
   { return *m_view; }
 
   ZROI& roi();
+
+  ZRegionAnnotation& regionAnnotation();
 
   State state() const;
 

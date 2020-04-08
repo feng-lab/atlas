@@ -39,7 +39,7 @@ void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
   dialog.setNameFilter(ZROI::getQtWriteNameFilter());
   dialog.setDirectory(lastOpenedObjPath());
   if (title.isEmpty())
-    dialog.setWindowTitle(tr("Save Mesh As"));
+    dialog.setWindowTitle(tr("Save ROI As"));
   else
     dialog.setWindowTitle(title);
 

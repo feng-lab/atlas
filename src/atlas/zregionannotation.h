@@ -38,6 +38,8 @@ public:
 
   void mergeROIToRegion(const ZROI& roi, int64_t regionID);
 
+  void mergeROIToRegion(const ZROI& roi, int slice, size_t id, int64_t regionID);
+
   // return nullptr if not exist
   const ZMesh* meshOfRegion(int64_t regionID);
 
@@ -104,13 +106,12 @@ private:
 
   void updateBoundBox();
 
+  std::shared_ptr<ZROI> createROI();
+
 private:
   friend class ZRegionAnnotationUpdateMeshCommand;
   friend class ZRegionAnnotationTransformMeshCommand;
 
-  int m_width;
-  int m_height;
-  int m_depth;
   double m_voxelSizeX; //todo : these fields should always be available
   double m_voxelSizeY;
   double m_voxelSizeZ;

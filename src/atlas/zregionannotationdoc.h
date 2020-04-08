@@ -15,6 +15,8 @@ public:
   ZRegionAnnotation& regionAnnotation(size_t id)
   { return *m_idToRegionAnnotationPacks.at(id)->regionAnnotation; }
 
+  ZRegionAnnotation& currentRegionAnnotation();
+
   // ZObjDoc interface
 public:
   bool save(size_t id) override;

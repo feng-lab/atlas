@@ -20,28 +20,22 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
   if (!index.isValid())
     return QVariant();
 
-  RegionNode* item = static_cast<RegionNode*>(index.internalPointer());
+  auto item = static_cast<RegionNode*>(index.internalPointer());
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case AbbreviationColumn:
         return item->abbreviation;
-        break;
       case IDColumn:
         return qlonglong(item->id);
-        break;
       case NameColumn:
         return item->name;
-        break;
       case MergeROIColumn:
         return QString("Merge ROI to %1...").arg(item->abbreviation);
-        break;
       case ExportROIColumn:
         return QString("Export ROI of %1...").arg(item->abbreviation);
-        break;
       case ExportMeshColumn:
         return QString("Export Mesh of %1...").arg(item->abbreviation);
-        break;
       default:
         break;
     }
@@ -54,13 +48,10 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
       case NameColumn:
       case MergeROIColumn:
         return static_cast<qlonglong>(item->id * 10 + 1);
-        break;
       case ExportROIColumn:
         return static_cast<qlonglong>(item->id * 10 + 2);
-        break;
       case ExportMeshColumn:
         return static_cast<qlonglong>(item->id * 10 + 3);
-        break;
       default:
         break;
     }

@@ -71,9 +71,9 @@ ZRegionAnnotation::ZRegionAnnotation(QObject* parent)
 
   QStringList regions;
 #if 1
-  regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF";
+  // regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF";
 #else
-  regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF" << "grey";
+  // regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF" << "grey";
 #endif
   readMouseBrainAtlasOntology(regions, m_ontology);
   connect(&m_undoStack, &QUndoStack::cleanChanged,
@@ -95,9 +95,6 @@ ZRegionAnnotation::~ZRegionAnnotation()
 
 void ZRegionAnnotation::clear()
 {
-  m_width = -1;
-  m_height = -1;
-  m_depth = -1;
   m_voxelSizeX = 1;
   m_voxelSizeX = 1;
   m_voxelSizeX = 1;
@@ -130,14 +127,13 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, format);
   //LOG(INFO) << origLabelImg.info().toQString();
-  m_width = origLabelImg.width();
-  m_height = origLabelImg.height();
-  m_depth = origLabelImg.depth();
+//  m_width = origLabelImg.width();
+//  m_height = origLabelImg.height();
+//  m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
   m_voxelSizeX = origLabelImg.info().voxelSizeXInUm();
   m_voxelSizeY = origLabelImg.info().voxelSizeYInUm();
   m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
-  updateBoundBox();
 
   for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {
     if (createMesh) {
@@ -194,7 +190,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     }
     if (createROI) {
       // create contours
-      it->roi = std::make_shared<ZROI>(undoStack());
+      it->roi = this->createROI();
       binaryImgToROI(binaryImg, *it->roi.get());
     }
 
@@ -212,20 +208,20 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
       }
     }
   }
-  for (auto it = m_ontology.beginRoot(); it != m_ontology.endRoot(); ++it) {
-#if 1
-    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
-        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0) {
-      m_ontology.eraseChildren(it);
-    }
-#else
-    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
-        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
-        it->abbreviation.compare("grey", Qt::CaseInsensitive) == 0) {
-      m_ontology.eraseChildren(it);
-    }
-#endif
-  }
+//  for (auto it = m_ontology.beginRoot(); it != m_ontology.endRoot(); ++it) {
+//#if 1
+//    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
+//        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0) {
+//      m_ontology.eraseChildren(it);
+//    }
+//#else
+//    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
+//        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
+//        it->abbreviation.compare("grey", Qt::CaseInsensitive) == 0) {
+//      m_ontology.eraseChildren(it);
+//    }
+//#endif
+//  }
   LOG(INFO) << "Finish importing label image";
 
   STOP_AND_LOG(bt);
@@ -234,6 +230,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     emit allMeshChanged();
   }
   if (createROI) {
+    updateBoundBox();
     emit allROIChanged();
   }
 }
@@ -241,7 +238,9 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, Compression comp) const
 {
   LOG(INFO) << "Exporting Label Image...";
-  ZImgInfo info(m_width, m_height, m_depth, 1, 1, 2);
+
+  ZImgInfo info(m_boundBox.maxCorner().x + 2, m_boundBox.maxCorner().y + 2, m_boundBox.maxCorner().z + 2,
+                1, 1, 2);
   info.voxelSizeUnit = VoxelSizeUnit::um;
   info.voxelSizeX = m_voxelSizeX;
   info.voxelSizeY = m_voxelSizeY;
@@ -254,16 +253,16 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, C
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
     }
   }
-  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
-        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
-      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
-      if (it->roi) {
-        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
-        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
-      }
-    }
-  }
+//  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+//    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
+//        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
+//      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
+//      if (it->roi) {
+//        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+//        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+//      }
+//    }
+//  }
   res.save(fn, format, comp);
   LOG(INFO) << "Finish exporting label image";
 }
@@ -273,18 +272,33 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
       if (!it->roi) {
-        it->roi = std::make_shared<ZROI>(undoStack());
+        it->roi = createROI();
         emit regionROIAdded(it->id, it->roi.get());
       }
       it->roi->mergeWith(roi);
 
       for (auto pit = m_ontology.beginAncestor(it); pit != m_ontology.endAncestor(it); ++pit) {
         if (!pit->roi) {
-          pit->roi = std::make_shared<ZROI>(undoStack());
+          pit->roi = createROI();
           emit regionROIAdded(it->id, it->roi.get());
         }
         pit->roi->mergeWith(roi);
       }
+
+      return;
+    }
+  }
+}
+
+void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
+{
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == regionID) {
+      if (!it->roi) {
+        it->roi = createROI();
+        emit regionROIAdded(it->id, it->roi.get());
+      }
+      it->roi->mergeWith(roi, slice, id);
 
       return;
     }
@@ -331,13 +345,12 @@ void ZRegionAnnotation::load(const QString& filename)
     int regionAnnotationVer;
     ver.read(intType, &regionAnnotationVer);
 
-    allGrp.openAttribute("Width").read(intType, &m_width);
-    allGrp.openAttribute("Height").read(intType, &m_height);
-    allGrp.openAttribute("Depth").read(intType, &m_depth);
+//    allGrp.openAttribute("Width").read(intType, &m_width);
+//    allGrp.openAttribute("Height").read(intType, &m_height);
+//    allGrp.openAttribute("Depth").read(intType, &m_depth);
     allGrp.openAttribute("VoxelSizeXInUM").read(doubleType, &m_voxelSizeX);
     allGrp.openAttribute("VoxelSizeYInUM").read(doubleType, &m_voxelSizeY);
     allGrp.openAttribute("VoxelSizeZInUM").read(doubleType, &m_voxelSizeZ);
-    updateBoundBox();
 
     H5::Attribute numRegionAttr = allGrp.openAttribute("RegionNumber");
     int numRegion;
@@ -376,7 +389,7 @@ void ZRegionAnnotation::load(const QString& filename)
 
       if (H5Lexists(regionGrp.getId(), "ROI", H5P_DEFAULT) > 0) {
         H5::Group roiGrp = regionGrp.openGroup("ROI");
-        p.roi = std::make_shared<ZROI>(undoStack());
+        p.roi = createROI();
         p.roi->load(roiGrp);
       }
 
@@ -411,6 +424,7 @@ void ZRegionAnnotation::load(const QString& filename)
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
 
+  updateBoundBox();
   emit allMeshChanged();
   emit allROIChanged();
 }
@@ -435,9 +449,9 @@ void ZRegionAnnotation::save(const QString& filename) const
     int regionAnnotationVer = 100;
     ver.write(intType, &regionAnnotationVer);
 
-    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
-    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
-    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
+//    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
+//    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
+//    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
     allGrp.createAttribute("VoxelSizeXInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeX);
     allGrp.createAttribute("VoxelSizeYInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeY);
     allGrp.createAttribute("VoxelSizeZInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeZ);
@@ -544,13 +558,20 @@ ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTreeWithDeepCopyedMesh() cons
 
 void ZRegionAnnotation::updateBoundBox()
 {
-  if (m_width <= 0 || m_height <= 0 || m_depth <= 0) {
-    m_boundBox.reset();
-  } else {
-    m_boundBox.setMinCorner(glm::ivec4(0));
-    m_boundBox.setMaxCorner(glm::ivec4(m_width - 1, m_height - 1, m_depth - 1, 0));
+  m_boundBox.reset();
+  for (const auto& node : m_ontology) {
+    if (node.roi) {
+      m_boundBox.expand(node.roi->boundBox());
+    }
   }
   emit boundBoxChanged();
+}
+
+std::shared_ptr<ZROI> ZRegionAnnotation::createROI()
+{
+  auto res = std::make_shared<ZROI>(undoStack());
+  connect(res.get(), &ZROI::boundBoxChanged, this, &ZRegionAnnotation::updateBoundBox);
+  return res;
 }
 
 void ZRegionAnnotationUpdateMeshCommand::redo()

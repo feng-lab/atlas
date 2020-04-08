@@ -25,7 +25,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  const ZBBox<glm::ivec4>& boundBox() const;
+  ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

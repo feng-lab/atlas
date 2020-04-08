@@ -6,6 +6,8 @@
 #include "zgraphicsview.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
+#include "zchooseregiondialog.h"
+#include "zregionannotation.h"
 #include <QGraphicsSceneContextMenuEvent>
 #include <QToolTip>
 #include <QPushButton>
@@ -57,11 +59,12 @@ void SliceROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* even
   }
 }
 
-ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem* parent)
+ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, QGraphicsItem* parent)
   : QGraphicsPathItem(parent)
   , m_roi(roi)
   , m_slice(slice)
   , m_id(id)
+  , m_view(view)
 {
   // setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
@@ -126,9 +129,15 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
     QMenu menu;
     QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+    QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
     QAction* selectedAction = menu.exec(event->screenPos());
     if (selectedAction == addCtrlPointAction) {
       m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
+    } else if (selectedAction == addROItoRegionAction) {
+      ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+      if (dlg.exec() == QDialog::Accepted) {
+        m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
+      }
     }
   }
 }
@@ -365,7 +374,7 @@ void ZROIFilter::setNormalView(int z, int /*t*/)
     m_sliceToROIItem.clear();
     m_sliceToCtrlPtItems.clear();
     size_t slice = rz;
-    if (m_ROI->hasSlice(slice)) {
+    if (m_ROI && m_ROI->hasSlice(slice)) {
       for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
         createShapeItem(slice, shapeID);
         createCtrlPtItems(slice, shapeID);
@@ -397,11 +406,13 @@ void ZROIFilter::setMaxZProjView(int /*t*/)
   if (m_lazyRendering) {
     m_sliceToROIItem.clear();
     m_sliceToCtrlPtItems.clear();
-    for (const auto& sliceROI : *m_ROI) {
-      int slice = sliceROI.first;
-      for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
-        createShapeItem(slice, shapeID);
-        createCtrlPtItems(slice, shapeID);
+    if (m_ROI) {
+      for (const auto& sliceROI : *m_ROI) {
+        int slice = sliceROI.first;
+        for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
+          createShapeItem(slice, shapeID);
+          createCtrlPtItems(slice, shapeID);
+        }
       }
     }
   } else {
@@ -424,9 +435,12 @@ void ZROIFilter::setMaxZProjView(int /*t*/)
 
 ZBBox<glm::ivec4> ZROIFilter::boundBox() const
 {
-  ZBBox<glm::ivec4> res = m_ROI->boundBox();
-  updateBoundBoxWithOffsetPara(res);
-  return res;
+  if (m_ROI) {
+    ZBBox<glm::ivec4> res = m_ROI->boundBox();
+    updateBoundBoxWithOffsetPara(res);
+    return res;
+  }
+  return ZBBox<glm::ivec4>();
 }
 
 std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
@@ -481,6 +495,9 @@ void ZROIFilter::deleteKeyPressed()
 //    m_ROI->deleteSliceROI(slices[i]);
 //  }
 
+  if (!m_ROI)
+    return;
+
   std::vector<ZROIControlPoint> controlPoints;
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
@@ -497,6 +514,9 @@ void ZROIFilter::deleteKeyPressed()
 
 void ZROIFilter::mousePressed(const QPointF& scenePos)
 {
+  if (!m_ROI)
+    return;
+
   m_hasSelectedItems = false;
   if (m_view.isMaxZProjView()) {
     for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
@@ -533,6 +553,9 @@ void ZROIFilter::mousePressed(const QPointF& scenePos)
 
 void ZROIFilter::mouseMoved(const QPointF &scenePos)
 {
+  if (!m_ROI)
+    return;
+
   if (m_hasSelectedItems && scenePos != m_startPoint) {
     std::vector<ZROIControlPoint> controlPoints;
     for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
@@ -553,6 +576,9 @@ void ZROIFilter::mouseMoved(const QPointF &scenePos)
 
 void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
 {
+  if (!m_ROI)
+    return;
+
   if (m_hasSelectedItems) {
     m_ROI->endMoveSelectedControlPointsCommand();
     m_hasSelectedItems = false;
@@ -561,6 +587,9 @@ void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
 
 void ZROIFilter::rotateClockwise()
 {
+  if (!m_ROI)
+    return;
+
   std::vector<ZROIControlPoint> controlPoints;
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
@@ -578,6 +607,9 @@ void ZROIFilter::rotateClockwise()
 
 void ZROIFilter::rotateCounterclockwise()
 {
+  if (!m_ROI)
+    return;
+
   std::vector<ZROIControlPoint> controlPoints;
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
@@ -595,6 +627,9 @@ void ZROIFilter::rotateCounterclockwise()
 
 void ZROIFilter::viewPrecedenceChanged()
 {
+  if (!m_ROI)
+    return;
+
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
       shapeItem->setZValue(m_viewPrecedencePara.get());
@@ -614,6 +649,9 @@ void ZROIFilter::viewPrecedenceChanged()
 
 void ZROIFilter::transformChanged()
 {
+  if (!m_ROI)
+    return;
+
   m_sliceToROIItem.clear();
   m_sliceToCtrlPtItems.clear();
   if (!m_ROI->isEmpty()) {
@@ -664,7 +702,7 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
     }
   }
 
-  auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID);
+  auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID, m_view);
   roiItem->setZValue(m_viewPrecedencePara.get());
   roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                               m_outlineColor.get().y * 255,
@@ -720,6 +758,8 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
 
 void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
 {
+  if (!m_ROI)
+    return;
   //LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
   if (!append) {
     for (auto& item : m_view.scene().selectedItems()) {
@@ -734,6 +774,8 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
 
 void ZROIFilter::visibleChanged()
 {
+  if (!m_ROI)
+    return;
   if (m_visible.get()) {
     if (m_view.isMaxZProjView()) {
       setMaxZProjView(m_view.currentTime());
@@ -758,6 +800,8 @@ void ZROIFilter::visibleChanged()
 
 void ZROIFilter::showControlPointsChanged()
 {
+  if (!m_ROI)
+    return;
   if (m_showControlPoints.get()) {
     if (m_view.isMaxZProjView()) {
       setMaxZProjView(m_view.currentTime());
@@ -777,6 +821,8 @@ void ZROIFilter::showControlPointsChanged()
 
 void ZROIFilter::fixedControlPointsSizeChanged()
 {
+  if (!m_ROI)
+    return;
   auto s = m_view.graphicsView().currentScale();
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
@@ -792,6 +838,8 @@ void ZROIFilter::fixedControlPointsSizeChanged()
 
 void ZROIFilter::outlineColorChanged()
 {
+  if (!m_ROI)
+    return;
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
       shapeItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
@@ -804,6 +852,8 @@ void ZROIFilter::outlineColorChanged()
 
 void ZROIFilter::regionColorChanged()
 {
+  if (!m_ROI)
+    return;
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
       shapeItem->setBrush(QColor(m_regionColor.get().x * 255,
@@ -816,6 +866,8 @@ void ZROIFilter::regionColorChanged()
 
 void ZROIFilter::opacityChanged()
 {
+  if (!m_ROI)
+    return;
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
       shapeItem->setBrush(QColor(m_regionColor.get().x * 255,
@@ -830,6 +882,8 @@ void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
                               const std::vector<size_t>& deletedShapes,
                               const std::vector<size_t>& changedShapes)
 {
+  if (!m_ROI)
+    return;
   if (newShapes.empty() && deletedShapes.empty() && changedShapes.empty()) {
     m_sliceToCtrlPtItems.erase(slice);
     m_sliceToROIItem.erase(slice);
@@ -864,6 +918,8 @@ void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
 
 void ZROIFilter::onRoiMoved(int slice, const std::vector<size_t>& changedShapes)
 {
+  if (!m_ROI)
+    return;
   if (changedShapes.empty()) {
     for (auto&[id, shapeItem] : m_sliceToROIItem[slice]) {
       shapeItem->updateValue();
@@ -885,12 +941,16 @@ void ZROIFilter::onRoiMoved(int slice, const std::vector<size_t>& changedShapes)
 
 void ZROIFilter::onRoiDeleted(int slice)
 {
+  if (!m_ROI)
+    return;
   m_sliceToROIItem.erase(slice);
   m_sliceToCtrlPtItems.erase(slice);
 }
 
 void ZROIFilter::viewScaleChanged(double s)
 {
+  if (!m_ROI)
+    return;
   if (m_fixedControlPointsSize.get()) {
     for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
       for (auto&[id, ctrlItems] : sliceItem) {

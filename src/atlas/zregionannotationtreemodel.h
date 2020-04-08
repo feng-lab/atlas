@@ -20,23 +20,23 @@ public:
 
   explicit ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, QObject* parent = nullptr);
 
-  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
+  [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
-  Qt::ItemFlags flags(const QModelIndex& index) const;
+  [[nodiscard]] Qt::ItemFlags flags(const QModelIndex& index) const override;
 
-  bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+  bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
-  QVariant headerData(int section, Qt::Orientation orientation,
-                      int role = Qt::DisplayRole) const;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
+                                    int role) const override;
 
-  QModelIndex index(int row, int column,
-                    const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] QModelIndex index(int row, int column,
+                                  const QModelIndex& parent) const override;
 
-  QModelIndex parent(const QModelIndex& index) const;
+  [[nodiscard]] QModelIndex parent(const QModelIndex& index) const override;
 
-  int rowCount(const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] int rowCount(const QModelIndex& parent) const override;
 
-  int columnCount(const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
   void clicked(const QModelIndex& idxIn);
 

@@ -20,6 +20,15 @@ ZRegionAnnotationDoc::ZRegionAnnotationDoc(ZDoc& doc)
   createActions();
 }
 
+ZRegionAnnotation& ZRegionAnnotationDoc::currentRegionAnnotation()
+{
+  if (m_idToRegionAnnotationPacks.empty()) {
+    auto ra = new ZRegionAnnotation(this);
+    addRegionAnnotation(ra, "");
+  }
+  return *m_idToRegionAnnotationPacks.begin()->second->regionAnnotation;
+}
+
 bool ZRegionAnnotationDoc::save(size_t id)
 {
   if (!objHasUnsavedChange(id))
@@ -383,6 +392,11 @@ ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotati
   }
   regionAnnotation = regionAnnotationIn;
   updateDerivedData();
+  if (m_name.isEmpty()) {
+    hasUnsavedChange = true;
+    static size_t num = 1;
+    m_name = QString("Unsaved RegionAnnotation %1").arg(num++);
+  }
 }
 
 void ZRegionAnnotationDoc::RegionAnnotationPack::updateDerivedData()

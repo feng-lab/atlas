@@ -222,9 +222,9 @@ public:
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
-  void mergeWith(const ZROI& other);
+  void mergeWith(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1);
 
-  std::set<int> mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs);
+  std::set<int> mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice = -1, int64_t shapeID = -1);
 
   static QPainterPath splineToPainterPath(const QPolygonF& spline, bool makeCloseIfNot = false);
 
@@ -490,17 +490,19 @@ protected:
 class ZROIMergeROICommand : public ZROICommand
 {
 public:
-  ZROIMergeROICommand(ZROI& roi, const std::map<int, ZSliceROI>& otherSliceROIs)
-    : ZROICommand(roi), m_otherSliceROIs(otherSliceROIs)
+  ZROIMergeROICommand(ZROI& roi, const std::map<int, ZSliceROI>& otherSliceROIs, int64_t slice = -1, int64_t shapeID = -1)
+    : ZROICommand(roi), m_otherSliceROIs(otherSliceROIs), m_slice(slice), m_shapeID(shapeID)
   {
     setText("Merge ROI");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.mergeWith_Impl(m_otherSliceROIs); }
+  { m_changedSlices = m_roi.mergeWith_Impl(m_otherSliceROIs, m_slice, m_shapeID); }
 
 protected:
   std::map<int, ZSliceROI> m_otherSliceROIs;
+  int64_t m_slice;
+  int64_t m_shapeID;
 };
 
 } // namespace nim

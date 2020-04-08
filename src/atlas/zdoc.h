@@ -32,6 +32,8 @@ class Z3DAnimationDoc;
 
 class ZROIDoc;
 
+class ZRegionAnnotationDoc;
+
 class ZMeshDoc;
 
 class ZDoc : public QObject
@@ -167,6 +169,9 @@ public:
   ZMeshDoc& meshDoc()
   { return *m_meshDoc; }
 
+  ZRegionAnnotationDoc& regionAnnotationDoc()
+  { return *m_regionAnnotationDoc; }
+
   void hideAnimation3DView();
 
   void removeAllObjs();
@@ -261,6 +266,7 @@ private:
   Z3DAnimationDoc* m_animation3DDoc;
   ZROIDoc* m_roiDoc;
   ZMeshDoc* m_meshDoc;
+  ZRegionAnnotationDoc* m_regionAnnotationDoc;
 };
 
 } // namespace nim

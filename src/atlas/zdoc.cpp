@@ -10,6 +10,7 @@
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
+#include "zregionannotationdoc.h"
 #include "zmeshdoc.h"
 #include "ztheme.h"
 #include <QUndoGroup>
@@ -50,6 +51,9 @@ ZDoc::ZDoc(QObject* parent)
 
   m_meshDoc = new ZMeshDoc(*this);
   registerObjDoc(m_meshDoc);
+
+  m_regionAnnotationDoc = new ZRegionAnnotationDoc(*this);
+  registerObjDoc(m_regionAnnotationDoc);
 }
 
 bool ZDoc::hasObj() const

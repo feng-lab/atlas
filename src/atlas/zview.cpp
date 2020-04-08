@@ -7,6 +7,7 @@
 #include "zactiongroup.h"
 #include "znumericparameter.h"
 #include "zroidoc.h"
+#include "zregionannotationdoc.h"
 #include "ztakescreenshotwidget.h"
 #include "zlog.h"
 #include "ztheme.h"
@@ -141,6 +142,11 @@ std::pair<int, int> ZView::currentSliceRange() const
 ZROI& ZView::roi()
 {
   return m_doc.roiDoc().currentROI();
+}
+
+ZRegionAnnotation& ZView::regionAnnotation()
+{
+  return m_doc.regionAnnotationDoc().currentRegionAnnotation();
 }
 
 ZView::State ZView::state() const

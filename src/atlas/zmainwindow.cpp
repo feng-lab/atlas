@@ -29,7 +29,6 @@
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
 #include "zroiview.h"
-#include "zregionannotationdoc.h"
 #include "zregionannotationview.h"
 #include "zsvgdoc.h"
 #include "zsvgview.h"
@@ -465,9 +464,7 @@ void ZMainWindow::init()
   m_doc->registerObjDoc(swcDoc);
   m_view->registerObjView(std::make_unique<ZSwcView>(*swcDoc, *m_view));
 
-  ZRegionAnnotationDoc* regionAnnotationDoc = new ZRegionAnnotationDoc(*m_doc);
-  m_doc->registerObjDoc(regionAnnotationDoc);
-  m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(*regionAnnotationDoc, *m_view));
+  m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(m_doc->regionAnnotationDoc(), *m_view));
 
   ZSvgDoc* svgDoc = new ZSvgDoc(*m_doc);
   m_doc->registerObjDoc(svgDoc);

@@ -552,20 +552,32 @@ void ZROI::deleteSliceROI(int slice)
   }
 }
 
-void ZROI::mergeWith(const ZROI& other)
+void ZROI::mergeWith(const ZROI& other, int64_t slice, int64_t shapeID)
 {
-  m_undoStack->push(new ZROIMergeROICommand(*this, other.m_sliceROIs));
+  m_undoStack->push(new ZROIMergeROICommand(*this, other.m_sliceROIs, slice, shapeID));
 }
 
-std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs)
+std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice, int64_t shapeID)
 {
   std::set<int> changedSlices;
-  for (const auto& sliceROI : sliceROIs) {
-    if (!sliceROI.second.isEmpty()) {
-      changedSlices.insert(sliceROI.first);
-      std::vector<size_t> newShapes;
-      m_shapeID = m_sliceROIs[sliceROI.first].mergeWith(sliceROI.second, m_shapeID, newShapes);
-      onSliceROIUpdated(sliceROI.first, newShapes, std::vector<size_t>(), std::vector<size_t>());
+  if (shapeID >= 0) { // merge one shape
+    changedSlices.insert(slice);
+    const auto& sliceROI = sliceROIs.at(slice);
+    std::vector<size_t> newShapes;
+
+    m_sliceROIs[slice].m_idToShapeOperations[m_shapeID] = sliceROI.m_idToShapeOperations.at(shapeID);
+    newShapes.push_back(m_shapeID);
+    m_sliceROIs[slice].m_idToPainterPath[m_shapeID++] = sliceROI.m_idToPainterPath.at(shapeID);
+
+    onSliceROIUpdated(slice, newShapes, std::vector<size_t>(), std::vector<size_t>());
+  } else { // merge all
+    for (const auto& sliceROI : sliceROIs) {
+      if (!sliceROI.second.isEmpty()) {
+        changedSlices.insert(sliceROI.first);
+        std::vector<size_t> newShapes;
+        m_shapeID = m_sliceROIs[sliceROI.first].mergeWith(sliceROI.second, m_shapeID, newShapes);
+        onSliceROIUpdated(sliceROI.first, newShapes, std::vector<size_t>(), std::vector<size_t>());
+      }
     }
   }
   return changedSlices;

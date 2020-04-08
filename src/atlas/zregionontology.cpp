@@ -65,7 +65,7 @@ void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
     }
   } else {
     ZTree<RegionNode>::Iterator currIt;
-    if (regionAbbrevs.contains(node.abbreviation, Qt::CaseInsensitive)) {
+    if (regionAbbrevs.empty() || regionAbbrevs.contains(node.abbreviation, Qt::CaseInsensitive)) {
       currIt = ontology.appendRoot(node);
     }
     for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {

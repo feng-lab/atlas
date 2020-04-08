@@ -61,9 +61,11 @@ void ZRegionAnnotationFilter::setMaxZProjView(int t)
   }
 }
 
-const ZBBox<glm::ivec4>& ZRegionAnnotationFilter::boundBox() const
+ZBBox<glm::ivec4> ZRegionAnnotationFilter::boundBox() const
 {
-  return m_regionAnnotation->boundBox();
+  auto res = m_regionAnnotation->boundBox();
+  updateBoundBoxWithOffsetPara(res);
+  return res;
 }
 
 std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup()
@@ -172,7 +174,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     if (node.roi) {
       flt->setData(*(node.roi));
     }
-    flt->setVisible(false);
+    flt->setVisible(true);
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,

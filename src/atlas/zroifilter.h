@@ -53,7 +53,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROIGraphicsItem(ZROI& roi, int slice, size_t id, QGraphicsItem* parent = nullptr);
+  ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -70,6 +70,7 @@ private:
   ZROI& m_roi;
   int m_slice;
   size_t m_id;
+  ZView& m_view;
 
   QPointF m_basePos;
 };
