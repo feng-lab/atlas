@@ -25,121 +25,184 @@ QPainterPath ZROIShapeOperation::toPainterPath() const
   return res;
 }
 
-void ZSliceROI::addRect(const QRectF& rect, size_t id)
+void ZSliceROI::updatePaintPath(size_t id)
+{
+  auto res = QPainterPath();
+  for (const auto& so : m_idToShapeOperations.at(id)) {
+    if (so.isAdd) {
+      res += so.toPainterPath();
+    } else {
+      res -= so.toPainterPath();
+    }
+  }
+  m_idToPainterPath[id] = res;
+}
+
+void ZSliceROI::newRect(const QRectF& rect, size_t id)
 {
   CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(true, ROIType::Rect, rect)));
+  m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Rect, rect)}));
+  updatePaintPath(id);
+}
+
+void ZSliceROI::newEllipse(const QRectF& ellipse, size_t id)
+{
+  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
+  m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Ellipse, ellipse)}));
+  updatePaintPath(id);
+}
+
+void ZSliceROI::newPolygon(const QPolygonF& poly, size_t id)
+{
+  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
+  m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Polygon, poly)}));
+  updatePaintPath(id);
+}
+
+void ZSliceROI::newSpline(const QPolygonF& spline, size_t id)
+{
+  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
+  m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Spline, spline)}));
+  updatePaintPath(id);
+}
+
+void ZSliceROI::addRect(const QRectF& rect, size_t id)
+{
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(true, ROIType::Rect, rect));
   updatePaintPath(id);
 }
 
 void ZSliceROI::addEllipse(const QRectF& ellipse, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(true, ROIType::Ellipse, ellipse)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(true, ROIType::Ellipse, ellipse));
   updatePaintPath(id);
 }
 
 void ZSliceROI::addPolygon(const QPolygonF& poly, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(true, ROIType::Polygon, poly)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(true, ROIType::Polygon, poly));
   updatePaintPath(id);
 }
 
 void ZSliceROI::addSpline(const QPolygonF& spline, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(true, ROIType::Spline, spline)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(true, ROIType::Spline, spline));
   updatePaintPath(id);
 }
 
 void ZSliceROI::subtractRect(const QRectF& rect, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(false, ROIType::Rect, rect)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(false, ROIType::Rect, rect));
   updatePaintPath(id);
 }
 
 void ZSliceROI::subtractEllipse(const QRectF& ellipse, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(false, ROIType::Ellipse, ellipse)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(false, ROIType::Ellipse, ellipse));
   updatePaintPath(id);
 }
 
 void ZSliceROI::subtractPolygon(const QPolygonF& poly, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(false, ROIType::Polygon, poly)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(false, ROIType::Polygon, poly));
   updatePaintPath(id);
 }
 
 void ZSliceROI::subtractSpline(const QPolygonF& spline, size_t id)
 {
-  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
-  m_idToShapeOperations.emplace(std::make_pair(id, ZROIShapeOperation(false, ROIType::Spline, spline)));
+  CHECK(m_idToShapeOperations.find(id) != m_idToShapeOperations.end());
+  m_idToShapeOperations.at(id).push_back(ZROIShapeOperation(false, ROIType::Spline, spline));
   updatePaintPath(id);
 }
 
-void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::set<size_t> >& shapeOpIDToPointIndices, double angle,
+void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle,
                                  std::vector<size_t>& editedShapes)
 {
-  for (const auto&[shapeOpID, pointIndices] : shapeOpIDToPointIndices) {
-    ZROIShapeOperation& shapeOp = m_idToShapeOperations.at(shapeOpID);
-    QPolygonF& poly = shapeOp.poly;
-    if (poly.size() > 3 && (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline)) {
-      QPointF center = poly[0];
-      for (int i = 1; i < poly.size(); ++i) {
-        center += poly[i];
+  for (const auto&[shapeID, controlPoints] : shapeIDToControlPoints) {
+    auto& shapeOps = m_idToShapeOperations.at(shapeID);
+    bool noOp = true;
+    QPointF center(0, 0);
+    int centerNumber = 0;
+    for (const auto& shapeOp : shapeOps) {
+      if ((shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) && shapeOp.poly.size() > 3) {
+        noOp = false;
+        for (int i = 0; i < shapeOp.poly.size() - 1; ++i) {
+          center += shapeOp.poly[i];
+        }
+        centerNumber += shapeOp.poly.size() - 1;
       }
-      center /= poly.size();
-
-      for (auto idx : pointIndices) {
-        QPointF startPt = poly[idx] - center;
+    }
+    if (!noOp) {
+      center /= centerNumber;
+      for (const auto& controlPoint : controlPoints) {
+        auto& shapeOp = shapeOps[controlPoint.shapeIndex];
+        QPointF startPt = shapeOp.poly[controlPoint.pointIndex] - center;
         glm::dvec2 rPt = glm::rotate(glm::dvec2(startPt.x(), startPt.y()), angle);
         QPointF resPt = QPointF(rPt.x, rPt.y) + center;
-        poly[idx] = resPt;
-        CHECK(idx < static_cast<size_t>(poly.size()) - 1);
-        if (idx == 0) {
-          poly[poly.size() - 1] = resPt;
+        shapeOp.poly[controlPoint.pointIndex] = resPt;
+        CHECK(controlPoint.pointIndex < static_cast<size_t>(shapeOp.poly.size()) - 1);
+        if (controlPoint.pointIndex == 0) {
+          shapeOp.poly[shapeOp.poly.size() - 1] = resPt;
         }
       }
     }
 
-    updatePaintPath(shapeOpID);
+    updatePaintPath(shapeID);
 
-    editedShapes.push_back(shapeOpID);
+    editedShapes.push_back(shapeID);
   }
 }
 
-void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIDToPointIndices,
+void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
                                  std::vector<size_t>& removedShapes, std::vector<size_t>& editedShapes)
 {
-  for (const auto&[shapeOpID, pointIndices] : shapeOpIDToPointIndices) {
-    ZROIShapeOperation& shapeOp = m_idToShapeOperations[shapeOpID];
-
-    bool deleteAll = shapeOp.type == ROIType::Rect ||
-                     shapeOp.type == ROIType::Ellipse ||
-                     (shapeOp.poly.size() - static_cast<int>(pointIndices.size()) < 4);
-    //LOG(INFO) << m_shapeOperations.size() << " " << shapeOp->poly.size();
-    if (deleteAll) {
-      removedShapes.push_back(shapeOpID);
-    } else {
-      size_t pointIndexSubtract = 0;
-      for (auto pointIndex : pointIndices) {
-        size_t idx = pointIndex - pointIndexSubtract;
-        ++pointIndexSubtract;
-        CHECK(idx < static_cast<size_t>(shapeOp.poly.size() - 1));
-        if (idx == 0) {
-          shapeOp.poly.removeFirst();
-          shapeOp.poly.removeLast();
-          shapeOp.poly.push_back(shapeOp.poly.first());
+  for (const auto&[shapeID, controlPoints] : shapeIDToControlPoints) {
+    auto& shapeOps = m_idToShapeOperations.at(shapeID);
+    std::map<size_t, size_t> shapeIndexToPointIndexSubtract;
+    for (size_t i = 0; i < shapeOps.size(); ++i) {
+      shapeIndexToPointIndexSubtract[i] = 0;
+    }
+    for (const auto& controlPoint : controlPoints) {
+      auto& shapeOp = shapeOps[controlPoint.shapeIndex];
+      if (shapeOp.type == ROIType::Rect || shapeOp.type == ROIType::Ellipse) {
+        shapeOp.poly.clear();
+      } else {
+        if (shapeOp.poly.size() < 4) {
+          shapeOp.poly.clear();
         } else {
-          shapeOp.poly.removeAt(idx);
+          size_t idx = controlPoint.pointIndex - shapeIndexToPointIndexSubtract[controlPoint.shapeIndex];
+          shapeIndexToPointIndexSubtract[controlPoint.shapeIndex]++;
+          if (idx == 0) {
+            shapeOp.poly.removeFirst();
+            shapeOp.poly.removeLast();
+            shapeOp.poly.push_back(shapeOp.poly.first());
+          } else {
+            shapeOp.poly.removeAt(idx);
+          }
         }
       }
-      updatePaintPath(shapeOpID);
-      editedShapes.push_back(shapeOpID);
+    }
+    shapeOps.erase(
+      std::remove_if(shapeOps.begin(), shapeOps.end(),
+                     [](const auto& so) { return so.poly.empty(); }),
+      shapeOps.end());
+
+    while (!shapeOps.empty() && !shapeOps[0].isAdd) {
+      shapeOps.erase(shapeOps.begin());
+    }
+
+    if (shapeOps.empty()) {
+      removedShapes.push_back(shapeID);
+    } else {
+      updatePaintPath(shapeID);
+      editedShapes.push_back(shapeID);
     }
   }
   for (auto shapeID : removedShapes) {
@@ -151,23 +214,28 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shape
 bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes)
 {
   int shapeID = -1;
+  int shapeIndex = -1;
   int pos = -1;
   double minDist = std::numeric_limits<double>::max();
-  for (const auto&[id, shape] : m_idToShapeOperations) {
-    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-      const QPolygonF& poly = shape.poly;
-      for (int j = 0; j < poly.size() - 1; ++j) {
-        double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
-        if (dist < minDist) {
-          minDist = dist;
-          shapeID = id;
-          pos = j + 1;
+  for (const auto&[id, shapes] : m_idToShapeOperations) {
+    for (size_t i = 0; i < shapes.size(); ++i) {
+      const auto& shape = shapes[i];
+      if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+        const QPolygonF& poly = shape.poly;
+        for (int j = 0; j < poly.size() - 1; ++j) {
+          double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
+          if (dist < minDist) {
+            minDist = dist;
+            shapeID = id;
+            shapeIndex = i;
+            pos = j + 1;
+          }
         }
       }
     }
   }
-  if (shapeID >= 0 && pos >= 0) {
-    m_idToShapeOperations.at(shapeID).poly.insert(pos, pt);
+  if (shapeID >= 0 && shapeIndex >= 0 && pos >= 0) {
+    m_idToShapeOperations.at(shapeID)[shapeIndex].poly.insert(pos, pt);
     updatePaintPath(shapeID);
     editedShapes.push_back(shapeID);
     return true;
@@ -177,21 +245,27 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShape
 
 void ZSliceROI::addCtrlPointToShape(const QPointF &pt, size_t shapeID)
 {
+  int shapeIndex = -1;
   int pos = -1;
   double minDist = std::numeric_limits<double>::max();
-  const auto& shape = m_idToShapeOperations[shapeID];
-  if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-    const QPolygonF& poly = shape.poly;
-    for (int j = 0; j < poly.size() - 1; ++j) {
-      double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
-      if (dist < minDist) {
-        minDist = dist;
-        pos = j + 1;
+  const auto& shapes = m_idToShapeOperations[shapeID];
+  for (size_t i = 0; i < shapes.size(); ++i) {
+    const auto& shape = shapes[i];
+    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+      const QPolygonF& poly = shape.poly;
+      for (int j = 0; j < poly.size() - 1; ++j) {
+        double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
+        if (dist < minDist) {
+          minDist = dist;
+          shapeIndex = i;
+          pos = j + 1;
+        }
       }
     }
   }
-  if (pos >= 0) {
-    m_idToShapeOperations.at(shapeID).poly.insert(pos, pt);
+
+  if (shapeIndex >= 0 && pos >= 0) {
+    m_idToShapeOperations.at(shapeID)[shapeIndex].poly.insert(pos, pt);
     updatePaintPath(shapeID);
   }
 }
@@ -211,8 +285,9 @@ void ZSliceROI::setTopLeft(double x, double y)
   QRectF rect = boundingRect();
   double dx = x - rect.left();
   double dy = y - rect.top();
-  for (auto&[id, shape] : m_idToShapeOperations) {
-    shape.translate(dx, dy);
+  for (auto&[id, shapes] : m_idToShapeOperations) {
+    for (auto& shape : shapes)
+      shape.translate(dx, dy);
     updatePaintPath(id);
   }
 }
@@ -234,17 +309,13 @@ QPainterPath ZSliceROI::paintPath() const
 {
   auto res = QPainterPath();
   for (const auto&[id, pp] : m_idToPainterPath) {
-    if (m_idToShapeOperations.at(id).isAdd) {
-      res += pp;
-    } else {
-      res -= pp;
-    }
+    res += pp;
   }
 
   return res;
 }
 
-size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id)
+size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
 {
   m_idToPainterPath.clear();
 
@@ -261,82 +332,183 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id)
 
     H5std_string strBuf;
     for (int j = 0; j < numShape; ++j) {
-      H5::Group shapeGrp = sliceGrp.openGroup(qUtf8Printable(QString("Shape%1").arg(j + 1)));
+      if (roiVer == 100) {
+        H5::Group shapeGrp = sliceGrp.openGroup(qUtf8Printable(QString("Shape%1").arg(j + 1)));
 
-      H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
-      typeAttr.read(strType, strBuf);
-      ROIType type = ROIType::Rect;
-      if (strBuf == "Rect") {
-        type = ROIType::Rect;
-      } else if (strBuf == "Ellipse") {
-        type = ROIType::Ellipse;
-      } else if (strBuf == "Polygon") {
-        type = ROIType::Polygon;
-      } else if (strBuf == "Spline") {
-        type = ROIType::Spline;
+        H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
+        typeAttr.read(strType, strBuf);
+        ROIType type = ROIType::Rect;
+        if (strBuf == "Rect") {
+          type = ROIType::Rect;
+        } else if (strBuf == "Ellipse") {
+          type = ROIType::Ellipse;
+        } else if (strBuf == "Polygon") {
+          type = ROIType::Polygon;
+        } else if (strBuf == "Spline") {
+          type = ROIType::Spline;
+        } else {
+          throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
+        }
+
+        H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
+        int isAdd;
+        isAddAttr.read(intType, &isAdd);
+
+        H5::DataSet points = shapeGrp.openDataSet("Points");
+        H5::DataSpace pointsDataspace = points.getSpace();
+
+        if (pointsDataspace.getSimpleExtentNdims() != 2)
+          throw ZIOException("Wrong ROI file contents");
+
+        hsize_t pointListDim[2];
+
+        pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
+
+        if (pointListDim[1] != 2 || pointListDim[0] < 2)
+          throw ZIOException("Wrong ROI file contents");
+
+        QPolygonF poly(pointListDim[0]);
+        points.read(poly.data(), doubleType);
+        QRectF rect(poly[0], poly[1]);
+
+        switch (type) {
+          case ROIType::Rect:
+            newRect(rect, id++);
+//            if (isAdd) {
+//              addRect(rect, id++);
+//            } else {
+//              subtractRect(rect, id++);
+//            }
+            break;
+          case ROIType::Ellipse:
+            newEllipse(rect, id++);
+//            if (isAdd) {
+//              addEllipse(rect, id++);
+//            } else {
+//              subtractEllipse(rect, id++);
+//            }
+            break;
+          case ROIType::Polygon:
+            if (!poly.isClosed()) {
+              poly.push_back(poly[0]);
+            }
+            newPolygon(poly, id++);
+//            if (isAdd) {
+//              addPolygon(poly, id++);
+//            } else {
+//              subtractPolygon(poly, id++);
+//            }
+            break;
+          case ROIType::Spline:
+            if (!poly.isClosed()) {
+              poly.push_back(poly[0]);
+            }
+            newSpline(poly, id++);
+//            if (isAdd) {
+//              addSpline(poly, id++);
+//            } else {
+//              subtractSpline(poly, id++);
+//            }
+            break;
+          default:
+            CHECK(false);
+            break;
+        }
       } else {
-        throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
-      }
+        H5::Group allShapeGrp = sliceGrp.openGroup(qUtf8Printable(QString("Shape%1").arg(j + 1)));
 
-      H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
-      int isAdd;
-      isAddAttr.read(intType, &isAdd);
+        H5::Attribute numSubShapesAttr = allShapeGrp.openAttribute("SubShapeNumber");
+        int numSubShape;
+        numSubShapesAttr.read(intType, &numSubShape);
 
-      H5::DataSet points = shapeGrp.openDataSet("Points");
-      H5::DataSpace pointsDataspace = points.getSpace();
+        for (int k = 0; k < numSubShape; ++k) {
+          H5::Group shapeGrp = allShapeGrp.openGroup(qUtf8Printable(QString("SubShape%1").arg(k + 1)));
 
-      if (pointsDataspace.getSimpleExtentNdims() != 2)
-        throw ZIOException("Wrong ROI file contents");
-
-      hsize_t pointListDim[2];
-
-      pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
-
-      if (pointListDim[1] != 2 || pointListDim[0] < 2)
-        throw ZIOException("Wrong ROI file contents");
-
-      QPolygonF poly(pointListDim[0]);
-      points.read(poly.data(), doubleType);
-      QRectF rect(poly[0], poly[1]);
-
-      switch (type) {
-        case ROIType::Rect:
-          if (isAdd) {
-            addRect(rect, id++);
+          H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
+          typeAttr.read(strType, strBuf);
+          ROIType type = ROIType::Rect;
+          if (strBuf == "Rect") {
+            type = ROIType::Rect;
+          } else if (strBuf == "Ellipse") {
+            type = ROIType::Ellipse;
+          } else if (strBuf == "Polygon") {
+            type = ROIType::Polygon;
+          } else if (strBuf == "Spline") {
+            type = ROIType::Spline;
           } else {
-            subtractRect(rect, id++);
+            throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
           }
-          break;
-        case ROIType::Ellipse:
-          if (isAdd) {
-            addEllipse(rect, id++);
-          } else {
-            subtractEllipse(rect, id++);
+
+          H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
+          int isAdd;
+          isAddAttr.read(intType, &isAdd);
+
+          H5::DataSet points = shapeGrp.openDataSet("Points");
+          H5::DataSpace pointsDataspace = points.getSpace();
+
+          if (pointsDataspace.getSimpleExtentNdims() != 2)
+            throw ZIOException("Wrong ROI file contents");
+
+          hsize_t pointListDim[2];
+
+          pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
+
+          if (pointListDim[1] != 2 || pointListDim[0] < 2)
+            throw ZIOException("Wrong ROI file contents");
+
+          QPolygonF poly(pointListDim[0]);
+          points.read(poly.data(), doubleType);
+          QRectF rect(poly[0], poly[1]);
+
+          switch (type) {
+            case ROIType::Rect:
+              if (k == 0) {
+                newRect(rect, id);
+              } else if (isAdd) {
+                addRect(rect, id);
+              } else {
+                subtractRect(rect, id);
+              }
+              break;
+            case ROIType::Ellipse:
+              if (k == 0) {
+                newEllipse(rect, id);
+              } else  if (isAdd) {
+                addEllipse(rect, id);
+              } else {
+                subtractEllipse(rect, id);
+              }
+              break;
+            case ROIType::Polygon:
+              if (!poly.isClosed()) {
+                poly.push_back(poly[0]);
+              }
+              if (k == 0) {
+                newPolygon(poly, id);
+              } else if (isAdd) {
+                addPolygon(poly, id);
+              } else {
+                subtractPolygon(poly, id);
+              }
+              break;
+            case ROIType::Spline:
+              if (!poly.isClosed()) {
+                poly.push_back(poly[0]);
+              }
+              if (k == 0) {
+                newSpline(poly, id);
+              } else if (isAdd) {
+                addSpline(poly, id);
+              } else {
+                subtractSpline(poly, id);
+              }
+              break;
+            default:
+              CHECK(false);
+              break;
           }
-          break;
-        case ROIType::Polygon:
-          if (!poly.isClosed()) {
-            poly.push_back(poly[0]);
-          }
-          if (isAdd) {
-            addPolygon(poly, id++);
-          } else {
-            subtractPolygon(poly, id++);
-          }
-          break;
-        case ROIType::Spline:
-          if (!poly.isClosed()) {
-            poly.push_back(poly[0]);
-          }
-          if (isAdd) {
-            addSpline(poly, id++);
-          } else {
-            subtractSpline(poly, id++);
-          }
-          break;
-        default:
-          CHECK(false);
-          break;
+        }
+        id++;
       }
     }
   }
@@ -363,40 +535,48 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
     shapeNumberAttr.write(intType, &shapeNumber);
 
     size_t i = 0;
-    for (const auto&[id, shape] : m_idToShapeOperations) {
-      H5::Group shapeGrp = sliceGrp.createGroup(qUtf8Printable(QString("Shape%1").arg(i + 1)));
+    for (const auto&[id, shapes] : m_idToShapeOperations) {
+      H5::Group allShapeGrp = sliceGrp.createGroup(qUtf8Printable(QString("Shape%1").arg(i + 1)));
       ++i;
 
-      H5::Attribute type = shapeGrp.createAttribute("Type", strType, attrDataSpace);
-      switch (shape.type) {
-        case ROIType::Rect:
-          type.write(strType, std::string("Rect"));
-          break;
-        case ROIType::Ellipse:
-          type.write(strType, std::string("Ellipse"));
-          break;
-        case ROIType::Polygon:
-          type.write(strType, std::string("Polygon"));
-          break;
-        case ROIType::Spline:
-          type.write(strType, std::string("Spline"));
-          break;
-        default:
-          CHECK(false);
-          break;
+      H5::Attribute subShapeNumberAttr = allShapeGrp.createAttribute("SubShapeNumber", intType, attrDataSpace);
+      int subShapeNumber = shapes.size();
+      subShapeNumberAttr.write(intType, &subShapeNumber);
+
+      for (int si = 0; si < subShapeNumber; ++si) {
+        H5::Group shapeGrp = allShapeGrp.createGroup(qUtf8Printable(QString("SubShape%1").arg(si + 1)));
+        const auto& shape = shapes[si];
+        H5::Attribute type = shapeGrp.createAttribute("Type", strType, attrDataSpace);
+        switch (shape.type) {
+          case ROIType::Rect:
+            type.write(strType, std::string("Rect"));
+            break;
+          case ROIType::Ellipse:
+            type.write(strType, std::string("Ellipse"));
+            break;
+          case ROIType::Polygon:
+            type.write(strType, std::string("Polygon"));
+            break;
+          case ROIType::Spline:
+            type.write(strType, std::string("Spline"));
+            break;
+          default:
+            CHECK(false);
+            break;
+        }
+
+        H5::Attribute isAddAttr = shapeGrp.createAttribute("IsAdd", intType, attrDataSpace);
+        int isAdd = shape.isAdd ? 1 : 0;
+        isAddAttr.write(intType, &isAdd);
+
+        hsize_t pointListDim[2];
+        pointListDim[1] = 2;
+        CHECK(shape.poly.size() >= 2);
+        pointListDim[0] = shape.poly.size();
+        H5::DataSpace pointListDataspace(2, pointListDim);
+        H5::DataSet pointList = shapeGrp.createDataSet("Points", doubleType, pointListDataspace);
+        pointList.write(shape.poly.data(), doubleType);
       }
-
-      H5::Attribute isAddAttr = shapeGrp.createAttribute("IsAdd", intType, attrDataSpace);
-      int isAdd = shape.isAdd ? 1 : 0;
-      isAddAttr.write(intType, &isAdd);
-
-      hsize_t pointListDim[2];
-      pointListDim[1] = 2;
-      CHECK(shape.poly.size() >= 2);
-      pointListDim[0] = shape.poly.size();
-      H5::DataSpace pointListDataspace(2, pointListDim);
-      H5::DataSet pointList = shapeGrp.createDataSet("Points", doubleType, pointListDataspace);
-      pointList.write(shape.poly.data(), doubleType);
     }
   }
   catch (H5::Exception const& e) {
@@ -406,10 +586,12 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
 
 bool ZSliceROI::hasPolyOrSpline() const
 {
-  for (const auto&[id, shape] : m_idToShapeOperations) {
-    if (shape.type == ROIType::Polygon ||
-      shape.type == ROIType::Spline)
-      return true;
+  for (const auto&[id, shapes] : m_idToShapeOperations) {
+    for (const auto& shape : shapes) {
+      if (shape.type == ROIType::Polygon ||
+          shape.type == ROIType::Spline)
+        return true;
+    }
   }
   return false;
 }
@@ -605,22 +787,25 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const
   std::vector<ZROIControlPoint> res;
   const ZSliceROI& sliceROI = m_sliceROIs.at(slice);
 
-  for (const auto&[id, shape] : sliceROI.m_idToShapeOperations) {
-    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-      for (int j = 0; j < shape.poly.size() - 1; ++j) {
-        res.emplace_back(slice, id, ZROIControlPoint::Pos::Any, j);
-      }
-    } else {
-      res.emplace_back(slice, id, ZROIControlPoint::Pos::MidLeft);
-      res.emplace_back(slice, id, ZROIControlPoint::Pos::BottomMid);
-      res.emplace_back(slice, id, ZROIControlPoint::Pos::MidRight);
-      res.emplace_back(slice, id, ZROIControlPoint::Pos::TopMid);
-      res.emplace_back(slice, id, ZROIControlPoint::Pos::Center);
-      if (shape.type == ROIType::Rect) {
-        res.emplace_back(slice, id, ZROIControlPoint::Pos::TopLeft);
-        res.emplace_back(slice, id, ZROIControlPoint::Pos::BottomLeft);
-        res.emplace_back(slice, id, ZROIControlPoint::Pos::BottomRight);
-        res.emplace_back(slice, id, ZROIControlPoint::Pos::TopRight);
+  for (const auto&[id, shapes] : sliceROI.m_idToShapeOperations) {
+    for (size_t si = 0; si < shapes.size(); ++si) {
+      const auto& shape = shapes[si];
+      if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+        for (int j = 0; j < shape.poly.size() - 1; ++j) {
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Any, j);
+        }
+      } else {
+        res.emplace_back(slice, id, si, ZROIControlPoint::Pos::MidLeft);
+        res.emplace_back(slice, id, si, ZROIControlPoint::Pos::BottomMid);
+        res.emplace_back(slice, id, si, ZROIControlPoint::Pos::MidRight);
+        res.emplace_back(slice, id, si, ZROIControlPoint::Pos::TopMid);
+        res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Center);
+        if (shape.type == ROIType::Rect) {
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::TopLeft);
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::BottomLeft);
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::BottomRight);
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::TopRight);
+        }
       }
     }
   }
@@ -632,22 +817,25 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice, size_t shapeID
   std::vector<ZROIControlPoint> res;
   const ZSliceROI& sliceROI = m_sliceROIs.at(slice);
 
-  const auto& shape = sliceROI.m_idToShapeOperations.at(shapeID);
-  if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-    for (int j = 0; j < shape.poly.size() - 1; ++j) {
-      res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::Any, j);
-    }
-  } else {
-    res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::MidLeft);
-    res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::BottomMid);
-    res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::MidRight);
-    res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::TopMid);
-    res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::Center);
-    if (shape.type == ROIType::Rect) {
-      res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::TopLeft);
-      res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::BottomLeft);
-      res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::BottomRight);
-      res.emplace_back(slice, shapeID, ZROIControlPoint::Pos::TopRight);
+  const auto& shapes = sliceROI.m_idToShapeOperations.at(shapeID);
+  for (size_t si = 0; si < shapes.size(); ++si) {
+    const auto& shape = shapes[si];
+    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+      for (int j = 0; j < shape.poly.size() - 1; ++j) {
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Any, j);
+      }
+    } else {
+      res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::MidLeft);
+      res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::BottomMid);
+      res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::MidRight);
+      res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::TopMid);
+      res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Center);
+      if (shape.type == ROIType::Rect) {
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::TopLeft);
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::BottomLeft);
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::BottomRight);
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::TopRight);
+      }
     }
   }
 
@@ -663,13 +851,12 @@ void ZROI::rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPo
 std::set<int> ZROI::rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle)
 {
   std::set<int> slices;
-  std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIDToPointIndices;
+  std::map<int, std::map<size_t, std::vector<ZROIControlPoint>>> sliceToShapeIDToControlPoints;
   for (const auto& controlPoint : controlPoints) {
-    sliceToShapeOpIDToPointIndices[controlPoint.slice][controlPoint.shapeOperationID].insert(
-      controlPoint.pointIndex);
+    sliceToShapeIDToControlPoints[controlPoint.slice][controlPoint.shapeID].push_back(controlPoint);
     slices.insert(controlPoint.slice);
   }
-  for (const auto& sliceOthers : sliceToShapeOpIDToPointIndices) {
+  for (const auto& sliceOthers : sliceToShapeIDToControlPoints) {
     auto sit = m_sliceROIs.find(sliceOthers.first);
     if (sit != m_sliceROIs.end()) {
       std::vector<size_t> editedShapes;
@@ -689,13 +876,12 @@ void ZROI::deleteROIControlPoints(const std::vector<ZROIControlPoint>& controlPo
 std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints)
 {
   std::set<int> slices;
-  std::map<int, std::map<size_t, std::set<size_t>>> sliceToShapeOpIDToPointIndices;
+  std::map<int, std::map<size_t, std::vector<ZROIControlPoint>>> sliceToShapeIDToControlPoints;
   for (const auto& controlPoint : controlPoints) {
-    sliceToShapeOpIDToPointIndices[controlPoint.slice][controlPoint.shapeOperationID].insert(
-      controlPoint.pointIndex);
+    sliceToShapeIDToControlPoints[controlPoint.slice][controlPoint.shapeID].push_back(controlPoint);
     slices.insert(controlPoint.slice);
   }
-  for (const auto& sliceOthers : sliceToShapeOpIDToPointIndices) {
+  for (const auto& sliceOthers : sliceToShapeIDToControlPoints) {
     auto sit = m_sliceROIs.find(sliceOthers.first);
     if (sit != m_sliceROIs.end()) {
       std::vector<size_t> removedShapes;
@@ -709,7 +895,7 @@ std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoi
 
 QPointF ZROI::controlPointCoord(const ZROIControlPoint& ctrlPt) const
 {
-  const ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations.at(ctrlPt.shapeOperationID);
+  const ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations.at(ctrlPt.shapeID)[ctrlPt.shapeIndex];
 
   double midX = 0;
   double midY = 0;
@@ -760,9 +946,9 @@ void ZROI::shiftControlPointsCoords(const std::vector<ZROIControlPoint>& control
   std::map<int, std::set<size_t>> sliceToShapeOpIDs;
   for (const auto& ctrlPt : controlPoints) {
     m_changedSlices.insert(ctrlPt.slice);
-    sliceToShapeOpIDs[ctrlPt.slice].insert(ctrlPt.shapeOperationID);
+    sliceToShapeOpIDs[ctrlPt.slice].insert(ctrlPt.shapeID);
 
-    ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations[ctrlPt.shapeOperationID];
+    ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations[ctrlPt.shapeID][ctrlPt.shapeIndex];
     QPointF newPos = controlPointCoord(ctrlPt) + coordShift;
     QRectF rect;
     if (shapeOp.type == ROIType::Ellipse || shapeOp.type == ROIType::Rect) {
@@ -845,7 +1031,7 @@ QPointF ZROI::setControlPointCoord(const ZROIControlPoint& ctrlPt, const QPointF
 {
   m_changedSlices.insert(ctrlPt.slice);
 
-  ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations[ctrlPt.shapeOperationID];
+  ZROIShapeOperation& shapeOp = m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations[ctrlPt.shapeID][ctrlPt.shapeIndex];
   QPointF newPos = coord;
   QRectF rect;
   if (shapeOp.type == ROIType::Ellipse || shapeOp.type == ROIType::Rect) {
@@ -915,16 +1101,16 @@ QPointF ZROI::setControlPointCoord(const ZROIControlPoint& ctrlPt, const QPointF
       break;
   }
 
-  m_sliceROIs.at(ctrlPt.slice).updatePaintPath(ctrlPt.shapeOperationID);
+  m_sliceROIs.at(ctrlPt.slice).updatePaintPath(ctrlPt.shapeID);
 
-  onSliceROIMoved(ctrlPt.slice, std::vector<size_t>{ctrlPt.shapeOperationID});
+  onSliceROIMoved(ctrlPt.slice, std::vector<size_t>{ctrlPt.shapeID});
 
   return newPos;
 }
 
 const ZROIShapeOperation& ZROI::controlPointShapeOp(const ZROIControlPoint& ctrlPt) const
 {
-  return m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations.at(ctrlPt.shapeOperationID);
+  return m_sliceROIs.at(ctrlPt.slice).m_idToShapeOperations.at(ctrlPt.shapeID)[ctrlPt.shapeIndex];
 }
 
 void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID)
@@ -1022,7 +1208,7 @@ void ZROI::load(H5::Group& allGrp)
       int slice;
       sliceAttr.read(intType, &slice);
 
-      m_shapeID = m_sliceROIs[slice].load(sliceGrp, m_shapeID);
+      m_shapeID = m_sliceROIs[slice].load(sliceGrp, m_shapeID, roiVer);
 
       onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>());
     }
@@ -1042,7 +1228,7 @@ void ZROI::save(H5::Group& allGrp) const
     H5::DataSpace attrDataSpace(H5S_SCALAR);
 
     H5::Attribute ver = allGrp.createAttribute("Version", intType, attrDataSpace);
-    int roiVer = 100;
+    int roiVer = 200;
     ver.write(intType, &roiVer);
 
     int idx = 0;

@@ -125,20 +125,23 @@ void ROIGraphicsItem::updateValue()
 
 void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  const auto& shapeOp = m_roi.shapeOperations(m_slice, m_id);
-  if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
-    QMenu menu;
-    QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
-    QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
-    QAction* selectedAction = menu.exec(event->screenPos());
-    if (selectedAction == addCtrlPointAction) {
-      m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
-    } else if (selectedAction == addROItoRegionAction) {
-      ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
-      if (dlg.exec() == QDialog::Accepted) {
-        m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
+  const auto& shapeOps = m_roi.shapeOperations(m_slice, m_id);
+  for (const auto& shapeOp : shapeOps) {
+    if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
+      QMenu menu;
+      QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+      QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
+      QAction* selectedAction = menu.exec(event->screenPos());
+      if (selectedAction == addCtrlPointAction) {
+        m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
+      } else if (selectedAction == addROItoRegionAction) {
+        ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+        if (dlg.exec() == QDialog::Accepted) {
+          m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
+        }
       }
     }
+    return;
   }
 }
 
@@ -148,7 +151,6 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
   , m_roi(roi)
   , m_controlPoint(controlPoint)
   , m_viewScale(viewScale)
-  , m_shapeOp(m_roi.controlPointShapeOp(m_controlPoint))
 {
 //  if (m_shapeOp.type == ROIType::Polygon || m_shapeOp.type == ROIType::Spline) {
 //    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
@@ -242,7 +244,7 @@ void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
   if (event->button() == Qt::LeftButton) {
-    emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeOperationID, event->modifiers() == Qt::ControlModifier);
+    emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
   } else {
     QGraphicsRectItem::mouseDoubleClickEvent(event);
   }

@@ -62,14 +62,48 @@ struct ZROIShapeOperation
   QPolygonF poly;
 };
 
+struct ZROIControlPoint
+{
+  enum class Pos
+  {
+    TopLeft,
+    MidLeft,
+    BottomLeft,
+    BottomMid,
+    BottomRight,
+    MidRight,
+    TopRight,
+    TopMid,
+    Center,
+    Any
+  };
+
+  ZROIControlPoint(int slice_, size_t shapeID_, size_t shapeIndex_, Pos pos_, size_t pointIndex_ = 0)
+    : slice(slice_), shapeID(shapeID_), shapeIndex(shapeIndex_), pos(pos_), pointIndex(pointIndex_)
+  {}
+
+  int slice;
+  size_t shapeID;
+  size_t shapeIndex;
+  Pos pos;
+  size_t pointIndex;
+};
+
 class ZSliceROI
 {
 public:
   bool isEmpty() const
   { return m_idToShapeOperations.empty(); }
 
-  void updatePaintPath(size_t id)
-  { m_idToPainterPath[id] = m_idToShapeOperations.at(id).toPainterPath(); }
+  void updatePaintPath(size_t id);
+
+  void newRect(const QRectF& rect, size_t id);
+
+  void newEllipse(const QRectF& ellipse, size_t id);
+
+  void newPolygon(const QPolygonF& poly, size_t id);
+
+  void newSpline(const QPolygonF& spline, size_t id);
 
   void addRect(const QRectF& rect, size_t id);
 
@@ -87,10 +121,10 @@ public:
 
   void subtractSpline(const QPolygonF& spline, size_t id);
 
-  void rotateCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIDToPointIndices, double angle,
+  void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle,
                         std::vector<size_t>& editedShapes);
 
-  void deleteCtrlPoints(const std::map<size_t, std::set<size_t>>& shapeOpIDToPointIndices,
+  void deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
                         std::vector<size_t>& removedShapes, std::vector<size_t>& editedShapes);
 
   bool addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes);
@@ -105,7 +139,7 @@ public:
 
   QPainterPath paintPath() const;
 
-  size_t load(H5::Group& sliceGrp, size_t id);
+  size_t load(H5::Group& sliceGrp, size_t id, int roiVer);
 
   void save(H5::Group& sliceGrp) const;
 
@@ -114,34 +148,8 @@ public:
 protected:
   friend class ZROI;
 
-  std::map<size_t, ZROIShapeOperation> m_idToShapeOperations;
+  std::map<size_t, std::vector<ZROIShapeOperation>> m_idToShapeOperations;
   std::map<size_t, QPainterPath> m_idToPainterPath;
-};
-
-struct ZROIControlPoint
-{
-  enum class Pos
-  {
-    TopLeft,
-    MidLeft,
-    BottomLeft,
-    BottomMid,
-    BottomRight,
-    MidRight,
-    TopRight,
-    TopMid,
-    Center,
-    Any
-  };
-
-  ZROIControlPoint(int slice_, size_t shapeOperationID_, Pos pos_, size_t pointIndex_ = 0)
-    : slice(slice_), shapeOperationID(shapeOperationID_), pos(pos_), pointIndex(pointIndex_)
-  {}
-
-  int slice;
-  size_t shapeOperationID;
-  Pos pos;
-  size_t pointIndex;
 };
 
 class ZROISliceMoveSelectedControlPointsCommand;
@@ -174,52 +182,128 @@ public:
   void deleteSliceROI_Impl(int slice)
   { emit roiDeleted(slice); m_sliceROIs.erase(slice); }
 
-  void addRect(int slice, const QRectF& rect)
+  void newRect(int slice, const QRectF& rect)
   {
-    m_sliceROIs[slice].addRect(rect, m_shapeID++);
+    m_sliceROIs[slice].newRect(rect, m_shapeID++);
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
-  void addEllipse(int slice, const QRectF& ellipse)
+  void newEllipse(int slice, const QRectF& ellipse)
   {
-    m_sliceROIs[slice].addEllipse(ellipse, m_shapeID++);
+    m_sliceROIs[slice].newEllipse(ellipse, m_shapeID++);
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
-  void addPolygon(int slice, const QPolygonF& poly)
+  void newPolygon(int slice, const QPolygonF& poly)
   {
-    m_sliceROIs[slice].addPolygon(poly, m_shapeID++);
+    m_sliceROIs[slice].newPolygon(poly, m_shapeID++);
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
-  void addSpline(int slice, const QPolygonF& spline)
+  void newSpline(int slice, const QPolygonF& spline)
   {
-    m_sliceROIs[slice].addSpline(spline, m_shapeID++);
+    m_sliceROIs[slice].newSpline(spline, m_shapeID++);
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
   }
 
-  void subtractRect(int slice, const QRectF& rect)
+  void addRect(int slice, const QRectF& rect, int64_t shapeID = -1)
   {
-    m_sliceROIs[slice].subtractRect(rect, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
+    if (m_sliceROIs[slice].isEmpty()) {
+      newRect(slice, rect);
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].addRect(rect, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
   }
 
-  void subtractEllipse(int slice, const QRectF& ellipse)
+  void addEllipse(int slice, const QRectF& ellipse, int64_t shapeID = -1)
   {
-    m_sliceROIs[slice].subtractEllipse(ellipse, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
+    if (m_sliceROIs[slice].isEmpty()) {
+      newEllipse(slice, ellipse);
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].addEllipse(ellipse, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
   }
 
-  void subtractPolygon(int slice, const QPolygonF& poly)
+  void addPolygon(int slice, const QPolygonF& poly, int64_t shapeID = -1)
   {
-    m_sliceROIs[slice].subtractPolygon(poly, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
+    if (m_sliceROIs[slice].isEmpty()) {
+      newPolygon(slice, poly);
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].addPolygon(poly, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
   }
 
-  void subtractSpline(int slice, const QPolygonF& spline)
+  void addSpline(int slice, const QPolygonF& spline, int64_t shapeID = -1)
   {
-    m_sliceROIs[slice].subtractSpline(spline, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID-1}, std::vector<size_t>(), std::vector<size_t>());
+    if (m_sliceROIs[slice].isEmpty()) {
+      newSpline(slice, spline);
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].addSpline(spline, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+  }
+
+  void subtractRect(int slice, const QRectF& rect, int64_t shapeID = -1)
+  {
+    if (m_sliceROIs[slice].isEmpty()) {
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].subtractRect(rect, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+  }
+
+  void subtractEllipse(int slice, const QRectF& ellipse, int64_t shapeID = -1)
+  {
+    if (m_sliceROIs[slice].isEmpty()) {
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].subtractEllipse(ellipse, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+  }
+
+  void subtractPolygon(int slice, const QPolygonF& poly, int64_t shapeID = -1)
+  {
+    if (m_sliceROIs[slice].isEmpty()) {
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].subtractPolygon(poly, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+  }
+
+  void subtractSpline(int slice, const QPolygonF& spline, int64_t shapeID = -1)
+  {
+    if (m_sliceROIs[slice].isEmpty()) {
+      return;
+    }
+    if (shapeID < 0) {
+      shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
+    }
+    m_sliceROIs[slice].subtractSpline(spline, shapeID);
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
   }
 
   void mergeWith(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1);
@@ -264,7 +348,7 @@ public:
     return m_sliceROIs.at(slice).m_idToPainterPath.at(id);
   }
 
-  const ZROIShapeOperation& shapeOperations(int slice, size_t id) const
+  const std::vector<ZROIShapeOperation>& shapeOperations(int slice, size_t id) const
   {
     return m_sliceROIs.at(slice).m_idToShapeOperations.at(id);
   }

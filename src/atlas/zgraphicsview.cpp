@@ -185,14 +185,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_roiAction = ROIAction::Subtract;
             break;
           default:
-            m_roiAction = ROIAction::Add;
+            m_roiAction = ROIAction::New;
             break;
         }
-        if (m_roiAction == ROIAction::New) {
-          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-          for (int i = sliceRange.first; i < sliceRange.second; ++i)
-            m_view->roi().deleteSliceROI(i);
-        }
+//        if (m_roiAction == ROIAction::New) {
+//          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+//          for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//            m_view->roi().deleteSliceROI(i);
+//        }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
         m_startPtItem->setZValue(5000);
@@ -211,10 +211,13 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
           if (m_spline.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-              if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+              if (m_roiAction == ROIAction::New) {
+                m_view->roi().newSpline(i, m_spline);
+              } else if (m_roiAction == ROIAction::Add) {
                 m_view->roi().addSpline(i, m_spline);
-              else if (m_roiAction == ROIAction::Subtract)
+              } else if (m_roiAction == ROIAction::Subtract) {
                 m_view->roi().subtractSpline(i, m_spline);
+              }
             }
           }
           m_startPtItem.reset();
@@ -263,14 +266,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             m_roiAction = ROIAction::Subtract;
             break;
           default:
-            m_roiAction = ROIAction::Add;
+            m_roiAction = ROIAction::New;
             break;
         }
-        if (m_roiAction == ROIAction::New) {
-          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-          for (int i = sliceRange.first; i < sliceRange.second; ++i)
-            m_view->roi().deleteSliceROI(i);
-        }
+//        if (m_roiAction == ROIAction::New) {
+//          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+//          for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//            m_view->roi().deleteSliceROI(i);
+//        }
         QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
         m_startPtItem->setZValue(5000);
@@ -293,10 +296,13 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
           if (m_polygon.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-              if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+              if (m_roiAction == ROIAction::New) {
+                m_view->roi().newPolygon(i, m_polygon);
+              } else if (m_roiAction == ROIAction::Add) {
                 m_view->roi().addPolygon(i, m_polygon);
-              else if (m_roiAction == ROIAction::Subtract)
+              } else if (m_roiAction == ROIAction::Subtract) {
                 m_view->roi().subtractPolygon(i, m_polygon);
+              }
             }
           }
           m_startPtItem.reset();
@@ -376,14 +382,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_roiAction = ROIAction::Subtract;
         break;
       default:
-        m_roiAction = ROIAction::Add;
+        m_roiAction = ROIAction::New;
         break;
     }
-    if (m_roiAction == ROIAction::New) {
-      std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i)
-        m_view->roi().deleteSliceROI(i);
-    }
+//    if (m_roiAction == ROIAction::New) {
+//      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+//      for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//        m_view->roi().deleteSliceROI(i);
+//    }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
     m_startPtItem->setZValue(5000);
@@ -406,14 +412,14 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
         m_roiAction = ROIAction::Subtract;
         break;
       default:
-        m_roiAction = ROIAction::Add;
+        m_roiAction = ROIAction::New;
         break;
     }
-    if (m_roiAction == ROIAction::New) {
-      std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i)
-        m_view->roi().deleteSliceROI(i);
-    }
+//    if (m_roiAction == ROIAction::New) {
+//      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+//      for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//        m_view->roi().deleteSliceROI(i);
+//    }
     QPolygonF startPoly = mapToScene(event->x() - 5, event->y() - 5, 10, 10);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
     m_startPtItem->setZValue(5000);
@@ -450,10 +456,13 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
           //m_view->roi().addSpline(i, m_spline);
-          if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+          if (m_roiAction == ROIAction::New) {
+            m_view->roi().newSpline(i, m_spline);
+          } else if (m_roiAction == ROIAction::Add) {
             m_view->roi().addSpline(i, m_spline);
-          else if (m_roiAction == ROIAction::Subtract)
+          } else if (m_roiAction == ROIAction::Subtract) {
             m_view->roi().subtractSpline(i, m_spline);
+          }
         }
       }
       m_startPtItem.reset();
@@ -465,7 +474,9 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
           //m_view->roi().addPolygon(i, m_polygon);
-          if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New)
+          if (m_roiAction == ROIAction::New) {
+            m_view->roi().newPolygon(i, m_polygon);
+          } else if (m_roiAction == ROIAction::Add)
             m_view->roi().addPolygon(i, m_polygon);
           else if (m_roiAction == ROIAction::Subtract)
             m_view->roi().subtractPolygon(i, m_polygon);
@@ -528,7 +539,9 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New) {
+        if (m_roiAction == ROIAction::New) {
+          m_view->roi().newRect(i, rect);
+        } else if (m_roiAction == ROIAction::Add) {
           m_view->roi().addRect(i, rect);
         } else if (m_roiAction == ROIAction::Subtract) {
           m_view->roi().subtractRect(i, rect);
@@ -542,7 +555,9 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::Add || m_roiAction == ROIAction::New) {
+        if (m_roiAction == ROIAction::New) {
+          m_view->roi().newEllipse(i, rect);
+        } else if (m_roiAction == ROIAction::Add) {
           m_view->roi().addEllipse(i, rect);
         } else if (m_roiAction == ROIAction::Subtract) {
           m_view->roi().subtractEllipse(i, rect);

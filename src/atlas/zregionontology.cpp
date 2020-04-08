@@ -578,7 +578,9 @@ void binaryImgToROI(const ZImg& img, ZROI& roi)
           if (!poly.isClosed()) {
             poly.push_back(poly[0]);
           }
-          if (contoursTree.numAncestors(it) % 2 == 0) {
+          if (contoursTree.numAncestors(it) == 0) {
+            roi.newSpline(s, poly);
+          } else if (contoursTree.numAncestors(it) % 2 == 0) {
             roi.addSpline(s, poly);
           } else {
             roi.subtractSpline(s, poly);

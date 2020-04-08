@@ -115,8 +115,6 @@ private:
   double m_viewScale;
   bool m_fixedSize = true;
 
-  const ZROIShapeOperation& m_shapeOp;
-
   QPointF m_basePos;
 };
 
