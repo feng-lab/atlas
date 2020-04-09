@@ -109,10 +109,11 @@ void ZRegionAnnotationFilter::copyKeyPressed()
   }
 }
 
-void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point)
+void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
 {
+  auto srcBoundBox = m_regionAnnotation->copiedItemBoundBox();
   for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->pasteKeyPressed(slice, point);
+    idFilter.second->pasteKeyPressed(slice, point, srcBoundBox, hFlip, vFlip);
   }
 }
 

@@ -107,11 +107,11 @@ public:
     }
   }
 
-  void pasteKeyPressed(int slice, QPointF point) override
+  void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
-        idFilter.second->pasteKeyPressed(slice, point);
+        idFilter.second->pasteKeyPressed(slice, point, hFlip, vFlip);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());

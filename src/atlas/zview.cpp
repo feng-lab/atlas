@@ -103,7 +103,7 @@ QToolButton* ZView::createROIToolButton(QWidget* parent)
   res->addAction(m_roiPolygonAction);
   res->addAction(m_roiRectangleAction);
   res->addAction(m_roiEllipseAction);
-  res->addAction(m_roiFFPolygonAction);
+  //res->addAction(m_roiFFPolygonAction);
   connect(res, &QToolButton::triggered, res, &QToolButton::setDefaultAction);
   res->setDefaultAction(m_roiSplineAction);
   res->setPopupMode(QToolButton::MenuButtonPopup);
@@ -159,8 +159,8 @@ ZView::State ZView::state() const
     return State::ROIPolygon;
   if (m_roiSplineAction->isChecked())
     return State::ROISpline;
-  if (m_roiFFPolygonAction->isChecked())
-    return State::ROIFFPolygon;
+//  if (m_roiFFPolygonAction->isChecked())
+//    return State::ROIFFPolygon;
 
   return State::Normal;
 }
@@ -337,11 +337,11 @@ void ZView::copy()
   }
 }
 
-void ZView::paste(int slice, QPointF point)
+void ZView::pasteHere(int slice, QPointF point, bool hFlip, bool vFlip)
 {
-  LOG(INFO) << "paste";
+  LOG(INFO) << "paste here";
   for (const auto& view : m_objViews) {
-    view->pasteKeyPressed(slice, point);
+    view->pasteKeyPressed(slice, point, hFlip, vFlip);
   }
 }
 
@@ -349,7 +349,7 @@ void ZView::paste()
 {
   LOG(INFO) << "paste";
   for (const auto& view : m_objViews) {
-    view->pasteKeyPressed(currentSlice(), m_view->lastPressedPoint());
+    view->pasteKeyPressed(currentSlice(), m_view->lastPressedPoint(), false, false);
   }
 }
 
@@ -540,7 +540,7 @@ void ZView::createActions()
   m_pasteAction = new QAction(tr("&Paste"), this);
   m_pasteAction->setStatusTip(tr("Paste Selected Items"));
   m_pasteAction->setShortcut(QKeySequence::Paste);
-  connect(m_pasteAction, &QAction::triggered, this, qOverload<>(&ZView::paste));
+  connect(m_pasteAction, &QAction::triggered, this, &ZView::paste);
 
 //  m_deleteAction = new QAction(tr("&Delete"), this);
 //  m_deleteAction->setStatusTip(tr("Delete Selected Items"));
@@ -634,7 +634,7 @@ void ZView::createActions()
   m_roiStyleActionGroup->addAction(m_roiPolygonAction);
   m_roiStyleActionGroup->addAction(m_roiRectangleAction);
   m_roiStyleActionGroup->addAction(m_roiEllipseAction);
-  m_roiStyleActionGroup->addAction(m_roiFFPolygonAction);
+  //m_roiStyleActionGroup->addAction(m_roiFFPolygonAction);
   //m_roiStyleActionGroup->addAction(m_roiLineAction);
 }
 

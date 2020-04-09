@@ -163,7 +163,7 @@ public:
 
   void copy();
 
-  void paste(int slice, QPointF point);
+  void pasteHere(int slice, QPointF point, bool hFlip = false, bool vFlip = false);
 
   void paste();
 

@@ -43,7 +43,7 @@ public:
 
   virtual void copyKeyPressed() = 0;
 
-  virtual void pasteKeyPressed(int slice, QPointF point) = 0;
+  virtual void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) = 0;
 
   // called if mouse is pressed in a scene pos
   virtual void mousePressed(const QPointF& scenePos) = 0;

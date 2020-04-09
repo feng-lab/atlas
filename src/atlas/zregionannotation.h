@@ -84,6 +84,8 @@ public:
   // apply transformation to mesh
   void transformMesh(const glm::mat4& transformation);
 
+  ZBBox<glm::ivec4> copiedItemBoundBox() const;
+
 signals:
 
   void boundBoxChanged();

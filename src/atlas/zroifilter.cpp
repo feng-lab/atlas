@@ -141,6 +141,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
         }
       }
     }
+    //event->accept();
     return;
   }
 }
@@ -208,6 +209,23 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
 //  QGraphicsRectItem::paint(painter, option, widget);
 //}
 
+//void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+//{
+//  const auto& shapeOp = m_roi.shapeOperations(m_controlPoint.slice, m_controlPoint.shapeID)[m_controlPoint.shapeIndex];
+//  if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
+//    QMenu menu;
+//    QAction* hFlipAction = menu.addAction("Flip Horizontally");
+//    QAction* vFlipAction = menu.addAction("Flip Vertically");
+//    QAction* selectedAction = menu.exec(event->screenPos());
+//    if (selectedAction == hFlipAction) {
+//
+//    } else if (selectedAction == vFlipAction) {
+//
+//    }
+//    //event->accept();
+//  }
+//}
+
 QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
 //  if (change == ItemPositionChange && scene()) {
@@ -234,9 +252,18 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
   return QGraphicsRectItem::itemChange(change, value);
 }
 
+//void ROICtrlPtGraphicsItem::mousePressEvent(QGraphicsSceneMouseEvent* event)
+//{
+//  if (event->button() != Qt::LeftButton) {
+//    event->accept();
+//    return;
+//  }
+//  QGraphicsRectItem::mousePressEvent(event);
+//}
+
 void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-  if (!m_doubleClicked) {
+  if (!m_doubleClicked && event->modifiers() != Qt::AltModifier) {
     QGraphicsRectItem::mouseReleaseEvent(event);
   }
   m_doubleClicked = false;
@@ -245,7 +272,11 @@ void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
   if (event->button() == Qt::LeftButton) {
-    emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
+    if (event->modifiers() == Qt::AltModifier) {
+      emit m_roi.deselectShape(m_controlPoint.slice, m_controlPoint.shapeID);
+    } else {
+      emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
+    }
     m_doubleClicked = true;
   } else {
     QGraphicsRectItem::mouseDoubleClickEvent(event);
@@ -330,6 +361,7 @@ void ZROIFilter::setData(ZROI& roi)
   connect(m_ROI, &ZROI::roiMoved, this, &ZROIFilter::onRoiMoved);
   connect(m_ROI, &ZROI::roiDeleted, this, &ZROIFilter::onRoiDeleted);
   connect(m_ROI, &ZROI::selectShape, this, &ZROIFilter::selectCtrlPtItems);
+  connect(m_ROI, &ZROI::deselectShape, this, &ZROIFilter::deselectCtrlPtItems);
 }
 
 void ZROIFilter::releaseItemsOwnership()
@@ -537,12 +569,21 @@ void ZROIFilter::copyKeyPressed()
     m_ROI->copyROIFromControlPoints(controlPoints);
 }
 
-void ZROIFilter::pasteKeyPressed(int slice, QPointF point)
+void ZROIFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
 {
   if (!m_ROI)
     return;
 
-  m_ROI->pasteROIToCoord(slice, point);
+  m_ROI->pasteROIToCoord(slice, point, m_ROI->copiedItemBoundBox(), hFlip, vFlip);
+}
+
+void ZROIFilter::pasteKeyPressed(int slice, QPointF point, const nim::ZBBox<glm::ivec4>& srcBoundBox, bool hFlip,
+                                 bool vFlip)
+{
+  if (!m_ROI)
+    return;
+
+  m_ROI->pasteROIToCoord(slice, point, srcBoundBox, hFlip, vFlip);
 }
 
 void ZROIFilter::mousePressed(const QPointF& scenePos)
@@ -803,6 +844,15 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
     item->setSelected(true);
   }
   //LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
+}
+
+void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)
+{
+  if (!m_ROI)
+    return;
+  for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
+    item->setSelected(false);
+  }
 }
 
 void ZROIFilter::visibleChanged()

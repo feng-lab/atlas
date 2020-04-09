@@ -103,6 +103,10 @@ public:
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
+  // void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+//  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+
   void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
   void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
@@ -154,7 +158,9 @@ public:
 
   void copyKeyPressed() override;
 
-  void pasteKeyPressed(int slice, QPointF point) override;
+  void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) override;
+
+  void pasteKeyPressed(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip, bool vFlip);
 
   void mousePressed(const QPointF& scenePos) override;
 
@@ -187,6 +193,8 @@ protected:
   void createCtrlPtItems(int slice, size_t shapeID);
 
   void selectCtrlPtItems(int slice, size_t shapeID, bool append);
+
+  void deselectCtrlPtItems(int slice, size_t shapeID);
 
 private:
   void visibleChanged();

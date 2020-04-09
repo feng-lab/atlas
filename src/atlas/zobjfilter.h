@@ -29,10 +29,12 @@ public:
   virtual void copyKeyPressed()
   {}
 
-  virtual void pasteKeyPressed(int slice, QPointF point)
+  virtual void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
   {
     Q_UNUSED(slice)
     Q_UNUSED(point)
+    Q_UNUSED(hFlip)
+    Q_UNUSED(vFlip)
   }
 
   virtual void mousePressed(const QPointF& scenePos)

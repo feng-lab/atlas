@@ -33,7 +33,7 @@ public:
 
   void copyKeyPressed() override;
 
-  void pasteKeyPressed(int slice, QPointF point) override;
+  void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) override;
 
   void mousePressed(const QPointF& scenePos) override;
 

@@ -525,6 +525,17 @@ void ZRegionAnnotation::transformMesh(const glm::mat4& transformation)
   m_undoStack.push(cmd);
 }
 
+ZBBox<glm::ivec4> ZRegionAnnotation::copiedItemBoundBox() const
+{
+  ZBBox<glm::ivec4> boundBox;
+  for (const auto& node : m_ontology) {
+    if (node.roi) {
+      boundBox.expand(node.roi->copiedItemBoundBox());
+    }
+  }
+  return boundBox;
+}
+
 void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
 {
   auto it = m_ontology.begin();

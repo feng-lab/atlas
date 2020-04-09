@@ -42,6 +42,8 @@ struct ZROIShapeOperation
   void translate(double x, double y)
   { poly.translate(x, y); }
 
+  void flipAround(double x, double y, bool hFlip, bool vFlip);
+
   QRectF rect() const
   {
     CHECK(poly.size() == 2);
@@ -136,6 +138,8 @@ public:
   void setTopLeft(double x, double y);
 
   void translate(double x, double y);
+
+  void flipAround(double x, double y, bool hFlip, bool vFlip);
 
   QRectF boundingRect() const;
 
@@ -368,7 +372,9 @@ public:
 
   void copyROIFromControlPoints(const std::vector<ZROIControlPoint>& controlPoints);
 
-  void pasteROIToCoord(int slice, QPointF point);
+  ZBBox<glm::ivec4> copiedItemBoundBox() const;
+
+  void pasteROIToCoord(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip = false, bool vFlip = false);
 
   QPointF controlPointCoord(const ZROIControlPoint& ctrlPt) const;
 
@@ -449,6 +455,8 @@ signals:
   void boundBoxChanged();
 
   void selectShape(int slice, size_t shapeID, bool append);
+
+  void deselectShape(int slice, size_t shapeID);
 
   void undoStackCleanChanged(bool clean);
 

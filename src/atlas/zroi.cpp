@@ -10,6 +10,31 @@
 
 namespace nim {
 
+void ZROIShapeOperation::flipAround(double x, double y, bool hFlip, bool vFlip)
+{
+  if (!hFlip && !vFlip)
+    return;
+  if (type == ROIType::Rect || type == ROIType::Ellipse) {
+    auto r = rect();
+    poly.clear();
+    poly.push_back(r.topLeft());
+    poly.push_back(r.topRight());
+    poly.push_back(r.bottomRight());
+    poly.push_back(r.bottomLeft());
+  }
+  for (auto& pt : poly) {
+    if (hFlip) {
+      pt.setX(x * 2.0 - pt.x());
+    }
+    if (vFlip) {
+      pt.setY(y * 2.0 - pt.y());
+    }
+  }
+  if (type == ROIType::Rect || type == ROIType::Ellipse) {
+    setRect(poly.boundingRect());
+  }
+}
+
 QPainterPath ZROIShapeOperation::toPainterPath() const
 {
   QPainterPath res;
@@ -300,6 +325,15 @@ void ZSliceROI::translate(double x, double y)
   for (auto&[id, shapes] : m_idToShapeOperations) {
     for (auto& shape : shapes)
       shape.translate(x, y);
+    updatePaintPath(id);
+  }
+}
+
+void ZSliceROI::flipAround(double x, double y, bool hFlip, bool vFlip)
+{
+  for (auto&[id, shapes] : m_idToShapeOperations) {
+    for (auto& shape : shapes)
+      shape.flipAround(x, y, hFlip, vFlip);
     updatePaintPath(id);
   }
 }
@@ -924,12 +958,8 @@ void ZROI::copyROIFromControlPoints(const std::vector<ZROIControlPoint>& control
   }
 }
 
-void ZROI::pasteROIToCoord(int slice, QPointF point)
+ZBBox<glm::ivec4> ZROI::copiedItemBoundBox() const
 {
-  if (m_sliceROICopy.empty()) {
-    return;
-  }
-
   ZBBox<glm::ivec4> boundBox;
   for (const auto& sliceROI : m_sliceROICopy) {
     QRectF rect = sliceROI.second.boundingRect();
@@ -938,12 +968,25 @@ void ZROI::pasteROIToCoord(int slice, QPointF point)
     boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1),
                                sliceROI.first, 0));
   }
+  return boundBox;
+}
+
+void ZROI::pasteROIToCoord(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip, bool vFlip)
+{
+  if (m_sliceROICopy.empty()) {
+    return;
+  }
 
   std::map<int, ZSliceROI> sliceROIs;
-  for (const auto& [s, sliceROI] : m_sliceROICopy) {
-    sliceROIs[s + slice] = sliceROI;
-    sliceROIs[s + slice].translate(point.x() - boundBox.minCorner().x,
-                                   point.y() - boundBox.minCorner().y);
+  for (const auto&[s, sliceROI] : m_sliceROICopy) {
+    auto targetSlice = s + slice - srcBoundBox.minCorner().z;
+    sliceROIs[targetSlice] = sliceROI;
+    if (hFlip || vFlip) {
+      sliceROIs[targetSlice].flipAround(point.x(), point.y(), hFlip, vFlip);
+    } else {
+      sliceROIs[targetSlice].translate(point.x() - srcBoundBox.minCorner().x,
+                                       point.y() - srcBoundBox.minCorner().y);
+    }
   }
 
   m_undoStack->push(new ZROIMergeROICommand(*this, sliceROIs));
