@@ -50,6 +50,12 @@ public:
 
   ~ZView();
 
+  inline QAction* copyAction()
+  { return m_copyAction; }
+
+  inline QAction* pasteAction()
+  { return m_pasteAction; }
+
   inline QAction* zoomInAction()
   { return m_zoomInAction; }
 
@@ -155,6 +161,12 @@ public:
 
   int maxViewPrecedence() const;
 
+  void copy();
+
+  void paste(int slice, QPointF point);
+
+  void paste();
+
 signals:
 
   void objViewReady(size_t id);
@@ -212,6 +224,10 @@ private:
   mutable ZDVec4Parameter* m_viewport;
 
   //
+  QAction* m_copyAction;
+  QAction* m_pasteAction;
+  // QAction* m_deleteAction;
+
   QAction* m_zoomInAction;
   QAction* m_zoomOutAction;
   QActionGroup* m_imgViewStyleActionGroup;

@@ -49,6 +49,9 @@ public:
 
   void setRubberBandDragMode();
 
+  QPointF lastPressedPoint()
+  { return m_lastPressedPt; }
+
 signals:
 
   void scaleChanged(double s);
@@ -102,6 +105,8 @@ private:
   std::unique_ptr<QGraphicsPathItem> m_ffpolygonItem;
 
   double m_currentStepScaleFactor = 1.;
+
+  QPointF m_lastPressedPt;
 };
 
 } // namespace nim

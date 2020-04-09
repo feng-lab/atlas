@@ -102,6 +102,20 @@ void ZRegionAnnotationFilter::deleteKeyPressed()
   }
 }
 
+void ZRegionAnnotationFilter::copyKeyPressed()
+{
+  for (const auto& idFilter : m_idToROIFilters) {
+    idFilter.second->copyKeyPressed();
+  }
+}
+
+void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point)
+{
+  for (const auto& idFilter : m_idToROIFilters) {
+    idFilter.second->pasteKeyPressed(slice, point);
+  }
+}
+
 void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 {
   for (const auto& idFilter : m_idToROIFilters) {

@@ -31,6 +31,10 @@ public:
 
   void deleteKeyPressed() override;
 
+  void copyKeyPressed() override;
+
+  void pasteKeyPressed(int slice, QPointF point) override;
+
   void mousePressed(const QPointF& scenePos) override;
 
   void mouseMoved(const QPointF& scenePos) override;

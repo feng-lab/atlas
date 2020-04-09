@@ -3,6 +3,7 @@
 #include "zview.h"
 #include "zlog.h"
 #include <QGraphicsSceneMouseEvent>
+#include <QMenu>
 
 namespace nim {
 
@@ -12,6 +13,16 @@ ZGraphicsScene::ZGraphicsScene(ZView* view)
 {
   setSceneRect(QRectF(0, 0, 200, 200));
   setItemIndexMethod(NoIndex);
+}
+
+void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMenuEvent)
+{
+  QMenu menu;
+  QAction *pasteAction = menu.addAction("Paste");
+  QAction *selectedAction = menu.exec(contextMenuEvent->screenPos());
+  if (selectedAction == pasteAction) {
+    m_view->paste(m_view->currentSlice(), contextMenuEvent->scenePos());
+  }
 }
 
 void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)

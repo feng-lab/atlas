@@ -72,6 +72,8 @@ protected:
 
   void setModified();
 
+  void setModified(bool clean);
+
   void importMaskImage();
 
   void createMaskImage();

@@ -329,6 +329,30 @@ int ZView::maxViewPrecedence() const
   return res;
 }
 
+void ZView::copy()
+{
+  LOG(INFO) << "copy";
+  for (const auto& view : m_objViews) {
+    view->copyKeyPressed();
+  }
+}
+
+void ZView::paste(int slice, QPointF point)
+{
+  LOG(INFO) << "paste";
+  for (const auto& view : m_objViews) {
+    view->pasteKeyPressed(slice, point);
+  }
+}
+
+void ZView::paste()
+{
+  LOG(INFO) << "paste";
+  for (const auto& view : m_objViews) {
+    view->pasteKeyPressed(currentSlice(), m_view->lastPressedPoint());
+  }
+}
+
 void ZView::sliceChanged()
 {
   if (m_doNotReceiveSliceSignal)
@@ -508,6 +532,23 @@ void ZView::keyPressEvent(QKeyEvent* event)
 
 void ZView::createActions()
 {
+  m_copyAction = new QAction(tr("&Copy"), this);
+  m_copyAction->setStatusTip(tr("Copy Selected Items"));
+  m_copyAction->setShortcut(QKeySequence::Copy);
+  connect(m_copyAction, &QAction::triggered, this, &ZView::copy);
+
+  m_pasteAction = new QAction(tr("&Paste"), this);
+  m_pasteAction->setStatusTip(tr("Paste Selected Items"));
+  m_pasteAction->setShortcut(QKeySequence::Paste);
+  connect(m_pasteAction, &QAction::triggered, this, qOverload<>(&ZView::paste));
+
+//  m_deleteAction = new QAction(tr("&Delete"), this);
+//  m_deleteAction->setStatusTip(tr("Delete Selected Items"));
+//  QList<QKeySequence> deleteKey;
+//  deleteKey << QKeySequence::Delete << QKeySequence(Qt::Key_Backspace);
+//  m_deleteAction->setShortcuts(deleteKey);
+//  connect(m_deleteAction, &QAction::triggered, this, &ZView::deleteKeyPressed);
+
   m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);

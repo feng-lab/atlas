@@ -95,6 +95,30 @@ public:
     }
   }
 
+  void copyKeyPressed() override
+  {
+    for (const auto& idFilter : m_idToFilter) {
+      try {
+        idFilter.second->copyKeyPressed();
+      }
+      catch (const ZException& e) {
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+      }
+    }
+  }
+
+  void pasteKeyPressed(int slice, QPointF point) override
+  {
+    for (const auto& idFilter : m_idToFilter) {
+      try {
+        idFilter.second->pasteKeyPressed(slice, point);
+      }
+      catch (const ZException& e) {
+        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+      }
+    }
+  }
+
   void mousePressed(const QPointF& scenePos) override
   {
     for (const auto& idFilter : m_idToFilter) {

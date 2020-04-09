@@ -21,11 +21,13 @@ signals:
   void mouseReleased(QPointF);
 
 protected:
-  void mousePressEvent(QGraphicsSceneMouseEvent* event);
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent *contextMenuEvent) override;
 
-  void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
+  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
-  void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
+  void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
+
+  void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
 
 private:
   ZView* m_view;

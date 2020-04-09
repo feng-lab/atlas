@@ -236,15 +236,17 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
 
 void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
-  if (event->button() != Qt::LeftButton) {
+  if (!m_doubleClicked) {
     QGraphicsRectItem::mouseReleaseEvent(event);
   }
+  m_doubleClicked = false;
 }
 
 void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
   if (event->button() == Qt::LeftButton) {
     emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
+    m_doubleClicked = true;
   } else {
     QGraphicsRectItem::mouseDoubleClickEvent(event);
   }
@@ -512,6 +514,35 @@ void ZROIFilter::deleteKeyPressed()
   }
   if (!controlPoints.empty())
     m_ROI->deleteROIControlPoints(controlPoints);
+}
+
+void ZROIFilter::copyKeyPressed()
+{
+  if (!m_ROI)
+    return;
+
+  m_ROI->clearCopy();
+
+  std::vector<ZROIControlPoint> controlPoints;
+  for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+    for (auto&[id, ctrlItems] : sliceItem) {
+      for (auto& item : ctrlItems) {
+        if (item->isSelected()) {
+          controlPoints.push_back(item->controlPoint());
+        }
+      }
+    }
+  }
+  if (!controlPoints.empty())
+    m_ROI->copyROIFromControlPoints(controlPoints);
+}
+
+void ZROIFilter::pasteKeyPressed(int slice, QPointF point)
+{
+  if (!m_ROI)
+    return;
+
+  m_ROI->pasteROIToCoord(slice, point);
 }
 
 void ZROIFilter::mousePressed(const QPointF& scenePos)

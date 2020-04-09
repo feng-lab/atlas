@@ -116,6 +116,7 @@ private:
   bool m_fixedSize = true;
 
   QPointF m_basePos;
+  bool m_doubleClicked = false;
 };
 
 class ZROIFilter : public ZObjFilter
@@ -150,6 +151,10 @@ public:
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupForAnnotationFilter();
 
   void deleteKeyPressed() override;
+
+  void copyKeyPressed() override;
+
+  void pasteKeyPressed(int slice, QPointF point) override;
 
   void mousePressed(const QPointF& scenePos) override;
 

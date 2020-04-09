@@ -617,6 +617,10 @@ void ZMainWindow::createMenus()
   m_editMenu = menuBar()->addMenu(tr("&Edit"));
   m_editMenu->addAction(m_doc->undoAction());
   m_editMenu->addAction(m_doc->redoAction());
+  m_editMenu->addSeparator();
+  m_editMenu->addAction(m_view->copyAction());
+  m_editMenu->addAction(m_view->pasteAction());
+  //m_editMenu->addAction(m_view->deleteAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
   m_viewMenu->addAction(m_view->zoomInAction());

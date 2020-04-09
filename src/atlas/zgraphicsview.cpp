@@ -20,6 +20,7 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   : QGraphicsView(scene, parent)
   , m_view(parent)
   , m_scale("Scale", 100, 7, 10000)
+  , m_lastPressedPt(0, 0)
 {
   setMinimumSize(400, 400);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
@@ -28,6 +29,7 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);
   setRenderHint(QPainter::Antialiasing);
   setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
+  // setResizeAnchor(QGraphicsView::AnchorUnderMouse);
   setMouseTracking(true);
   //viewport()->setCursor(Qt::ArrowCursor);
   setBackgroundRole(QPalette::NoRole);
@@ -161,6 +163,8 @@ void ZGraphicsView::checkViewport()
 
 void ZGraphicsView::mousePressEvent(QMouseEvent* event)
 {
+  m_lastPressedPt = mapToScene(event->x(), event->y());
+
   QGraphicsItem* item = itemAt(event->x(), event->y());
   ROIGraphicsItem* roiItem = qgraphicsitem_cast<ROIGraphicsItem*>(item);
   ROICtrlPtGraphicsItem* roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);

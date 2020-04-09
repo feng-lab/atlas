@@ -135,6 +135,8 @@ public:
 
   void setTopLeft(double x, double y);
 
+  void translate(double x, double y);
+
   QRectF boundingRect() const;
 
   QPainterPath paintPath() const;
@@ -361,6 +363,13 @@ public:
 
   std::set<int> deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints);
 
+  void clearCopy()
+  { m_sliceROICopy.clear(); }
+
+  void copyROIFromControlPoints(const std::vector<ZROIControlPoint>& controlPoints);
+
+  void pasteROIToCoord(int slice, QPointF point);
+
   QPointF controlPointCoord(const ZROIControlPoint& ctrlPt) const;
 
   void shiftControlPointsCoords(const std::vector<ZROIControlPoint>& controlPoints, const QPointF& coordShift);
@@ -402,6 +411,10 @@ public:
   void changeSliceROIs(const std::map<int, ZSliceROI>& sliceROIs, const std::set<int>& changedSlices);
 
   // qt style read write name filter for filedialog
+  static QString fileExtension()
+  { return ".nimroi"; }
+
+  // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename)
   { return filename.endsWith(".nimroi", Qt::CaseInsensitive); }
 
@@ -437,6 +450,8 @@ signals:
 
   void selectShape(int slice, size_t shapeID, bool append);
 
+  void undoStackCleanChanged(bool clean);
+
 protected:
   void resetBoundBox();
 
@@ -458,6 +473,8 @@ protected:
   std::set<int> m_changedSlices;
 
   size_t m_shapeID = 0;
+
+  std::map<int, ZSliceROI> m_sliceROICopy;
 };
 
 class ZROICommand : public QUndoCommand

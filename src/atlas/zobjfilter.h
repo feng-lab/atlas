@@ -26,6 +26,15 @@ public:
   virtual void deleteKeyPressed()
   {}
 
+  virtual void copyKeyPressed()
+  {}
+
+  virtual void pasteKeyPressed(int slice, QPointF point)
+  {
+    Q_UNUSED(slice)
+    Q_UNUSED(point)
+  }
+
   virtual void mousePressed(const QPointF& scenePos)
   { Q_UNUSED(scenePos) }
 

@@ -281,6 +281,26 @@ void ZROIDoc::setModified()
   }
 }
 
+void ZROIDoc::setModified(bool clean)
+{
+  if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
+    for (const auto& idPack : m_idToROIPacks) {
+      if (idPack.second->roi.get() == roi) {
+        if (clean && idPack.second->path.endsWith(ZROI::fileExtension(), Qt::CaseInsensitive)) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = false;
+          m_doc.updateObjInfo(idPack.first);
+        } else if (!idPack.second->hasUnsavedChange) {
+          idPack.second->updateDerivedData();
+          idPack.second->hasUnsavedChange = true;
+          m_doc.updateObjInfo(idPack.first);
+        }
+        return;
+      }
+    }
+  }
+}
+
 void ZROIDoc::importMaskImage()
 {
   QStringList filters;
@@ -372,9 +392,11 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
   m_doc.undoGroup()->addStack(roi->undoStack());
 
   emit objAdded(id, this);
-  connect(roi, &ZROI::roiChanged, this, &ZROIDoc::setModified);
-  connect(roi, &ZROI::roiDeleted, this, &ZROIDoc::setModified);
-  connect(roi, &ZROI::roiMoved, this, &ZROIDoc::setModified);
+  connect(roi, &ZROI::roiChanged, this, qOverload<>(&ZROIDoc::setModified));
+  connect(roi, &ZROI::roiDeleted, this, qOverload<>(&ZROIDoc::setModified));
+  connect(roi, &ZROI::roiMoved, this, qOverload<>(&ZROIDoc::setModified));
+//  connect(roi, &ZROI::undoStackCleanChanged,
+//          this, qOverload<bool>(&ZROIDoc::setModified));
   return id;
 }
 
