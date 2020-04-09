@@ -728,6 +728,8 @@ PYBIND11_MODULE(_imgpy, m)
                 "ellipse"_a.noconvert())
     .def_static("polygonToMask", &ZROIUtils::polygonToMask_Python,
                 "polygon"_a.noconvert())
+    .def_static("shapeToMask", &ZROIUtils::shapeToMask_Python,
+                "shapes"_a)
     .def("__repr__", [](const ZROIUtils&) {
       return QString("<_imgpy.ZROIUtils>").toStdString();
     });

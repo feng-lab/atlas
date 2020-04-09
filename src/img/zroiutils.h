@@ -64,7 +64,7 @@ public:
   using RowMatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using RowMatrixXu8 = Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using RowMatrixXb = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-  using EigenDRef = Eigen::Ref<const Eigen::MatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
+  using EigenDRef = Eigen::Ref<const RowMatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
 
 // return tight mask, x_start, y_start in which mask could be empty
   // static std::tuple<RowMatrixXb, int32_t, int32_t> qPainterPathToMask_Python(const QPainterPath& path);
@@ -84,7 +84,7 @@ public:
     QPolygonF res;
     if (mat.rows() == 0 || mat.cols() == 0)
       return res;
-    CHECK(mat.cols() == 2);
+    CHECK(mat.cols() == 2) << mat.rows() << " " << mat.cols();
     res = QPolygonF(mat.rows());
     for (Eigen::Index r = 0; r < mat.rows(); ++r) {
       res[r].setX(mat(r, 0));
@@ -132,6 +132,30 @@ public:
   inline static std::tuple<ZImg, int32_t, int32_t> polygonToMask_Python(const EigenDRef& poly)
   {
     return qPainterPathToMask(polygonToQPainterPath(matToPoly(poly)));
+  }
+
+  inline static std::tuple<ZImg, int32_t, int32_t> shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
+  {
+    QPainterPath pp;
+    for (const auto&[points, type, isAdd] : shapeOps) {
+      QPainterPath subpp;
+      auto poly = matToPoly(points);
+      if (type == "Rect") {
+        subpp = rectToQPainterPath(poly);
+      } else if (type == "Ellipse") {
+        subpp = ellipseToQPainterPath(poly);
+      } else if (type == "Polygon") {
+        subpp = polygonToQPainterPath(poly);
+      } else if (type == "Spline") {
+        subpp = splineToQPainterPath(poly);
+      }
+      if (isAdd) {
+        pp += subpp;
+      } else {
+        pp -= subpp;
+      }
+    }
+    return qPainterPathToMask(pp);
   }
 #endif
 
