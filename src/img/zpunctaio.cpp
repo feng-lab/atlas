@@ -481,7 +481,11 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
 {
   Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
-  if (mat.rows() > 0 && mat.cols() == 3) {
+  if (mat.rows() > 0 && mat.cols() == 2) {
+    for (int i = 0; i < mat.rows(); ++i) {
+      puncta.emplace_back(mat(i, 0), mat(i, 1), 0.0, 2);
+    }
+  } else if (mat.rows() > 0 && mat.cols() == 3) {
     for (int i = 0; i < mat.rows(); ++i) {
       puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), 2);
     }
@@ -490,7 +494,7 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
       puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
     }
   } else {
-    throw ZIOException("file is not nx3 or nx4 matrix");
+    throw ZIOException("file is not nx2 or nx3 or nx4 matrix");
   }
 }
 
