@@ -16,7 +16,7 @@ from common_dirs import *
 
 
 def macos_min_version():
-    return '10.12'
+    return '10.13'
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
@@ -506,12 +506,10 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                         '-DACCELERATESPARSE:BOOL=OFF',
                          '-DSUITESPARSE:BOOL=OFF',
                          '-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_BENCHMARKS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DEIGENSPARSE:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])
