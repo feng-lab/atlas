@@ -1109,7 +1109,7 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['curl']:
         if is_windows():
-            unpack_tool_to_software_dir(src_package_dir(), 'curl*win*')
+            unpack_tool_to_target_dir(src_package_dir(), 'curl*win*')
 
     if libs['tbb']:
         subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
@@ -1249,7 +1249,7 @@ def build_libs(libs: dict, update_src: bool):
         if update_src:
             update_git_submodule(src_dir)
         if is_windows():
-            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+            nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
         else:
             nasm_dir = ''  # does not need
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
@@ -1262,9 +1262,9 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['libjpeg']:
         if is_windows():
-            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+            nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
         elif is_mac():
-            nasm_dir = unpack_tool_to_software_dir(src_package_dir(), 'nasm*macosx*', 'nasm-*')
+            nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*macosx*', 'nasm-*')
             os.chown(os.path.join(nasm_dir, 'nasm'), os.getuid(), os.getgid())
             os.chmod(os.path.join(nasm_dir, 'nasm'), os.stat(os.path.join(nasm_dir, 'nasm')).st_mode | stat.S_IXUSR)
         else:
@@ -1355,14 +1355,14 @@ def build_libs(libs: dict, update_src: bool):
     #
     # if libs['ospray']:
     #     if is_windows():
-    #         ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*win*')
-    #         embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*win*')
+    #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*win*')
+    #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*win*')
     #     elif is_linux():
-    #         ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*linux*')
-    #         embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*linux*')
+    #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*linux*')
+    #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*linux*')
     #     else:
-    #         ispc_dir = unpack_tool_to_software_dir(src_package_dir(), 'ispc*osx*')
-    #         embree_dir = unpack_tool_to_software_dir(src_package_dir(), 'embree*osx*')
+    #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*osx*')
+    #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*osx*')
     #     src_dir = os.path.join(ext_dir(), 'OSPRay')
     #     if update_src:
     #         update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
