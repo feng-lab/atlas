@@ -29,12 +29,6 @@ def atlas_repository_dir() -> str:
     return res
 
 
-def base_dir() -> str:
-    res = os.path.normpath(os.path.join(atlas_repository_dir(), '..'))
-    assert os.path.exists(res)
-    return res
-
-
 def atlas_src_dir() -> str:
     res = os.path.join(atlas_repository_dir(), 'src')
     assert os.path.exists(res)
@@ -78,7 +72,7 @@ def resource_dir() -> str:
 
 
 def src_package_dir() -> str:
-    res = os.path.join(base_dir(), 'atlas_others')
+    res = os.path.join(os.path.normpath(os.path.join(atlas_repository_dir(), '..')), 'atlas_others')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
             res = os.path.join('Z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_others')
@@ -294,6 +288,14 @@ def find_src_package_with_glob(files: str):
         raise Exception("Can not find matching package with pattern: " + files)
     else:
         raise Exception("Find more than one matching packages with pattern: " + files)
+
+
+def remove_old_src_folder_with_glob(folder: str):
+    folder_list = glob.glob(folder)
+    if len(folder_list) == 1:
+        shutil.rmtree(folder_list[0], ignore_errors=False)
+    elif len(folder_list) > 1:
+        raise Exception("Find more than one matching folders with pattern: " + folder)
 
 
 def get_package_top_level_folder(file: str, folder: str):

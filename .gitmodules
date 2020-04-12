@@ -22,3 +22,55 @@
 	path = src/3rdparty/ceres-solver
 	url = https://github.com/ceres-solver/ceres-solver.git
 	branch = master
+[submodule "src/3rdparty/folly"]
+	path = src/3rdparty/folly
+	url = https://github.com/facebook/folly.git
+	branch = master
+[submodule "src/3rdparty/cpuinfo"]
+	path = src/3rdparty/cpuinfo
+	url = https://github.com/pytorch/cpuinfo.git
+	branch = master
+[submodule "src/3rdparty/gflags"]
+	path = src/3rdparty/gflags
+	url = https://github.com/gflags/gflags.git
+	branch = master
+[submodule "src/3rdparty/glog"]
+	path = src/3rdparty/glog
+	url = https://github.com/feng-lab/glog.git
+	branch = feng
+[submodule "src/3rdparty/benchmark"]
+	path = src/3rdparty/benchmark
+	url = https://github.com/google/benchmark.git
+	branch = master
+[submodule "src/3rdparty/glbinding"]
+	path = src/3rdparty/glbinding
+	url = https://github.com/cginternals/glbinding.git
+	branch = master
+[submodule "src/3rdparty/jxrlib"]
+	path = src/3rdparty/jxrlib
+	url = https://github.com/4creators/jxrlib
+	branch = master
+[submodule "src/3rdparty/assimp"]
+	path = src/3rdparty/assimp
+	url = https://github.com/assimp/assimp.git
+	branch = master
+[submodule "src/3rdparty/ITK"]
+	path = src/3rdparty/ITK
+	url = https://github.com/InsightSoftwareConsortium/ITK.git
+	branch = master
+[submodule "src/3rdparty/vtk"]
+	path = src/3rdparty/vtk
+	url = https://gitlab.kitware.com/vtk/vtk.git
+	branch = master
+[submodule "src/3rdparty/opencv"]
+	path = src/3rdparty/opencv
+	url = https://github.com/opencv/opencv.git
+	branch = master
+[submodule "src/3rdparty/opencv_contrib"]
+	path = src/3rdparty/opencv_contrib
+	url = https://github.com/opencv/opencv_contrib.git
+	branch = master
+[submodule "src/3rdparty/grpc"]
+	path = src/3rdparty/grpc
+	url = https://github.com/grpc/grpc.git
+	branch = master

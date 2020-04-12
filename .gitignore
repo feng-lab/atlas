@@ -22,6 +22,15 @@
 *.jar
 *.pyc
 
+# source code dirs
+/src/3rdparty/zlib*
+/src/3rdparty/libjpeg*
+/src/3rdparty/libpng*
+/src/3rdparty/GeometricTools*
+/src/3rdparty/hdf5*
+/src/3rdparty/FreeImage*
+/src/3rdparty/__*
+
 !/neurolabi/lib/Mingw/*.zip
 
 # qtcreator c project file
