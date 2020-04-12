@@ -12,20 +12,20 @@ if (WIN32)
 endif (WIN32)
 
 find_package(c-ares REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/c-ares NO_DEFAULT_PATH)
-set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boringssl)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
 find_package(OpenSSL REQUIRED)
 
 # Find Protobuf installation
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
 find_package(Protobuf CONFIG REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/protobuf NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using Protobuf ${Protobuf_VERSION}")
 
 # Find gRPC installation
 # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
 find_package(gRPC CONFIG REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/grpc NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 
 include(gRPCGenerateCPP)
@@ -41,7 +41,7 @@ set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
 
 find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/vtk NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "VTK_DIR: ${VTK_DIR}")
 message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
 
@@ -49,14 +49,14 @@ set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools)
 
 find_package(benchmark REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/benchmark NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/share ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/hdf5/cmake NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(ASSIMP REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/assimp NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "ASSIMP_INCLUDE_DIRS: ${ASSIMP_INCLUDE_DIRS}")
 message(STATUS "ASSIMP_LIBRARY_DIRS: ${ASSIMP_LIBRARY_DIRS}")
 message(STATUS "ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
@@ -64,12 +64,12 @@ link_directories(${ASSIMP_LIBRARY_DIRS})  # need to do this before creating targ
 
 set(OpenCV_STATIC ON)
 find_package(OpenCV REQUIRED COMPONENTS imgproc core
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/opencv NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV_LIBS: ${OpenCV_LIBS}")
 
 find_package(GLBINDING REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glbinding NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
@@ -151,7 +151,7 @@ if (WIN32)
 elseif (APPLE)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif (WIN32)
 
@@ -573,8 +573,8 @@ target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/boost)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/folly)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/boost)
+target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/folly)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0601 _USE_MATH_DEFINES _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
@@ -621,11 +621,11 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\jdk"
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\build\\jdk"
                      "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jdk")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\jars"
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\build\\jars"
                      "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jars")
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
@@ -675,11 +675,11 @@ else (WIN32)
                           )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jdk
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jdk)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jars
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jars)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -694,15 +694,15 @@ else (WIN32)
                        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ffmpeg
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jdk
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/jars
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jars)
   endif ()
 endif (WIN32)
