@@ -505,10 +505,13 @@ def build_ceres_solver(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        cmakecmd.extend(['-DBUILD_TESTING:BOOL="0"',
-                         '-DACCELERATESPARSE:BOOL="0"',
-                         '-DSUITESPARSE:BOOL="0"',
-                         '-DBUILD_EXAMPLES:BOOL="0"',
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         '-DACCELERATESPARSE:BOOL=OFF',
+                         '-DSUITESPARSE:BOOL=OFF',
+                         '-DBUILD_EXAMPLES:BOOL=OFF',
+                         '-DBUILD_BENCHMARKS:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DEIGENSPARSE:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])

@@ -147,6 +147,8 @@ def make_cmake_ceres_solver_project(ceres_folder: str, out_folder: str):
 
 
 if __name__ == "__main__":
+    print('build ceres-solver separately now')
+    sys.exit(1)
     if len(sys.argv) > 2:
         make_cmake_ceres_solver_project(sys.argv[1], sys.argv[2])
     else:

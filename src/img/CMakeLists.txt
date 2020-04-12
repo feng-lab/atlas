@@ -8,8 +8,6 @@ project(img)
 #   message(STATUS "${_variableName}=${${_variableName}}")
 # endforeach ()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/ceres-solver/ceres-solver.cmake)
-
 # tiff srcs
 set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
 set(TIFF_SOURCES
@@ -256,7 +254,6 @@ else ()
   set(LIBRARY_NAME img)
 endif ()
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES}
-            ${CERESSOLVER_HEADERS} ${CERESSOLVER_INTERNAL}
             )
 
 if (BUILD_WITH_CONDA)
@@ -268,7 +265,6 @@ endif ()
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
-target_include_directories(${LIBRARY_NAME} PUBLIC ${CERESSOLVER_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/eigen3)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/boost)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
@@ -328,9 +324,6 @@ if (WIN32)
   set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
 
-  set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                              "/wd4100 /wd4996 /I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}") # 'identifier' : unreferenced formal parameter)
-
   set_source_files_properties(zroiutils.cpp PROPERTIES COMPILE_FLAGS /I${GEOMETRICTOOLS_INCLUDE_DIRS})
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
@@ -375,24 +368,12 @@ else (WIN32)
 
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 
-  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
-                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder \
-                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set_source_files_properties(${CERESSOLVER_INTERNAL} PROPERTIES COMPILE_FLAGS
-                                "-Wno-unused-parameter -Wno-sign-compare -Wno-shadow -Wno-ignored-qualifiers \
-                              -Wno-unknown-pragmas -Wno-unused-variable -Wno-reorder -Wno-maybe-uninitialized \
-                              -I${CERESSOLVER_INTERNAL_INCLUDE_DIRS}")
-  endif ()
-
   set_source_files_properties(zroiutils.cpp PROPERTIES COMPILE_FLAGS -I${GEOMETRICTOOLS_INCLUDE_DIRS})
 endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
-                      hdf5_cpp-static hdf5-static
+                      hdf5_cpp-static hdf5-static ceres
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
