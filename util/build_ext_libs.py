@@ -1221,12 +1221,6 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_dir)
         build_eigen(src_dir, ext_build_dir())
 
-    if libs['ceres-solver']:
-        src_dir = os.path.join(ext_dir(), 'ceres-solver')
-        if update_src:
-            update_git_submodule(src_dir)
-        build_ceres_solver(src_dir, ext_build_dir())
-
     if libs['pybind11']:
         if update_src:
             update_git_submodule(os.path.join(ext_dir(), 'pybind11'))
@@ -1282,6 +1276,12 @@ def build_libs(libs: dict, update_src: bool):
         else:
             nasm_dir = ''  # does not need
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
+
+    if libs['ceres-solver']:
+        src_dir = os.path.join(ext_dir(), 'ceres-solver')
+        if update_src:
+            update_git_submodule(src_dir)
+        build_ceres_solver(src_dir, ext_build_dir())
 
     if libs['glbinding']:
         src_dir = os.path.join(ext_dir(), 'glbinding')
@@ -1433,7 +1433,6 @@ def parse_inputs(argv: list):
             'ffmpeg': False,
             'boost': False,
             'eigen': False,
-            'ceres-solver': False,
             'pybind11': False,
             'cppitertools': False,
             'glm': False,
@@ -1444,6 +1443,7 @@ def parse_inputs(argv: list):
             'glog': False,
             'benchmark': False,
             'grpc': False,
+            'ceres-solver': False,
             'glbinding': False,
             'libjpeg': False,
             'libpng': False,
