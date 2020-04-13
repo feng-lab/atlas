@@ -104,6 +104,22 @@ public:
   // return ncc img and overlapvoxels img
   std::tuple<ZImg, ZImg> computeNCC();
 
+  // for python
+  std::tuple<ZVoxelCoordinate, double, double, double>
+  computeMovingImgOffset_Python();
+
+  std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
+  computeMovingImgOffsetMR_Python(size_t intvX, size_t intvY, size_t intvZ);
+
+  std::tuple<ZVoxelCoordinate, double, double, double>
+  refineMovingImgOffset_Python(const ZVoxelCoordinate& offset,
+                               size_t radiusX, size_t radiusY, size_t radiusZ);
+
+  std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
+  refineMovingImgOffsetMR_Python(const ZVoxelCoordinate& offset,
+                                 size_t radiusX, size_t radiusY, size_t radiusZ,
+                                 size_t intvX, size_t intvY, size_t intvZ);
+
 private:
   void init();
 

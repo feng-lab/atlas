@@ -715,6 +715,13 @@ PYBIND11_MODULE(_imgpy, m)
     .def("computeNCCOfOffset", &ZImgNCCMatch::computeNCCOfOffset,
          "offset"_a)
     .def("computeNCC", &ZImgNCCMatch::computeNCC)
+    .def("computeMovingImgOffset", &ZImgNCCMatch::computeMovingImgOffset_Python)
+    .def("computeMovingImgOffsetMR", &ZImgNCCMatch::computeMovingImgOffsetMR_Python,
+         "intvX"_a, "intvY"_a, "intvZ"_a)
+    .def("refineMovingImgOffset", &ZImgNCCMatch::refineMovingImgOffset_Python,
+         "offset"_a, "radiusX"_a, "radiusY"_a, "radiusZ"_a)
+    .def("refineMovingImgOffsetMR", &ZImgNCCMatch::refineMovingImgOffsetMR_Python,
+         "offset"_a, "radiusX"_a, "radiusY"_a, "radiusZ"_a, "intvX"_a, "intvY"_a, "intvZ"_a)
     .def("__repr__", [](const ZImgNCCMatch&) {
       return QString("<_imgpy.ZImgNCCMatch>").toStdString();
     });

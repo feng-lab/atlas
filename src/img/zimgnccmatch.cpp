@@ -443,6 +443,60 @@ std::tuple<ZImg, ZImg> ZImgNCCMatch::computeNCC()
   return {nccImg, numberOfOverlapVoxelsImg};
 }
 
+std::tuple<ZVoxelCoordinate, double, double, double>
+ZImgNCCMatch::computeMovingImgOffset_Python()
+{
+  double maxNCC = 0.;
+  double maxWeightedNCC = 0.;
+  double numOverlapVoxels = 0.;
+  auto res = computeMovingImgOffset(&maxNCC, &maxWeightedNCC, &numOverlapVoxels);
+  return std::make_tuple(res, maxNCC, maxWeightedNCC, numOverlapVoxels);
+}
+
+std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
+ZImgNCCMatch::computeMovingImgOffsetMR_Python(size_t intvX, size_t intvY, size_t intvZ)
+{
+  double maxNCC = 0.;
+  double maxWeightedNCC = 0.;
+  double numOverlapVoxels = 0.;
+  double lowResMaxNCC = 0.;
+  double lowResMaxWeightedNCC = 0.;
+  double lowResNumOverlapVoxels = 0.;
+  auto res = computeMovingImgOffsetMR(intvX, intvY, intvZ, &maxNCC, &maxWeightedNCC, &numOverlapVoxels,
+                                      &lowResMaxNCC, &lowResMaxWeightedNCC, &lowResNumOverlapVoxels);
+  return std::make_tuple(res, maxNCC, maxWeightedNCC, numOverlapVoxels,
+                         lowResMaxNCC, lowResMaxWeightedNCC, lowResNumOverlapVoxels);
+}
+
+std::tuple<ZVoxelCoordinate, double, double, double>
+ZImgNCCMatch::refineMovingImgOffset_Python(const ZVoxelCoordinate& offset,
+                                           size_t radiusX, size_t radiusY, size_t radiusZ)
+{
+  double maxNCC = 0.;
+  double maxWeightedNCC = 0.;
+  double numOverlapVoxels = 0.;
+  auto res = refineMovingImgOffset(offset, radiusX, radiusY, radiusZ, &maxNCC, &maxWeightedNCC, &numOverlapVoxels);
+  return std::make_tuple(res, maxNCC, maxWeightedNCC, numOverlapVoxels);
+}
+
+std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
+ZImgNCCMatch::refineMovingImgOffsetMR_Python(const ZVoxelCoordinate& offset,
+                                             size_t radiusX, size_t radiusY, size_t radiusZ,
+                                             size_t intvX, size_t intvY, size_t intvZ)
+{
+  double maxNCC = 0.;
+  double maxWeightedNCC = 0.;
+  double numOverlapVoxels = 0.;
+  double lowResMaxNCC = 0.;
+  double lowResMaxWeightedNCC = 0.;
+  double lowResNumOverlapVoxels = 0.;
+  auto res = refineMovingImgOffsetMR(offset, radiusX, radiusY, radiusZ,
+                                     intvX, intvY, intvZ, &maxNCC, &maxWeightedNCC, &numOverlapVoxels,
+                                     &lowResMaxNCC, &lowResMaxWeightedNCC, &lowResNumOverlapVoxels);
+  return std::make_tuple(res, maxNCC, maxWeightedNCC, numOverlapVoxels,
+                         lowResMaxNCC, lowResMaxWeightedNCC, lowResNumOverlapVoxels);
+}
+
 void ZImgNCCMatch::init()
 {
   useAllFixedImgChannels();
