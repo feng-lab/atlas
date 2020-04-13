@@ -29,6 +29,12 @@ def atlas_repository_dir() -> str:
     return res
 
 
+def build_tools_dir() -> str:
+    res = os.path.join(atlas_repository_dir(), 'util', 'build_tools')
+    assert os.path.exists(res)
+    return res
+
+
 def atlas_src_dir() -> str:
     res = os.path.join(atlas_repository_dir(), 'src')
     assert os.path.exists(res)
@@ -338,7 +344,7 @@ def unpack_file_to_folder(file: str, folder: str):
 
 
 def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: str,
-                              tool_folder_glob_name=None, *, target_dir: str = ext_build_dir()) -> str:
+                              tool_folder_glob_name=None, *, target_dir: str = build_tools_dir()) -> str:
     if tool_folder_glob_name is None:
         tool_folder_glob_name = tool_package_glob_name
     package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
@@ -361,16 +367,17 @@ def install_cmake():
 
 # to install new version of ninja, delete existing binary in atlas/src/3rdparty/build/ninja
 def install_ninja():
-    if os.path.exists(os.path.join(ext_build_dir(), 'ninja')):
+    target_dir = build_tools_dir()
+    if os.path.exists(os.path.join(target_dir, 'ninja')):
         return
     if is_windows():
-        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-win.zip'), ext_build_dir())
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-win.zip'), target_dir)
     elif is_linux():
-        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-linux.zip'), ext_build_dir())
-        os.chmod(os.path.join(ext_build_dir(), 'ninja'), stat.S_IXUSR)
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-linux.zip'), target_dir)
+        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IXUSR)
     else:
-        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-mac.zip'), ext_build_dir())
-        os.chmod(os.path.join(ext_build_dir(), 'ninja'), stat.S_IXUSR)
+        unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-mac.zip'), target_dir)
+        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IXUSR)
 
 
 def install_ffmpeg():
@@ -391,32 +398,32 @@ def install_ffmpeg():
 
 def get_cmake_binary() -> str:
     if is_windows():
-        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*win*-x64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*win*-x64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     elif is_linux():
-        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*Linux*_64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*Linux*_64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     else:
-        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*Darwin*_64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*Darwin*_64'))
         return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
 
 
 def get_ninja_binary() -> str:
     if is_windows():
-        return os.path.join(ext_build_dir(), 'ninja.exe')
+        return os.path.join(build_tools_dir(), 'ninja.exe')
     else:
-        return os.path.join(ext_build_dir(), 'ninja')
+        return os.path.join(build_tools_dir(), 'ninja')
 
 
 def get_ffmpeg_binary() -> str:
     if is_windows():
-        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*win*'))
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*win*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
-        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*static'))
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*static'))
         return os.path.join(folder, 'ffmpeg')
     else:
-        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*macos*'))
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*macos*'))
         return os.path.join(folder, 'bin', 'ffmpeg')
 
 

@@ -501,7 +501,32 @@ def build_eigen(src_dir: str, install_dir: str):
 def build_ceres_solver(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = None
+    bak_file = None
+    orig_file1 = None
+    bak_file1 = None
+    orig_file2 = None
+    bak_file2 = None
+    orig_file3 = None
+    bak_file3 = None
     try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
+                              to_texts=[r'if (FALSE)'])
+        orig_file1 = os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
+                               to_texts=[r'if (FALSE)'])
+        orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
+        bak_file2 = patch_file(orig_file2,
+                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
+                               to_texts=[r'if (FALSE)'])
+        orig_file3 = os.path.join(src_dir, 'cmake', 'FindCXSparse.cmake')
+        bak_file3 = patch_file(orig_file3,
+                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
+                               to_texts=[r'if (FALSE)'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
@@ -515,10 +540,14 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
+        os.replace(bak_file2, orig_file2)
+        os.replace(bak_file3, orig_file3)
 
 
 def build_folly(src_dir: str, install_dir: str):
-    shutil.rmtree(install_dir, ignore_errors=False)
+    shutil.rmtree(install_dir, ignore_errors=True)
     shutil.copytree(src_dir, install_dir)
     try:
         if is_windows():
@@ -1295,8 +1324,8 @@ def build_libs(libs: dict, update_src: bool):
     if libs['geometrictools']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'GeometricToolsEngine*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
-        if update_src:
-            shutil.rmtree(src_dir, ignore_errors=True)
+        if update_src or not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'GeometricTools*'))
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
         shutil.rmtree(os.path.join(ext_build_dir(), 'geometrictools'), ignore_errors=True)
@@ -1320,8 +1349,8 @@ def build_libs(libs: dict, update_src: bool):
     if libs['freeimage']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'FreeImage*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
-        if update_src:
-            shutil.rmtree(src_dir, ignore_errors=True)
+        if update_src or not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'FreeImage*'))
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
         build_freeimage(src_dir, ext_build_dir())
@@ -1430,20 +1459,22 @@ def parse_inputs(argv: list):
             'ospray': False,
             'java': False,
             }
-    update_src = True
+    update_src = False
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver'],
                             'libpng': ['opencv'],
                             'libjpeg': ['opencv'],
                             'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc'],
                             'gflags': ['glog', 'grpc'],
+                            'glog': ['ceres-solver'],
                             'benchmark': ['grpc'],
                             'tbb': ['itk', 'opencv'],
                             'hdf5': ['itk'],
+                            'ceres-solver': ['opencv'],
                             }
 
     print('current interpreter: ' + sys.executable)
     if len(argv) == 1:
-        usage = 'usage: python3 build_ext_libs.py [noupdatesrc] [all or components...] [except] [components...]\n' \
+        usage = 'usage: python3 build_ext_libs.py [updatesrc] [all or components...] [except] [components...]\n' \
                 'valid components:'
         for lib in libs:
             usage += ' [' + lib + ']'
@@ -1459,8 +1490,8 @@ def parse_inputs(argv: list):
             state = False
         elif lib.lower() in libs:
             libs[lib.lower()] = state
-        elif lib.lower() == 'noupdatesrc':
-            update_src = False
+        elif lib.lower() == 'updatesrc':
+            update_src = True
         else:
             raise SyntaxError("wrong lib name: " + lib)
 

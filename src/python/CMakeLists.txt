@@ -11,6 +11,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
+
 if (UNIX AND NOT APPLE)
   # excludes symbols in all archive libraries from automatic export.
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--exclude-libs,ALL")
@@ -103,7 +105,7 @@ install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/" # source directory
         )
 install(TARGETS ${module_name} DESTINATION $ENV{SP_DIR}/zimg)
 install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION $ENV{SP_DIR}/zimg)
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/jars" # source directory
+install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/jars" # source directory
         DESTINATION $ENV{SP_DIR}/zimg # target directory
         FILES_MATCHING PATTERN "*.jar"
         PATTERN "*idea*" EXCLUDE
