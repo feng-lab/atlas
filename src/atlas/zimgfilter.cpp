@@ -17,13 +17,15 @@
 namespace nim {
 
 ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height, double voxelSizeXInUm,
-                                                   double viewScale, const QRectF& viewPort, const glm::vec3& color,
+                                                   double viewScale, double transformScale,
+                                                   const QRectF& viewPort, const glm::vec3& color,
                                                    QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_lengthInUm(length)
   , m_height(height)
   , m_voxelSizeXInUm(voxelSizeXInUm)
   , m_viewScale(viewScale)
+  , m_transformScale(transformScale)
   , m_viewPort(viewPort)
   , m_viewPortPos(.8, .8)
 {
@@ -40,11 +42,18 @@ ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height,
 QVariant ZImgScaleBarGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange && scene()) {
+    //LOG(INFO) << value.toPointF();
     QPointF newPos = value.toPointF();
-    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
-    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
+    //LOG(INFO) << mapFromScene(newPos);
+    //auto vp = mapRectFromScene(m_viewPort);
+    //LOG(INFO) << m_viewPort.topLeft() << m_viewPort.bottomRight() << vp.topLeft() << vp.bottomRight();
+    newPos = QPointF(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())),
+                     qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
+//    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
+//    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
     m_viewPortPos.x = (newPos.x() - m_viewPort.left()) / m_viewPort.width();
     m_viewPortPos.y = (newPos.y() - m_viewPort.top()) / m_viewPort.height();
+    //LOG(INFO) << newPos;
     return newPos;
   }
   return QGraphicsRectItem::itemChange(change, value);
@@ -53,7 +62,7 @@ QVariant ZImgScaleBarGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange 
 void ZImgScaleBarGraphicsItem::updateRectSize()
 {
   double height = m_height / m_viewScale;
-  double width = m_lengthInUm / m_voxelSizeXInUm;
+  double width = m_lengthInUm / m_voxelSizeXInUm * m_transformScale;
   QRectF rect(0, 0, width, height);
   setRect(rect);
 }
@@ -194,10 +203,11 @@ void ZImgFilter::setData(ZImgPack& pack)
                                                                 m_scaleBarHeight.get(),
                                                                 m_imgPack->imgInfo().voxelSizeXInUm(),
                                                                 m_view.currentScale(),
+                                                                getQTransform().m11(),
                                                                 mapFromSceneRect(m_view.currentViewport()),
                                                                 m_scaleBarColor.get());
     m_scaleBarItem->setVisible(false);
-    m_scaleBarItem->setZValue(m_viewPrecedencePara.get() + 1);
+    m_scaleBarItem->setZValue(30000);
     m_view.scene().addItem(m_scaleBarItem.get());
   } else {
     m_showScaleBar.setEnabled(false);
@@ -336,7 +346,7 @@ void ZImgFilter::viewPrecedenceChanged()
     m_item->setZValue(m_viewPrecedencePara.get());
   }
   if (m_scaleBarItem) {
-    m_scaleBarItem->setZValue(m_viewPrecedencePara.get() + 1);
+    m_scaleBarItem->setZValue(30000);
   }
   ZObjFilter::viewPrecedenceChanged();
 }
@@ -345,6 +355,9 @@ void ZImgFilter::transformChanged()
 {
   if (m_item) {
     m_item->setTransform(getQTransform());
+    if (m_scaleBarItem) {
+      m_scaleBarItem->setTransformScale(getQTransform().m11());
+    }
     viewportChanged();
   }
   ZObjFilter::transformChanged();
@@ -611,7 +624,7 @@ void ZImgFilter::viewportChanged()
     }
   }
   if (m_scaleBarItem)
-    m_scaleBarItem->setViewPort(vp);
+    m_scaleBarItem->setViewPort(m_view.currentViewport());
 }
 
 void ZImgFilter::flipHorizontally()

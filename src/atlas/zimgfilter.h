@@ -27,7 +27,8 @@ public:
   { return Type; }
 
   explicit ZImgScaleBarGraphicsItem(double lengthInUm, double height, double voxelSizeXInUm,
-                                    double viewScale, const QRectF& viewPort, const glm::vec3& color,
+                                    double viewScale, double transformScale, const QRectF& viewPort,
+                                    const glm::vec3& color,
                                     QGraphicsItem* parent = nullptr);
 
   void setLengthInUm(double l)
@@ -46,6 +47,12 @@ public:
   void setViewScale(double s)
   {
     m_viewScale = s;
+    updateRectSize();
+  }
+
+  void setTransformScale(double s)
+  {
+    m_transformScale = s;
     updateRectSize();
   }
 
@@ -73,6 +80,7 @@ private:
   double m_height;
   double m_voxelSizeXInUm;
   double m_viewScale;
+  double m_transformScale;
   QRectF m_viewPort;
   glm::vec2 m_viewPortPos;
 };
