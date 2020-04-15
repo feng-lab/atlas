@@ -1875,6 +1875,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumb
       CHECK(z == 0 && t == 0 && c < 0 && img.numTimes() == 1 && img.depth() == 1 &&
             (img.numChannels() == 4 || img.numChannels() == 3));
       ZImg tmp(img.info());
+      CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
       ZImgFormat::XYZCtoCXYZ(img, tmp);
       TIFFWriteEncodedStrip(m_tif.get(), 0, tmp.planeData(0, 0, 0), tmp.byteNumber());
     }
