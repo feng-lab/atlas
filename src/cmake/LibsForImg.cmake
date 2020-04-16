@@ -156,10 +156,10 @@ endif (WIN32)
 
 if (WIN32)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/FreeImagePlus.lib
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/FreeImage.lib)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.lib
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.lib)
 elseif (APPLE)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)

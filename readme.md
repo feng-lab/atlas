@@ -27,9 +27,13 @@
 
 ### All:
 * `atlas_others` folder and repository folder should be in same directory
-* `git submodule update --init --recursive`
-* (setup SSH credential for github), run `python3 util/build_ext_libs.py all` to build external libraries
-* run `python3 util/build_and_deploy_atlas.py all` or build CMakeLists.txt
+* get submodules
+    ```bash
+    git submodule update --init --recursive
+    # or git submodule update --init --recursive --depth 1
+    ```
+* run `python3 util/build_ext_libs.py all` to build external libraries
+* run `python3 util/build_and_deploy_atlas.py` or build CMakeLists.txt
 
 ## C++ Version Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)

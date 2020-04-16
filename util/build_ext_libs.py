@@ -248,6 +248,8 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
 def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True) -> str:
     assert len(from_texts) == len(to_texts)
     bak_file = get_bak_file_name(orig_file)
+    if os.path.exists(bak_file):
+        os.remove(bak_file)
     os.rename(orig_file, bak_file)
     with open(bak_file, mode='r', encoding='utf-8') as f:
         from_lines = f.readlines()
@@ -314,8 +316,6 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        subprocess.run(['git', 'reset', '--hard', 'HEAD'],
-                       cwd=src_dir, shell=False, check=True)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -350,8 +350,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         else:
             cmakecmd.extend([ssl_src_dir])
         build_cmakecmd(cmakecmd, ssl_build_dir)
-        shutil.copytree(os.path.join(ssl_src_dir, 'src', 'include'), os.path.join(ssl_install_dir, 'include'),
-                        dirs_exist_ok=True)
+        distutils.dir_util.copy_tree(os.path.join(ssl_src_dir, 'src', 'include'),
+                                     os.path.join(ssl_install_dir, 'include'))
         if is_windows():
             glob_copy(os.path.join(ssl_build_dir, '*.lib'), os.path.join(ssl_install_dir, 'lib'))
             glob_copy(os.path.join(ssl_build_dir, 'decrepit', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
@@ -490,7 +490,7 @@ def build_eigen(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        cmakecmd.extend(['-DBUILD_TESTING:BOOL="0"'])
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -547,8 +547,9 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
 
 def build_folly(src_dir: str, install_dir: str):
+    install_dir = os.path.join(install_dir, 'folly')
     shutil.rmtree(install_dir, ignore_errors=True)
-    shutil.copytree(src_dir, install_dir)
+    distutils.dir_util.copy_tree(src_dir, install_dir)
     try:
         if is_windows():
             shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-win.h'),
@@ -670,7 +671,9 @@ def build_jxrlib(src_dir: str, install_dir: str):
         if not is_windows():
             shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
             os.replace(bak_file, orig_file)
-        subprocess.run(['git', 'reset', '--hard', 'HEAD'],
+        subprocess.run(['git', 'reset', '--hard'],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run(['git', 'clean', '-dff'],
                        cwd=src_dir, shell=False, check=True)
 
 
@@ -813,9 +816,9 @@ def build_freeimage(src_dir: str, install_dir: str):
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Dist', 'x64'),
-                                         install_dir)
+                                         os.path.join(install_dir, 'freeimage'))
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
-                                         install_dir)
+                                         os.path.join(install_dir, 'freeimage'))
         elif is_linux():
             orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
             from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
@@ -944,11 +947,12 @@ def build_itk(src_dir: str, install_dir: str):
                          ],
                         )
 
-        # if is_windows():
-        #     cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-        #                      '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
-        #                      # '-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/cmake/hdf5',
-        #                      ])
+        if is_windows():
+            cmakecmd.extend([
+                # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+                # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
+                '-DHDF5_DIR:PATH=' + ext_build_dir() + '/cmake/hdf5',
+            ])
         # else:
         #     cmakecmd.extend(['-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
         #                      ])
@@ -1201,7 +1205,7 @@ def build_libs(libs: dict, update_src: bool):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'zlib*'))
                 unpack_file_to_folder(package_name, ext_dir())
                 assert os.path.exists(src_dir)
-            build_zlib(src_dir, ext_build_lib())
+            build_zlib(src_dir, ext_build_dir())
 
     if libs['ffmpeg']:
         install_ffmpeg()
@@ -1241,7 +1245,7 @@ def build_libs(libs: dict, update_src: bool):
         src_dir = os.path.join(ext_dir(), 'folly')
         if update_src:
             update_git_submodule(src_dir)
-        build_folly(src_dir, os.path.join(ext_build_dir(), 'folly'))
+        build_folly(src_dir, ext_build_dir())
 
     if libs['cpuinfo']:
         src_dir = os.path.join(ext_dir(), 'cpuinfo')
@@ -1329,7 +1333,7 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
         shutil.rmtree(os.path.join(ext_build_dir(), 'geometrictools'), ignore_errors=True)
-        shutil.copytree(src_dir, os.path.join(ext_build_dir(), 'geometrictools'))
+        distutils.dir_util.copy_tree(src_dir, os.path.join(ext_build_dir(), 'geometrictools'))
 
     if libs['assimp']:
         src_dir = os.path.join(ext_dir(), 'assimp')
@@ -1350,7 +1354,7 @@ def build_libs(libs: dict, update_src: bool):
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'FreeImage*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
         if update_src or not os.path.exists(src_dir):
-            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'FreeImage*'))
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'FreeImage'))
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
         build_freeimage(src_dir, ext_build_dir())
@@ -1403,7 +1407,7 @@ def build_libs(libs: dict, update_src: bool):
     if libs['java']:
         shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
         shutil.rmtree(os.path.join(ext_build_dir(), 'jdk'), ignore_errors=True)
-        shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
+        distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
 
         if is_mac():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*osx*'))

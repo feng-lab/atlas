@@ -102,7 +102,7 @@ def build_atlas_package():
             shutil.copytree(os.path.join(binary_dir, 'Resources'),
                             os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Resources'),
                             symlinks=True)
-            build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), '*.dll'),
+            build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), 'assimp*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             build_ext_libs.glob_copy(os.path.join(common_dirs.freeimage_redist_dir(), '*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
