@@ -60,14 +60,31 @@ int main(int argc, char* argv[])
     usage += std::string(argv[0]) + "";
     gflags::SetUsageMessage(usage);
     gflags::SetVersionString(GIT_VERSION);
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
+    gflags::ParseCommandLineFlags(&argc, &argv, false);
 
 #ifdef ATLAS_WITH_TESTS
-    if (FLAGS_run_unit_tests) {
-      return ZUnitTest::run();
-    }
-    if (FLAGS_run_benchmarks) {
-      return ZRunBenchmark::run();
+    if (FLAGS_run_unit_tests || FLAGS_run_benchmarks) {
+      QCoreApplication app(argc, argv);
+#ifdef _WIN32
+      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
+      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
+#elif defined(__APPLE__)
+      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jdk");
+      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jars");
+#else
+      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
+      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
+#endif
+      initImgLib(argv[0], jdkDIR, jarsDIR, "", false);
+      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
+        nim::shutdownImgLib(false);
+      });
+      if (FLAGS_run_unit_tests) {
+        return ZUnitTest::run();
+      }
+      if (FLAGS_run_benchmarks) {
+        return ZRunBenchmark::run();
+      }
     }
 #endif
 
