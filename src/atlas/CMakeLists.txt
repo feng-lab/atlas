@@ -614,19 +614,19 @@ if (WIN32)
 
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources")
+                     COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/Resources")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\ffmpeg.exe"
-                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\")
+                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg.exe"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\build\\jdk"
-                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jdk")
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}\\..\\3rdparty\\build\\jars"
-                     "$<TARGET_FILE_DIR:${APP_NAME}>\\Resources\\jars")
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jars")
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)

@@ -13,7 +13,8 @@
 
 #ifndef Q_MOC_RUN
 
-#include <boost/math/special_functions.hpp>
+#include <boost/math/special_functions/digamma.hpp>
+#include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/constants/constants.hpp>
 
 #endif
