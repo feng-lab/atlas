@@ -63,8 +63,7 @@ void checkLength(long length, double spacing,
  * Thanks to SO #236129 for this solution:
  * http://stackoverflow.com/a/236803
  */
-std::vector<std::string>& split(const std::string& s, char delim,
-                                std::vector<std::string>& elems)
+[[maybe_unused]] std::vector<std::string>& split(const std::string& s, char delim, std::vector<std::string>& elems)
 {
   std::stringstream ss(s);
   std::string item;

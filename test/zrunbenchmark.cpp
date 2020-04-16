@@ -5,7 +5,6 @@
 #include "zrandom.h"
 #include "zsaturateoperation.h"
 #include <boost/multiprecision/cpp_int.hpp>
-#include <tbb/mutex.h>
 #include <QReadWriteLock>
 #include <QMutexLocker>
 #include <mutex>
@@ -260,22 +259,11 @@ static void BM_stdMutex(benchmark::State& state)
   state.SetItemsProcessed(state.iterations() * state.range(0));
 }
 
-static void BM_tbbMutex(benchmark::State& state)
-{
-  tbb::mutex lock;
-  while (state.KeepRunning()) {
-    for (int i = 0; i < state.range(0); ++i)
-      tbb::mutex::scoped_lock lk(lock);
-  }
-  state.SetItemsProcessed(state.iterations() * state.range(0));
-}
-
 static void addLockBench()
 {
   BENCHMARK(BM_QReadWriteLock)->Range(8, 8 << 12);
   BENCHMARK(BM_QMutex)->Range(8, 8 << 12);
   BENCHMARK(BM_stdMutex)->Range(8, 8 << 12);
-  BENCHMARK(BM_tbbMutex)->Range(8, 8 << 12);
 }
 
 int ZRunBenchmark::run()

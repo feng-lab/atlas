@@ -48,8 +48,8 @@
 	branch = master
 [submodule "src/3rdparty/jxrlib"]
 	path = src/3rdparty/jxrlib
-	url = https://github.com/4creators/jxrlib
-	branch = master
+	url = https://github.com/feng-lab/jxrlib.git
+	branch = feng
 [submodule "src/3rdparty/assimp"]
 	path = src/3rdparty/assimp
 	url = https://github.com/assimp/assimp.git
