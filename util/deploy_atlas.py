@@ -52,7 +52,7 @@ def build_atlas_package():
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-            
+
             subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
                             '--run_unit_tests'], shell=False, check=True)
             subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
@@ -60,9 +60,6 @@ def build_atlas_package():
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-
-            # shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-            #              os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -82,9 +79,6 @@ def build_atlas_package():
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-            # subprocess.run(['scp', zip_name,
-            #                 'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
-            #                cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -131,8 +125,6 @@ def build_atlas_package():
                                 'zip',
                                 root_dir=common_dirs.deploy_target_dir(),
                                 base_dir='Atlas')
-            # shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), zip_name),
-            #              os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', zip_name))
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -261,7 +253,8 @@ def build_atlas_installer():
 
 def deploy_atlas():
     build_atlas_package()
-    build_atlas_installer()
+    if 'feng' in os.path.expanduser("~"):
+        build_atlas_installer()
 
 
 if __name__ == "__main__":
