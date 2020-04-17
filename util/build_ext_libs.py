@@ -1413,25 +1413,20 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['java']:
         shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
-        shutil.rmtree(os.path.join(ext_build_dir(), 'jdk'), ignore_errors=True)
         distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
 
         if is_mac():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*osx*'))
-            jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
-            unpack_file_to_folder(package_name, ext_build_dir())
-            print(jdk_dir)
-            shutil.move(os.path.join(jdk_dir, 'Contents', 'Home'), ext_build_dir())
-            os.rename(os.path.join(ext_build_dir(), 'Home'), os.path.join(ext_build_dir(), 'jdk'))
-            shutil.rmtree(jdk_dir, ignore_errors=True)
-        else:
+        elif is_linux():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*linux*'))
-            if is_windows():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*windows*'))
-            jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
+        else:
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*windows*'))
+        jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
+        print(jdk_dir)
+        if not os.path.exists(jdk_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jdk*'))
             unpack_file_to_folder(package_name, ext_build_dir())
-            print(jdk_dir)
-            os.rename(jdk_dir, os.path.join(ext_build_dir(), 'jdk'))
+            assert os.path.exists(jdk_dir)
 
 
 def parse_inputs(argv: list):
