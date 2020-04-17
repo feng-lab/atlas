@@ -725,15 +725,19 @@ def build_assimp(src_dir: str, install_dir: str):
 
         if is_mac():
             orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
-            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
-            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@',
+                          r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
+            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@',
+                        r'@CMAKE_INSTALL_FULL_LIBDIR@/']
             bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
 
             orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
             from_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@',
+                r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
             to_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@',
+                r'@CMAKE_INSTALL_FULL_LIBDIR@/']
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         if is_windows():
