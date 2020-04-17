@@ -368,7 +368,7 @@ def install_cmake():
 # to install new version of ninja, delete existing binary in atlas/src/3rdparty/build/ninja
 def install_ninja():
     target_dir = build_tools_dir()
-    if os.path.exists(os.path.join(target_dir, 'ninja')):
+    if os.path.exists(os.path.join(target_dir, 'ninja')) or os.path.exists(os.path.join(target_dir, 'ninja.exe')):
         return
     if is_windows():
         unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-win.zip'), target_dir)
