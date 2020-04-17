@@ -142,7 +142,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                    '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-                   '-DCMAKE_CXX_FLAGS:STRING=$(CMAKE_CXX_FLAGS) /utf-8 /std:c++17'
+                   '-DCMAKE_C_FLAGS:STRING=/utf-8',
+                   '-DCMAKE_CXX_FLAGS:STRING=/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
                    ]
             if use_clang_cl():
                 res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
@@ -159,8 +160,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '-DCMAKE_C_FLAGS:STRING=$(CMAKE_C_FLAGS) -fPIC',
-               '-DCMAKE_CXX_FLAGS:STRING=$(CMAKE_CXX_FLAGS) -std=c++17 -fPIC'
+               '-DCMAKE_C_FLAGS:STRING=-fPIC',
+               '-DCMAKE_CXX_FLAGS:STRING=-std=c++17 -fPIC'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -175,7 +176,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               '-DCMAKE_CXX_FLAGS:STRING=$(CMAKE_CXX_FLAGS) -stdlib=libc++ -std=c++17'
+               '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -317,6 +318,8 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
+        subprocess.run(['git', 'reset', '--hard'],
+                       cwd=src_dir, shell=False, check=True)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -990,7 +993,18 @@ def build_itk(src_dir: str, install_dir: str):
 def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'Filters', 'FlowPaths', 'vtkModifiedBSPTree.cxx')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'struct Isort : public std::binary_function<Intersection, Intersection, bool>',
+                                          r'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }'],
+                              to_texts=[r'struct Isort',
+                                        'typedef Intersection first_argument_type;\n'
+                                        'typedef Intersection second_argument_type;\n'
+                                        'typedef bool result_type;\n'
+                                        'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -1001,7 +1015,6 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
-                         '-DVTK_MODULE_ENABLE_VTK_IOADIOS:STRING=NO',
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO'])
 
         if is_windows():
@@ -1019,6 +1032,7 @@ def build_vtk(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
