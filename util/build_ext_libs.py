@@ -729,31 +729,15 @@ def build_assimp(src_dir: str, install_dir: str):
 
         if is_mac():
             orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
-            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@',
-                          r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
-            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@',
-                        r'@CMAKE_INSTALL_FULL_LIBDIR@/']
+            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
             bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
 
             orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
             from_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@',
-                r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
             to_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@',
-                r'@CMAKE_INSTALL_FULL_LIBDIR@/']
-            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
-        elif is_linux():
-            orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
-            from_texts = [r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
-            to_texts = [r'@CMAKE_INSTALL_FULL_LIBDIR@/']
-            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
-
-            orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
-            from_texts = [
-                r'${_IMPORT_PREFIX}/lib${LIBSUFFIX}/']
-            to_texts = [
-                r'@CMAKE_INSTALL_FULL_LIBDIR@/']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -776,7 +760,7 @@ def build_assimp(src_dir: str, install_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
-        if is_mac() or is_linux():
+        if is_mac():
             os.replace(bak_file_3, orig_file_3)
             os.replace(bak_file_4, orig_file_4)
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -1016,17 +1000,6 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO'])
-
-        if is_windows():
-            cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=OFF',
-                             # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-                             # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib'
-                             ])
-        else:
-            if is_mac():
-                cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=ON'])
-            else:
-                cmakecmd.extend(['-DVTK_MODULE_USE_EXTERNAL_VTK_libxml2:BOOL=OFF'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
