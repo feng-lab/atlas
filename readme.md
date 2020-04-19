@@ -1,8 +1,14 @@
 ## Installation
 ### macOS:
-* install xcode, homebrew, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3
+* install xcode
+* install homebrew **without installing xcode command line tools**
+    ```bash
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/feng-lab/homebrew-install/master/install.sh)"
+    # if xcode command line tools are already installed, disable it:
+    sudo xcode-select -switch /Applications/Xcode.app`
+    ```
+* install qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3 (recommend miniconda)
 * `brew install unrar p7zip git golang`
-* disable command line tools: `sudo xcode-select -switch /Applications/Xcode.app`
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
