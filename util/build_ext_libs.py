@@ -417,6 +417,7 @@ def build_benchmark(src_dir: str, install_dir: str):
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
     try:
         if is_linux():
+            env = os.environ.copy()
             subprocess.run(['perl', './Configure',
                             'linux-x86_64',
                             'enable-ec_nistp_64_gcc_128',
