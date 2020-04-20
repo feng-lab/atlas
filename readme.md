@@ -8,7 +8,7 @@
     sudo xcode-select -switch /Applications/Xcode.app`
     ```
 * install qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3 (recommend miniconda)
-* `brew install unrar p7zip git golang`
+* `brew install unrar p7zip git golang autoconf`
 
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git

@@ -24,7 +24,7 @@ public:
 
   // LogSink interface
   virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-                    const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override;
+                    const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len) override;
 
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>

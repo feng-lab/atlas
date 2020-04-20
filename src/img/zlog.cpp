@@ -80,10 +80,10 @@ public:
 public:
   void send(LogSeverity /*severity*/, const char* /*full_filename*/, const char* /*base_filename*/,
             int /*line*/, const ::tm* /*tm_time*/, const char* message,
-            size_t /*prefix_len*/, size_t message_len) override
+            size_t message_len, int32_t /*usecs*/, size_t prefix_len) override
   {
     if (isValid()) {
-      m_file.write(message, message_len + 1);  // glog: after message_len is '\n'
+      m_file.write(message - prefix_len, message_len + prefix_len + 1);  // glog: after message_len is '\n'
       m_file.flush();
     }
   }
@@ -103,10 +103,10 @@ public:
   // LogSink interface
 public:
   void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-            const tm* tm_time, const char* message, size_t prefix_len, size_t message_len) override
+            const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len) override
   {
     if (isValid()) {
-      m_logFunction(LogData(severity, full_filename, base_filename, line, tm_time, message, prefix_len, message_len));
+      m_logFunction(LogData(severity, full_filename, base_filename, line, tm_time, message, message_len, prefix_len));
     }
   }
 };

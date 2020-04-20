@@ -30,6 +30,7 @@
 /src/3rdparty/hdf5*
 /src/3rdparty/FreeImage*
 /src/3rdparty/__*
+/src/3rdparty/boost*
 
 !/neurolabi/lib/Mingw/*.zip
 

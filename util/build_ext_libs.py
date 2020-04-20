@@ -80,6 +80,15 @@ def glob_copy(files: str, dst: str):
         shutil.copy2(file, dst)
 
 
+def glob_remove(files: str):
+    for file in glob.iglob(files):
+        if os.path.isdir(file):
+            shutil.rmtree(file, ignore_errors=True)
+        else:
+            os.remove(file)
+        print(f'{file} removed')
+
+
 def get_vcvars_environment(remove_conda_from_path: bool = True):
     """
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
@@ -140,6 +149,7 @@ def get_cmake_cmd_common_part(install_dir: str):
             res = [get_cmake_binary(),  # '-E', 'echo',
                    '-DCMAKE_BUILD_TYPE=Release',
                    '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+                   '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                    '-DCMAKE_C_FLAGS:STRING=/utf-8',
@@ -159,6 +169,7 @@ def get_cmake_cmd_common_part(install_dir: str):
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+               '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '-DCMAKE_C_FLAGS:STRING=-fPIC',
                '-DCMAKE_CXX_FLAGS:STRING=-std=c++17 -fPIC'
@@ -173,10 +184,12 @@ def get_cmake_cmd_common_part(install_dir: str):
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+               '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               '-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17'
+               f'-DCMAKE_C_FLAGS:STRING=-mmacosx-version-min={macos_min_version()}',
+               f'-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -266,6 +279,65 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     if not keep_bak_file:
         os.remove(bak_file)
     return bak_file
+
+
+def build_zlib(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        if not is_windows():
+            cmakecmd.extend(['-DAMD64:BOOL=ON'])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_boost(src_dir: str, install_dir: str):
+    try:
+        if is_windows():
+            env = get_vcvars_environment()
+            subprocess.run(['bootstrap',
+                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                            '--without-icu',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=True, check=True, env=env)
+            subprocess.run(['.\\b2',
+                            'install',
+                            f'cxxflags=/std:c++17',
+                            ],
+                           cwd=src_dir, shell=True, check=True, env=env)
+        else:
+            subprocess.run(['./bootstrap.sh',
+                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                            '--without-icu',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True)
+            if is_mac():
+                subprocess.run(['./b2',
+                                'install',
+                                f'cxxflags=-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}',
+                                'linkflags=-stdlib=libc++',
+                                ],
+                               cwd=src_dir, shell=False, check=True)
+            else:
+                subprocess.run(['./b2',
+                                'install',
+                                f'cxxflags=-std=c++17',
+                                ],
+                               cwd=src_dir, shell=False, check=True)
+    finally:
+        print('done')
+
+
+def clean_boost(install_dir: str):
+    shutil.rmtree(os.path.join(install_dir, 'include', 'boost'), ignore_errors=False)
+    glob_remove(os.path.join(install_dir, 'lib', 'cmake', 'boost*'))
+    glob_remove(os.path.join(install_dir, 'lib', 'cmake', 'Boost*'))
+    glob_remove(os.path.join(install_dir, 'lib', 'libboost*'))
 
 
 def build_cpuinfo(src_dir: str, install_dir: str):
@@ -369,18 +441,18 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     finally:
         shutil.rmtree(ssl_build_dir, ignore_errors=False)
 
-    sub_src_dir = os.path.join(src_dir, 'third_party', 'cares', 'cares')
-    sub_install_dir = ext_build_dir()
-    sub_build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
-        cmakecmd.extend(['-DCARES_SHARED:BOOL=OFF',
-                         '-DCARES_STATIC:BOOL=ON',
-                         '-DCARES_STATIC_PIC:BOOL=ON',
-                         sub_src_dir])
-        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
-    finally:
-        shutil.rmtree(sub_build_dir, ignore_errors=False)
+    # sub_src_dir = os.path.join(src_dir, 'third_party', 'cares', 'cares')
+    # sub_install_dir = ext_build_dir()
+    # sub_build_dir = create_build_dir(src_dir)
+    # try:
+    #     cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+    #     cmakecmd.extend(['-DCARES_SHARED:BOOL=OFF',
+    #                      '-DCARES_STATIC:BOOL=ON',
+    #                      '-DCARES_STATIC_PIC:BOOL=ON',
+    #                      sub_src_dir])
+    #     build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+    # finally:
+    #     shutil.rmtree(sub_build_dir, ignore_errors=False)
 
     sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
     sub_install_dir = ext_build_dir()
@@ -389,7 +461,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
         cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
                          '-Dprotobuf_WITH_ZLIB:BOOL=ON',
-                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF'])
+                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF',
+                         '-Dprotobuf_BUILD_SHARED_LIBS:BOOL=OFF'])
         # if is_windows():
         #     cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib'])
         cmakecmd.extend([sub_src_dir])
@@ -412,11 +485,13 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_ZLIB_PROVIDER:STRING=package',
                          '-DgRPC_PROTOBUF_PROVIDER=package',
                          '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
-                         '-DgRPC_CARES_PROVIDER=package',
+                         '-DgRPC_CARES_PROVIDER=module',
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={ssl_install_dir}',
                          '-DgRPC_GFLAGS_PROVIDER:STRING=package',
-                         '-DgRPC_BENCHMARK_PROVIDER:STRING=package'])
+                         '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
+                         '-DgRPC_ABSL_PROVIDER:STRING=module',
+                         ])
         # if is_windows():
         #     cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib',
         #                      f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
@@ -432,6 +507,197 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_double_conversion(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_fmt(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DFMT_DOC:BOOL=OFF',
+                         '-DFMT_TEST:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_jemalloc(src_dir: str, install_dir: str):
+    try:
+        if is_windows():
+            assert False
+        else:
+            env = os.environ.copy()
+            if is_mac():
+                env['CC'] = 'clang'
+                env['CFLAGS'] = f'-mmacosx-version-min={macos_min_version()}'
+                env['LDFLAGS'] = '-stdlib=libc++'
+                env['CXX'] = 'clang++'
+                env['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}'
+            subprocess.run(['./autogen.sh',
+                            '--disable-debug',
+                            '--with-jemalloc-prefix=je_',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=src_dir, shell=False, check=True, env=env)
+    finally:
+        subprocess.run(['git', 'reset', '--hard'],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run(['git', 'clean', '-dff'],
+                       cwd=src_dir, shell=False, check=True)
+
+
+def build_libevent(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
+                         '-DEVENT__DISABLE_BENCHMARK:BOOL=ON',
+                         '-DEVENT__DISABLE_TESTS:BOOL=ON',
+                         '-DEVENT__DISABLE_REGRESS:BOOL=ON',
+                         '-DEVENT__DISABLE_SAMPLES:BOOL=ON',
+                         '-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF',
+                         '-DEVENT__DOXYGEN:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_lz4(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DLZ4_BUNDLED_MODE:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DBUILD_STATIC_LIBS:BOOL=ON',
+                         '-DLZ4_BUILD_LEGACY_LZ4C:BOOL=OFF',
+                         os.path.join(src_dir, 'contrib', 'cmake_unofficial')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_snappy(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
+                         '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
+                         '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_xz(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_zstd(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF',
+                         os.path.join(src_dir, 'build', 'cmake')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
+    if header_only:
+        install_dir = os.path.join(install_dir, 'folly')
+        shutil.rmtree(install_dir, ignore_errors=True)
+        distutils.dir_util.copy_tree(src_dir, install_dir)
+        try:
+            if is_windows():
+                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-win.h'),
+                             os.path.join(install_dir, 'folly', 'folly-config.h'))
+            elif is_mac():
+                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-macos.h'),
+                             os.path.join(install_dir, 'folly', 'folly-config.h'))
+            else:
+                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-linux.h'),
+                             os.path.join(install_dir, 'folly', 'folly-config.h'))
+
+            orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
+            patch_file(orig_file,
+                       from_texts=[r'static void warnAboutToCrash() noexcept;'],
+                       to_texts=[r'inline static void warnAboutToCrash() noexcept {}'])
+        finally:
+            print('')
+    else:
+        build_dir = create_build_dir(src_dir)
+
+        orig_file = bak_file = None
+        orig_file2 = bak_file2 = None
+        orig_file3 = bak_file3 = None
+        try:
+            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'-std=${CXX_STD}'],
+                                  to_texts=[r''])
+
+            orig_file2 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.h')
+            bak_file2 = patch_file(orig_file2,
+                                   from_texts=[r'// intended to be specific to OpenSSL.',
+                                               r'SSL_CTX_set1_sigalgs_list',
+                                               r'#ifdef OPENSSL_IS_BORINGSSL'],
+                                   to_texts=['// intended to be specific to OpenSSL.\n'
+                                             '#if defined(OPENSSL_IS_BORINGSSL)\n'
+                                             '#define FOLLY_OPENSSL_IS_110 (OPENSSL_VERSION_NUMBER >= 0x10100000L)\n'
+                                             '#endif\n',
+                                             r'SSL_CTX_set1_sigalgs_list_already_exists',
+                                             '#ifdef OPENSSL_IS_BORINGSSL\n'
+                                             'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s);\n'])
+
+            orig_file3 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.cpp')
+            bak_file3 = patch_file(orig_file3,
+                                   from_texts=[r'SSL_CTX_set1_sigalgs_list',
+                                               r'#ifdef OPENSSL_IS_BORINGSSL'],
+                                   to_texts=[r'SSL_CTX_set1_sigalgs_list_already_exists',
+                                             '#ifdef OPENSSL_IS_BORINGSSL\n'
+                                             'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s) {return s->tlsext_hostname;}\n'])
+
+            cmakecmd = get_cmake_cmd_common_part(install_dir)
+            cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                             '-DPYTHON_EXTENSIONS:BOOL=OFF',
+                             '-DBUILD_TESTS:BOOL=OFF',
+                             src_dir])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            os.replace(bak_file, orig_file)
+            os.replace(bak_file2, orig_file2)
+            os.replace(bak_file3, orig_file3)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
@@ -468,21 +734,6 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
                 cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
                                  '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
                                  src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
-def build_zlib(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        if not is_windows():
-            cmakecmd.extend(['-DAMD64:BOOL=ON'])
-
-        cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -548,29 +799,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file1, orig_file1)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
-
-
-def build_folly(src_dir: str, install_dir: str):
-    install_dir = os.path.join(install_dir, 'folly')
-    shutil.rmtree(install_dir, ignore_errors=True)
-    distutils.dir_util.copy_tree(src_dir, install_dir)
-    try:
-        if is_windows():
-            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-win.h'),
-                         os.path.join(install_dir, 'folly', 'folly-config.h'))
-        elif is_mac():
-            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-macos.h'),
-                         os.path.join(install_dir, 'folly', 'folly-config.h'))
-        else:
-            shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-linux.h'),
-                         os.path.join(install_dir, 'folly', 'folly-config.h'))
-
-        orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
-        patch_file(orig_file,
-                   from_texts=[r'static void warnAboutToCrash() noexcept;'],
-                   to_texts=[r'inline static void warnAboutToCrash() noexcept {}'])
-    finally:
-        print('')
 
 
 def build_libpng(src_dir: str, install_dir: str):
@@ -1208,11 +1436,13 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['boost']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
-        src_dir = get_package_top_level_folder(package_name, ext_build_dir())
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
         if not os.path.exists(src_dir):
-            remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'boost*'))
-            unpack_file_to_folder(package_name, ext_build_dir())
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'boost*'))
+            clean_boost(ext_build_dir())
+            unpack_file_to_folder(package_name, ext_dir())
             assert os.path.exists(src_dir)
+        build_boost(src_dir, ext_build_dir())
 
     if libs['eigen']:
         src_dir = os.path.join(ext_dir(), 'eigen')
@@ -1235,12 +1465,6 @@ def build_libs(libs: dict, update_src: bool):
     if libs['googletest']:
         if update_src:
             update_git_submodule(os.path.join(ext_dir(), 'googletest'))
-
-    if libs['folly']:
-        src_dir = os.path.join(ext_dir(), 'folly')
-        if update_src:
-            update_git_submodule(src_dir)
-        build_folly(src_dir, ext_build_dir())
 
     if libs['cpuinfo']:
         src_dir = os.path.join(ext_dir(), 'cpuinfo')
@@ -1275,6 +1499,31 @@ def build_libs(libs: dict, update_src: bool):
         else:
             nasm_dir = ''  # does not need
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
+
+    if libs['folly']:
+        dc_src_dir = os.path.join(atlas_repository_dir(), '..', 'double-conversion')
+        # jm_src_dir = os.path.join(atlas_repository_dir(), '..', 'jemalloc')
+        fmt_src_dir = os.path.join(atlas_repository_dir(), '..', 'fmt')
+        le_src_dir = os.path.join(atlas_repository_dir(), '..', 'libevent')
+        lz4_src_dir = os.path.join(atlas_repository_dir(), '..', 'lz4')
+        snappy_src_dir = os.path.join(atlas_repository_dir(), '..', 'snappy')
+        xz_src_dir = os.path.join(atlas_repository_dir(), '..', 'xz')
+        zstd_src_dir = os.path.join(atlas_repository_dir(), '..', 'zstd')
+        src_dir = os.path.join(ext_dir(), 'folly')
+        if update_src:
+            # update_git_submodule(dc_src_dir)
+            # update_git_submodule(jm_src_dir)
+            update_git_submodule(src_dir)
+        # build_double_conversion(dc_src_dir, ext_build_dir())
+        # build_fmt(fmt_src_dir, ext_build_dir())
+        # if is_linux():
+        #     build_jemalloc(jm_src_dir, ext_build_dir())
+        # build_libevent(le_src_dir, ext_build_dir())
+        # build_lz4(lz4_src_dir, ext_build_dir())
+        # build_snappy(snappy_src_dir, ext_build_dir())
+        # build_xz(xz_src_dir, ext_build_dir())
+        # build_zstd(zstd_src_dir, ext_build_dir())
+        build_folly(src_dir, ext_build_dir(), header_only=True)
 
     if libs['ceres-solver']:
         src_dir = os.path.join(ext_dir(), 'ceres-solver')
