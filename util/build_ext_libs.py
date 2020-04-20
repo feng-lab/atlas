@@ -417,7 +417,19 @@ def build_benchmark(src_dir: str, install_dir: str):
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
     try:
         if is_linux():
-            assert False
+            subprocess.run(['perl', './Configure',
+                            'linux-x86_64',
+                            'enable-ec_nistp_64_gcc_128',
+                            'zlib',
+                            'no-shared',
+                            'no-tests',
+                            'no-ui-console',
+                            #'no-legacy',
+                            '--prefix=' + install_dir,
+                            '--openssldir=' + os.path.join(install_dir, 'ssl')],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', 'install_sw'],
+                           cwd=src_dir, shell=False, check=True, env=env)
         elif is_mac():
             env = os.environ.copy()
             env['CC'] = 'clang'
@@ -609,6 +621,7 @@ def build_libevent(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
+                         '-DEVENT__DISABLE_OPENSSL:BOOL=ON',
                          '-DEVENT__DISABLE_BENCHMARK:BOOL=ON',
                          '-DEVENT__DISABLE_TESTS:BOOL=ON',
                          '-DEVENT__DISABLE_REGRESS:BOOL=ON',
@@ -1566,28 +1579,34 @@ def build_libs(libs: dict, update_src: bool):
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
     if libs['folly']:
-        dc_src_dir = os.path.join(atlas_repository_dir(), '..', 'double-conversion')
-        # jm_src_dir = os.path.join(atlas_repository_dir(), '..', 'jemalloc')
-        fmt_src_dir = os.path.join(atlas_repository_dir(), '..', 'fmt')
-        le_src_dir = os.path.join(atlas_repository_dir(), '..', 'libevent')
-        lz4_src_dir = os.path.join(atlas_repository_dir(), '..', 'lz4')
-        snappy_src_dir = os.path.join(atlas_repository_dir(), '..', 'snappy')
-        xz_src_dir = os.path.join(atlas_repository_dir(), '..', 'xz')
-        zstd_src_dir = os.path.join(atlas_repository_dir(), '..', 'zstd')
+        dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
+        # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
+        fmt_src_dir = os.path.join(ext_dir(), 'fmt')
+        le_src_dir = os.path.join(ext_dir(), 'libevent')
+        lz4_src_dir = os.path.join(ext_dir(), 'lz4')
+        snappy_src_dir = os.path.join(ext_dir(), 'snappy')
+        xz_src_dir = os.path.join(ext_dir(), 'xz')
+        zstd_src_dir = os.path.join(ext_dir(), 'zstd')
         src_dir = os.path.join(ext_dir(), 'folly')
         if update_src:
-            # update_git_submodule(dc_src_dir)
+            update_git_submodule(dc_src_dir)
             # update_git_submodule(jm_src_dir)
+            update_git_submodule(fmt_src_dir)
+            update_git_submodule(le_src_dir)
+            update_git_submodule(lz4_src_dir)
+            update_git_submodule(snappy_src_dir)
+            update_git_submodule(xz_src_dir)
+            update_git_submodule(zstd_src_dir)
             update_git_submodule(src_dir)
-        # build_double_conversion(dc_src_dir, ext_build_dir())
-        # build_fmt(fmt_src_dir, ext_build_dir())
+        build_double_conversion(dc_src_dir, ext_build_dir())
+        build_fmt(fmt_src_dir, ext_build_dir())
         # if is_linux():
         #     build_jemalloc(jm_src_dir, ext_build_dir())
-        # build_libevent(le_src_dir, ext_build_dir())
-        # build_lz4(lz4_src_dir, ext_build_dir())
-        # build_snappy(snappy_src_dir, ext_build_dir())
-        # build_xz(xz_src_dir, ext_build_dir())
-        # build_zstd(zstd_src_dir, ext_build_dir())
+        build_libevent(le_src_dir, ext_build_dir())
+        build_lz4(lz4_src_dir, ext_build_dir())
+        build_snappy(snappy_src_dir, ext_build_dir())
+        build_xz(xz_src_dir, ext_build_dir())
+        build_zstd(zstd_src_dir, ext_build_dir())
         build_folly(src_dir, ext_build_dir(), header_only=False)
         build_folly(src_dir, ext_build_dir(), header_only=True)
 
