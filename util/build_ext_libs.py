@@ -414,32 +414,75 @@ def build_benchmark(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
-    ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl-with-bazel')
-    ssl_install_dir = ext_build_dir()
-    ssl_build_dir = create_build_dir(src_dir)
+def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
     try:
-        cmakecmd = get_cmake_cmd_common_part(ssl_install_dir)
-        if is_windows():
-            cmakecmd.extend(['-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
-                             ssl_src_dir])
-        else:
-            cmakecmd.extend([ssl_src_dir])
-        build_cmakecmd(cmakecmd, ssl_build_dir)
-        distutils.dir_util.copy_tree(os.path.join(ssl_src_dir, 'src', 'include'),
-                                     os.path.join(ssl_install_dir, 'include'))
-        if is_windows():
-            glob_copy(os.path.join(ssl_build_dir, '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'decrepit', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'crypto', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'ssl', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
-        else:
-            glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
-            glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+        if is_linux():
+            assert False
+        elif is_mac():
+            env = os.environ.copy()
+            env['CC'] = 'clang'
+            env['CFLAGS'] = f'-mmacosx-version-min={macos_min_version()}'
+            env['LDFLAGS'] = '-stdlib=libc++'
+            env['CXX'] = 'clang++'
+            env['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}'
+            subprocess.run(['perl', './Configure',
+                            'darwin64-x86_64-cc',
+                            'enable-ec_nistp_64_gcc_128',
+                            'zlib',
+                            'no-shared',
+                            'no-tests',
+                            'no-ui-console',
+                            #'no-legacy',
+                            '--prefix=' + install_dir,
+                            '--openssldir=' + os.path.join(install_dir, 'ssl')],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', 'install_sw'],
+                           cwd=src_dir, shell=False, check=True, env=env)
+        elif is_windows():
+            env = get_vcvars_environment()
+            env['PATH'] = f'{env["PATH"]};{nasm_dir}'
+            subprocess.run(['perl', './Configure',
+                            'VC-WIN64A',
+                            'zlib',
+                            'no-shared',
+                            'no-tests',
+                            'no-ui-console',
+                            #'no-legacy',
+                            '--prefix=' + install_dir,
+                            '--openssldir=' + os.path.join(install_dir, 'ssl')],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['nmake', 'install_sw'],
+                           cwd=src_dir, shell=False, check=True, env=env)
     finally:
-        shutil.rmtree(ssl_build_dir, ignore_errors=False)
+        print('done')
+
+
+def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
+    # ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl-with-bazel')
+    # ssl_install_dir = ext_build_dir()
+    # ssl_build_dir = create_build_dir(src_dir)
+    # try:
+    #     cmakecmd = get_cmake_cmd_common_part(ssl_install_dir)
+    #     if is_windows():
+    #         cmakecmd.extend(['-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
+    #                          ssl_src_dir])
+    #     else:
+    #         cmakecmd.extend([ssl_src_dir])
+    #     build_cmakecmd(cmakecmd, ssl_build_dir)
+    #     distutils.dir_util.copy_tree(os.path.join(ssl_src_dir, 'src', 'include'),
+    #                                  os.path.join(ssl_install_dir, 'include'))
+    #     if is_windows():
+    #         glob_copy(os.path.join(ssl_build_dir, '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'decrepit', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'crypto', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'ssl', '*.lib'), os.path.join(ssl_install_dir, 'lib'))
+    #     else:
+    #         glob_copy(os.path.join(ssl_build_dir, 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'decrepit', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'crypto', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+    #         glob_copy(os.path.join(ssl_build_dir, 'ssl', 'lib*.a'), os.path.join(ssl_install_dir, 'lib'))
+    # finally:
+    #     shutil.rmtree(ssl_build_dir, ignore_errors=False)
 
     # sub_src_dir = os.path.join(src_dir, 'third_party', 'cares', 'cares')
     # sub_install_dir = ext_build_dir()
@@ -487,7 +530,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
                          '-DgRPC_CARES_PROVIDER=module',
                          '-DgRPC_SSL_PROVIDER=package',
-                         f'-DOPENSSL_ROOT_DIR:PATH={ssl_install_dir}',
+                         f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
                          '-DgRPC_GFLAGS_PROVIDER:STRING=package',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
                          '-DgRPC_ABSL_PROVIDER:STRING=module',
@@ -660,32 +703,40 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
         orig_file = bak_file = None
         orig_file2 = bak_file2 = None
         orig_file3 = bak_file3 = None
+        orig_file4 = bak_file4 = None
         try:
             orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
             bak_file = patch_file(orig_file,
                                   from_texts=[r'-std=${CXX_STD}'],
                                   to_texts=[r''])
 
-            orig_file2 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.h')
-            bak_file2 = patch_file(orig_file2,
-                                   from_texts=[r'// intended to be specific to OpenSSL.',
-                                               r'SSL_CTX_set1_sigalgs_list',
-                                               r'#ifdef OPENSSL_IS_BORINGSSL'],
-                                   to_texts=['// intended to be specific to OpenSSL.\n'
-                                             '#if defined(OPENSSL_IS_BORINGSSL)\n'
-                                             '#define FOLLY_OPENSSL_IS_110 (OPENSSL_VERSION_NUMBER >= 0x10100000L)\n'
-                                             '#endif\n',
-                                             r'SSL_CTX_set1_sigalgs_list_already_exists',
-                                             '#ifdef OPENSSL_IS_BORINGSSL\n'
-                                             'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s);\n'])
+            # orig_file2 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.h')
+            # bak_file2 = patch_file(orig_file2,
+            #                        from_texts=[r'// intended to be specific to OpenSSL.',
+            #                                    r'SSL_CTX_set1_sigalgs_list',
+            #                                    r'#ifdef OPENSSL_IS_BORINGSSL'],
+            #                        to_texts=['// intended to be specific to OpenSSL.\n'
+            #                                  '#if defined(OPENSSL_IS_BORINGSSL)\n'
+            #                                  '#define FOLLY_OPENSSL_IS_110 (OPENSSL_VERSION_NUMBER >= 0x10100000L)\n'
+            #                                  '#endif\n',
+            #                                  r'SSL_CTX_set1_sigalgs_list_already_exists',
+            #                                  '#ifdef OPENSSL_IS_BORINGSSL\n'
+            #                                  'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s);\n'])
+            #
+            # orig_file3 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.cpp')
+            # bak_file3 = patch_file(orig_file3,
+            #                        from_texts=[r'SSL_CTX_set1_sigalgs_list',
+            #                                    r'#ifdef OPENSSL_IS_BORINGSSL'],
+            #                        to_texts=[r'SSL_CTX_set1_sigalgs_list_already_exists',
+            #                                  '#ifdef OPENSSL_IS_BORINGSSL\n'
+            #                                  'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s) {return s->tlsext_hostname;}\n'])
 
-            orig_file3 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.cpp')
-            bak_file3 = patch_file(orig_file3,
-                                   from_texts=[r'SSL_CTX_set1_sigalgs_list',
-                                               r'#ifdef OPENSSL_IS_BORINGSSL'],
-                                   to_texts=[r'SSL_CTX_set1_sigalgs_list_already_exists',
-                                             '#ifdef OPENSSL_IS_BORINGSSL\n'
-                                             'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s) {return s->tlsext_hostname;}\n'])
+            orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
+            bak_file4 = patch_file(orig_file4,
+                                   from_texts=[r'project(${PACKAGE_NAME} CXX C)'],
+                                   to_texts=['project(${PACKAGE_NAME} CXX C)\n'
+                                             'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
+                                             'set(Boost_USE_STATIC_LIBS ON)\n'])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -696,8 +747,9 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
             os.replace(bak_file, orig_file)
-            os.replace(bak_file2, orig_file2)
-            os.replace(bak_file3, orig_file3)
+            # os.replace(bak_file2, orig_file2)
+            # os.replace(bak_file3, orig_file3)
+            os.replace(bak_file4, orig_file4)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
@@ -1490,6 +1542,19 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_dir)
         build_benchmark(src_dir, ext_build_dir())
 
+    if libs['openssl']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openssl*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openssl*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+        if is_windows():
+            nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
+        else:
+            nasm_dir = ''  # does not need
+        build_openssl(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
+
     if libs['grpc']:
         src_dir = os.path.join(ext_dir(), 'grpc')
         if update_src:
@@ -1523,6 +1588,7 @@ def build_libs(libs: dict, update_src: bool):
         # build_snappy(snappy_src_dir, ext_build_dir())
         # build_xz(xz_src_dir, ext_build_dir())
         # build_zstd(zstd_src_dir, ext_build_dir())
+        build_folly(src_dir, ext_build_dir(), header_only=False)
         build_folly(src_dir, ext_build_dir(), header_only=True)
 
     if libs['ceres-solver']:
@@ -1685,6 +1751,7 @@ def parse_inputs(argv: list):
             'gflags': False,
             'glog': False,
             'benchmark': False,
+            'openssl': False,
             'grpc': False,
             'ceres-solver': False,
             'glbinding': False,
@@ -1710,6 +1777,7 @@ def parse_inputs(argv: list):
                             'gflags': ['glog', 'grpc'],
                             'glog': ['ceres-solver'],
                             'benchmark': ['grpc'],
+                            'openssl': ['grpc', 'folly'],
                             'tbb': ['itk', 'opencv'],
                             'hdf5': ['itk'],
                             'ceres-solver': ['opencv'],
@@ -1743,6 +1811,7 @@ def parse_inputs(argv: list):
     if is_linux():
         libs['zlib'] = False
         libs['curl'] = False
+        libs['openssl'] = False
     elif is_mac():
         libs['zlib'] = False
         libs['curl'] = False
