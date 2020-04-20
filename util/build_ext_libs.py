@@ -1830,7 +1830,6 @@ def parse_inputs(argv: list):
     if is_linux():
         libs['zlib'] = False
         libs['curl'] = False
-        libs['openssl'] = False
     elif is_mac():
         libs['zlib'] = False
         libs['curl'] = False
