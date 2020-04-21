@@ -1832,14 +1832,15 @@ def parse_inputs(argv: list):
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver'],
                             'libpng': ['opencv'],
                             'libjpeg': ['opencv'],
-                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc'],
+                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly'],
                             'gflags': ['glog', 'grpc'],
-                            'glog': ['ceres-solver'],
+                            'glog': ['ceres-solver', 'folly'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
                             'tbb': ['itk', 'opencv'],
                             'hdf5': ['itk'],
                             'ceres-solver': ['opencv'],
+                            'boost': ['folly'],
                             }
 
     print('current interpreter: ' + sys.executable)
