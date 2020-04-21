@@ -11,8 +11,6 @@ if (WIN32)
   find_package(ZLIB)
 endif (WIN32)
 
-find_package(c-ares REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
 find_package(OpenSSL REQUIRED)
 
@@ -21,12 +19,14 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using Protobuf ${Protobuf_VERSION}")
+print_target_properties(protobuf::libprotobuf)
 
 # Find gRPC installation
 # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.
 find_package(gRPC CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
+print_target_properties(gRPC::grpc++)
 
 include(gRPCGenerateCPP)
 
@@ -44,32 +44,38 @@ find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "VTK_DIR: ${VTK_DIR}")
 message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
+print_target_properties(VTK::FiltersGeometry)
+print_target_properties(VTK::FiltersSources)
+print_target_properties(VTK::IOXML)
 
 set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools)
 
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(benchmark::benchmark)
 
-find_package(HDF5 REQUIRED COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
+#find_package(HDF5 REQUIRED COMPONENTS C CXX static
+#             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+#message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
 find_package(ASSIMP REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "ASSIMP_INCLUDE_DIRS: ${ASSIMP_INCLUDE_DIRS}")
-message(STATUS "ASSIMP_LIBRARY_DIRS: ${ASSIMP_LIBRARY_DIRS}")
-message(STATUS "ASSIMP_LIBRARIES: ${ASSIMP_LIBRARIES}")
-link_directories(${ASSIMP_LIBRARY_DIRS})  # need to do this before creating target
+print_target_properties(assimp::assimp)
 
 set(OpenCV_STATIC ON)
 find_package(OpenCV REQUIRED COMPONENTS imgproc core
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "OpenCV_LIBS: ${OpenCV_LIBS}")
+print_target_properties(opencv_imgproc)
+print_target_properties(opencv_core)
 
 find_package(GLBINDING REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(glbinding::glbinding-aux)
+print_target_properties(glbinding::glbinding)
+print_target_properties(glbinding::KHRplatform)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
@@ -77,6 +83,12 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg PATHS ${QT_PATHS})
+print_target_properties(Qt5::Core)
+print_target_properties(Qt5::Widgets)
+print_target_properties(Qt5::Network)
+print_target_properties(Qt5::Svg)
+
+print_target_properties(img)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
@@ -568,13 +580,10 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${PROTO_SRCS} ${GRPC_SRCS})
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${APP_NAME} PUBLIC ${GEOMETRICTOOLS_INCLUDE_DIRS})
-target_include_directories(${APP_NAME} PUBLIC ${HDF5_INCLUDE_DIR})
+target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(${APP_NAME} PRIVATE ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
-target_include_directories(${APP_NAME} PUBLIC ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/boost)
-target_include_directories(${APP_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/folly)
+target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
   target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE _WIN32_WINNT=0x0601 _USE_MATH_DEFINES _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
@@ -610,8 +619,6 @@ if (WIN32)
   endif()
 
   # for some files
-  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS /I${ASSIMP_INCLUDE_DIRS})
-
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${APP_NAME}>/Resources")
@@ -648,7 +655,6 @@ else (WIN32)
   endif ()
 
   # for some files
-  set_source_files_properties(zmeshio.cpp PROPERTIES COMPILE_FLAGS "-isystem ${ASSIMP_INCLUDE_DIRS}")
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
                               "-Wno-unused-parameter")
 
@@ -708,9 +714,8 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
-                      hdf5_cpp-static hdf5-static
                       img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg
-                      ${ASSIMP_LIBRARIES} gRPC::grpc++ protobuf::libprotobuf)
+                      assimp::assimp gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)

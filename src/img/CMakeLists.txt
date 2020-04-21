@@ -259,16 +259,15 @@ add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURC
 if (BUILD_WITH_CONDA)
   set(IPP_LIBRARIES "")
 else ()
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_IPP)
-  target_include_directories(${LIBRARY_NAME} PUBLIC ${IPP_INCLUDE_DIRS})
+  target_compile_definitions(${LIBRARY_NAME} PRIVATE ZIMG_USE_IPP)
+  target_include_directories(${LIBRARY_NAME} PRIVATE ${IPP_INCLUDE_DIRS})
 endif ()
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(${LIBRARY_NAME} PUBLIC ${MKL_INCLUDE_DIRS})
+target_include_directories(${LIBRARY_NAME} PRIVATE ${MKL_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/eigen3)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/folly)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cppitertools)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT) # EIGEN_USE_MKL_VML)
@@ -310,18 +309,13 @@ if (WIN32)
   endif()
 
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS /I${TIFFDIR})
-  set_source_files_properties(${TIFFDIR}/tif_ojpeg.c PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(${TIFFDIR}/tif_jpeg.c PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
-  set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS /I${JPEGTURBO_INCLUDE_DIRS})
   set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
-  set_source_files_properties(zcpuinfo.cpp PROPERTIES COMPILE_FLAGS /I${CPUINFO_INCLUDE_DIRS})
   foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
     message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
     set(JXRINC "${JXRINC} /I${item}")
   endforeach ()
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
-  set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
 
   set_source_files_properties(zroiutils.cpp PROPERTIES COMPILE_FLAGS /I${GEOMETRICTOOLS_INCLUDE_DIRS})
@@ -350,20 +344,13 @@ else (WIN32)
   set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
 
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS -I${TIFFDIR})
-  set_source_files_properties(${TIFFDIR}/tif_ojpeg.c
-                              PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")
-  set_source_files_properties(${TIFFDIR}/tif_jpeg.c
-                              PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -I${JPEGTURBO_INCLUDE_DIRS}")
-  set_source_files_properties(zimgjpeg.cpp PROPERTIES COMPILE_FLAGS -I${JPEGTURBO_INCLUDE_DIRS})
   set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS -I${PNG_INCLUDE_DIRS})
-  set_source_files_properties(zcpuinfo.cpp PROPERTIES COMPILE_FLAGS -I${CPUINFO_INCLUDE_DIRS})
   foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
     message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
     set(JXRINC "${JXRINC} -I${item}")
   endforeach ()
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
-  set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS -I${FREEIMAGE_INCLUDE_DIRS})
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS -I${SCIFIODIR})
 
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
@@ -373,7 +360,7 @@ endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
-                      hdf5_cpp-static hdf5-static ceres
+                      hdf5_cpp-static hdf5-static ceres Folly::folly
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

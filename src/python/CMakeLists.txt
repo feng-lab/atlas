@@ -12,6 +12,8 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
+list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
+set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 if (UNIX AND NOT APPLE)
   # excludes symbols in all archive libraries from automatic export.
@@ -40,7 +42,11 @@ if (UNIX)
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-x")
 endif ()
 
+LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
+
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
+
+include(BuildType)
 
 if (NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
@@ -56,7 +62,8 @@ else ()
   message(STATUS "PREFIX environment variable not defined, set this for IDE: " $ENV{PREFIX})
 endif ()
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/LibsForImg.cmake)
+include(PrintCMakeTargetInfo)
+include(LibsForImg)
 
 # subprojects
 add_subdirectory(../img condaimg)

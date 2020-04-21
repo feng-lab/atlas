@@ -12,6 +12,8 @@ set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/src/3rdparty/build)
+list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_SOURCE_DIR}/src/3rdparty/build)
+set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 if (UNIX AND NOT APPLE)
   # excludes symbols in all archive libraries from automatic export.
@@ -59,7 +61,8 @@ if (NOT CMAKE_DEBUG_POSTFIX)
 endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
-include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/LibsForImg.cmake)
+include(PrintCMakeTargetInfo)
+include(LibsForImg)
 
 # subprojects
 add_subdirectory(src/img)

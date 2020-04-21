@@ -11,12 +11,7 @@ else ()
 endif ()
 
 find_package(TBB REQUIRED tbb)
-# get_target_property(TBB_INCLUDE_DIRS TBB::tbb INTERFACE_INCLUDE_DIRECTORIES)
-# message(STATUS "TBB_INCLUDE_DIRS:" ${TBB_INCLUDE_DIRS})
-get_target_property(TBB_LIBRARY TBB::tbb IMPORTED_LOCATION_RELEASE)
-message(STATUS "TBB_LIBRARY: ${TBB_LIBRARY}")
-get_target_property(TBB_IMPORTED_IMPLIB_RELEASE TBB::tbb IMPORTED_IMPLIB_RELEASE)
-message(STATUS "TBB_IMPORTED_IMPLIB_RELEASE: ${TBB_IMPORTED_IMPLIB_RELEASE}")
+print_target_properties(TBB::tbb)
 
 if (BUILD_WITH_CONDA)
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} $ENV{PREFIX}/include $ENV{PREFIX}/include/fftw)
@@ -92,14 +87,10 @@ else ()
         ${IPP_PATH}/lib/intel64/libippcc.a)
   endif ()
 endif ()
-
-find_package(ITK REQUIRED COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "ITK_DIR: ${ITK_DIR}")
-message(STATUS "ITK_USE_FILE: ${ITK_USE_FILE}")
-include(${ITK_USE_FILE})
-message(STATUS "ITK_INCLUDE_DIRS: ${ITK_INCLUDE_DIRS}")
-message(STATUS "ITK_LIBRARIES: ${ITK_LIBRARIES}")
+message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
+message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
+message(STATUS "IPP_INCLUDE_DIRS: ${IPP_INCLUDE_DIRS}")
+message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
 
 set(CPUINFO_INCLUDE_DIRS ${CPUINFO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
@@ -112,6 +103,8 @@ else (WIN32)
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libcpuinfo.a
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libclog.a)
 endif (WIN32)
+message(STATUS "CPUINFO_INCLUDE_DIRS: ${CPUINFO_INCLUDE_DIRS}")
+message(STATUS "CPUINFO_LIBRARIES: ${CPUINFO_LIBRARIES}")
 
 #find_package(libjpeg REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libjpeg-turbo NO_DEFAULT_PATH)
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
@@ -123,6 +116,8 @@ else (WIN32)
   set(JPEGTURBO_LIBRARIES ${JPEGTURBO_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libjpeg.a)
 endif (WIN32)
+message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
+message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
 
 # libpng16.cmake does not provide include dir, so we have to create it, note PNG_INCLUDE_DIRS will only used by 1 file
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng/libpng16.cmake)
@@ -136,6 +131,8 @@ set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
 #      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libpng/lib/libpng.a)
 #endif (WIN32)
 #find_package(libpng16 REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libpng/lib/libpng NO_DEFAULT_PATH)
+message(STATUS "PNG_INCLUDE_DIRS: ${PNG_INCLUDE_DIRS}")
+print_target_properties(png_static)
 
 set(JPEGXR_INCLUDE_DIRS ${JPEGXR_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/libjxr/common
@@ -153,6 +150,8 @@ else (WIN32)
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libjxrglue.a
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libjpegxr.a)
 endif (WIN32)
+message(STATUS "JPEGXR_INCLUDE_DIRS: ${JPEGXR_INCLUDE_DIRS}")
+message(STATUS "JPEGXR_LIBRARIES: ${JPEGXR_LIBRARIES}")
 
 if (WIN32)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
@@ -171,24 +170,71 @@ else ()
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libfreeimageplus.so)
 endif ()
+message(STATUS "FREEIMAGE_INCLUDE_DIRS: ${FREEIMAGE_INCLUDE_DIRS}")
+message(STATUS "FREEIMAGE_LIBRARIES: ${FREEIMAGE_LIBRARIES}")
+
+find_package(ITK REQUIRED
+             COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+message(STATUS "ITK_DIR: ${ITK_DIR}")
+message(STATUS "ITK_USE_FILE: ${ITK_USE_FILE}")
+include(${ITK_USE_FILE})
+message(STATUS "ITK_INCLUDE_DIRS: ${ITK_INCLUDE_DIRS}")
+message(STATUS "ITK_LIBRARIES: ${ITK_LIBRARIES}")
+print_target_properties(ITKIOMeta)
+print_target_properties(ITKIONIFTI)
+print_target_properties(ITKIONRRD)
+print_target_properties(ITKIOGDCM)
+print_target_properties(ITKBinaryMathematicalMorphology)
 
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(gflags)
 find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build
              NO_DEFAULT_PATH)
+print_target_properties(glog::glog)
 
 set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/geometrictools)
+message(STATUS "GEOMETRICTOOLS_INCLUDE_DIRS: ${GEOMETRICTOOLS_INCLUDE_DIRS}")
 
-find_package(HDF5 REQUIRED COMPONENTS C CXX static
+find_package(HDF5 REQUIRED
+             COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
+print_target_properties(hdf5_cpp-static)
+print_target_properties(hdf5-static)
 
 find_package(Ceres REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "CERES_INCLUDE_DIRS: ${CERES_INCLUDE_DIRS}")
-message(STATUS "CERES_LIBRARIES: ${CERES_LIBRARIES}")
+print_target_properties(Eigen3::Eigen)
+print_target_properties(ceres)
+
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost 1.72.0 MODULE REQUIRED
+             COMPONENTS
+             headers
+             context
+             filesystem
+             program_options
+             regex
+             system
+             thread
+             )
+print_target_properties(Boost::headers)
+print_target_properties(Boost::context)
+print_target_properties(Boost::filesystem)
+print_target_properties(Boost::program_options)
+print_target_properties(Boost::regex)
+print_target_properties(Boost::system)
+print_target_properties(Boost::thread)
+
+find_package(folly REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(Folly::folly)
+print_target_properties(Folly::folly_deps)
+print_target_properties(fmt::fmt)
+print_target_properties(Threads::Threads)
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)
@@ -199,5 +245,5 @@ else ()
   # find_package(Qt5Core ${QT_VERSION} REQUIRED PATHS ${QT_PATHS})
   find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Gui PATHS ${QT_PATHS})
 endif ()
-get_target_property(Qt5CoreLoc Qt5::Core IMPORTED_LOCATION_RELEASE)
-message(STATUS "Qt5Core: ${Qt5CoreLoc}")
+print_target_properties(Qt5::Core)
+print_target_properties(Qt5::Gui)

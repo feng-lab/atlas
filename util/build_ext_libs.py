@@ -565,6 +565,24 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_bzip2(src_dir: str, install_dir: str):
+    assert is_windows()
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DENABLE_DEBUG=OFF',
+                         '-DENABLE_APP=OFF',
+                         '-DENABLE_DOCS=OFF',
+                         '-DENABLE_EXAMPLES=OFF',
+                         '-DENABLE_STATIC_LIB=ON',
+                         '-DENABLE_SHARED_LIB=OFF',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_double_conversion(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -724,6 +742,13 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
                                   from_texts=[r'-std=${CXX_STD}'],
                                   to_texts=[r''])
 
+            orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
+            bak_file2 = patch_file(orig_file2,
+                                   from_texts=[r'${ZLIB_INCLUDE_DIRS}',
+                                               r'${BZIP2_INCLUDE_DIRS}'],
+                                   to_texts=[r'',
+                                             r''])
+
             # orig_file2 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.h')
             # bak_file2 = patch_file(orig_file2,
             #                        from_texts=[r'// intended to be specific to OpenSSL.',
@@ -761,7 +786,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
             os.replace(bak_file, orig_file)
-            # os.replace(bak_file2, orig_file2)
+            os.replace(bak_file2, orig_file2)
             # os.replace(bak_file3, orig_file3)
             os.replace(bak_file4, orig_file4)
 
@@ -1261,6 +1286,15 @@ def build_itk(src_dir: str, install_dir: str):
                              r'#set(ITKTBB_INCLUDE_DIRS',
                              r'#set(ITKTBB_LIBRARIES',
                              r'#set(TBB_DIR'])
+
+        # ITKZLIB_INCLUDE_DIRS includes /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+        # which cause conda compilation errors
+        orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.1', 'Modules', 'ITKZLIB.cmake')
+        patch_file(orig_file_3,
+                   from_texts=[r'set(ITKZLIB_INCLUDE_DIRS',
+                               ],
+                   to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
+                             ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -1580,6 +1614,7 @@ def build_libs(libs: dict, update_src: bool):
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
     if libs['folly']:
+        bz2_src_dir = os.path.join(ext_dir(), 'bzip2') if is_windows() else None
         dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
         fmt_src_dir = os.path.join(ext_dir(), 'fmt')
@@ -1590,6 +1625,8 @@ def build_libs(libs: dict, update_src: bool):
         zstd_src_dir = os.path.join(ext_dir(), 'zstd')
         src_dir = os.path.join(ext_dir(), 'folly')
         if update_src:
+            if is_windows():
+                update_git_submodule(bz2_src_dir)
             update_git_submodule(dc_src_dir)
             # update_git_submodule(jm_src_dir)
             update_git_submodule(fmt_src_dir)
@@ -1599,6 +1636,8 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(xz_src_dir)
             update_git_submodule(zstd_src_dir)
             update_git_submodule(src_dir)
+        if is_windows():
+            build_bzip2(bz2_src_dir, ext_build_dir())
         build_double_conversion(dc_src_dir, ext_build_dir())
         build_fmt(fmt_src_dir, ext_build_dir())
         # if is_linux():
@@ -1609,7 +1648,7 @@ def build_libs(libs: dict, update_src: bool):
         build_xz(xz_src_dir, ext_build_dir())
         build_zstd(zstd_src_dir, ext_build_dir())
         build_folly(src_dir, ext_build_dir(), header_only=False)
-        build_folly(src_dir, ext_build_dir(), header_only=True)
+        # build_folly(src_dir, ext_build_dir(), header_only=True)
 
     if libs['ceres-solver']:
         src_dir = os.path.join(ext_dir(), 'ceres-solver')
