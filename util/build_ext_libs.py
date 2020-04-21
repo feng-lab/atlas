@@ -143,7 +143,27 @@ def get_tbb_env():
     return env
 
 
+def get_common_build_flags():
+    res = {}
+    if is_mac():
+        osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
+        assert os.path.exists(osx_sysroot)
+        res['CC'] = 'clang'
+        res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} -fPIC'
+        res['LDFLAGS'] = '-stdlib=libc++'
+        res['CXX'] = 'clang++'
+        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} -fPIC'
+    elif is_linux():
+        res['CFLAGS'] = f'-fPIC'
+        res['CXXFLAGS'] = f'-std=c++17 -fPIC'
+    elif is_windows():
+        res['CFLAGS'] = f'/utf-8'
+        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
+    return res
+
+
 def get_cmake_cmd_common_part(install_dir: str):
+    cbf = get_common_build_flags()
     if is_windows():
         if use_ninja():
             res = [get_cmake_binary(),  # '-E', 'echo',
@@ -152,8 +172,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                    '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-                   '-DCMAKE_C_FLAGS:STRING=/utf-8',
-                   '-DCMAKE_CXX_FLAGS:STRING=/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
+                   f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
+                   f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                    ]
             if use_clang_cl():
                 res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
@@ -171,8 +191,8 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '-DCMAKE_C_FLAGS:STRING=-fPIC',
-               '-DCMAKE_CXX_FLAGS:STRING=-std=c++17 -fPIC'
+               f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
+               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -189,7 +209,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                f'-DCMAKE_C_FLAGS:STRING=-mmacosx-version-min={macos_min_version()}',
-               f'-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17'
+               f'-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17 -fPIC'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -298,6 +318,7 @@ def build_zlib(src_dir: str, install_dir: str):
 
 def build_boost(src_dir: str, install_dir: str):
     try:
+        cbf = get_common_build_flags()
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['bootstrap',
@@ -307,7 +328,7 @@ def build_boost(src_dir: str, install_dir: str):
                            cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['.\\b2',
                             'install',
-                            f'cxxflags=/std:c++17',
+                            f'cxxflags={cbf["CXXFLAGS"]}',
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
         else:
@@ -319,14 +340,14 @@ def build_boost(src_dir: str, install_dir: str):
             if is_mac():
                 subprocess.run(['./b2',
                                 'install',
-                                f'cxxflags=-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}',
-                                'linkflags=-stdlib=libc++',
+                                f'cxxflags={cbf["CXXFLAGS"]}',
+                                f'linkflags={cbf["LDFLAGS"]}',
                                 ],
                                cwd=src_dir, shell=False, check=True)
             else:
                 subprocess.run(['./b2',
                                 'install',
-                                f'cxxflags=-std=c++17',
+                                f'cxxflags={cbf["CXXFLAGS"]}',
                                 ],
                                cwd=src_dir, shell=False, check=True)
     finally:
@@ -416,8 +437,11 @@ def build_benchmark(src_dir: str, install_dir: str):
 
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
     try:
+        cbf = get_common_build_flags()
         if is_linux():
             env = os.environ.copy()
+            env['CFLAGS'] = cbf['CFLAGS']
+            env['CXXFLAGS'] = cbf['CXXFLAGS']
             subprocess.run(['perl', './Configure',
                             'linux-x86_64',
                             'enable-ec_nistp_64_gcc_128',
@@ -433,11 +457,11 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                            cwd=src_dir, shell=False, check=True, env=env)
         elif is_mac():
             env = os.environ.copy()
-            env['CC'] = 'clang'
-            env['CFLAGS'] = f'-mmacosx-version-min={macos_min_version()}'
-            env['LDFLAGS'] = '-stdlib=libc++'
-            env['CXX'] = 'clang++'
-            env['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}'
+            env['CC'] = cbf['CC']
+            env['CFLAGS'] = cbf['CFLAGS']
+            env['LDFLAGS'] = cbf['LDFLAGS']
+            env['CXX'] = cbf['CXX']
+            env['CXXFLAGS'] = cbf['CXXFLAGS']
             subprocess.run(['perl', './Configure',
                             'darwin64-x86_64-cc',
                             'enable-ec_nistp_64_gcc_128',
@@ -453,6 +477,8 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                            cwd=src_dir, shell=False, check=True, env=env)
         elif is_windows():
             env = get_vcvars_environment()
+            env['CFLAGS'] = cbf['CFLAGS']
+            env['CXXFLAGS'] = cbf['CXXFLAGS']
             env['PATH'] = f'{env["PATH"]};{nasm_dir}'
             subprocess.run(['perl', './Configure',
                             'VC-WIN64A',
@@ -614,12 +640,16 @@ def build_jemalloc(src_dir: str, install_dir: str):
             assert False
         else:
             env = os.environ.copy()
+            cbf = get_common_build_flags()
             if is_mac():
-                env['CC'] = 'clang'
-                env['CFLAGS'] = f'-mmacosx-version-min={macos_min_version()}'
-                env['LDFLAGS'] = '-stdlib=libc++'
-                env['CXX'] = 'clang++'
-                env['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -mmacosx-version-min={macos_min_version()}'
+                env['CC'] = cbf['CC']
+                env['CFLAGS'] = cbf['CFLAGS']
+                env['LDFLAGS'] = cbf['LDFLAGS']
+                env['CXX'] = cbf['CXX']
+                env['CXXFLAGS'] = cbf['CXXFLAGS']
+            elif is_linux():
+                env['CFLAGS'] = cbf['CFLAGS']
+                env['CXXFLAGS'] = cbf['CXXFLAGS']
             subprocess.run(['./autogen.sh',
                             '--disable-debug',
                             '--with-jemalloc-prefix=je_',
