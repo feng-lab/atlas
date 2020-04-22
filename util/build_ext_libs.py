@@ -150,14 +150,14 @@ def get_common_build_flags():
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
         res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
+                        f'-fPIC -fvisibility=hidden'
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
     elif is_linux():
-        res['CFLAGS'] = f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
+        res['CFLAGS'] = f'-fPIC -fvisibility=hidden'
         res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
@@ -175,6 +175,9 @@ def get_cmake_cmd_common_part(install_dir: str):
                    #'-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
+                   '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+                   '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+                   '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                    f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                    f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                    ]
@@ -194,6 +197,9 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
+               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -209,10 +215,13 @@ def get_cmake_cmd_common_part(install_dir: str):
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
+               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               f'-DCMAKE_C_FLAGS:STRING=-mmacosx-version-min={macos_min_version()}',
-               f'-DCMAKE_CXX_FLAGS:STRING=-stdlib=libc++ -std=c++17 -fPIC'
+               f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
+               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
         if use_ninja():
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])

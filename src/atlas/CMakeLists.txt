@@ -614,8 +614,8 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /permissive-)
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_link_options(${APP_NAME} PUBLIC "/LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE" # to create an output file whether or not LINK finds more than one definition for a symbol.
-                        )
+    # to create an output file whether or not LINK finds more than one definition for a symbol.
+    target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE)
   endif()
 
   # for some files
@@ -646,10 +646,10 @@ else (WIN32)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
     target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${APP_NAME} PUBLIC -Wshadow)
-    
-    target_link_options(${APP_NAME} PUBLIC "-stdlib=libc++ -framework OpenGL")
+
+    target_link_options(${APP_NAME} PUBLIC -stdlib=libc++ -framework OpenGL)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    
+
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 

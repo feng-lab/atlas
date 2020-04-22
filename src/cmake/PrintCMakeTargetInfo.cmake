@@ -29,7 +29,7 @@ endfunction(print_whitelisted_properties)
 
 function(print_target_properties tgt)
     if(NOT TARGET ${tgt})
-      message(NOTICE "There is no target named '${tgt}'")
+      message(WARNING "There is no target named '${tgt}'")
       return()
     endif()
 

@@ -22,7 +22,6 @@ if (BUILD_WITH_CONDA)
   find_library(MKL_CORE NAMES mkl_core
                PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
   set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
-  message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 else ()
   if (WIN32)
     set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
@@ -212,7 +211,7 @@ print_target_properties(ceres)
 
 if (WIN32)
   add_library(Folly::folly INTERFACE IMPORTED)
-  set_target_properties(Folly::folly PROPERTIES 
+  set_target_properties(Folly::folly PROPERTIES
                         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/boost-1_72;${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly")
 else (WIN32)
 set(Boost_USE_STATIC_LIBS ON)
