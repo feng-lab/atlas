@@ -46,7 +46,7 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.14.0")
 
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
@@ -85,7 +85,7 @@ if (Matlab_FOUND AND ${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.14.0")
 
     add_custom_command(TARGET correct_czi_shading_mex
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${TBB_LIBRARY}
+                       COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:TBB::tbb>
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                        $<TARGET_FILE_DIR:correct_czi_shading_mex>/libfreeimageplus.so.3

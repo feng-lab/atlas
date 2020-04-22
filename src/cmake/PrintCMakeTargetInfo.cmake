@@ -40,8 +40,10 @@ function(print_target_properties tgt)
         set(PROP_LIST ${CMAKE_PROPERTY_LIST})
     endif()
 
+    string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPERCASE)
+
     foreach (prop ${PROP_LIST})
-        string(REPLACE "<CONFIG>" "${CMAKE_BUILD_TYPE}" prop ${prop})
+        string(REPLACE "<CONFIG>" "${CMAKE_BUILD_TYPE_UPPERCASE}" prop ${prop})
         # message (STATUS "Checking ${prop}")
         get_property(propval TARGET ${tgt} PROPERTY ${prop} SET)
         if (propval)
