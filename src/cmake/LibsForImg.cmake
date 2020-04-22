@@ -210,8 +210,13 @@ find_package(Ceres REQUIRED
 print_target_properties(Eigen3::Eigen)
 print_target_properties(ceres)
 
+if (WIN32)
+  add_library(Folly::folly INTERFACE IMPORTED)
+  set_target_properties(Folly::folly PROPERTIES 
+                        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/boost-1_72;${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly")
+else (WIN32)
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.72.0 MODULE REQUIRED
+find_package(Boost 1.72.0 REQUIRED
              COMPONENTS
              headers
              context
@@ -220,6 +225,7 @@ find_package(Boost 1.72.0 MODULE REQUIRED
              regex
              system
              thread
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
              )
 print_target_properties(Boost::headers)
 print_target_properties(Boost::context)
@@ -235,6 +241,7 @@ print_target_properties(Folly::folly)
 print_target_properties(Folly::folly_deps)
 print_target_properties(fmt::fmt)
 print_target_properties(Threads::Threads)
+endif (WIN32)
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)

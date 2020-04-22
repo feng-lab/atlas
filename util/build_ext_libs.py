@@ -149,13 +149,16 @@ def get_common_build_flags():
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
-        res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} -fPIC'
+        res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
+                        f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
-        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 -isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} -fPIC'
+        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 ' \
+                          f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
+                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
     elif is_linux():
-        res['CFLAGS'] = f'-fPIC'
-        res['CXXFLAGS'] = f'-std=c++17 -fPIC'
+        res['CFLAGS'] = f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
+        res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
         res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
@@ -169,7 +172,7 @@ def get_cmake_cmd_common_part(install_dir: str):
             res = [get_cmake_binary(),  # '-E', 'echo',
                    '-DCMAKE_BUILD_TYPE=Release',
                    '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
-                   '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
+                   #'-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                    f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
@@ -313,6 +316,7 @@ def build_zlib(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
+        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -321,14 +325,19 @@ def build_boost(src_dir: str, install_dir: str):
         cbf = get_common_build_flags()
         if is_windows():
             env = get_vcvars_environment()
-            subprocess.run(['bootstrap',
-                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
-                            '--without-icu',
-                            '--prefix=' + install_dir],
+            subprocess.run(['bootstrap'],
                            cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(['.\\b2',
+            subprocess.run(['.\\b2', 'address-model=64',
                             'install',
+                            '--prefix=' + install_dir,
                             f'cxxflags={cbf["CXXFLAGS"]}',
+                            '--with-headers',
+                            '--with-context',
+                            '--with-filesystem',
+                            '--with-program_options',
+                            '--with-regex',
+                            '--with-thread',
+                            '--with-system',
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
         else:
@@ -483,15 +492,17 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(['perl', './Configure',
                             'VC-WIN64A',
                             'zlib',
+                            f'--with-zlib-include={os.path.join(ext_build_dir(), "include")}',
+                            f'--with-zlib-lib={os.path.join(ext_build_dir(), "lib", "zlibstatic.lib")}',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
                             #'no-legacy',
                             '--prefix=' + install_dir,
                             '--openssldir=' + os.path.join(install_dir, 'ssl')],
-                           cwd=src_dir, shell=False, check=True, env=env)
+                           cwd=src_dir, shell=True, check=True, env=env)
             subprocess.run(['nmake', 'install_sw'],
-                           cwd=src_dir, shell=False, check=True, env=env)
+                           cwd=src_dir, shell=True, check=True, env=env)
     finally:
         print('done')
 
@@ -1677,8 +1688,8 @@ def build_libs(libs: dict, update_src: bool):
         build_snappy(snappy_src_dir, ext_build_dir())
         build_xz(xz_src_dir, ext_build_dir())
         build_zstd(zstd_src_dir, ext_build_dir())
-        build_folly(src_dir, ext_build_dir(), header_only=False)
-        # build_folly(src_dir, ext_build_dir(), header_only=True)
+        # vs2019 build error https://github.com/facebook/folly/issues/1324
+        build_folly(src_dir, ext_build_dir(), header_only=is_windows())
 
     if libs['ceres-solver']:
         src_dir = os.path.join(ext_dir(), 'ceres-solver')

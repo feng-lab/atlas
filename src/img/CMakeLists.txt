@@ -299,8 +299,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
 
-  #target_link_libraries(${LIBRARY_NAME} PUBLIC /LTCG) # Link-time Code Generation
-  set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS /LTCG:STATUS)
+  target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
   # for some files
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS /arch:AVX)
@@ -310,6 +309,7 @@ if (WIN32)
 
   set_source_files_properties(ztiff.cpp PROPERTIES COMPILE_FLAGS /I${TIFFDIR})
   set_source_files_properties(zimgpng.cpp PROPERTIES COMPILE_FLAGS /I${PNG_INCLUDE_DIRS})
+  set_source_files_properties(zimgfreeimage.cpp PROPERTIES COMPILE_FLAGS /I${FREEIMAGE_INCLUDE_DIRS})
   foreach (item IN LISTS JPEGXR_INCLUDE_DIRS)
     message(STATUS "JPEGXR_INCLUDE_DIRS: ${item}")
     set(JXRINC "${JXRINC} /I${item}")
@@ -332,8 +332,8 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-compat)
-    #target_link_libraries(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
-    set_target_properties(${LIBRARY_NAME} PROPERTIES LINK_FLAGS -stdlib=libc++)
+
+    target_link_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
