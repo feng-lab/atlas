@@ -463,7 +463,6 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(['perl', './Configure',
                             'linux-x86_64',
                             'enable-ec_nistp_64_gcc_128',
-                            'zlib',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
@@ -483,7 +482,6 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(['perl', './Configure',
                             'darwin64-x86_64-cc',
                             'enable-ec_nistp_64_gcc_128',
-                            'zlib',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
@@ -500,9 +498,6 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             env['PATH'] = f'{env["PATH"]};{nasm_dir}'
             subprocess.run(['perl', './Configure',
                             'VC-WIN64A',
-                            'zlib',
-                            f'--with-zlib-include={os.path.join(ext_build_dir(), "include")}',
-                            f'--with-zlib-lib={os.path.join(ext_build_dir(), "lib", "zlibstatic.lib")}',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
@@ -1663,7 +1658,7 @@ def build_libs(libs: dict, update_src: bool):
             nasm_dir = ''  # does not need
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
-    if libs['folly']:
+    if libs['folly-deps']:
         bz2_src_dir = os.path.join(ext_dir(), 'bzip2') if is_windows() else None
         dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
@@ -1673,7 +1668,6 @@ def build_libs(libs: dict, update_src: bool):
         snappy_src_dir = os.path.join(ext_dir(), 'snappy')
         xz_src_dir = os.path.join(ext_dir(), 'xz')
         zstd_src_dir = os.path.join(ext_dir(), 'zstd')
-        src_dir = os.path.join(ext_dir(), 'folly')
         if update_src:
             if is_windows():
                 update_git_submodule(bz2_src_dir)
@@ -1685,7 +1679,6 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(snappy_src_dir)
             update_git_submodule(xz_src_dir)
             update_git_submodule(zstd_src_dir)
-            update_git_submodule(src_dir)
         if is_windows():
             build_bzip2(bz2_src_dir, ext_build_dir())
         build_double_conversion(dc_src_dir, ext_build_dir())
@@ -1697,6 +1690,11 @@ def build_libs(libs: dict, update_src: bool):
         build_snappy(snappy_src_dir, ext_build_dir())
         build_xz(xz_src_dir, ext_build_dir())
         build_zstd(zstd_src_dir, ext_build_dir())
+
+    if libs['folly']:
+        src_dir = os.path.join(ext_dir(), 'folly')
+        if update_src:
+            update_git_submodule(src_dir)
         # vs2019 build error https://github.com/facebook/folly/issues/1324
         build_folly(src_dir, ext_build_dir(), header_only=is_windows())
 
@@ -1855,13 +1853,14 @@ def parse_inputs(argv: list):
             'cppitertools': False,
             'glm': False,
             'googletest': False,
-            'folly': False,
             'cpuinfo': False,
             'gflags': False,
             'glog': False,
             'benchmark': False,
             'openssl': False,
             'grpc': False,
+            'folly-deps': False,
+            'folly': False,
             'ceres-solver': False,
             'glbinding': False,
             'libjpeg': False,
@@ -1891,6 +1890,7 @@ def parse_inputs(argv: list):
                             'hdf5': ['itk'],
                             'ceres-solver': ['opencv'],
                             'boost': ['folly'],
+                            'folly-deps': ['folly'],
                             }
 
     print('current interpreter: ' + sys.executable)
