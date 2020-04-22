@@ -5,7 +5,8 @@ execute_process(COMMAND cmake --help-property-list OUTPUT_VARIABLE CMAKE_PROPERT
 STRING(REGEX REPLACE ";" "\\\\;" CMAKE_PROPERTY_LIST "${CMAKE_PROPERTY_LIST}")
 STRING(REGEX REPLACE "\n" ";" CMAKE_PROPERTY_LIST "${CMAKE_PROPERTY_LIST}")
 # Fix https://stackoverflow.com/questions/32197663/how-can-i-remove-the-the-location-property-may-not-be-read-from-target-error-i
-list(FILTER CMAKE_PROPERTY_LIST EXCLUDE REGEX "^LOCATION$|^LOCATION_|_LOCATION$")
+# list(FILTER CMAKE_PROPERTY_LIST EXCLUDE REGEX "^LOCATION$|^LOCATION_|_LOCATION$")
+list(FILTER CMAKE_PROPERTY_LIST EXCLUDE REGEX "^LOCATION$|^LOCATION_")
 # For some reason, "TYPE" shows up twice - others might too?
 list(REMOVE_DUPLICATES CMAKE_PROPERTY_LIST)
 
@@ -33,12 +34,20 @@ function(print_target_properties tgt)
       return()
     endif()
 
+    set(options NO_LOCATION)
+    cmake_parse_arguments(PARSE_ARGV 1 print_target_properties "${options}" "" "")
+    # message (STATUS "print_target_properties_NO_LOCATION = ${print_target_properties_NO_LOCATION}")
+
     get_target_property(target_type ${tgt} TYPE)
     if(target_type STREQUAL "INTERFACE_LIBRARY")
         set(PROP_LIST ${CMAKE_WHITELISTED_PROPERTY_LIST})
     else()
         set(PROP_LIST ${CMAKE_PROPERTY_LIST})
     endif()
+
+    if (print_target_properties_NO_LOCATION)
+        list(FILTER PROP_LIST EXCLUDE REGEX "_LOCATION$")
+    endif ()
 
     string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPERCASE)
 

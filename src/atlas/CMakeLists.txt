@@ -13,8 +13,22 @@ if (WIN32)
   find_package(ZLIB)
 endif (WIN32)
 
+# OpenSSL installation directory can be configured by setting OPENSSL_ROOT_DIR
+# We expect to locate OpenSSL using the built-in cmake module as the openssl
+# project itself does not provide installation support in its CMakeLists.txt
+# See https://cmake.org/cmake/help/v3.6/module/FindOpenSSL.html
 set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
 find_package(OpenSSL REQUIRED)
+if(TARGET OpenSSL::SSL)
+  print_target_properties(OpenSSL::SSL)
+  print_target_properties(OpenSSL::Crypto)
+  set(_Atlas_SSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
+else()
+  set(_Atlas_SSL_LIBRARIES ${OPENSSL_LIBRARIES})
+endif()
+set(_Atlas_SSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
+message(STATUS "_Atlas_SSL_INCLUDE_DIR: ${_Atlas_SSL_INCLUDE_DIR}")
+message(STATUS "_Atlas_SSL_LIBRARIES: ${_Atlas_SSL_LIBRARIES}")
 
 # Find Protobuf installation
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
@@ -90,7 +104,7 @@ print_target_properties(Qt5::Widgets)
 print_target_properties(Qt5::Network)
 print_target_properties(Qt5::Svg)
 
-print_target_properties(img)
+print_target_properties(img NO_LOCATION)
 
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
