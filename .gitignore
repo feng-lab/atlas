@@ -32,6 +32,7 @@
 /src/3rdparty/__*
 /src/3rdparty/boost*
 /src/3rdparty/openssl*
+/src/3rdparty/build
 
 !/neurolabi/lib/Mingw/*.zip
 

@@ -58,9 +58,9 @@ def update_git_submodule(target_folder: str, tag: str = None):
 
 
 def create_build_dir(src_dir: str):
-    build_dir = os.path.normpath(os.path.join(src_dir, '..', '__' + Path(src_dir).name + '-build'))
+    build_dir = os.path.normpath(os.path.join(ext_build_dir(), '__' + Path(src_dir).name + '-build'))
     shutil.rmtree(build_dir, ignore_errors=True)
-    os.makedirs(build_dir, exist_ok=False)
+    os.mkdir(build_dir)
     return build_dir
 
 
@@ -1901,6 +1901,9 @@ def parse_inputs(argv: list):
             usage += ' [' + lib + ']'
         print(usage)
         sys.exit(0)
+
+    if len(argv) == 2 and argv[1].lower() == "all":
+        shutil.rmtree(ext_build_dir(), ignore_errors=True)
 
     state = True
     for lib in argv[1:]:

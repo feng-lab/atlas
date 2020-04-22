@@ -49,6 +49,8 @@ def ext_dir() -> str:
 
 def ext_build_dir() -> str:
     res = os.path.join(atlas_src_dir(), '3rdparty', 'build')
+    if not os.path.exists(res):
+        os.mkdir(res)
     assert os.path.exists(res)
     return res
 
