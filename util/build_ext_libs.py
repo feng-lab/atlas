@@ -1749,8 +1749,6 @@ def build_libs(libs: dict, update_src: bool):
             remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'GeometricTools*'))
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
-        shutil.rmtree(os.path.join(ext_build_dir(), 'geometrictools'), ignore_errors=True)
-        distutils.dir_util.copy_tree(src_dir, os.path.join(ext_build_dir(), 'geometrictools'))
 
     if libs['assimp']:
         src_dir = os.path.join(ext_dir(), 'assimp')

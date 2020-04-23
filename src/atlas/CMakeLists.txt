@@ -65,9 +65,6 @@ print_target_properties(VTK::FiltersGeometry)
 print_target_properties(VTK::FiltersSources)
 print_target_properties(VTK::IOXML)
 
-set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/geometrictools)
-
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(benchmark::benchmark)
@@ -598,7 +595,6 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${APP_NAME} PRIVATE ${GEOMETRICTOOLS_INCLUDE_DIRS})
 target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)

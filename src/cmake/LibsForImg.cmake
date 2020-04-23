@@ -194,9 +194,15 @@ find_package(glog REQUIRED
              NO_DEFAULT_PATH)
 print_target_properties(glog::glog)
 
-set(GEOMETRICTOOLS_INCLUDE_DIRS ${GEOMETRICTOOLS_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/geometrictools)
-message(STATUS "GEOMETRICTOOLS_INCLUDE_DIRS: ${GEOMETRICTOOLS_INCLUDE_DIRS}")
+add_library(GeometricTools INTERFACE IMPORTED)
+set_target_properties(GeometricTools PROPERTIES
+                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/GeometricTools/GTE")
+print_target_properties(GeometricTools)
+
+add_library(glm::glm INTERFACE IMPORTED)
+set_target_properties(glm::glm PROPERTIES
+                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/glm")
+print_target_properties(glm::glm)
 
 find_package(HDF5 REQUIRED
              COMPONENTS C CXX static
@@ -216,10 +222,13 @@ if (WIN32)
                headers
                PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
                )
+  print_target_properties(Boost::headers)
+
   add_library(Folly::folly INTERFACE IMPORTED)
   set_target_properties(Folly::folly PROPERTIES
                         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly"
                         INTERFACE_LINK_LIBRARIES "Boost::headers")
+  print_target_properties(Folly::folly)
 else (WIN32)
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.72.0 REQUIRED
