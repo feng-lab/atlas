@@ -44,9 +44,9 @@ set(TIFF_SOURCES
     ${TIFFDIR}/tif_warning.c
     ${TIFFDIR}/tif_write.c
     ${TIFFDIR}/tif_zip.c
-    ${TIFFDIR}/tif_ojpeg.c
     ${TIFFDIR}/tif_jpeg.c
-    ${TIFFDIR}/tif_jbig.c
+    ${TIFFDIR}/tif_lzma.c
+    ${TIFFDIR}/tif_zstd.c
     ${TIFFDIR}/tif_stream.cxx
     )
 if (WIN32)
@@ -96,7 +96,7 @@ set(IMG_SOURCES
     zimgpng.h
     zimgregion.h
     zimgsliceprovider.h
-    zimgstackinterface.h
+    # zimgstackinterface.h
     zimgtiff.h
     zimgv3draw.h
     zimgzeissczi.h
@@ -134,7 +134,7 @@ set(IMG_SOURCES
     zimgpng.cpp
     zimgregion.cpp
     zimgsliceprovider.cpp
-    zimgstackinterface.cpp
+    # zimgstackinterface.cpp
     zimgtiff.cpp
     zimgv3draw.cpp
     zimgzeissczi.cpp

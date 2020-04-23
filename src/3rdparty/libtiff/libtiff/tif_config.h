@@ -112,13 +112,13 @@
 /* #undef JPEG_DUAL_MODE_8_12 */
 
 /* 12bit libjpeg primary include file with path */
-#define LIBJPEG_12_PATH 
+#define LIBJPEG_12_PATH
 
 /* Support LZMA2 compression */
-/* #undef LZMA_SUPPORT */
+#define LZMA_SUPPORT 1
 
 /* Support ZSTD compression */
-/* #undef ZSTD_SUPPORT */
+#define ZSTD_SUPPORT 1
 
 /* Name of package */
 #define PACKAGE "LibTIFF Software"
@@ -223,7 +223,7 @@
 #endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-#define _FILE_OFFSET_BITS 
+#define _FILE_OFFSET_BITS
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
@@ -351,13 +351,13 @@
 /* #undef JPEG_DUAL_MODE_8_12 */
 
 /* 12bit libjpeg primary include file with path */
-#define LIBJPEG_12_PATH 
+#define LIBJPEG_12_PATH
 
 /* Support LZMA2 compression */
-/* #undef LZMA_SUPPORT */
+#define LZMA_SUPPORT 1
 
 /* Support ZSTD compression */
-/* #undef ZSTD_SUPPORT */
+#define ZSTD_SUPPORT 1
 
 /* Support WEBP compression */
 /* #undef WEBP_SUPPORT */

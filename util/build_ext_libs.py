@@ -940,6 +940,10 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        # env = get_vcvars_environment() if is_windows() else os.environ.copy()
+        # env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl')
+        # build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -1317,11 +1321,14 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_USE_GPU:BOOL=OFF',
                          '-DITK_DOXYGEN_HTML:BOOL=OFF',
                          '-DModule_ITKReview:BOOL=ON',
-                         '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         '-DITK_USE_SYSTEM_EIGEN:BOOL=ON',
                          '-DModule_ITKTBB:BOOL=ON',
                          # '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake',
+                         '-DITK_USE_SYSTEM_DOUBLECONVERSION:BOOL=ON',
+                         '-DITK_USE_SYSTEM_EIGEN:BOOL=ON',
                          '-DITK_USE_SYSTEM_HDF5:BOOL=ON',
+                         '-DITK_USE_SYSTEM_JPEG:BOOL=ON',
+                         '-DITK_USE_SYSTEM_PNG:BOOL=ON',
+                         '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          ],
                         )
 
@@ -1388,6 +1395,13 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_BUILD_TESTING:STRING=OFF',
                          '-DVTK_DATA_EXCLUDE_FROM_ALL:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_doubleconversion:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
@@ -1410,7 +1424,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
         cmakecmd.extend(['-DBUILD_opencv_videoio:BOOL=ON',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_PROTOBUF:BOOL=OFF',
-                         '-DBUILD_opencv_python2:BOOL=OFF',
                          '-DBUILD_opencv_videostab:BOOL=ON',
                          '-DBUILD_opencv_hdf:BOOL=OFF',
                          '-DBUILD_opencv_sfm:BOOL=OFF',
@@ -1676,35 +1689,45 @@ def build_libs(libs: dict, update_src: bool):
             nasm_dir = ''  # does not need
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
+    if libs['double-conversion']:
+        dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
+        if update_src:
+            update_git_submodule(dc_src_dir)
+        build_double_conversion(dc_src_dir, ext_build_dir())
+
+    if libs['lz4']:
+        lz4_src_dir = os.path.join(ext_dir(), 'lz4')
+        if update_src:
+            update_git_submodule(lz4_src_dir)
+        build_lz4(lz4_src_dir, ext_build_dir())
+
+    # lzma
+    if libs['xz']:
+        xz_src_dir = os.path.join(ext_dir(), 'xz')
+        if update_src:
+            update_git_submodule(xz_src_dir)
+        build_xz(xz_src_dir, ext_build_dir())
+
     if libs['folly-deps']:
         bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
-        dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
         fmt_src_dir = os.path.join(ext_dir(), 'fmt')
         le_src_dir = os.path.join(ext_dir(), 'libevent')
-        lz4_src_dir = os.path.join(ext_dir(), 'lz4')
         snappy_src_dir = os.path.join(ext_dir(), 'snappy')
-        xz_src_dir = os.path.join(ext_dir(), 'xz')
         zstd_src_dir = os.path.join(ext_dir(), 'zstd')
         if update_src:
             update_git_submodule(bz2_src_dir)
-            update_git_submodule(dc_src_dir)
             # update_git_submodule(jm_src_dir)
             update_git_submodule(fmt_src_dir)
             update_git_submodule(le_src_dir)
-            update_git_submodule(lz4_src_dir)
             update_git_submodule(snappy_src_dir)
-            update_git_submodule(xz_src_dir)
             update_git_submodule(zstd_src_dir)
         build_bzip2(bz2_src_dir, ext_build_dir())
-        build_double_conversion(dc_src_dir, ext_build_dir())
         build_fmt(fmt_src_dir, ext_build_dir())
         # if is_linux():
         #     build_jemalloc(jm_src_dir, ext_build_dir())
         build_libevent(le_src_dir, ext_build_dir())
-        build_lz4(lz4_src_dir, ext_build_dir())
         build_snappy(snappy_src_dir, ext_build_dir())
-        build_xz(xz_src_dir, ext_build_dir())
         build_zstd(zstd_src_dir, ext_build_dir())
 
     if libs['folly']:
@@ -1873,6 +1896,9 @@ def parse_inputs(argv: list):
             'benchmark': False,
             'openssl': False,
             'grpc': False,
+            'double-conversion': False,
+            'lz4': False,
+            'xz': False,
             'folly-deps': False,
             'folly': False,
             'ceres-solver': False,
@@ -1892,19 +1918,22 @@ def parse_inputs(argv: list):
             'java': False,
             }
     update_src = False
-    libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver'],
-                            'libpng': ['opencv'],
-                            'libjpeg': ['opencv'],
+    libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
+                            'libpng': ['opencv', 'itk', 'vtk'],
+                            'libjpeg': ['opencv', 'itk', 'vtk'],
                             'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly'],
                             'gflags': ['glog', 'grpc'],
                             'glog': ['ceres-solver', 'folly'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
                             'tbb': ['itk', 'opencv'],
-                            'hdf5': ['itk'],
+                            'hdf5': ['itk', 'vtk'],
                             'ceres-solver': ['opencv'],
                             'boost': ['folly'],
                             'folly-deps': ['folly'],
+                            'double-conversion': ['folly', 'itk', 'vtk'],
+                            'lz4': ['vtk'],
+                            'xz': ['vtk'],
                             }
 
     print('current interpreter: ' + sys.executable)

@@ -261,10 +261,12 @@ enum class Compression : std::uint16_t
   DEFLATE = 32946,  /* Deflate compression */ // zip
   ADOBE_DEFLATE = 8,       /* Deflate compression,
                as recognized by Adobe */
-/* compression code 32947 is reserved for Oceana Matrix <dev@oceana.com> */
-    DCS = 32947,   /* Kodak DCS encoding */
-  JBIG = 34661,  /* ISO JBIG */
-  JP2000 = 34712   /* Leadtools JPEG2000 */
+  /* compression code 32947 is reserved for Oceana Matrix <dev@oceana.com> */
+  DCS = 32947,   /* Kodak DCS encoding */
+  JP2000 = 34712,   /* Leadtools JPEG2000 */
+  /* compression codes 34887-34889 are reserved for ESRI */
+  LZMA = 34925,  /* LZMA2 */
+  ZSTD = 50000, /* ZSTD: WARNING not registered in Adobe-maintained registry */
 };
 
 enum class PadOption

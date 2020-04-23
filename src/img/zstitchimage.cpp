@@ -564,8 +564,6 @@ void ZStitchImage::doWork()
     tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
-    fftw_plan_with_nthreads(1);
-
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
     for (const auto& con : conn) {
       allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
@@ -656,6 +654,7 @@ void ZStitchImage::doWork()
     };
 
     if (m_useMultithreading) {
+      fftw_plan_with_nthreads(1);
 //      int nthread =
 //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
 //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
@@ -673,14 +672,13 @@ void ZStitchImage::doWork()
           }
         }
       );
+
+      fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
       for (size_t i = 0; i < allPairs.size(); ++i) {
         stitch_pair(i);
       }
     }
-
-    fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
-
 
     ZImgMerge imgMerge;
     std::vector<ZImgTileSubBlock> imgs;
@@ -974,8 +972,6 @@ void ZStitchImage::doRestitch()
     tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
-    fftw_plan_with_nthreads(1);
-
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
     for (const auto& con : conn) {
       allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
@@ -1031,6 +1027,7 @@ void ZStitchImage::doRestitch()
     };
 
     if (m_useMultithreading) {
+      fftw_plan_with_nthreads(1);
 //      int nthread =
 //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
 //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
@@ -1048,13 +1045,12 @@ void ZStitchImage::doRestitch()
           }
         }
       );
+      fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
       for (size_t i = 0; i < allPairs.size(); ++i) {
         stitch_pair(i);
       }
     }
-
-    fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
 
     ZImgMerge imgMerge;
     std::vector<ZImgTileSubBlock> imgs;
