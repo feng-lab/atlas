@@ -320,13 +320,14 @@ def build_zlib(src_dir: str, install_dir: str):
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
-                              from_texts=[r'install(TARGETS zlib zlibstatic'],
-                              to_texts=[r'install(TARGETS zlibstatic'])
+                              from_texts=[r'install(TARGETS zlib zlibstatic',
+                                          r'target_link_libraries(example zlib)',
+                                          r'target_link_libraries(minigzip zlib)'],
+                              to_texts=[r'install(TARGETS zlibstatic',
+                                        r'target_link_libraries(example zlibstatic)',
+                                        r'target_link_libraries(minigzip zlibstatic)'])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        if not is_windows():
-            cmakecmd.extend(['-DAMD64:BOOL=ON'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -614,7 +615,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
 
 
 def build_bzip2(src_dir: str, install_dir: str):
-    assert is_windows()
     build_dir = create_build_dir(src_dir)
 
     try:
