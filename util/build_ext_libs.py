@@ -316,7 +316,13 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
 def build_zlib(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'install(TARGETS zlib zlibstatic'],
+                              to_texts=[r'install(TARGETS zlibstatic'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if not is_windows():
@@ -327,6 +333,7 @@ def build_zlib(src_dir: str, install_dir: str):
     finally:
         print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_boost(src_dir: str, install_dir: str):
@@ -1087,9 +1094,13 @@ def build_assimp(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
         orig_file2 = os.path.join(src_dir, 'CMakeLists.txt')
-        from_texts = [r'SET (ASSIMP_SOVERSION 4)']
-        to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})']
+        from_texts = [r'SET (ASSIMP_SOVERSION 5)',
+                      r' -lz']
+        to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
+                    r' ZLIB::ZLIB']
         bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
+
+        os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
 
         if is_mac():
             orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
@@ -1106,7 +1117,9 @@ def build_assimp(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
-                         '-DASSIMP_BUILD_TESTS:BOOL=OFF'])
+                         '-DASSIMP_BUILD_TESTS:BOOL=OFF',
+                         '-DASSIMP_BUILD_ZLIB:BOOL=OFF',
+                         '-DASSIMP_HUNTER_ENABLED:BOOL=OFF'])
 
         # if is_windows():
         #     cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
@@ -1122,6 +1135,8 @@ def build_assimp(src_dir: str, install_dir: str):
         #                     'lib/libassimp.dylib'],
         #                    cwd=install_dir, shell=False, check=True)
     finally:
+        subprocess.run(['git', 'reset', '--hard'],
+                       cwd=src_dir, shell=False, check=True)
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
         if is_mac():
@@ -1566,14 +1581,13 @@ def build_libs(libs: dict, update_src: bool):
                     print("{0} successfully patched at {1} places.".format(file, len(allIndexes)))
 
     if libs['zlib']:
-        if is_windows():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
-            if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'zlib*'))
-                unpack_file_to_folder(package_name, ext_dir())
-                assert os.path.exists(src_dir)
-            build_zlib(src_dir, ext_build_dir())
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'zlib*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+        build_zlib(src_dir, ext_build_dir())
 
     if libs['ffmpeg']:
         install_ffmpeg()
@@ -1659,7 +1673,7 @@ def build_libs(libs: dict, update_src: bool):
         build_grpc(src_dir, ext_build_dir(), nasm_dir=nasm_dir)
 
     if libs['folly-deps']:
-        bz2_src_dir = os.path.join(ext_dir(), 'bzip2') if is_windows() else None
+        bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
         dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
         fmt_src_dir = os.path.join(ext_dir(), 'fmt')
@@ -1669,8 +1683,7 @@ def build_libs(libs: dict, update_src: bool):
         xz_src_dir = os.path.join(ext_dir(), 'xz')
         zstd_src_dir = os.path.join(ext_dir(), 'zstd')
         if update_src:
-            if is_windows():
-                update_git_submodule(bz2_src_dir)
+            update_git_submodule(bz2_src_dir)
             update_git_submodule(dc_src_dir)
             # update_git_submodule(jm_src_dir)
             update_git_submodule(fmt_src_dir)
@@ -1679,8 +1692,7 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(snappy_src_dir)
             update_git_submodule(xz_src_dir)
             update_git_submodule(zstd_src_dir)
-        if is_windows():
-            build_bzip2(bz2_src_dir, ext_build_dir())
+        build_bzip2(bz2_src_dir, ext_build_dir())
         build_double_conversion(dc_src_dir, ext_build_dir())
         build_fmt(fmt_src_dir, ext_build_dir())
         # if is_linux():
@@ -1920,10 +1932,8 @@ def parse_inputs(argv: list):
     libs['cmake'] = True
     libs['ninja'] = True
     if is_linux():
-        libs['zlib'] = False
         libs['curl'] = False
     elif is_mac():
-        libs['zlib'] = False
         libs['curl'] = False
 
     for lib, rev_dep in libs_reverse_depends.items():

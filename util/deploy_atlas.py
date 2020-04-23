@@ -98,8 +98,6 @@ def build_atlas_package():
                             symlinks=True)
             build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), 'assimp*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
-            build_ext_libs.glob_copy(os.path.join(common_dirs.assimp_redist_dir(), 'zlib*.dll'),
-                                     os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             build_ext_libs.glob_copy(os.path.join(common_dirs.freeimage_redist_dir(), '*.dll'),
                                      os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
             shutil.copy2(os.path.join(common_dirs.tbb_redist_dir(), 'tbb.dll'),
