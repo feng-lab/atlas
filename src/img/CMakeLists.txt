@@ -266,7 +266,6 @@ endif ()
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${LIBRARY_NAME} PRIVATE ${MKL_INCLUDE_DIRS})
 target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
-target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/eigen3)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/glm)
 target_include_directories(${LIBRARY_NAME} SYSTEM PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/cppitertools)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_NO_DEBUG EIGEN_DONT_PARALLELIZE)
@@ -360,7 +359,7 @@ endif (WIN32)
 
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
-                      hdf5_cpp-static hdf5-static ceres Folly::folly
+                      hdf5_cpp-static hdf5-static ceres Folly::folly Eigen3::Eigen
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

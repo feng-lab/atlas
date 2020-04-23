@@ -210,9 +210,16 @@ print_target_properties(Eigen3::Eigen)
 print_target_properties(ceres)
 
 if (WIN32)
+  set(Boost_USE_STATIC_LIBS ON)
+  find_package(Boost 1.72.0 REQUIRED
+               COMPONENTS
+               headers
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
+               )
   add_library(Folly::folly INTERFACE IMPORTED)
   set_target_properties(Folly::folly PROPERTIES
-                        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/boost-1_72;${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly")
+                        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly"
+                        INTERFACE_LINK_LIBRARIES "Boost::headers")
 else (WIN32)
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.72.0 REQUIRED

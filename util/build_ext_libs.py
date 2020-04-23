@@ -58,7 +58,7 @@ def update_git_submodule(target_folder: str, tag: str = None):
 
 
 def create_build_dir(src_dir: str):
-    build_dir = os.path.normpath(os.path.join(ext_build_dir(), '__' + Path(src_dir).name + '-build'))
+    build_dir = os.path.normpath(os.path.join(ext_build_dir(), '__' + Path(src_dir).name))
     shutil.rmtree(build_dir, ignore_errors=True)
     os.mkdir(build_dir)
     return build_dir
