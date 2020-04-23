@@ -13,18 +13,8 @@
 ### Windows:
 * install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
-* install golang: https://golang.org
-* install vcpkg: https://github.com/Microsoft/vcpkg
-* install vcpkg packages
-    ```bash
-    vcpkg install folly:x64-windows
-    vcpkg update
-    vcpkg upgrade --no-dry-run
-    # remove
-    vcpkg remove zlib:x64-windows --recurse
-    vcpkg remove double-conversion:x64-windows --recurse
-    vcpkg remove gflags:x64-windows --recurse
-    ```
+* install golang: https://golang.org, add to path
+* install perl: https://www.activestate.com/products/perl/downloads/, add to path
 
 ### Linux:
 * install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja
@@ -35,8 +25,8 @@
 * `atlas_others` folder and repository folder should be in same directory
 * get submodules
     ```bash
-    git submodule update --init --recursive
-    # or git submodule update --init --recursive --depth 1
+    git submodule update --init --recursive --depth 1
+    # or git submodule update --init --recursive
     ```
 * run `python3 util/build_ext_libs.py all` to build external libraries
 * run `python3 util/build_and_deploy_atlas.py` or build CMakeLists.txt

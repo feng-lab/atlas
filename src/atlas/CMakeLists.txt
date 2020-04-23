@@ -639,7 +639,7 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14"
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14.0.1"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
@@ -691,7 +691,7 @@ else (WIN32)
                           )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14.jdk/Contents/Home
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14.0.1.jdk/Contents/Home
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jdk)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
@@ -714,7 +714,7 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk-14.0.1
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
