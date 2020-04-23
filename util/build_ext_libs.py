@@ -322,10 +322,14 @@ def build_zlib(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=[r'install(TARGETS zlib zlibstatic',
                                           r'target_link_libraries(example zlib)',
-                                          r'target_link_libraries(minigzip zlib)'],
+                                          r'target_link_libraries(minigzip zlib)',
+                                          r'target_link_libraries(example64 zlib)',
+                                          r'target_link_libraries(minigzip64 zlib)',],
                               to_texts=[r'install(TARGETS zlibstatic',
                                         r'target_link_libraries(example zlibstatic)',
-                                        r'target_link_libraries(minigzip zlibstatic)'])
+                                        r'target_link_libraries(minigzip zlibstatic)',
+                                        r'target_link_libraries(example64 zlibstatic)',
+                                        r'target_link_libraries(minigzip64 zlibstatic)',])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
