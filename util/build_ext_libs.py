@@ -378,8 +378,7 @@ def build_boost(src_dir: str, install_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['bootstrap'],
                            cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(['.\\b2', 'address-model=64',
-                            'install',
+            subprocess.run(['.\\b2',
                             '--prefix=' + install_dir,
                             f'cxxflags={cbf["CXXFLAGS"]}',
                             '--with-headers',
@@ -389,6 +388,9 @@ def build_boost(src_dir: str, install_dir: str):
                             '--with-regex',
                             '--with-thread',
                             '--with-system',
+                            'address-model=64',
+                            'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
+                            'install',
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
         else:
@@ -399,15 +401,18 @@ def build_boost(src_dir: str, install_dir: str):
                            cwd=src_dir, shell=False, check=True)
             if is_mac():
                 subprocess.run(['./b2',
-                                'install',
+                                'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
                                 f'linkflags={cbf["LDFLAGS"]}',
+                                'install',
                                 ],
                                cwd=src_dir, shell=False, check=True)
             else:
                 subprocess.run(['./b2',
-                                'install',
+                                'address-model=64',
+                                'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
+                                'install',
                                 ],
                                cwd=src_dir, shell=False, check=True)
     finally:
