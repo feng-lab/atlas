@@ -29,11 +29,13 @@ def update_or_clone_git_repository(repository_folder: str, repository_url: str):
 
 def update_or_clone_git_repository_with_submodules(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
-        print('git', 'pull', Path(repository_folder).name)
+        print(f'git pull {Path(repository_folder).name}')
         subprocess.run(['git', 'pull'], cwd=repository_folder, shell=False, check=False)
-        subprocess.run(['git', 'submodule', 'update', '--init', '--recursive'], cwd=repository_folder, shell=False, check=False)
+        subprocess.run(['git', 'submodule', 'update', '--init', '--recursive'],
+                       cwd=repository_folder, shell=False, check=False)
     else:
-        subprocess.run(['git', 'clone', '--recursive', repository_url, repository_folder], shell=False, check=True)
+        subprocess.run(['git', 'clone', '--recursive', repository_url, repository_folder],
+                       shell=False, check=True)
 
 
 def export_git_repository(repository_folder: str, target_folder: str, branch: str = '', tag: str = ''):
@@ -55,6 +57,14 @@ def update_git_submodule(target_folder: str, tag: str = None):
                    cwd=atlas_repository_dir(), shell=False, check=True)
     if tag is not None:
         subprocess.run(['git', 'checkout', tag], cwd=target_folder, shell=False, check=True)
+
+
+def cleanup_git_submodule(target_folder: str):
+    assert os.path.isfile(os.path.join(target_folder, '.git')), f'{target_folder} is not git submodule'
+    subprocess.run(['git', 'reset', '--hard'],
+                   cwd=target_folder, shell=False, check=True)
+    subprocess.run(['git', 'clean', '-dff'],
+                   cwd=target_folder, shell=False, check=True)
 
 
 def create_build_dir(src_dir: str):
@@ -165,6 +175,24 @@ def get_common_build_flags():
     return res
 
 
+def get_env_for_config_make():
+    env = get_vcvars_environment() if is_windows() else os.environ.copy()
+    cbf = get_common_build_flags()
+    if is_mac():
+        env['CC'] = cbf['CC']
+        env['CFLAGS'] = cbf['CFLAGS']
+        env['LDFLAGS'] = cbf['LDFLAGS']
+        env['CXX'] = cbf['CXX']
+        env['CXXFLAGS'] = cbf['CXXFLAGS']
+    elif is_linux():
+        env['CFLAGS'] = cbf['CFLAGS']
+        env['CXXFLAGS'] = cbf['CXXFLAGS']
+    elif is_windows():
+        env['CFLAGS'] = cbf['CFLAGS']
+        env['CXXFLAGS'] = cbf['CXXFLAGS']
+    return env
+
+
 def get_cmake_cmd_common_part(install_dir: str):
     cbf = get_common_build_flags()
     if is_windows():
@@ -172,7 +200,7 @@ def get_cmake_cmd_common_part(install_dir: str):
             res = [get_cmake_binary(),  # '-E', 'echo',
                    '-DCMAKE_BUILD_TYPE=Release',
                    '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
-                   #'-DCMAKE_MODULE_PATH=' + ext_build_dir(),
+                   # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                    '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                    '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
@@ -324,12 +352,14 @@ def build_zlib(src_dir: str, install_dir: str):
                                           r'target_link_libraries(example zlib)',
                                           r'target_link_libraries(minigzip zlib)',
                                           r'target_link_libraries(example64 zlib)',
-                                          r'target_link_libraries(minigzip64 zlib)',],
+                                          r'target_link_libraries(minigzip64 zlib)',
+                                          ],
                               to_texts=[r'install(TARGETS zlibstatic',
                                         r'target_link_libraries(example zlibstatic)',
                                         r'target_link_libraries(minigzip zlibstatic)',
                                         r'target_link_libraries(example64 zlibstatic)',
-                                        r'target_link_libraries(minigzip64 zlibstatic)',])
+                                        r'target_link_libraries(minigzip64 zlibstatic)',
+                                        ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -441,8 +471,7 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        subprocess.run(['git', 'reset', '--hard'],
-                       cwd=src_dir, shell=False, check=True)
+        cleanup_git_submodule(src_dir)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -467,46 +496,36 @@ def build_benchmark(src_dir: str, install_dir: str):
 
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
     try:
-        cbf = get_common_build_flags()
         if is_linux():
-            env = os.environ.copy()
-            env['CFLAGS'] = cbf['CFLAGS']
-            env['CXXFLAGS'] = cbf['CXXFLAGS']
+            env = get_env_for_config_make()
             subprocess.run(['perl', './Configure',
                             'linux-x86_64',
                             'enable-ec_nistp_64_gcc_128',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
-                            #'no-legacy',
+                            # 'no-legacy',
                             '--prefix=' + install_dir,
                             '--openssldir=' + os.path.join(install_dir, 'ssl')],
                            cwd=src_dir, shell=False, check=True, env=env)
             subprocess.run(['make', 'install_sw'],
                            cwd=src_dir, shell=False, check=True, env=env)
         elif is_mac():
-            env = os.environ.copy()
-            env['CC'] = cbf['CC']
-            env['CFLAGS'] = cbf['CFLAGS']
-            env['LDFLAGS'] = cbf['LDFLAGS']
-            env['CXX'] = cbf['CXX']
-            env['CXXFLAGS'] = cbf['CXXFLAGS']
+            env = get_env_for_config_make()
             subprocess.run(['perl', './Configure',
                             'darwin64-x86_64-cc',
                             'enable-ec_nistp_64_gcc_128',
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
-                            #'no-legacy',
+                            # 'no-legacy',
                             '--prefix=' + install_dir,
                             '--openssldir=' + os.path.join(install_dir, 'ssl')],
                            cwd=src_dir, shell=False, check=True, env=env)
             subprocess.run(['make', 'install_sw'],
                            cwd=src_dir, shell=False, check=True, env=env)
         elif is_windows():
-            env = get_vcvars_environment()
-            env['CFLAGS'] = cbf['CFLAGS']
-            env['CXXFLAGS'] = cbf['CXXFLAGS']
+            env = get_env_for_config_make()
             env['PATH'] = f'{env["PATH"]};{nasm_dir}'
             subprocess.run(['perl', './Configure',
                             'VC-WIN64A',
@@ -665,17 +684,7 @@ def build_jemalloc(src_dir: str, install_dir: str):
         if is_windows():
             assert False
         else:
-            env = os.environ.copy()
-            cbf = get_common_build_flags()
-            if is_mac():
-                env['CC'] = cbf['CC']
-                env['CFLAGS'] = cbf['CFLAGS']
-                env['LDFLAGS'] = cbf['LDFLAGS']
-                env['CXX'] = cbf['CXX']
-                env['CXXFLAGS'] = cbf['CXXFLAGS']
-            elif is_linux():
-                env['CFLAGS'] = cbf['CFLAGS']
-                env['CXXFLAGS'] = cbf['CXXFLAGS']
+            env = get_env_for_config_make()
             subprocess.run(['./autogen.sh',
                             '--disable-debug',
                             '--with-jemalloc-prefix=je_',
@@ -684,10 +693,7 @@ def build_jemalloc(src_dir: str, install_dir: str):
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
                            cwd=src_dir, shell=False, check=True, env=env)
     finally:
-        subprocess.run(['git', 'reset', '--hard'],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run(['git', 'clean', '-dff'],
-                       cwd=src_dir, shell=False, check=True)
+        cleanup_git_submodule(src_dir)
 
 
 def build_libevent(src_dir: str, install_dir: str):
@@ -763,7 +769,27 @@ def build_zstd(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_folly(src_dir: str, install_dir: str, header_only: bool=False):
+def build_libsodium(src_dir: str, install_dir: str):
+    try:
+        if is_windows():
+            env = get_vcvars_environment()
+            subprocess.run(['MSBuild', 'libsodium.sln', '/target:libsodium', '/property:Platform=x64',
+                            '/property:Configuration=StaticRelease', '/maxcpucount'],
+                           cwd=os.path.join(src_dir, 'builds', 'msvc', 'vs2019'), shell=True, check=True, env=env)
+        else:
+            env = get_env_for_config_make()
+            subprocess.run(['./configure',
+                            '--enable-shared=no',
+                            '--enable-static=yes',
+                            '--prefix=' + install_dir],
+                           cwd=src_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=src_dir, shell=False, check=True, env=env)
+    finally:
+        print('done')
+
+
+def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
     if header_only:
         install_dir = os.path.join(install_dir, 'folly')
         shutil.rmtree(install_dir, ignore_errors=True)
@@ -1054,10 +1080,7 @@ def build_jxrlib(src_dir: str, install_dir: str):
         if not is_windows():
             shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
             os.replace(bak_file, orig_file)
-        subprocess.run(['git', 'reset', '--hard'],
-                       cwd=src_dir, shell=False, check=True)
-        subprocess.run(['git', 'clean', '-dff'],
-                       cwd=src_dir, shell=False, check=True)
+        cleanup_git_submodule(src_dir)
 
 
 def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str):
@@ -1143,14 +1166,13 @@ def build_assimp(src_dir: str, install_dir: str):
         #                     'lib/libassimp.dylib'],
         #                    cwd=install_dir, shell=False, check=True)
     finally:
-        subprocess.run(['git', 'reset', '--hard'],
-                       cwd=src_dir, shell=False, check=True)
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
         if is_mac():
             os.replace(bak_file_3, orig_file_3)
             os.replace(bak_file_4, orig_file_4)
         shutil.rmtree(build_dir, ignore_errors=False)
+        cleanup_git_submodule(src_dir)
 
 
 def build_hdf5(src_dir: str, install_dir: str):
@@ -1358,7 +1380,8 @@ def build_itk(src_dir: str, install_dir: str):
                              r'#set(ITKTBB_LIBRARIES',
                              r'#set(TBB_DIR'])
 
-        # ITKZLIB_INCLUDE_DIRS includes /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+        # ITKZLIB_INCLUDE_DIRS includes
+        # /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
         # which cause conda compilation errors
         orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.1', 'Modules', 'ITKZLIB.cmake')
         patch_file(orig_file_3,
@@ -1379,14 +1402,16 @@ def build_vtk(src_dir: str, install_dir: str):
     orig_file = bak_file = None
     try:
         orig_file = os.path.join(src_dir, 'Filters', 'FlowPaths', 'vtkModifiedBSPTree.cxx')
+        from_texts = [r'struct Isort : public std::binary_function<Intersection, Intersection, bool>',
+                      r'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }']
+        to_texts = [r'struct Isort',
+                    'typedef Intersection first_argument_type;\n'
+                    'typedef Intersection second_argument_type;\n'
+                    'typedef bool result_type;\n'
+                    'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }']
         bak_file = patch_file(orig_file,
-                              from_texts=[r'struct Isort : public std::binary_function<Intersection, Intersection, bool>',
-                                          r'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }'],
-                              to_texts=[r'struct Isort',
-                                        'typedef Intersection first_argument_type;\n'
-                                        'typedef Intersection second_argument_type;\n'
-                                        'typedef bool result_type;\n'
-                                        'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }'])
+                              from_texts=from_texts,
+                              to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -1582,20 +1607,20 @@ def build_libs(libs: dict, update_src: bool):
             file += '.exe'
         with open(file, 'r+b') as f:
             with mmap.mmap(f.fileno(), 0) as mm:
-                allIndexes = []
+                all_indexes = []
                 index = mm.find(pattern_bytes)
                 while index != -1:
-                    allIndexes.append(index)
+                    all_indexes.append(index)
                     index = mm.find(pattern_bytes, index + len(pattern_bytes))
-                if not allIndexes:
+                if not all_indexes:
                     print("Pattern not found in {0}, skip patching.".format(file))
                 else:
                     # make backup
                     shutil.copy2(file, file + '.bak')
-                    for index in allIndexes:
+                    for index in all_indexes:
                         mm[index:index + len(replace_bytes)] = replace_bytes
                     mm.flush()
-                    print("{0} successfully patched at {1} places.".format(file, len(allIndexes)))
+                    print("{0} successfully patched at {1} places.".format(file, len(all_indexes)))
 
     if libs['zlib']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'zlib*'))
@@ -1722,13 +1747,21 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(le_src_dir)
             update_git_submodule(snappy_src_dir)
             update_git_submodule(zstd_src_dir)
-        build_bzip2(bz2_src_dir, ext_build_dir())
-        build_fmt(fmt_src_dir, ext_build_dir())
-        # if is_linux():
-        #     build_jemalloc(jm_src_dir, ext_build_dir())
-        build_libevent(le_src_dir, ext_build_dir())
-        build_snappy(snappy_src_dir, ext_build_dir())
-        build_zstd(zstd_src_dir, ext_build_dir())
+        # build_bzip2(bz2_src_dir, ext_build_dir())
+        # build_fmt(fmt_src_dir, ext_build_dir())
+        # # if is_linux():
+        # #     build_jemalloc(jm_src_dir, ext_build_dir())
+        # build_libevent(le_src_dir, ext_build_dir())
+        # build_snappy(snappy_src_dir, ext_build_dir())
+        # build_zstd(zstd_src_dir, ext_build_dir())
+        #
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'libsodium*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+        build_libsodium(src_dir, ext_build_dir())
 
     if libs['folly']:
         src_dir = os.path.join(ext_dir(), 'folly')
