@@ -131,7 +131,6 @@
         <file>icons/polygon-dark.svg</file>
         <file>icons/spline.svg</file>
         <file>icons/spline-dark.svg</file>
-        <file>Resources/ontology/mouse_brain_atlas.json</file>
         <file>icons/selection.svg</file>
         <file>icons/selection-dark.svg</file>
         <file>icons/drag.svg</file>

@@ -3,6 +3,7 @@
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
+#include "zapplication.h"
 //#include <CGAL/Surface_mesh_default_triangulation_3.h>
 //#include <CGAL/Surface_mesh_default_criteria_3.h>
 //#include <CGAL/Complex_2_in_triangulation_3.h>
@@ -25,6 +26,7 @@
 #include <vtkPolyDataNormals.h>
 #include <QFile>
 #include <QObject>
+#include <limits>
 
 namespace nim {
 
@@ -35,32 +37,62 @@ void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
   QJsonArray children;
   for (QJsonObject::const_iterator it = obj.constBegin(); it != obj.constEnd(); ++it) {
     if (it.key() == "id") {
-      node.id = it.value().toInt(-1);
+      node.id = it.value().toInt(std::numeric_limits<int>::lowest());
+      if (!it.value().isDouble() || node.id == std::numeric_limits<int>::lowest()) {
+        throw ZIOException(QString("wrong id: %1").arg(it.value().toVariant().toString()));
+      }
+      for (const auto& nd : ontology) {
+        if (nd.id == node.id) {
+          throw ZIOException(QString("id %1 used more than once").arg(nd.id));
+        }
+      }
     } else if (it.key() == "parent_structure_id") {
-      node.parentID = it.value().toInt(-1);
+      node.parentID = it.value().toInt(std::numeric_limits<int>::lowest());
     } else if (it.key() == "acronym") {
       node.abbreviation = it.value().toString();
+      if (node.abbreviation.isEmpty()) {
+        throw ZIOException(QString("node acronym can not be empty"));
+      }
     } else if (it.key() == "name") {
       node.name = it.value().toString();
+      if (node.name.isEmpty()) {
+        throw ZIOException(QString("node name can not be empty"));
+      }
     } else if (it.key() == "color_hex_triplet") {
       QString colorStr = it.value().toString();
-      CHECK(colorStr.size() == 6);
+      if (colorStr.size() != 6) {
+        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+      }
       bool ok;
       node.red = colorStr.mid(0, 2).toInt(&ok, 16);
-      CHECK(ok);
+      if (!ok) {
+        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+      }
       node.green = colorStr.mid(2, 2).toInt(&ok, 16);
-      CHECK(ok);
+      if (!ok) {
+        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+      }
       node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
-      CHECK(ok);
+      if (!ok) {
+        throw ZIOException(QString("wrong color string: %1").arg(colorStr));
+      }
     } else if (it.key() == "children") {
-      CHECK(it.value().isArray());
+      if (!it.value().isArray()) {
+        throw ZIOException(QString("children is not array"));
+      }
       children = it.value().toArray();
     }
   }
   if (!ontology.isNull(parentIt)) {
+    if (node.parentID != parentIt->id) {
+      throw ZIOException(
+        QString("node %1 has wrong parent id %2 (should be %3)").arg(node.id).arg(node.parentID).arg(parentIt->id));
+    }
     ZTree<RegionNode>::Iterator currIt = ontology.appendChild(parentIt, node);
     for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      CHECK((*it).isObject());
+      if (!(*it).isObject()) {
+        throw ZIOException(QString("child is not object"));
+      }
       readOntology((*it).toObject(), currIt, regionAbbrevs, ontology);
     }
   } else {
@@ -69,7 +101,9 @@ void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
       currIt = ontology.appendRoot(node);
     }
     for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-      CHECK((*it).isObject());
+      if (!(*it).isObject()) {
+        throw ZIOException(QString("child is not object"));
+      }
       readOntology((*it).toObject(), currIt, regionAbbrevs, ontology);
     }
   }
@@ -78,7 +112,7 @@ void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
 void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  QString ontologyFilename = ":/Resources/ontology/mouse_brain_atlas.json";
+  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v3.json";
   QFile file(ontologyFilename);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
     throw ZIOException(QObject::tr("Can not open ontology file"));
@@ -95,43 +129,15 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
     throw ZIOException(QObject::tr("File is not %1 format").arg("ontology"));
   }
   QJsonObject rootObj = loadObj["msg"].toArray().first().toObject();
-  RegionNode node;
-  QJsonArray children;
-  for (QJsonObject::const_iterator it = rootObj.constBegin(); it != rootObj.constEnd(); ++it) {
-    if (it.key() == "id") {
-      node.id = it.value().toInt(-1);
-    } else if (it.key() == "parent_structure_id") {
-      node.parentID = -1;
-    } else if (it.key() == "acronym") {
-      node.abbreviation = it.value().toString();
-    } else if (it.key() == "name") {
-      node.name = it.value().toString();
-    } else if (it.key() == "color_hex_triplet") {
-      QString colorStr = it.value().toString();
-      CHECK(colorStr.size() == 6);
-      bool ok;
-      node.red = colorStr.mid(0, 2).toInt(&ok, 16);
-      CHECK(ok);
-      node.green = colorStr.mid(2, 2).toInt(&ok, 16);
-      CHECK(ok);
-      node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
-      CHECK(ok);
-    } else if (it.key() == "children") {
-      CHECK(it.value().isArray());
-      children = it.value().toArray();
-    }
-  }
-  ZTree<RegionNode>::Iterator currIt = ontology.appendRoot(node);
-  for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-    CHECK((*it).isObject());
-    readOntology((*it).toObject(), currIt, QStringList(), ontology);
-  }
+  ZTree<RegionNode>::Iterator nullIt;
+  readOntology(rootObj, nullIt, QStringList(), ontology);
 }
 
 void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  QString ontologyFilename = ":/Resources/ontology/mouse_brain_atlas.json";
+  //QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
+  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v3.json";
   QFile file(ontologyFilename);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
     throw ZIOException(QObject::tr("Can not open ontology file"));
@@ -148,37 +154,8 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
     throw ZIOException(QObject::tr("File is not %1 format").arg("ontology"));
   }
   QJsonObject rootObj = loadObj["msg"].toArray().first().toObject();
-  RegionNode node;
-  QJsonArray children;
-  for (QJsonObject::const_iterator it = rootObj.constBegin(); it != rootObj.constEnd(); ++it) {
-    if (it.key() == "id") {
-      node.id = it.value().toInt(-1);
-    } else if (it.key() == "parent_structure_id") {
-      node.parentID = -1;
-    } else if (it.key() == "acronym") {
-      node.abbreviation = it.value().toString();
-    } else if (it.key() == "name") {
-      node.name = it.value().toString();
-    } else if (it.key() == "color_hex_triplet") {
-      QString colorStr = it.value().toString();
-      CHECK(colorStr.size() == 6);
-      bool ok;
-      node.red = colorStr.mid(0, 2).toInt(&ok, 16);
-      CHECK(ok);
-      node.green = colorStr.mid(2, 2).toInt(&ok, 16);
-      CHECK(ok);
-      node.blue = colorStr.mid(4, 2).toInt(&ok, 16);
-      CHECK(ok);
-    } else if (it.key() == "children") {
-      CHECK(it.value().isArray());
-      children = it.value().toArray();
-    }
-  }
   ZTree<RegionNode>::Iterator nullIt;
-  for (QJsonArray::const_iterator it = children.constBegin(); it != children.constEnd(); ++it) {
-    CHECK((*it).isObject());
-    readOntology((*it).toObject(), nullIt, regionAbbrevs, ontology);
-  }
+  readOntology(rootObj, nullIt, regionAbbrevs, ontology);
 }
 
 int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)

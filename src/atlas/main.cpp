@@ -129,16 +129,8 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::instance().logDir();
     removeOldLogs(logDir);
 
-#ifdef _WIN32
-    QString jdkDIR = QApplication::applicationDirPath() + QString("/Resources/jdk");
-    QString jarsDIR = QApplication::applicationDirPath() + QString("/Resources/jars");
-#elif defined(__APPLE__)
-    QString jdkDIR = QApplication::applicationDirPath() + QString("/../Resources/jdk");
-    QString jarsDIR = QApplication::applicationDirPath() + QString("/../Resources/jars");
-#else
-    QString jdkDIR = QApplication::applicationDirPath() + QString("/Resources/jdk");
-    QString jarsDIR = QApplication::applicationDirPath() + QString("/Resources/jars");
-#endif
+    QString jdkDIR = app.resourcesDirPath() + QString("/jdk");
+    QString jarsDIR = app.resourcesDirPath() + QString("/jars");
     initImgLib(argv[0], jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();

@@ -16,6 +16,8 @@ public:
 
   bool event(QEvent *event) override;
 
+  static QString resourcesDirPath();
+
 signals:
   void fileOpenRequest(QList<QUrl> urlList);
 };

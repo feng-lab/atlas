@@ -45,4 +45,13 @@ bool ZApplication::event(QEvent* event)
   return QApplication::event(event);
 }
 
+QString ZApplication::resourcesDirPath()
+{
+#if defined(__APPLE__)
+  return applicationDirPath() + QString("/../Resources");
+#else
+  return applicationDirPath() + QString("/Resources");
+#endif
+}
+
 } // namespace nim

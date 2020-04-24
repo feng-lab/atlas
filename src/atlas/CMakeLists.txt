@@ -581,7 +581,15 @@ set(SOURCES
     zrpcservice.cpp
     zrpcservice.h
     ztheme.cpp
-    ztheme.h zserializationutils.h zroiwidget.cpp zroiwidget.h zgraphicsitemgroup.cpp zgraphicsitemgroup.h zchooseregiondialog.cpp zchooseregiondialog.h)
+    ztheme.h
+    zserializationutils.h
+    zroiwidget.cpp
+    zroiwidget.h
+    zgraphicsitemgroup.cpp
+    zgraphicsitemgroup.h
+    zchooseregiondialog.cpp
+    zchooseregiondialog.h
+    )
 
 # our target
 set(APP_NAME Atlas)
@@ -645,6 +653,10 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jars")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ontology
+                     $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions)
@@ -699,6 +711,10 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jars)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ontology
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/ontology)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
   else ()
     add_custom_command(TARGET ${APP_NAME}
@@ -720,6 +736,10 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jars)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ontology
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
   endif ()
 endif (WIN32)
 

@@ -135,9 +135,15 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
       if (selectedAction == addCtrlPointAction) {
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
       } else if (selectedAction == addROItoRegionAction) {
-        ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
-        if (dlg.exec() == QDialog::Accepted) {
-          m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
+        try {
+          ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+          if (dlg.exec() == QDialog::Accepted) {
+            m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
+          }
+        }
+        catch (const ZException& e) {
+          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                                QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
       }
     }
