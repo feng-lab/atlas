@@ -776,6 +776,20 @@ def build_libsodium(src_dir: str, install_dir: str):
             subprocess.run(['MSBuild', 'libsodium.sln', '/target:libsodium', '/property:Platform=x64',
                             '/property:Configuration=StaticRelease', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'builds', 'msvc', 'vs2019'), shell=True, check=True, env=env)
+            glob_copy(os.path.join(src_dir, 'src', 'libsodium', 'include', '*.h'),
+                      os.path.join(install_dir, 'include'))
+            shutil.rmtree(os.path.join(install_dir, 'include', 'sodium'), ignore_errors=True)
+            distutils.dir_util.copy_tree(os.path.join(src_dir, 'src', 'libsodium', 'include', 'sodium'),
+                                         os.path.join(install_dir, 'include', 'sodium'))
+
+            glob_copy(os.path.join(src_dir, 'bin', 'x64', 'Release', 'v142', 'static', '*.lib'),
+                      os.path.join(install_dir, 'lib'))
+
+            orig_file = os.path.join(install_dir, 'include', 'sodium', 'export.h')
+            patch_file(orig_file,
+                       from_texts=[r'#ifdef SODIUM_STATIC'],
+                       to_texts=['#define SODIUM_STATIC\n'
+                                 '#ifdef SODIUM_STATIC'])
         else:
             env = get_env_for_config_make()
             subprocess.run(['./configure',
@@ -1747,13 +1761,13 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(le_src_dir)
             update_git_submodule(snappy_src_dir)
             update_git_submodule(zstd_src_dir)
-        # build_bzip2(bz2_src_dir, ext_build_dir())
-        # build_fmt(fmt_src_dir, ext_build_dir())
-        # # if is_linux():
-        # #     build_jemalloc(jm_src_dir, ext_build_dir())
-        # build_libevent(le_src_dir, ext_build_dir())
-        # build_snappy(snappy_src_dir, ext_build_dir())
-        # build_zstd(zstd_src_dir, ext_build_dir())
+        build_bzip2(bz2_src_dir, ext_build_dir())
+        build_fmt(fmt_src_dir, ext_build_dir())
+        # if is_linux():
+        #     build_jemalloc(jm_src_dir, ext_build_dir())
+        build_libevent(le_src_dir, ext_build_dir())
+        build_snappy(snappy_src_dir, ext_build_dir())
+        build_zstd(zstd_src_dir, ext_build_dir())
         #
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
