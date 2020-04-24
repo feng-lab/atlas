@@ -185,8 +185,8 @@ PYBIND11_MODULE(_imgpy, m)
     .value("ADOBE_DEFLATE", Compression::ADOBE_DEFLATE)
     .value("DCS", Compression::DCS)
     .value("JP2000", Compression::JP2000)
-    .value("LZMA", Compression::JBIG)
-    .value("ZSTD", Compression::JBIG);
+    .value("LZMA", Compression::LZMA)
+    .value("ZSTD", Compression::ZSTD);
 
   py::class_<col4>(m, "col4")
     .def(py::init<>())
