@@ -714,6 +714,7 @@ def build_libevent(src_dir: str, install_dir: str):
                          '-DEVENT__DISABLE_SAMPLES:BOOL=ON',
                          '-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF',
                          '-DEVENT__DOXYGEN:BOOL=OFF',
+                         '-DEVENT__LIBRARY_TYPE=STATIC',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -768,6 +769,8 @@ def build_zstd(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF',
+                         '-DZSTD_BUILD_SHARED:BOOL=OFF',
+                         '-DZSTD_BUILD_STATIC:BOOL=ON',
                          os.path.join(src_dir, 'build', 'cmake')])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
