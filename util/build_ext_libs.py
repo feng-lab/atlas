@@ -951,14 +951,11 @@ def build_eigen(src_dir: str, install_dir: str):
 def build_ceres_solver(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = None
-    bak_file = None
-    orig_file1 = None
-    bak_file1 = None
-    orig_file2 = None
-    bak_file2 = None
-    orig_file3 = None
-    bak_file3 = None
+    orig_file = bak_file = None
+    orig_file1 = bak_file1 = None
+    orig_file2 = bak_file2 = None
+    orig_file3 = bak_file3 = None
+    orig_file4 = bak_file4 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -976,6 +973,11 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         bak_file3 = patch_file(orig_file3,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
                                to_texts=[r'if (FALSE)'])
+        # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
+        orig_file4 = os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt')
+        bak_file4 = patch_file(orig_file4,
+                               from_texts=[r' ${LAPACK_LIBRARIES}'],
+                               to_texts=[r' '])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -998,6 +1000,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file1, orig_file1)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
+        os.replace(bak_file4, orig_file4)
 
 
 def build_libpng(src_dir: str, install_dir: str):
