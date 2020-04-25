@@ -34,6 +34,7 @@
 /src/3rdparty/openssl*
 /src/3rdparty/build
 /src/3rdparty/libsodium*
+/src/3rdparty/openjpeg*
 
 !/neurolabi/lib/Mingw/*.zip
 

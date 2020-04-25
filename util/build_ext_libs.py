@@ -1050,6 +1050,24 @@ def build_libpng(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_openjpeg(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        cmakecmd.extend(['-DBUILD_STATIC_LIBS:BOOL=ON',
+                         '-DBUILD_DOC:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DBUILD_CODEC:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_jxrlib(src_dir: str, install_dir: str):
 
     orig_file = None
@@ -1151,9 +1169,13 @@ def build_assimp(src_dir: str, install_dir: str):
 
         orig_file2 = os.path.join(src_dir, 'CMakeLists.txt')
         from_texts = [r'SET (ASSIMP_SOVERSION 5)',
-                      r' -lz']
+                      r' -lz',
+                      r'-Werror',
+                      r'/WX']
         to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
-                    r' ZLIB::ZLIB']
+                    r' ZLIB::ZLIB',
+                    r' ',
+                    r' ']
         bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
@@ -1833,6 +1855,15 @@ def build_libs(libs: dict, update_src: bool):
             assert os.path.exists(src_dir)
         build_libpng(src_dir, ext_build_dir())
 
+    if libs['openjpeg']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'openjpeg*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'openjpeg*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+        build_openjpeg(src_dir, ext_build_dir())
+
     if libs['jxrlib']:
         src_dir = os.path.join(ext_dir(), 'jxrlib')
         if update_src:
@@ -1963,6 +1994,7 @@ def parse_inputs(argv: list):
             'glbinding': False,
             'libjpeg': False,
             'libpng': False,
+            'openjpeg': False,
             'jxrlib': False,
             'geometrictools': False,
             'assimp': False,
@@ -1992,6 +2024,7 @@ def parse_inputs(argv: list):
                             'double-conversion': ['folly', 'itk', 'vtk'],
                             'lz4': ['vtk'],
                             'xz': ['vtk'],
+                            'openjpeg': ['opencv'],
                             }
 
     print('current interpreter: ' + sys.executable)
