@@ -570,7 +570,8 @@ void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img)
   }
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format, Compression comp)
+void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format,
+                      const ZImgWriteParameters& paras)
 {
   if (img.isEmpty()) {
     throw ZIOException("Can not write empty image.");
@@ -584,7 +585,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, comp);
+          writer->writeImg(filename, img, paras);
           return;
         }
         catch (const ZIOException& e) {
@@ -597,7 +598,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, comp);
+      m_ioFormats[format]->writeImg(filename, img, paras);
       return;
     }
     catch (const ZIOException& e) {
@@ -609,7 +610,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
   throw ZIOException(error);
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format, Compression comp)
+void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format,
+                      const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
     throw ZIOException("Can not write empty image.");
@@ -623,7 +625,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, comp);
+          writer->writeImg(filename, img, paras);
           return;
         }
         catch (const ZIOException& e) {
@@ -636,7 +638,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, comp);
+      m_ioFormats[format]->writeImg(filename, img, paras);
       return;
     }
     catch (const ZIOException& e) {
@@ -648,7 +650,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
   throw ZIOException(error);
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format, Compression comp)
+void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format,
+                      const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
     throw ZIOException("Can not write empty image.");
@@ -662,7 +665,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, comp);
+          writer->writeImg(filename, img, paras);
           return;
         }
         catch (const ZIOException& e) {
@@ -675,7 +678,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, comp);
+      m_ioFormats[format]->writeImg(filename, img, paras);
       return;
     }
     catch (const ZIOException& e) {

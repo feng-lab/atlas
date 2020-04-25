@@ -236,9 +236,9 @@ void ZImg::load(const ZImgSource& imgSource)
   ZImgIO().readImg(imgSource, *this);
 }
 
-void ZImg::save(const QString& filename, FileFormat format, Compression comp) const
+void ZImg::save(const QString& filename, FileFormat format, const ZImgWriteParameters& paras) const
 {
-  ZImgIO().writeImg(filename, *this, format, comp);
+  ZImgIO().writeImg(filename, *this, format, paras);
 }
 
 void ZImg::load(const QStringList& fileList, Dimension catDim, size_t scene, FileFormat format,

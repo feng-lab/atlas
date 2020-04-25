@@ -321,12 +321,12 @@ void ZImgPack::setChannelColor(size_t c, col4 col)
   }
 }
 
-void ZImgPack::save(const QString& fileName, FileFormat format, Compression comp)
+void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteParameters& paras)
 {
   if (m_diskCached) {
-    ZImgIO::instance().writeImg(fileName, *this, format, comp);
+    ZImgIO::instance().writeImg(fileName, *this, format, paras);
   } else {
-    m_img.save(fileName, format, comp);
+    m_img.save(fileName, format, paras);
     m_diskCached = true;
   }
   m_imgSource = ZImgSource(fileName);

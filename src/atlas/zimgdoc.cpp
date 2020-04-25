@@ -35,7 +35,7 @@ bool ZImgDoc::save(size_t id)
   auto& pack = m_idToImgPacks.at(id);
   if (!pack->isSequence() && ZImg::fileExtensionWriteSupported(pack->paths()[0])) {
     QString err;
-    if (saveImg(pack.get(), pack->paths()[0], FileFormat::Unknown, Compression::AUTO, err)) {
+    if (saveImg(pack.get(), pack->paths()[0], FileFormat::Unknown, ZImgWriteParameters(), err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
@@ -475,10 +475,11 @@ void ZImgDoc::createActions()
   connect(m_correctChromaticShiftAction, &QAction::triggered, this, &ZImgDoc::correctChromaticShift);
 }
 
-bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format, Compression comp, QString& errorMsg)
+bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format,
+                      const ZImgWriteParameters& paras, QString& errorMsg)
 {
   try {
-    pack->save(fileName, format, comp);
+    pack->save(fileName, format, paras);
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);

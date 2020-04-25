@@ -655,7 +655,9 @@ void changeImgCompressionType()
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
     QString outname = outFolder + fileInfo.baseName() + ".tif";
-    img.save(outname, FileFormat::Tiff, Compression::LZW);
+    ZImgWriteParameters paras;
+    paras.compression = Compression::LZW;
+    img.save(outname, FileFormat::Tiff, paras);
   }
 }
 
@@ -697,10 +699,12 @@ void makeAxonChannelImages()
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
+    ZImgWriteParameters paras;
+    paras.compression = Compression::LZW;
     img.normalize(0, 50);
-    img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img.save(outname, FileFormat::Tiff, paras);
     img1.normalize(11, 50);
-    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
+    img1.save(outname1, FileFormat::Tiff, paras);
   }
 
   dir = QDir("/Volumes/PVPY/ipsi");
@@ -719,10 +723,12 @@ void makeAxonChannelImages()
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
+    ZImgWriteParameters paras;
+    paras.compression = Compression::LZW;
     img.normalize(0, 50);
-    img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img.save(outname, FileFormat::Tiff, paras);
     img1.normalize(11, 50);
-    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
+    img1.save(outname1, FileFormat::Tiff, paras);
   }
 
   dir = QDir("/Volumes/PVPY/Py");
@@ -741,10 +747,12 @@ void makeAxonChannelImages()
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, axonChannel, axonChannel + 1));
     img.zoom(0.25, 0.25);
     ZImg img1 = img;
+    ZImgWriteParameters paras;
+    paras.compression = Compression::LZW;
     img.normalize(0, 50);
-    img.save(outname, FileFormat::Tiff, Compression::LZW);
+    img.save(outname, FileFormat::Tiff, paras);
     img1.normalize(11, 50);
-    img1.save(outname1, FileFormat::Tiff, Compression::LZW);
+    img1.save(outname1, FileFormat::Tiff, paras);
   }
 }
 

@@ -71,13 +71,13 @@ public:
   void readImg(const ZImgSource& imgSource, ZImg& img);
 
   void writeImg(const QString& filename, const ZImg& img, FileFormat format = FileFormat::Unknown,
-                Compression comp = Compression::AUTO);
+                const ZImgWriteParameters& paras = ZImgWriteParameters());
 
   void writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format = FileFormat::Unknown,
-                Compression comp = Compression::AUTO);
+                const ZImgWriteParameters& paras = ZImgWriteParameters());
 
   void writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format = FileFormat::Unknown,
-                Compression comp = Compression::AUTO);
+                const ZImgWriteParameters& paras = ZImgWriteParameters());
 
   // qt style name filter for image open dialog
   void getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats) const;

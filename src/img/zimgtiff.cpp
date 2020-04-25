@@ -144,14 +144,14 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 }
 
-void ZImgTiff::writeImg(const QString& filename, const ZImg& img, Compression comp)
+void ZImgTiff::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (img.byteNumber() > 1024_usize * 1024 * 3600) {
-    tiffWriter.startWriting(filename, comp, extraSample, true);
+    tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
-    tiffWriter.startWriting(filename, comp, extraSample, false);
+    tiffWriter.startWriting(filename, paras.compression, extraSample, false);
   }
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t z = 0; z < img.depth(); ++z) {
@@ -160,14 +160,15 @@ void ZImgTiff::writeImg(const QString& filename, const ZImg& img, Compression co
   }
 }
 
-void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
+void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                        const ZImgWriteParameters& paras)
 {
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600) {
-    tiffWriter.startWriting(filename, comp, extraSample, true);
+    tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
-    tiffWriter.startWriting(filename, comp, extraSample, false);
+    tiffWriter.startWriting(filename, paras.compression, extraSample, false);
   }
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {

@@ -400,7 +400,7 @@ bool ZImgPng::supportRead() const
 
 bool ZImgPng::supportWrite() const
 {
-  return false;
+  return true;
 }
 
 } // namespace nim

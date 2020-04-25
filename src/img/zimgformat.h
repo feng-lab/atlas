@@ -72,12 +72,13 @@ public:
   virtual void readImg(const QString& filename, ZImg& img,
                        const ZImgRegion& region, size_t scene, size_t ratio) = 0;
 
+  virtual void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras);
 
-  virtual void writeImg(const QString& filename, const ZImg& img, Compression comp);
+  virtual void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                        const ZImgWriteParameters& paras);
 
-  virtual void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp);
-
-  virtual void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockProvider, Compression comp);
+  virtual void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockProvider,
+                        const ZImgWriteParameters& paras);
 
   // convert RGBARGBA..... to RRR...GGG...BBB...AAA...
   static void CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB = false, bool ARGBtoRGBA = false);

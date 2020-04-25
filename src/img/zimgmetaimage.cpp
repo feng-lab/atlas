@@ -123,9 +123,9 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   }
 }
 
-void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, Compression comp)
+void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
-  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+  CHECK(paras.compression == Compression::AUTO || paras.compression == Compression::NONE || paras.compression == Compression::DEFLATE);
   if (img.numTimes() != 1) {
     throw ZIOException("time sequence image is not supported");
   }
@@ -217,20 +217,21 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, Compressi
                                       : const_cast<uint8_t*>(img.channelData(0)));
 
   metaImage.DistanceUnits(distanceUnitType);
-  metaImage.CompressedData(comp != Compression::NONE);
+  metaImage.CompressedData(paras.compression != Compression::NONE);
 
   if (!metaImage.Write(QFile::encodeName(filename).constData())) {
     throw ZIOException("Can not write metaimage");
   }
 }
 
-void ZImgMetaImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
+void ZImgMetaImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                             const ZImgWriteParameters& paras)
 {
-  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
+  CHECK(paras.compression == Compression::AUTO || paras.compression == Compression::NONE || paras.compression == Compression::DEFLATE);
   if (imgSliceProvider.imgInfo().numTimes != 1) {
     throw ZIOException("time sequence image is not supported");
   }
-  writeImg(filename, imgSliceProvider.allSlices(0, 1), comp);
+  writeImg(filename, imgSliceProvider.allSlices(0, 1), paras);
 }
 
 bool ZImgMetaImage::supportRead() const

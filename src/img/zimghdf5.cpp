@@ -650,7 +650,8 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 }
 
-void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
+void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
+                        const ZImgWriteParameters&)
 {
   try {
     H5::Exception::dontPrint();
@@ -702,7 +703,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, Compression)
   }
 }
 
-void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression)
+void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                        const ZImgWriteParameters&)
 {
   try {
     H5::Exception::dontPrint();
@@ -760,7 +762,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
   }
 }
 
-void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider, Compression)
+void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider,
+                        const ZImgWriteParameters&)
 {
   try {
     H5::Exception::dontPrint();

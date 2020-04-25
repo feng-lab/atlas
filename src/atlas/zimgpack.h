@@ -133,7 +133,7 @@ public:
   bool hasUnsavedChange() const
   { return m_hasUnsavedChange; }
 
-  void save(const QString& fileName, FileFormat format, Compression comp);
+  void save(const QString& fileName, FileFormat format, const ZImgWriteParameters& paras);
 
   bool needUpdate(const QRectF& viewport, double scale,
                   const QRectF& oldViewport, double oldScale,

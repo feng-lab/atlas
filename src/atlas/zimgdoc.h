@@ -100,7 +100,8 @@ protected:
 private:
   void createActions();
 
-  bool saveImg(ZImgPack* pack, const QString& fileName, FileFormat format, Compression comp, QString& errorMsg);
+  bool saveImg(ZImgPack* pack, const QString& fileName, FileFormat format,
+               const ZImgWriteParameters& paras, QString& errorMsg);
 
   // notify obj manager about the update
   void packInfoUpdated(ZImgPack* pack);

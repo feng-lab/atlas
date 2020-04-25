@@ -31,7 +31,7 @@ public:
 
   void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true);
 
-  void exportLabelImage(const QString& fn, FileFormat format, Compression comp) const;
+  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras) const;
 
   size_t numRegions() const
   { return m_ontology.size(); }

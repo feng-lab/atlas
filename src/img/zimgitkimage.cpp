@@ -260,7 +260,8 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   }
 }
 
-void ZImgITKImage::writeImg(const QString& /*filename*/, const ZImg& /*img*/, Compression /*comp*/)
+void ZImgITKImage::writeImg(const QString& /*filename*/, const ZImg& /*img*/,
+                            const ZImgWriteParameters&)
 {
 //  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (img.numTimes() != 1) {
@@ -362,7 +363,7 @@ void ZImgITKImage::writeImg(const QString& /*filename*/, const ZImg& /*img*/, Co
 
 void ZImgITKImage::writeImg(const QString& /*filename*/,
                             const ZImgSliceProvider& /*imgSliceProvider*/,
-                            Compression /*comp*/)
+                            const ZImgWriteParameters&)
 {
 //  CHECK(comp == Compression::AUTO || comp == Compression::NONE || comp == Compression::DEFLATE);
 //  if (imgSliceProvider.imgInfo().numTimes != 1) {

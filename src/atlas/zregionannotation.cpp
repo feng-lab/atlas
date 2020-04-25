@@ -235,7 +235,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
 }
 
-void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, Compression comp) const
+void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras) const
 {
   LOG(INFO) << "Exporting Label Image...";
 
@@ -263,7 +263,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, C
 //      }
 //    }
 //  }
-  res.save(fn, format, comp);
+  res.save(fn, format, paras);
   LOG(INFO) << "Finish exporting label image";
 }
 
@@ -508,7 +508,7 @@ void ZRegionAnnotation::updateMesh()
   QTemporaryDir dir;
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.mhd");
-    exportLabelImage(fn, FileFormat::MetaImage, Compression::AUTO);
+    exportLabelImage(fn, FileFormat::MetaImage, ZImgWriteParameters());
     auto cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
     importLabelImage(fn, FileFormat::MetaImage, true, false);
     cmd->setNewOntology(m_ontology);

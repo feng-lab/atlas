@@ -166,9 +166,9 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   }
 }
 
-void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, Compression comp)
+void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
-  if (comp != Compression::AUTO && comp != Compression::NONE) {
+  if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
     LOG(WARNING) << "compression is not supported for V3DRaw";
   }
   if (img.numTimes() != 1) {
@@ -196,9 +196,10 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, Compression 
   writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
 }
 
-void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp)
+void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                          const ZImgWriteParameters& paras)
 {
-  if (comp != Compression::AUTO && comp != Compression::NONE) {
+  if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
     LOG(WARNING) << "compression is not supported for V3DRaw";
   }
   if (imgSliceProvider.imgInfo().numTimes != 1) {

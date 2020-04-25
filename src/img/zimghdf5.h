@@ -49,11 +49,13 @@ public:
 
   void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio) override;
 
-  void writeImg(const QString& filename, const ZImg& img, Compression comp) override;
+  void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider, Compression comp) override;
+  void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+                const ZImgWriteParameters& paras) override;
 
-  void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider, Compression comp) override;
+  void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider,
+                const ZImgWriteParameters& paras) override;
 
   bool supportRead() const override;
 

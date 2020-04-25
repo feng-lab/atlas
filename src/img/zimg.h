@@ -9,6 +9,11 @@
 
 namespace nim {
 
+struct ZImgWriteParameters
+{
+  Compression compression = Compression::AUTO;
+};
+
 class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>
 {
 public:
@@ -179,8 +184,8 @@ public:
 
   void load(const ZImgSource& imgSource);
 
-  void
-  save(const QString& filename, FileFormat format = FileFormat::Unknown, Compression comp = Compression::AUTO) const;
+  void save(const QString& filename, FileFormat format = FileFormat::Unknown,
+            const ZImgWriteParameters& paras = ZImgWriteParameters()) const;
 
   // convenient function to get img information from file, throw ZIOException if read error or empty image
   static std::vector<ZImgInfo>

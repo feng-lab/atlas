@@ -79,25 +79,25 @@ bool ZImgFormat::canWrite(const QString& filename) const
   return false;
 }
 
-void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, Compression /*comp*/)
+void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, const ZImgWriteParameters& /*paras*/)
 {
 }
 
 void ZImgFormat::writeImg(const QString& filename,
                           const ZImgSliceProvider& imgSliceProvider,
-                          Compression comp)
+                          const ZImgWriteParameters& paras)
 {
   if (canWrite(filename)) {
-    writeImg(filename, imgSliceProvider.wholeImg(1), comp);
+    writeImg(filename, imgSliceProvider.wholeImg(1), paras);
   }
 }
 
 void ZImgFormat::writeImg(const QString& filename,
                           const ZImgBlockProvider& imgBlockProvider,
-                          Compression comp)
+                          const ZImgWriteParameters& paras)
 {
   if (canWrite(filename)) {
-    writeImg(filename, imgBlockProvider.wholeImg(), comp);
+    writeImg(filename, imgBlockProvider.wholeImg(), paras);
   }
 }
 
