@@ -1365,10 +1365,9 @@ def build_botan(src_dir: str, install_dir: str):
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = None
-    bak_file = None
-    orig_file_1 = None
-    bak_file_1 = None
+    orig_file = bak_file = None
+    orig_file_1 = bak_file_1 = None
+    # orig_file4 = bak_file4 = None
     try:
         orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
         bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
@@ -1380,6 +1379,10 @@ def build_itk(src_dir: str, install_dir: str):
         if is_windows():
             bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h'],
                                     to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
+
+        # orig_file4 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'GDCM', 'src', 'gdcm', 'CMakeLists.txt')
+        # bak_file4 = patch_file(orig_file4, from_texts=[r'find_package(OpenJPEG 2.0.0 REQUIRED)'],
+        #                        to_texts=[r'find_package(OpenJPEG REQUIRED)'])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
@@ -1398,6 +1401,9 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_USE_SYSTEM_JPEG:BOOL=ON',
                          '-DITK_USE_SYSTEM_PNG:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
+                         #'-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
+
+                         '-DModule_MorphologicalContourInterpolation=ON', # example how to turn on a remote module
                          ],
                         )
 
@@ -1439,6 +1445,7 @@ def build_itk(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        # os.replace(bak_file4, orig_file4)
         if is_windows():
             os.replace(bak_file_1, orig_file_1)
 
@@ -1493,82 +1500,90 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     bak_file_3 = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DBUILD_opencv_videoio:BOOL=ON',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DBUILD_PROTOBUF:BOOL=OFF',
-                         '-DBUILD_opencv_videostab:BOOL=ON',
-                         '-DBUILD_opencv_hdf:BOOL=OFF',
-                         '-DBUILD_opencv_sfm:BOOL=OFF',
-                         '-DBUILD_opencv_ts:BOOL=OFF',
-                         '-DBUILD_opencv_xfeatures2d:BOOL=OFF',
-                         '-DBUILD_opencv_dnn:BOOL=OFF',
-                         '-DBUILD_opencv_dnn_objdetect:BOOL=OFF',
-                         '-DBUILD_opencv_world:BOOL=OFF',
-                         '-DBUILD_opencv_python2:BOOL=OFF',
-                         '-DBUILD_opencv_python3:BOOL=OFF',
-                         '-DPYTHON3_EXECUTABLE=' + sys.executable,
-                         '-DINSTALL_PYTHON_EXAMPLES:BOOL=ON',
-                         '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
-                         '-DBUILD_opencv_java:BOOL=OFF',
-                         '-DWITH_EIGEN:BOOL=ON',
-                         '-DWITH_TBB:BOOL=ON',
-                         '-DWITH_LAPACK:BOOL=OFF',
-                         # '-DWITH_MKL:BOOL=ON',
-                         # '-DMKL_USE_MULTITHREAD:BOOL=ON',
-                         # '-DMKL_WITH_TBB:BOOL=ON',
-                         '-DWITH_VTK:BOOL=OFF',
-                         '-DBUILD_PERF_TESTS:BOOL=OFF',
-                         '-DWITH_PNG:BOOL=OFF',
-                         '-DWITH_MATLAB:BOOL=OFF',
-                         '-DWITH_FFMPEG:BOOL=ON',
-                         '-DWITH_1394:BOOL=OFF',
-                         '-DWITH_GSTREAMER:BOOL=OFF',
-                         '-DBUILD_DOCS:BOOL=OFF',
-                         '-DBUILD_PNG:BOOL=OFF',
-                         '-DWITH_GPHOTO2:BOOL=OFF',
-                         '-DBUILD_ZLIB:BOOL=OFF',
-                         '-DWITH_CUDA:BOOL=OFF',
-                         '-DWITH_CUFFT:BOOL=OFF',
-                         '-DWITH_OPENCL:BOOL=OFF',
-                         '-DWITH_PVAPI:BOOL=OFF',
-                         '-DBUILD_JASPER:BOOL=OFF',
-                         '-DBUILD_TESTS:BOOL=OFF',
-                         '-DBUILD_JPEG:BOOL=OFF',
-                         '-DBUILD_TIFF:BOOL=OFF',
-                         '-DWITH_LIBV4L:BOOL=OFF',
-                         '-DWITH_GIGEAPI:BOOL=OFF',
-                         '-DBUILD_opencv_video:BOOL=ON',
-                         '-DWITH_V4L:BOOL=OFF',
-                         '-DWITH_WEBP:BOOL=OFF',
-                         '-DWITH_TIFF:BOOL=OFF',
-                         '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
-                         '-DBUILD_JAVA:BOOL=OFF',
-                         '-DBUILD_OPENEXR:BOOL=OFF',
-                         '-DWITH_JPEG:BOOL=ON',
-                         '-DWITH_PNG:BOOL=ON',
-                         '-DWITH_OPENEXR:BOOL=OFF',
-                         '-DBUILD_PACKAGE:BOOL=OFF',
-                         '-DWITH_JASPER:BOOL=OFF',
-                         '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
-                         '-DBUILD_opencv_apps:BOOL=OFF',
-                         '-DBUILD_opencv_matlab:BOOL=OFF',
-                         '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF'])
+        cmakecmd.extend([
+            '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
+            '-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF',
+            '-DBUILD_ZLIB:BOOL=OFF',
+            '-DBUILD_TIFF:BOOL=OFF',
+            '-DBUILD_JASPER:BOOL=OFF',
+            '-DBUILD_JPEG:BOOL=OFF',
+            '-DBUILD_PNG:BOOL=OFF',
+            '-DBUILD_OPENEXR:BOOL=ON',
+            '-DBUILD_WEBP:BOOL=ON',
+
+            '-DBUILD_PROTOBUF:BOOL=OFF',
+
+            '-DWITH_1394:BOOL=OFF',
+            '-DWITH_VTK:BOOL=OFF',
+            '-DWITH_CUDA:BOOL=OFF',
+            '-DWITH_EIGEN:BOOL=ON',
+            '-DWITH_FFMPEG:BOOL=ON',
+            '-DWITH_GSTREAMER:BOOL=OFF',
+            '-DWITH_IPP:BOOL=ON',
+            '-DWITH_JASPER:BOOL=OFF',
+            '-DWITH_OPENJPEG:BOOL=ON',
+            '-DWITH_JPEG:BOOL=ON',
+            '-DWITH_WEBP:BOOL=ON',
+            '-DWITH_OPENEXR:BOOL=ON',
+            '-DWITH_PNG:BOOL=ON',
+            '-DWITH_TBB:BOOL=ON',
+            '-DWITH_TIFF:BOOL=OFF',
+            '-DWITH_OPENCL:BOOL=OFF',
+            '-DWITH_OPENCL_SVM:BOOL=OFF',
+            '-DWITH_OPENCLAMDFFT:BOOL=OFF',
+            '-DWITH_OPENCLAMDBLAS:BOOL=OFF',
+            '-DWITH_LAPACK:BOOL=OFF',
+            # '-DWITH_MKL:BOOL=ON',
+            # '-DMKL_USE_MULTITHREAD:BOOL=ON',
+            # '-DMKL_WITH_TBB:BOOL=ON',
+            '-DWITH_PROTOBUF:BOOL=ON',
+
+            '-DBUILD_SHARED_LIBS:BOOL=OFF',
+            '-DBUILD_opencv_apps:BOOL=OFF',
+            '-DBUILD_opencv_js:BOOL=OFF',
+            '-DBUILD_DOCS:BOOL=OFF',
+            '-DBUILD_EXAMPLES:BOOL=OFF',
+            '-DBUILD_PACKAGE:BOOL=OFF',
+            '-DBUILD_PERF_TESTS:BOOL=OFF',
+            '-DBUILD_TESTS:BOOL=OFF',
+            '-DBUILD_WITH_DEBUG_INFO:BOOL=OFF',
+            '-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
+            '-DBUILD_FAT_JAVA_LIB:BOOL=OFF',
+            '-DBUILD_JAVA:BOOL=OFF',
+
+            '-DENABLE_PRECOMPILED_HEADERS:BOOL=OFF',
+
+            '-DBUILD_opencv_video:BOOL=ON',
+            '-DBUILD_opencv_videoio:BOOL=ON',
+            '-DBUILD_opencv_ts:BOOL=OFF',
+            '-DBUILD_opencv_dnn:BOOL=OFF',
+            '-DBUILD_opencv_world:BOOL=OFF',
+            '-DBUILD_opencv_python2:BOOL=OFF',
+            '-DBUILD_opencv_python3:BOOL=OFF',
+            '-DPYTHON3_EXECUTABLE=' + sys.executable,
+            '-DBUILD_opencv_java:BOOL=OFF',
+
+            '-DBUILD_opencv_dnn_objdetect:BOOL=OFF',
+            '-DBUILD_opencv_hdf:BOOL=OFF',
+            '-DBUILD_opencv_matlab:BOOL=OFF',
+            '-DBUILD_opencv_sfm:BOOL=OFF',
+            '-DBUILD_opencv_videostab:BOOL=ON',
+            '-DBUILD_opencv_xfeatures2d:BOOL=OFF',
+        ])
 
         if is_windows():
             cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DWITH_WIN32UI:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
-                             # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-                             # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
-                             # '-DJPEG_INCLUDE_DIR:PATH=' + ext_dir() + '\\libjpeg-turbo\\include/',
-                             # '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '\\libjpeg-turbo\\lib\\jpeg-static.lib',
+                             ])
+        elif is_linux():
+            cmakecmd.extend(['-DWITH_V4L:BOOL=ON',
+                             '-DWITH_PTHREADS_PF:BOOL=OFF',
+                             '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
                              ])
         else:
             cmakecmd.extend(['-DWITH_PTHREADS_PF:BOOL=OFF',
-                             '-DWITH_QUICKTIME:BOOL=OFF',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
-                             # '-DJPEG_INCLUDE_DIR:PATH=' + ext_dir() + '/libjpeg-turbo/include/',
-                             # '-DJPEG_LIBRARY:FILEPATH=' + ext_dir() + '/libjpeg-turbo/lib/libjpeg.a',
                              ])
 
             if is_linux():
