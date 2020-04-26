@@ -397,7 +397,6 @@ void ZImgPng::checkImgBeforeWriting(const QString &filename, const ZImgInfo &inf
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO &&
-      paras.compression != Compression::NONE &&
       paras.compression != Compression::DEFLATE) {
     throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
   }
@@ -407,10 +406,10 @@ void ZImgPng::checkImgBeforeWriting(const QString &filename, const ZImgInfo &inf
   if (!(info.numChannels == 1 ||
         (info.numChannels == 2 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
-        (info.numChannels == 3)) ||
+        (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
         info.voxelFormat != VoxelFormat::Unsigned ||
         info.bytesPerVoxel > 2) {
-    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+    throw ZIOException(QString("image can not be represented as png: %1").arg(info.toQString()));
   }
 }
 
@@ -418,7 +417,7 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
 {
   checkImgBeforeWriting(filename, img.info(), paras);
 
-  auto outfile = openFile(filename, "w");
+  auto outfile = openFile(filename, "wb");
 
   PngPack png;
   png.pngPtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
@@ -427,7 +426,7 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
   }
   if (!png.pngPtr || !png.infoPtr) {
     png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
-    throw ZIOException("Libpng read error");
+    throw ZIOException("can not create Libpng write struct");
   }
 
   [[maybe_unused]] auto guard1 = folly::makeGuard([&png]() {

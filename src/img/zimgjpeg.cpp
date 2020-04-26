@@ -5,6 +5,7 @@
 #include "zioutils.h"
 #include "zimage2dutils.h"
 #include <jpeglib.h>
+#include <turbojpeg.h>
 #include <QFile>
 #include <folly/ScopeGuard.h>
 #include <boost/iostreams/device/array.hpp>
@@ -525,6 +526,82 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 }
 
+void ZImgJpeg::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
+{
+  ZImgFormat::checkImgBeforeWriting(filename, info, paras);
+  if (paras.compression != Compression::AUTO) {
+    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
+  }
+  if (info.numTimes != 1 || info.depth != 1) {
+    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+  }
+  if (!(info.numChannels == 1 || (info.numChannels == 3)) ||
+      info.voxelFormat != VoxelFormat::Unsigned ||
+      info.bytesPerVoxel > 1 ||
+      info.lastChannelIsAlphaChannel) {
+    throw ZIOException(QString("image can not be represented as jpeg: %1").arg(info.toQString()));
+  }
+  if (paras.jpegChrominanceSubsampling != 444 &&
+      paras.jpegChrominanceSubsampling != 422 &&
+      paras.jpegChrominanceSubsampling != 420) {
+    throw ZIOException(QString("unsupported chrominance subsampling: %1").arg(paras.jpegChrominanceSubsampling));
+  }
+}
+
+void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+{
+  checkImgBeforeWriting(filename, img.info(), paras);
+
+  int flags = 0;
+  if (paras.jpegAccurateDCT) {
+    flags |= TJFLAG_ACCURATEDCT;
+  }
+  if (paras.jpegProgressive) {
+    flags |= TJFLAG_PROGRESSIVE;
+  }
+
+  int pixelFormat = TJPF_RGB;
+  int chrominanceSubsampling = TJSAMP_444;
+  if (img.numChannels() == 1) {
+    pixelFormat = TJPF_GRAY;
+    chrominanceSubsampling = TJSAMP_GRAY;
+  } else {
+    if (paras.jpegChrominanceSubsampling == 422) {
+      chrominanceSubsampling = TJSAMP_422;
+    } else if (paras.jpegChrominanceSubsampling == 420) {
+      chrominanceSubsampling = TJSAMP_420;
+    } else {
+      CHECK(chrominanceSubsampling == TJSAMP_444);
+    }
+  }
+
+  tjhandle tjInstance = nullptr;
+  if ((tjInstance = tjInitCompress()) == nullptr) {
+    throw ZIOException(QString("libjpeg-turbo: initializing compressor: %1").arg(tjGetErrorStr2(tjInstance)));
+  }
+  [[maybe_unused]] auto guard1 = folly::makeGuard([&tjInstance]() {
+    if (tjInstance) tjDestroy(tjInstance);
+  });
+
+  ZImg tmp(img.info());
+  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
+  ZImgFormat::XYZCtoCXYZ(img, tmp);
+  unsigned char* jpegBuf = nullptr;  /* Dynamically allocate the JPEG buffer */
+  [[maybe_unused]] auto guard2 = folly::makeGuard([&jpegBuf]() {
+    if (jpegBuf) tjFree(jpegBuf);
+  });
+  unsigned long jpegSize;
+  if (tjCompress2(tjInstance, tmp.channelData<uint8_t>(0), img.width(), 0, img.height(), pixelFormat,
+                  &jpegBuf, &jpegSize, chrominanceSubsampling, paras.jpegQuality, flags) < 0) {
+    throw ZIOException(QString("libjpeg-turbo: compressing image: %1").arg(tjGetErrorStr2(tjInstance)));
+  }
+
+  auto outfile = openFile(filename, "wb");
+  if (fwrite(jpegBuf, jpegSize, 1, outfile.get()) < 1) {
+    throw ZIOException("error writing output jpeg file");
+  }
+}
+
 bool ZImgJpeg::supportRead() const
 {
   return true;
@@ -532,7 +609,7 @@ bool ZImgJpeg::supportRead() const
 
 bool ZImgJpeg::supportWrite() const
 {
-  return false;
+  return true;
 }
 
 void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)

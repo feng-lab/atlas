@@ -31,13 +31,17 @@ public:
 
   void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio) override;
 
+  void checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras) override;
+
+  void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
+
   bool supportRead() const override;
 
   bool supportWrite() const override;
 
-  void readInfo(uint8_t* mem, size_t size, ZImgInfo& info);
+  static void readInfo(uint8_t* mem, size_t size, ZImgInfo& info);
 
-  void readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
+  static void readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
 };
 
 } // namespace nim

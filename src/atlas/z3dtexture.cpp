@@ -331,8 +331,7 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
     auto colorBuffer = std::make_unique<uint8_t[]>(bypePerPixel(dataFormat, dataType) * numPixels());
     downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), width(), height(),
-                           QImage::Format_ARGB32);
+    QImage upsideDownImage(colorBuffer.get(), width(), height(),QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);
     QImageWriter writer(filename);
     writer.setCompression(1);

@@ -742,7 +742,7 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& forma
       }
       filters.push_back(filter);
       formats.push_back(fmt.first);
-      comps.push_back(Compression::NONE);
+      comps.push_back(Compression::AUTO);
     }
   }
 }

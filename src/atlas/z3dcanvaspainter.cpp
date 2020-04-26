@@ -8,9 +8,6 @@
 #include "zexception.h"
 #include "zimgformat.h"
 #include "zlog.h"
-#include <QImage>
-#include <QImageWriter>
-#include <QPainter>
 #include <memory>
 
 namespace nim {

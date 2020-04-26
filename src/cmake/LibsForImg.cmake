@@ -110,10 +110,12 @@ set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
 if (WIN32)
   set(JPEGTURBO_LIBRARIES ${JPEGTURBO_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/jpeg-static.lib)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/jpeg-static.lib
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/turbojpeg-static.lib)
 else (WIN32)
   set(JPEGTURBO_LIBRARIES ${JPEGTURBO_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libjpeg.a)
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libjpeg.a
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libturbojpeg.a)
 endif (WIN32)
 message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
 message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
