@@ -166,14 +166,21 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   }
 }
 
-void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+void ZImgV3DRaw::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
 {
+  ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
-    LOG(WARNING) << "compression is not supported for V3DRaw";
+    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
   }
-  if (img.numTimes() != 1) {
+  if (info.numTimes != 1) {
     throw ZIOException("time sequence is not supported");
   }
+}
+
+void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+{
+  checkImgBeforeWriting(filename, img.info(), paras);
+
   std::ofstream outputFileStream;
   openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
@@ -199,12 +206,7 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWr
 void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
                           const ZImgWriteParameters& paras)
 {
-  if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
-    LOG(WARNING) << "compression is not supported for V3DRaw";
-  }
-  if (imgSliceProvider.imgInfo().numTimes != 1) {
-    throw ZIOException("time sequence is not supported");
-  }
+  checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
 
   std::ofstream outputFileStream;
   openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);

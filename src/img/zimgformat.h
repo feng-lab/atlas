@@ -35,23 +35,23 @@ public:
   virtual ~ZImgFormat();
 
   // whether read or write is supported
-  virtual bool supportRead() const = 0;
+  [[nodiscard]] virtual bool supportRead() const = 0;
 
-  virtual bool supportWrite() const = 0;
+  [[nodiscard]] virtual bool supportWrite() const = 0;
 
   // check file extension
-  bool canRead(const QString& filename) const;
+  [[nodiscard]] bool canRead(const QString& filename) const;
 
-  bool canWrite(const QString& filename) const;
+  [[nodiscard]] bool canWrite(const QString& filename) const;
 
-  virtual QString shortName() const = 0;
+  [[nodiscard]] virtual QString shortName() const = 0;
 
-  virtual QString fullName() const = 0;
+  [[nodiscard]] virtual QString fullName() const = 0;
 
   // should start with '.'
-  virtual QStringList extensions() const = 0;
+  [[nodiscard]] virtual QStringList extensions() const = 0;
 
-  virtual FileFormat format() const = 0;
+  [[nodiscard]] virtual FileFormat format() const = 0;
 
   // following io functions will throw ZIOException if read or write fails
 
@@ -71,6 +71,11 @@ public:
   // read everything, input can be changed even if read failed
   virtual void readImg(const QString& filename, ZImg& img,
                        const ZImgRegion& region, size_t scene, size_t ratio) = 0;
+
+  // check whether the current img can be represented by the file with the paras
+  // base calss only check filename, subclass should do more, throw ioexception with reason
+  // should be used in writeImg functions
+  virtual void checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras);
 
   virtual void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras);
 

@@ -370,7 +370,9 @@ void ZROIDoc::createMaskImage()
       ZImg img = roi.toMaskImg();
 
       int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-      img.save(dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx]);
+      ZImgWriteParameters paras;
+      paras.compression = comps[fmtIdx];
+      img.save(dialog.selectedFiles().at(0), formats[fmtIdx], paras);
       img.clear();
       m_doc.loadFile(dialog.selectedFiles().at(0));
     }

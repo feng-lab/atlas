@@ -12,6 +12,10 @@ namespace nim {
 struct ZImgWriteParameters
 {
   Compression compression = Compression::AUTO;
+  // from 1 to 9
+  // Lower compression levels result in faster execution, but less compression.
+  // Higher levels result in greater compression, but slower execution.
+  int zlibCompressionLevel = 6;
 };
 
 class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>

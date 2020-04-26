@@ -30,6 +30,8 @@ public:
 
   void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio) override;
 
+  void checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras) override;
+
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
   void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,

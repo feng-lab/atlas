@@ -393,6 +393,92 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   //bt.stopAndLog();
 }
 
+void ZImgPng::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
+{
+  ZImgFormat::checkImgBeforeWriting(filename, info, paras);
+  if (paras.compression != Compression::AUTO &&
+      paras.compression != Compression::NONE &&
+      paras.compression != Compression::DEFLATE) {
+    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
+  }
+  if (info.numTimes != 1 || info.depth != 1) {
+    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+  }
+  if (!(info.numChannels == 1 ||
+        (info.numChannels == 2 && info.lastChannelIsAlphaChannel) ||
+        (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
+        (info.numChannels == 3)) ||
+        info.voxelFormat != VoxelFormat::Unsigned ||
+        info.bytesPerVoxel > 2) {
+    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+  }
+}
+
+void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+{
+  checkImgBeforeWriting(filename, img.info(), paras);
+
+  auto outfile = openFile(filename, "w");
+
+  PngPack png;
+  png.pngPtr = png_create_write_struct(PNG_LIBPNG_VER_STRING, &png, pngReadErrorFunction, pngReadWarningFunction);
+  if (png.pngPtr) {
+    png.infoPtr = png_create_info_struct(png.pngPtr);
+  }
+  if (!png.pngPtr || !png.infoPtr) {
+    png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
+    throw ZIOException("Libpng read error");
+  }
+
+  [[maybe_unused]] auto guard1 = folly::makeGuard([&png]() {
+    png_destroy_write_struct(&png.pngPtr, &png.infoPtr);
+  });
+
+  png_init_io(png.pngPtr, outfile.get());
+
+  png_set_compression_level(png.pngPtr, paras.zlibCompressionLevel);
+
+  int colorType = PNG_COLOR_TYPE_RGB_ALPHA;
+  if (img.info().numChannels == 1) {
+    colorType = PNG_COLOR_TYPE_GRAY;
+  } else if (img.info().numChannels == 2) {
+    CHECK(img.info().lastChannelIsAlphaChannel);
+    colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
+  } else if (img.info().numChannels == 3) {
+    colorType = PNG_COLOR_TYPE_RGB;
+  } else {
+    CHECK(img.info().lastChannelIsAlphaChannel && img.info().numChannels == 4);
+  }
+
+  png_set_IHDR(
+    png.pngPtr,
+    png.infoPtr,
+    img.width(), img.height(),
+    8 * img.bytesPerVoxel(),
+    colorType,
+    PNG_INTERLACE_NONE,
+    PNG_COMPRESSION_TYPE_DEFAULT,
+    PNG_FILTER_TYPE_DEFAULT
+  );
+  png_text text[1];
+  int num_text = 0;
+  text[num_text].compression = PNG_TEXT_COMPRESSION_NONE;
+  text[num_text].key = strdup("Description");
+  text[num_text].text = strdup("Created by zimg");
+  ++num_text;
+  png_set_text(png.pngPtr, png.infoPtr, text, num_text);
+
+  png_write_info(png.pngPtr, png.infoPtr);
+
+  ZImg tmp(img.info());
+  CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
+  ZImgFormat::XYZCtoCXYZ(img, tmp);
+  for (size_t r = 0; r < tmp.height(); ++r) {
+    png_write_row(png.pngPtr, tmp.channelData<uint8_t>(0) + r * tmp.rowByteNumber() * tmp.numChannels());
+  }
+  png_write_end(png.pngPtr, nullptr);
+}
+
 bool ZImgPng::supportRead() const
 {
   return true;

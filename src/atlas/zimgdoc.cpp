@@ -62,7 +62,9 @@ bool ZImgDoc::saveAs(size_t id)
     QString err;
     auto& pack = m_idToImgPacks.at(id);
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (saveImg(pack.get(), dialog.selectedFiles().at(0), formats[fmtIdx], comps[fmtIdx], err)) {
+    ZImgWriteParameters paras;
+    paras.compression = comps[fmtIdx];
+    if (saveImg(pack.get(), dialog.selectedFiles().at(0), formats[fmtIdx], paras, err)) {
       m_doc.updateObjInfo(id);
       return true;
     }

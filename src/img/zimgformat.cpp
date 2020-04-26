@@ -79,6 +79,14 @@ bool ZImgFormat::canWrite(const QString& filename) const
   return false;
 }
 
+void ZImgFormat::checkImgBeforeWriting(const QString& filename, const ZImgInfo& /*info*/,
+                                       const ZImgWriteParameters& /*paras*/)
+{
+  if (!canWrite(filename)) {
+    throw ZIOException(QString("filename %1 is not supported for writing").arg(filename));
+  }
+}
+
 void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, const ZImgWriteParameters& /*paras*/)
 {
 }
@@ -87,18 +95,16 @@ void ZImgFormat::writeImg(const QString& filename,
                           const ZImgSliceProvider& imgSliceProvider,
                           const ZImgWriteParameters& paras)
 {
-  if (canWrite(filename)) {
-    writeImg(filename, imgSliceProvider.wholeImg(1), paras);
-  }
+  checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
+  writeImg(filename, imgSliceProvider.wholeImg(1), paras);
 }
 
 void ZImgFormat::writeImg(const QString& filename,
                           const ZImgBlockProvider& imgBlockProvider,
                           const ZImgWriteParameters& paras)
 {
-  if (canWrite(filename)) {
-    writeImg(filename, imgBlockProvider.wholeImg(), paras);
-  }
+  checkImgBeforeWriting(filename, imgBlockProvider.imgInfo(), paras);
+  writeImg(filename, imgBlockProvider.wholeImg(), paras);
 }
 
 ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrderIn,

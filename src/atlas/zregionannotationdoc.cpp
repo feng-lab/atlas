@@ -322,8 +322,10 @@ void ZRegionAnnotationDoc::exportLabelImage()
   QApplication::processEvents();
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
+      ZImgWriteParameters paras;
+      paras.compression = comps[fmtIdx];
       m_idToRegionAnnotationPacks.begin()->second->regionAnnotation->exportLabelImage(fn, formats[fmtIdx],
-                                                                                      comps[fmtIdx]);
+                                                                                      paras);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }

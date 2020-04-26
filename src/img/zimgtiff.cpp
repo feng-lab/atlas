@@ -146,6 +146,8 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
 void ZImgTiff::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
+  checkImgBeforeWriting(filename, img.info(), paras);
+
   ZTiffWriter tiffWriter;
   int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (img.byteNumber() > 1024_usize * 1024 * 3600) {
@@ -163,6 +165,8 @@ void ZImgTiff::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
                         const ZImgWriteParameters& paras)
 {
+  checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
+
   ZTiffWriter tiffWriter;
   int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
   if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600) {

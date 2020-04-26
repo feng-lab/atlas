@@ -269,6 +269,40 @@ enum class Compression : std::uint16_t
   ZSTD = 50000, /* ZSTD: WARNING not registered in Adobe-maintained registry */
 };
 
+inline QString enumToString(Compression m)
+{
+  switch (m) {
+    case Compression::AUTO:
+      return "Auto";
+    case Compression::NONE:
+      return "None";
+    case Compression::LZW:
+      return "LZW";
+    case Compression::JPEG:
+      return "JPEG";
+    case Compression::T85:
+      return "T85";
+    case Compression::T43:
+      return "T43";
+    case Compression::PACKBITS:
+      return "PACKBITS";
+    case Compression::DEFLATE:
+      return "DEFLATE";
+    case Compression::ADOBE_DEFLATE:
+      return "ADOBE_DEFLATE";
+    case Compression::DCS:
+      return "DCS";
+    case Compression::JP2000:
+      return "JP2000";
+    case Compression::LZMA:
+      return "LZMA";
+    case Compression::ZSTD:
+      return "ZSTD";
+    default:
+      throw ZIOException("invalid Compression");
+  }
+}
+
 enum class PadOption
 {
   //Input array values outside the bounds of the array are implicitly

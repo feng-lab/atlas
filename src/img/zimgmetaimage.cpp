@@ -123,12 +123,23 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   }
 }
 
-void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+void ZImgMetaImage::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info,
+                                          const ZImgWriteParameters& paras)
 {
-  CHECK(paras.compression == Compression::AUTO || paras.compression == Compression::NONE || paras.compression == Compression::DEFLATE);
-  if (img.numTimes() != 1) {
+  ZImgFormat::checkImgBeforeWriting(filename, info, paras);
+  if (!(paras.compression == Compression::AUTO ||
+        paras.compression == Compression::NONE ||
+        paras.compression == Compression::DEFLATE)) {
+    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
+  }
+  if (info.numTimes != 1) {
     throw ZIOException("time sequence image is not supported");
   }
+}
+
+void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+{
+  checkImgBeforeWriting(filename, img.info(), paras);
 
   bool multipleChannel = img.numChannels() > 1;
 
@@ -222,16 +233,6 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZIm
   if (!metaImage.Write(QFile::encodeName(filename).constData())) {
     throw ZIOException("Can not write metaimage");
   }
-}
-
-void ZImgMetaImage::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
-                             const ZImgWriteParameters& paras)
-{
-  CHECK(paras.compression == Compression::AUTO || paras.compression == Compression::NONE || paras.compression == Compression::DEFLATE);
-  if (imgSliceProvider.imgInfo().numTimes != 1) {
-    throw ZIOException("time sequence image is not supported");
-  }
-  writeImg(filename, imgSliceProvider.allSlices(0, 1), paras);
 }
 
 bool ZImgMetaImage::supportRead() const

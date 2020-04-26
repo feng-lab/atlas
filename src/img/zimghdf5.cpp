@@ -94,7 +94,8 @@ void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t 
   }
 }
 
-void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::ZImg& img)
+void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::ZImg& img,
+                                    const nim::ZImgWriteParameters& paras)
 {
   H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
   H5::FloatType floatType(H5::PredType::IEEE_F32LE);
@@ -117,7 +118,7 @@ void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, c
                          std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
-  pList.setDeflate(6);
+  pList.setDeflate(paras.zlibCompressionLevel);
   pList.setChunk(2, chunkDim);
 
   H5::DataSet imgData;
@@ -180,7 +181,8 @@ void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, c
   }
 }
 
-void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::ZImg& img)
+void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::ZImg& img,
+                          const nim::ZImgWriteParameters& paras)
 {
   H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
   H5::FloatType floatType(H5::PredType::IEEE_F32LE);
@@ -198,7 +200,7 @@ void writeImgSliceToH5Grp(H5::Group& zGrp, const H5std_string& name, const nim::
                          std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
-  pList.setDeflate(6);
+  pList.setDeflate(paras.zlibCompressionLevel);
   pList.setChunk(2, chunkDim);
 
   H5::DataSet imgData;
@@ -651,8 +653,9 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 }
 
 void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
-                        const ZImgWriteParameters&)
+                        const ZImgWriteParameters& paras)
 {
+  checkImgBeforeWriting(filename, img.info(), paras);
   try {
     H5::Exception::dontPrint();
 
@@ -685,13 +688,13 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
           H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
           ZImg tmpImg = img.createView(z, c, t);
-          writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
+          writeImgSliceToH5Grp(zGrp, "Data", tmpImg, paras);
 
           level = 1;
           while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
             level *= 2;
             tmpImg.zoom(0.5, 0.5);
-            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg, paras);
           }
         }
       }
@@ -704,8 +707,9 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
 }
 
 void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
-                        const ZImgWriteParameters&)
+                        const ZImgWriteParameters& paras)
 {
+  checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
   try {
     H5::Exception::dontPrint();
 
@@ -744,13 +748,13 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
           H5::Group zGrp = channelGrps[c].createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
           ZImg tmpImg = img.createView(c, 0);
-          writeImgSliceToH5Grp(zGrp, "Data", tmpImg);
+          writeImgSliceToH5Grp(zGrp, "Data", tmpImg, paras);
 
           level = 1;
           while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
             level *= 2;
             tmpImg.zoom(0.5, 0.5);
-            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg, paras);
           }
         }
       }
@@ -763,8 +767,9 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
 }
 
 void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider,
-                        const ZImgWriteParameters&)
+                        const ZImgWriteParameters& paras)
 {
+  checkImgBeforeWriting(filename, imgBlockrovider.imgInfo(), paras);
   try {
     H5::Exception::dontPrint();
 
@@ -802,7 +807,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
         for (size_t z = 0; z < imgBlockrovider.imgInfo().depth; ++z) {
           H5::Group zGrp = channelGrp.createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 
-          writeFixedValueImgSliceToH5Grp(zGrp, "Data", imgSlice);
+          writeFixedValueImgSliceToH5Grp(zGrp, "Data", imgSlice, paras);
         }
       }
     }
@@ -839,7 +844,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
           while (tmpImg.width() > chunkSize() || tmpImg.height() > chunkSize()) {
             level *= 2;
             tmpImg.zoom(0.5, 0.5);
-            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg);
+            writeImgSliceToH5Grp(zGrp, QString("DownsampledBy%1Data").arg(level).toStdString(), tmpImg, paras);
           }
 
           LOG(INFO) << "Finish building pyramidal for slice " << z << " of channel " << c;
