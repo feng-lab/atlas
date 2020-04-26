@@ -232,6 +232,15 @@ PYBIND11_MODULE(_imgpy, m)
     }
   });
 
+  py::class_<ZImgWriteParameters>(m, "ZImgWriteParameters")
+    .def(py::init<>())
+    .def_readwrite("compression", &ZImgWriteParameters::compression)
+    .def_readwrite("zlibCompressionLevel", &ZImgWriteParameters::zlibCompressionLevel)
+    .def_readwrite("jpegQuality", &ZImgWriteParameters::jpegQuality)
+    .def_readwrite("jpegProgressive", &ZImgWriteParameters::jpegProgressive)
+    .def_readwrite("jpegAccurateDCT", &ZImgWriteParameters::jpegAccurateDCT)
+    .def_readwrite("jpegChrominanceSubsampling", &ZImgWriteParameters::jpegChrominanceSubsampling);
+
   py::class_<ZImgInfo>(m, "ZImgInfo")
     .def(py::init<>())
     .def(py::init<size_t, size_t, size_t, size_t, size_t, size_t, VoxelFormat>(),
@@ -413,7 +422,7 @@ PYBIND11_MODULE(_imgpy, m)
     }, "filename"_a, "format"_a = FileFormat::Unknown)
     .def("isEmpty", &ZImg::isEmpty)
     .def("save", &ZImg::save,
-         "filename"_a, "format"_a = FileFormat::Unknown, "compression"_a = Compression::AUTO)
+         "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
     .def_property("info",
                   [](const ZImg& v) {
                     return v.info();

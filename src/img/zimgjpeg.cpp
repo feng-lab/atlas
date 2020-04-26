@@ -535,10 +535,11 @@ void ZImgJpeg::checkImgBeforeWriting(const QString &filename, const ZImgInfo &in
   if (info.numTimes != 1 || info.depth != 1) {
     throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
   }
-  if (!(info.numChannels == 1 || (info.numChannels == 3)) ||
+  if (!(info.numChannels == 1 ||
+        (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
+        (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
       info.voxelFormat != VoxelFormat::Unsigned ||
-      info.bytesPerVoxel > 1 ||
-      info.lastChannelIsAlphaChannel) {
+      info.bytesPerVoxel > 1) {
     throw ZIOException(QString("image can not be represented as jpeg: %1").arg(info.toQString()));
   }
   if (paras.jpegChrominanceSubsampling != 444 &&
@@ -566,6 +567,10 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
     pixelFormat = TJPF_GRAY;
     chrominanceSubsampling = TJSAMP_GRAY;
   } else {
+    if (img.numChannels() == 4) {
+      LOG(WARNING) << "Alpha Channel will be ignored when encoding as jpeg";
+      pixelFormat = TJPF_RGBA;
+    }
     if (paras.jpegChrominanceSubsampling == 422) {
       chrominanceSubsampling = TJSAMP_422;
     } else if (paras.jpegChrominanceSubsampling == 420) {
