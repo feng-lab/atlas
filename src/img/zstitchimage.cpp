@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include "zimgnccmatch.h"
-#include "zimgio.h"
 #include "zeigenutils.h"
 #include "zvbgmm.h"
 #include <QDir>
@@ -708,9 +707,8 @@ void ZStitchImage::doWork()
     }
     fOut.close();
 #endif
-    if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-        m_mergeMode == ImgMergeMode::Max) {
-      ZImgIO().writeImg(m_resFileName, imgMerge);
+    imgMerge.save(m_resFileName);
+    if (true) {
       for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
         QFileInfo fi(m_resFileName);
         QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
@@ -719,18 +717,6 @@ void ZStitchImage::doWork()
         img.save(ofn);
         img.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
         img.save(dsofn);
-      }
-    } else {
-      auto wholeImg = imgMerge.wholeImg();
-      wholeImg.save(m_resFileName);
-      for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
-        QFileInfo fi(m_resFileName);
-        QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
-        QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
-        ZImg tmp = wholeImg.createView(c);
-        tmp.save(ofn);
-        tmp.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
-        tmp.save(dsofn);
       }
     }
   }
@@ -1080,9 +1066,8 @@ void ZStitchImage::doRestitch()
     }
     fOut.close();
 #endif
-    if (imgMerge.imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
-        m_mergeMode == ImgMergeMode::Max) {
-      ZImgIO().writeImg(m_resFileName, imgMerge);
+    imgMerge.save(m_resFileName);
+    if (true) {
       for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
         QFileInfo fi(m_resFileName);
         QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
@@ -1091,18 +1076,6 @@ void ZStitchImage::doRestitch()
         img.save(ofn);
         img.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
         img.save(dsofn);
-      }
-    } else {
-      auto wholeImg = imgMerge.wholeImg();
-      wholeImg.save(m_resFileName);
-      for (size_t c = 0; c < imgMerge.imgInfo().numChannels; ++c) {
-        QFileInfo fi(m_resFileName);
-        QString ofn = fi.path() + "/" + fi.baseName() + QString("_ch%1.v3draw").arg(c + 1);
-        QString dsofn = fi.path() + "/" + fi.baseName() + QString("_ch%1_downsampled.v3draw").arg(c + 1);
-        ZImg tmp = wholeImg.createView(c);
-        tmp.save(ofn);
-        tmp.blockDownsample(2, 2, 1, ImgMergeMode::Mean);
-        tmp.save(dsofn);
       }
     }
   }

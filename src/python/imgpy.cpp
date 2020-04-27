@@ -5,6 +5,7 @@
 #include "zglobalinit.h"
 #include "zstitchimage.h"
 #include "zimgnccmatch.h"
+#include "zimgmerge.h"
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
@@ -109,6 +110,21 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 
   return res;
 }
+
+template <class ZImgSubBlockBase = ZImgSubBlock>
+class PyZImgSubBlock : public ZImgSubBlockBase {
+public:
+  using ZImgSubBlockBase::ZImgSubBlockBase; // Inherit constructors
+  std::shared_ptr<ZImg> read() const override { PYBIND11_OVERLOAD_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, ); }
+  ZImgInfo readInfo() const override { PYBIND11_OVERLOAD_PURE(ZImgInfo, ZImgSubBlockBase, readInfo, ); }
+};
+template <class ZImgTileSubBlockBase = ZImgTileSubBlock>
+class PyZImgTileSubBlock : public PyZImgSubBlock<ZImgTileSubBlockBase> {
+public:
+  using PyZImgSubBlock<ZImgTileSubBlockBase>::PyZImgSubBlock; // Inherit constructors (via PyA_Tpl's inherited constructors)
+  std::shared_ptr<ZImg> read() const override { PYBIND11_OVERLOAD(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, ); }
+  ZImgInfo readInfo() const override { PYBIND11_OVERLOAD(ZImgInfo, ZImgTileSubBlockBase, readInfo, ); }
+};
 
 }
 
@@ -751,6 +767,38 @@ PYBIND11_MODULE(_imgpy, m)
     .def("__repr__", [](const ZROIUtils&) {
       return QString("<_imgpy.ZROIUtils>").toStdString();
     });
+
+  py::class_<ZImgSubBlock, PyZImgSubBlock<>>(m, "ZImgSubBlock")
+    .def(py::init<size_t, size_t, int64_t, int64_t, int64_t, int64_t, int64_t>(),
+         "ratio"_a, "t"_a, "z"_a, "x"_a, "y"_a, "width"_a, "height"_a)
+    .def("read", &ZImgSubBlock::read)
+    .def("readInfo", &ZImgSubBlock::readInfo)
+    .def("__repr__", [](const ZImgSubBlock&) {
+      return QString("<_imgpy.ZImgSubBlock>").toStdString();
+    });
+  py::class_<ZImgTileSubBlock, ZImgSubBlock, PyZImgTileSubBlock<>>(m, "ZImgTileSubBlock")
+    .def(py::init<const ZImgSource&, size_t, size_t, size_t, ImgMergeMode>(),
+         "source"_a, "downsampleBlockWidth"_a = 1, "downsampleBlockHeight"_a = 1, "downsampleBlockDepth"_a = 1,
+         "downsampleCombineMode"_a = ImgMergeMode::Mean)
+    .def("__repr__", [](const ZImgTileSubBlock&) {
+      return QString("<_imgpy.ZImgTileSubBlock>").toStdString();
+    });
+
+  py::class_<ZImgMerge>(m, "ZImgMerge")
+    .def(py::init<>())
+    .def("addImg", &ZImgMerge::addImg,
+         "img"_a, "loc"_a, "imgName"_a = QString(""))
+    .def("addImgPair", &ZImgMerge::addImgPair,
+         "img1"_a, "img2"_a, "img2Offset"_a, "connectionCost"_a = 0, "img1Name"_a = QString(""), "img2Name"_a = QString(""))
+    .def("resolveLocations", &ZImgMerge::resolveLocations)
+    .def("setMergeMode", &ZImgMerge::setMergeMode,
+         "mode"_a = ImgMergeMode::Max)
+    .def("save", &ZImgMerge::save,
+         "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
+    .def("__repr__", [](const ZImgMerge&) {
+      return QString("<_imgpy.ZImgMerge>").toStdString();
+    });
+
 
   m.attr("__version__") = GIT_VERSION;
 

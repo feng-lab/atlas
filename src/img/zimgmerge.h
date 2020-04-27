@@ -37,6 +37,8 @@ private:
 class ZImgMerge : public ZImgBlockProvider
 {
 public:
+  virtual ~ZImgMerge() = default;
+
   // img has absolute location, if img already exist, update its location
   void addImg(const ZImgSubBlock& img, const ZVoxelCoordinate& loc, const QString& imgName = "");
 
@@ -75,9 +77,13 @@ public:
 
   ZImg wholeImg() const override;
 
+  // resolveLocations() needs to be called before this
+  void save(const QString& fileName, FileFormat format = FileFormat::Unknown,
+            const ZImgWriteParameters& paras = ZImgWriteParameters());
+
 protected:
-  void resolveLocations(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
-                        const ZImgSubBlock* refImg, double minCost, QStringList& summary) const;
+  void resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
+                             const ZImgSubBlock* refImg, double minCost, QStringList& summary) const;
 
   void mergeImgs(ZImg& res, const std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
                  ImgMergeMode mode, QString& summary) const;
