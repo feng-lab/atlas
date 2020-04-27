@@ -24,7 +24,7 @@ public:
   ZImgInfo readInfo() const override;
 
 private:
-  const ZImgSource& m_source;
+  ZImgSource m_source;
   size_t m_downsampleBlockWidth;
   size_t m_downsampleBlockHeight;
   size_t m_downsampleBlockDepth;
