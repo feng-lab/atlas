@@ -1521,8 +1521,6 @@ def build_vtk(src_dir: str, install_dir: str):
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file_3 = None
-    bak_file_3 = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend([
@@ -1611,12 +1609,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
                              ])
 
-            if is_linux():
-                orig_file_3 = os.path.join(src_dir, 'modules', 'core', 'include', 'opencv2', 'core', 'private.hpp')
-                bak_file_3 = patch_file(orig_file_3,
-                                        from_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) ((FUN)(__VA_ARGS__))'],
-                                        to_texts=[r'#define CV_INSTRUMENT_FUN_IPP(FUN, ...) (FUN(__VA_ARGS__))'])
-
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -1628,8 +1620,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
                    from_texts=[r';\$<LINK_ONLY:tbb>', r'\$<LINK_ONLY:tbb>;'],
                    to_texts=[r'', r''])
     finally:
-        if is_linux():
-            os.replace(bak_file_3, orig_file_3)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 

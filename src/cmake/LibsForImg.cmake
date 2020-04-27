@@ -120,6 +120,9 @@ endif (WIN32)
 message(STATUS "JPEGTURBO_INCLUDE_DIRS: ${JPEGTURBO_INCLUDE_DIRS}")
 message(STATUS "JPEGTURBO_LIBRARIES: ${JPEGTURBO_LIBRARIES}")
 
+find_package(ZLIB MODULE REQUIRED)
+print_target_properties(ZLIB::ZLIB)
+
 # libpng16.cmake does not provide include dir, so we have to create it, note PNG_INCLUDE_DIRS will only used by 1 file
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng/libpng16.cmake)
 set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
