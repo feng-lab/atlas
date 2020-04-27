@@ -35,6 +35,7 @@
 /src/3rdparty/build
 /src/3rdparty/libsodium*
 /src/3rdparty/openjpeg*
+/src/3rdparty/libwebp*
 
 !/neurolabi/lib/Mingw/*.zip
 

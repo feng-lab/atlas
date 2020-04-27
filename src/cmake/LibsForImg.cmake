@@ -174,6 +174,21 @@ endif ()
 message(STATUS "FREEIMAGE_INCLUDE_DIRS: ${FREEIMAGE_INCLUDE_DIRS}")
 message(STATUS "FREEIMAGE_LIBRARIES: ${FREEIMAGE_LIBRARIES}")
 
+find_package(WebP REQUIRED
+             COMPONENTS webp
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(WebP::webp)
+
+find_package(liblzma REQUIRED
+             COMPONENTS liblzma
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(liblzma::liblzma)
+
+find_package(zstd REQUIRED
+             COMPONENTS libzstd_static
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(zstd::libzstd_static)
+
 find_package(ITK REQUIRED
              COMPONENTS ITKIOMeta ITKIONIFTI ITKIONRRD ITKIOGDCM ITKBinaryMathematicalMorphology
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

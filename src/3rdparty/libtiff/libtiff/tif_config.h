@@ -120,6 +120,9 @@
 /* Support ZSTD compression */
 #define ZSTD_SUPPORT 1
 
+/* Support WEBP compression */
+#define WEBP_SUPPORT 1
+
 /* Name of package */
 #define PACKAGE "LibTIFF Software"
 
@@ -360,7 +363,7 @@
 #define ZSTD_SUPPORT 1
 
 /* Support WEBP compression */
-/* #undef WEBP_SUPPORT */
+#define WEBP_SUPPORT 1
 
 /* Name of package */
 #define PACKAGE "LibTIFF Software"

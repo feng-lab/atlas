@@ -267,6 +267,7 @@ enum class Compression : std::uint16_t
   /* compression codes 34887-34889 are reserved for ESRI */
   LZMA = 34925,  /* LZMA2 */
   ZSTD = 50000, /* ZSTD: WARNING not registered in Adobe-maintained registry */
+  WEBP = 50001, /* WEBP: WARNING not registered in Adobe-maintained registry */
 };
 
 inline QString enumToString(Compression m)
@@ -298,6 +299,8 @@ inline QString enumToString(Compression m)
       return "LZMA";
     case Compression::ZSTD:
       return "ZSTD";
+    case Compression::WEBP:
+      return "WEBP";
     default:
       throw ZIOException("invalid Compression");
   }

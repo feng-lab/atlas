@@ -47,6 +47,7 @@ set(TIFF_SOURCES
     ${TIFFDIR}/tif_jpeg.c
     ${TIFFDIR}/tif_lzma.c
     ${TIFFDIR}/tif_zstd.c
+    ${TIFFDIR}/tif_webp.c
     ${TIFFDIR}/tif_stream.cxx
     )
 if (WIN32)
@@ -354,7 +355,7 @@ endif (WIN32)
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
                       hdf5_cpp-static hdf5-static ceres Folly::folly Eigen3::Eigen Boost::headers
-                      GeometricTools glm::glm
+                      GeometricTools glm::glm WebP::webp zstd::libzstd_static liblzma::liblzma
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

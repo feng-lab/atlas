@@ -186,7 +186,8 @@ PYBIND11_MODULE(_imgpy, m)
     .value("DCS", Compression::DCS)
     .value("JP2000", Compression::JP2000)
     .value("LZMA", Compression::LZMA)
-    .value("ZSTD", Compression::ZSTD);
+    .value("ZSTD", Compression::ZSTD)
+    .value("WEBP", Compression::WEBP);
 
   py::class_<col4>(m, "col4")
     .def(py::init<>())
