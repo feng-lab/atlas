@@ -1217,6 +1217,11 @@ void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID)
   m_undoStack->push(new ZROISliceAddControlPointCommand(*this, slice, pt, shapeID));
 }
 
+void ZROI::sliceSubtractShape(int slice, size_t shapeID, const std::vector<ZROIShapeOperation> &otherShape)
+{
+  m_undoStack->push(new ZROISliceSubtractShapeCommand(*this, slice, shapeID, otherShape));
+}
+
 void ZROI::startMoveSelectedControlPointsCommand()
 {
   if (!m_moveSelectedControlPointsCommand) {

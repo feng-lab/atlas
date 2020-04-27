@@ -404,6 +404,21 @@ public:
     }
   }
 
+  void sliceSubtractShape(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape);
+
+  void sliceSubtractShape_Impl(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape)
+  {
+    std::vector<size_t> shapes;
+    shapes.push_back(shapeID);
+    auto& shape = m_sliceROIs.at(slice).m_idToShapeOperations.at(shapeID);
+    for (const auto& otherShapeOp : otherShape) {
+      auto shapeOpCopy = otherShapeOp;
+      shapeOpCopy.isAdd = !shapeOpCopy.isAdd;
+      shape.push_back(shapeOpCopy);
+    }
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+  }
+
   void sliceSetTopLeft(int slice, double x, double y)
   {
     m_sliceROIs.at(slice).setTopLeft(x, y);
@@ -572,6 +587,27 @@ protected:
   int m_slice;
   QPointF m_controlPoint;
   int m_shapeID;
+};
+
+class ZROISliceSubtractShapeCommand : public ZROICommand
+{
+public:
+  ZROISliceSubtractShapeCommand(ZROI& roi, int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape)
+    : ZROICommand(roi), m_slice(slice), m_shapeID(shapeID), m_subtractedShape(otherShape)
+  {
+    setText("Subtract Shape");
+  }
+
+  void redo() override
+  {
+    m_roi.sliceSubtractShape_Impl(m_slice, m_shapeID, m_subtractedShape);
+    m_changedSlices.insert(m_slice);
+  }
+
+protected:
+  int m_slice;
+  size_t m_shapeID;
+  std::vector<ZROIShapeOperation> m_subtractedShape;
 };
 
 class ZROISliceMoveSelectedControlPointsCommand : public ZROICommand

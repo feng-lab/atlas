@@ -130,6 +130,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
     if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
       QMenu menu;
       QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
       QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
       QAction* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == addCtrlPointAction) {
@@ -145,6 +146,8 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
           QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                                 QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
+      } else if (selectedAction == subtractNextSelectedShapeAction) {
+        m_view.scene().registerROIForSubtraction(&m_roi, m_slice, m_id);
       }
     }
     //event->accept();
@@ -281,10 +284,16 @@ void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
     if (event->modifiers() == Qt::AltModifier) {
       emit m_roi.deselectShape(m_controlPoint.slice, m_controlPoint.shapeID);
     } else {
+      auto zscene = dynamic_cast<ZGraphicsScene*>(scene());
+      CHECK(zscene);
+      zscene->performROISubtraction(&m_roi, m_controlPoint.slice, m_controlPoint.shapeID);
       emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
     }
     m_doubleClicked = true;
   } else {
+    auto zscene = dynamic_cast<ZGraphicsScene*>(scene());
+    CHECK(zscene);
+    zscene->removeROIForSubtraction();
     QGraphicsRectItem::mouseDoubleClickEvent(event);
   }
 }
