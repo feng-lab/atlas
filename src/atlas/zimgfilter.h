@@ -91,6 +91,12 @@ Q_OBJECT
 public:
   explicit ZImgFilter(ZView& view);
 
+  static int getViewPrecedence()
+  {
+    static int vp = 0;
+    return vp++;
+  }
+
   void setData(ZImgPack& pack);
 
   void releaseItemsOwnership();

@@ -83,6 +83,12 @@ Q_OBJECT
 public:
   explicit ZPunctaFilter(ZView& view);
 
+  static int getViewPrecedence()
+  {
+    static int vp = 20000;
+    return vp++;
+  }
+
   void setData(ZPuncta& puncta);
 
   void releaseItemsOwnership();

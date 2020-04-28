@@ -1,2 +1,2 @@
-Atlas is developed by Linqing Feng (flq@live.com). 
-Copyright 2019 @ Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology. All rights reserved.
+Atlas is developed by Linqing Feng (flq@live.com).
+Copyright (c) @ Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology. All rights reserved.

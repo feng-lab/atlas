@@ -192,7 +192,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
   m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(1000);
+  m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);

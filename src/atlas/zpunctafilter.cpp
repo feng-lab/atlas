@@ -133,7 +133,7 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
   m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(2000);
+  m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);

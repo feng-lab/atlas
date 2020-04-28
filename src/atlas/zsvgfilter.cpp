@@ -19,7 +19,7 @@ ZSvgFilter::ZSvgFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSvgFilter::opacityChanged);
   addParameter(&m_visible);
   m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(100);
+  m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);

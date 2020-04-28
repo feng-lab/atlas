@@ -416,6 +416,7 @@ public:
       shapeOpCopy.isAdd = !shapeOpCopy.isAdd;
       shape.push_back(shapeOpCopy);
     }
+    m_sliceROIs.at(slice).updatePaintPath(shapeID);
     onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
   }
 

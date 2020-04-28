@@ -86,7 +86,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint,
+  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm, ZView& view,
                         double viewScale = 1., QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -94,6 +94,9 @@ public:
   void setFixedSize(bool v);
 
   void setViewScale(double s);
+
+  void setTransform_(const QTransform& tfm)
+  { m_transform = tfm; updateValue(); }
 
   ZROIControlPoint controlPoint() const
   { return m_controlPoint; }
@@ -103,7 +106,7 @@ public:
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
-  // void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 //  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
@@ -121,6 +124,8 @@ private:
 
   QPointF m_basePos;
   bool m_doubleClicked = false;
+  QTransform m_transform;
+  ZView& m_view;
 };
 
 class ZROIFilter : public ZObjFilter
@@ -128,6 +133,12 @@ class ZROIFilter : public ZObjFilter
 Q_OBJECT
 public:
   explicit ZROIFilter(ZView& view);
+
+  static int getViewPrecedence()
+  {
+    static int vp = 30000;
+    return vp++;
+  }
 
   void setData(ZROI& roi);
 

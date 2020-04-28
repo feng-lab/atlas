@@ -90,6 +90,12 @@ Q_OBJECT
 public:
   explicit ZSwcFilter(ZView& view);
 
+  static int getViewPrecedence()
+  {
+    static int vp = 20000;
+    return vp++;
+  }
+
   void setData(ZSwc& swc);
 
   void releaseItemsOwnership();

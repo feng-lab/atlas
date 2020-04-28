@@ -108,7 +108,7 @@ ZImgFilter::ZImgFilter(ZView& view)
   connect(&m_scaleBarColor, &ZVec3Parameter::valueChanged, this, &ZImgFilter::scaleBarColorChanged);
   addParameter(&m_scaleBarColor);
   m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(0);
+  m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_viewPrecedencePara);
   addParameter(&m_transform);

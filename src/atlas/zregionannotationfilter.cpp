@@ -18,7 +18,7 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZRegionAnnotationFilter::visibleChanged);
   //addParameter(&m_visible);
   m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(3000);
+  m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
 }
 
@@ -192,6 +192,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setVisible(true);
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
+    flt->viewPrecedencePara().setValue(m_viewPrecedencePara.get());
     connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,
             &flt->viewPrecedencePara(), &ZIntParameter::updateFromSender);
     connect(&m_transform, &Z2DTransformParameter::valueChanged,

@@ -19,6 +19,12 @@ Q_OBJECT
 public:
   explicit ZSvgFilter(ZView& view);
 
+  static int getViewPrecedence()
+  {
+    static int vp = 10000;
+    return vp++;
+  }
+
   void setData(QSvgRenderer& svg);
 
   void releaseItemsOwnership();

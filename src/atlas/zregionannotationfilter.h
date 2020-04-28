@@ -12,6 +12,12 @@ Q_OBJECT
 public:
   explicit ZRegionAnnotationFilter(ZView& view);
 
+  static int getViewPrecedence()
+  {
+    static int vp = 40000;
+    return vp++;
+  }
+
   void setData(ZRegionAnnotation& regionAnnotation);
 
   void releaseItemsOwnership();
