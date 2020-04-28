@@ -420,7 +420,7 @@ def build_boost(src_dir: str, install_dir: str):
 
 
 def clean_boost(install_dir: str):
-    shutil.rmtree(os.path.join(install_dir, 'include', 'boost'), ignore_errors=False)
+    shutil.rmtree(os.path.join(install_dir, 'include', 'boost'), ignore_errors=True)
     glob_remove(os.path.join(install_dir, 'lib', 'cmake', 'boost*'))
     glob_remove(os.path.join(install_dir, 'lib', 'cmake', 'Boost*'))
     glob_remove(os.path.join(install_dir, 'lib', 'libboost*'))
@@ -879,12 +879,13 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                    from_texts=[r'project(${PACKAGE_NAME} CXX C)'],
                                    to_texts=['project(${PACKAGE_NAME} CXX C)\n'
                                              'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
-                                             'set(Boost_USE_STATIC_LIBS ON)\n'])
+                                             ])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DPYTHON_EXTENSIONS:BOOL=OFF',
                              '-DBUILD_TESTS:BOOL=OFF',
+                             '-DBOOST_LINK_STATIC=ON',
                              src_dir])
             build_and_install_cmakecmd(cmakecmd, build_dir)
         finally:
@@ -1178,30 +1179,30 @@ def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str)
 def build_assimp(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = None
-    bak_file = None
-    orig_file2 = None
-    bak_file2 = None
-    orig_file_3 = None
-    bak_file_3 = None
-    orig_file_4 = None
-    bak_file_4 = None
+    orig_file = bak_file = None
+    orig_file2 = bak_file2 = None
+    orig_file3 = bak_file3 = None
+    orig_file_3 = bak_file_3 = None
+    orig_file_4 = bak_file_4 = None
     try:
         orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
         from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
         to_texts = [r'#define AI_MAX_ALLOC(type) ((size_t(256) * 1024 * 1024 * 1024) / sizeof(type))']
         bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
-        orig_file2 = os.path.join(src_dir, 'CMakeLists.txt')
-        from_texts = [r'SET (ASSIMP_SOVERSION 5)',
-                      r' -lz',
-                      r'-Werror',
+        orig_file2 = os.path.join(src_dir, 'code', 'CMakeLists.txt')
+        from_texts = [r'-Werror',
                       r'/WX']
-        to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
-                    r' ZLIB::ZLIB',
-                    r' ',
+        to_texts = [r' ',
                     r' ']
         bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
+
+        orig_file3 = os.path.join(src_dir, 'CMakeLists.txt')
+        from_texts = [r'SET (ASSIMP_SOVERSION 5)',
+                      r' -lz']
+        to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
+                    r' ZLIB::ZLIB']
+        bak_file3 = patch_file(orig_file3, from_texts=from_texts, to_texts=to_texts)
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
 
@@ -1240,6 +1241,7 @@ def build_assimp(src_dir: str, install_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
+        os.replace(bak_file3, orig_file3)
         if is_mac():
             os.replace(bak_file_3, orig_file_3)
             os.replace(bak_file_4, orig_file_4)

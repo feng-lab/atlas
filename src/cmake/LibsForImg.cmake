@@ -235,43 +235,28 @@ find_package(Ceres REQUIRED
 print_target_properties(Eigen3::Eigen)
 print_target_properties(ceres)
 
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost 1.73.0 REQUIRED
+             COMPONENTS
+             headers
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
+             )
+print_target_properties(Boost::headers)
 if (WIN32)
-  set(Boost_USE_STATIC_LIBS ON)
-  find_package(Boost 1.72.0 REQUIRED
-               COMPONENTS
-               headers
-               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-               )
-  print_target_properties(Boost::headers)
-
   add_library(Folly::folly INTERFACE IMPORTED)
   set_target_properties(Folly::folly PROPERTIES
                         INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly"
                         INTERFACE_LINK_LIBRARIES "Boost::headers")
   print_target_properties(Folly::folly)
 else (WIN32)
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.72.0 REQUIRED
-             COMPONENTS
-             headers
-             context
-             filesystem
-             program_options
-             regex
-             system
-             thread
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-             )
-print_target_properties(Boost::headers)
+find_package(folly REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Boost::context)
 print_target_properties(Boost::filesystem)
 print_target_properties(Boost::program_options)
 print_target_properties(Boost::regex)
 print_target_properties(Boost::system)
 print_target_properties(Boost::thread)
-
-find_package(folly REQUIRED
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Folly::folly)
 print_target_properties(Folly::folly_deps)
 print_target_properties(fmt::fmt)
