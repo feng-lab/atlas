@@ -44,6 +44,7 @@ void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMen
 {
   QGraphicsScene::contextMenuEvent(contextMenuEvent);
   if (!contextMenuEvent->isAccepted()) {
+    removeROIForSubtraction();
     QMenu menu;
     QAction* pasteAction = menu.addAction("Paste Here");
     QAction* pasteHFlipAction = menu.addAction("Paste Horizonally Flipped");
