@@ -17,7 +17,7 @@ def get_bak_file_name(orig_file: str):
 
 def update_pacakge_xml_version(template_file:str, file: str):
     tree = eTree.parse(template_file)
-    tree.find('Version').text = '{0:%Y.%m.%d}'.format(datetime.datetime.now())
+    tree.find('Version').text = '{0:%Y.%m.%d.%H}'.format(datetime.datetime.now())
     tree.find('ReleaseDate').text = '{0:%Y-%m-%d}'.format(datetime.datetime.now())
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)

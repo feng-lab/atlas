@@ -83,7 +83,18 @@ ZRegionAnnotation::ZRegionAnnotation(QObject* parent)
 ZRegionAnnotation::ZRegionAnnotation(const QString& filename, QObject* parent)
   : QObject(parent)
 {
+  ZTree<RegionNode> ontology;
+  readMouseBrainAtlasOntology(QStringList(), ontology);
   load(filename);
+  for (auto& read_region : m_ontology) {
+    for (auto& region : ontology) {
+      if (region.id == read_region.id) {
+        region.roi = read_region.roi;
+        region.mesh = read_region.mesh;
+      }
+    }
+  }
+  m_ontology.swap(ontology);
   connect(&m_undoStack, &QUndoStack::cleanChanged,
           this, &ZRegionAnnotation::undoStackCleanChanged);
 }
