@@ -316,6 +316,26 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, 
   }
 }
 
+void ZRegionAnnotation::changeROIRegion(ZROI &roi, int slice, size_t shapeId, int64_t regionID)
+{
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == regionID && it->roi.get() == &roi) {
+      return;
+    }
+  }
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == regionID) {
+      if (!it->roi) {
+        it->roi = createROI();
+        emit regionROIAdded(it->id, it->roi.get());
+      }
+      it->roi->mergeWith(roi, slice, shapeId);
+      roi.deleteROIShape(slice, shapeId);
+      return;
+    }
+  }
+}
+
 const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
 {
   for (const auto& node : m_ontology) {

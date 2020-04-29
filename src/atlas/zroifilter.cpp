@@ -61,12 +61,14 @@ void SliceROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* even
   }
 }
 
-ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, QGraphicsItem* parent)
+ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, const RegionNode* regionNode,
+                                 QGraphicsItem* parent)
   : QGraphicsPathItem(parent)
   , m_roi(roi)
   , m_slice(slice)
   , m_id(id)
   , m_view(view)
+  , m_regionNode(regionNode)
 {
   // setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
@@ -79,6 +81,10 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, Q
   //m_basePos = topLeft;
   m_basePos = QPointF(0, 0);
   setPos(m_basePos);
+  if (m_regionNode) {
+    QString tooltip = QString("Region: %1 (%2)").arg(m_regionNode->abbreviation).arg(m_regionNode->name);
+    setToolTip(tooltip);
+  }
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
 }
@@ -93,6 +99,10 @@ void ROIGraphicsItem::updateValue()
   //m_basePos = topLeft;
   m_basePos = QPointF(0, 0);
   setPos(m_basePos);
+  if (m_regionNode) {
+    QString tooltip = QString("Region: %1 (%2)").arg(m_regionNode->abbreviation).arg(m_regionNode->name);
+    setToolTip(tooltip);
+  }
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -136,24 +146,37 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
       QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
 //      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
 //      QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
+      QAction* toRegionAction = nullptr;
+      QAction* subtractNextSelectedShapeAction = nullptr;
+      if (m_regionNode) {
+        subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
+        toRegionAction = menu.addAction("Change Region ID...");
+      } else {
+        toRegionAction = menu.addAction("Add ROI to Region...");
+      }
       QAction* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == addCtrlPointAction) {
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
+      } else if (selectedAction == toRegionAction) {
+        try {
+          ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+          if (dlg.exec() == QDialog::Accepted) {
+            if (m_regionNode) {
+              m_view.regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
+                                                        dlg.selectedID());
+            } else {
+              m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
+                                                         dlg.selectedID());
+            }
+          }
+        }
+        catch (const ZException& e) {
+          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                                QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
+        }
+      } else if (m_regionNode && selectedAction == subtractNextSelectedShapeAction) {
+        m_view.scene().registerROIForSubtraction(&m_roi, m_slice, m_id);
       }
-//      } else if (selectedAction == addROItoRegionAction) {
-//        try {
-//          ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
-//          if (dlg.exec() == QDialog::Accepted) {
-//            m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id, dlg.selectedID());
-//          }
-//        }
-//        catch (const ZException& e) {
-//          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-//                                QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
-//        }
-//      } else if (selectedAction == subtractNextSelectedShapeAction) {
-//        m_view.scene().registerROIForSubtraction(&m_roi, m_slice, m_id);
-//      }
     }
     //event->accept();
     return;
@@ -161,13 +184,15 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 }
 
 ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm,
-                                             ZView& view, double viewScale, QGraphicsItem* parent)
+                                             ZView& view, double viewScale, const RegionNode* regionNode,
+                                             QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_roi(roi)
   , m_controlPoint(controlPoint)
   , m_viewScale(viewScale)
   , m_transform(tfm)
   , m_view(view)
+  , m_regionNode(regionNode)
 {
 //  if (m_shapeOp.type == ROIType::Polygon || m_shapeOp.type == ROIType::Spline) {
 //    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
@@ -180,8 +205,11 @@ ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& 
 
   m_basePos = m_transform.map(m_roi.controlPointCoord(m_controlPoint));
   setPos(m_basePos);
-  setToolTip(
-    QString("Coord:(%1,%2)").arg(m_basePos.x()).arg(m_basePos.y()));
+  QString tooltip = QString("Coord:(%1,%2) ").arg(m_basePos.x()).arg(m_basePos.y());
+  if (m_regionNode) {
+    tooltip += QString("Region: %1 (%2)").arg(m_regionNode->abbreviation).arg(m_regionNode->name);
+  }
+  setToolTip(tooltip);
   setPen(QPen(QColor(0, 0, 0), 0));
   setBrush(QBrush(QColor(255, 255, 255)));
   setCursor(Qt::PointingHandCursor);
@@ -191,9 +219,12 @@ void ROICtrlPtGraphicsItem::updateValue()
 {
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_transform.map(m_roi.controlPointCoord(m_controlPoint));
+  QString tooltip = QString("Coord:(%1,%2) ").arg(m_basePos.x()).arg(m_basePos.y());
+  if (m_regionNode) {
+    tooltip += QString("Region: %1 (%2)").arg(m_regionNode->abbreviation).arg(m_regionNode->name);
+  }
+  setToolTip(tooltip);
   setPos(m_basePos);
-  setToolTip(
-    QString("Coord:(%1,%2)").arg(m_basePos.x()).arg(m_basePos.y()));
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
@@ -278,13 +309,24 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
     if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
       QMenu menu;
       QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
-      QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
+      QAction* toRegionAction = nullptr;
+      if (m_regionNode) {
+        toRegionAction = menu.addAction("Change Region ID...");
+      } else {
+        toRegionAction = menu.addAction("Add ROI to Region...");
+      }
       QAction* selectedAction = menu.exec(event->screenPos());
-      if (selectedAction == addROItoRegionAction) {
+      if (selectedAction == toRegionAction) {
         try {
           ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
-            m_view.regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice, m_controlPoint.shapeID, dlg.selectedID());
+            if (m_regionNode) {
+              m_view.regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice, m_controlPoint.shapeID,
+                                                        dlg.selectedID());
+            } else {
+              m_view.regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice, m_controlPoint.shapeID,
+                                                         dlg.selectedID());
+            }
           }
         }
         catch (const ZException& e) {
@@ -358,7 +400,7 @@ void ROICtrlPtGraphicsItem::updateRectSize()
   }
 }
 
-ZROIFilter::ZROIFilter(ZView& view)
+ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   : ZObjFilter(view)
   , m_visible("Visible", true)
   , m_showControlPoints("Show Control Points", true)
@@ -366,6 +408,7 @@ ZROIFilter::ZROIFilter(ZView& view)
   , m_outlineColor("Outline Color", glm::vec3(1, 1, 0), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", .5, 0., 1.)
+  , m_regionNode(regionNode)
 {
   m_outlineColor.setStyle("COLOR");
   m_regionColor.setStyle("COLOR");
@@ -849,7 +892,7 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
   }
 
   QTransform trans = getQTransform();
-  auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID, m_view);
+  auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID, m_view, m_regionNode);
   roiItem->setZValue(m_viewPrecedencePara.get());
   roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
                               m_outlineColor.get().y * 255,
@@ -888,7 +931,7 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
   QTransform trans = getQTransform();
   for (const auto& controlPoint : controlPoints) {
     ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, trans, m_view,
-                                                                m_view.graphicsView().currentScale());
+                                                                m_view.graphicsView().currentScale(), m_regionNode);
     int zValue = m_ROI->shapeOperations(slice, shapeID)[controlPoint.shapeIndex].isAdd ? m_viewPrecedencePara.get() + 1 : m_viewPrecedencePara.get();
     rectItem->setZValue(zValue);
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());

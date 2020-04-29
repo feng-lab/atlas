@@ -185,7 +185,7 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   for (const auto& node : m_regionAnnotation->annotationTree()) {
     int id = node.id;
-    ZROIFilter* flt = new ZROIFilter(m_view);
+    auto flt = new ZROIFilter(m_view, &node);
     if (node.roi) {
       flt->setData(*(node.roi));
     }
@@ -193,6 +193,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->viewPrecedencePara().setValue(m_viewPrecedencePara.get());
+    flt->transformPara().set(m_transform.get());
     connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,
             &flt->viewPrecedencePara(), &ZIntParameter::updateFromSender);
     connect(&m_transform, &Z2DTransformParameter::valueChanged,

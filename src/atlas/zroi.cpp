@@ -942,6 +942,18 @@ std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoi
   return slices;
 }
 
+void ZROI::deleteROIShape(int slice, size_t shapeID)
+{
+  m_undoStack->push(new ZROIDeleteROIShapeCommand(*this, slice, shapeID));
+}
+
+void ZROI::deleteROIShape_Impl(int slice, size_t shapeId)
+{
+  m_sliceROIs.at(slice).m_idToPainterPath.erase(shapeId);
+  m_sliceROIs.at(slice).m_idToShapeOperations.erase(shapeId);
+  onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>{shapeId}, std::vector<size_t>());
+}
+
 void ZROI::copyROIFromControlPoints(const std::vector<ZROIControlPoint>& controlPoints)
 {
   clearCopy();
@@ -1220,6 +1232,20 @@ void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID)
 void ZROI::sliceSubtractShape(int slice, size_t shapeID, const std::vector<ZROIShapeOperation> &otherShape)
 {
   m_undoStack->push(new ZROISliceSubtractShapeCommand(*this, slice, shapeID, otherShape));
+}
+
+void ZROI::sliceSubtractShape_Impl(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape)
+{
+  std::vector<size_t> shapes;
+  shapes.push_back(shapeID);
+  auto& shape = m_sliceROIs.at(slice).m_idToShapeOperations.at(shapeID);
+  for (const auto& otherShapeOp : otherShape) {
+    ZROIShapeOperation shapeOpCopy = otherShapeOp;
+    shapeOpCopy.isAdd = !shapeOpCopy.isAdd;
+    shape.push_back(shapeOpCopy);
+  }
+  m_sliceROIs.at(slice).updatePaintPath(shapeID);
+  onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
 }
 
 void ZROI::startMoveSelectedControlPointsCommand()

@@ -191,6 +191,7 @@ void ZMainWindow::closeEvent(QCloseEvent* event)
   m_3dWindow.clear();
 
   if (maybeSave()) {
+    delete m_editObjDockWidget;
     writeSettings();
     event->accept();
     // otherwise it is very slow to close the application

@@ -156,6 +156,9 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
   QJsonObject rootObj = loadObj["msg"].toArray().first().toObject();
   ZTree<RegionNode>::Iterator nullIt;
   readOntology(rootObj, nullIt, regionAbbrevs, ontology);
+
+  RegionNode node;
+  ontology.appendRoot(node);
 }
 
 int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)

@@ -13,8 +13,8 @@ namespace nim {
 
 struct RegionNode
 {
-  explicit RegionNode(int64_t id_ = -1, int64_t parentID_ = -1, int red_ = 0, int green_ = 0, int blue_ = 0,
-                      QString name_ = "", QString abbreviation_ = "")
+  explicit RegionNode(int64_t id_ = -1, int64_t parentID_ = -2, int red_ = 255, int green_ = 255, int blue_ = 255,
+                      QString name_ = "Undefined", QString abbreviation_ = "Undefined")
     : id(id_), parentID(parentID_), red(red_), green(green_), blue(blue_)
     , name(std::move(name_)), abbreviation(std::move(abbreviation_))
   {}

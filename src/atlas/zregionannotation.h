@@ -40,6 +40,8 @@ public:
 
   void mergeROIToRegion(const ZROI& roi, int slice, size_t id, int64_t regionID);
 
+  void changeROIRegion(ZROI& roi, int slice, size_t id, int64_t regionID);
+
   // return nullptr if not exist
   const ZMesh* meshOfRegion(int64_t regionID);
 

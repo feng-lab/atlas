@@ -12,9 +12,11 @@
 #include <map>
 #include <vector>
 
+namespace nim {
+
 class ZWidgetsGroup;
 
-namespace nim {
+struct RegionNode;
 
 class SliceROIGraphicsItem : public QGraphicsPathItem
 {
@@ -53,7 +55,8 @@ public:
   int type() const override
   { return Type; }
 
-  ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, QGraphicsItem* parent = nullptr);
+  ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, const RegionNode* regionNode = nullptr,
+                  QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -71,6 +74,7 @@ private:
   int m_slice;
   size_t m_id;
   ZView& m_view;
+  const RegionNode* m_regionNode = nullptr;
 
   QPointF m_basePos;
 };
@@ -87,7 +91,8 @@ public:
   { return Type; }
 
   ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm, ZView& view,
-                        double viewScale = 1., QGraphicsItem* parent = nullptr);
+                        double viewScale = 1., const RegionNode* regionNode = nullptr,
+                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
@@ -126,13 +131,14 @@ private:
   bool m_doubleClicked = false;
   QTransform m_transform;
   ZView& m_view;
+  const RegionNode* m_regionNode = nullptr;
 };
 
 class ZROIFilter : public ZObjFilter
 {
 Q_OBJECT
 public:
-  explicit ZROIFilter(ZView& view);
+  explicit ZROIFilter(ZView& view, const RegionNode* regionNode = nullptr);
 
   static int getViewPrecedence()
   {
@@ -248,6 +254,7 @@ private:
   QPointF m_startPoint;
 
   bool m_lazyRendering = true;
+  const RegionNode* m_regionNode = nullptr;
 };
 
 } // namespace nim

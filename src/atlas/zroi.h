@@ -367,6 +367,10 @@ public:
 
   std::set<int> deleteROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints);
 
+  void deleteROIShape(int slice, size_t shapeId);
+
+  void deleteROIShape_Impl(int slice, size_t shapeId);
+
   void clearCopy()
   { m_sliceROICopy.clear(); }
 
@@ -406,19 +410,7 @@ public:
 
   void sliceSubtractShape(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape);
 
-  void sliceSubtractShape_Impl(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape)
-  {
-    std::vector<size_t> shapes;
-    shapes.push_back(shapeID);
-    auto& shape = m_sliceROIs.at(slice).m_idToShapeOperations.at(shapeID);
-    for (const auto& otherShapeOp : otherShape) {
-      auto shapeOpCopy = otherShapeOp;
-      shapeOpCopy.isAdd = !shapeOpCopy.isAdd;
-      shape.push_back(shapeOpCopy);
-    }
-    m_sliceROIs.at(slice).updatePaintPath(shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
-  }
+  void sliceSubtractShape_Impl(int slice, size_t shapeID, const std::vector<ZROIShapeOperation>& otherShape);
 
   void sliceSetTopLeft(int slice, double x, double y)
   {
@@ -548,6 +540,23 @@ public:
 
 protected:
   std::vector<ZROIControlPoint> m_controlPoints;
+};
+
+class ZROIDeleteROIShapeCommand : public ZROICommand
+{
+public:
+  ZROIDeleteROIShapeCommand(ZROI& roi, int slice, size_t shapeId)
+    : ZROICommand(roi), m_slice(slice), m_shapeId(shapeId)
+  {
+    setText("Delete Shape");
+  }
+
+  void redo() override
+  { m_roi.deleteROIShape_Impl(m_slice, m_shapeId); m_changedSlices.insert(m_slice); }
+
+protected:
+  int m_slice;
+  size_t m_shapeId;
 };
 
 class ZROIDeleteSliceROICommand : public ZROICommand
