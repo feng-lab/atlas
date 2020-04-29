@@ -235,13 +235,24 @@ find_package(Ceres REQUIRED
 print_target_properties(Eigen3::Eigen)
 print_target_properties(ceres)
 
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.73.0 REQUIRED
-             COMPONENTS
-             headers
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-             )
-print_target_properties(Boost::headers)
+if (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+  set(Boost_USE_STATIC_LIBS ON)
+  find_package(Boost 1.73.0 REQUIRED
+               COMPONENTS
+               headers context filesystem program_options regex system thread
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
+               )
+  print_target_properties(Boost::headers)
+else (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+  set(Boost_USE_STATIC_LIBS ON)
+  find_package(Boost 1.73.0 REQUIRED
+               COMPONENTS
+               headers
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
+               )
+  print_target_properties(Boost::headers)
+endif (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+
 if (WIN32)
   add_library(Folly::folly INTERFACE IMPORTED)
   set_target_properties(Folly::folly PROPERTIES
@@ -249,6 +260,9 @@ if (WIN32)
                         INTERFACE_LINK_LIBRARIES "Boost::headers")
   print_target_properties(Folly::folly)
 else (WIN32)
+  IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+    MESSAGE ("It is greater than 1.2")
+  ENDIF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
 find_package(folly REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Boost::context)
