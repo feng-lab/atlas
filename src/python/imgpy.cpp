@@ -10,6 +10,7 @@
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
 #include "zroiutils.h"
+#include "zimgautothreshold.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -614,6 +615,10 @@ PYBIND11_MODULE(_imgpy, m)
 
   py::class_<ZPunctaDetection>(m, "ZPunctaDetection")
     .def(py::init<>())
+    .def(py::init<const QString&, size_t, size_t, size_t>(),
+         "filename"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0)
+    .def(py::init<const QString&, const ZImgInfo&, size_t, size_t, size_t>(),
+         "filename"_a, "imgInfo"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0)
     .def("setInputFile", &ZPunctaDetection::setInputFile,
          "filename"_a, "punctaChannel"_a = 0, "t"_a = 0, "scene"_a = 0,
          "voxelSizeInUmX"_a = -1.0, "voxelSizeInUmY"_a = -1.0, "voxelSizeInUmZ"_a = -1.0)
@@ -797,6 +802,15 @@ PYBIND11_MODULE(_imgpy, m)
          "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
     .def("__repr__", [](const ZImgMerge&) {
       return QString("<_imgpy.ZImgMerge>").toStdString();
+    });
+
+  py::class_<ZImgAutoThreshold<false>>(m, "ZImgAutoThreshold")
+    .def(py::init<>())
+    .def("u8TriangleThre", &ZImgAutoThreshold<false>::u8TriangleThre,
+         "filename"_a, "minValue"_a, "maxValue"_a, "c"_a = 0, "t"_a = 0, "scene"_a = 0,
+         "mask"_a = std::vector<ZVoxelCoordinate>())
+    .def("__repr__", [](const ZImgAutoThreshold<false>&) {
+      return QString("<_imgpy.ZImgAutoThreshold>").toStdString();
     });
 
 

@@ -248,9 +248,9 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
   if (scene >= infos.size()) {
     throw ZImgException("input scene incorrect");
   }
-  if (!infos[scene].isType<uint8_t>()) {
-    throw ZImgException("input img voxel type is not uint8_t");
-  }
+//  if (!infos[scene].isType<uint8_t>()) {
+//    throw ZImgException("input img voxel type is not uint8_t");
+//  }
 
   size_t conn = 18;
 
