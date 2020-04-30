@@ -99,6 +99,8 @@ public:
 
   void updatePaintPath(size_t id);
 
+  static QPainterPath shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape);
+
   void newRect(const QRectF& rect, size_t id);
 
   void newEllipse(const QRectF& ellipse, size_t id);

@@ -32,12 +32,13 @@ void ZGraphicsScene::removeROIForSubtraction()
 
 void ZGraphicsScene::performROISubtraction(const ZROI *roi, int slice, size_t shapeID)
 {
-  if (m_roi && m_slice >= 0) {
+  if (m_roi && m_slice >= 0 &&
+      !(m_roi == roi && m_slice == slice && m_shapeID == shapeID)) {
     m_roi->sliceSubtractShape(m_slice, m_shapeID, roi->shapeOperations(slice, shapeID));
-    m_roi = nullptr;
-    m_slice = -1;
-    m_shapeID = 0;
   }
+  m_roi = nullptr;
+  m_slice = -1;
+  m_shapeID = 0;
 }
 
 void ZGraphicsScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMenuEvent)
