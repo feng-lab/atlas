@@ -1272,19 +1272,11 @@ def build_hdf5(src_dir: str, install_dir: str):
 
 
 def build_freeimage(src_dir: str, install_dir: str):
-
-    orig_file = None
-    bak_file = None
     orig_file_3 = None
     bak_file_3 = None
     orig_file_4 = None
     bak_file_4 = None
     try:
-        orig_file = os.path.join(src_dir, 'Source', 'LibRawLite', 'internal', 'dcraw_common.cpp')
-        from_texts = [r'DCRAW_VERSION']
-        to_texts = [r' DCRAW_VERSION']
-        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
-
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
@@ -1342,7 +1334,6 @@ def build_freeimage(src_dir: str, install_dir: str):
             subprocess.run(['make', '-f', 'Makefile_fip', 'clean'],
                            cwd=src_dir, shell=False, check=True)
     finally:
-        os.replace(bak_file, orig_file)
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
@@ -1935,10 +1926,10 @@ def build_libs(libs: dict, update_src: bool):
         build_hdf5(src_dir, ext_build_dir())
 
     if libs['freeimage']:
-        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'FreeImage*'))
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'freeimage-svn*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
         if update_src or not os.path.exists(src_dir):
-            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'FreeImage'))
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'freeimage-svn*'))
             unpack_file_to_folder(package_name, ext_dir())
         assert os.path.exists(src_dir)
         build_freeimage(src_dir, ext_build_dir())
