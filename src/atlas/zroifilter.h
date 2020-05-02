@@ -60,6 +60,8 @@ public:
 
   void updateValue();
 
+  QPainterPath shape() const override;
+
 protected:
   //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
@@ -68,6 +70,10 @@ protected:
 //  QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+  void hoverEnterEvent(QGraphicsSceneHoverEvent* event) override;
+
+  void hoverLeaveEvent(QGraphicsSceneHoverEvent* event) override;
 
 private:
   ZROI& m_roi;

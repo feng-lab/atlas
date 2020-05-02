@@ -87,6 +87,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, c
   }
   //todo: uncomment this when we have undo
   //setCursor(Qt::OpenHandCursor);
+  setAcceptHoverEvents(true);
 }
 
 void ROIGraphicsItem::updateValue()
@@ -104,6 +105,11 @@ void ROIGraphicsItem::updateValue()
     setToolTip(tooltip);
   }
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
+QPainterPath ROIGraphicsItem::shape() const
+{
+  return m_roi.shapePainterPath(m_slice, m_id);
 }
 
 //void ROIGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
@@ -181,6 +187,24 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
     //event->accept();
     return;
   }
+}
+
+void ROIGraphicsItem::hoverEnterEvent(QGraphicsSceneHoverEvent*)
+{
+  prepareGeometryChange();
+  QPen p = pen();
+  p.setCosmetic(true);
+  p.setWidth(10);
+  setPen(p);
+}
+
+void ROIGraphicsItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
+{
+  prepareGeometryChange();
+  QPen p = pen();
+  p.setCosmetic(true);
+  p.setWidth(1);
+  setPen(p);
 }
 
 ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm,
@@ -894,10 +918,12 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
   QTransform trans = getQTransform();
   auto roiItem = new ROIGraphicsItem(*m_ROI, slice, shapeID, m_view, m_regionNode);
   roiItem->setZValue(m_viewPrecedencePara.get());
-  roiItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                              m_outlineColor.get().y * 255,
-                              m_outlineColor.get().z * 255),
-                       0));
+  QPen pen(QColor(m_outlineColor.get().x * 255,
+                  m_outlineColor.get().y * 255,
+                  m_outlineColor.get().z * 255),
+           1);
+  pen.setCosmetic(true);
+  roiItem->setPen(pen);
   roiItem->setBrush(QColor(m_regionColor.get().x * 255,
                            m_regionColor.get().y * 255,
                            m_regionColor.get().z * 255,
@@ -1041,12 +1067,14 @@ void ZROIFilter::outlineColorChanged()
 {
   if (!m_ROI)
     return;
+  QPen pen(QColor(m_outlineColor.get().x * 255,
+                  m_outlineColor.get().y * 255,
+                  m_outlineColor.get().z * 255),
+           1);
+  pen.setCosmetic(true);
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setPen(QPen(QColor(m_outlineColor.get().x * 255,
-                                    m_outlineColor.get().y * 255,
-                                    m_outlineColor.get().z * 255),
-                             0));
+      shapeItem->setPen(pen);
     }
   }
 }

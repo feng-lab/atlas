@@ -5,6 +5,7 @@
 #include <QPushButton>
 #include <QStylePainter>
 #include <QAbstractItemView>
+#include <QApplication>
 
 namespace nim {
 
@@ -63,7 +64,7 @@ void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem&
     QRect rect = option.rect;
     m_button->setGeometry(rect);
     m_button->setText(index.data().toString());
-    //m_button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    // m_button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     if (option.state == QStyle::State_Selected)
       painter->fillRect(rect, option.palette.highlight());
     QPixmap map = m_button->grab();
@@ -84,7 +85,9 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     m_button->setText(index.data().toString());
     QSize res = m_button->grab().size();
-    res.setWidth(res.width() * 2);
+
+    res.setWidth(res.width());
+    res.setHeight(res.height() / qApp->devicePixelRatio());
     return res;
   }
   return QStyledItemDelegate::sizeHint(option, index);
