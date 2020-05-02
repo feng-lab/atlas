@@ -70,7 +70,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, c
   , m_view(view)
   , m_regionNode(regionNode)
 {
-  // setFlags(QGraphicsItem::ItemIsSelectable);
+//   setFlags(QGraphicsItem::ItemIsSelectable);
   //todo: uncomment this when we have undo
 //  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
 //           QGraphicsItem::ItemIsSelectable);
@@ -128,8 +128,8 @@ QPainterPath ROIGraphicsItem::shape() const
 //  QGraphicsPathItem::mouseReleaseEvent(event);
 //}
 //
-//QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
-//{
+QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
+{
 //  if (change == ItemPositionChange && scene()) {
 //    QPointF newPos = value.toPointF() - m_offset;
 ////    QRectF boundRect = path().boundingRect();
@@ -140,8 +140,19 @@ QPainterPath ROIGraphicsItem::shape() const
 //    m_roi.sliceSetTopLeft(m_slice, newPos.x(), newPos.y());
 //    return newPos + m_offset;
 //  }
-//  return QGraphicsPathItem::itemChange(change, value);
-//}
+  if (change == ItemSelectedHasChanged && scene()) {
+    auto selected = value.toBool();
+    //LOG(INFO) << selected;
+    if (!selected) {
+      emit m_roi.deselectShape(m_slice, m_id);
+    } else {
+      m_view.scene().performROISubtraction(&m_roi, m_slice, m_id);
+      emit m_roi.selectShape(m_slice, m_id, true);
+    }
+    return value;
+  }
+  return QGraphicsPathItem::itemChange(change, value);
+}
 
 void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
@@ -317,6 +328,7 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
 //    return m_roi.setControlPointCoord(m_controlPoint, newPos) + m_offset;
 //  } else
   if (change == ItemSelectedHasChanged && scene()) {
+    //LOG(INFO) << value.toBool();
     updateRectSize();
     return value;
   }
