@@ -10,7 +10,6 @@
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
-#include <QMenu>
 
 namespace nim {
 
@@ -44,7 +43,7 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
 
   createContextMenu();
 
-  ZButtonColumnDelegate* delegate = new ZButtonColumnDelegate(this);
+  auto delegate = new ZButtonColumnDelegate(this);
   setMouseTracking(true);
   setItemDelegate(delegate);
   connect(this, &ZRegionAnnotationTreeView::entered, delegate, &ZButtonColumnDelegate::cellEntered);

@@ -1,5 +1,7 @@
 #include "zregionannotationfilter.h"
 
+#include "zregionannotationviewsettingtreemodel.h"
+#include "zregionannotationviewsettingtreeview.h"
 #include "zgraphicsview.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
@@ -83,11 +85,16 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     m_widgetsGroup->addChild(*pb, 1);
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
-    for (const auto& nameID : m_nameToID) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(nameID.first);
-      m_widgetsGroup->addChild(wg);
-    }
+//    for (const auto& nameID : m_nameToID) {
+//      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
+//      wg->setGroupName(nameID.first);
+//      m_widgetsGroup->addChild(wg);
+//    }
+    auto model =
+      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, this);
+    m_viewSettingTreeWidgetGroup.reset(new ZWidgetsGroup(
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4));
+    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
     m_widgetsGroup->addChild(m_transform, 2);
     m_widgetsGroup->addChild(m_offsetPara, 2);
   }
@@ -168,8 +175,12 @@ void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
-    for (const auto& nameID : m_nameToID) {
-      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter());
+//    for (const auto& nameID : m_nameToID) {
+//      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsm_idToROIFiltersGroupForAnnotationFilter());
+//    }
+    if (m_viewSettingTreeWidgetGroup) {
+      m_widgetsGroup->removeChild(m_viewSettingTreeWidgetGroup);
+      m_viewSettingTreeWidgetGroup.reset();
     }
   }
 
@@ -213,11 +224,16 @@ void ZRegionAnnotationFilter::allROIChanged()
   }
 
   if (m_widgetsGroup) {
-    for (const auto& nameID : m_nameToID) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(nameID.first);
-      m_widgetsGroup->addChild(wg);
-    }
+    auto model =
+      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, this);
+    m_viewSettingTreeWidgetGroup.reset(new ZWidgetsGroup(
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4));
+    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
+//    for (const auto& nameID : m_nameToID) {
+//      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
+//      wg->setGroupName(nameID.first);
+//      m_widgetsGroup->addChild(wg);
+//    }
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
 }

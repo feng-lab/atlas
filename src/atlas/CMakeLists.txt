@@ -589,6 +589,12 @@ set(SOURCES
     zgraphicsitemgroup.h
     zchooseregiondialog.cpp
     zchooseregiondialog.h
+    zregionannotationviewsettingtreemodel.h
+    zregionannotationviewsettingtreeview.h
+    zregionannotationviewsettingcolumndelegate.h
+    zregionannotationviewsettingtreemodel.cpp
+    zregionannotationviewsettingtreeview.cpp
+    zregionannotationviewsettingcolumndelegate.cpp
     )
 
 # our target

@@ -68,6 +68,8 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView& m_view;
+
+  std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;
 };
 
 } // namespace nim
