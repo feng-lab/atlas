@@ -19,6 +19,10 @@ protected:
 
   void labelClicked() override;
 
+//  void aboutToBeDestroyed();
+//
+//  void closeEvent(QCloseEvent *event) override;
+
 private:
   ZColorMapParameter* m_colorMap;
   ZColorMapEditor* m_editorWindow = nullptr;

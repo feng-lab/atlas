@@ -26,6 +26,10 @@ void ZColorMapWidgetWithEditorWindow::createEditorWindow()
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();
+//    connect(this, &ZColorMapWidgetWithEditorWindow::destroyed,
+//            this, &ZColorMapWidgetWithEditorWindow::aboutToBeDestroyed);
+    connect(this, &ZColorMapWidgetWithEditorWindow::destroyed,
+            m_editorWindow, &QWidget::deleteLater);
 
     QApplication::restoreOverrideCursor();
   }
@@ -35,5 +39,17 @@ void ZColorMapWidgetWithEditorWindow::labelClicked()
 {
   createEditorWindow();
 }
+
+//void ZColorMapWidgetWithEditorWindow::aboutToBeDestroyed()
+//{
+//  LOG(INFO) << "here";
+//}
+//
+//void ZColorMapWidgetWithEditorWindow::closeEvent(QCloseEvent *event)
+//{
+//  LOG(INFO) << "here";
+//  if (m_editorWindow)
+//    delete m_editorWindow;
+//}
 
 } // namespace nim

@@ -1,7 +1,7 @@
 #include "zregionannotationviewsettingcolumndelegate.h"
 
 #include "zlog.h"
-#include "zregionviewsettingwitheditorwindow.h"
+#include "zclickablelabel.h"
 #include <QPainter>
 #include <QPushButton>
 #include <QStylePainter>
@@ -41,7 +41,9 @@ ZRegionAnnotationViewSettingColumnDelegate::createEditor(QWidget* parent, const 
     bool ok;
     int64_t regionID = index.data(Qt::UserRole).toLongLong(&ok);
     CHECK(ok);
-    auto wgt = new ZRegionViewSettingWithEditorWindow(m_idToROIFilters.at(regionID).get(), parent);
+    auto wgt = new ZRegionViewSettingLabel(m_idToROIFilters.at(regionID).get(), parent);
+    connect(wgt, &ZRegionViewSettingLabel::clicked,
+            this, &ZRegionAnnotationViewSettingColumnDelegate::buttonClicked);
     return wgt;
 #endif
   } else {
@@ -49,11 +51,10 @@ ZRegionAnnotationViewSettingColumnDelegate::createEditor(QWidget* parent, const 
   }
 }
 
-#ifdef USE_BUTTON
 void ZRegionAnnotationViewSettingColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+    if (auto btn = qobject_cast<QWidget*>(editor)) {
       btn->setProperty("user_data", index.data(Qt::UserRole));
     }
     //LOG(INFO) << "set " << btn->property("user_data");
@@ -65,7 +66,7 @@ void ZRegionAnnotationViewSettingColumnDelegate::setEditorData(QWidget* editor, 
 void ZRegionAnnotationViewSettingColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+    if (auto btn = qobject_cast<QWidget*>(editor)) {
       model->setData(index, btn->property("user_data"), Qt::UserRole);
     }
     //LOG(INFO) << btn->property("user_data");
@@ -73,7 +74,6 @@ void ZRegionAnnotationViewSettingColumnDelegate::setModelData(QWidget* editor, Q
     QStyledItemDelegate::setModelData(editor, model, index);
   }
 }
-#endif
 
 void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
@@ -92,7 +92,7 @@ void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const 
     int64_t regionID = index.data(Qt::UserRole).toLongLong(&ok);
     CHECK(ok);
     QRect rect = option.rect;
-    auto wgt = new ZRegionViewSettingWithEditorWindow(m_idToROIFilters.at(regionID).get(), m_widget);
+    auto wgt = new ZRegionViewSettingLabel(m_idToROIFilters.at(regionID).get(), m_widget);
     wgt->setGeometry(rect);
     if (option.state == QStyle::State_Selected)
       painter->fillRect(rect, option.palette.highlight());
@@ -140,13 +140,11 @@ void ZRegionAnnotationViewSettingColumnDelegate::cellEntered(const QModelIndex& 
   }
 }
 
-#ifdef USE_BUTTON
 void ZRegionAnnotationViewSettingColumnDelegate::buttonClicked()
 {
-  if (QPushButton* btn = qobject_cast<QPushButton*>(sender())) {
+  if (auto btn = qobject_cast<QWidget*>(sender())) {
     emit buttonClickedForUserData(btn->property("user_data"));
   }
 }
-#endif
 
 } // namespace nim

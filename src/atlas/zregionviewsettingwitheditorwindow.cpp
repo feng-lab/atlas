@@ -29,6 +29,8 @@ void ZRegionViewSettingWithEditorWindow::createEditorWindow()
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();
+    connect(this, &ZRegionViewSettingWithEditorWindow::destroyed,
+            m_editorWindow, &QWidget::deleteLater);
 
     QApplication::restoreOverrideCursor();
   }
