@@ -16,6 +16,8 @@ class ZDVec4Parameter;
 
 class ZDVec3Parameter;
 
+class ZROIFilter;
+
 class ZClickableLabel : public QWidget
 {
 Q_OBJECT
@@ -96,6 +98,22 @@ protected:
   QSize minimumSizeHint() const override;
 
   Z3DTransferFunctionParameter* m_transferFunction;
+
+  bool getTip(const QPoint& p, QRect* r, QString* s) override;
+};
+
+class ZRegionViewSettingLabel : public ZClickableLabel
+{
+public:
+  explicit ZRegionViewSettingLabel(ZROIFilter* roiFilter, QWidget* parent = nullptr,
+                                   Qt::WindowFlags f = 0);
+
+protected:
+  void paintEvent(QPaintEvent* e) override;
+
+  QSize minimumSizeHint() const override;
+
+  ZROIFilter* m_roiFilter;
 
   bool getTip(const QPoint& p, QRect* r, QString* s) override;
 };

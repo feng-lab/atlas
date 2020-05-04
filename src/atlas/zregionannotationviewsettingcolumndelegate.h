@@ -7,6 +7,8 @@
 
 namespace nim {
 
+// #define USE_BUTTON
+
 class ZRegionAnnotationViewSettingColumnDelegate : public QStyledItemDelegate
 {
 Q_OBJECT
@@ -18,9 +20,11 @@ public:
   virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
                                 const QModelIndex& index) const override;
 
+#ifdef USE_BUTTON
   void setEditorData(QWidget* editor, const QModelIndex& index) const override;
 
   void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
+#endif
 
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
@@ -36,11 +40,13 @@ signals:
   void buttonClickedForUserData(QVariant ud);
 
 protected:
+#ifdef USE_BUTTON
   void buttonClicked();
+#endif
 
 private:
   QAbstractItemView* m_widget;
-  QPushButton* m_button;
+  QPushButton* m_button = nullptr;
   bool m_isOneCellInEditMode;
   QPersistentModelIndex m_currentEditedCellIndex;
   std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;

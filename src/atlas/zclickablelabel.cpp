@@ -4,6 +4,7 @@
 #include "zcolormap.h"
 #include "z3dtransferfunction.h"
 #include "znumericparameter.h"
+#include "zroifilter.h"
 #include <QMouseEvent>
 #include <QHelpEvent>
 #include <QToolTip>
@@ -251,6 +252,97 @@ bool ZClickableTransferFunctionLabel::getTip(const QPoint& p, QRect* r, QString*
     QColor color = m_transferFunction->get().fractionMappedQColor(
       (p.x() * 1. - contentsRect().left()) / contentsRect().width());
     *s = color.name();
+    return true;
+  }
+
+  return false;
+}
+
+ZRegionViewSettingLabel::ZRegionViewSettingLabel(ZROIFilter* roiFilter,
+                                                 QWidget* parent, Qt::WindowFlags f)
+  : ZClickableLabel(parent, f)
+  , m_roiFilter(roiFilter)
+{
+}
+
+void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
+{
+  QPainter painter(this);
+  painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+  QColor color1(0, 0, 0);
+  QColor color2(255, 255, 255);
+  qreal width = contentsRect().width() / 10.;
+  qreal height = contentsRect().height() / 5.;
+  for (int i = 0; i < 10; ++i) {
+    if (i % 2 == 0) {
+      painter.fillRect(QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.1 * 5 * height,
+        width, height), color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.3 * 5 * height,
+          width, height), color1);
+    } else {
+      painter.fillRect(QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.1 * 5 * height,
+                              width, height), color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.3 * 5 * height,
+                              width, height), color2);
+    }
+  }
+
+  if (m_roiFilter) {
+    auto outlineColor = m_roiFilter->outlineColor();
+    auto regionColor = m_roiFilter->regionColor();
+    auto opacity = m_roiFilter->opacity();
+    auto outlineQColor = QColor(outlineColor.x * 255,
+                                outlineColor.y * 255,
+                                outlineColor.z * 255,
+                                255);
+    auto regionQColor = QColor(regionColor.x * 255,
+                               regionColor.y * 255,
+                               regionColor.z * 255,
+                               opacity * 255);
+    QColor regionSolidQColor = regionQColor;
+    regionSolidQColor.setAlpha(255);
+    for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+      auto wd = contentsRect().width();
+      if (x - contentsRect().left() <= wd * 0.1 || contentsRect().right() - x <= wd * 0.1) {
+        painter.setPen(outlineQColor);
+        painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());
+      } else {
+        painter.setPen(outlineQColor);
+        painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom() * 0.1);
+        painter.drawLine(x, contentsRect().bottom() * 0.9, x, contentsRect().bottom());
+        painter.setPen(regionQColor);
+        painter.drawLine(x, contentsRect().bottom() * 0.1, x, contentsRect().bottom() * 0.5);
+        painter.setPen(regionSolidQColor);
+        painter.drawLine(x, contentsRect().bottom() * 0.5, x, contentsRect().bottom() * 0.9);
+      }
+    }
+  }
+}
+
+QSize ZRegionViewSettingLabel::minimumSizeHint() const
+{
+  return QSize(50, 50);
+}
+
+bool ZRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
+{
+  if (!m_roiFilter)
+    return false;
+
+  if (contentsRect().contains(p)) {
+    auto outlineColor = m_roiFilter->outlineColor();
+    auto regionColor = m_roiFilter->regionColor();
+    auto opacity = m_roiFilter->opacity();
+    auto outlineQColor = QColor(outlineColor.x * 255,
+                                outlineColor.y * 255,
+                                outlineColor.z * 255,
+                                255);
+    auto regionQColor = QColor(regionColor.x * 255,
+                               regionColor.y * 255,
+                               regionColor.z * 255,
+                               opacity * 255);
+    *r = contentsRect();
+    *s = QString("Outline Color: %1, Region Color: %2").arg(outlineQColor.name()).arg(regionQColor.name());
     return true;
   }
 

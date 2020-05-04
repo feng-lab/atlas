@@ -595,6 +595,8 @@ set(SOURCES
     zregionannotationviewsettingtreemodel.cpp
     zregionannotationviewsettingtreeview.cpp
     zregionannotationviewsettingcolumndelegate.cpp
+    zregionviewsettingwitheditorwindow.h
+    zregionviewsettingwitheditorwindow.cpp
     )
 
 # our target

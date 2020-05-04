@@ -127,7 +127,7 @@ void ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData(const QVaria
   CHECK(ok);
 
   auto wg = m_idToROIFilters.at(regionID)->viewSettingWidgetsGroupForAnnotationFilter();
-  auto label = new QLabel(QString("Region: %1").arg(m_regionAnnotation.nameOfRegion(regionID)));
+  auto label = new QLabel(QString("Region: %1").arg(m_idToROIFilters.at(regionID)->regionName()));
   m_regionViewSettingEditorWindow.reset(wg->createWidget(true, false, label));
   m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
   m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);

@@ -598,6 +598,11 @@ void ZROIFilter::setMaxZProjView(int /*t*/)
   }
 }
 
+QString ZROIFilter::regionName() const
+{
+  return m_regionNode ? m_regionNode->name : QString();
+}
+
 ZBBox<glm::ivec4> ZROIFilter::boundBox() const
 {
   if (m_ROI) {

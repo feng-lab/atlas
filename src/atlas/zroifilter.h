@@ -159,7 +159,7 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  bool visible()
+  bool visible() const
   { return m_visible.get(); }
 
   void setSelected(bool v);
@@ -173,6 +173,17 @@ public:
 
   void setRegionColor(const glm::vec3& col)
   { m_regionColor.set(col); }
+
+  glm::vec3 outlineColor() const
+  { return m_outlineColor.get(); }
+
+  glm::vec3 regionColor() const
+  { return m_regionColor.get(); }
+
+  double opacity() const
+  { return m_opacity.get(); }
+
+  QString regionName() const;
 
   ZBBox<glm::ivec4> boundBox() const;
 
