@@ -167,10 +167,10 @@ QStringList ZImgFreeImage::extensions() const
   QStringList res;
   res << "bmp" << "cut" << "dds" << "exr" << "g3" << "gif" << "hdr" << "ico"
       << "iff" << "lbm" << "j2k" << "j2c" << "jng" << "jp2" /*<< "jpg"*/ << "jif"
-      /*<< "jpeg"*/ << "jpe" << "koa" << "mng" << "pbm"
+      /*<< "jpeg"*/ << "jpe" << "jxr" << "wdp" << "hdp" << "koa" << "mng" << "pbm"
       << "pcd" << "pcx" << "pfm" << "pgm" << "pct" << "pict" << "pic" /*<< "png"*/
-      << "ppm" << "psd" << "ras" << "sgi" << "tga" << "targa" << "wbmp" << "xbm"
-      << "webp" << "xpm" << "3fr" << "arw" << "bay" << "bmp" << "cap" << "cine"
+      << "ppm" << "psd" << "ras" << "sgi" << "tga" << "targa" << "wap" << "wbmp" << "wbm"
+      << "webp" << "xbm" << "xpm" << "3fr" << "arw" << "bay" << "bmq" << "cap" << "cine"
       << "cr2" << "crw" << "cs1" << "dc2" << "dcr" << "dng" << "drf" << "dsc"
       << "erf" << "fff" << "ia" << "iiq" << "k25" << "kc2" << "kdc" << "mdc"
       << "mef" << "mos" << "mrw" << "nef" << "nrw" << "orf" << "pef" << "ptx"

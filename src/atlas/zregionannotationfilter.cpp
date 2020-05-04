@@ -12,6 +12,8 @@
 
 namespace nim {
 
+#define NEW_REGION_ANNOTATION_VIEW_SETTING_UI 0
+
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
   , m_visible("Visible", true)
@@ -175,13 +177,16 @@ void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
-//    for (const auto& nameID : m_nameToID) {
-//      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsm_idToROIFiltersGroupForAnnotationFilter());
-//    }
+#ifdef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
     if (m_viewSettingTreeWidgetGroup) {
       m_widgetsGroup->removeChild(m_viewSettingTreeWidgetGroup);
       m_viewSettingTreeWidgetGroup.reset();
     }
+#else
+    for (const auto& nameID : m_nameToID) {
+      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsm_idToROIFiltersGroupForAnnotationFilter());
+    }
+#endif
   }
 
   m_idToROIFilters.clear();
@@ -224,16 +229,19 @@ void ZRegionAnnotationFilter::allROIChanged()
   }
 
   if (m_widgetsGroup) {
+#ifdef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, this);
     m_viewSettingTreeWidgetGroup.reset(new ZWidgetsGroup(
       *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4));
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
-//    for (const auto& nameID : m_nameToID) {
-//      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
-//      wg->setGroupName(nameID.first);
-//      m_widgetsGroup->addChild(wg);
-//    }
+#else
+    for (const auto& nameID : m_nameToID) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
+      wg->setGroupName(nameID.first);
+      m_widgetsGroup->addChild(wg);
+    }
+#endif
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
 }

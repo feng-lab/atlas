@@ -103,8 +103,6 @@ ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionViewItem&
     if (m_actualWidget) {
       QSize res = m_actualWidget->grab().size();
 
-      res.setWidth(res.width());
-      res.setHeight(res.height() / qApp->devicePixelRatio());
       return res;
     }
   }
