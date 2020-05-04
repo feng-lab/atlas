@@ -87,7 +87,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
     m_button->setText(index.data().toString());
     QSize res = m_button->grab().size();
 
-    res.setWidth(res.width() * 2);
+    res.setWidth(res.width() * 2 / qApp->devicePixelRatio());
     res.setHeight(res.height() / qApp->devicePixelRatio());
     return res;
   }
