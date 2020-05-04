@@ -336,7 +336,7 @@ void ZRegionAnnotation::changeROIRegion(ZROI &roi, int slice, size_t shapeId, in
   }
 }
 
-const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
+const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID) const
 {
   for (const auto& node : m_ontology) {
     if (node.id == regionID) {
@@ -346,7 +346,7 @@ const ZMesh* ZRegionAnnotation::meshOfRegion(int64_t regionID)
   return nullptr;
 }
 
-const ZROI* ZRegionAnnotation::roiOfRegion(int64_t regionID)
+const ZROI* ZRegionAnnotation::roiOfRegion(int64_t regionID) const
 {
   for (const auto& node : m_ontology) {
     if (node.id == regionID) {
@@ -354,6 +354,16 @@ const ZROI* ZRegionAnnotation::roiOfRegion(int64_t regionID)
     }
   }
   return nullptr;
+}
+
+QString ZRegionAnnotation::nameOfRegion(int64_t regionID) const
+{
+  for (const auto& node : m_ontology) {
+    if (node.id == regionID) {
+      return node.name;
+    }
+  }
+  return "";
 }
 
 void ZRegionAnnotation::load(const QString& filename)

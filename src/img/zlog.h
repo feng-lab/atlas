@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QPoint>
+#include <QRect>
 #include <memory>
 #include <functional>
 #include <iosfwd>
@@ -122,6 +123,16 @@ inline std::ostream& operator<<(std::ostream& s, const QPoint& v)
 }
 
 inline std::ostream& operator<<(std::ostream& s, const QPointF& v)
+{
+  return (s << qtTypeToQString(v).toUtf8().constData());
+}
+
+inline std::ostream& operator<<(std::ostream& s, const QRect& v)
+{
+  return (s << qtTypeToQString(v).toUtf8().constData());
+}
+
+inline std::ostream& operator<<(std::ostream& s, const QRectF& v)
 {
   return (s << qtTypeToQString(v).toUtf8().constData());
 }

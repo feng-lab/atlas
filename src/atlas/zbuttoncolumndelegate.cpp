@@ -61,6 +61,7 @@ void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* mo
 void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
+    // LOG(INFO) << "here";
     QRect rect = option.rect;
     m_button->setGeometry(rect);
     m_button->setText(index.data().toString());
@@ -86,7 +87,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
     m_button->setText(index.data().toString());
     QSize res = m_button->grab().size();
 
-    res.setWidth(res.width());
+    res.setWidth(res.width() * 2);
     res.setHeight(res.height() / qApp->devicePixelRatio());
     return res;
   }

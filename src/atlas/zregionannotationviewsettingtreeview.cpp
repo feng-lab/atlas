@@ -3,13 +3,17 @@
 #include "zstyleditemdelegate.h"
 #include "zregionannotationviewsettingcolumndelegate.h"
 #include "zlog.h"
+#include "ztheme.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
 #include <QMessageBox>
+#include <QScrollBar>
+#include <QLabel>
 #include <QApplication>
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
+#include <QApplication>
 
 namespace nim {
 
@@ -31,6 +35,14 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   setModel(m_ratProxyModel);
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn, Qt::AscendingOrder);
+  setStyleSheet(
+    QString("QTreeView::indicator:unchecked {image: url(%1);}"
+            "QTreeView::indicator:checked {image: url(%2);}"
+            "QTreeView::indicator:indeterminate {image: url(%3);}")
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
+  );
 
   connect(this, &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested, this,
           &ZRegionAnnotationViewSettingTreeView::contextMenu);
@@ -41,7 +53,7 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   connect(this, &ZRegionAnnotationViewSettingTreeView::activated, this,
           &ZRegionAnnotationViewSettingTreeView::indexActivated);
 
-  setMinimumWidth(400);
+  setMinimumWidth(200);
 
   setAlternatingRowColors(true);
   //QPalette p = palette();
@@ -55,6 +67,11 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   setItemDelegate(delegate);
   connect(this, &ZRegionAnnotationViewSettingTreeView::entered,
           delegate, &ZRegionAnnotationViewSettingColumnDelegate::cellEntered);
+  connect(delegate, &ZRegionAnnotationViewSettingColumnDelegate::buttonClickedForUserData,
+          this, &ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData);
+
+  connect(this, &ZRegionAnnotationViewSettingTreeView::expanded,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
 
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
           this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
@@ -66,6 +83,13 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
           this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
   connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
           this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+
+  //setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  verticalScrollBar()->setDisabled(true);
+  // setVerticalScrollMode(QTreeView::ScrollPerItem);
+
+  setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
   adaptColumns();
 }
 
@@ -94,7 +118,22 @@ void ZRegionAnnotationViewSettingTreeView::indexActivated(const QModelIndex& ind
 void ZRegionAnnotationViewSettingTreeView::adaptColumns()
 {
   resizeColumnToContents(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn);
-  resizeColumnToContents(ZRegionAnnotationViewSettingTreeModel::WidgetColumn);
+}
+
+void ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData(const QVariant& ud)
+{
+  bool ok;
+  int64_t regionID = ud.toLongLong(&ok);
+  CHECK(ok);
+
+  auto wg = m_idToROIFilters.at(regionID)->viewSettingWidgetsGroupForAnnotationFilter();
+  auto label = new QLabel(QString("Region: %1").arg(m_regionAnnotation.nameOfRegion(regionID)));
+  m_regionViewSettingEditorWindow.reset(wg->createWidget(true, false, label));
+  m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
+  m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);
+  m_regionViewSettingEditorWindow->showNormal();
+  m_regionViewSettingEditorWindow->raise();
+  m_regionViewSettingEditorWindow->activateWindow();
 }
 
 void ZRegionAnnotationViewSettingTreeView::keyPressEvent(QKeyEvent* /*e*/)
@@ -103,6 +142,11 @@ void ZRegionAnnotationViewSettingTreeView::keyPressEvent(QKeyEvent* /*e*/)
 
 void ZRegionAnnotationViewSettingTreeView::createContextMenu()
 {
+}
+
+void ZRegionAnnotationViewSettingTreeView::wheelEvent(QWheelEvent* e)
+{
+  e->ignore();
 }
 
 } // namespace nim

@@ -159,6 +159,9 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
+  bool visible()
+  { return m_visible.get(); }
+
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;

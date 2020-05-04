@@ -61,6 +61,8 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
           this, &ZRegionAnnotationTreeView::adaptColumns);
   adaptColumns();
+
+  header()->setStretchLastSection(false);
 }
 
 void ZRegionAnnotationTreeView::contextMenu(const QPoint& /*pos*/)

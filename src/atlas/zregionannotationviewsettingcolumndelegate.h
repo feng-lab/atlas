@@ -36,14 +36,14 @@ signals:
   void buttonClickedForUserData(QVariant ud);
 
 protected:
+  void buttonClicked();
 
 private:
   QAbstractItemView* m_widget;
+  QPushButton* m_button;
   bool m_isOneCellInEditMode;
   QPersistentModelIndex m_currentEditedCellIndex;
   std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
-  int m_currentID = -1;
-  mutable std::shared_ptr<QWidget> m_actualWidget;
 };
 
 } // namespace nim

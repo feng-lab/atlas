@@ -43,9 +43,11 @@ public:
   void changeROIRegion(ZROI& roi, int slice, size_t id, int64_t regionID);
 
   // return nullptr if not exist
-  const ZMesh* meshOfRegion(int64_t regionID);
+  const ZMesh* meshOfRegion(int64_t regionID) const;
 
-  const ZROI* roiOfRegion(int64_t regionID);
+  const ZROI* roiOfRegion(int64_t regionID) const;
+
+  QString nameOfRegion(int64_t regionID) const;
 
   const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }

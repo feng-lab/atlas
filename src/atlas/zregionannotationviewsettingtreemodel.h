@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zregionannotation.h"
+#include "zroifilter.h"
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
@@ -18,7 +19,10 @@ public:
     AbbreviationColumn, WidgetColumn, ColumnCount
   };
 
-  explicit ZRegionAnnotationViewSettingTreeModel(ZRegionAnnotation& anno, QObject* parent = nullptr);
+  explicit ZRegionAnnotationViewSettingTreeModel(
+    ZRegionAnnotation& anno,
+    std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+    QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
@@ -48,6 +52,7 @@ protected:
   ZRegionAnnotation& m_regionAnnotation;
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
+  std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
 };
 
 } // namespace nim

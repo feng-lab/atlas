@@ -5,10 +5,14 @@
 
 namespace nim {
 
-ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(ZRegionAnnotation& anno, QObject* parent)
+ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
+  ZRegionAnnotation& anno,
+  std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+  QObject* parent)
   : QAbstractItemModel(parent)
   , m_regionAnnotation(anno)
   , m_annotationTree(m_regionAnnotation.annotationTree())
+  , m_idToROIFilters(idToROIFilters)
 {
   for (auto it = m_annotationTree.begin(); it != m_annotationTree.end(); ++it) {
     m_nodeToIter[&(*it)] = it;
@@ -22,12 +26,20 @@ QVariant ZRegionAnnotationViewSettingTreeModel::data(const QModelIndex& index, i
 
   auto item = static_cast<RegionNode*>(index.internalPointer());
 
+  if (role == Qt::CheckStateRole && index.column() == AbbreviationColumn) {
+    auto state = Qt::Unchecked;
+    if (m_idToROIFilters.at(item->id)->visible()) {
+      state = Qt::Checked;
+    }
+    return state;
+  }
+
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case AbbreviationColumn:
-        return QVariant(item->abbreviation + QString("_%1").arg(item->id));
+        return QVariant(item->abbreviation);
       case WidgetColumn:
-        return qlonglong(item->id);
+        return "...";
       default:
         break;
     }
@@ -43,6 +55,17 @@ QVariant ZRegionAnnotationViewSettingTreeModel::data(const QModelIndex& index, i
     }
   }
 
+  if (role == Qt::ToolTipRole) {
+    switch (index.column()) {
+      case AbbreviationColumn:
+        return QVariant(QString("Region: %1, ID: %2").arg(item->name).arg(item->id));
+      case WidgetColumn:
+        return QVariant(QString("Modify %1 view setting").arg(item->abbreviation));
+      default:
+        break;
+    }
+  }
+
   return QVariant();
 }
 
@@ -53,13 +76,30 @@ Qt::ItemFlags ZRegionAnnotationViewSettingTreeModel::flags(const QModelIndex& in
 
   Qt::ItemFlags flags = Qt::ItemIsEnabled;
 
+  if (index.column() == AbbreviationColumn)
+    flags |= Qt::ItemIsUserCheckable;
+
   return flags;
 }
 
-bool ZRegionAnnotationViewSettingTreeModel::setData(const QModelIndex& index, const QVariant& /*value*/, int /*role*/)
+bool ZRegionAnnotationViewSettingTreeModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
   if (!index.isValid())
     return false;
+
+  if (role == Qt::CheckStateRole && index.column() == AbbreviationColumn) {
+    auto cs = static_cast<Qt::CheckState>(value.toInt());
+
+    auto item = static_cast<RegionNode*>(index.internalPointer());
+    m_idToROIFilters.at(item->id)->setVisible(cs == Qt::Checked);
+    emit dataChanged(index, index);
+//    // update child items check state
+//    updateChildCheckState(index, cs);
+//    // update parent items
+//    updateParentCheckState(index);
+
+    return true;
+  }
 
   return false;
 }
@@ -73,7 +113,7 @@ QVariant ZRegionAnnotationViewSettingTreeModel::headerData(int section, Qt::Orie
         return QString("Region");
         break;
       case WidgetColumn:
-        return QString("");
+        return QString("View Settings");
         break;
       default:
         break;

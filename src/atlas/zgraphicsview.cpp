@@ -436,7 +436,7 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
     scene()->addItem(m_ellipseItem.get());
   } else {
     QPointF scenePt = mapToScene(event->x(), event->y());
-    LOG(INFO) << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
+    LOG(INFO) << scenePt << " " << m_view->currentSlice();
     QGraphicsView::mousePressEvent(event);
     //viewport()->setCursor(Qt::ArrowCursor);
   }
@@ -491,7 +491,7 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
       m_polygonItem.reset();
     } else {
       QPointF scenePt = mapToScene(event->x(), event->y());
-      LOG(INFO) << "d " << scenePt.x() << " " << scenePt.y() << " " << m_view->currentSlice();
+      LOG(INFO) << "d " << scenePt << " " << m_view->currentSlice();
       QGraphicsView::mouseDoubleClickEvent(event);
       //viewport()->setCursor(Qt::ArrowCursor);
     }

@@ -389,8 +389,8 @@ size_t ZObjModel::indexToId(const QModelIndex& index)
 QModelIndex ZObjModel::idToIndex(size_t id, int col)
 {
   QModelIndex res;
-  for (int row = 0; row < rowCount(); ++row) {
-    QModelIndex idx = index(row, col);
+  for (int row = 0; row < rowCount(QModelIndex()); ++row) {
+    QModelIndex idx = index(row, col, QModelIndex());
     ObjItem* objItem = static_cast<ObjItem*>(idx.internalPointer());
     if (objItem->id == id) {
       res = idx;
@@ -439,8 +439,8 @@ void ZObjModel::clicked(const QModelIndex& idxIn)
         m_doc->sendHideViewSettingSignal();
       } else {
         QModelIndex prevIdx;
-        for (int row = 0; row < rowCount(); ++row) {
-          QModelIndex idx = index(row, ViewSettingColumn);
+        for (int row = 0; row < rowCount(QModelIndex()); ++row) {
+          QModelIndex idx = index(row, ViewSettingColumn, QModelIndex());
           if (static_cast<ObjItem*>(idx.internalPointer()) == m_viewSettingCurrentItem) {
             prevIdx = idx;
             break;
@@ -542,7 +542,7 @@ void ZObjModel::updateParentCheckState(const QModelIndex& child)
 
 void ZObjModel::setModelIndexCheckState(const QModelIndex& index, Qt::CheckState cs)
 {
-  ObjItem* item = static_cast<ObjItem*>(index.internalPointer());
+  auto item = static_cast<ObjItem*>(index.internalPointer());
   item->checkState = cs;
   emit dataChanged(index, index);
   item->doc->setObjVisible(item->id, item->checkState == Qt::Checked);

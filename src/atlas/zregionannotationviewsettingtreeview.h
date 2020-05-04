@@ -31,9 +31,13 @@ protected:
 
   void adaptColumns();
 
+  void buttonClickedForUserData(const QVariant& ud);
+
   void keyPressEvent(QKeyEvent* e) override;
 
   void createContextMenu();
+
+  void wheelEvent(QWheelEvent* e) override;
 
 private:
   ZRegionAnnotationViewSettingTreeModel& m_ratModel;
@@ -41,6 +45,7 @@ private:
   QSortFilterProxyModel* m_ratProxyModel;
   QMenu* m_contextMenu;
   std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
+  std::unique_ptr<QWidget> m_regionViewSettingEditorWindow;
 };
 
 } // namespace nim

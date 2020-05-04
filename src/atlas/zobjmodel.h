@@ -37,38 +37,38 @@ public:
 
   explicit ZObjModel(ZDoc* doc);
 
-  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const;
+  [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
-  Qt::ItemFlags flags(const QModelIndex& index) const;
+  [[nodiscard]] Qt::ItemFlags flags(const QModelIndex& index) const override;
 
-  bool setData(const QModelIndex& index, const QVariant& value, int role = Qt::EditRole);
+  bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
-  QVariant headerData(int section, Qt::Orientation orientation,
-                      int role = Qt::DisplayRole) const;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
+                                    int role) const override;
 
-  QModelIndex index(int row, int column,
-                    const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] QModelIndex index(int row, int column,
+                                  const QModelIndex& parent) const override;
 
-  QModelIndex parent(const QModelIndex& index) const;
+  [[nodiscard]] QModelIndex parent(const QModelIndex& index) const override;
 
-  int rowCount(const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] int rowCount(const QModelIndex& parent) const override;
 
-  int columnCount(const QModelIndex& parent = QModelIndex()) const;
+  [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
-  inline bool hasObj() const
+  [[nodiscard]] inline bool hasObj() const
   { return !m_rootItem->children.empty(); }
 
-  size_t numObjs() const;
+  [[nodiscard]] size_t numObjs() const;
 
-  QList<size_t> objs() const;
+  [[nodiscard]] QList<size_t> objs() const;
 
   QList<size_t> objsOfDoc(const ZObjDoc* doc) const;
 
-  bool isObjVisible(size_t id) const;
+  [[nodiscard]] bool isObjVisible(size_t id) const;
 
   void setObjVisible(size_t id, bool v);
 
-  ZObjDoc* idToDoc(size_t id) const;
+  [[nodiscard]] ZObjDoc* idToDoc(size_t id) const;
 
   void updateObj(size_t id);
 
@@ -100,9 +100,9 @@ protected:
   // These two functions assume the input modelindex is valid
   virtual void setModelIndexCheckState(const QModelIndex& index, Qt::CheckState cs);
 
-  Qt::CheckState getModelIndexCheckState(const QModelIndex& index) const;
+  [[nodiscard]] Qt::CheckState getModelIndexCheckState(const QModelIndex& index) const;
 
-  bool needCheckbox(const QModelIndex& index) const;
+  [[nodiscard]] bool needCheckbox(const QModelIndex& index) const;
 
 protected:
   ZDoc* m_doc;
@@ -111,7 +111,7 @@ protected:
   {
     ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_);
 
-    int row() const;
+    [[nodiscard]] int row() const;
 
     std::vector<std::unique_ptr<ObjItem>> children;
     ObjItem* parent;

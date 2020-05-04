@@ -18,30 +18,21 @@ ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDe
   if (auto wg = qobject_cast<QAbstractItemView*>(parent)) {
     m_widget = wg;
 
-    m_currentID = m_idToROIFilters.begin()->first;
-    std::shared_ptr<ZWidgetsGroup> wgg = m_idToROIFilters[m_currentID]->viewSettingWidgetsGroupForAnnotationFilter();
-    auto wgi = wgg->createWidget(true, false);
-    wgi->setParent(m_widget);
-    m_actualWidget.reset(wgi);
+    m_button = new QPushButton("...", m_widget);
+    m_button->hide();
 
     m_isOneCellInEditMode = false;
   }
 }
 
 QWidget*
-ZRegionAnnotationViewSettingColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option,
-                                                         const QModelIndex& index) const
+ZRegionAnnotationViewSettingColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    auto region = index.data(Qt::UserRole).toLongLong();
-    LOG(INFO) << region;
-    std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[region]->viewSettingWidgetsGroupForAnnotationFilter();
-    LOG(INFO) << "here";
-    auto wgi = wg->createWidget(true, false);
-    LOG(INFO) << "here";
-    wgi->setParent(parent);
-    m_actualWidget.reset(wgi);
-    return wgi;
+    auto btn = new QPushButton(parent);
+    btn->setText("...");
+    connect(btn, &QPushButton::clicked, this, &ZRegionAnnotationViewSettingColumnDelegate::buttonClicked);
+    return btn;
   } else {
     return QStyledItemDelegate::createEditor(parent, option, index);
   }
@@ -50,8 +41,8 @@ ZRegionAnnotationViewSettingColumnDelegate::createEditor(QWidget* parent, const 
 void ZRegionAnnotationViewSettingColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (auto wgt = qobject_cast<QWidget*>(editor)) {
-      wgt->setProperty("user_data", index.data(Qt::UserRole));
+    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+      btn->setProperty("user_data", index.data(Qt::UserRole));
     }
     //LOG(INFO) << "set " << btn->property("user_data");
   } else {
@@ -59,12 +50,11 @@ void ZRegionAnnotationViewSettingColumnDelegate::setEditorData(QWidget* editor, 
   }
 }
 
-void ZRegionAnnotationViewSettingColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
-                                                              const QModelIndex& index) const
+void ZRegionAnnotationViewSettingColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (auto wgt = qobject_cast<QWidget*>(editor)) {
-      model->setData(index, wgt->property("user_data"), Qt::UserRole);
+    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+      model->setData(index, btn->property("user_data"), Qt::UserRole);
     }
     //LOG(INFO) << btn->property("user_data");
   } else {
@@ -72,39 +62,33 @@ void ZRegionAnnotationViewSettingColumnDelegate::setModelData(QWidget* editor, Q
   }
 }
 
-void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
-                                                       const QModelIndex& index) const
+void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (m_actualWidget) {
-      QRect rect = option.rect;
-      m_actualWidget->setGeometry(rect);
-      if (option.state == QStyle::State_Selected)
-        painter->fillRect(rect, option.palette.highlight());
-      QPixmap map = m_actualWidget->grab();
-      painter->drawPixmap(option.rect, map);
-    }
+    // LOG(INFO) << "here";
+    QRect rect = option.rect;
+    m_button->setGeometry(rect);
+    m_button->setText("...");
+    // m_button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    if (option.state == QStyle::State_Selected)
+      painter->fillRect(rect, option.palette.highlight());
+    QPixmap map = m_button->grab();
+    painter->drawPixmap(option.rect, map);
   } else {
     QStyledItemDelegate::paint(painter, option, index);
   }
 }
 
-void
-ZRegionAnnotationViewSettingColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
-                                                                 const QModelIndex& /*index*/) const
+void ZRegionAnnotationViewSettingColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
+                                                 const QModelIndex& /*index*/) const
 {
   editor->setGeometry(option.rect);
 }
 
-QSize
-ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
+QSize ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (m_actualWidget) {
-      QSize res = m_actualWidget->grab().size();
-
-      return res;
-    }
+    return QSize(32, 32);
   }
   return QStyledItemDelegate::sizeHint(option, index);
 }
@@ -123,6 +107,13 @@ void ZRegionAnnotationViewSettingColumnDelegate::cellEntered(const QModelIndex& 
       m_isOneCellInEditMode = false;
       m_widget->closePersistentEditor(m_currentEditedCellIndex);
     }
+  }
+}
+
+void ZRegionAnnotationViewSettingColumnDelegate::buttonClicked()
+{
+  if (QPushButton* btn = qobject_cast<QPushButton*>(sender())) {
+    emit buttonClickedForUserData(btn->property("user_data"));
   }
 }
 
