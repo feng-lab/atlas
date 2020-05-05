@@ -47,11 +47,11 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
       case IDColumn:
       case NameColumn:
       case MergeROIColumn:
-        return static_cast<qlonglong>(item->id * 10 + 1);
+        return static_cast<qlonglong>(item->id >= 0 ? item->id * 10 + 1 : item->id * 10 - 1);
       case ExportROIColumn:
-        return static_cast<qlonglong>(item->id * 10 + 2);
+        return static_cast<qlonglong>(item->id >= 0 ? item->id * 10 + 2 : item->id * 10 - 2);
       case ExportMeshColumn:
-        return static_cast<qlonglong>(item->id * 10 + 3);
+        return static_cast<qlonglong>(item->id >= 0 ? item->id * 10 + 3 : item->id * 10 - 3);
       default:
         break;
     }

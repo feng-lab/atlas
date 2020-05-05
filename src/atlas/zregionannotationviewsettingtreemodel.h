@@ -42,7 +42,7 @@ public:
 
   [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
-  void clicked(const QModelIndex& idxIn);
+  void clicked(const QModelIndex& index);
 
   void doubleClicked(const QModelIndex& index);
 
@@ -53,6 +53,7 @@ protected:
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
   std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
+  std::unique_ptr<QWidget> m_regionViewSettingEditorWindow;
 };
 
 } // namespace nim

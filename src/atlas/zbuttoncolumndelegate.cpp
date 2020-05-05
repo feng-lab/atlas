@@ -61,7 +61,7 @@ void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* mo
 void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    // LOG(INFO) << "here";
+    LOG(INFO) << "painting " << index.data().toString();
     QRect rect = option.rect;
     m_button->setGeometry(rect);
     m_button->setText(index.data().toString());
@@ -97,6 +97,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
 void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole) == 1) {
+    // LOG(INFO) << "in";
     if (m_isOneCellInEditMode) {
       m_widget->closePersistentEditor(m_currentEditedCellIndex);
     }
@@ -105,6 +106,7 @@ void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
     m_currentEditedCellIndex = index;
   } else {
     if (m_isOneCellInEditMode) {
+      // LOG(INFO) << "out";
       m_isOneCellInEditMode = false;
       m_widget->closePersistentEditor(m_currentEditedCellIndex);
     }

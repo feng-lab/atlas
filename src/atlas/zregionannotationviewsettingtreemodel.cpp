@@ -2,6 +2,8 @@
 
 #include "zobjdoc.h"
 #include "zlog.h"
+#include <QLabel>
+#include <QApplication>
 
 namespace nim {
 
@@ -204,8 +206,19 @@ int ZRegionAnnotationViewSettingTreeModel::columnCount(const QModelIndex& /*pare
   return ColumnCount;
 }
 
-void ZRegionAnnotationViewSettingTreeModel::clicked(const QModelIndex& /*idxIn*/)
+void ZRegionAnnotationViewSettingTreeModel::clicked(const QModelIndex& index)
 {
+  if (index.isValid() && headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
+    auto item = static_cast<RegionNode*>(index.internalPointer());
+    auto wg = m_idToROIFilters.at(item->id)->viewSettingWidgetsGroupForAnnotationFilter();
+    auto label = new QLabel(QString("Region: %1").arg(m_idToROIFilters.at(item->id)->regionName()));
+    m_regionViewSettingEditorWindow.reset(wg->createWidget(true, false, label));
+    m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
+    m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);
+    m_regionViewSettingEditorWindow->showNormal();
+    m_regionViewSettingEditorWindow->raise();
+    m_regionViewSettingEditorWindow->activateWindow();
+  }
   //  if (idxIn.isValid()) {
   //    if (idxIn.column() == ViewSettingColumn) {
   //      ObjItem *item = static_cast<ObjItem*>(idxIn.internalPointer());

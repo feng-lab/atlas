@@ -101,10 +101,10 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
 {
   bool ok;
   int64_t regionID = ud.toLongLong(&ok);
-  int64_t action = regionID % 10;
+  int64_t action = std::abs(regionID % 10);
   regionID = regionID / 10;
   CHECK(ok);
-  //LOG(INFO) << regionID;
+  // LOG(INFO) << regionID;
   if (action == 1) {
     if (!m_doc.roiDoc().hasObj()) {
       QMessageBox::critical(this, qApp->applicationName(), tr("No ROI to merge, try creating some ROI first"));

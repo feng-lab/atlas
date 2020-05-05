@@ -44,14 +44,14 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
       .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
   );
 
-  connect(this, &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested, this,
-          &ZRegionAnnotationViewSettingTreeView::contextMenu);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::clicked, this,
-          &ZRegionAnnotationViewSettingTreeView::indexClicked);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::doubleClicked, this,
-          &ZRegionAnnotationViewSettingTreeView::indexDoubleClicked);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::activated, this,
-          &ZRegionAnnotationViewSettingTreeView::indexActivated);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested,
+          this, &ZRegionAnnotationViewSettingTreeView::contextMenu);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::clicked,
+          this, &ZRegionAnnotationViewSettingTreeView::indexClicked);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::doubleClicked,
+          this, &ZRegionAnnotationViewSettingTreeView::indexDoubleClicked);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::activated,
+          this, &ZRegionAnnotationViewSettingTreeView::indexActivated);
 
   setMinimumWidth(200);
 
@@ -63,12 +63,12 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   createContextMenu();
 
   auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(m_idToROIFilters, this);
-  setMouseTracking(true);
+  setMouseTracking(false);
   setItemDelegate(delegate);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::entered,
-          delegate, &ZRegionAnnotationViewSettingColumnDelegate::cellEntered);
-  connect(delegate, &ZRegionAnnotationViewSettingColumnDelegate::buttonClickedForUserData,
-          this, &ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData);
+//  connect(this, &ZRegionAnnotationViewSettingTreeView::entered,
+//          delegate, &ZRegionAnnotationViewSettingColumnDelegate::cellEntered);
+//  connect(delegate, &ZRegionAnnotationViewSettingColumnDelegate::buttonClickedForUserData,
+//          this, &ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData);
 
   connect(this, &ZRegionAnnotationViewSettingTreeView::expanded,
           this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
@@ -118,22 +118,6 @@ void ZRegionAnnotationViewSettingTreeView::indexActivated(const QModelIndex& ind
 void ZRegionAnnotationViewSettingTreeView::adaptColumns()
 {
   resizeColumnToContents(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn);
-}
-
-void ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData(const QVariant& ud)
-{
-  bool ok;
-  int64_t regionID = ud.toLongLong(&ok);
-  CHECK(ok);
-
-  auto wg = m_idToROIFilters.at(regionID)->viewSettingWidgetsGroupForAnnotationFilter();
-  auto label = new QLabel(QString("Region: %1").arg(m_idToROIFilters.at(regionID)->regionName()));
-  m_regionViewSettingEditorWindow.reset(wg->createWidget(true, false, label));
-  m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
-  m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);
-  m_regionViewSettingEditorWindow->showNormal();
-  m_regionViewSettingEditorWindow->raise();
-  m_regionViewSettingEditorWindow->activateWindow();
 }
 
 void ZRegionAnnotationViewSettingTreeView::keyPressEvent(QKeyEvent* /*e*/)

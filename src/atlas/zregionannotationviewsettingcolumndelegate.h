@@ -2,49 +2,22 @@
 
 #include "zroifilter.h"
 #include <QStyledItemDelegate>
-#include <QWidget>
-#include <QPushButton>
 
 namespace nim {
-
-// #define USE_BUTTON
 
 class ZRegionAnnotationViewSettingColumnDelegate : public QStyledItemDelegate
 {
 Q_OBJECT
 public:
-  ZRegionAnnotationViewSettingColumnDelegate(
+  explicit ZRegionAnnotationViewSettingColumnDelegate(
     std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
     QObject* parent = nullptr);
 
-  virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
-                                const QModelIndex& index) const override;
-
-  void setEditorData(QWidget* editor, const QModelIndex& index) const override;
-
-  void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
-
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
-  virtual void
-  updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-
-  QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
-
-  void cellEntered(const QModelIndex& index);
-
-signals:
-
-  void buttonClickedForUserData(QVariant ud);
-
-protected:
-  void buttonClicked();
+  [[nodiscard]] QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
 private:
-  QAbstractItemView* m_widget;
-  QPushButton* m_button = nullptr;
-  bool m_isOneCellInEditMode;
-  QPersistentModelIndex m_currentEditedCellIndex;
   std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
 };
 
