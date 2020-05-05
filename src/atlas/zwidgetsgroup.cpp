@@ -203,44 +203,15 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
           connect(pb, &QPushButton::clicked, this, &ZWidgetsGroup::emitRequestAdvancedWidgetSignal);
         }
       } else {
-        if (m_useToolBoxStyle) {
-          QToolBox* toolBox = new QToolBox();
-          for (const auto& childGroup : m_childGroups) {
-            if (m_useToolBoxStyle) {
-              if (childGroup->isGroup()) {
-                QWidget* wg = childGroup->createWidget(false, false);
-                toolBox->addItem(wg, childGroup->getGroupName());
-                // fully expand page, no scroll bar
-                qobject_cast<QScrollArea*>(wg->parentWidget()->parentWidget())->setSizePolicy(
-                  QSizePolicy::Preferred, QSizePolicy::Fixed);
-              } else {
-                QLayout* lw = childGroup->createLayout(false);
-                vbl->addLayout(lw);
-              }
-            } else {
-              if (childGroup->isGroup()) {
-                QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
-                QLayout* lw = childGroup->createLayout(false);
-                groupBox->setLayout(lw);
-                vbl->addWidget(groupBox);
-              } else {
-                QLayout* lw = childGroup->createLayout(false);
-                vbl->addLayout(lw);
-              }
-            }
-          }
-          vbl->addWidget(toolBox);
-        } else {
-          for (const auto& childGroup : m_childGroups) {
-            if (childGroup->isGroup()) {
-              QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
-              QLayout* lw = childGroup->createLayout(false);
-              groupBox->setLayout(lw);
-              vbl->addWidget(groupBox);
-            } else {
-              QLayout* lw = childGroup->createLayout(false);
-              vbl->addLayout(lw);
-            }
+        for (const auto& childGroup : m_childGroups) {
+          if (childGroup->isGroup()) {
+            QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
+            QLayout* lw = childGroup->createLayout(false);
+            groupBox->setLayout(lw);
+            vbl->addWidget(groupBox);
+          } else {
+            QLayout* lw = childGroup->createLayout(false);
+            vbl->addLayout(lw);
           }
         }
       }

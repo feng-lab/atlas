@@ -12,8 +12,6 @@
 
 namespace nim {
 
-#define NEW_REGION_ANNOTATION_VIEW_SETTING_UI 1
-
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
   , m_visible("Visible", true)
@@ -89,23 +87,13 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_transform, 2);
     m_widgetsGroup->addChild(m_offsetPara, 2);
-#ifdef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
+
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
       *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
-#else
-    for (const auto& nameID : m_nameToID) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(nameID.first);
-      m_widgetsGroup->addChild(wg);
-    }
-#endif
   }
-#ifndef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
-  m_widgetsGroup->setUseToolBoxStyle(true);
-#endif
   return m_widgetsGroup;
 }
 
@@ -182,16 +170,10 @@ void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
-#ifdef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
     if (m_viewSettingTreeWidgetGroup) {
       m_widgetsGroup->removeChild(m_viewSettingTreeWidgetGroup);
       m_viewSettingTreeWidgetGroup.reset();
     }
-#else
-    for (const auto& nameID : m_nameToID) {
-      m_widgetsGroup->removeChild(m_idToROIFilters[nameID.second]->viewSettingWidgetsm_idToROIFiltersGroupForAnnotationFilter());
-    }
-#endif
   }
 
   m_idToROIFilters.clear();
@@ -236,19 +218,12 @@ void ZRegionAnnotationFilter::allROIChanged()
   }
 
   if (m_widgetsGroup) {
-#ifdef NEW_REGION_ANNOTATION_VIEW_SETTING_UI
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
       *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
-#else
-    for (const auto& nameID : m_nameToID) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_idToROIFilters[nameID.second]->viewSettingWidgetsGroupForAnnotationFilter();
-      wg->setGroupName(nameID.first);
-      m_widgetsGroup->addChild(wg);
-    }
-#endif
+
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
 }

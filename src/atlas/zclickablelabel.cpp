@@ -5,6 +5,7 @@
 #include "z3dtransferfunction.h"
 #include "znumericparameter.h"
 #include "zroifilter.h"
+#include "z3dmeshfilter.h"
 #include <QMouseEvent>
 #include <QHelpEvent>
 #include <QToolTip>
@@ -334,11 +335,6 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   }
 }
 
-QSize ZRegionViewSettingLabel::minimumSizeHint() const
-{
-  return QSize(50, 50);
-}
-
 bool ZRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
   if (!m_roiFilter)
@@ -358,6 +354,79 @@ bool ZRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
                                opacity * 255);
     *r = contentsRect();
     *s = QString("Outline Color: %1, Region Color: %2").arg(outlineQColor.name()).arg(regionQColor.name());
+    return true;
+  }
+
+  return false;
+}
+
+Z3DRegionViewSettingLabel::Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter,
+                                                     QWidget* parent, Qt::WindowFlags f)
+  : ZClickableLabel(parent, f)
+  , m_meshFilter(meshFilter)
+{
+}
+
+void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
+{
+  QPainter painter(this);
+  painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+  QColor color1(0, 0, 0);
+  QColor color2(255, 255, 255);
+  auto height = contentsRect().height() / 4;
+  auto width = height;
+  for (int i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
+    if (i % 2 == 0) {
+      painter.fillRect(
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.0 * 5 * height,
+               std::min(contentsRect().width() - i * width - 1, width), height), color2);
+      painter.fillRect(
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.25 * 5 * height,
+               std::min(contentsRect().width() - i * width - 1, width), height), color1);
+    } else {
+      painter.fillRect(
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.0 * 5 * height,
+               std::min(contentsRect().width() - i * width - 1, width), height), color1);
+      painter.fillRect(
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.25 * 5 * height,
+               std::min(contentsRect().width() - i * width - 1, width), height), color2);
+    }
+  }
+
+  if (m_meshFilter) {
+    auto meshColor = m_meshFilter->meshColor();
+    auto opacity = m_meshFilter->opacity();
+    auto meshQColor = QColor(meshColor.x * 255,
+                             meshColor.y * 255,
+                             meshColor.z * 255,
+                             opacity * 255);
+    QColor meshSolidQColor = meshQColor;
+    meshSolidQColor.setAlpha(255);
+    for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+      painter.setPen(meshQColor);
+      painter.drawLine(x, contentsRect().top() + 0.0 * contentsRect().height(),
+                       x, contentsRect().top() + 0.5 * contentsRect().height());
+      painter.setPen(meshSolidQColor);
+      painter.drawLine(x, contentsRect().top() + 0.5 * contentsRect().height(),
+                       x, contentsRect().top() + 1.0 * contentsRect().height());
+    }
+  }
+}
+
+bool Z3DRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
+{
+  if (!m_meshFilter)
+    return false;
+
+  if (contentsRect().contains(p)) {
+    auto meshColor = m_meshFilter->meshColor();
+    auto opacity = m_meshFilter->opacity();
+    auto meshQColor = QColor(meshColor.x * 255,
+                             meshColor.y * 255,
+                             meshColor.z * 255,
+                             opacity * 255);
+    *r = contentsRect();
+    *s = QString("Mesh Color: %2").arg(meshQColor.name());
     return true;
   }
 

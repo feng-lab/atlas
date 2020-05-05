@@ -1,5 +1,6 @@
 #include "z3dmeshfilter.h"
 
+#include "zregionannotation.h"
 #include "z3drenderport.h"
 #include "zmesh.h"
 #include "zrandom.h"
@@ -8,7 +9,8 @@
 
 namespace nim {
 
-Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
+Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas,
+                             const RegionNode* regionNode, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_monoEyeOutport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
@@ -29,6 +31,7 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_pressedMesh(nullptr)
   , m_selectedMeshes(nullptr)
   , m_dataIsInvalid(false)
+  , m_regionNode(regionNode)
 {
   addPrivateRenderPort(m_monoEyeOutport);
   addPrivateRenderPort(m_leftEyeOutport);
@@ -73,6 +76,11 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   addParameter(m_triangleListRenderer.wireframeModePara());
   addParameter(m_triangleListRenderer.wireframeColorPara());
+}
+
+QString Z3DMeshFilter::regionName() const
+{
+  return m_regionNode ? m_regionNode->name : QString();
 }
 
 void Z3DMeshFilter::process(Z3DEye eye)

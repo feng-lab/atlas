@@ -14,7 +14,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
   try {
     for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), this);
+      Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
       viewControl->setData(m_doc.meshList(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -46,7 +46,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
 void Z3DMeshView::docMeshAdded(size_t id)
 {
   try {
-    Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), this);
+    Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
     viewControl->setData(m_doc.meshList(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

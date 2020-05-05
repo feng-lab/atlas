@@ -17,14 +17,22 @@
 
 namespace nim {
 
+struct RegionNode;
+
 class Z3DMeshFilter : public Z3DGeometryFilter
 {
 Q_OBJECT
 public:
-  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
+  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode = nullptr,
+                         QObject* parent = nullptr);
 
   void setMeshColor(const glm::vec4& col)
   { m_singleColorForAllMesh.set(col); }
+
+  glm::vec4 meshColor() const
+  { return m_singleColorForAllMesh.get(); }
+
+  QString regionName() const;
 
   bool isFixed() const
   { return m_meshList[0]->numVertices() == 96957; }
@@ -128,6 +136,8 @@ private:
   bool m_dataIsInvalid;
 
   std::vector<ZMesh*> m_origMeshList;
+
+  const RegionNode* m_regionNode = nullptr;
 };
 
 } // namespace nim

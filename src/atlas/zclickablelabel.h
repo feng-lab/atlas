@@ -18,6 +18,8 @@ class ZDVec3Parameter;
 
 class ZROIFilter;
 
+class Z3DMeshFilter;
+
 class ZClickableLabel : public QWidget
 {
 Q_OBJECT
@@ -111,9 +113,27 @@ public:
 protected:
   void paintEvent(QPaintEvent* e) override;
 
-  QSize minimumSizeHint() const override;
+  QSize minimumSizeHint() const override
+  { return QSize(50, 50); }
 
   ZROIFilter* m_roiFilter;
+
+  bool getTip(const QPoint& p, QRect* r, QString* s) override;
+};
+
+class Z3DRegionViewSettingLabel : public ZClickableLabel
+{
+public:
+  explicit Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter, QWidget* parent = nullptr,
+                                     Qt::WindowFlags f = 0);
+
+protected:
+  void paintEvent(QPaintEvent* e) override;
+
+  QSize minimumSizeHint() const override
+  { return QSize(40, 40); }
+
+  Z3DMeshFilter* m_meshFilter;
 
   bool getTip(const QPoint& p, QRect* r, QString* s) override;
 };

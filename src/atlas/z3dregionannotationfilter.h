@@ -64,6 +64,8 @@ private:
   std::map<QString, int> m_nameToID;
 
   size_t m_numParas;
+
+  std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;
 };
 
 } // namespace nim

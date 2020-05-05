@@ -34,9 +34,6 @@ public:
   inline void setGroupName(const QString& name)
   { m_groupName = name; }
 
-  inline void setUseToolBoxStyle(bool v)
-  { m_useToolBoxStyle = v; }
-
   std::vector<ZParameter*> getParameterList();
 
   void addChild(QWidget& widget, int visibleLevel);
@@ -98,8 +95,6 @@ private:
   int m_cutOffbetweenBasicAndAdvancedLevel = 1;
   std::vector<std::shared_ptr<ZWidgetsGroup>> m_childGroups;
   bool m_isVisible = true;
-
-  bool m_useToolBoxStyle = false;
 };
 
 } // namespace nim
