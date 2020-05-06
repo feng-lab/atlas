@@ -11,11 +11,10 @@ namespace nim {
 
 ZButtonColumnDelegate::ZButtonColumnDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
-  , m_button(nullptr)
 {
   if (QAbstractItemView* wg = qobject_cast<QAbstractItemView*>(parent)) {
     m_widget = wg;
-    m_button = new QPushButton("...", m_widget);
+    m_button = std::make_unique<QPushButton>("...", m_widget);
     m_button->hide();
     m_isOneCellInEditMode = false;
   }
@@ -84,10 +83,11 @@ void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOp
 QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    m_button->setText(index.data().toString());
+    m_button.reset(new QPushButton(index.data().toString(), m_widget));
+    m_button->hide();
     QSize res = m_button->grab().size();
 
-    res.setWidth(res.width() * 2 / qApp->devicePixelRatio());
+    res.setWidth(res.width()  * 2 / qApp->devicePixelRatio());
     res.setHeight(res.height() / qApp->devicePixelRatio());
     return res;
   }

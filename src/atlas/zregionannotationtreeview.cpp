@@ -50,6 +50,9 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this,
           &ZRegionAnnotationTreeView::buttonClickedForUserData);
 
+  connect(this, &ZRegionAnnotationTreeView::expanded,
+          this, &ZRegionAnnotationTreeView::adaptColumns);
+
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
           this, &ZRegionAnnotationTreeView::adaptColumns);
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,

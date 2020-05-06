@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zregionannotation.h"
-#include "zroifilter.h"
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
@@ -9,6 +8,10 @@
 #include <map>
 
 namespace nim {
+
+class ZROIFilter;
+
+class Z3DMeshFilter;
 
 class ZRegionAnnotationViewSettingTreeModel : public QAbstractItemModel
 {
@@ -19,9 +22,14 @@ public:
     AbbreviationColumn, WidgetColumn, ColumnCount
   };
 
-  explicit ZRegionAnnotationViewSettingTreeModel(
+  ZRegionAnnotationViewSettingTreeModel(
     ZRegionAnnotation& anno,
     std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+    QObject* parent = nullptr);
+
+  ZRegionAnnotationViewSettingTreeModel(
+    ZRegionAnnotation& anno,
+    std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
     QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
@@ -48,11 +56,15 @@ public:
 
   void activated(const QModelIndex& idxIn);
 
+private:
+  explicit ZRegionAnnotationViewSettingTreeModel(ZRegionAnnotation& anno, QObject* parent = nullptr);
+
 protected:
   ZRegionAnnotation& m_regionAnnotation;
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
-  std::map<int, std::unique_ptr<ZROIFilter>>& m_idToROIFilters;
+  std::map<int, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
+  std::map<int, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
   std::unique_ptr<QWidget> m_regionViewSettingEditorWindow;
 };
 

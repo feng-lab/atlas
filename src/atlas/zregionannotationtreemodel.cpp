@@ -22,7 +22,7 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
 
   auto item = static_cast<RegionNode*>(index.internalPointer());
 
-  if (role == Qt::DisplayRole) {
+  if (role == Qt::DisplayRole || role == Qt::ToolTipRole) {
     switch (index.column()) {
       case AbbreviationColumn:
         return item->abbreviation;

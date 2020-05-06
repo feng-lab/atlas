@@ -37,7 +37,7 @@ protected:
 
 private:
   QAbstractItemView* m_widget;
-  QPushButton* m_button;
+  mutable std::unique_ptr<QPushButton> m_button;
   bool m_isOneCellInEditMode;
   QPersistentModelIndex m_currentEditedCellIndex;
 };

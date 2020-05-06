@@ -6,6 +6,8 @@
 #include "ztheme.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
+#include "zroifilter.h"
+#include "z3dmeshfilter.h"
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QLabel>
@@ -13,7 +15,6 @@
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
-#include <QApplication>
 
 namespace nim {
 
@@ -22,76 +23,25 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   ZRegionAnnotation& anno,
   std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
   QWidget* parent)
-  : QTreeView(parent)
-  , m_ratModel(objModel)
-  , m_regionAnnotation(anno)
-  , m_idToROIFilters(idToROIFilters)
+  : ZRegionAnnotationViewSettingTreeView(objModel, anno, parent)
 {
-  setSortingEnabled(true);
-  setExpandsOnDoubleClick(false);
-  m_ratProxyModel = new QSortFilterProxyModel(this);
-  m_ratProxyModel->setSourceModel(&m_ratModel);
-  m_ratProxyModel->setDynamicSortFilter(true);
-  setModel(m_ratProxyModel);
-  setContextMenuPolicy(Qt::CustomContextMenu);
-  sortByColumn(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn, Qt::AscendingOrder);
-  setStyleSheet(
-    QString("QTreeView::indicator:unchecked {image: url(%1);}"
-            "QTreeView::indicator:checked {image: url(%2);}"
-            "QTreeView::indicator:indeterminate {image: url(%3);}")
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
-  );
-
-  connect(this, &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested,
-          this, &ZRegionAnnotationViewSettingTreeView::contextMenu);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::clicked,
-          this, &ZRegionAnnotationViewSettingTreeView::indexClicked);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::doubleClicked,
-          this, &ZRegionAnnotationViewSettingTreeView::indexDoubleClicked);
-  connect(this, &ZRegionAnnotationViewSettingTreeView::activated,
-          this, &ZRegionAnnotationViewSettingTreeView::indexActivated);
-
-  setMinimumWidth(200);
-
-  setAlternatingRowColors(true);
-  //QPalette p = palette();
-  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  //setPalette(p);
-
-  createContextMenu();
-
-  auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(m_idToROIFilters, this);
+  m_idToROIFilters = &idToROIFilters;
+  auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(idToROIFilters, this);
   setMouseTracking(false);
   setItemDelegate(delegate);
-//  connect(this, &ZRegionAnnotationViewSettingTreeView::entered,
-//          delegate, &ZRegionAnnotationViewSettingColumnDelegate::cellEntered);
-//  connect(delegate, &ZRegionAnnotationViewSettingColumnDelegate::buttonClickedForUserData,
-//          this, &ZRegionAnnotationViewSettingTreeView::buttonClickedForUserData);
+}
 
-  connect(this, &ZRegionAnnotationViewSettingTreeView::expanded,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
-          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
-
-  setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-  //setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-  //verticalScrollBar()->setDisabled(true);
-  // setVerticalScrollMode(QTreeView::ScrollPerItem);
-
-  setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
-  adaptColumns();
-  //setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
+  ZRegionAnnotationViewSettingTreeModel& objModel,
+  ZRegionAnnotation& anno,
+  std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+  QWidget* parent)
+  : ZRegionAnnotationViewSettingTreeView(objModel, anno, parent)
+{
+  m_idToMeshFilters = &idToMeshFilters;
+  auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(idToMeshFilters, this);
+  setMouseTracking(false);
+  setItemDelegate(delegate);
 }
 
 void ZRegionAnnotationViewSettingTreeView::contextMenu(const QPoint& /*pos*/)
@@ -132,6 +82,74 @@ void ZRegionAnnotationViewSettingTreeView::createContextMenu()
 void ZRegionAnnotationViewSettingTreeView::wheelEvent(QWheelEvent* e)
 {
   e->ignore();
+}
+
+ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
+  ZRegionAnnotationViewSettingTreeModel &objModel,
+  ZRegionAnnotation &anno,
+  QWidget* parent)
+  : QTreeView(parent)
+  , m_ratModel(objModel)
+  , m_regionAnnotation(anno)
+{
+  setSortingEnabled(true);
+  setExpandsOnDoubleClick(false);
+  m_ratProxyModel = new QSortFilterProxyModel(this);
+  m_ratProxyModel->setSourceModel(&m_ratModel);
+  m_ratProxyModel->setDynamicSortFilter(true);
+  setModel(m_ratProxyModel);
+  setContextMenuPolicy(Qt::CustomContextMenu);
+  sortByColumn(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn, Qt::AscendingOrder);
+  setStyleSheet(
+    QString("QTreeView::indicator:unchecked {image: url(%1);}"
+            "QTreeView::indicator:checked {image: url(%2);}"
+            "QTreeView::indicator:indeterminate {image: url(%3);}")
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
+      .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
+  );
+
+  connect(this, &ZRegionAnnotationViewSettingTreeView::customContextMenuRequested,
+          this, &ZRegionAnnotationViewSettingTreeView::contextMenu);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::clicked,
+          this, &ZRegionAnnotationViewSettingTreeView::indexClicked);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::doubleClicked,
+          this, &ZRegionAnnotationViewSettingTreeView::indexDoubleClicked);
+  connect(this, &ZRegionAnnotationViewSettingTreeView::activated,
+          this, &ZRegionAnnotationViewSettingTreeView::indexActivated);
+
+  setMinimumWidth(200);
+
+  setAlternatingRowColors(true);
+  //QPalette p = palette();
+  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  //setPalette(p);
+
+  createContextMenu();
+
+  connect(this, &ZRegionAnnotationViewSettingTreeView::expanded,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
+          this, &ZRegionAnnotationViewSettingTreeView::adaptColumns);
+
+  //setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+  setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  verticalScrollBar()->setDisabled(true);
+  // setVerticalScrollMode(QTreeView::ScrollPerItem);
+
+  setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+  setMaximumWidth(300);
+  adaptColumns();
+  //setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
 }
 
 } // namespace nim

@@ -1,7 +1,7 @@
 #include "z3dregionannotationfilter.h"
 
-#include "z3dregionannotationviewsettingtreemodel.h"
-#include "z3dregionannotationviewsettingtreeview.h"
+#include "zregionannotationviewsettingtreemodel.h"
+#include "zregionannotationviewsettingtreeview.h"
 #include "zmesh.h"
 #include "zrandom.h"
 #include <QFileInfo>
@@ -59,9 +59,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_manipulatorSize, 7);
 
     auto model =
-      new Z3DRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new Z3DRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
   }
   return m_widgetsGroup;
@@ -186,9 +186,9 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
 
   if (m_widgetsGroup) {
     auto model =
-      new Z3DRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new Z3DRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

@@ -2,6 +2,8 @@
 
 #include "zobjdoc.h"
 #include "zlog.h"
+#include "zroifilter.h"
+#include "z3dmeshfilter.h"
 #include <QLabel>
 #include <QApplication>
 
@@ -11,14 +13,18 @@ ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
   ZRegionAnnotation& anno,
   std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
   QObject* parent)
-  : QAbstractItemModel(parent)
-  , m_regionAnnotation(anno)
-  , m_annotationTree(m_regionAnnotation.annotationTree())
-  , m_idToROIFilters(idToROIFilters)
+  : ZRegionAnnotationViewSettingTreeModel(anno, parent)
 {
-  for (auto it = m_annotationTree.begin(); it != m_annotationTree.end(); ++it) {
-    m_nodeToIter[&(*it)] = it;
-  }
+  m_idToROIFilters = &idToROIFilters;
+}
+
+ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
+  ZRegionAnnotation& anno,
+  std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+  QObject* parent)
+  : ZRegionAnnotationViewSettingTreeModel(anno, parent)
+{
+  m_idToMeshFilters = &idToMeshFilters;
 }
 
 QVariant ZRegionAnnotationViewSettingTreeModel::data(const QModelIndex& index, int role) const
@@ -30,7 +36,8 @@ QVariant ZRegionAnnotationViewSettingTreeModel::data(const QModelIndex& index, i
 
   if (role == Qt::CheckStateRole && index.column() == AbbreviationColumn) {
     auto state = Qt::Unchecked;
-    if (m_idToROIFilters.at(item->id)->visible()) {
+    if ((m_idToROIFilters && m_idToROIFilters->at(item->id)->visible()) ||
+        (m_idToMeshFilters && m_idToMeshFilters->at(item->id)->isVisible())) {
       state = Qt::Checked;
     }
     return state;
@@ -93,7 +100,11 @@ bool ZRegionAnnotationViewSettingTreeModel::setData(const QModelIndex& index, co
     auto cs = static_cast<Qt::CheckState>(value.toInt());
 
     auto item = static_cast<RegionNode*>(index.internalPointer());
-    m_idToROIFilters.at(item->id)->setVisible(cs == Qt::Checked);
+    if (m_idToROIFilters) {
+      m_idToROIFilters->at(item->id)->setVisible(cs == Qt::Checked);
+    } else if (m_idToMeshFilters) {
+      m_idToMeshFilters->at(item->id)->setVisible(cs == Qt::Checked);
+    }
     emit dataChanged(index, index);
 //    // update child items check state
 //    updateChildCheckState(index, cs);
@@ -210,14 +221,24 @@ void ZRegionAnnotationViewSettingTreeModel::clicked(const QModelIndex& index)
 {
   if (index.isValid() && headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     auto item = static_cast<RegionNode*>(index.internalPointer());
-    auto wg = m_idToROIFilters.at(item->id)->viewSettingWidgetsGroupForAnnotationFilter();
-    auto label = new QLabel(QString("Region: %1").arg(m_idToROIFilters.at(item->id)->regionName()));
-    m_regionViewSettingEditorWindow.reset(wg->createWidget(true, false, label));
-    m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
-    m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);
-    m_regionViewSettingEditorWindow->showNormal();
-    m_regionViewSettingEditorWindow->raise();
-    m_regionViewSettingEditorWindow->activateWindow();
+    QWidget* wgt = nullptr;
+    if (m_idToROIFilters) {
+      auto wg = m_idToROIFilters->at(item->id)->viewSettingWidgetsGroupForAnnotationFilter();
+      auto label = new QLabel(QString("Region: %1").arg(m_idToROIFilters->at(item->id)->regionName()));
+      wgt = wg->createWidget(true, false, label);
+    } else if (m_idToMeshFilters) {
+      auto wg = m_idToMeshFilters->at(item->id)->widgetsGroupForAnnotationFilter();
+      auto label = new QLabel(QString("Region: %1").arg(m_idToMeshFilters->at(item->id)->regionName()));
+      wgt = wg->createWidget(true, false, label);
+    }
+    m_regionViewSettingEditorWindow.reset(wgt);
+    if (m_regionViewSettingEditorWindow) {
+      m_regionViewSettingEditorWindow->setParent(QApplication::activeWindow());
+      m_regionViewSettingEditorWindow->setWindowFlag(Qt::Window, true);
+      m_regionViewSettingEditorWindow->showNormal();
+      m_regionViewSettingEditorWindow->raise();
+      m_regionViewSettingEditorWindow->activateWindow();
+    }
   }
   //  if (idxIn.isValid()) {
   //    if (idxIn.column() == ViewSettingColumn) {
@@ -267,6 +288,16 @@ void ZRegionAnnotationViewSettingTreeModel::activated(const QModelIndex& /*idxIn
   //    //LOG(INFO) << id;
   //    m_regionAnnotation->sendOpenEditWidgetSignal(id);
   //  }
+}
+
+ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(ZRegionAnnotation& anno, QObject* parent)
+  : QAbstractItemModel(parent)
+  , m_regionAnnotation(anno)
+  , m_annotationTree(m_regionAnnotation.annotationTree())
+{
+  for (auto it = m_annotationTree.begin(); it != m_annotationTree.end(); ++it) {
+    m_nodeToIter[&(*it)] = it;
+  }
 }
 
 } // namespace nim

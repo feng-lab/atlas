@@ -110,11 +110,14 @@ public:
   explicit ZRegionViewSettingLabel(ZROIFilter* roiFilter, QWidget* parent = nullptr,
                                    Qt::WindowFlags f = 0);
 
+  static QSize staticMinimumSizeHint()
+  { return QSize(50, 50); }
+
 protected:
   void paintEvent(QPaintEvent* e) override;
 
   QSize minimumSizeHint() const override
-  { return QSize(50, 50); }
+  { return staticMinimumSizeHint(); }
 
   ZROIFilter* m_roiFilter;
 
@@ -127,11 +130,14 @@ public:
   explicit Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter, QWidget* parent = nullptr,
                                      Qt::WindowFlags f = 0);
 
+  static QSize staticMinimumSizeHint()
+  { return QSize(40, 40); }
+
 protected:
   void paintEvent(QPaintEvent* e) override;
 
   QSize minimumSizeHint() const override
-  { return QSize(40, 40); }
+  { return staticMinimumSizeHint(); }
 
   Z3DMeshFilter* m_meshFilter;
 
