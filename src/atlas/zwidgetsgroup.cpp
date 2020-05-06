@@ -124,7 +124,7 @@ QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* labe
 {
   QLayout* lw = createLayout(createBasic);
   // if is boxLayout, add strech to fill the space
-  if (QBoxLayout* blo = qobject_cast<QBoxLayout*>(lw)) {
+  if (auto blo = qobject_cast<QBoxLayout*>(lw)) {
     if (!noStretch) {
       blo->addStretch();
     }

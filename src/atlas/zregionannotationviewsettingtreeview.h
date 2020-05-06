@@ -37,6 +37,12 @@ protected:
 
   void wheelEvent(QWheelEvent* e) override;
 
+  QSize minimumSizeHint() const override
+  { return QSize(100, 300); }
+
+  QSize sizeHint() const override
+  { return QSize(300, 300); }
+
 private:
   ZRegionAnnotationViewSettingTreeModel& m_ratModel;
   ZRegionAnnotation& m_regionAnnotation;

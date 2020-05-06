@@ -91,7 +91,7 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4);
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
   }
   return m_widgetsGroup;
@@ -221,7 +221,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters, &m_view), 4);
+      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

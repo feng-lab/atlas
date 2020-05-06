@@ -46,9 +46,9 @@ public:
     Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROIFFPolygon
   };
 
-  ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
+  explicit ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
 
-  ~ZView();
+  ~ZView() override;
 
   inline QAction* copyAction()
   { return m_copyAction; }

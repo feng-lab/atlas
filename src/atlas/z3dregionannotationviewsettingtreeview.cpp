@@ -83,13 +83,14 @@ Z3DRegionAnnotationViewSettingTreeView::Z3DRegionAnnotationViewSettingTreeView(
   connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
           this, &Z3DRegionAnnotationViewSettingTreeView::adaptColumns);
 
-  //setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+  //setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   verticalScrollBar()->setDisabled(true);
   // setVerticalScrollMode(QTreeView::ScrollPerItem);
 
   setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
   adaptColumns();
+  // setMaximumWidth(300);
 }
 
 void Z3DRegionAnnotationViewSettingTreeView::contextMenu(const QPoint& /*pos*/)

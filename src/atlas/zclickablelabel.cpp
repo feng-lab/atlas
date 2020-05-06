@@ -378,17 +378,17 @@ void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   for (int i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
       painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.0 * 5 * height,
+        QRectF(contentsRect().left() + i * width, contentsRect().top(),
                std::min(contentsRect().width() - i * width - 1, width), height), color2);
       painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.25 * 5 * height,
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
                std::min(contentsRect().width() - i * width - 1, width), height), color1);
     } else {
       painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.0 * 5 * height,
+        QRectF(contentsRect().left() + i * width, contentsRect().top(),
                std::min(contentsRect().width() - i * width - 1, width), height), color1);
       painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.25 * 5 * height,
+        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
                std::min(contentsRect().width() - i * width - 1, width), height), color2);
     }
   }
