@@ -10,18 +10,41 @@
 
 namespace nim {
 
-ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
-  : QDialog(parent), m_doc(doc)
+ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection, QWidget* parent)
+  : QDialog(parent), m_objDoc(&objDoc), m_multipleSelection(multipleSelection)
 {
-  setWindowTitle(QString("Choose %1").arg(m_doc.typeName()));
+  setWindowTitle(QString("Choose %1").arg(m_objDoc->typeName()));
   createWidget();
-  QList<size_t> objs = m_doc.objs();
+  QList<size_t> objs = m_objDoc->objs();
 
   for (int i = 0; i < objs.size(); ++i) {
     size_t id = objs[i];
     auto item = new QTreeWidgetItem(m_treeWidget,
-                                    QStringList() << m_doc.objName(id)
-                                                  << QDir::toNativeSeparators(m_doc.objPath(id)));
+                                    QStringList() << m_objDoc->objName(id)
+                                                  << QDir::toNativeSeparators(m_objDoc->objPath(id)));
+    item->setData(0, Qt::UserRole, QVariant::fromValue(id));
+    item->setSelected(i == 0);
+  }
+
+  m_treeWidget->resizeColumnToContents(0);
+#ifdef __APPLE__
+  m_treeWidget->setAlternatingRowColors(true);
+#endif
+}
+
+ZChooseObjDialog::ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWidget* parent)
+  : QDialog(parent), m_doc(&doc), m_multipleSelection(multipleSelection)
+{
+  setWindowTitle(QString("Choose object"));
+  createWidget();
+  QList<size_t> objs = m_doc->objs();
+
+  for (int i = 0; i < objs.size(); ++i) {
+    size_t id = objs[i];
+    auto objDoc = m_doc->idToDoc(id);
+    auto item = new QTreeWidgetItem(m_treeWidget,
+                                    QStringList() << objDoc->objName(id)
+                                                  << QDir::toNativeSeparators(objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
     item->setSelected(i == 0);
   }
@@ -35,15 +58,28 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& doc, QWidget* parent)
 void ZChooseObjDialog::createWidget()
 {
   auto lo = new QVBoxLayout(this);
-  m_label = new QLabel(QString("Choose one %1:").arg(m_doc.typeName()), this);
+  if (m_objDoc) {
+    if (m_multipleSelection) {
+      m_label = new QLabel(QString("Choose some %1:").arg(m_objDoc->typeName()), this);
+    } else {
+      m_label = new QLabel(QString("Choose one %1:").arg(m_objDoc->typeName()), this);
+    }
+  } else if (m_doc) {
+    if (m_multipleSelection) {
+      m_label = new QLabel(QString("Choose some objects"), this);
+    } else {
+      m_label = new QLabel(QString("Choose one object"), this);
+    }
+  }
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);
   m_treeWidget->setColumnCount(2);
   m_treeWidget->setHeaderHidden(true);
   m_treeWidget->setItemsExpandable(true);
   m_treeWidget->setMinimumWidth(500);
-  m_treeWidget->setSelectionMode(QAbstractItemView::SingleSelection);
-  connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZChooseObjDialog::updateSelectedID);
+  m_treeWidget->setSelectionMode(
+    m_multipleSelection ? QAbstractItemView::MultiSelection : QAbstractItemView::SingleSelection);
+  connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZChooseObjDialog::updateSelectedIDs);
   m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
   lo->addWidget(m_label);
@@ -58,13 +94,12 @@ void ZChooseObjDialog::createWidget()
           this, &ZChooseObjDialog::reject);
 }
 
-void ZChooseObjDialog::updateSelectedID()
+void ZChooseObjDialog::updateSelectedIDs()
 {
+  m_selectedIDs.clear();
   QList<QTreeWidgetItem*> sis = m_treeWidget->selectedItems();
-  if (sis.empty()) {
-    m_selectedID = 0;
-  } else {
-    m_selectedID = sis[0]->data(0, Qt::UserRole).value<size_t>();
+  for (auto item : m_treeWidget->selectedItems()) {
+    m_selectedIDs.push_back(item->data(0, Qt::UserRole).value<size_t>());
   }
 }
 

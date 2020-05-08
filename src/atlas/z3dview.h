@@ -34,6 +34,8 @@ public:
 
   ~Z3DView();
 
+  const ZDoc& doc() const;
+
   inline QAction* zoomInAction()
   { return m_zoomInAction; }
 
@@ -99,6 +101,28 @@ public:
   QList<Z3DObjView*> objViews()
   { return m_3dObjViews; }
 
+  ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t> ids) const;
+
+  ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t> ids) const;
+
+  void cameraFocusesOn(double x, double y, double z, double radius = 64)
+  { m_globalParas->cameraFocusesOn(x, y, z, radius); }
+
+  void cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double minRadius = 64)
+  { m_globalParas->cameraFocusesOn(bound, minRadius); }
+
+  void cameraPointsTo(double x, double y, double z)
+  { m_globalParas->cameraPointsTo(x, y, z); }
+
+  void cameraPointsTo(const ZBBox<glm::dvec3>& bound)
+  { m_globalParas->cameraPointsTo(bound); }
+
+  void flipView(); //Look from the oppsite side
+
+  void setXZView();
+
+  void setYZView();
+
 signals:
 
   void objViewReady(size_t id);
@@ -114,15 +138,6 @@ private:
   void resetCameraCenter();
 
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
-
-  void gotoPosition(double x, double y, double z, double radius = 64);
-
-  void gotoPosition(const ZBBox<glm::dvec3>& bound, double minRadius = 64);
-
-  void flipView(); //Look from the oppsite side
-  void setXZView();
-
-  void setYZView();
 
   bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
                                      bool clockWise, int numFrame, int width, int height,

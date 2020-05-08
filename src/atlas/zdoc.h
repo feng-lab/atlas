@@ -44,6 +44,8 @@ public:
 
   explicit ZDoc(QObject* parent = nullptr);
 
+  std::vector<size_t> chooseObjsWithWidget(const QString& title, QWidget* parent) const;
+
   bool hasObj() const;
 
   size_t numObjs() const;

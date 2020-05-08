@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zbbox.h"
 #include "znumericparameter.h"
 #include "z3dcameraparameter.h"
 #include "z3dpickingmanager.h"
@@ -13,11 +14,13 @@ class Z3DCanvas;
 
 class ZWidgetsGroup;
 
+class Z3DView;
+
 class Z3DGlobalParameters : public QObject
 {
 Q_OBJECT
 public:
-  Z3DGlobalParameters(Z3DCanvas& canvas);
+  Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view);
 
   const std::vector<ZParameter*>& parameters() const
   { return m_parameters; }
@@ -56,6 +59,14 @@ public:
   // must call
   void setPickingTarget(Z3DRenderTarget& rt)
   { pickingManager.setRenderTarget(rt); }
+
+  void cameraFocusesOn(double x, double y, double z, double radius = 64);
+
+  void cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double minRadius = 64);
+
+  void cameraPointsTo(double x, double y, double z);
+
+  void cameraPointsTo(const ZBBox<glm::dvec3>& bound);
 
 private:
   void updateLightsArray();
@@ -107,6 +118,8 @@ private:
   std::vector<glm::vec3> m_lightSpotDirectionArray;
 
   Z3DCanvas& m_canvas;
+
+  Z3DView& m_view;
 };
 
 } // namespace nim

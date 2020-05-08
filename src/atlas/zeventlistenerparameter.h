@@ -4,6 +4,7 @@
 #include <QList>
 #include <QMouseEvent>
 #include <QKeyEvent>
+#include <QContextMenuEvent>
 
 namespace nim {
 
@@ -30,6 +31,9 @@ public:
   void listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
                 QEvent::Type type = QEvent::KeyPress);
 
+  void listenToContextMenuEvent()
+  { if (!m_listeningToContextMenuEvent) { m_listeningToContextMenuEvent = true; emit valueChanged(); } }
+
   void clearAll();
 
   void sendEvent(QEvent* e, int w, int h);
@@ -55,6 +59,8 @@ signals:
   void keyEventTriggered(QKeyEvent* e, int w, int h);
 
   void wheelEventTriggered(QWheelEvent* e, int w, int h);
+
+  void contextMenuEventTriggered(QContextMenuEvent* e, int w, int h);
 
 protected:
   struct MouseEvent
@@ -89,6 +95,7 @@ private:
   bool m_sharing;
   QList<MouseEvent> m_mouseEvents;
   QList<KeyEvent> m_keyEvents;
+  bool m_listeningToContextMenuEvent;
 };
 
 } // namespace nim

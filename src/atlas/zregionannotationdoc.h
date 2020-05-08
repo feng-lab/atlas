@@ -23,10 +23,10 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "RegionAnnotation"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "RegionAnnotations"; }
 
   bool canReadFile(const QString& fileName) override;
@@ -35,31 +35,31 @@ public:
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] QList<QAction*> loadFileActions() const override;
 
-  QMenu* processObjMenu() const override;
+  [[nodiscard]] QMenu* processObjMenu() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
   QUndoStack* objUndoStack(size_t id) override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
   QWidget* createObjEditWidget(size_t id) override;
 
@@ -113,9 +113,9 @@ private:
 private:
   std::map<size_t, std::shared_ptr<RegionAnnotationPack>> m_idToRegionAnnotationPacks;
 
-  QAction* m_loadRegionAnnotationAction;
-  QAction* m_importLabelImageAction;
-  QAction* m_exportLabelImageAction;
+  QAction* m_loadRegionAnnotationAction = nullptr;
+  QAction* m_importLabelImageAction = nullptr;
+  QAction* m_exportLabelImageAction = nullptr;
 };
 
 } // namespace nim

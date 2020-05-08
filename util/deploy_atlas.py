@@ -15,7 +15,7 @@ def get_bak_file_name(orig_file: str):
     return orig_file + '.bak'
 
 
-def update_pacakge_xml_version(template_file:str, file: str):
+def update_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
     tree.find('Version').text = '{0:%Y.%m.%d.%H}'.format(datetime.datetime.now())
     tree.find('ReleaseDate').text = '{0:%Y-%m-%d}'.format(datetime.datetime.now())
@@ -23,7 +23,7 @@ def update_pacakge_xml_version(template_file:str, file: str):
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
-def update_maintenance_pacakge_xml_version(template_file:str, file: str):
+def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
     tree.find('Version').text = '3.2.2'  # todo: get version and date from qt components.xml
     tree.find('ReleaseDate').text = '2020-03-13'
@@ -218,7 +218,7 @@ def build_atlas_installer():
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
     if sys.platform.startswith('win'):
-        zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w')\
+        zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w') \
             .write(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), arcname=installer_app_name)
     else:
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],

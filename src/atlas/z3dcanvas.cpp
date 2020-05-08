@@ -282,7 +282,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
   m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
-  
+
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
 }
 
@@ -305,6 +305,11 @@ void Z3DCanvas::toggleFullScreen()
 void Z3DCanvas::updateAll()
 {
   m_glWidget->update();
+}
+
+void Z3DCanvas::contextMenuEvent(QContextMenuEvent* event)
+{
+  broadcastEvent(event, width(), height());
 }
 
 void Z3DCanvas::enterEvent(QEvent* e)

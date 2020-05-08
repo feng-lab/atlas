@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas)
+Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   : geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
@@ -22,6 +22,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas)
   , pickingManager()
   , interactionHandler("Interaction Handler", &camera)
   , m_canvas(canvas)
+  , m_view(view)
 {
   geometriesMultisampleMode.addOptions("None", "2x2");
   geometriesMultisampleMode.select("2x2");
@@ -51,6 +52,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas)
   addParameter(transparencyMethod);
   addParameter(weightedBlendedDepthScale);
 
+  auto cameraParameterIndex = m_parameters.size();
   addParameter(camera);
 
   // lights
@@ -224,20 +226,17 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas)
   addParameter(fogDensity);
 
   m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
-  m_widgetsGrp->addChild(geometriesMultisampleMode, 1);
-  m_widgetsGrp->addChild(transparencyMethod, 1);
-  m_widgetsGrp->addChild(weightedBlendedDepthScale, 1);
-  m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera)), 1);
-  m_widgetsGrp->addChild(camera, 1);
   m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
-  m_widgetsGrpNoCamera->addChild(geometriesMultisampleMode, 1);
-  m_widgetsGrpNoCamera->addChild(transparencyMethod, 1);
-  m_widgetsGrpNoCamera->addChild(weightedBlendedDepthScale, 1);
-  for (size_t i = 3; i < m_parameters.size(); ++i) {
-    m_widgetsGrp->addChild(*m_parameters[i], 1);
-    m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);
+  for (size_t i = 0; i < m_parameters.size(); ++i) {
+    if (i == cameraParameterIndex) {
+      m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_view)), 1);
+      m_widgetsGrp->addChild(*m_parameters[i], 1);
+    } else {
+      m_widgetsGrp->addChild(*m_parameters[i], 1);
+      m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);
+    }
   }
-  
+
   pickingManager.setDevicePixelRatio(m_canvas.devicePixelRatioF());
 }
 
@@ -272,6 +271,37 @@ void Z3DGlobalParameters::updateLightsArray()
     m_lightSpotExponentArray[i] = lightSpotExponent[i]->get();
     m_lightSpotDirectionArray[i] = lightSpotDirection[i]->get();
   }
+}
+
+void Z3DGlobalParameters::cameraFocusesOn(double x, double y, double z, double radius)
+{
+  ZBBox<glm::dvec3> bound(glm::dvec3(x, y, z) - radius, glm::dvec3(x, y, z) + radius);
+  camera.resetCamera(bound, Z3DCamera::ResetOption::ResetAll);
+}
+
+void Z3DGlobalParameters::cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double minRadius)
+{
+  if (bound.empty()) {
+    return;
+  }
+  glm::dvec3 cent = (bound.minCorner() + bound.maxCorner()) / 2.;
+  auto bd = bound;
+  bd.expand(ZBBox<glm::dvec3>(cent - minRadius, cent + minRadius));
+  camera.resetCamera(bd, Z3DCamera::ResetOption::PreserveViewVector);
+}
+
+void Z3DGlobalParameters::cameraPointsTo(double x, double y, double z)
+{
+  camera.setCenter(glm::vec3(x, y, z));
+}
+
+void Z3DGlobalParameters::cameraPointsTo(const ZBBox<glm::dvec3>& bound)
+{
+  if (bound.empty()) {
+    return;
+  }
+  auto cent = glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.);
+  camera.setCenter(cent);
 }
 
 } // namespace nim

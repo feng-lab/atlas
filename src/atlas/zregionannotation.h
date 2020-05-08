@@ -33,7 +33,7 @@ public:
 
   void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras) const;
 
-  size_t numRegions() const
+  [[nodiscard]] size_t numRegions() const
   { return m_ontology.size(); }
 
   void mergeROIToRegion(const ZROI& roi, int64_t regionID);
@@ -43,16 +43,16 @@ public:
   void changeROIRegion(ZROI& roi, int slice, size_t id, int64_t regionID);
 
   // return nullptr if not exist
-  const ZMesh* meshOfRegion(int64_t regionID) const;
+  [[nodiscard]] const ZMesh* meshOfRegion(int64_t regionID) const;
 
-  const ZROI* roiOfRegion(int64_t regionID) const;
+  [[nodiscard]] const ZROI* roiOfRegion(int64_t regionID) const;
 
-  QString nameOfRegion(int64_t regionID) const;
+  [[nodiscard]] QString nameOfRegion(int64_t regionID) const;
 
-  const ZBBox<glm::ivec4>& boundBox() const
+  [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
-  const ZTree<RegionNode>& annotationTree() const
+  [[nodiscard]] const ZTree<RegionNode>& annotationTree() const
   { return m_ontology; }
 
   ZTree<RegionNode>& annotationTree()
@@ -88,7 +88,7 @@ public:
   // apply transformation to mesh
   void transformMesh(const glm::mat4& transformation);
 
-  ZBBox<glm::ivec4> copiedItemBoundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> copiedItemBoundBox() const;
 
 signals:
 
@@ -108,7 +108,7 @@ private:
 
   void transformMesh_Impl(const glm::mat4& trans);
 
-  ZTree<RegionNode> copyAnnotationTreeWithDeepCopyedMesh() const;
+  [[nodiscard]] ZTree<RegionNode> copyAnnotationTreeWithDeepCopyedMesh() const;
 
   void updateBoundBox();
 
@@ -118,9 +118,9 @@ private:
   friend class ZRegionAnnotationUpdateMeshCommand;
   friend class ZRegionAnnotationTransformMeshCommand;
 
-  double m_voxelSizeX; //todo : these fields should always be available
-  double m_voxelSizeY;
-  double m_voxelSizeZ;
+  double m_voxelSizeX = 0.0; //todo : these fields should always be available
+  double m_voxelSizeY = 0.0;
+  double m_voxelSizeZ = 0.0;
   ZTree<RegionNode> m_ontology;
   ZBBox<glm::ivec4> m_boundBox;
 

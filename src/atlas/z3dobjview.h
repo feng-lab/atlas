@@ -24,6 +24,11 @@ public:
 
   virtual bool hasObj(size_t id) const = 0;
 
+  // return default ZBBox if object id is not the current type
+  virtual ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const = 0;
+
+  virtual ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const = 0;
+
   virtual void read(size_t id, const QJsonObject& json) = 0;
 
   virtual void write(size_t id, QJsonObject& json) const = 0;

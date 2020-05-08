@@ -9,7 +9,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
 
 namespace nim {
@@ -124,7 +123,7 @@ QList<QAction*> ZRegionAnnotationDoc::loadFileActions() const
 
 QMenu* ZRegionAnnotationDoc::processObjMenu() const
 {
-  QMenu* res = new QMenu(typeName());
+  auto res = new QMenu(typeName());
   res->addAction(m_importLabelImageAction);
   //res->addAction(m_exportLabelImageAction);
   return res;
@@ -281,7 +280,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
   QList<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
-  if (m_idToRegionAnnotationPacks.size() == 0) {
+  if (m_idToRegionAnnotationPacks.empty()) {
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("No RegionAnnotation to Export"));
     return;
@@ -292,7 +291,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
                              "Right now this function only works when there is only one regionannotation object"));
     return;
   }
-  int id = m_idToRegionAnnotationPacks.begin()->first;
+  auto id = m_idToRegionAnnotationPacks.begin()->first;
   if (m_idToRegionAnnotationPacks.begin()->second->hasUnsavedChange) {
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                           tr("Please Save RegionAnnotation First"));
@@ -338,7 +337,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
 
 void ZRegionAnnotationDoc::setModified()
 {
-  if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
+  if (auto ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (const auto& idPack : m_idToRegionAnnotationPacks) {
       if (idPack.second->regionAnnotation == ra) {
         if (!idPack.second->hasUnsavedChange) {
@@ -354,7 +353,7 @@ void ZRegionAnnotationDoc::setModified()
 
 void ZRegionAnnotationDoc::setModified(bool clean)
 {
-  if (ZRegionAnnotation* ra = qobject_cast<ZRegionAnnotation*>(sender())) {
+  if (auto ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (const auto& idPack : m_idToRegionAnnotationPacks) {
       if (idPack.second->regionAnnotation == ra) {
         if (clean && idPack.second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {

@@ -159,6 +159,9 @@ public:
   inline glm::mat4 coordTransform() const
   { return m_coordTransform.get(); }
 
+  inline glm::mat4 inverseCoordTransform() const
+  { return glm::inverse(m_coordTransform.get()); }
+
   inline float opacity() const
   { return m_opacity.get(); }
 

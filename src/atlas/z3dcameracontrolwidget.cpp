@@ -1,5 +1,7 @@
 #include "z3dcameracontrolwidget.h"
 
+#include "z3dview.h"
+#include "zdoc.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPushButton>
@@ -7,9 +9,10 @@
 
 namespace nim {
 
-Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, QWidget* parent)
+Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DView& view, QWidget* parent)
   : QWidget(parent)
   , m_camera(camera)
+  , m_view(view)
 {
   createWidget();
 }
@@ -52,6 +55,58 @@ void Z3DCameraControlWidget::pitch()
     double angle = glm::radians(double(m_pitchDegreeSpinBox->value()));
     m_camera.pitch(angle);
   }
+}
+
+void Z3DCameraControlWidget::focusOn()
+{
+  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Focuses on objects..."), this);
+  if (!objIDs.empty()) {
+    m_view.cameraFocusesOn(m_view.boundBoxOfObjsAfterClipping(objIDs));
+  }
+}
+
+void Z3DCameraControlWidget::focusOnIgnoreClipping()
+{
+  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Focuses on objects (ignore clipping)..."), this);
+  if (!objIDs.empty()) {
+    m_view.cameraFocusesOn(m_view.boundBoxOfObjs(objIDs));
+  }
+}
+
+void Z3DCameraControlWidget::pointsTo()
+{
+  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Camera points to objects..."), this);
+  if (!objIDs.empty()) {
+    m_view.cameraPointsTo(m_view.boundBoxOfObjsAfterClipping(objIDs));
+  }
+}
+
+void Z3DCameraControlWidget::pointsToIgnoreClipping()
+{
+  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Camera points to objects (ignore clipping)..."), this);
+  if (!objIDs.empty()) {
+    m_view.cameraPointsTo(m_view.boundBoxOfObjs(objIDs));
+  }
+}
+
+void Z3DCameraControlWidget::flipView()
+{
+  m_view.flipView();
+}
+
+void Z3DCameraControlWidget::setXYView()
+{
+  m_view.resetCameraAction()->trigger();
+}
+
+void Z3DCameraControlWidget::setXZView()
+{
+  m_view.setXZView();
+}
+
+void Z3DCameraControlWidget::setYZView()
+{
+  m_view.setYZView();
 }
 
 void Z3DCameraControlWidget::createWidget()
@@ -136,6 +191,52 @@ void Z3DCameraControlWidget::createWidget()
   m_pitchDegreeSpinBox->setValue(90);
   m_pitchDegreeSpinBox->setSuffix(" degrees");
   hlo->addWidget(m_pitchDegreeSpinBox);
+  vlo->addLayout(hlo);
+
+  m_focusOnButton = new QPushButton("Focuses on Objects...", this);
+  m_focusOnButton->setToolTip(
+    "Set the camera to focus on the selected objects");
+  connect(m_focusOnButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::focusOn);
+  vlo->addWidget(m_focusOnButton);
+
+  m_focusOnIgnoreClippingButton = new QPushButton("Focuses on Objects (ignore clipping)...", this);
+  m_focusOnIgnoreClippingButton->setToolTip(
+    "Set the camera to focus on the selected objects, clipping of selected objects are ignored.");
+  connect(m_focusOnIgnoreClippingButton, &QPushButton::clicked,
+          this, &Z3DCameraControlWidget::focusOnIgnoreClipping);
+  vlo->addWidget(m_focusOnIgnoreClippingButton);
+
+  m_moveCenterButton = new QPushButton("Camera Points to Objects...", this);
+  m_moveCenterButton->setToolTip(
+    "Move the center of camera to the center of selected objects, camera position will not be changed.");
+  connect(m_moveCenterButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::pointsTo);
+  vlo->addWidget(m_moveCenterButton);
+
+  m_moveCenterIgnoreClippingButton = new QPushButton("Camera Points to Objects (ignore clipping)...", this);
+  m_moveCenterIgnoreClippingButton->setToolTip(
+    "Move the center of camera to the center of selected objects ignoring their clippings, "
+    "camera position will not be changed.");
+  connect(m_moveCenterIgnoreClippingButton, &QPushButton::clicked,
+          this, &Z3DCameraControlWidget::pointsToIgnoreClipping);
+  vlo->addWidget(m_moveCenterIgnoreClippingButton);
+
+  hlo = new QHBoxLayout;
+  m_flipViewButton = new QPushButton("Flip", this);
+  m_flipViewButton->setToolTip("Look from the oppsite side.");
+  connect(m_flipViewButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::flipView);
+  hlo->addWidget(m_flipViewButton);
+  m_setXYViewButton = new QPushButton("XY", this);
+  m_setXYViewButton->setToolTip("reset to XY view.");
+  connect(m_setXYViewButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::setXYView);
+  hlo->addWidget(m_setXYViewButton);
+  m_setXZViewButton = new QPushButton("XZ", this);
+  m_setXZViewButton->setToolTip("reset to XZ view.");
+  connect(m_setXZViewButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::setXZView);
+  hlo->addWidget(m_setXZViewButton);
+  m_setYZViewButton = new QPushButton("YZ", this);
+  m_setYZViewButton->setToolTip("reset to YZ view.");
+  connect(m_setYZViewButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::setYZView);
+  hlo->addWidget(m_setYZViewButton);
   vlo->addLayout(hlo);
 
   setLayout(vlo);

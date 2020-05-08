@@ -1,7 +1,5 @@
 import os
 import sys
-import xml.etree.ElementTree as eTree
-import difflib
 from pkg_resources import parse_version
 import shutil
 import glob
@@ -353,7 +351,7 @@ def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: 
     package_unpack_folder = get_package_top_level_folder(package_name, target_dir)
     if not os.path.exists(package_unpack_folder):
         remove_old_src_folder_with_glob(os.path.join(target_dir, tool_folder_glob_name))
-        unpack_file_to_folder(package_name,target_dir)
+        unpack_file_to_folder(package_name, target_dir)
         assert os.path.exists(package_unpack_folder)
     return package_unpack_folder
 

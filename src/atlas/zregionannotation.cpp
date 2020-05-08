@@ -1,11 +1,9 @@
 #include "zregionannotation.h"
 
 #include "zexception.h"
-#include "zioutils.h"
 #include "zimgconnectedcomponents.h"
 #include "zlog.h"
 #include "zimgfillhole.h"
-#include "zimgsigneddistancemap.h"
 #include "zbenchtimer.h"
 #include <QStandardPaths>
 #include <QFile>
@@ -171,8 +169,8 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   ZImg labelImg = origLabelImg;
   info.setVoxelFormat<uint8_t>();
   ZImg binaryImg(info);
-  int64_t maxPossibleLabelInImg = origLabelImg.dataRangeMax<int64_t>();
-  int64_t minPossibleLabelInImg = origLabelImg.dataRangeMin<int64_t>();
+  auto maxPossibleLabelInImg = origLabelImg.dataRangeMax<int64_t>();
+  auto minPossibleLabelInImg = origLabelImg.dataRangeMin<int64_t>();
   ZImgFillHole<> imFill;
   imFill.setFullyConnected(true);
   imFill.setForegroundValue(1);
@@ -197,22 +195,22 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     if (createMesh) {
       // create mesh
       it->mesh = std::make_shared<ZMesh>();
-      binaryImgToMesh(binaryImg, *it->mesh.get());
+      binaryImgToMesh(binaryImg, *it->mesh);
     }
     if (createROI) {
       // create contours
       it->roi = this->createROI();
-      binaryImgToROI(binaryImg, *it->roi.get());
+      binaryImgToROI(binaryImg, *it->roi);
     }
 
     // update labelImg: change id to parentID (merge current region to parent region)
-    if (!m_ontology.isRoot(it)) {
+    if (!ZTree<RegionNode>::isRoot(it)) {
       int64_t parentID = it->parentID;
-      auto pit = m_ontology.parent(it);
+      auto pit = ZTree<RegionNode>::parent(it);
       while ((parentID > maxPossibleLabelInImg || parentID < minPossibleLabelInImg) &&
-             !m_ontology.isRoot(pit)) {
+             !ZTree<RegionNode>::isRoot(pit)) {
         parentID = pit->parentID;
-        pit = m_ontology.parent(pit);
+        pit = ZTree<RegionNode>::parent(pit);
       }
       if (parentID <= maxPossibleLabelInImg && parentID >= minPossibleLabelInImg) {
         labelImg.unaryOperation(ChangeValue(it->id, parentID));
@@ -235,7 +233,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 //  }
   LOG(INFO) << "Finish importing label image";
 
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
   if (createMesh) {
     emit allMeshChanged();
@@ -445,10 +443,10 @@ void ZRegionAnnotation::load(const QString& filename)
 
     std::map<int64_t, ZTree<RegionNode>::Iterator> itMap;
     while (!nodeMap.empty()) {
-      std::map<int64_t, RegionNode>::iterator it = nodeMap.begin();
+      auto it = nodeMap.begin();
       while (it != nodeMap.end()) {
         int64_t parentID = it->second.parentID;
-        std::map<int64_t, ZTree<RegionNode>::Iterator>::const_iterator nodeIt = itMap.find(parentID);
+        auto nodeIt = itMap.find(parentID);
         if (nodeIt != itMap.end()) {
           itMap[it->first] = m_ontology.appendChild(nodeIt->second, it->second);
           it = nodeMap.erase(it);

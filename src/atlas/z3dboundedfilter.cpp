@@ -225,6 +225,34 @@ void Z3DBoundedFilter::rotateZM()
   m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), -boost::math::float_constants::degree, m_center);
 }
 
+ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
+{
+  ZBBox<glm::dvec3> res;
+  auto notTransformedBBAfterCutting = notTransformedBoundBoxAfterClipping();
+  if (!notTransformedBBAfterCutting.empty()) {
+    glm::dmat4 tfm(m_rendererBase.coordTransform());
+    auto physicalLUF = notTransformedBBAfterCutting.minCorner();
+    auto physicalRDB = notTransformedBBAfterCutting.maxCorner();
+    res.expand(glm::applyMatrix(tfm, physicalLUF));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalLUF.x, physicalRDB.y, physicalRDB.z)));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalLUF.x, physicalRDB.y, physicalLUF.z)));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalLUF.x, physicalLUF.y, physicalRDB.z)));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalRDB.x, physicalLUF.y, physicalLUF.z)));
+    res.expand(glm::applyMatrix(tfm, physicalRDB));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalRDB.x, physicalRDB.y, physicalLUF.z)));
+    res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalRDB.x, physicalLUF.y, physicalRDB.z)));
+  }
+  return res;
+}
+
+ZBBox<glm::dvec3> Z3DBoundedFilter::notTransformedBoundBoxAfterClipping() const
+{
+  ZBBox<glm::dvec3> res = notTransformedBoundBox();
+  res.setMinCorner(glm::max(res.minCorner(), glm::dvec3(m_xCut.get().x, m_yCut.get().x, m_zCut.get().x)));
+  res.setMaxCorner(glm::min(res.maxCorner(), glm::dvec3(m_xCut.get().y, m_yCut.get().y, m_zCut.get().y)));
+  return res;
+}
+
 void Z3DBoundedFilter::updateBoundBox()
 {
   updateNotTransformedBoundBox();

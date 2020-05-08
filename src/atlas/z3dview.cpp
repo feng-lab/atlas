@@ -101,6 +101,11 @@ Z3DView::~Z3DView()
   m_canvas->getGLFocus();
 }
 
+const ZDoc& Z3DView::doc() const
+{
+  return *m_doc;
+}
+
 std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1) {
@@ -309,18 +314,30 @@ bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
   return res;
 }
 
-void Z3DView::gotoPosition(double x, double y, double z, double radius)
+ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t> ids) const
 {
-  ZBBox<glm::dvec3> bound(glm::dvec3(x, y, z) - radius, glm::dvec3(x, y, z) + radius);
-  camera().resetCamera(bound, Z3DCamera::ResetOption::ResetAll);
+  ZBBox<glm::dvec3> res;
+  for (auto id : ids) {
+    for (auto objView : m_3dObjViews) {
+      if (objView->hasObj(id)) {
+        res.expand(objView->boundBoxOfObj(id));
+      }
+    }
+  }
+  return res;
 }
 
-void Z3DView::gotoPosition(const ZBBox<glm::dvec3>& bound, double minRadius)
+ZBBox<glm::dvec3> Z3DView::boundBoxOfObjsAfterClipping(const std::vector<size_t> ids) const
 {
-  glm::dvec3 cent = (bound.minCorner() + bound.maxCorner()) / 2.;
-  auto bd = bound;
-  bd.expand(ZBBox<glm::dvec3>(cent - minRadius, cent + minRadius));
-  camera().resetCamera(bd, Z3DCamera::ResetOption::PreserveViewVector);
+  ZBBox<glm::dvec3> res;
+  for (auto id : ids) {
+    for (auto objView : m_3dObjViews) {
+      if (objView->hasObj(id)) {
+        res.expand(objView->boundBoxOfObjAfterClipping(id));
+      }
+    }
+  }
+  return res;
 }
 
 void Z3DView::flipView()
@@ -419,7 +436,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
 void Z3DView::init()
 {
   m_canvas->getGLFocus();
-  m_globalParas.reset(new Z3DGlobalParameters(*m_canvas));
+  m_globalParas.reset(new Z3DGlobalParameters(*m_canvas, *this));
 
   // filters
   m_canvasPainter.reset(new Z3DCanvasPainter(*m_globalParas, *m_canvas));

@@ -49,6 +49,12 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
+  // get salient 3d position hit by 2d point
+  // check success before using the returned value
+  // if first hit 3d position is in volume, success will be true,
+  // otherwise don't use the returned value
+  glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
+
 protected:
   void updateSize() override;
 
@@ -59,6 +65,8 @@ protected:
   void fullResolutionRenderingToggled();
 
   void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
+
+  void contextMenuEvent(QContextMenuEvent* e, int w, int h);
 
   //  void invalidateFRVolumeZSlice();
   //  void invalidateFRVolumeYSlice();
@@ -98,6 +106,20 @@ private:
   void updateBlockIDTarget();
 
   void volumeChanged();
+
+  // check success before using the returned value
+  // if first hit 3d position is in volume, success will be true,
+  // otherwise don't use the returned value
+  glm::vec3 getFirstHit3DPosition(int x, int y, int width, int height, bool& success);
+
+  // use first channel intensity
+  glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
+
+  //get 3D position from 2D screen position
+  glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
+
+  //get 3D position from 2D screen position and depth
+  glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
 
 private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
@@ -159,6 +181,7 @@ private:
   ZIntParameter m_zSlice2Position;
 
   ZEventListenerParameter m_leftMouseButtonPressEvent;
+  ZEventListenerParameter m_contextMenuEvent;
   glm::ivec2 m_startCoord;
 };
 

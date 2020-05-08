@@ -18,22 +18,22 @@ Q_OBJECT
 public:
   explicit ZObjDoc(ZDoc& doc);
 
-  inline bool hasObj() const
+  [[nodiscard]] inline bool hasObj() const
   { return !objs().empty(); }
 
-  inline bool hasObjWithID(size_t id) const
+  [[nodiscard]] inline bool hasObjWithID(size_t id) const
   { return m_doc.objsOfDoc(this).contains(id); }
 
-  inline QList<size_t> objs() const
+  [[nodiscard]] inline QList<size_t> objs() const
   { return m_doc.objsOfDoc(this); }
 
-  inline QList<size_t> selectedObjs() const
+  [[nodiscard]] inline QList<size_t> selectedObjs() const
   { return m_doc.selectedObjsOfDoc(this); }
 
-  inline bool isObjSelected(size_t id) const
+  [[nodiscard]] inline bool isObjSelected(size_t id) const
   { return m_doc.isObjSelected(id); }
 
-  inline bool isObjVisible(size_t id) const
+  [[nodiscard]] inline bool isObjVisible(size_t id) const
   { return m_doc.isObjVisible(id); }
 
   ZDoc& doc()
@@ -44,14 +44,14 @@ public:
 
   virtual bool saveAs(size_t id) = 0;
 
-  void showObjInGraphicalShell(size_t id);
+  void showObjInGraphicalShell(size_t id) const;
 
   // popup a widget to let user choose one object, return 0 if user click cancel
   size_t chooseOneObjWithWidget(const QString& title = "", QWidget* parent = nullptr) const;
 
-  virtual QString typeName() const = 0;
+  [[nodiscard]] virtual QString typeName() const = 0;
 
-  virtual QString typePluralName() const = 0;
+  [[nodiscard]] virtual QString typePluralName() const = 0;
 
   virtual bool canReadFile(const QString& fileName) = 0;
 
@@ -61,35 +61,35 @@ public:
 
   virtual size_t loadFile(const QJsonValue& jValue, QString& errorMsg) = 0;
 
-  virtual QList<QAction*> loadFileActions() const = 0;
+  [[nodiscard]] virtual QList<QAction*> loadFileActions() const = 0;
 
-  virtual QMenu* processObjMenu() const
+  [[nodiscard]] virtual QMenu* processObjMenu() const
   { return nullptr; }
 
   // remove obj with id
   virtual void removeObj(size_t id) = 0;
 
   //
-  virtual QString objName(size_t id) const = 0;
+  [[nodiscard]] virtual QString objName(size_t id) const = 0;
 
-  QString objNameWithModifiedMarker(size_t id) const;
+  [[nodiscard]] QString objNameWithModifiedMarker(size_t id) const;
 
-  QString objNameWithModifiedMarkerAndID(size_t id) const;
+  [[nodiscard]] QString objNameWithModifiedMarkerAndID(size_t id) const;
 
-  virtual QString objPath(size_t id) const = 0;
+  [[nodiscard]] virtual QString objPath(size_t id) const = 0;
 
-  virtual bool objHasUnsavedChange(size_t id) const = 0;
+  [[nodiscard]] virtual bool objHasUnsavedChange(size_t id) const = 0;
 
-  virtual QString objInfo(size_t id) const = 0;
+  [[nodiscard]] virtual QString objInfo(size_t id) const = 0;
 
-  virtual QString objDetailedInfo(size_t id) const
+  [[nodiscard]] virtual QString objDetailedInfo(size_t id) const
   {
     Q_UNUSED(id)
     static QString str;
     return str;
   }
 
-  virtual QString objTooltip(size_t id) const = 0;
+  [[nodiscard]] virtual QString objTooltip(size_t id) const = 0;
 
   virtual QUndoStack* objUndoStack(size_t id)
   {
@@ -97,15 +97,15 @@ public:
     return nullptr;
   }
 
-  virtual QJsonValue jsonValue(size_t id) const = 0;
+  [[nodiscard]] virtual QJsonValue jsonValue(size_t id) const = 0;
 
-  virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const = 0;
+  [[nodiscard]] virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const = 0;
 
   // make alias of obj (many id point to same actual object)
   virtual size_t makeAlias(size_t id) = 0;
 
   // has other id point to same object
-  virtual bool isAlias(size_t id) const = 0;
+  [[nodiscard]] virtual bool isAlias(size_t id) const = 0;
 
   virtual QWidget* createObjEditWidget(size_t /*id*/)
   { return nullptr; }

@@ -9,6 +9,7 @@
 #include "zmeshutils.h"
 #include <QMessageBox>
 #include <QApplication>
+#include <QMenu>
 
 namespace nim {
 
@@ -63,6 +64,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_showZSlice2("Show Z Slice 2", false)
   , m_zSlice2Position("Z Slice 2 Position", 0, 0, 1)
   , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
+  , m_contextMenuEvent("Context Menu", false)
 {
   m_baseBoundBoxRenderer.setEnableMultisample(false);
   m_textureCopyRenderer.setDiscardTransparent(true);
@@ -178,6 +180,11 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_leftMouseButtonPressEvent, &ZEventListenerParameter::mouseEventTriggered,
           this, &Z3DImgFilter::leftMouseButtonPressed);
   addEventListener(m_leftMouseButtonPressEvent);
+
+  m_contextMenuEvent.listenToContextMenuEvent();
+  connect(&m_contextMenuEvent, &ZEventListenerParameter::contextMenuEventTriggered,
+          this, &Z3DImgFilter::contextMenuEvent);
+  addEventListener(m_contextMenuEvent);
 
   m_imgRaycasterRenderer.setLayerTarget(m_layerTarget);
   m_imgSliceRenderer.setLayerTarget(m_layerTarget);
@@ -420,6 +427,15 @@ void Z3DImgFilter::renderTransparent(Z3DEye eye)
   m_rendererBase.render(eye, m_textureCopyRenderer);
 }
 
+glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool& success)
+{
+  if (m_imgRaycasterRenderer.compositeMode() == "Direct Volume Rendering") {
+    return getMaxInten3DPositionUnderScreenPoint(x, y, width, height, success);
+  } else {
+    return getFirstHit3DPosition(x, y, width, height, success);
+  }
+}
+
 void Z3DImgFilter::updateSize()
 {
   Z3DBoundedFilter::updateSize();
@@ -469,6 +485,44 @@ void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* /*e*/, int /*w*/, int /*h
   //  if (e->type() == QEvent::MouseButtonRelease) {
   //    toggleInteractionMode(false, this);
   //  }
+}
+
+void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
+{
+  if (isVisible() && isSelected() && m_3dImg) {
+    bool success = false;
+    auto pos3D = get3DPosition(event->pos().x() * qApp->devicePixelRatio(),
+                               event->pos().y() * qApp->devicePixelRatio(),
+                               w * qApp->devicePixelRatio(),
+                               h * qApp->devicePixelRatio(),
+                               success);
+    QMenu menu;
+    QAction* enterSubregionViewAction = success ? menu.addAction("Enter Subregion View") : nullptr;
+    QAction* exitSubregionViewAction = nullptr;
+    if (m_xCut.get() != m_xCut.range() || m_yCut.get() != m_yCut.range() || m_zCut.get() != m_zCut.range()) {
+      exitSubregionViewAction = menu.addAction("Exit Subregion View");
+    }
+    if (menu.isEmpty()) {
+      return;
+    }
+    QAction* selectedAction = menu.exec(event->globalPos());
+    if (enterSubregionViewAction && selectedAction == enterSubregionViewAction) {
+      LOG(INFO) << "open subregion at image coord " << pos3D;
+      auto minCoord = pos3D - 128.f;
+      auto maxCoord = pos3D + 128.f;
+      m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
+      m_yCut.set(glm::vec2(minCoord.y, maxCoord.y));
+      m_zCut.set(glm::vec2(minCoord.z, maxCoord.z));
+      m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBoxAfterClipping());
+      m_fullResolutionRendering.set(true);
+    } else if (exitSubregionViewAction && selectedAction == exitSubregionViewAction) {
+      m_fullResolutionRendering.set(false);
+      m_xCut.set(m_xCut.range());
+      m_yCut.set(m_yCut.range());
+      m_zCut.set(m_zCut.range());
+      m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
+    }
+  }
 }
 
 //void Z3DImgFilter::invalidateFRVolumeZSlice()
@@ -922,6 +976,119 @@ void Z3DImgFilter::updateBlockIDTarget()
 void Z3DImgFilter::volumeChanged()
 {
 
+}
+
+glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool& success)
+{
+  glm::vec3 res(-1);
+  success = false;
+  if (m_imgRaycasterRenderer.hasVisibleRendering() &&
+      (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+    glm::ivec2 pos2D = glm::ivec2(x, height - y);
+    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
+
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
+    if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
+        glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
+      success = true;
+    }
+  }
+  return res;
+}
+
+glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success)
+{
+  glm::vec3 res(-1);
+  glm::vec3 des(-1);
+  success = false;
+  if (m_imgRaycasterRenderer.hasVisibleRendering() && m_3dImg &&
+      (m_outport.hasValidData() || m_rightEyeOutport.hasValidData())) {
+    glm::ivec2 pos2D = glm::ivec2(x, height - y);
+    Z3DRenderOutputPort& port = m_outport.hasValidData() ? m_outport : m_rightEyeOutport;
+
+    glm::vec3 fpos3D = get3DPosition(pos2D, width, height, port);
+    res = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
+    if (glm::all(glm::greaterThanEqual(res, glm::vec3(0.f))) &&
+        glm::all(glm::lessThan(res, glm::vec3(m_3dImg->dimensions())))) {
+      success = true;
+    }
+
+    if (success) {
+      fpos3D = get3DPosition(pos2D, 1.0, width, height);
+      des = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
+      //LWARN() << "start" << res << "to" << des;
+      if (glm::length(des - res) <= 1.f) {  // res is last pixel along current ray direction
+        return res;
+      }
+    }
+  }
+
+  // find maximum intensity voxel start from res along des direction
+  if (success) {
+    double maxInten = m_3dImg->imgPack().value(res.x, res.y, res.z);
+    glm::vec3 p = res;
+    glm::vec3 d = des - res;
+    float N = std::max(std::max(std::abs(d.x), std::abs(d.y)), std::abs(d.z));
+    glm::vec3 stepSize = d / N;
+    while (true) {
+      p = p + stepSize;
+      glm::vec3 roundP = glm::round(p);
+      if (roundP.x < 0 || roundP.x >= m_3dImg->imgPack().imgInfo().width ||
+          roundP.y < 0 || roundP.y >= m_3dImg->imgPack().imgInfo().height ||
+          roundP.z < 0 || roundP.z >= m_3dImg->imgPack().imgInfo().depth) {
+        break;
+      }
+      double inten = m_3dImg->imgPack().value(roundP.x, roundP.y, roundP.z);
+      if (inten > maxInten) {
+        maxInten = inten;
+        res = roundP;
+      }
+    }
+    //LWARN() << "res" << res << "maxInten" << maxInten;
+  }
+  return res;
+}
+
+glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port)
+{
+  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
+  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+
+  glm::ivec4 viewport;
+  viewport[0] = 0;
+  viewport[1] = 0;
+  viewport[2] = width;
+  viewport[3] = height;
+
+  GLfloat WindowPosZ;
+  port.bindTarget();
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadPixels(pos2D.x, pos2D.y, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
+  port.releaseTarget();
+
+  CHECK_GL_ERROR
+  glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, WindowPosZ), modelview,
+                                 projection, viewport);
+
+  return pos;
+}
+
+glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
+{
+  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
+  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+
+  glm::ivec4 viewport;
+  viewport[0] = 0;
+  viewport[1] = 0;
+  viewport[2] = width;
+  viewport[3] = height;
+
+  glm::vec3 pos = glm::unProject(glm::vec3(pos2D.x, pos2D.y, depth), modelview,
+                                 projection, viewport);
+
+  return pos;
 }
 
 } // namespace nim

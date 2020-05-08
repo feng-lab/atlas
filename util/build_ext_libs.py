@@ -1,15 +1,7 @@
-import os
-import stat
-import sys
-import shutil
-import tarfile
-import zipfile
-from pathlib import Path
-import subprocess
 import difflib
+from pathlib import Path
 import json
 import distutils.dir_util
-import glob
 import mmap
 
 from common_dirs import *
@@ -537,7 +529,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
                             'no-shared',
                             'no-tests',
                             'no-ui-console',
-                            #'no-legacy',
+                            # 'no-legacy',
                             '--prefix=' + install_dir,
                             '--openssldir=' + os.path.join(install_dir, 'ssl')],
                            cwd=src_dir, shell=True, check=True, env=env)
@@ -548,6 +540,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
 
 
 def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
+    print(nasm_dir)
     # ssl_src_dir = os.path.join(src_dir, 'third_party', 'boringssl-with-bazel')
     # ssl_install_dir = ext_build_dir()
     # ssl_build_dir = create_build_dir(src_dir)
@@ -838,7 +831,6 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
 
         orig_file = bak_file = None
         orig_file2 = bak_file2 = None
-        orig_file3 = bak_file3 = None
         orig_file4 = bak_file4 = None
         try:
             orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
@@ -852,27 +844,6 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                                r'${BZIP2_INCLUDE_DIRS}'],
                                    to_texts=[r'',
                                              r''])
-
-            # orig_file2 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.h')
-            # bak_file2 = patch_file(orig_file2,
-            #                        from_texts=[r'// intended to be specific to OpenSSL.',
-            #                                    r'SSL_CTX_set1_sigalgs_list',
-            #                                    r'#ifdef OPENSSL_IS_BORINGSSL'],
-            #                        to_texts=['// intended to be specific to OpenSSL.\n'
-            #                                  '#if defined(OPENSSL_IS_BORINGSSL)\n'
-            #                                  '#define FOLLY_OPENSSL_IS_110 (OPENSSL_VERSION_NUMBER >= 0x10100000L)\n'
-            #                                  '#endif\n',
-            #                                  r'SSL_CTX_set1_sigalgs_list_already_exists',
-            #                                  '#ifdef OPENSSL_IS_BORINGSSL\n'
-            #                                  'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s);\n'])
-            #
-            # orig_file3 = os.path.join(src_dir, 'folly', 'portability', 'OpenSSL.cpp')
-            # bak_file3 = patch_file(orig_file3,
-            #                        from_texts=[r'SSL_CTX_set1_sigalgs_list',
-            #                                    r'#ifdef OPENSSL_IS_BORINGSSL'],
-            #                        to_texts=[r'SSL_CTX_set1_sigalgs_list_already_exists',
-            #                                  '#ifdef OPENSSL_IS_BORINGSSL\n'
-            #                                  'const char* SSL_SESSION_get0_hostname(const SSL_SESSION* s) {return s->tlsext_hostname;}\n'])
 
             orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
             bak_file4 = patch_file(orig_file4,
@@ -1095,7 +1066,6 @@ def build_libwebp(src_dir: str, install_dir: str):
 
 
 def build_jxrlib(src_dir: str, install_dir: str):
-
     orig_file = None
     bak_file = None
     try:
@@ -1214,9 +1184,11 @@ def build_assimp(src_dir: str, install_dir: str):
 
             orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
             from_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.'
+                r'@ASSIMP_VERSION_MAJOR@']
             to_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@'
+                r'@CMAKE_SHARED_LIBRARY_SUFFIX@']
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -1343,7 +1315,6 @@ def build_freeimage(src_dir: str, install_dir: str):
 
 
 def build_botan(src_dir: str, install_dir: str):
-
     try:
         python = sys.executable
 
@@ -1419,9 +1390,9 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_USE_SYSTEM_JPEG:BOOL=ON',
                          '-DITK_USE_SYSTEM_PNG:BOOL=ON',
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
-                         #'-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
+                         # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
 
-                         '-DModule_MorphologicalContourInterpolation=ON', # example how to turn on a remote module
+                         '-DModule_MorphologicalContourInterpolation=ON',  # example how to turn on a remote module
                          ],
                         )
 

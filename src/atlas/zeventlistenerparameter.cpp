@@ -39,7 +39,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
   if (!m_isWidgetsEnabled)
     return;
 
-  if (QMouseEvent* mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
+  if (auto mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
     bool accept = false;
     //LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
     for (const auto& me : m_mouseEvents) {
@@ -60,7 +60,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
       if (m_sharing)
         e->ignore();
     }
-  } else if (QWheelEvent* wheelEvent = dynamic_cast<QWheelEvent*>(e)) {
+  } else if (auto wheelEvent = dynamic_cast<QWheelEvent*>(e)) {
     bool accept = false;
     for (const auto& me : m_mouseEvents) {
       accept = true;
@@ -77,7 +77,7 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
       if (m_sharing)
         e->ignore();
     }
-  } else if (QKeyEvent* keyEvent = dynamic_cast<QKeyEvent*>(e)) {
+  } else if (auto keyEvent = dynamic_cast<QKeyEvent*>(e)) {
     bool accept = false;
     for (const auto& ke : m_keyEvents) {
       accept = true;
@@ -90,6 +90,15 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
     if (accept) {
       emit eventTriggered(e, w, h);
       emit keyEventTriggered(keyEvent, w, h);
+
+      if (m_sharing)
+        e->ignore();
+    }
+  } else if (auto contextMenuEvent = dynamic_cast<QContextMenuEvent*>(e)) {
+    bool accept = m_listeningToContextMenuEvent;
+    if (accept) {
+      emit eventTriggered(e, w, h);
+      emit contextMenuEventTriggered(contextMenuEvent, w, h);
 
       if (m_sharing)
         e->ignore();

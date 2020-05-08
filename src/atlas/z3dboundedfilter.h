@@ -70,6 +70,12 @@ public:
   const ZBBox<glm::dvec3>& notTransformedBoundBox() const
   { return m_notTransformedBoundBox; }
 
+  inline glm::mat4 coordTransform() const
+  { return m_rendererBase.coordTransform(); }
+
+  inline glm::mat4 inverseCoordTransform() const
+  { return m_rendererBase.inverseCoordTransform(); }
+
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   glm::vec3 physicalLUF() const
   { return glm::vec3(m_notTransformedBoundBox.minCorner()); }
@@ -149,6 +155,10 @@ public:
   void rotateYM() override;
 
   void rotateZM() override;
+
+  ZBBox<glm::dvec3> axisAlignedBoundBoxAfterClipping() const;
+
+  ZBBox<glm::dvec3> notTransformedBoundBoxAfterClipping() const;
 
 signals:
 

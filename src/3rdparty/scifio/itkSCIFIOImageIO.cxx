@@ -88,7 +88,7 @@ ReturnType valueOfString(const std::string& s)
 {
   ReturnType res;
   if (!(std::istringstream(s) >> res)) {
-    itkGenericExceptionMacro(<<"SCIFIOImageIO: error while converting: " << s);
+    itkGenericExceptionMacro(<<"SCIFIOImageIO: error while converting: " << s)
   }
   return res;
 }
@@ -157,7 +157,7 @@ std::string SCIFIOImageIO::WaitForNewLines(int pipedatalength)
       errorMessage += message;
     } else {
       DestroyJavaProcess();
-      itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. " << errorMessage);
+      itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. " << errorMessage)
     }
   }
 
@@ -170,12 +170,12 @@ void SCIFIOImageIO::CheckError(const std::string& message)
     LOG(ERROR) << "SCIFIOITKBridge caught exception: " << message;
     DestroyJavaProcess();
     //exit(1);
-    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ");
+    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ")
   } else if (message.size() >= 15 && message.substr(0, 15) == "Command failure") {
     LOG(ERROR) << "SCIFIOITKBridge command failed with message: " << message;
     DestroyJavaProcess();
     //exit(1);
-    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ");
+    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ")
   }
 }
 
@@ -345,7 +345,7 @@ void SCIFIOImageIO::CreateJavaProcess()
 #else
   const int pipeResult = pipe(m_Pipe);
   if (pipeResult != 0) {
-    itkExceptionMacro(<<"Error with SCIFIOImageIO pipe.");
+    itkExceptionMacro(<<"Error with SCIFIOImageIO pipe.")
   }
 #endif
 
@@ -359,17 +359,17 @@ void SCIFIOImageIO::CreateJavaProcess()
   switch (state) {
     case itksysProcess_State_Exited: {
       int retCode = itksysProcess_GetExitValue(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exited with return value: " << retCode);
+      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exited with return value: " << retCode)
       break;
     }
     case itksysProcess_State_Error: {
       std::string msg = itksysProcess_GetErrorString(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation error:" << std::endl << msg);
+      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation error:" << std::endl << msg)
       break;
     }
     case itksysProcess_State_Exception: {
       std::string msg = itksysProcess_GetExceptionString(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exception:" << std::endl << msg);
+      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exception:" << std::endl << msg)
       break;
     }
     case itksysProcess_State_Executing: {
@@ -377,15 +377,15 @@ void SCIFIOImageIO::CreateJavaProcess()
       break;
     }
     case itksysProcess_State_Expired: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation expired.");
+      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation expired.")
       break;
     }
     case itksysProcess_State_Killed: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation killed.");
+      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation killed.")
       break;
     }
     case itksysProcess_State_Disowned: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation disowned.");
+      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation disowned.")
       break;
     }
 //     case kwsysProcess_State_Starting:
@@ -393,7 +393,7 @@ void SCIFIOImageIO::CreateJavaProcess()
 //       break;
 //       }
     default: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation is in unknown state.");
+      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation is in unknown state.")
       break;
     }
   }
@@ -454,7 +454,7 @@ bool SCIFIOImageIO::CanReadFile(const char* FileNameToRead)
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -498,7 +498,7 @@ bool SCIFIOImageIO::SetSeries(int series)
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -546,7 +546,7 @@ int SCIFIOImageIO::GetSeriesCount()
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -591,7 +591,7 @@ void SCIFIOImageIO::ReadImageInformation()
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -706,7 +706,7 @@ void SCIFIOImageIO::ReadImageInformation()
   }
 
   // component type
-  itkAssertOrThrowMacro(dict.HasKey("PixelType"), "PixelType is not in the metadata dictionary!");
+  itkAssertOrThrowMacro(dict.HasKey("PixelType"), "PixelType is not in the metadata dictionary!")
   auto pixelType = GetTypedMetaData<int>(dict, "PixelType");
   VLOG(1) << "Setting ComponentType: " << pixelType;
   this->SetComponentType(scifioToITKComponentType(pixelType));
@@ -785,7 +785,7 @@ void SCIFIOImageIO::Read(void* pData)
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -813,7 +813,7 @@ void SCIFIOImageIO::Read(void* pData)
       errorMessage += message;
     } else {
       DestroyJavaProcess();
-      itkExceptionMacro(<<"SCIFIOImageIO: 'SCIFIOITKBridge read' exited abnormally. " << errorMessage);
+      itkExceptionMacro(<<"SCIFIOImageIO: 'SCIFIOITKBridge read' exited abnormally. " << errorMessage)
     }
   }
 }
@@ -833,7 +833,7 @@ bool SCIFIOImageIO::CanWriteFile(const char* name)
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -1019,7 +1019,7 @@ void SCIFIOImageIO::Write(const void* buffer)
 #else
   ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast< ssize_t >( command.size())) {
-    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
+    itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!")
   }
 #endif
 
@@ -1069,7 +1069,7 @@ void SCIFIOImageIO::Write(const void* buffer)
 #else
       writtenBytes = write(m_Pipe[1], data, bytesToRead);
       if (writtenBytes < bytesToRead) {
-        itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << bytesToRead << " bytes!");
+        itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << bytesToRead << " bytes!")
       }
 #endif
 

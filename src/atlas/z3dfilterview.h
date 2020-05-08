@@ -26,6 +26,24 @@ public:
   bool hasObj(size_t id) const override
   { return m_idToFilter.find(id) != m_idToFilter.end(); }
 
+  ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const override
+  {
+    ZBBox<glm::dvec3> res;
+    if (hasObj(id)) {
+      res.expand(m_idToFilter.at(id)->axisAlignedBoundBox());
+    }
+    return res;
+  }
+
+  ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const override
+  {
+    ZBBox<glm::dvec3> res;
+    if (hasObj(id)) {
+      res.expand(m_idToFilter.at(id)->axisAlignedBoundBoxAfterClipping());
+    }
+    return res;
+  }
+
   void read(size_t id, const QJsonObject& json) override
   {
     if (hasObj(id)) {

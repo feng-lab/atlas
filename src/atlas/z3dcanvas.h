@@ -159,6 +159,8 @@ signals:
   void openGLContextInitialized();
 
 protected:
+  void contextMenuEvent(QContextMenuEvent* event) override;
+
   void enterEvent(QEvent* e) override;
 
   void leaveEvent(QEvent* e) override;

@@ -13,6 +13,7 @@
 #include "zregionannotationdoc.h"
 #include "zmeshdoc.h"
 #include "ztheme.h"
+#include "zchooseobjdialog.h"
 #include <QUndoGroup>
 #include <QAction>
 #include <QMessageBox>
@@ -54,6 +55,20 @@ ZDoc::ZDoc(QObject* parent)
 
   m_regionAnnotationDoc = new ZRegionAnnotationDoc(*this);
   registerObjDoc(m_regionAnnotationDoc);
+}
+
+std::vector<size_t> ZDoc::chooseObjsWithWidget(const QString& title, QWidget* parent) const
+{
+  if (hasObj()) {
+    ZChooseObjDialog dlg(*this, true, parent);
+    if (!title.isEmpty()) {
+      dlg.setWindowTitle(title);
+    }
+    if (dlg.exec() == QDialog::Accepted) {
+      return dlg.selectedIDs();
+    }
+  }
+  return std::vector<size_t>();
 }
 
 bool ZDoc::hasObj() const

@@ -21,7 +21,7 @@ ZObjDoc::ZObjDoc(ZDoc& doc)
 {
 }
 
-void ZObjDoc::showObjInGraphicalShell(size_t id)
+void ZObjDoc::showObjInGraphicalShell(size_t id) const
 {
   ZFileUtils::showInGraphicalShell(objPath(id));
 }
@@ -29,7 +29,7 @@ void ZObjDoc::showObjInGraphicalShell(size_t id)
 size_t ZObjDoc::chooseOneObjWithWidget(const QString& title, QWidget* parent) const
 {
   if (hasObj()) {
-    ZChooseObjDialog dlg(*this, parent);
+    ZChooseObjDialog dlg(*this, false, parent);
     if (!title.isEmpty()) {
       dlg.setWindowTitle(title);
     }
