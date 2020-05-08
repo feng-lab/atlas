@@ -25,12 +25,11 @@
 #include "zglobal.h"
 
 #include <cstdio>
-#include <cstdlib>
 
 #include <cmath>
-#include <fstream>
 #include <string>
 #include <sstream>
+#include <utility>
 
 #ifdef _WIN32
 #define SCIFIO_SEP ";"
@@ -49,7 +48,7 @@ namespace {
 void checkLength(long length, double spacing,
                  std::vector<long>& lengthVec, std::vector<double>& spacingVec)
 {
-  if (length > 1 || lengthVec.size() > 0) {
+  if (length > 1 || !lengthVec.empty()) {
     if (spacing <= 0.0) spacing = 1.0;
 
     lengthVec.push_back(length);
@@ -96,10 +95,10 @@ ReturnType valueOfString(const std::string& s)
 
 
 template<typename T>
-T GetTypedMetaData(MetaDataDictionary dict, std::string key)
+T GetTypedMetaData(const MetaDataDictionary& dict, std::string key)
 {
   std::string tmp;
-  ExposeMetaData<std::string>(dict, key, tmp);
+  ExposeMetaData<std::string>(dict, std::move(key), tmp);
   return valueOfString<T>(tmp);
 }
 
@@ -165,14 +164,14 @@ std::string SCIFIOImageIO::WaitForNewLines(int pipedatalength)
   return readBack;
 }
 
-void SCIFIOImageIO::CheckError(std::string message)
+void SCIFIOImageIO::CheckError(const std::string& message)
 {
-  if (message.size() >= 16 && message.substr(0, 16).compare("Caught exception") == 0) {
+  if (message.size() >= 16 && message.substr(0, 16) == "Caught exception") {
     LOG(ERROR) << "SCIFIOITKBridge caught exception: " << message;
     DestroyJavaProcess();
     //exit(1);
     itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ");
-  } else if (message.size() >= 15 && message.substr(0, 15).compare("Command failure") == 0) {
+  } else if (message.size() >= 15 && message.substr(0, 15) == "Command failure") {
     LOG(ERROR) << "SCIFIOITKBridge command failed with message: " << message;
     DestroyJavaProcess();
     //exit(1);
@@ -224,7 +223,7 @@ std::string SCIFIOImageIO::FindDimensionOrder(const ImageIORegion& region)
   return command;
 }
 
-bool SCIFIOImageIO::CheckJavaPath(std::string javaHome, std::string& javaCmd)
+bool SCIFIOImageIO::CheckJavaPath(const std::string& javaHome, std::string& javaCmd)
 {
   std::vector<std::string> javaCmdPath;
 #if defined(_WIN32)
@@ -245,7 +244,7 @@ bool SCIFIOImageIO::CheckJavaPath(std::string javaHome, std::string& javaCmd)
   return false;
 }
 
-std::string SCIFIOImageIO::RemoveFinalSlash(std::string path) const
+std::string SCIFIOImageIO::RemoveFinalSlash(std::string path)
 {
   if (!path.empty() && (path[path.size() - 1] == '/' || path[path.size() - 1] == '\\')) {
     path.resize(path.size() - 1);
@@ -253,7 +252,7 @@ std::string SCIFIOImageIO::RemoveFinalSlash(std::string path) const
   return path;
 }
 
-SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
+SCIFIOImageIO::SCIFIOImageIO() : m_Argv(nullptr)
 {
   this->m_FileType = IOFileEnum::Binary;
 
@@ -261,7 +260,7 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
   std::string scifioPath = nim::ZGlobal::jarsDIR.toStdString();
   if (!itksys::SystemTools::FileExists(scifioPath.c_str(), false)) {
     itkExceptionMacro("SCIFIO_PATH is not set. " << "This environment variable must point to the "
-                                                 << "directory containing the SCIFIO JAR files");
+                                                 << "directory containing the SCIFIO JAR files")
   }
 
   std::vector<std::string> packageCmdPath;
@@ -308,8 +307,8 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(0)
 
 // output the full Java command line, for debugging
   VLOG(1) << "-- JAVA COMMAND --";
-  for (unsigned int i = 0; i < m_Args.size(); ++i) {
-    VLOG(1) << "\t" << m_Args.at(i);
+  for (auto& m_Arg : m_Args) {
+    VLOG(1) << "\t" << m_Arg;
   }
 
 // convert to something usable by itksys
@@ -516,7 +515,7 @@ bool SCIFIOImageIO::SetSeries(int series)
   int p0 = 0;
   int p1 = 0;
   std::string seriesResult;
-  p1 = commandOutput.find("\n", p0);
+  p1 = commandOutput.find('\n', p0);
   seriesResult = commandOutput.substr(p0, p1);
   VLOG(1) << "SetSeries result: " << seriesResult;
 
@@ -565,7 +564,7 @@ int SCIFIOImageIO::GetSeriesCount()
   int p0 = 0;
   int p1 = 0;
   std::string seriesResult;
-  p1 = commandOutput.find("\n", p0);
+  p1 = commandOutput.find('\n', p0);
   seriesResult = commandOutput.substr(p0, p1);
   VLOG(1) << "GetSeriesCount result: " << seriesResult;
 
@@ -708,7 +707,7 @@ void SCIFIOImageIO::ReadImageInformation()
 
   // component type
   itkAssertOrThrowMacro(dict.HasKey("PixelType"), "PixelType is not in the metadata dictionary!");
-  const long pixelType = GetTypedMetaData<long>(dict, "PixelType");
+  auto pixelType = GetTypedMetaData<int>(dict, "PixelType");
   VLOG(1) << "Setting ComponentType: " << pixelType;
   this->SetComponentType(scifioToITKComponentType(pixelType));
 
@@ -746,7 +745,7 @@ void SCIFIOImageIO::ReadImageInformation()
   for (size_t i = 0; i < lengthVec.size(); i++) {
     VLOG(1) << "Setting Length " << i << ": " << lengthVec.at(i);
     VLOG(1) << "Setting Spacing " << i << ": " << spacingVec.at(i);
-    int index = lengthVec.size() - 1 - i;
+    auto index = lengthVec.size() - 1 - i;
     this->SetDimensions(i, lengthVec.at(index));
     this->SetSpacing(i, spacingVec.at(index));
   }
@@ -873,7 +872,7 @@ void SCIFIOImageIO::Write(const void* buffer)
   CreateJavaProcess();
 
   ImageIORegion region = GetIORegion();
-  int regionDim = region.GetImageDimension();
+  auto regionDim = region.GetImageDimension();
 
   std::string command = "write\t";
   VLOG(1) << "File name: " << m_FileName;
@@ -893,25 +892,25 @@ void SCIFIOImageIO::Write(const void* buffer)
   command += toString(regionDim);
   command += "\t";
 
-  for (int i = 0; i < regionDim; ++i) {
+  for (uint32_t i = 0; i < regionDim; ++i) {
     VLOG(1) << "Dimension " << i << ": " << region.GetSize(i);
     command += toString(region.GetSize(i));
     command += "\t";
   }
 
-  for (int i = regionDim; i < 5; ++i) {
+  for (uint32_t i = regionDim; i < 5; ++i) {
     VLOG(1) << "Dimension " << i << ": " << 1;
     command += toString(1);
     command += "\t";
   }
 
-  for (int i = 0; i < regionDim; ++i) {
+  for (uint32_t i = 0; i < regionDim; ++i) {
     VLOG(1) << "Phys Pixel size " << i << ": " << this->GetSpacing(i);
     command += toString(this->GetSpacing(i));
     command += "\t";
   }
 
-  for (int i = regionDim; i < 5; i++) {
+  for (uint32_t i = regionDim; i < 5; i++) {
     VLOG(1) << "Phys Pixel size" << i << ": " << 1;
     command += toString(1);
     command += "\t";
@@ -921,20 +920,20 @@ void SCIFIOImageIO::Write(const void* buffer)
   command += toString(itkToSCIFIOPixelType(GetComponentType()));
   command += "\t";
 
-  int rgbChannelCount = GetNumberOfComponents();
+  auto rgbChannelCount = GetNumberOfComponents();
 
   VLOG(1) << "RGB Channels: " << rgbChannelCount;
   command += toString(rgbChannelCount);
   command += "\t";
 
   // int xIndex = 0, yIndex = 1
-  int zIndex = 2;
-  int cIndex = 3;
-  int tIndex = 4;
+  uint32_t zIndex = 2;
+  uint32_t cIndex = 3;
+  uint32_t tIndex = 4;
   int bytesPerPlane = rgbChannelCount;
   int numPlanes = 1;
 
-  for (int dim = 0; dim < 5; dim++) {
+  for (uint32_t dim = 0; dim < 5; dim++) {
     if (dim < regionDim) {
       int index = region.GetIndex(dim);
       int size = region.GetSize(dim);

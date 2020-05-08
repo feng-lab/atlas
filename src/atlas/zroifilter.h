@@ -159,7 +159,7 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  bool visible() const
+  bool isVisible() const
   { return m_visible.get(); }
 
   void setSelected(bool v);

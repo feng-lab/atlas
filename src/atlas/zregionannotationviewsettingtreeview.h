@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zlog.h"
 #include "zregionannotationviewsettingtreemodel.h"
 #include <QTreeView>
 
@@ -44,12 +45,6 @@ protected:
 
   void wheelEvent(QWheelEvent* e) override;
 
-//  QSize minimumSizeHint() const override
-//  { return QSize(100, 300); }
-//
-//  QSize sizeHint() const override
-//  { return QSize(300, 300); }
-
 private:
   ZRegionAnnotationViewSettingTreeView(ZRegionAnnotationViewSettingTreeModel& objModel,
                                        ZRegionAnnotation& anno,
@@ -60,8 +55,6 @@ private:
   ZRegionAnnotation& m_regionAnnotation;
   QSortFilterProxyModel* m_ratProxyModel;
   QMenu* m_contextMenu;
-  std::map<int, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
-  std::map<int, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
 };
 
 } // namespace nim

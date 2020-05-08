@@ -135,13 +135,13 @@ private:
 
   std::string WaitForNewLines(int pipedatalength);
 
-  void CheckError(std::string message);
+  void CheckError(const std::string& message);
 
-  bool CheckJavaPath(std::string javaHome, std::string& javaCmd);
+  static bool CheckJavaPath(const std::string& javaHome, std::string& javaCmd);
 
-  std::string RemoveFinalSlash(std::string path) const;
+  static std::string RemoveFinalSlash(std::string path) ;
 
-  char** toCArray(std::vector<std::string>& args)
+  static char** toCArray(std::vector<std::string>& args)
   {
     auto** argv = new char* [args.size() + 1];
     for (int i = 0; i < static_cast< int >( args.size()); i++) {
@@ -152,7 +152,7 @@ private:
     return argv;
   }
 
-  ImageIOBase::IOComponentEnum scifioToITKComponentType(int pixelType)
+  static ImageIOBase::IOComponentEnum scifioToITKComponentType(int pixelType)
   {
     switch (pixelType) {
       case 0:
@@ -174,7 +174,7 @@ private:
     }
   }
 
-  int itkToSCIFIOPixelType(ImageIOBase::IOComponentEnum cmp)
+  static int itkToSCIFIOPixelType(ImageIOBase::IOComponentEnum cmp)
   {
     switch (cmp) {
       case IOComponentEnum::CHAR:
@@ -202,7 +202,7 @@ private:
   MetaDataDictionary m_MetaDataDictionary;
   std::vector<std::string> m_Args;
   char** m_Argv;
-  itksysProcess_Pipe_Handle m_Pipe[2];
+  itksysProcess_Pipe_Handle m_Pipe[2]{};
   itksysProcess* m_Process;
 };
 } // end namespace itk

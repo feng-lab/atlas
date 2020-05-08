@@ -25,7 +25,6 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   QWidget* parent)
   : ZRegionAnnotationViewSettingTreeView(objModel, anno, parent)
 {
-  m_idToROIFilters = &idToROIFilters;
   auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(idToROIFilters, this);
   setMouseTracking(false);
   setItemDelegate(delegate);
@@ -38,7 +37,6 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   QWidget* parent)
   : ZRegionAnnotationViewSettingTreeView(objModel, anno, parent)
 {
-  m_idToMeshFilters = &idToMeshFilters;
   auto delegate = new ZRegionAnnotationViewSettingColumnDelegate(idToMeshFilters, this);
   setMouseTracking(false);
   setItemDelegate(delegate);
@@ -69,6 +67,7 @@ void ZRegionAnnotationViewSettingTreeView::indexActivated(const QModelIndex& ind
 void ZRegionAnnotationViewSettingTreeView::adaptColumns()
 {
   resizeColumnToContents(ZRegionAnnotationViewSettingTreeModel::AbbreviationColumn);
+  resizeColumnToContents(ZRegionAnnotationViewSettingTreeModel::WidgetColumn);
 }
 
 void ZRegionAnnotationViewSettingTreeView::keyPressEvent(QKeyEvent* /*e*/)
@@ -144,12 +143,13 @@ ZRegionAnnotationViewSettingTreeView::ZRegionAnnotationViewSettingTreeView(
   //setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
   setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   verticalScrollBar()->setDisabled(true);
+  setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  horizontalScrollBar()->setDisabled(true);
   // setVerticalScrollMode(QTreeView::ScrollPerItem);
 
   setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
-  setMaximumWidth(300);
   adaptColumns();
-  //setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+  header()->setStretchLastSection(false);
 }
 
 } // namespace nim

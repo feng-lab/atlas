@@ -36,7 +36,7 @@ QVariant ZRegionAnnotationViewSettingTreeModel::data(const QModelIndex& index, i
 
   if (role == Qt::CheckStateRole && index.column() == AbbreviationColumn) {
     auto state = Qt::Unchecked;
-    if ((m_idToROIFilters && m_idToROIFilters->at(item->id)->visible()) ||
+    if ((m_idToROIFilters && m_idToROIFilters->at(item->id)->isVisible()) ||
         (m_idToMeshFilters && m_idToMeshFilters->at(item->id)->isVisible())) {
       state = Qt::Checked;
     }
