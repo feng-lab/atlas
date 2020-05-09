@@ -81,7 +81,6 @@ set(IMG_SOURCES
     zimagefilterkernel.h
     zimagesse3.h
     zimg.h
-    zimg.inl
     zimgformat.h
     zimgfreeimage.h
     zimginfo.h

@@ -51,6 +51,71 @@ TEST(Img, UnaryOperator)
   }
 }
 
+TEST(Img, convert)
+{
+  using namespace nim;
+
+  ZImgInfo info(10, 10, 1);
+  ZImg img(info);
+  img.fill(10);
+
+  ZImgRegion rgn1(1,4,1,4);
+  for (ZImgRegionIterator<uint8_t> it = ZImgRegionIterator<uint8_t>(img, rgn1);
+       !it.isAtEnd(); ++it) {
+    *it = 22;
+  }
+  ZImgRegion rgn2(5,8,5,8);
+  for (ZImgRegionIterator<uint8_t> it = ZImgRegionIterator<uint8_t>(img, rgn2);
+       !it.isAtEnd(); ++it) {
+    *it = 33;
+  }
+  img.setValue(44, ZVoxelCoordinate(1, 6));
+  img.setValue(45, ZVoxelCoordinate(2, 7));
+  img.setValue(44, ZVoxelCoordinate(3, 8));
+
+  ZImg img1 = img.convertNormalizedTo();
+  ZImg img2 = img.convertTo(10, 45);
+
+  ZImgRegionIterator<uint8_t> it = ZImgRegionIterator<uint8_t>(img1);
+  ZImgRegionIterator<uint8_t> it1 = ZImgRegionIterator<uint8_t>(img2);
+  for (; !it.isAtEnd(); ++it, ++it1) {
+    ASSERT_EQ(*it, *it1);
+  }
+}
+
+TEST(Img, threshold)
+{
+  using namespace nim;
+
+  ZImgInfo info(10, 10, 1);
+  ZImg img(info);
+  img.fill(10);
+
+  ZImgRegion rgn1(1,4,1,4);
+  for (auto it = ZImgRegionIterator<uint8_t>(img, rgn1); !it.isAtEnd(); ++it) {
+    *it = 22;
+  }
+  ZImgRegion rgn2(5,8,5,8);
+  for (auto it = ZImgRegionIterator<uint8_t>(img, rgn2); !it.isAtEnd(); ++it) {
+    *it = 33;
+  }
+  img.setValue(44, ZVoxelCoordinate(1, 6));
+  img.setValue(45, ZVoxelCoordinate(2, 7));
+  img.setValue(44, ZVoxelCoordinate(3, 8));
+
+  ZImg imgCopy = img;
+
+  img.thresholdAbove(33, ZImg::ThresholdMode::IncludeThreshold, 33);
+  for (auto it = ZImgRegionIterator<uint8_t>(img); !it.isAtEnd(); ++it) {
+    ASSERT_LE(*it, 33_u8);
+  }
+
+  imgCopy.thresholdBelow(33, ZImg::ThresholdMode::IncludeThreshold, 33);
+  for (auto it = ZImgRegionIterator<uint8_t>(imgCopy); !it.isAtEnd(); ++it) {
+    ASSERT_GE(*it, 33_u8);
+  }
+}
+
 TEST(Img, TypedUnaryOperator)
 {
   using namespace nim;

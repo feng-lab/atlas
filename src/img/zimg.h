@@ -5,9 +5,375 @@
 #include "zimgmetadatabase.h"
 #include "zimgmetatag.h"
 #include "zjson.h"
+#include "zsaturateoperation.h"
+#include "zlog.h"
 #include <QStringList>
 
 namespace nim {
+
+// Macro to call the correct version of typed function
+// To work with img of different type,
+// write a function:
+//   template<typename TVoxel>
+//   void function(t1 arg1, t2 arg2) {
+//     ...
+//   }
+//
+// and use this macro to dispatch:
+//   IMG_TYPED_CALL(function, img, arg1, arg2);
+//
+// if the function return something, use
+//   IMG_RETURN_TYPED_CALL(function, img, arg1, arg2);
+//
+//
+#define IMG_TYPED_CALL(function, img, ...) {                \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {         \
+    switch (img.bytesPerVoxel()) {                          \
+    case 1:                                                 \
+      function<uint8_t>(__VA_ARGS__);                       \
+      break;                                                \
+    case 2:                                                 \
+      function<uint16_t>(__VA_ARGS__);                      \
+      break;                                                \
+    case 4:                                                 \
+      function<uint32_t>(__VA_ARGS__);                      \
+      break;                                                \
+    case 8:                                                 \
+      function<uint64_t>(__VA_ARGS__);                      \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  } else if (img.voxelFormat() == VoxelFormat::Float) {     \
+    switch (img.bytesPerVoxel()) {                          \
+    case 4:                                                 \
+      function<float>(__VA_ARGS__);                         \
+      break;                                                \
+    case 8:                                                 \
+      function<double>(__VA_ARGS__);                        \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {    \
+    switch (img.bytesPerVoxel()) {                          \
+    case 1:                                                 \
+      function<int8_t>(__VA_ARGS__);                        \
+      break;                                                \
+    case 2:                                                 \
+      function<int16_t>(__VA_ARGS__);                       \
+      break;                                                \
+    case 4:                                                 \
+      function<int32_t>(__VA_ARGS__);                       \
+      break;                                                \
+    case 8:                                                 \
+      function<int64_t>(__VA_ARGS__);                       \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  }                                                         \
+}
+
+#define IMG_RETURN_TYPED_CALL(function, img, ...) {         \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {         \
+    switch (img.bytesPerVoxel()) {                          \
+    case 1:                                                 \
+      return function<uint8_t>(__VA_ARGS__);                \
+      break;                                                \
+    case 2:                                                 \
+      return function<uint16_t>(__VA_ARGS__);               \
+      break;                                                \
+    case 4:                                                 \
+      return function<uint32_t>(__VA_ARGS__);               \
+      break;                                                \
+    case 8:                                                 \
+      return function<uint64_t>(__VA_ARGS__);               \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  } else if (img.voxelFormat() == VoxelFormat::Float) {     \
+    switch (img.bytesPerVoxel()) {                          \
+    case 4:                                                 \
+      return function<float>(__VA_ARGS__);                  \
+      break;                                                \
+    case 8:                                                 \
+      return function<double>(__VA_ARGS__);                 \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {    \
+    switch (img.bytesPerVoxel()) {                          \
+    case 1:                                                 \
+      return function<int8_t>(__VA_ARGS__);                 \
+      break;                                                \
+    case 2:                                                 \
+      return function<int16_t>(__VA_ARGS__);                \
+      break;                                                \
+    case 4:                                                 \
+      return function<int32_t>(__VA_ARGS__);                \
+      break;                                                \
+    case 8:                                                 \
+      return function<int64_t>(__VA_ARGS__);                \
+      break;                                                \
+    default:                                                \
+      break;                                                \
+    }                                                       \
+  }                                                         \
+}
+
+#define IMGINFO_RETURN_TYPED_CALL(function, info, ...) {  \
+  if (info.voxelFormat == VoxelFormat::Unsigned) {        \
+    switch (info.bytesPerVoxel) {                         \
+    case 1:                                               \
+      return function<uint8_t>(__VA_ARGS__);              \
+      break;                                              \
+    case 2:                                               \
+      return function<uint16_t>(__VA_ARGS__);             \
+      break;                                              \
+    case 4:                                               \
+      return function<uint32_t>(__VA_ARGS__);             \
+      break;                                              \
+    case 8:                                               \
+      return function<uint64_t>(__VA_ARGS__);             \
+      break;                                              \
+    default:                                              \
+      break;                                              \
+    }                                                     \
+  } else if (info.voxelFormat == VoxelFormat::Float) {    \
+    switch (info.bytesPerVoxel) {                         \
+    case 4:                                               \
+      return function<float>(__VA_ARGS__);                \
+      break;                                              \
+    case 8:                                               \
+      return function<double>(__VA_ARGS__);               \
+      break;                                              \
+    default:                                              \
+      break;                                              \
+    }                                                     \
+  } else if (info.voxelFormat == VoxelFormat::Signed) {   \
+    switch (info.bytesPerVoxel) {                         \
+    case 1:                                               \
+      return function<int8_t>(__VA_ARGS__);               \
+      break;                                              \
+    case 2:                                               \
+      return function<int16_t>(__VA_ARGS__);              \
+      break;                                              \
+    case 4:                                               \
+      return function<int32_t>(__VA_ARGS__);              \
+      break;                                              \
+    case 8:                                               \
+      return function<int64_t>(__VA_ARGS__);              \
+      break;                                              \
+    default:                                              \
+      break;                                              \
+    }                                                     \
+  }                                                       \
+}
+
+// for function that take 2 template argument
+// first one is derived from img, second one is provided by user
+#define IMG_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {                   \
+    switch (img.bytesPerVoxel()) {                                    \
+    case 1:                                                           \
+      function<uint8_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                          \
+    case 2:                                                           \
+      function<uint16_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                          \
+    case 4:                                                           \
+      function<uint32_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                          \
+    case 8:                                                           \
+      function<uint64_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                          \
+    default:                                                          \
+      break;                                                          \
+    }                                                                 \
+  } else if (img.voxelFormat() == VoxelFormat::Float) {               \
+    switch (img.bytesPerVoxel()) {                                    \
+    case 4:                                                           \
+      function<float, T2ND>(__VA_ARGS__);                             \
+      break;                                                          \
+    case 8:                                                           \
+      function<double, T2ND>(__VA_ARGS__);                            \
+      break;                                                          \
+    default:                                                          \
+      break;                                                          \
+    }                                                                 \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {              \
+    switch (img.bytesPerVoxel()) {                                    \
+    case 1:                                                           \
+      function<int8_t, T2ND>(__VA_ARGS__);                            \
+      break;                                                          \
+    case 2:                                                           \
+      function<int16_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                          \
+    case 4:                                                           \
+      function<int32_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                          \
+    case 8:                                                           \
+      function<int64_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                          \
+    default:                                                          \
+      break;                                                          \
+    }                                                                 \
+  }                                                                   \
+}
+
+// for function that take 3 template argument
+// first one is derived from img, second and third is provided by user
+#define IMG_TYPED_CALL_FIX2ND3RDTYPE(function, img, T2ND, T3RD, ...) {   \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {                      \
+    switch (img.bytesPerVoxel()) {                                       \
+    case 1:                                                              \
+      function<uint8_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      break;                                                             \
+    case 2:                                                              \
+      function<uint16_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      break;                                                             \
+    case 4:                                                              \
+      function<uint32_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      break;                                                             \
+    case 8:                                                              \
+      function<uint64_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      break;                                                             \
+    default:                                                             \
+      break;                                                             \
+    }                                                                    \
+  } else if (img.voxelFormat() == VoxelFormat::Float) {                  \
+    switch (img.bytesPerVoxel()) {                                       \
+    case 4:                                                              \
+      function<float, T2ND, T3RD>(__VA_ARGS__);                          \
+      break;                                                             \
+    case 8:                                                              \
+      function<double, T2ND, T3RD>(__VA_ARGS__);                         \
+      break;                                                             \
+    default:                                                             \
+      break;                                                             \
+    }                                                                    \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {                 \
+    switch (img.bytesPerVoxel()) {                                       \
+    case 1:                                                              \
+      function<int8_t, T2ND, T3RD>(__VA_ARGS__);                         \
+      break;                                                             \
+    case 2:                                                              \
+      function<int16_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      break;                                                             \
+    case 4:                                                              \
+      function<int32_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      break;                                                             \
+    case 8:                                                              \
+      function<int64_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      break;                                                             \
+    default:                                                             \
+      break;                                                             \
+    }                                                                    \
+  }                                                                      \
+}
+
+#define IMG_RETURN_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {                          \
+    switch (img.bytesPerVoxel()) {                                           \
+    case 1:                                                                  \
+      return function<uint8_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                                 \
+    case 2:                                                                  \
+      return function<uint16_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                                 \
+    case 4:                                                                  \
+      return function<uint32_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                                 \
+    case 8:                                                                  \
+      return function<uint64_t, T2ND>(__VA_ARGS__);                          \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  } else if (img.voxelFormat() == VoxelFormat::Float) {                      \
+    switch (img.bytesPerVoxel()) {                                           \
+    case 4:                                                                  \
+      return function<float, T2ND>(__VA_ARGS__);                             \
+      break;                                                                 \
+    case 8:                                                                  \
+      return function<double, T2ND>(__VA_ARGS__);                            \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {                     \
+    switch (img.bytesPerVoxel()) {                                           \
+    case 1:                                                                  \
+      return function<int8_t, T2ND>(__VA_ARGS__);                            \
+      break;                                                                 \
+    case 2:                                                                  \
+      return function<int16_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                                 \
+    case 4:                                                                  \
+      return function<int32_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                                 \
+    case 8:                                                                  \
+      return function<int64_t, T2ND>(__VA_ARGS__);                           \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  }                                                                          \
+}
+
+// for function that process 2 types of img
+// first one is derived from img1, second one is derived from img2
+#define IMG_TYPED_CALL_2TYPE(function, img1, img2, ...) {                    \
+  if (img2.voxelFormat() == VoxelFormat::Unsigned) {                         \
+    switch (img2.bytesPerVoxel()) {                                          \
+    case 1:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint8_t, __VA_ARGS__)        \
+      break;                                                                 \
+    case 2:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint16_t, __VA_ARGS__)       \
+      break;                                                                 \
+    case 4:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint32_t, __VA_ARGS__)       \
+      break;                                                                 \
+    case 8:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint64_t, __VA_ARGS__)       \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  } else if (img2.voxelFormat() == VoxelFormat::Float) {                     \
+    switch (img2.bytesPerVoxel()) {                                          \
+    case 4:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, float, __VA_ARGS__)          \
+      break;                                                                 \
+    case 8:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, double, __VA_ARGS__)         \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  } else if (img2.voxelFormat() == VoxelFormat::Signed) {                    \
+    switch (img2.bytesPerVoxel()) {                                          \
+    case 1:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int8_t, __VA_ARGS__)         \
+      break;                                                                 \
+    case 2:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int16_t, __VA_ARGS__)        \
+      break;                                                                 \
+    case 4:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int32_t, __VA_ARGS__)        \
+      break;                                                                 \
+    case 8:                                                                  \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int64_t, __VA_ARGS__)        \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  }                                                                          \
+}
 
 struct ZImgWriteParameters
 {
@@ -35,7 +401,7 @@ struct ZImgWriteParameters
 class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>
 {
 public:
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 };
 
 class ZImg;
@@ -43,7 +409,7 @@ class ZImg;
 class ZImgThumbernail : public ZImgMetadataBase<ZImg>
 {
 public:
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 };
 
 // throw ZIOException if file does not exist
@@ -76,7 +442,7 @@ struct ZImgSource
     return !(*this == other);
   }
 
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
   QStringList filenames;
   Dimension catDim = Dimension::Z;
@@ -107,9 +473,9 @@ public:
   ZImgSubBlock& operator=(const ZImgSubBlock&) = default;
 
   // subclass read should depend its own members rather than member of this class
-  virtual std::shared_ptr<ZImg> read() const = 0;
+  [[nodiscard]] virtual std::shared_ptr<ZImg> read() const = 0;
 
-  virtual ZImgInfo readInfo() const = 0;
+  [[nodiscard]] virtual ZImgInfo readInfo() const = 0;
 
   size_t ratio;  // realsize / storedsize, 2 means downsampled by 2
   size_t t;   // start t
@@ -238,19 +604,19 @@ public:
 
   void wrapData(const std::vector<void*>& data, const ZImgInfo& info);
 
-  inline bool isEmpty() const
+  [[nodiscard]] inline bool isEmpty() const
   { return m_data.empty() || m_info.isEmpty(); }
 
-  inline bool hasThumbnail() const
+  [[nodiscard]] inline bool hasThumbnail() const
   { return !m_thumbnail.isEmpty(); }
 
-  inline const ZImgThumbernail& thumbnail() const
+  [[nodiscard]] inline const ZImgThumbernail& thumbnail() const
   { return m_thumbnail; }
 
-  inline const ZImgInfo& info() const
+  [[nodiscard]] inline const ZImgInfo& info() const
   { return m_info; }
 
-  inline const ZImgMetadata& metadata() const
+  [[nodiscard]] inline const ZImgMetadata& metadata() const
   { return m_metadata; }
 
   inline ZImgThumbernail& thumbnailRef()
@@ -263,112 +629,112 @@ public:
   { return m_metadata; }
 
   template<typename TVoxel>
-  bool isType() const
+  [[nodiscard]] bool isType() const
   { return m_info.isType<TVoxel>(); }
 
-  inline bool isSameType(const ZImg& other) const
+  [[nodiscard]] inline bool isSameType(const ZImg& other) const
   { return m_info.isSameType(other.m_info); }
 
-  inline bool isSameSize(const ZImg& other) const
+  [[nodiscard]] inline bool isSameSize(const ZImg& other) const
   { return m_info.isSameSize(other.m_info); }
 
-  inline bool contains(size_t x, size_t y, size_t z, size_t c, size_t t = 0) const
+  [[nodiscard]] inline bool contains(size_t x, size_t y, size_t z, size_t c, size_t t = 0) const
   {
     return !isEmpty() && x < m_info.width && y < m_info.height && z < m_info.depth &&
            c < m_info.numChannels && t < m_info.numTimes;
   }
 
-  inline size_t size(Dimension dim) const
+  [[nodiscard]] inline size_t size(Dimension dim) const
   { return m_info.size(dim); }
 
-  inline size_t size(size_t dim) const
+  [[nodiscard]] inline size_t size(size_t dim) const
   { return m_info.size(dim); }
 
   //inline bool isMultiLocationsImg() const { return m_info.numLocations > 1; }
-  inline bool isTimeSeries() const
+  [[nodiscard]] inline bool isTimeSeries() const
   { return m_info.numTimes > 1; }
 
-  inline bool isMultiChannelsImg() const
+  [[nodiscard]] inline bool isMultiChannelsImg() const
   { return m_info.numChannels > 1; }
 
   // imgs that have x,y,z dimensions and don't have t,l dimensions are 3D Img, x,y dimensions can be singleton
-  inline bool is3DImg() const
+  [[nodiscard]] inline bool is3DImg() const
   { return !isEmpty() && m_info.numTimes == 1 && m_info.depth > 1; }
 
   // imgs that have x,y dimensions and don't have z,t,l dimensions are 2D Img, x,y dimensions can be singleton
-  inline bool is2DImg() const
+  [[nodiscard]] inline bool is2DImg() const
   { return !isEmpty() && m_info.numTimes == 1 && m_info.depth == 1; }
 
-  inline size_t voxelByteNumber() const
+  [[nodiscard]] inline size_t voxelByteNumber() const
   { return m_info.voxelByteNumber(); }
 
-  inline size_t rowVoxelNumber() const
+  [[nodiscard]] inline size_t rowVoxelNumber() const
   { return m_info.rowVoxelNumber(); }
 
-  inline size_t rowByteNumber() const
+  [[nodiscard]] inline size_t rowByteNumber() const
   { return m_info.rowByteNumber(); }
 
-  inline size_t planeVoxelNumber() const
+  [[nodiscard]] inline size_t planeVoxelNumber() const
   { return m_info.planeVoxelNumber(); }
 
-  inline size_t planeByteNumber() const
+  [[nodiscard]] inline size_t planeByteNumber() const
   { return m_info.planeByteNumber(); }
 
-  inline size_t channelVoxelNumber() const
+  [[nodiscard]] inline size_t channelVoxelNumber() const
   { return m_info.channelVoxelNumber(); }
 
-  inline size_t channelByteNumber() const
+  [[nodiscard]] inline size_t channelByteNumber() const
   { return m_info.channelByteNumber(); }
 
-  inline size_t timeVoxelNumber() const
+  [[nodiscard]] inline size_t timeVoxelNumber() const
   { return m_info.timeVoxelNumber(); }
 
-  inline size_t timeByteNumber() const
+  [[nodiscard]] inline size_t timeByteNumber() const
   { return m_info.timeByteNumber(); }
 
   //inline size_t locationVoxelNumber() const { return m_info.locationVoxelNumber(); }
   //inline size_t locationByteNumber() const { return m_info.locationByteNumber(); }
-  inline size_t voxelNumber() const
+  [[nodiscard]] inline size_t voxelNumber() const
   { return m_info.voxelNumber(); }
 
-  inline size_t byteNumber() const
+  [[nodiscard]] inline size_t byteNumber() const
   { return m_info.byteNumber(); }
 
-  inline size_t width() const
+  [[nodiscard]] inline size_t width() const
   { return m_info.width; }
 
-  inline size_t height() const
+  [[nodiscard]] inline size_t height() const
   { return m_info.height; }
 
-  inline size_t depth() const
+  [[nodiscard]] inline size_t depth() const
   { return m_info.depth; }
 
-  inline size_t numChannels() const
+  [[nodiscard]] inline size_t numChannels() const
   { return m_info.numChannels; }
 
-  inline size_t numTimes() const
+  [[nodiscard]] inline size_t numTimes() const
   { return m_info.numTimes; }
 
   //inline size_t numLocations() const { return m_info.numLocations; }
-  inline VoxelFormat voxelFormat() const
+  [[nodiscard]] inline VoxelFormat voxelFormat() const
   { return m_info.voxelFormat; }
 
-  inline size_t bytesPerVoxel() const
+  [[nodiscard]] inline size_t bytesPerVoxel() const
   { return m_info.bytesPerVoxel; }
 
-  inline size_t validBitCount() const
+  [[nodiscard]] inline size_t validBitCount() const
   { return m_info.validBitCount; }
 
-  inline VoxelSizeUnit voxelSizeUnit() const
+  [[nodiscard]] inline VoxelSizeUnit voxelSizeUnit() const
   { return m_info.voxelSizeUnit; }
 
-  inline double voxelSizeX() const
+  [[nodiscard]] inline double voxelSizeX() const
   { return m_info.voxelSizeX; }
 
-  inline double voxelSizeY() const
+  [[nodiscard]] inline double voxelSizeY() const
   { return m_info.voxelSizeY; }
 
-  inline double voxelSizeZ() const
+  [[nodiscard]] inline double voxelSizeZ() const
   { return m_info.voxelSizeZ; }
 
 //  // if current or result voxelSizeUnit is Voxel, throw exception
@@ -390,17 +756,17 @@ public:
 //  inline double voxelSizeZInUm() const
 //  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
 
-  inline col4 channelColor(size_t c) const
+  [[nodiscard]] inline col4 channelColor(size_t c) const
   { return m_info.channelColors[c]; }
 
   //inline Location location(size_t l) const { return m_info.locations[l]; }
-  inline const QString& channelName(size_t c) const
+  [[nodiscard]] inline const QString& channelName(size_t c) const
   { return m_info.channelNames[c]; }
 
-  inline QString displayChannelName(size_t c) const
+  [[nodiscard]] inline QString displayChannelName(size_t c) const
   { return m_info.displayChannelName(c); }
 
-  inline double timeStamp(size_t t) const
+  [[nodiscard]] inline double timeStamp(size_t t) const
   { return m_info.timeStamps[t]; }
 
   // remove old data and allocate data space based on current info
@@ -455,7 +821,7 @@ public:
   }
 
   template<typename T = uint8_t>
-  inline const T* timeData(size_t t) const
+  [[nodiscard]] inline const T* timeData(size_t t) const
   { return reinterpret_cast<T*>(m_data[t]); }
 
   template<typename T = uint8_t>
@@ -529,22 +895,22 @@ public:
   void reverseEndianness();
 
   // output img as values row by row, for debug
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
   // img view is a virtual img that doesn't own any img data, usually it is a channel or a time spot or a location from original img
   // operate on img view is same as operate on partial img
   // img view will automatically become to a real img after some operations that need memory reallocation
   // use img view to work with part of img
-  ZImg createView(int c = -1, int t = -1);
+  [[nodiscard]] ZImg createView(int c = -1, int t = -1);
 
-  const ZImg createView(int c = -1, int t = -1) const;
+  [[nodiscard]] const ZImg createView(int c = -1, int t = -1) const;
 
   // view of one single channel slice
-  ZImg createView(size_t z, size_t c, size_t t);
+  [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t);
 
-  const ZImg createView(size_t z, size_t c, size_t t) const;
+  [[nodiscard]] const ZImg createView(size_t z, size_t c, size_t t) const;
 
-  inline bool isImgView() const
+  [[nodiscard]] inline bool isImgView() const
   { return !m_ownData; }
 
   // statistics
@@ -557,40 +923,58 @@ public:
   // bin size for integer img is (dataRangeMax-dataRangeMin+1)/nbins
   // if mask is specified, it should be same size as current img, in mask img, zero indicate off, non-zero indicate on
   // only mask on voxels are counted in histogram
-  std::vector<size_t> histogram(size_t nbins = 0, const ZImg& mask = ZImg()) const;
+  [[nodiscard]] std::vector<size_t> histogram(size_t nbins = 0, const ZImg& mask = ZImg()) const;
 
   // given an bin index, return data range this bin represent
   // not very accurate for 64-bit integer type
-  std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const
+  [[nodiscard]] inline std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const
   { return m_info.binRange(binIdx, nbins); }
 
   // take range as parameter, TRange will be cast to img data type
   // bin size for float img is (maxData-minData)/nbins
   // bin size for integer img is (maxData-minData+1)/nbins
   template<typename TRange>
-  std::vector<size_t> histogram(TRange minData, TRange maxData, size_t nbins = 0, const ZImg& mask = ZImg()) const;
+  std::vector<size_t> histogram(TRange minData, TRange maxData, size_t nbins = 0, const ZImg& mask = ZImg()) const
+  {
+    if (nbins == 0) {
+      nbins = bytesPerVoxel() > 1 ? 65536 : 256;
+    }
+
+    std::vector<size_t> res(nbins, 0);
+
+    if (mask.isEmpty()) {
+      IMG_TYPED_CALL(histogram_Impl, (*this), res, minData, maxData)
+    } else if (isSameSize(mask)) {
+      IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, minData, maxData, mask)
+    } else {
+      throw ZImgException(QString("histogram mask has different size <%1> than current img <%2>")
+                            .arg(mask.info().toQString()).arg(m_info.toQString()));
+    }
+
+    return res;
+  }
 
   // overload
   template<typename TRange>
-  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  inline std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
   { return m_info.binRange<TRange>(binIdx, minData, maxData, nbins); }
 
   // property of img type
   // intensity range of current img type, for float img, range is [0.0 1.0]
   // use template return type because img can be any type, and even double type can not represent all 64-bit integer type value
   template<typename TValue = double>
-  TValue dataRangeMin() const
+  inline TValue dataRangeMin() const
   { return m_info.dataRangeMin<TValue>(); }
 
   template<typename TValue = double>
-  TValue dataRangeMax() const
+  inline TValue dataRangeMax() const
   { return m_info.dataRangeMax<TValue>(); }
 
   // some utils, these functions will throw ZImgException if input parameters is invalid
 
   // if region is empty, return empty img
   // throw ZImgException if current img is empty or region is not valid
-  ZImg crop(const ZImgRegion& region) const;
+  [[nodiscard]] ZImg crop(const ZImgRegion& region) const;
 
   // crop from start coordinate to end coordinate with outside pixel padded.
   // padValue is only used when padOption is PadOption::Constant, padValue will be cast to img voxel type
@@ -598,24 +982,69 @@ public:
   // throw ZImgException if current img is empty or region goes wrong
   template<typename TPadValue = uint8_t>
   ZImg cropWithPad(const ZVoxelCoordinate& startCoord, const ZVoxelCoordinate& endCoord,
-                   PadOption padOption = PadOption::Constant, TPadValue padValue = TPadValue(0)) const;
+                   PadOption padOption = PadOption::Constant, TPadValue padValue = TPadValue(0)) const
+  {
+    ZImg res;
+
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not crop empty img <%1>").arg(m_info.toQString()));
+    }
+    if (endCoord.anyLessThan(startCoord)) {
+      throw ZImgException(QString("Try to crop pad img with invalid region <%1> to <%2>")
+                            .arg(startCoord.toQString()).arg(endCoord.toQString()));
+    }
+    if (endCoord.anyEqual(startCoord)) {
+      return res;
+    }
+
+    if (startCoord.allGreaterEqual(0) &&
+        endCoord.allLessEqual(ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth,
+                                               m_info.numChannels, m_info.numTimes))) {
+      res = crop(ZImgRegion(startCoord, endCoord));
+    }
+
+    ZImgInfo info = m_info;
+    info.width = endCoord.x - startCoord.x;
+    info.height = endCoord.y - startCoord.y;
+    info.depth = endCoord.z - startCoord.z;
+    info.numChannels = endCoord.c - startCoord.c;
+    info.numTimes = endCoord.t - startCoord.t;
+    info.createDefaultDescriptions();
+
+    res = ZImg(info);
+
+    IMG_TYPED_CALL(cropWithPad_Impl, res, res, startCoord, endCoord, padOption, padValue)
+
+    return res;
+  }
 
   // extract part of img
-  ZImg extractVoxel(size_t x, size_t y, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractVoxel(size_t x, size_t y, int z = -1, int c = -1, int t = -1) const;
 
-  ZImg extractCol(size_t x, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractCol(size_t x, int z = -1, int c = -1, int t = -1) const;
 
-  ZImg extractRow(size_t y, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractRow(size_t y, int z = -1, int c = -1, int t = -1) const;
 
-  ZImg extractPlane(size_t z, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractPlane(size_t z, int c = -1, int t = -1) const;
 
-  ZImg extractChannel(size_t c, int t = -1) const;
+  [[nodiscard]] ZImg extractChannel(size_t c, int t = -1) const;
 
-  ZImg extractTime(size_t t) const;
+  [[nodiscard]] ZImg extractTime(size_t t) const;
 
   // value will be cast to img voxel type
   template<typename TFillValue>
-  ZImg& fill(TFillValue value);
+  ZImg& fill(TFillValue value)
+  {
+    if (bytesPerVoxel() == 1 || value == TFillValue(0)) {
+      for (size_t t = 0; t < m_info.numTimes; ++t) {
+        std::memset(timeData(t), static_cast<unsigned char>(value), timeByteNumber());
+      }
+      return *this;
+    }
+
+    IMG_TYPED_CALL(fill_Impl, (*this), value)
+    return *this;
+  }
 
   // fill with uniform distributed value with range [dataRangeMin, dataRangeMax]
   ZImg& fillRandom();
@@ -647,21 +1076,82 @@ public:
   static ZImg combine(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
 
   // projection
-  ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, int start = -1, int end = -1) const;
+  [[nodiscard]] ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, int start = -1, int end = -1) const;
 
-  ZImg maximumZProjection(int start = -1, int end = -1) const;
+  [[nodiscard]] ZImg maximumZProjection(int start = -1, int end = -1) const;
 
   // map [minData maxData] to [dataRangeMin, dataRangeMax]
   // for float img, dataRangeMin is 0.0, dataRangeMax is 1.0
   template<typename TRange>
-  ZImg normalized(TRange minData, TRange maxData) const;
+  [[nodiscard]] ZImg normalized(TRange minData, TRange maxData) const
+  {
+    ZImg res(*this);
+    res.normalize(minData, maxData);
+    return res;
+  }
 
   // first compute minimum and maximum value, then use as Range
-  ZImg normalized() const;
+  [[nodiscard]] ZImg normalized() const;
 
   // to normalize only channel 1, call img.createView(1,-1,-1).normalize(minD, maxD);
   template<typename TRange>
-  ZImg& normalize(TRange minData, TRange maxData);
+  ZImg& normalize(TRange minData, TRange maxData)
+  {
+    if (isEmpty()) {
+      return *this;
+    }
+    size_t bytesPerVoxel = m_info.bytesPerVoxel;
+    VoxelFormat vf = m_info.voxelFormat;
+    if (vf == VoxelFormat::Float) {
+      switch (bytesPerVoxel) {
+        case 4:
+          scale_Impl<float, float>(minData, maxData, this, this);
+          break;
+        case 8:
+          scale_Impl<double, double>(minData, maxData, this, this);
+          break;
+        default:
+          break;
+      }
+    } else if (vf == VoxelFormat::Signed) {
+      switch (bytesPerVoxel) {
+        case 1:
+          scale_Impl<int8_t, int8_t>(minData, maxData, this, this);
+          break;
+        case 2:
+          scale_Impl<int16_t, int16_t>(minData, maxData, this, this);
+          break;
+        case 4:
+          scale_Impl<int32_t, int32_t>(minData, maxData, this, this);
+          break;
+        case 8:
+          scale_Impl<int64_t, int64_t>(minData, maxData, this, this);
+          break;
+        default:
+          break;
+      }
+    } else {
+      switch (bytesPerVoxel) {
+        case 1:
+          scale_Impl<uint8_t, uint8_t>(minData, maxData, this, this);
+          break;
+        case 2:
+          scale_Impl<uint16_t, uint16_t>(minData, maxData, this, this);
+          break;
+        case 4:
+          scale_Impl<uint32_t, uint32_t>(minData, maxData, this, this);
+          break;
+        case 8:
+          scale_Impl<uint64_t, uint64_t>(minData, maxData, this, this);
+          break;
+        default:
+          break;
+      }
+    }
+
+    m_info.validBitCount = 0;
+    return *this;
+  }
 
   // first compute minimum and maximum value, then use as Range
   ZImg& normalize();
@@ -677,35 +1167,65 @@ public:
 
   // make img of new type, map current data type range to target img data type range, return new img
   // note: float img data type range is [0.0 1.0]
-  template<typename TDesVoxel>
-  [[nodiscard]] ZImg convertTo() const;
+  template<typename TDesVoxel = uint8_t>
+  [[nodiscard]] ZImg convertTo() const
+  {
+    ZImgInfo info = m_info;
+    info.setVoxelFormat<TDesVoxel>();
+    ZImg res(info);
+
+    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, (*this), TDesVoxel, false, this, &res)
+    return res;
+  }
 
   // convert normalized img to another type
-  template<typename TDesVoxel>
-  [[nodiscard]] ZImg convertNormalizedTo() const;
+  template<typename TDesVoxel = uint8_t>
+  [[nodiscard]] ZImg convertNormalizedTo() const
+  {
+    ZImgInfo info = m_info;
+    info.setVoxelFormat<TDesVoxel>();
+    ZImg res(info);
+
+    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, (*this), TDesVoxel, true, this, &res)
+    return res;
+  }
 
   // make img of new type, map [minData maxData] to target img data type range, return new img
-  template<typename TDesVoxel, typename TRange>
-  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData) const;
+  template<typename TDesVoxel = uint8_t, typename TRange>
+  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData) const
+  {
+    ZImgInfo info = m_info;
+    info.setVoxelFormat<TDesVoxel>();
+    ZImg res(info);
+
+    IMG_TYPED_CALL_FIX2NDTYPE(scale_Impl, (*this), TDesVoxel, minData, maxData, this, &res)
+
+    return res;
+  }
 
   // deduce TDesVoxel from img
   template<typename TRange>
-  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const;
+  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
+  {
+    IMG_RETURN_TYPED_CALL(convertTo, targetImgType, minData, maxData)
+    return ZImg();
+  }
 
   // resize in x-y-z dimensions
   // 'antialiasing' specifies whether to perform antialiasing when shrinking an image. For the 'nearest' method,
   // the parameter 'antialiasingForNearest' is used (default false); for all other methods, the default is true.
-  ZImg resized(size_t desWidth, size_t desHeight, size_t desDepth,
-               Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
-               bool antialiasingForNearest = false) const;
+  [[nodiscard]] ZImg resized(size_t desWidth, size_t desHeight, size_t desDepth,
+                             Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
+                             bool antialiasingForNearest = false) const;
 
-  ZImg zoomed(double scaleX, double scaleY, double scaleZ,
-              Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
-              bool antialiasingForNearest = false) const;
+  [[nodiscard]] ZImg zoomed(double scaleX, double scaleY, double scaleZ,
+                            Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
+                            bool antialiasingForNearest = false) const;
 
   // combine voxels in each block into one voxel of result img
   // result img size is ceil(width/blockWidth) * ceil(height/blockHeight) * ceil(depth/blockDepth)
-  ZImg blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode) const;
+  [[nodiscard]] ZImg blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockDepth,
+                                      ImgMergeMode mode) const;
 
   // resize zoom this img, will change img memory and make virtual img non-virtual
   ZImg& resize(size_t desWidth, size_t desHeight, size_t desDepth,
@@ -727,96 +1247,189 @@ public:
 
   // returns a same size img that contains the cumulative sum of the voxels along dimension dim
   // note: for integer image perform saturate arithmetic, see below
-  ZImg cumulativeSum(Dimension dim) const;
+  [[nodiscard]] ZImg cumulativeSum(Dimension dim) const;
 
   // calculate the sum of each 3D block defined by the template size. The
   // returned img will have size (width+twidth-1) x (height+theight-1) x (depth+tdepth-1) x c x t x l
   // all locations, times, channels are processed in the same way
   // throw ZImgException if template size is 0
   // note: for integer image perform saturate arithmetic, see below
-  ZImg blockSum(size_t twidth, size_t theight, size_t tdepth) const;
+  [[nodiscard]] ZImg blockSum(size_t twidth, size_t theight, size_t tdepth) const;
 
   // same as blockSum then crop [startX, endX) * [startY, endY) * [startZ, endZ)
   // throw ZImgException if template size is 0 or range is wrong
   // note: for integer image perform saturate arithmetic, see below
-  ZImg blockSumPart(size_t twidth, size_t theight, size_t tdepth, size_t xStart, size_t xEnd,
-                    size_t yStart, size_t yEnd, size_t zStart, size_t zEnd) const;
+  [[nodiscard]] ZImg blockSumPart(size_t twidth, size_t theight, size_t tdepth, size_t xStart, size_t xEnd,
+                                  size_t yStart, size_t yEnd, size_t zStart, size_t zEnd) const;
 
   // threshold
   // if voxel >  (or >= based on ThresholdMode) threshold, voxel = outsidevalue,
   // TValue will be cast to current img data type
   template<typename TValue>
-  ZImg& thresholdAbove(TValue threshold, ThresholdMode threMode, TValue outsideValue);
+  ZImg& thresholdAbove(TValue threshold, ThresholdMode threMode, TValue outsideValue)
+  {
+    IMG_TYPED_CALL(thresholdAbove_Impl, (*this), threshold, threMode, outsideValue)
+    return *this;
+  }
 
   // if voxel <  (or <= based on ThresholdMode) threshold, voxel = outsidevalue,
   // TValue will be cast to current img data type
   template<typename TValue>
-  ZImg& thresholdBelow(TValue threshold, ThresholdMode threMode, TValue outsideValue);
+  ZImg& thresholdBelow(TValue threshold, ThresholdMode threMode, TValue outsideValue = TValue(0))
+  {
+    IMG_TYPED_CALL(thresholdBelow_Impl, (*this), threshold, threMode, outsideValue)
+    return *this;
+  }
 
   // binarize
   // return a uint8_t img with 1 and 0
   // if voxel > (or >= based on ThresholdMode) threshold, result mask voxel = 1 else mask voxel = 0
   // TValue threshold will be cast to current img data type
   template<typename TValue>
-  ZImg binarized(TValue threshold, ThresholdMode threMode) const;
+  [[nodiscard]] ZImg binarized(TValue threshold, ThresholdMode threMode) const
+  {
+    ZImgInfo info = m_info;
+    info.voxelFormat = VoxelFormat::Unsigned;
+    info.bytesPerVoxel = 1;
+    ZImg res(info);
+
+    IMG_TYPED_CALL(binarized_Impl, (*this), res, threshold, threMode)
+
+    return res;
+  }
 
   // return a uint8_t img with 1 and 0
   // for all img type, if voxel > 0, result mask voxel = 1
-  inline ZImg binarized() const
+  [[nodiscard]] inline ZImg binarized() const
   { return binarized(0, ThresholdMode::ExcludeThreshold); }
 
   // return a uint8_t img with 1 and 0
   // for all img type, if isForeground(voxel) return true, result mask voxel = 1
   // GenericForegroundPredictor take any numeric type as parameter and return bool
   template<typename GenericForegroundPredictor>
-  ZImg binarized(const GenericForegroundPredictor& isForeground) const;
+  ZImg binarized(const GenericForegroundPredictor& isForeground) const
+  {
+    ZImgInfo info = m_info;
+    info.voxelFormat = VoxelFormat::Unsigned;
+    info.bytesPerVoxel = 1;
+    ZImg res(info);
+
+    IMG_TYPED_CALL(binarized_Impl, (*this), res, isForeground)
+
+    return res;
+  }
 
   // if you know the img type
   // ForegroundPredictor take TVoxel as parameter and return bool
   // throw ZImgException if type don't match
   template<typename TVoxel, typename ForegroundPredictor>
-  ZImg typedBinarized(const ForegroundPredictor& isForeground) const;
+  ZImg typedBinarized(const ForegroundPredictor& isForeground) const
+  {
+    if (!isType<TVoxel>()) {
+      throw ZImgException("Call typedBinarized with wrong type");
+    }
+
+    ZImgInfo info = m_info;
+    info.voxelFormat = VoxelFormat::Unsigned;
+    info.bytesPerVoxel = 1;
+    ZImg res(info);
+
+    binarized_Impl<TVoxel>(res, isForeground);
+    return res;
+  }
 
   // for integer type all perform saturate arithmetic
   // for example for a 8bit unsigned img, 128 * 2 = 255;  253 + 6 = 255; 34 - 230 = 0
   // for 8bit signed img, 12 + 120 = 127; -45-120 = -128; 23 * 1.51 = round(34.73) = 35;
   template<typename TScalar>
-  ZImg& operator+=(TScalar scalar);
+  ZImg& operator+=(TScalar scalar)
+  {
+    static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
+    if (scalar != TScalar(0)) {
+      IMG_TYPED_CALL(addScalar_Impl, (*this), scalar)
+    }
+    return *this;
+  }
 
   // add img, input should have same size, otherwise throw ZImgException
   ZImg& operator+=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
-  ZImg operator+(const TScalarOrZImg& scalarOrZImg) const;
+  ZImg operator+(const TScalarOrZImg& scalarOrZImg) const
+  {
+    ZImg res(*this);
+    res += scalarOrZImg;
+    return res;
+  }
 
   template<typename TScalar>
-  ZImg& operator-=(TScalar scalar);
+  ZImg& operator-=(TScalar scalar)
+  {
+    static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
+    if (scalar != TScalar(0)) {
+      IMG_TYPED_CALL(subScalar_Impl, (*this), scalar)
+    }
+    return *this;
+  }
 
   // sub img, input should have same size, otherwise throw ZImgException
   ZImg& operator-=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
-  ZImg operator-(const TScalarOrZImg& scalarOrZImg) const;
+  ZImg operator-(const TScalarOrZImg& scalarOrZImg) const
+  {
+    ZImg res(*this);
+    res -= scalarOrZImg;
+    return res;
+  }
 
   template<typename TScalar>
-  ZImg& operator*=(TScalar scalar);
+  ZImg& operator*=(TScalar scalar)
+  {
+    static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
+    if (scalar != TScalar(0)) {
+      IMG_TYPED_CALL(mulScalar_Impl, (*this), scalar)
+    } else {
+      fill(0);
+    }
+    return *this;
+  }
 
   // multiply img, input should have same size, otherwise throw ZImgException
   ZImg& operator*=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
-  ZImg operator*(const TScalarOrZImg& scalarOrZImg) const;
+  ZImg operator*(const TScalarOrZImg& scalarOrZImg) const
+  {
+    ZImg res(*this);
+    res *= scalarOrZImg;
+    return res;
+  }
 
   template<typename TScalar>
   // throw ZImgException if scalar is zero and not float
-  ZImg& operator/=(TScalar scalar);
+  ZImg& operator/=(TScalar scalar)
+  {
+    static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
+    if (scalar != TScalar(0)) {
+      IMG_TYPED_CALL(divScalar_Impl, (*this), scalar)
+    } else {
+      throw ZImgException("Can not divide img by zero");
+    }
+    return *this;
+  }
 
   // divide img, input should have same size, otherwise throw ZImgException
   // might got hardware exception if rhs contains zero and both img is not float type
   ZImg& operator/=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
-  ZImg operator/(const TScalarOrZImg& scalarOrZImg) const;
+  ZImg operator/(const TScalarOrZImg& scalarOrZImg) const
+  {
+    ZImg res(*this);
+    res /= scalarOrZImg;
+    return res;
+  }
 
   // divide img, input should have same size, otherwise throw ZImgException
   // result voxel is 0 if rhs voxel is 0
@@ -838,7 +1451,11 @@ public:
   // img.unaryOperation(someGenericOp());
   // note: this will generate about 10 switch case branches in function because we need to determine current img type
   template<typename GenericCustomUnaryOp>
-  ZImg& unaryOperation(const GenericCustomUnaryOp& op);
+  ZImg& unaryOperation(const GenericCustomUnaryOp& op)
+  {
+    IMG_TYPED_CALL(unaryOp_Impl, (*this), op)
+    return *this;
+  }
 
   // if you already know the img type (e.g. double) and have a function for that type like:
   // double someOpForDoubleVoxel(double current);
@@ -848,7 +1465,14 @@ public:
   // op can be either a function pointer or an instantiated function object (can have internal state)
   // **note** throw ZImgException if type don't match
   template<typename TVoxel, typename CustomUnaryOp>
-  ZImg& typedUnaryOperation(const CustomUnaryOp& op);
+  ZImg& typedUnaryOperation(const CustomUnaryOp& op)
+  {
+    if (!isType<TVoxel>()) {
+      throw ZImgException("Call typedUnaryOperation with wrong type");
+    }
+    unaryOp_Impl<TVoxel>(op);
+    return *this;
+  }
 
   // perform a custom voxel-wise operator <op> of *this and other
   // GenericBinaryFunctor is a generic lambda or non-template functor that accepts current voxel from *this as first argument
@@ -866,7 +1490,15 @@ public:
   // make sure input img has same size as current img, otherwise ZImgException will be thrown
   // note: this will generate about 100 switch case branches in function because we need to determine two img type
   template<typename GenericCustomBinaryOp>
-  ZImg& binaryOperation(const ZImg& other, const GenericCustomBinaryOp& op);
+  ZImg& binaryOperation(const ZImg& other, const GenericCustomBinaryOp& op)
+  {
+    if (!isSameSize(other)) {
+      throw ZImgException(QString("img binary operation requires same size img as input: this <%1>, other <%2>")
+                            .arg(m_info.toQString()).arg(other.info().toQString()));
+    }
+    IMG_TYPED_CALL_2TYPE(binaryOp_Impl, (*this), other, other, op)
+    return *this;
+  }
 
   // similar to unaryTypedOp, if you already know the type of current img and other img and have function like
   // double someBinaryOp(double current, int8_t otherVoxel);
@@ -874,7 +1506,18 @@ public:
   // img.binaryTypedOp<double, int8_t>(other, someBinaryOp);
   // **note** throw ZImgException if type don't match
   template<typename TVoxel, typename TVoxelOther, typename CustomBinaryOp>
-  ZImg& typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op);
+  ZImg& typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op)
+  {
+    if (!isType<TVoxel>() || !other.isType<TVoxelOther>()) {
+      throw ZImgException("Call typedBinaryOperation with wrong type");
+    }
+    if (!isSameSize(other)) {
+      throw ZImgException(QString("img binary operation requires same size img as input: this <%1>, other <%2>")
+                            .arg(m_info.toQString()).arg(other.info().toQString()));
+    }
+    binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
+    return *this;
+  }
 
   // img coordinate
   // convert idx to coord
@@ -887,61 +1530,127 @@ public:
   // if only last dimension of coord is invalid, result can still be meaningful
   static int64_t coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info);
 
-  inline ZVoxelCoordinate indexToCoord(int64_t idx) const
+  [[nodiscard]] inline ZVoxelCoordinate indexToCoord(int64_t idx) const
   { return indexToCoord(idx, m_info); }
 
-  inline int64_t coordToIndex(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] inline int64_t coordToIndex(const ZVoxelCoordinate& coord) const
   { return coordToIndex(coord, m_info); }
 
   // coord of one voxel pass each dimension
-  inline ZVoxelCoordinate endCoord() const
+  [[nodiscard]] inline ZVoxelCoordinate endCoord() const
   {
     return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
   }
 
   // max valid coord, **note** throw ZImgException for empty img
-  inline ZVoxelCoordinate maxCoord() const
+  [[nodiscard]] inline ZVoxelCoordinate maxCoord() const
   {
-    if (isEmpty()) throw ZImgException("No max coord for empty img");
+    if (isEmpty()) { throw ZImgException("No max coord for empty img"); }
     return ZVoxelCoordinate(m_info.width - 1, m_info.height - 1, m_info.depth - 1, m_info.numChannels - 1,
                             m_info.numTimes - 1);
   }
 
   // coord will always be invalid if img is empty
-  inline bool isCoordValid(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] inline bool isCoordValid(const ZVoxelCoordinate& coord) const
   {
     return !isEmpty() && coord.allGreaterEqual(0) && coord.allLessThan(endCoord());
   }
 
   // coord of first voxel with max img value
   template<typename TValue>
-  ZVoxelCoordinate firstMaxValueCoord(TValue& max, const ZImgRegion& region = ZImgRegion()) const;
+  ZVoxelCoordinate firstMaxValueCoord(TValue& max, const ZImgRegion& region = ZImgRegion()) const
+  {
+    ZVoxelCoordinate res;
+    ZImgRegion rgn = region;
+    if (rgn.isEmpty() || !rgn.isValid(m_info)) {
+      throw ZImgException(QString("Try to find max value location of img <%1> within invalid region <%2>")
+                            .arg(m_info.toQString()).arg(rgn.toQString()));
+    }
+    rgn.resolveRegionEnd(m_info);
+    IMG_TYPED_CALL(firstMaxValueCoord_Impl, (*this), res, max, rgn)
+    return res;
+  }
 
   // coord of all voxels with max img value
   template<typename TValue>
-  std::vector<ZVoxelCoordinate> maxValueCoords(TValue& max, const ZImgRegion& region = ZImgRegion()) const;
+  std::vector<ZVoxelCoordinate> maxValueCoords(TValue& max, const ZImgRegion& region = ZImgRegion()) const
+  {
+    std::vector<ZVoxelCoordinate> res;
+    ZImgRegion rgn = region;
+    if (rgn.isEmpty() || !rgn.isValid(m_info)) {
+      throw ZImgException(QString("Try to find max value locations of img <%1> within invalid region <%2>")
+                            .arg(m_info.toQString()).arg(rgn.toQString()));
+    }
+    rgn.resolveRegionEnd(m_info);
+    IMG_TYPED_CALL(maxValueCoords_Impl, (*this), res, max, rgn)
+    return res;
+  }
 
   // get value as type at coordinate
   // **throw ZImgException** if coord is invalid or img is empty
   // note: this might be slow because we need to find the correct data type and check if coordinate is valid
   // if you know the data type and don't need to check coord, use data<> function
   template<typename TValue = double>
-  TValue value(const ZVoxelCoordinate& coord) const;
+  TValue value(const ZVoxelCoordinate& coord) const
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not get voxel value of empty img <%1>").arg(m_info.toQString()));
+    }
+    if (isCoordValid(coord)) {
+      IMG_RETURN_TYPED_CALL(value_Impl, (*this), coord)
+      return 0;
+    } else {
+      throw ZImgException(QString("value: Invalid coordinate %1 of img <%2>")
+                            .arg(coord.toQString()).arg(m_info.toQString()));
+    }
+  }
 
   // overload
   template<typename TValue = double>
-  TValue value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0) const;
+  TValue value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0) const
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not get voxel value of empty img <%1>").arg(m_info.toQString()));
+    }
+    if (x < m_info.width && y < m_info.height && z < m_info.depth &&
+        c < m_info.numChannels && t < m_info.numTimes) {
+      IMG_RETURN_TYPED_CALL(value_Impl, (*this), x, y, z, c, t)
+      return 0;
+    } else {
+      throw ZImgException(QString("value: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
+                            .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
+    }
+  }
 
   // overload
   template<typename TValue = double>
-  TValue value(size_t idx) const;
+  TValue value(size_t idx) const
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not get voxel value of empty img <%1>").arg(m_info.toQString()));
+    }
+    if (idx < voxelNumber()) {
+      IMG_RETURN_TYPED_CALL(value_Impl, (*this), idx)
+      return 0;
+    } else {
+      throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
+                            .arg(idx).arg(m_info.toQString()));
+    }
+  }
 
   // **no throw** version of get value as type at coordinate, coord is always valid because we will pad img
   // for empty img, return 0
   // padValue is only used when padOption is PadOption::Constant, padValue will be cast to img voxel type
   template<typename TValue = double>
   TValue valueWithPad(const ZVoxelCoordinate& coord, PadOption padOption = PadOption::Constant,
-                      TValue padValue = TValue(0)) const;
+                      TValue padValue = TValue(0)) const
+  {
+    if (isEmpty()) {
+      return 0;
+    }
+    IMG_RETURN_TYPED_CALL(valueWithPad_Impl, (*this), coord, padOption, padValue)
+    return 0;
+  }
 
   // overload
   template<typename TValue = double>
@@ -954,34 +1663,90 @@ public:
   // set value of coord to value, value will be cast to current img type before set
   // **throw ZImgException** if coord is invalid or img is empty
   template<typename TValue>
-  void setValue(TValue value, const ZVoxelCoordinate& coord);
+  void setValue(TValue value, const ZVoxelCoordinate& coord)
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not set voxel value to empty img <%1>").arg(m_info.toQString()));
+    }
+    if (isCoordValid(coord)) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, coord)
+    } else {
+      throw ZImgException(QString("setValue: Invalid coordinate %1 of img <%2>")
+                            .arg(coord.toQString()).arg(m_info.toQString()));
+    }
+  }
 
   // overload
   template<typename TValue>
-  void setValue(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0);
+  void setValue(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0)
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not set voxel value to empty img <%1>").arg(m_info.toQString()));
+    }
+    if (x < m_info.width && y < m_info.height && z < m_info.depth &&
+        c < m_info.numChannels && t < m_info.numTimes) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, x, y, z, c, t)
+    } else {
+      throw ZImgException(QString("setValue: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
+                            .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
+    }
+  }
 
   // overload
   template<typename TValue>
-  void setValue(TValue value, size_t idx);
+  void setValue(TValue value, size_t idx)
+  {
+    if (isEmpty()) {
+      throw ZImgException(QString("Can not set voxel value to empty img <%1>").arg(m_info.toQString()));
+    }
+    if (idx < voxelNumber()) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, idx)
+    } else {
+      throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
+                            .arg(idx).arg(m_info.toQString()));
+    }
+  }
 
   // similar to setValue, instead of throw ZImgException in case of error, this function do nothing and return false
   // return true if succeed
   template<typename TValue>
-  bool setValueNoThrow(TValue value, const ZVoxelCoordinate& coord);
+  bool setValueNoThrow(TValue value, const ZVoxelCoordinate& coord)
+  {
+    if (isCoordValid(coord)) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, coord)
+      return true;
+    }
+    return false;
+  }
 
   // overload
   template<typename TValue>
-  bool setValueNoThrow(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0);
+  bool setValueNoThrow(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0)
+  {
+    if (!isEmpty() && x < m_info.width && y < m_info.height && z < m_info.depth &&
+        c < m_info.numChannels && t < m_info.numTimes) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, x, y, z, c, t)
+      return true;
+    }
+    return false;
+  }
 
   // overload
   template<typename TValue>
-  bool setValueNoThrow(TValue value, size_t idx);
+  bool setValueNoThrow(TValue value, size_t idx)
+  {
+    if (!isEmpty() && idx < voxelNumber()) {
+      IMG_TYPED_CALL(setValue_Impl, (*this), value, idx)
+      return true;
+    }
+    return false;
+  }
 
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
 
   // only int32_t now
-  QJsonValue toJson() const;
+  [[nodiscard]] QJsonValue toJson() const;
 
   static ZImg fromJson(const QJsonValue& value);
 
@@ -1021,14 +1786,106 @@ private:
   static ZImg combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
 
   template<typename TVoxel, typename TDesVoxel>
-  static void convert_Impl(bool normalize, const ZImg* src, ZImg* des);
+  static void convert_Impl(bool normalize, const ZImg* src, ZImg* des)
+  {
+    TVoxel minv;
+    TVoxel maxv;
+    if (normalize) {
+      src->computeMinMax(minv, maxv);
+    } else {
+      minv = src->dataRangeMin<TVoxel>();
+      maxv = src->dataRangeMax<TVoxel>();
+    }
+    //LOG(INFO) << minv << " " << maxv;
+    scale_Impl<TVoxel, TDesVoxel>(minv, maxv, src, des);
+  }
 
   template<typename TVoxel, typename TDesVoxel>
-  static void scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des);
+  static void scale_Impl(TVoxel minData, TVoxel maxData, const ZImg* src, ZImg* des)
+  {
+    CHECK(src->isType<TVoxel>());
+    CHECK(des->isType<TDesVoxel>());
+    TDesVoxel dataRangeMin = std::numeric_limits<TDesVoxel>::min();
+    TDesVoxel dataRangeMax = std::numeric_limits<TDesVoxel>::max();
+    if (des->voxelFormat() == VoxelFormat::Float) {
+      dataRangeMin = TDesVoxel(0.0);
+      dataRangeMax = TDesVoxel(1.0);
+    }
+
+    if (minData == maxData) {
+      if (src->voxelFormat() == VoxelFormat::Float) {
+        minData = TVoxel(0.0);
+        maxData = TVoxel(1.0);
+      } else {
+        minData = std::numeric_limits<TVoxel>::min();
+        maxData = std::numeric_limits<TVoxel>::max();
+      }
+    }
+
+    if (src->voxelFormat() != VoxelFormat::Float && std::is_same_v<TVoxel, TDesVoxel> &&
+        dataRangeMin == TDesVoxel(minData) && dataRangeMax == TDesVoxel(maxData)) {
+      if (src != des) {
+        for (size_t t = 0; t < src->numTimes(); ++t) {
+          std::memcpy(des->timeData(t), src->timeData(t), src->timeByteNumber());
+        }
+      }
+      return;
+    }
+
+    // use colormap
+    if constexpr (sizeof(TVoxel) <= 2) {  // can not be float
+      std::vector<TDesVoxel> colormap;
+      buildScaleColormap(minData, maxData, dataRangeMin, dataRangeMax, colormap);
+      TVoxel colormapMin = std::numeric_limits<TVoxel>::min();
+
+      for (size_t t = 0; t < src->numTimes(); ++t) {
+        for (size_t c = 0; c < src->numChannels(); ++c) {
+          const TVoxel* data = src->channelData<TVoxel>(c, t);
+          TDesVoxel* desData = des->channelData<TDesVoxel>(c, t);
+          for (size_t v = 0; v < src->channelVoxelNumber(); ++v) {
+            desData[v] = colormap[data[v] - colormapMin];
+          }
+        }
+      }
+    } else {
+      for (size_t t = 0; t < src->numTimes(); ++t) {
+        for (size_t c = 0; c < src->numChannels(); ++c) {
+          const TVoxel* data = src->channelData<TVoxel>(c, t);
+          TDesVoxel* desData = des->channelData<TDesVoxel>(c, t);
+          for (size_t v = 0; v < src->channelVoxelNumber(); ++v) {
+            if (data[v] <= minData) {
+              desData[v] = dataRangeMin;
+            } else if (data[v] >= maxData) {
+              desData[v] = dataRangeMax;
+            } else {
+              desData[v] = (data[v] - minData) * 1.0 / (maxData - minData) * dataRangeMax + dataRangeMin;
+            }
+          }
+        }
+      }
+    }
+  }
 
   template<typename TVoxel, typename TDesVoxel>
   static void buildScaleColormap(TVoxel minData, TVoxel maxData, TDesVoxel desDataRangeMin, TDesVoxel desDataRangeMax,
-                                 std::vector<TDesVoxel>& res);
+                                 std::vector<TDesVoxel>& res)
+  {
+    if constexpr (sizeof(TVoxel) <= 2) {
+      TVoxel srcDataRangeMin = std::numeric_limits<TVoxel>::min();
+      TVoxel srcDataRangeMax = std::numeric_limits<TVoxel>::max();
+      res.resize(srcDataRangeMax - srcDataRangeMin + 1);
+      for (TVoxel v = srcDataRangeMin; v < srcDataRangeMax; ++v) {
+        if (v <= minData) {
+          res[v - srcDataRangeMin] = desDataRangeMin;
+        } else if (v >= maxData) {
+          res[v - srcDataRangeMin] = desDataRangeMax;
+        } else {
+          res[v - srcDataRangeMin] = (v - minData) * 1.0 / (maxData - minData) * desDataRangeMax + desDataRangeMin;
+        }
+      }
+      res[srcDataRangeMax - srcDataRangeMin] = desDataRangeMax;
+    }
+  }
 
   template<typename TVoxel>
   ZImg& normalize_Impl();
@@ -1047,16 +1904,40 @@ private:
   void computeMinMax_Impl(TValue& minV, TValue& maxV) const;
 
   template<typename TVoxel, typename TScalar>
-  void addScalar_Impl(TScalar scalar);
+  void addScalar_Impl(TScalar scalar)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      saturate_add(data, scalar, timeVoxelNumber(), data);
+    }
+  }
 
   template<typename TVoxel, typename TScalar>
-  void subScalar_Impl(TScalar scalar);
+  void subScalar_Impl(TScalar scalar)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      saturate_sub(data, scalar, timeVoxelNumber(), data);
+    }
+  }
 
   template<typename TVoxel, typename TScalar>
-  void mulScalar_Impl(TScalar scalar);
+  void mulScalar_Impl(TScalar scalar)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      saturate_mul(data, scalar, timeVoxelNumber(), data);
+    }
+  }
 
   template<typename TVoxel, typename TScalar>
-  void divScalar_Impl(TScalar scalar);
+  void divScalar_Impl(TScalar scalar)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      saturate_div(data, scalar, timeVoxelNumber(), data);
+    }
+  }
 
   template<typename TVoxel, typename TVoxelRhs>
   void addImg_Impl(const ZImg& rhs);
@@ -1085,13 +1966,30 @@ private:
 
   template<typename TVoxel, typename TMaskVoxel>
   inline void histogramMask_Impl(std::vector<size_t>& res, const ZImg& mask) const
-  { histogramMask_Impl<TVoxel, TMaskVoxel>(res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>(), mask); }
+  { histogramMask_Impl < TVoxel, TMaskVoxel > (res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>(), mask); }
 
   template<typename TVoxel, typename GenericCustomUnaryOp>
-  void unaryOp_Impl(const GenericCustomUnaryOp& op);
+  void unaryOp_Impl(const GenericCustomUnaryOp& op)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = op(data[v]);
+      }
+    }
+  }
 
   template<typename TVoxel, typename TVoxelOther, typename GenericCustomBinaryOp>
-  void binaryOp_Impl(const ZImg& other, const GenericCustomBinaryOp& op);
+  void binaryOp_Impl(const ZImg& other, const GenericCustomBinaryOp& op)
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      TVoxel* data = timeData<TVoxel>(t);
+      const TVoxelOther* rhsData = other.timeData<TVoxelOther>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        data[v] = op(data[v], rhsData[v]);
+      }
+    }
+  }
 
   template<typename TVoxel>
   void flip_Impl(Dimension dim);
@@ -1110,22 +2008,103 @@ private:
                          size_t yStart, size_t zStart) const;
 
   template<typename TVoxel, typename TValue>
-  void firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZImgRegion& region) const;
+  void firstMaxValueCoord_Impl(ZVoxelCoordinate& res, TValue& max, const ZImgRegion& region) const
+  {
+    TVoxel maxValue = std::numeric_limits<TVoxel>::min();
+    if (voxelFormat() == VoxelFormat::Float) {
+      maxValue = std::numeric_limits<TVoxel>::lowest();
+    }
+    if (region.containsWholeTime(m_info)) {
+      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+        const TVoxel* data = timeData<TVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          if (data[v] > maxValue) {
+            maxValue = data[v];
+            res = indexToCoord(v);
+            res.t = t;
+          }
+        }
+      }
+
+    } else {
+      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+        for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
+          for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
+            for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
+              for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
+                TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
+                if (dat > maxValue) {
+                  maxValue = dat;
+                  res = ZVoxelCoordinate(x, y, z, c, t);
+                }
+              }
+            }
+          }
+        }
+      }
+
+    }
+    max = static_cast<TValue>(maxValue);
+  }
 
   // coord of all voxels with max img value
   template<typename TVoxel, typename TValue>
-  void maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, const ZImgRegion& region) const;
+  void maxValueCoords_Impl(std::vector<ZVoxelCoordinate>& res, TValue& max, const ZImgRegion& region) const
+  {
+    TVoxel maxValue = std::numeric_limits<TVoxel>::min();
+    if (voxelFormat() == VoxelFormat::Float) {
+      maxValue = std::numeric_limits<TVoxel>::lowest();
+    }
+    if (region.containsWholeTime(m_info)) {
+      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+        const TVoxel* data = timeData<TVoxel>(t);
+        for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+          if (data[v] > maxValue) {
+            maxValue = data[v];
+            res.clear();
+            ZVoxelCoordinate coord = indexToCoord(v);
+            coord.t = t;
+            res.push_back(coord);
+          } else if (data[v] == maxValue) {
+            ZVoxelCoordinate coord = indexToCoord(v);
+            coord.t = t;
+            res.push_back(coord);
+          }
+        }
+      }
+    } else {
+      for (size_t t = region.start.t; t < static_cast<size_t>(region.end.t); ++t) {
+        for (size_t c = region.start.c; c < static_cast<size_t>(region.end.c); ++c) {
+          for (size_t z = region.start.z; z < static_cast<size_t>(region.end.z); ++z) {
+            for (size_t y = region.start.y; y < static_cast<size_t>(region.end.y); ++y) {
+              for (size_t x = region.start.x; x < static_cast<size_t>(region.end.x); ++x) {
+                TVoxel dat = *(data<TVoxel>(x, y, z, c, t));
+                if (dat > maxValue) {
+                  maxValue = dat;
+                  res.clear();
+                  res.emplace_back(x, y, z, c, t);
+                } else if (dat == maxValue) {
+                  res.emplace_back(x, y, z, c, t);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    max = static_cast<TValue>(maxValue);
+  }
 
   template<typename TVoxel>
-  inline TVoxel value_Impl(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] inline TVoxel value_Impl(const ZVoxelCoordinate& coord) const
   { return *(data<TVoxel>(coord)); }
 
   template<typename TVoxel>
-  inline TVoxel value_Impl(size_t x, size_t y, size_t z, size_t c, size_t t) const
+  [[nodiscard]] inline TVoxel value_Impl(size_t x, size_t y, size_t z, size_t c, size_t t) const
   { return *(data<TVoxel>(x, y, z, c, t)); }
 
   template<typename TVoxel>
-  inline TVoxel value_Impl(size_t idx) const
+  [[nodiscard]] inline TVoxel value_Impl(size_t idx) const
   { return *(data<TVoxel>(idx)); }
 
   template<typename TVoxel>
@@ -1157,7 +2136,18 @@ private:
   void binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) const;
 
   template<typename TVoxel, typename GenericForegroundPredictor>
-  void binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForeground) const;
+  void binarized_Impl(ZImg& res, const GenericForegroundPredictor& isForeground) const
+  {
+    for (size_t t = 0; t < numTimes(); ++t) {
+      const TVoxel* data = timeData<TVoxel>(t);
+      auto resData = res.timeData<uint8_t>(t);
+      for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+        if (isForeground(data[v])) {
+          resData[v] = 1;
+        }
+      }
+    }
+  }
 
   template<typename TVoxel>
   void showContentAsQString_Impl(QString& res) const;
@@ -1188,371 +2178,4 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
   img.save(filename);
 }
 
-// Macro to call the correct version of typed function
-// To work with img of different type,
-// write a function:
-//   template<typename TVoxel>
-//   void function(t1 arg1, t2 arg2) {
-//     ...
-//   }
-//
-// and use this macro to dispatch:
-//   IMG_TYPED_CALL(function, img, arg1, arg2);
-//
-// if the function return something, use
-//   IMG_RETURN_TYPED_CALL(function, img, arg1, arg2);
-//
-//
-#define IMG_TYPED_CALL(function, img, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {            \
-    switch (img.bytesPerVoxel()) {                   \
-    case 1:                                          \
-      function<uint8_t>(__VA_ARGS__);                \
-      break;                                         \
-    case 2:                                          \
-      function<uint16_t>(__VA_ARGS__);               \
-      break;                                         \
-    case 4:                                          \
-      function<uint32_t>(__VA_ARGS__);               \
-      break;                                         \
-    case 8:                                          \
-      function<uint64_t>(__VA_ARGS__);               \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {        \
-    switch (img.bytesPerVoxel()) {                   \
-    case 4:                                          \
-      function<float>(__VA_ARGS__);                  \
-      break;                                         \
-    case 8:                                          \
-      function<double>(__VA_ARGS__);                 \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {       \
-    switch (img.bytesPerVoxel()) {                   \
-    case 1:                                          \
-      function<int8_t>(__VA_ARGS__);                 \
-      break;                                         \
-    case 2:                                          \
-      function<int16_t>(__VA_ARGS__);                \
-      break;                                         \
-    case 4:                                          \
-      function<int32_t>(__VA_ARGS__);                \
-      break;                                         \
-    case 8:                                          \
-      function<int64_t>(__VA_ARGS__);                \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  }                                                  \
-}
-
-#define IMG_RETURN_TYPED_CALL(function, img, ...) {  \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {            \
-    switch (img.bytesPerVoxel()) {                   \
-    case 1:                                          \
-      return function<uint8_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 2:                                          \
-      return function<uint16_t>(__VA_ARGS__);        \
-      break;                                         \
-    case 4:                                          \
-      return function<uint32_t>(__VA_ARGS__);        \
-      break;                                         \
-    case 8:                                          \
-      return function<uint64_t>(__VA_ARGS__);        \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {        \
-    switch (img.bytesPerVoxel()) {                   \
-    case 4:                                          \
-      return function<float>(__VA_ARGS__);           \
-      break;                                         \
-    case 8:                                          \
-      return function<double>(__VA_ARGS__);          \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {       \
-    switch (img.bytesPerVoxel()) {                   \
-    case 1:                                          \
-      return function<int8_t>(__VA_ARGS__);          \
-      break;                                         \
-    case 2:                                          \
-      return function<int16_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 4:                                          \
-      return function<int32_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 8:                                          \
-      return function<int64_t>(__VA_ARGS__);         \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  }                                                  \
-}
-
-#define IMGINFO_RETURN_TYPED_CALL(function, info, ...) {  \
-  if (info.voxelFormat == VoxelFormat::Unsigned) {            \
-    switch (info.bytesPerVoxel) {                   \
-    case 1:                                          \
-      return function<uint8_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 2:                                          \
-      return function<uint16_t>(__VA_ARGS__);        \
-      break;                                         \
-    case 4:                                          \
-      return function<uint32_t>(__VA_ARGS__);        \
-      break;                                         \
-    case 8:                                          \
-      return function<uint64_t>(__VA_ARGS__);        \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (info.voxelFormat == VoxelFormat::Float) {        \
-    switch (info.bytesPerVoxel) {                   \
-    case 4:                                          \
-      return function<float>(__VA_ARGS__);           \
-      break;                                         \
-    case 8:                                          \
-      return function<double>(__VA_ARGS__);          \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  } else if (info.voxelFormat == VoxelFormat::Signed) {       \
-    switch (info.bytesPerVoxel) {                   \
-    case 1:                                          \
-      return function<int8_t>(__VA_ARGS__);          \
-      break;                                         \
-    case 2:                                          \
-      return function<int16_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 4:                                          \
-      return function<int32_t>(__VA_ARGS__);         \
-      break;                                         \
-    case 8:                                          \
-      return function<int64_t>(__VA_ARGS__);         \
-      break;                                         \
-    default:                                         \
-      break;                                         \
-    }                                                \
-  }                                                  \
-}
-
-// for function that take 2 template argument
-// first one is derived from img, second one is provided by user
-#define IMG_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                             \
-    switch (img.bytesPerVoxel()) {                                    \
-    case 1:                                                           \
-      function<uint8_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                          \
-    case 2:                                                           \
-      function<uint16_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                          \
-    case 4:                                                           \
-      function<uint32_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                          \
-    case 8:                                                           \
-      function<uint64_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                          \
-    default:                                                          \
-      break;                                                          \
-    }                                                                 \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                         \
-    switch (img.bytesPerVoxel()) {                                    \
-    case 4:                                                           \
-      function<float, T2ND>(__VA_ARGS__);                             \
-      break;                                                          \
-    case 8:                                                           \
-      function<double, T2ND>(__VA_ARGS__);                            \
-      break;                                                          \
-    default:                                                          \
-      break;                                                          \
-    }                                                                 \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                        \
-    switch (img.bytesPerVoxel()) {                                    \
-    case 1:                                                           \
-      function<int8_t, T2ND>(__VA_ARGS__);                            \
-      break;                                                          \
-    case 2:                                                           \
-      function<int16_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                          \
-    case 4:                                                           \
-      function<int32_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                          \
-    case 8:                                                           \
-      function<int64_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                          \
-    default:                                                          \
-      break;                                                          \
-    }                                                                 \
-  }                                                                   \
-}
-
-// for function that take 3 template argument
-// first one is derived from img, second and third is provided by user
-#define IMG_TYPED_CALL_FIX2ND3RDTYPE(function, img, T2ND, T3RD, ...) {   \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                \
-    switch (img.bytesPerVoxel()) {                                       \
-    case 1:                                                              \
-      function<uint8_t, T2ND, T3RD>(__VA_ARGS__);                        \
-      break;                                                             \
-    case 2:                                                              \
-      function<uint16_t, T2ND, T3RD>(__VA_ARGS__);                       \
-      break;                                                             \
-    case 4:                                                              \
-      function<uint32_t, T2ND, T3RD>(__VA_ARGS__);                       \
-      break;                                                             \
-    case 8:                                                              \
-      function<uint64_t, T2ND, T3RD>(__VA_ARGS__);                       \
-      break;                                                             \
-    default:                                                             \
-      break;                                                             \
-    }                                                                    \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                            \
-    switch (img.bytesPerVoxel()) {                                       \
-    case 4:                                                              \
-      function<float, T2ND, T3RD>(__VA_ARGS__);                          \
-      break;                                                             \
-    case 8:                                                              \
-      function<double, T2ND, T3RD>(__VA_ARGS__);                         \
-      break;                                                             \
-    default:                                                             \
-      break;                                                             \
-    }                                                                    \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                           \
-    switch (img.bytesPerVoxel()) {                                       \
-    case 1:                                                              \
-      function<int8_t, T2ND, T3RD>(__VA_ARGS__);                         \
-      break;                                                             \
-    case 2:                                                              \
-      function<int16_t, T2ND, T3RD>(__VA_ARGS__);                        \
-      break;                                                             \
-    case 4:                                                              \
-      function<int32_t, T2ND, T3RD>(__VA_ARGS__);                        \
-      break;                                                             \
-    case 8:                                                              \
-      function<int64_t, T2ND, T3RD>(__VA_ARGS__);                        \
-      break;                                                             \
-    default:                                                             \
-      break;                                                             \
-    }                                                                    \
-  }                                                                      \
-}
-
-#define IMG_RETURN_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      return function<uint8_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                                 \
-    case 2:                                                                  \
-      return function<uint16_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                                 \
-    case 4:                                                                  \
-      return function<uint32_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                                 \
-    case 8:                                                                  \
-      return function<uint64_t, T2ND>(__VA_ARGS__);                          \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                                \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 4:                                                                  \
-      return function<float, T2ND>(__VA_ARGS__);                             \
-      break;                                                                 \
-    case 8:                                                                  \
-      return function<double, T2ND>(__VA_ARGS__);                            \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                               \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      return function<int8_t, T2ND>(__VA_ARGS__);                            \
-      break;                                                                 \
-    case 2:                                                                  \
-      return function<int16_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                                 \
-    case 4:                                                                  \
-      return function<int32_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                                 \
-    case 8:                                                                  \
-      return function<int64_t, T2ND>(__VA_ARGS__);                           \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  }                                                                          \
-}
-
-// for function that process 2 types of img
-// first one is derived from img1, second one is derived from img2
-#define IMG_TYPED_CALL_2TYPE(function, img1, img2, ...) {                    \
-  if (img2.voxelFormat() == VoxelFormat::Unsigned) {                                   \
-    switch (img2.bytesPerVoxel()) {                                          \
-    case 1:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint8_t, __VA_ARGS__)        \
-      break;                                                                 \
-    case 2:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint16_t, __VA_ARGS__)       \
-      break;                                                                 \
-    case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint32_t, __VA_ARGS__)       \
-      break;                                                                 \
-    case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint64_t, __VA_ARGS__)       \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img2.voxelFormat() == VoxelFormat::Float) {                               \
-    switch (img2.bytesPerVoxel()) {                                          \
-    case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, float, __VA_ARGS__)          \
-      break;                                                                 \
-    case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, double, __VA_ARGS__)         \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img2.voxelFormat() == VoxelFormat::Signed) {                              \
-    switch (img2.bytesPerVoxel()) {                                          \
-    case 1:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int8_t, __VA_ARGS__)         \
-      break;                                                                 \
-    case 2:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int16_t, __VA_ARGS__)        \
-      break;                                                                 \
-    case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int32_t, __VA_ARGS__)        \
-      break;                                                                 \
-    case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int64_t, __VA_ARGS__)        \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  }                                                                          \
-}
-
-
 }  // namespace nim
-
-#include "zimg.inl"

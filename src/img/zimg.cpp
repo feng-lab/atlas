@@ -141,12 +141,14 @@ ZImg::ZImg(const ZImg& other)
   m_ownData = true;
   if (m_ownData) { // deep copy
     allocate();
-    for (size_t t = 0; t < numTimes(); ++t)
+    for (size_t t = 0; t < numTimes(); ++t) {
       std::memcpy(timeData<uint8_t>(t), other.timeData<uint8_t>(t), timeByteNumber());
+    }
   } else { // shallow copy
     m_data.resize(numTimes());
-    for (size_t t = 0; t < numTimes(); ++t)
+    for (size_t t = 0; t < numTimes(); ++t) {
       m_data[t] = other.m_data[t];
+    }
   }
 }
 
@@ -412,8 +414,9 @@ template void ZImg::wrapData(double*, size_t, size_t, size_t, size_t, size_t);
 void ZImg::allocate()
 {
   clearData();
-  if (m_info.isEmpty())
+  if (m_info.isEmpty()) {
     return;
+  }
   m_data.resize(m_info.numTimes);
 
   for (size_t t = 0; t < m_info.numTimes; ++t) {
@@ -451,8 +454,9 @@ void ZImg::allocate()
 
 void ZImg::reverseEndianness()
 {
-  if (m_info.bytesPerVoxel == 1)
+  if (m_info.bytesPerVoxel == 1) {
     return;
+  }
 
   if (m_info.bytesPerVoxel == 2) {
     for (size_t t = 0; t < numTimes(); ++t) {
@@ -484,9 +488,10 @@ void ZImg::reverseEndianness()
 QString ZImg::toQString() const
 {
   QString res;
-  if (isEmpty())
+  if (isEmpty()) {
     return res;
-  IMG_TYPED_CALL(showContentAsQString_Impl, (*this), res);
+  }
+  IMG_TYPED_CALL(showContentAsQString_Impl, (*this), res)
   return res;
 }
 
@@ -508,8 +513,9 @@ ZImg ZImg::createView(int c, int t)
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
     res.m_data[lt] = channelData<uint8_t>(rgn.start.c, lt + rgn.start.t);
+  }
   res.m_ownData = false;
   return res;
 }
@@ -532,8 +538,9 @@ const ZImg ZImg::createView(int c, int t) const
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
     res.m_data[lt] = m_data[lt + rgn.start.t] + rgn.start.c * m_info.channelByteNumber();
+  }
   res.m_ownData = false;
   return res;
 }
@@ -554,8 +561,9 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t)
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
     res.m_data[lt] = planeData<uint8_t>(rgn.start.z, rgn.start.c, lt + rgn.start.t);
+  }
   res.m_ownData = false;
   return res;
 }
@@ -576,9 +584,10 @@ const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
   ZImg res;
   res.m_info = rgn.clip(m_info);
   res.m_data.resize(res.numTimes());
-  for (size_t lt = 0; lt < res.numTimes(); ++lt)
+  for (size_t lt = 0; lt < res.numTimes(); ++lt) {
     res.m_data[lt] = m_data[lt + rgn.start.t] +
                      rgn.start.c * m_info.channelByteNumber() + rgn.start.z * m_info.planeByteNumber();
+  }
   res.m_ownData = false;
   return res;
 }
@@ -586,7 +595,7 @@ const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
 template<typename TValue>
 void ZImg::computeMinMax(TValue& min, TValue& max) const
 {
-  IMG_TYPED_CALL(computeMinMax_Impl, (*this), min, max);
+  IMG_TYPED_CALL(computeMinMax_Impl, (*this), min, max)
 }
 
 template void ZImg::computeMinMax(uint8_t&, uint8_t&) const;
@@ -617,9 +626,9 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   std::vector<size_t> res(nbins, 0);
 
   if (mask.isEmpty()) {
-    IMG_TYPED_CALL(histogram_Impl, (*this), res);
+    IMG_TYPED_CALL(histogram_Impl, (*this), res)
   } else if (isSameSize(mask)) {
-    IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, mask);
+    IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, mask)
   } else {
     throw ZImgException(QString("histogram mask has different size <%1> than current img <%2>")
                           .arg(mask.info().toQString()).arg(m_info.toQString()));
@@ -823,7 +832,7 @@ void ZImg::fillRandom_Impl()
 
 ZImg& ZImg::fillRandom()
 {
-  IMG_TYPED_CALL(fillRandom_Impl, (*this));
+  IMG_TYPED_CALL(fillRandom_Impl, (*this))
   return *this;
 }
 
@@ -904,7 +913,7 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
       }
     }
   } else {
-    IMG_TYPED_CALL_2TYPE(pasteImg_Impl, (*this), img, img, start);
+    IMG_TYPED_CALL_2TYPE(pasteImg_Impl, (*this), img, img, start)
   }
 
   return *this;
@@ -937,7 +946,7 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
     return *this;
   }
 
-  IMG_TYPED_CALL_2TYPE(pasteImgMax_Impl, (*this), img, img, start);
+  IMG_TYPED_CALL_2TYPE(pasteImgMax_Impl, (*this), img, img, start)
 
   return *this;
 }
@@ -945,8 +954,9 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
 ZImg ZImg::cat(const std::vector<ZImg>& imgsIn, Dimension dim)
 {
   std::vector<const ZImg*> imgs;
-  for (const auto& img : imgsIn)
+  for (const auto& img : imgsIn) {
     imgs.push_back(&img);
+  }
   return cat(imgs, dim);
 }
 
@@ -961,14 +971,18 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 {
   // remove empty img
   std::vector<const ZImg*> imgs;
-  for (auto img : imgsIn)
-    if (img && !img->isEmpty())
+  for (auto img : imgsIn) {
+    if (img && !img->isEmpty()) {
       imgs.push_back(img);
+    }
+  }
 
-  if (imgs.empty())
+  if (imgs.empty()) {
     return ZImg();
-  if (imgs.size() == 1)
+  }
+  if (imgs.size() == 1) {
     return *(imgs[0]);
+  }
 
   // check dimensions and type
   const ZImg* firstImg = imgs[0];
@@ -1057,8 +1071,9 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
 ZImg ZImg::combine(const std::vector<ZImg>& imgsIn, ImgMergeMode mode)
 {
   std::vector<const ZImg*> imgs;
-  for (const auto& img : imgsIn)
+  for (const auto& img : imgsIn) {
     imgs.push_back(&img);
+  }
   return combine(imgs, mode);
 }
 
@@ -1073,14 +1088,18 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
 {
   // remove empty img
   std::vector<const ZImg*> imgs;
-  for (auto img : imgsIn)
-    if (img && !img->isEmpty())
+  for (auto img : imgsIn) {
+    if (img && !img->isEmpty()) {
       imgs.push_back(img);
+    }
+  }
 
-  if (imgs.empty())
+  if (imgs.empty()) {
     return ZImg();
-  if (imgs.size() == 1)
+  }
+  if (imgs.size() == 1) {
     return *(imgs[0]);
+  }
 
   // check dimensions size
   const ZImg* firstImg = imgs[0];
@@ -1093,15 +1112,16 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
     }
   }
 
-  IMG_RETURN_TYPED_CALL(combine_Impl, (*firstImg), imgs, mode);
+  IMG_RETURN_TYPED_CALL(combine_Impl, (*firstImg), imgs, mode)
 
   return ZImg();
 }
 
 ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int endIn) const
 {
-  if (isEmpty() || m_info.size(dim) == 1)
+  if (isEmpty() || m_info.size(dim) == 1) {
     return *this;
+  }
 
   size_t dstart = 0;
   size_t dend = m_info.size(dim);
@@ -1221,8 +1241,9 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int en
     }
 
     std::vector<const ZImg*> imgs;
-    for (const auto& subImg : subImgs)
+    for (const auto& subImg : subImgs) {
       imgs.push_back(&subImg);
+    }
     res = combine(imgs, mode);
   }
   return res;
@@ -1242,23 +1263,25 @@ ZImg ZImg::normalized() const
 
 ZImg& ZImg::normalize()
 {
-  if (isEmpty())
+  if (isEmpty()) {
     return *this;
-  IMG_RETURN_TYPED_CALL(normalize_Impl, (*this));
+  }
+  IMG_RETURN_TYPED_CALL(normalize_Impl, (*this))
   return *this;
 }
 
 template<typename TDesVoxel>
 ZImg ZImg::castTo() const
 {
-  if (isType<TDesVoxel>())
+  if (isType<TDesVoxel>()) {
     return *this;
+  }
 
   ZImgInfo info = m_info;
   info.setVoxelFormat<TDesVoxel>();
   ZImg res(info);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(cast_Impl, (*this), TDesVoxel, res);
+  IMG_TYPED_CALL_FIX2NDTYPE(cast_Impl, (*this), TDesVoxel, res)
 
   return res;
 }
@@ -1303,7 +1326,7 @@ ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
   info.validBitCount = 0;
   ZImg res(info);
 
-  IMG_TYPED_CALL_2TYPE(cast_Impl, (*this), res, res);
+  IMG_TYPED_CALL_2TYPE(cast_Impl, (*this), res, res)
 
   return res;
 }
@@ -1329,7 +1352,7 @@ ZImg ZImg::resized(size_t desWidth, size_t desHeight, size_t desDepth,
   info.depth = desDepth;
 
   res = ZImg(info);
-  IMG_TYPED_CALL(resize_Impl, (*this), res, interpolant, antialiasing, antialiasingForNearest);
+  IMG_TYPED_CALL(resize_Impl, (*this), res, interpolant, antialiasing, antialiasingForNearest)
 
   return res;
 }
@@ -1354,18 +1377,20 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
   info.depth = (m_info.depth + blockDepth - 1) / blockDepth;
   ZImg res(info);
 
-  if (res.isEmpty())
+  if (res.isEmpty()) {
     return res;
+  }
 
-  IMG_TYPED_CALL(blockDownsampled_Impl, (*this), res, blockWidth, blockHeight, blockDepth, mode);
+  IMG_TYPED_CALL(blockDownsampled_Impl, (*this), res, blockWidth, blockHeight, blockDepth, mode)
   return res;
 }
 
 ZImg& ZImg::resize(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant,
                    bool antialiasing, bool antialiasingForNearest)
 {
-  if (width() == desWidth && height() == desHeight && depth() == desDepth)
+  if (width() == desWidth && height() == desHeight && depth() == desDepth) {
     return *this;
+  }
   ZImg res = resized(desWidth, desHeight, desDepth, interpolant, antialiasing, antialiasingForNearest);
   swap(res);
   return *this;
@@ -1374,8 +1399,9 @@ ZImg& ZImg::resize(size_t desWidth, size_t desHeight, size_t desDepth, Interpola
 ZImg& ZImg::zoom(double scaleX, double scaleY, double scaleZ, Interpolant interpolant,
                  bool antialiasing, bool antialiasingForNearest)
 {
-  if (scaleX == 1 && scaleY == 1 && scaleZ == 1)
+  if (scaleX == 1 && scaleY == 1 && scaleZ == 1) {
     return *this;
+  }
   ZImg res = zoomed(scaleX, scaleY, scaleZ, interpolant, antialiasing, antialiasingForNearest);
   swap(res);
   return *this;
@@ -1383,8 +1409,9 @@ ZImg& ZImg::zoom(double scaleX, double scaleY, double scaleZ, Interpolant interp
 
 ZImg& ZImg::blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockDepth, ImgMergeMode mode)
 {
-  if (blockWidth == 1 && blockHeight == 1 && blockDepth == 1)
+  if (blockWidth == 1 && blockHeight == 1 && blockDepth == 1) {
     return *this;
+  }
   ZImg res = blockDownsampled(blockWidth, blockHeight, blockDepth, mode);
   swap(res);
   return *this;
@@ -1392,8 +1419,9 @@ ZImg& ZImg::blockDownsample(size_t blockWidth, size_t blockHeight, size_t blockD
 
 ZImg& ZImg::flip(Dimension dim)
 {
-  if (isEmpty())
+  if (isEmpty()) {
     return *this;
+  }
   /*if (dim == Dimension::L) { // flip locations
     size_t j = m_data.size() - 1;
     for (size_t i=0; i<m_data.size()/2; ++i, --j) {
@@ -1416,19 +1444,20 @@ ZImg& ZImg::flip(Dimension dim)
       }
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(flip_Impl, (*this), dim);
+    IMG_TYPED_CALL(flip_Impl, (*this), dim)
   }
   return *this;
 }
 
 ZImg& ZImg::reflect()
 {
-  if (isEmpty())
+  if (isEmpty()) {
     return *this;
+  }
   // reflect time
   flip(Dimension::T);
   // reflect others
-  IMG_TYPED_CALL(reflect_Impl, (*this));
+  IMG_TYPED_CALL(reflect_Impl, (*this))
   return *this;
 }
 
@@ -1448,7 +1477,7 @@ ZImg ZImg::cumulativeSum(Dimension dim) const
       currentCh += lastCh;
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(cumulativeSum_Impl, (*this), res, dim);
+    IMG_TYPED_CALL(cumulativeSum_Impl, (*this), res, dim)
   }
   return res;
 }
@@ -1460,17 +1489,19 @@ ZImg ZImg::blockSum(size_t twidth, size_t theight, size_t tdepth) const
       QString("wrong template size input for blockSum: %1, %2, %3)").arg(twidth).arg(theight).arg(tdepth));
   }
   ZImg res;
-  if (isEmpty())
+  if (isEmpty()) {
     return res;
+  }
   ZImgInfo info = m_info;
   info.width += twidth - 1;
   info.height += theight - 1;
   info.depth += tdepth - 1;
   res = ZImg(info);
-  if (res.voxelFormat() == VoxelFormat::Signed) // default signed image voxel is negative
+  if (res.voxelFormat() == VoxelFormat::Signed) { // default signed image voxel is negative
     res.fill(0);
+  }
 
-  IMG_TYPED_CALL(blockSum_Impl, (*this), res, twidth, theight, tdepth);
+  IMG_TYPED_CALL(blockSum_Impl, (*this), res, twidth, theight, tdepth)
 
   return res;
 }
@@ -1489,18 +1520,20 @@ ZImg ZImg::blockSumPart(size_t twidth, size_t theight, size_t tdepth, size_t xSt
                           .arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(zStart).arg(zEnd));
   }
   ZImg res;
-  if (isEmpty())
+  if (isEmpty()) {
     return res;
+  }
   ZImgInfo info = m_info;
   info.width = xEnd - xStart;
   info.height = yEnd - yStart;
   info.depth = zEnd - zStart;
   res = ZImg(info);
-  if (res.voxelFormat() == VoxelFormat::Signed) // default signed image voxel is negative
+  if (res.voxelFormat() == VoxelFormat::Signed) { // default signed image voxel is negative
     res.fill(0);
+  }
 
   IMG_TYPED_CALL(blockSumPart_Impl, (*this), res, twidth, theight, tdepth, xStart,
-                 yStart, zStart);
+                 yStart, zStart)
 
   return res;
 }
@@ -1511,7 +1544,7 @@ ZImg& ZImg::operator+=(const ZImg& rhs)
     throw ZImgException(QString("img addition requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(addImg_Impl, (*this), rhs, rhs);
+  IMG_TYPED_CALL_2TYPE(addImg_Impl, (*this), rhs, rhs)
   return *this;
 }
 
@@ -1521,7 +1554,7 @@ ZImg& ZImg::operator-=(const ZImg& rhs)
     throw ZImgException(QString("img subtraction requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(subImg_Impl, (*this), rhs, rhs);
+  IMG_TYPED_CALL_2TYPE(subImg_Impl, (*this), rhs, rhs)
   return *this;
 }
 
@@ -1531,7 +1564,7 @@ ZImg& ZImg::operator*=(const ZImg& rhs)
     throw ZImgException(QString("img multiplies requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(mulImg_Impl, (*this), rhs, rhs);
+  IMG_TYPED_CALL_2TYPE(mulImg_Impl, (*this), rhs, rhs)
   return *this;
 }
 
@@ -1541,7 +1574,7 @@ ZImg& ZImg::operator/=(const ZImg& rhs)
     throw ZImgException(QString("img divides requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(divImg_Impl, (*this), rhs, rhs);
+  IMG_TYPED_CALL_2TYPE(divImg_Impl, (*this), rhs, rhs)
   return *this;
 }
 
@@ -1551,7 +1584,7 @@ ZImg& ZImg::secureDivideBy(const ZImg& rhs)
     throw ZImgException(QString("img divides requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, (*this), rhs, rhs);
+  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, (*this), rhs, rhs)
   return *this;
 }
 
@@ -1561,8 +1594,9 @@ bool ZImg::operator==(const ZImg& other) const
     for (size_t t = 0; t < numTimes(); ++t) {
       const uint8_t* data = timeData(t);
       const uint8_t* otherData = other.timeData(t);
-      if (data != otherData && memcmp(data, otherData, timeByteNumber()) != 0)
+      if (data != otherData && memcmp(data, otherData, timeByteNumber()) != 0) {
         return false;
+      }
     }
     return true;
   }
@@ -1571,8 +1605,9 @@ bool ZImg::operator==(const ZImg& other) const
 
 ZVoxelCoordinate ZImg::indexToCoord(int64_t idx, const ZImgInfo& info)
 {
-  if (info.isEmpty())
+  if (info.isEmpty()) {
     throw ZImgException(QString("Can not convert index to coord with empty img info <%1>").arg(info.toQString()));
+  }
   ZVoxelCoordinate res;
   //  res.l = idx >= 0 ? (idx / info.locationVoxelNumber()) : (- 1 - ((-idx-1) / info.locationVoxelNumber()));
   //  idx -= res.l * (int64_t)info.locationVoxelNumber();  //idx is positive now
@@ -2242,7 +2277,7 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
-          if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
+          if (idx == res.size()) { idx = res.size() - 1; }  // only maxData map to index that out of bound
           res[idx] += 1;
         }
       }
@@ -2261,8 +2296,9 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
         for (size_t t = 0; t < numTimes(); ++t) {
           const TVoxel* data = timeData<TVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-            if (data[v] >= minData && data[v] <= maxData)
+            if (data[v] >= minData && data[v] <= maxData) {
               res[data[v] - minData] += 1;
+            }
           }
         }
       }
@@ -2307,7 +2343,7 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
-          if (idx == res.size()) idx = res.size() - 1;  // only maxData map to index that out of bound
+          if (idx == res.size()) { idx = res.size() - 1; }  // only maxData map to index that out of bound
           res[idx] += 1;
         }
       }
@@ -2320,8 +2356,9 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
           const TVoxel* data = timeData<TVoxel>(t);
           const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-            if (maskData[v])
+            if (maskData[v]) {
               res[data[v] - minData] += 1;
+            }
           }
         }
       } else {
@@ -2329,8 +2366,9 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
           const TVoxel* data = timeData<TVoxel>(t);
           const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-            if (maskData[v] && data[v] >= minData && data[v] <= maxData)
+            if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
               res[data[v] - minData] += 1;
+            }
           }
         }
       }
@@ -2709,16 +2747,18 @@ void ZImg::thresholdAbove_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
     for (size_t t = 0; t < numTimes(); ++t) {
       auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] >= threshold)
+        if (data[v] >= threshold) {
           data[v] = outsideValue;
+        }
       }
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
       auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] > threshold)
+        if (data[v] > threshold) {
           data[v] = outsideValue;
+        }
       }
     }
   }
@@ -2751,16 +2791,18 @@ void ZImg::thresholdBelow_Impl(TVoxel threshold, ThresholdMode threMode, TVoxel 
     for (size_t t = 0; t < numTimes(); ++t) {
       auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] <= threshold)
+        if (data[v] <= threshold) {
           data[v] = outsideValue;
+        }
       }
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
     for (size_t t = 0; t < numTimes(); ++t) {
       auto data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] < threshold)
+        if (data[v] < threshold) {
           data[v] = outsideValue;
+        }
       }
     }
   }
@@ -2794,8 +2836,9 @@ void ZImg::binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) c
       auto data = timeData<TVoxel>(t);
       auto resData = res.timeData<uint8_t>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] >= threshold)
+        if (data[v] >= threshold) {
           resData[v] = 1;
+        }
       }
     }
   } else if (threMode == ThresholdMode::ExcludeThreshold) {
@@ -2803,8 +2846,9 @@ void ZImg::binarized_Impl(ZImg& res, TVoxel threshold, ThresholdMode threMode) c
       auto data = timeData<TVoxel>(t);
       auto resData = res.timeData<uint8_t>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-        if (data[v] > threshold)
+        if (data[v] > threshold) {
           resData[v] = 1;
+        }
       }
     }
   }

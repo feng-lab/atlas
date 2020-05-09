@@ -42,7 +42,7 @@ BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: false
-ColumnLimit: 0
+ColumnLimit: 120
 CompactNamespaces: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 2
@@ -84,6 +84,8 @@ SpacesInContainerLiterals: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Latest
-StatementMacros: [ Q_UNUSED, ]
+StatementMacros: [ Q_UNUSED, IMG_TYPED_CALL, IMG_RETURN_TYPED_CALL, IMGINFO_RETURN_TYPED_CALL,
+                   IMG_TYPED_CALL_FIX2NDTYPE, IMG_TYPED_CALL_FIX2ND3RDTYPE, IMG_RETURN_TYPED_CALL_FIX2NDTYPE,
+                   IMG_TYPED_CALL_2TYPE, ]
 TabWidth: 8
 UseTab: Never
