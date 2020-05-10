@@ -1955,9 +1955,12 @@ def build_libs(libs: dict, update_src: bool):
     #     build_ospray(src_dir, ext_build_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
 
     if libs['ospray']:
-        src_dir = os.path.join(ext_dir(), 'ospray')
-        if update_src:
-            update_git_submodule(src_dir)
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'ospray*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'ospray*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
         build_ospray(src_dir, ext_build_dir())
 
     if libs['java']:

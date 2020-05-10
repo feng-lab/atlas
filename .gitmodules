@@ -106,7 +106,3 @@
 	path = src/3rdparty/bzip2
 	url = https://gitlab.com/federicomenaquintero/bzip2.git
 	branch = master
-[submodule "src/3rdparty/ospray"]
-	path = src/3rdparty/ospray
-	url = https://github.com/ospray/ospray.git
-	branch = master
