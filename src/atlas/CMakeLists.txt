@@ -681,7 +681,7 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -stdlib=libc++ -framework OpenGL)
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 
-    target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition -Wl,-rpath,$ORIGIN/lib)
+    target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition -Wl,-rpath,$$ORIGIN/lib)
   endif ()
 
   # for some files
