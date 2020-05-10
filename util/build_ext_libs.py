@@ -185,32 +185,30 @@ def get_env_for_config_make():
     return env
 
 
-def get_cmake_cmd_common_part(install_dir: str):
+def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
     cbf = get_common_build_flags()
     if is_windows():
-        if use_ninja():
-            res = [get_cmake_binary(),  # '-E', 'echo',
-                   '-DCMAKE_BUILD_TYPE=Release',
-                   '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
-                   # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
-                   '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
-                   '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-                   '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
-                   '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
-                   '-DCMAKE_C_VISIBILITY_PRESET=hidden',
-                   f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
-                   f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
-                   ]
-            if use_clang_cl():
-                res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
-                            '-DCMAKE_C_COMPILER=clang-cl',
-                            ])
-            return res
+        res = [get_cmake_binary(),  # '-E', 'echo',
+               '-DCMAKE_BUILD_TYPE=Release',
+               '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+               # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
+               '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
+               '-DCMAKE_INSTALL_PREFIX=' + install_dir,
+               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
+               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
+               ]
+        if use_clang_cl():
+            res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
+                        '-DCMAKE_C_COMPILER=clang-cl',
+                        ])
+        if use_ninja:
+            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         else:
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64',
-                    '-DCMAKE_INSTALL_PREFIX=' + install_dir
-                    ]
+            res.extend(['-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64'])
+        return res
     elif is_linux():
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
@@ -223,7 +221,7 @@ def get_cmake_cmd_common_part(install_dir: str):
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
-        if use_ninja():
+        if use_ninja:
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         return res
     else:
@@ -243,12 +241,12 @@ def get_cmake_cmd_common_part(install_dir: str):
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
-        if use_ninja():
+        if use_ninja:
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         return res
 
 
-def build_cmakecmd(cmakecmd, build_dir: str, env=None):
+def build_cmakecmd(cmakecmd, build_dir: str, *, env=None):
     if is_windows():
         if env is None:
             env = get_vcvars_environment()
@@ -280,19 +278,31 @@ def build_cmakecmd(cmakecmd, build_dir: str, env=None):
                                cwd=build_dir, shell=False, check=True, env=env)
 
 
-def build_and_install_cmakecmd(cmakecmd, build_dir: str, env=None):
+def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja(), use_cmake=False):
     if is_windows():
         if env is None:
             env = get_vcvars_environment()
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-        if use_ninja():
+        if use_cmake:
+            subprocess.run([get_cmake_binary(), '--build', '.'],
+                           cwd=build_dir, shell=False, check=True, env=env)
+        elif use_ninja:
             subprocess.run([get_ninja_binary(), 'install'],
                            cwd=build_dir, shell=False, check=True, env=env)
         else:
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
     else:
-        if use_ninja():
+        if use_cmake:
+            if env is None:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+                subprocess.run([get_cmake_binary(), '--build', '.'],
+                               cwd=build_dir, shell=False, check=True)
+            else:
+                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+                subprocess.run([get_cmake_binary(), '--build', '.'],
+                               cwd=build_dir, shell=False, check=True, env=env)
+        elif use_ninja:
             if env is None:
                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
                 subprocess.run([get_ninja_binary(), 'install'],
@@ -1122,30 +1132,6 @@ def build_jxrlib(src_dir: str, install_dir: str):
         cleanup_git_submodule(src_dir)
 
 
-def build_ospray(src_dir: str, install_dir: str, ispc_dir: str, embree_dir: str):
-    build_dir = create_build_dir(src_dir)
-
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-        cmakecmd.extend(['-DOSPRAY_USE_EMBREE_STREAMS:BOOL=ON',
-                         '-DOSPRAY_MODULE_BILINEAR_PATCH:BOOL=ON',
-                         '-Dembree_DIR:PATH=' + embree_dir])
-
-        env = get_tbb_env()
-        print('TBBROOT:', env['TBBROOT'])
-        if is_windows():
-            cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
-                             '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '\\ispc.exe'])
-        else:
-            cmakecmd.extend(['-DTBB_ROOT:PATH=' + env['TBBROOT'],
-                             '-DISPC_EXECUTABLE:FILEPATH=' + ispc_dir + '/ispc'])
-
-        cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-
 def build_assimp(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -1587,6 +1573,24 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_ospray(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
+        cmakecmd.extend(['-DDOWNLOAD_ISPC=ON',
+                         '-DDOWNLOAD_TBB=OFF',
+                         '-DBUILD_EMBREE_FROM_SOURCE=OFF',
+                         '-DBUILD_GLFW=ON',
+                         '-DBUILD_OIDN_FROM_SOURCE=OFF',
+                         ])
+
+        cmakecmd.extend([os.path.join(src_dir, 'scripts', 'superbuild')])
+        build_and_install_cmakecmd(cmakecmd, build_dir, use_ninja=False, use_cmake=True)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_libs(libs: dict, update_src: bool):
     print('extDIR:', ext_dir())
     print('srcPackageDIR:', src_package_dir())
@@ -1949,6 +1953,12 @@ def build_libs(libs: dict, update_src: bool):
     #     assert os.path.exists(ispc_dir)
     #     assert os.path.exists(embree_dir)
     #     build_ospray(src_dir, ext_build_dir(), ispc_dir=ispc_dir, embree_dir=embree_dir)
+
+    if libs['ospray']:
+        src_dir = os.path.join(ext_dir(), 'ospray')
+        if update_src:
+            update_git_submodule(src_dir)
+        build_ospray(src_dir, ext_build_dir())
 
     if libs['java']:
         shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
