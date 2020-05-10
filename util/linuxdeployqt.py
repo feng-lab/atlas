@@ -323,8 +323,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, 
     strip(dest_file)
     # https://github.com/NixOS/patchelf/issues/94
     # todo: check if it is needed as we set it in cmake already
-    # patch_elf(['--remove-rpath'], dest_file)
-    # patch_elf(['--force-rpath', "--set-rpath", "$ORIGIN" + os.sep + appdir_libs], dest_file)
+    patch_elf(['--remove-rpath'], dest_file)
+    patch_elf(['--force-rpath', "--set-rpath", "$ORIGIN" + os.sep + appdir_libs], dest_file)
 
     for dep in dependencies:
         details = dependencies[dep]
