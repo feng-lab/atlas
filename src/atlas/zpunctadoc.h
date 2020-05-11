@@ -49,6 +49,8 @@ public:
 
   QString objTooltip(size_t id) const override;
 
+  QUndoStack* objUndoStack(size_t id) override;
+
   QJsonValue jsonValue(size_t id) const override;
 
   bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
@@ -56,6 +58,8 @@ public:
   size_t makeAlias(size_t id) override;
 
   bool isAlias(size_t id) const override;
+
+  QWidget* createObjEditWidget(size_t id) override;
 
 protected:
   void loadPuncta();

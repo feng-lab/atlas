@@ -597,6 +597,12 @@ set(SOURCES
     zregionannotationviewsettingcolumndelegate.cpp
     zregionviewsettingwitheditorwindow.h
     zregionviewsettingwitheditorwindow.cpp
+    zpunctawidget.cpp
+    zpunctawidget.h
+    zpunctatablemodel.h
+    zpunctatablemodel.cpp
+    zpunctatableview.cpp
+    zpunctatableview.h
     )
 
 # our target

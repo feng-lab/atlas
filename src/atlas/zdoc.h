@@ -230,6 +230,10 @@ protected:
   void sendOpenEditWidgetSignal(size_t id)
   { emit openEditWidget(id); }
 
+  void onObjAboutToBeRemoved(size_t id, ZObjDoc* doc);
+
+  void onObjAdded(size_t id, ZObjDoc* doc);
+
 private:
   void create2DAnimation();
 

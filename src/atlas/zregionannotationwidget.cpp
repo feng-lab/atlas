@@ -96,8 +96,8 @@ void ZRegionAnnotationWidget::createWidget()
   vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
 
-  ZRegionAnnotationTreeModel* model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
-  ZRegionAnnotationTreeView* view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);
+  auto model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
+  auto view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);
   vlo->addWidget(view);
 
   setLayout(vlo);

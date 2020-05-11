@@ -170,7 +170,6 @@ QMenu* ZROIDoc::processObjMenu() const
 void ZROIDoc::removeObj(size_t id)
 {
   auto it = m_idToROIPacks.find(id);
-  m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
   m_idToROIPacks.erase(it);
   emit objRemoved(id, this);
@@ -391,7 +390,6 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
     m_idToROIPacks[id]->hasUnsavedChange = true;
   }
   m_doc.registerNewObj(id, this);
-  m_doc.undoGroup()->addStack(roi->undoStack());
 
   emit objAdded(id, this);
   connect(roi, &ZROI::roiChanged, this, qOverload<>(&ZROIDoc::setModified));

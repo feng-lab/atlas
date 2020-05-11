@@ -132,7 +132,6 @@ QMenu* ZRegionAnnotationDoc::processObjMenu() const
 void ZRegionAnnotationDoc::removeObj(size_t id)
 {
   auto it = m_idToRegionAnnotationPacks.find(id);
-  m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
   m_idToRegionAnnotationPacks.erase(it);
   emit objRemoved(id, this);
@@ -376,7 +375,6 @@ size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation* regionAnnota
   size_t id = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[id] = std::make_shared<RegionAnnotationPack>(regionAnnotation, path, unsaved);
   m_doc.registerNewObj(id, this);
-  m_doc.undoGroup()->addStack(regionAnnotation->undoStack());
 
   emit objAdded(id, this);
   connect(regionAnnotation, &ZRegionAnnotation::undoStackCleanChanged, this,

@@ -139,7 +139,6 @@ QList<QAction*> Z3DAnimationDoc::loadFileActions() const
 void Z3DAnimationDoc::removeObj(size_t id)
 {
   auto it = m_idToAnimationPacks.find(id);
-  m_doc.undoGroup()->removeStack(objUndoStack(id));
   emit objAboutToBeRemoved(it->first, this);
   m_idToAnimationPacks.erase(it);
   emit objRemoved(id, this);
@@ -265,7 +264,6 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
   size_t id = m_doc.getNewObjId();
   m_idToAnimationPacks[id] = std::make_shared<AnimationPack>(animation, path, name);
   m_doc.registerNewObj(id, this);
-  m_doc.undoGroup()->addStack(animation->undoStack());
   animation->bindView(m_view);
 
   emit objAdded(id, this);

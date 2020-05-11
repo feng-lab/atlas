@@ -4,6 +4,7 @@
 #include "zimgdoc.h"
 #include "zanalysisworklistdialog.h"
 #include "ztheme.h"
+#include "zpunctawidget.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -157,6 +158,11 @@ QString ZPunctaDoc::objTooltip(size_t id) const
   return m_idToPunctaPacks.at(id)->tooltip();
 }
 
+QUndoStack* ZPunctaDoc::objUndoStack(size_t id)
+{
+  return m_idToPunctaPacks.at(id)->puncta.undoStack();
+}
+
 QJsonValue ZPunctaDoc::jsonValue(size_t id) const
 {
   return QJsonValue(m_idToPunctaPacks.at(id)->path);
@@ -196,6 +202,14 @@ bool ZPunctaDoc::isAlias(size_t id) const
       return true;
   }
   return false;
+}
+
+QWidget* ZPunctaDoc::createObjEditWidget(size_t id)
+{
+  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+
+  auto& pack = m_idToPunctaPacks.at(id);
+  return new ZPunctaWidget(pack->puncta, m_doc);
 }
 
 void ZPunctaDoc::loadPuncta()

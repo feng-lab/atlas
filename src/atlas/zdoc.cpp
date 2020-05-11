@@ -287,6 +287,8 @@ void ZDoc::registerObjDoc(ZObjDoc* objD)
   connect(docRemoveAllAction, &QAction::triggered, this, &ZDoc::removeAllObjs);
   docPack.removeAllAction = docRemoveAllAction;
   m_docPacks.push_back(docPack);
+  connect(objD, &ZObjDoc::objAboutToBeRemoved, this, &ZDoc::onObjAboutToBeRemoved);
+  connect(objD, &ZObjDoc::objAdded, this, &ZDoc::onObjAdded);
   connect(objD, &ZObjDoc::objAboutToBeRemoved, this, &ZDoc::objAboutToBeRemoved);
   connect(objD, &ZObjDoc::objAdded, this, &ZDoc::objAdded);
   connect(objD, &ZObjDoc::objRemoved, this, &ZDoc::objRemoved);
@@ -578,6 +580,20 @@ void ZDoc::copySelectedObjsPathToClipboard()
       path += idToDoc(objs[i])->objPath(objs[i]);
     }
     QApplication::clipboard()->setText(path);
+  }
+}
+
+void ZDoc::onObjAboutToBeRemoved(size_t id, ZObjDoc* doc)
+{
+  if (auto us = doc->objUndoStack(id); us) {
+    m_undoGroup->removeStack(us);
+  }
+}
+
+void ZDoc::onObjAdded(size_t id, ZObjDoc *doc)
+{
+  if (auto us = doc->objUndoStack(id); us) {
+    m_undoGroup->addStack(us);
   }
 }
 
