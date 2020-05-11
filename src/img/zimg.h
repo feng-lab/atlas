@@ -20,15 +20,15 @@ namespace nim {
 //   }
 //
 // and use this macro to dispatch:
-//   IMG_TYPED_CALL(function, img, arg1, arg2);
+//   IMG_TYPED_CALL(function, imgInfo, arg1, arg2);
 //
 // if the function return something, use
-//   IMG_RETURN_TYPED_CALL(function, img, arg1, arg2);
+//   IMG_RETURN_TYPED_CALL(function, imgInfo, arg1, arg2);
 //
 //
-#define IMG_TYPED_CALL(function, img, ...) {                \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {         \
-    switch (img.bytesPerVoxel()) {                          \
+#define IMG_TYPED_CALL(function, imgInfo, ...) {            \
+  if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {       \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 1:                                                 \
       function<uint8_t>(__VA_ARGS__);                       \
       break;                                                \
@@ -44,8 +44,8 @@ namespace nim {
     default:                                                \
       break;                                                \
     }                                                       \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {     \
-    switch (img.bytesPerVoxel()) {                          \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Float) {   \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 4:                                                 \
       function<float>(__VA_ARGS__);                         \
       break;                                                \
@@ -55,8 +55,8 @@ namespace nim {
     default:                                                \
       break;                                                \
     }                                                       \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {    \
-    switch (img.bytesPerVoxel()) {                          \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {  \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 1:                                                 \
       function<int8_t>(__VA_ARGS__);                        \
       break;                                                \
@@ -75,9 +75,9 @@ namespace nim {
   }                                                         \
 }
 
-#define IMG_RETURN_TYPED_CALL(function, img, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {         \
-    switch (img.bytesPerVoxel()) {                          \
+#define IMG_RETURN_TYPED_CALL(function, imgInfo, ...) {     \
+  if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {       \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 1:                                                 \
       return function<uint8_t>(__VA_ARGS__);                \
       break;                                                \
@@ -93,8 +93,8 @@ namespace nim {
     default:                                                \
       break;                                                \
     }                                                       \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {     \
-    switch (img.bytesPerVoxel()) {                          \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Float) {   \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 4:                                                 \
       return function<float>(__VA_ARGS__);                  \
       break;                                                \
@@ -104,8 +104,8 @@ namespace nim {
     default:                                                \
       break;                                                \
     }                                                       \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {    \
-    switch (img.bytesPerVoxel()) {                          \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {  \
+    switch (imgInfo.bytesPerVoxel) {                        \
     case 1:                                                 \
       return function<int8_t>(__VA_ARGS__);                 \
       break;                                                \
@@ -124,99 +124,50 @@ namespace nim {
   }                                                         \
 }
 
-#define IMGINFO_RETURN_TYPED_CALL(function, info, ...) {  \
-  if (info.voxelFormat == VoxelFormat::Unsigned) {        \
-    switch (info.bytesPerVoxel) {                         \
-    case 1:                                               \
-      return function<uint8_t>(__VA_ARGS__);              \
-      break;                                              \
-    case 2:                                               \
-      return function<uint16_t>(__VA_ARGS__);             \
-      break;                                              \
-    case 4:                                               \
-      return function<uint32_t>(__VA_ARGS__);             \
-      break;                                              \
-    case 8:                                               \
-      return function<uint64_t>(__VA_ARGS__);             \
-      break;                                              \
-    default:                                              \
-      break;                                              \
-    }                                                     \
-  } else if (info.voxelFormat == VoxelFormat::Float) {    \
-    switch (info.bytesPerVoxel) {                         \
-    case 4:                                               \
-      return function<float>(__VA_ARGS__);                \
-      break;                                              \
-    case 8:                                               \
-      return function<double>(__VA_ARGS__);               \
-      break;                                              \
-    default:                                              \
-      break;                                              \
-    }                                                     \
-  } else if (info.voxelFormat == VoxelFormat::Signed) {   \
-    switch (info.bytesPerVoxel) {                         \
-    case 1:                                               \
-      return function<int8_t>(__VA_ARGS__);               \
-      break;                                              \
-    case 2:                                               \
-      return function<int16_t>(__VA_ARGS__);              \
-      break;                                              \
-    case 4:                                               \
-      return function<int32_t>(__VA_ARGS__);              \
-      break;                                              \
-    case 8:                                               \
-      return function<int64_t>(__VA_ARGS__);              \
-      break;                                              \
-    default:                                              \
-      break;                                              \
-    }                                                     \
-  }                                                       \
-}
-
 // for function that take 2 template argument
 // first one is derived from img, second one is provided by user
-#define IMG_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                   \
-    switch (img.bytesPerVoxel()) {                                    \
+#define IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo, T2, ...) {       \
+  if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                 \
+    switch (imgInfo.bytesPerVoxel) {                                  \
     case 1:                                                           \
-      function<uint8_t, T2ND>(__VA_ARGS__);                           \
+      function<uint8_t, T2>(__VA_ARGS__);                             \
       break;                                                          \
     case 2:                                                           \
-      function<uint16_t, T2ND>(__VA_ARGS__);                          \
+      function<uint16_t, T2>(__VA_ARGS__);                            \
       break;                                                          \
     case 4:                                                           \
-      function<uint32_t, T2ND>(__VA_ARGS__);                          \
+      function<uint32_t, T2>(__VA_ARGS__);                            \
       break;                                                          \
     case 8:                                                           \
-      function<uint64_t, T2ND>(__VA_ARGS__);                          \
+      function<uint64_t, T2>(__VA_ARGS__);                            \
       break;                                                          \
     default:                                                          \
       break;                                                          \
     }                                                                 \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {               \
-    switch (img.bytesPerVoxel()) {                                    \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Float) {             \
+    switch (imgInfo.bytesPerVoxel) {                                  \
     case 4:                                                           \
-      function<float, T2ND>(__VA_ARGS__);                             \
+      function<float, T2>(__VA_ARGS__);                               \
       break;                                                          \
     case 8:                                                           \
-      function<double, T2ND>(__VA_ARGS__);                            \
+      function<double, T2>(__VA_ARGS__);                              \
       break;                                                          \
     default:                                                          \
       break;                                                          \
     }                                                                 \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {              \
-    switch (img.bytesPerVoxel()) {                                    \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {            \
+    switch (imgInfo.bytesPerVoxel) {                                  \
     case 1:                                                           \
-      function<int8_t, T2ND>(__VA_ARGS__);                            \
+      function<int8_t, T2>(__VA_ARGS__);                              \
       break;                                                          \
     case 2:                                                           \
-      function<int16_t, T2ND>(__VA_ARGS__);                           \
+      function<int16_t, T2>(__VA_ARGS__);                             \
       break;                                                          \
     case 4:                                                           \
-      function<int32_t, T2ND>(__VA_ARGS__);                           \
+      function<int32_t, T2>(__VA_ARGS__);                             \
       break;                                                          \
     case 8:                                                           \
-      function<int64_t, T2ND>(__VA_ARGS__);                           \
+      function<int64_t, T2>(__VA_ARGS__);                             \
       break;                                                          \
     default:                                                          \
       break;                                                          \
@@ -226,48 +177,48 @@ namespace nim {
 
 // for function that take 3 template argument
 // first one is derived from img, second and third is provided by user
-#define IMG_TYPED_CALL_FIX2ND3RDTYPE(function, img, T2ND, T3RD, ...) {   \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                      \
-    switch (img.bytesPerVoxel()) {                                       \
+#define IMG_TYPED_CALL_FIX2ND3RDTYPE(function, imgInfo, T2, T3, ...) {   \
+  if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                    \
+    switch (imgInfo.bytesPerVoxel) {                                     \
     case 1:                                                              \
-      function<uint8_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      function<uint8_t, T2, T3>(__VA_ARGS__);                            \
       break;                                                             \
     case 2:                                                              \
-      function<uint16_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      function<uint16_t, T2, T3>(__VA_ARGS__);                           \
       break;                                                             \
     case 4:                                                              \
-      function<uint32_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      function<uint32_t, T2, T3>(__VA_ARGS__);                           \
       break;                                                             \
     case 8:                                                              \
-      function<uint64_t, T2ND, T3RD>(__VA_ARGS__);                       \
+      function<uint64_t, T2, T3>(__VA_ARGS__);                           \
       break;                                                             \
     default:                                                             \
       break;                                                             \
     }                                                                    \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                  \
-    switch (img.bytesPerVoxel()) {                                       \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                \
+    switch (imgInfo.bytesPerVoxel) {                                     \
     case 4:                                                              \
-      function<float, T2ND, T3RD>(__VA_ARGS__);                          \
+      function<float, T2, T3>(__VA_ARGS__);                              \
       break;                                                             \
     case 8:                                                              \
-      function<double, T2ND, T3RD>(__VA_ARGS__);                         \
+      function<double, T2, T3>(__VA_ARGS__);                             \
       break;                                                             \
     default:                                                             \
       break;                                                             \
     }                                                                    \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                 \
-    switch (img.bytesPerVoxel()) {                                       \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {               \
+    switch (imgInfo.bytesPerVoxel) {                                     \
     case 1:                                                              \
-      function<int8_t, T2ND, T3RD>(__VA_ARGS__);                         \
+      function<int8_t, T2, T3>(__VA_ARGS__);                             \
       break;                                                             \
     case 2:                                                              \
-      function<int16_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      function<int16_t, T2, T3>(__VA_ARGS__);                            \
       break;                                                             \
     case 4:                                                              \
-      function<int32_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      function<int32_t, T2, T3>(__VA_ARGS__);                            \
       break;                                                             \
     case 8:                                                              \
-      function<int64_t, T2ND, T3RD>(__VA_ARGS__);                        \
+      function<int64_t, T2, T3>(__VA_ARGS__);                            \
       break;                                                             \
     default:                                                             \
       break;                                                             \
@@ -275,48 +226,48 @@ namespace nim {
   }                                                                      \
 }
 
-#define IMG_RETURN_TYPED_CALL_FIX2NDTYPE(function, img, T2ND, ...) {         \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                          \
-    switch (img.bytesPerVoxel()) {                                           \
+#define IMG_RETURN_TYPED_CALL_FIX2NDTYPE(function, imgInfo, T2, ...) {       \
+  if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                        \
+    switch (imgInfo.bytesPerVoxel) {                                         \
     case 1:                                                                  \
-      return function<uint8_t, T2ND>(__VA_ARGS__);                           \
+      return function<uint8_t, T2>(__VA_ARGS__);                             \
       break;                                                                 \
     case 2:                                                                  \
-      return function<uint16_t, T2ND>(__VA_ARGS__);                          \
+      return function<uint16_t, T2>(__VA_ARGS__);                            \
       break;                                                                 \
     case 4:                                                                  \
-      return function<uint32_t, T2ND>(__VA_ARGS__);                          \
+      return function<uint32_t, T2>(__VA_ARGS__);                            \
       break;                                                                 \
     case 8:                                                                  \
-      return function<uint64_t, T2ND>(__VA_ARGS__);                          \
+      return function<uint64_t, T2>(__VA_ARGS__);                            \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
     }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                      \
-    switch (img.bytesPerVoxel()) {                                           \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                    \
+    switch (imgInfo.bytesPerVoxel) {                                         \
     case 4:                                                                  \
-      return function<float, T2ND>(__VA_ARGS__);                             \
+      return function<float, T2>(__VA_ARGS__);                               \
       break;                                                                 \
     case 8:                                                                  \
-      return function<double, T2ND>(__VA_ARGS__);                            \
+      return function<double, T2>(__VA_ARGS__);                              \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
     }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                     \
-    switch (img.bytesPerVoxel()) {                                           \
+  } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {                   \
+    switch (imgInfo.bytesPerVoxel) {                                         \
     case 1:                                                                  \
-      return function<int8_t, T2ND>(__VA_ARGS__);                            \
+      return function<int8_t, T2>(__VA_ARGS__);                              \
       break;                                                                 \
     case 2:                                                                  \
-      return function<int16_t, T2ND>(__VA_ARGS__);                           \
+      return function<int16_t, T2>(__VA_ARGS__);                             \
       break;                                                                 \
     case 4:                                                                  \
-      return function<int32_t, T2ND>(__VA_ARGS__);                           \
+      return function<int32_t, T2>(__VA_ARGS__);                             \
       break;                                                                 \
     case 8:                                                                  \
-      return function<int64_t, T2ND>(__VA_ARGS__);                           \
+      return function<int64_t, T2>(__VA_ARGS__);                             \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
@@ -326,48 +277,48 @@ namespace nim {
 
 // for function that process 2 types of img
 // first one is derived from img1, second one is derived from img2
-#define IMG_TYPED_CALL_2TYPE(function, img1, img2, ...) {                    \
-  if (img2.voxelFormat() == VoxelFormat::Unsigned) {                         \
-    switch (img2.bytesPerVoxel()) {                                          \
+#define IMG_TYPED_CALL_2TYPE(function, imgInfo1, imgInfo2, ...) {            \
+  if (imgInfo2.voxelFormat == VoxelFormat::Unsigned) {                       \
+    switch (imgInfo2.bytesPerVoxel) {                                        \
     case 1:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint8_t, __VA_ARGS__)        \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, uint8_t, __VA_ARGS__)    \
       break;                                                                 \
     case 2:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint16_t, __VA_ARGS__)       \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, uint16_t, __VA_ARGS__)   \
       break;                                                                 \
     case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint32_t, __VA_ARGS__)       \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, uint32_t, __VA_ARGS__)   \
       break;                                                                 \
     case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, uint64_t, __VA_ARGS__)       \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, uint64_t, __VA_ARGS__)   \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
     }                                                                        \
-  } else if (img2.voxelFormat() == VoxelFormat::Float) {                     \
-    switch (img2.bytesPerVoxel()) {                                          \
+  } else if (imgInfo2.voxelFormat == VoxelFormat::Float) {                   \
+    switch (imgInfo2.bytesPerVoxel) {                                        \
     case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, float, __VA_ARGS__)          \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, float, __VA_ARGS__)      \
       break;                                                                 \
     case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, double, __VA_ARGS__)         \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, double, __VA_ARGS__)     \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
     }                                                                        \
-  } else if (img2.voxelFormat() == VoxelFormat::Signed) {                    \
-    switch (img2.bytesPerVoxel()) {                                          \
+  } else if (imgInfo2.voxelFormat == VoxelFormat::Signed) {                  \
+    switch (imgInfo2.bytesPerVoxel) {                                        \
     case 1:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int8_t, __VA_ARGS__)         \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, int8_t, __VA_ARGS__)     \
       break;                                                                 \
     case 2:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int16_t, __VA_ARGS__)        \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, int16_t, __VA_ARGS__)    \
       break;                                                                 \
     case 4:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int32_t, __VA_ARGS__)        \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, int32_t, __VA_ARGS__)    \
       break;                                                                 \
     case 8:                                                                  \
-      IMG_TYPED_CALL_FIX2NDTYPE(function, img1, int64_t, __VA_ARGS__)        \
+      IMG_TYPED_CALL_FIX2NDTYPE(function, imgInfo1, int64_t, __VA_ARGS__)    \
       break;                                                                 \
     default:                                                                 \
       break;                                                                 \
@@ -943,9 +894,9 @@ public:
     std::vector<size_t> res(nbins, 0);
 
     if (mask.isEmpty()) {
-      IMG_TYPED_CALL(histogram_Impl, (*this), res, minData, maxData)
+      IMG_TYPED_CALL(histogram_Impl, m_info, res, minData, maxData)
     } else if (isSameSize(mask)) {
-      IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, minData, maxData, mask)
+      IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, minData, maxData, mask)
     } else {
       throw ZImgException(QString("histogram mask has different size <%1> than current img <%2>")
                             .arg(mask.info().toQString()).arg(m_info.toQString()));
@@ -1013,7 +964,7 @@ public:
 
     res = ZImg(info);
 
-    IMG_TYPED_CALL(cropWithPad_Impl, res, res, startCoord, endCoord, padOption, padValue)
+    IMG_TYPED_CALL(cropWithPad_Impl, info, res, startCoord, endCoord, padOption, padValue)
 
     return res;
   }
@@ -1042,7 +993,7 @@ public:
       return *this;
     }
 
-    IMG_TYPED_CALL(fill_Impl, (*this), value)
+    IMG_TYPED_CALL(fill_Impl, m_info, value)
     return *this;
   }
 
@@ -1174,7 +1125,7 @@ public:
     info.setVoxelFormat<TDesVoxel>();
     ZImg res(info);
 
-    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, (*this), TDesVoxel, false, this, &res)
+    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, m_info, TDesVoxel, false, this, &res)
     return res;
   }
 
@@ -1186,7 +1137,7 @@ public:
     info.setVoxelFormat<TDesVoxel>();
     ZImg res(info);
 
-    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, (*this), TDesVoxel, true, this, &res)
+    IMG_TYPED_CALL_FIX2NDTYPE(convert_Impl, m_info, TDesVoxel, true, this, &res)
     return res;
   }
 
@@ -1198,7 +1149,7 @@ public:
     info.setVoxelFormat<TDesVoxel>();
     ZImg res(info);
 
-    IMG_TYPED_CALL_FIX2NDTYPE(scale_Impl, (*this), TDesVoxel, minData, maxData, this, &res)
+    IMG_TYPED_CALL_FIX2NDTYPE(scale_Impl, m_info, TDesVoxel, minData, maxData, this, &res)
 
     return res;
   }
@@ -1207,7 +1158,7 @@ public:
   template<typename TRange>
   [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
   {
-    IMG_RETURN_TYPED_CALL(convertTo, targetImgType, minData, maxData)
+    IMG_RETURN_TYPED_CALL(convertTo, targetImgType.info(), minData, maxData)
     return ZImg();
   }
 
@@ -1268,7 +1219,7 @@ public:
   template<typename TValue>
   ZImg& thresholdAbove(TValue threshold, ThresholdMode threMode, TValue outsideValue)
   {
-    IMG_TYPED_CALL(thresholdAbove_Impl, (*this), threshold, threMode, outsideValue)
+    IMG_TYPED_CALL(thresholdAbove_Impl, m_info, threshold, threMode, outsideValue)
     return *this;
   }
 
@@ -1277,7 +1228,7 @@ public:
   template<typename TValue>
   ZImg& thresholdBelow(TValue threshold, ThresholdMode threMode, TValue outsideValue = TValue(0))
   {
-    IMG_TYPED_CALL(thresholdBelow_Impl, (*this), threshold, threMode, outsideValue)
+    IMG_TYPED_CALL(thresholdBelow_Impl, m_info, threshold, threMode, outsideValue)
     return *this;
   }
 
@@ -1293,7 +1244,7 @@ public:
     info.bytesPerVoxel = 1;
     ZImg res(info);
 
-    IMG_TYPED_CALL(binarized_Impl, (*this), res, threshold, threMode)
+    IMG_TYPED_CALL(binarized_Impl, m_info, res, threshold, threMode)
 
     return res;
   }
@@ -1314,7 +1265,7 @@ public:
     info.bytesPerVoxel = 1;
     ZImg res(info);
 
-    IMG_TYPED_CALL(binarized_Impl, (*this), res, isForeground)
+    IMG_TYPED_CALL(binarized_Impl, m_info, res, isForeground)
 
     return res;
   }
@@ -1346,7 +1297,7 @@ public:
   {
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
-      IMG_TYPED_CALL(addScalar_Impl, (*this), scalar)
+      IMG_TYPED_CALL(addScalar_Impl, m_info, scalar)
     }
     return *this;
   }
@@ -1367,7 +1318,7 @@ public:
   {
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
-      IMG_TYPED_CALL(subScalar_Impl, (*this), scalar)
+      IMG_TYPED_CALL(subScalar_Impl, m_info, scalar)
     }
     return *this;
   }
@@ -1388,7 +1339,7 @@ public:
   {
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
-      IMG_TYPED_CALL(mulScalar_Impl, (*this), scalar)
+      IMG_TYPED_CALL(mulScalar_Impl, m_info, scalar)
     } else {
       fill(0);
     }
@@ -1412,7 +1363,7 @@ public:
   {
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
-      IMG_TYPED_CALL(divScalar_Impl, (*this), scalar)
+      IMG_TYPED_CALL(divScalar_Impl, m_info, scalar)
     } else {
       throw ZImgException("Can not divide img by zero");
     }
@@ -1453,7 +1404,7 @@ public:
   template<typename GenericCustomUnaryOp>
   ZImg& unaryOperation(const GenericCustomUnaryOp& op)
   {
-    IMG_TYPED_CALL(unaryOp_Impl, (*this), op)
+    IMG_TYPED_CALL(unaryOp_Impl, m_info, op)
     return *this;
   }
 
@@ -1496,7 +1447,7 @@ public:
       throw ZImgException(QString("img binary operation requires same size img as input: this <%1>, other <%2>")
                             .arg(m_info.toQString()).arg(other.info().toQString()));
     }
-    IMG_TYPED_CALL_2TYPE(binaryOp_Impl, (*this), other, other, op)
+    IMG_TYPED_CALL_2TYPE(binaryOp_Impl, m_info, other.info(), other, op)
     return *this;
   }
 
@@ -1567,7 +1518,7 @@ public:
                             .arg(m_info.toQString()).arg(rgn.toQString()));
     }
     rgn.resolveRegionEnd(m_info);
-    IMG_TYPED_CALL(firstMaxValueCoord_Impl, (*this), res, max, rgn)
+    IMG_TYPED_CALL(firstMaxValueCoord_Impl, m_info, res, max, rgn)
     return res;
   }
 
@@ -1582,7 +1533,7 @@ public:
                             .arg(m_info.toQString()).arg(rgn.toQString()));
     }
     rgn.resolveRegionEnd(m_info);
-    IMG_TYPED_CALL(maxValueCoords_Impl, (*this), res, max, rgn)
+    IMG_TYPED_CALL(maxValueCoords_Impl, m_info, res, max, rgn)
     return res;
   }
 
@@ -1597,7 +1548,7 @@ public:
       throw ZImgException(QString("Can not get voxel value of empty img <%1>").arg(m_info.toQString()));
     }
     if (isCoordValid(coord)) {
-      IMG_RETURN_TYPED_CALL(value_Impl, (*this), coord)
+      IMG_RETURN_TYPED_CALL(value_Impl, m_info, coord)
       return 0;
     } else {
       throw ZImgException(QString("value: Invalid coordinate %1 of img <%2>")
@@ -1614,7 +1565,7 @@ public:
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth &&
         c < m_info.numChannels && t < m_info.numTimes) {
-      IMG_RETURN_TYPED_CALL(value_Impl, (*this), x, y, z, c, t)
+      IMG_RETURN_TYPED_CALL(value_Impl, m_info, x, y, z, c, t)
       return 0;
     } else {
       throw ZImgException(QString("value: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
@@ -1630,7 +1581,7 @@ public:
       throw ZImgException(QString("Can not get voxel value of empty img <%1>").arg(m_info.toQString()));
     }
     if (idx < voxelNumber()) {
-      IMG_RETURN_TYPED_CALL(value_Impl, (*this), idx)
+      IMG_RETURN_TYPED_CALL(value_Impl, m_info, idx)
       return 0;
     } else {
       throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
@@ -1648,7 +1599,7 @@ public:
     if (isEmpty()) {
       return 0;
     }
-    IMG_RETURN_TYPED_CALL(valueWithPad_Impl, (*this), coord, padOption, padValue)
+    IMG_RETURN_TYPED_CALL(valueWithPad_Impl, m_info, coord, padOption, padValue)
     return 0;
   }
 
@@ -1669,7 +1620,7 @@ public:
       throw ZImgException(QString("Can not set voxel value to empty img <%1>").arg(m_info.toQString()));
     }
     if (isCoordValid(coord)) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, coord)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, coord)
     } else {
       throw ZImgException(QString("setValue: Invalid coordinate %1 of img <%2>")
                             .arg(coord.toQString()).arg(m_info.toQString()));
@@ -1685,7 +1636,7 @@ public:
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth &&
         c < m_info.numChannels && t < m_info.numTimes) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, x, y, z, c, t)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, x, y, z, c, t)
     } else {
       throw ZImgException(QString("setValue: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
                             .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
@@ -1700,7 +1651,7 @@ public:
       throw ZImgException(QString("Can not set voxel value to empty img <%1>").arg(m_info.toQString()));
     }
     if (idx < voxelNumber()) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, idx)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, idx)
     } else {
       throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
                             .arg(idx).arg(m_info.toQString()));
@@ -1713,7 +1664,7 @@ public:
   bool setValueNoThrow(TValue value, const ZVoxelCoordinate& coord)
   {
     if (isCoordValid(coord)) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, coord)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, coord)
       return true;
     }
     return false;
@@ -1725,7 +1676,7 @@ public:
   {
     if (!isEmpty() && x < m_info.width && y < m_info.height && z < m_info.depth &&
         c < m_info.numChannels && t < m_info.numTimes) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, x, y, z, c, t)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, x, y, z, c, t)
       return true;
     }
     return false;
@@ -1736,7 +1687,7 @@ public:
   bool setValueNoThrow(TValue value, size_t idx)
   {
     if (!isEmpty() && idx < voxelNumber()) {
-      IMG_TYPED_CALL(setValue_Impl, (*this), value, idx)
+      IMG_TYPED_CALL(setValue_Impl, m_info, value, idx)
       return true;
     }
     return false;

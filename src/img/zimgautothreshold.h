@@ -16,7 +16,7 @@ public:
   template<typename TValue = double>
   TValue triangleThre(const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedTriangleThre, img, img, c, t);
+    IMG_RETURN_TYPED_CALL(typedTriangleThre, img.info(), img, c, t)
     return 0;
   }
 
@@ -30,7 +30,7 @@ public:
     if (scene >= infos.size()) {
       throw ZImgException("input scene incorrect");
     }
-    IMGINFO_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene, mask);
+    IMG_RETURN_TYPED_CALL(typedTriangleThre, infos[scene], filename, c, t, scene, mask)
     return 0;
   }
 
@@ -52,7 +52,7 @@ public:
   template<typename TValue = double>
   TValue centroidThre(double& cent1, double& cent2, const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedCentroidThre, img, cent1, cent2, img, c, t);
+    IMG_RETURN_TYPED_CALL(typedCentroidThre, img.info(), cent1, cent2, img, c, t)
     return 0;
   }
 
@@ -62,7 +62,7 @@ public:
   template<typename TValue = double>
   TValue maxHistThre(const ZImg& img, size_t c = 0, size_t t = 0)
   {
-    IMG_RETURN_TYPED_CALL(typedMaxHistThre, img, img, c, t);
+    IMG_RETURN_TYPED_CALL(typedMaxHistThre, img.info(), img, c, t)
     return 0;
   }
 

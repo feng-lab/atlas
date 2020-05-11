@@ -548,7 +548,7 @@ ZImg ZImgMerge::wholeImg() const
 
   if (m_mergeMode != ImgMergeMode::First && m_mergeMode != ImgMergeMode::Max) {
     // now merge overlap region
-    IMG_TYPED_CALL(merge_Impl, res, m_overlapRegion, minCoord, m_mergeMode, res, m_tiles);
+    IMG_TYPED_CALL(merge_Impl, res.info(), m_overlapRegion, minCoord, m_mergeMode, res, m_tiles)
   }
 
   return res;
@@ -768,7 +768,7 @@ void ZImgMerge::mergeImgs(ZImg& res, const std::map<const ZImgSubBlock*, ZVoxelC
 
   if (mode != ImgMergeMode::First && mode != ImgMergeMode::Max) {
     // now merge overlap region
-    IMG_TYPED_CALL(merge_Impl, res, overlapRegion, minCoord, mode, res, tiles);
+    IMG_TYPED_CALL(merge_Impl, res.info(), overlapRegion, minCoord, mode, res, tiles)
   }
 }
 

@@ -56,12 +56,12 @@ void ZChromaticShiftCorrection::doWork()
     LOG(INFO) << "Optimizer: " << m_optimizer;
   }
 
-  IMG_TYPED_CALL(calcChannelInfs, srcImg, srcImg);
+  IMG_TYPED_CALL(calcChannelInfs, srcImg.info(), srcImg)
   reportProgress(0.5);
   if (m_method == "Registration") {
-    IMG_TYPED_CALL(alignChannel, srcImg, srcImg, m_referenceChannel, m_targetChannel);
+    IMG_TYPED_CALL(alignChannel, srcImg.info(), srcImg, m_referenceChannel, m_targetChannel)
   } else {
-    IMG_TYPED_CALL(alignChannelWithPresetTransform, srcImg, srcImg, m_targetChannel, m_method);
+    IMG_TYPED_CALL(alignChannelWithPresetTransform, srcImg.info(), srcImg, m_targetChannel, m_method)
   }
   emit resultReady(m_resultFilename);
   reportProgress(1.0);

@@ -43,7 +43,7 @@ void ZSectionsRegistration::doWork()
     if (srcImg.numChannels() == 1) {
       m_referenceChannel = 0;
     } else {
-      IMG_TYPED_CALL(calcRefCh, srcImg, srcImg);
+      IMG_TYPED_CALL(calcRefCh, srcImg.info(), srcImg)
     }
   }
 
@@ -61,7 +61,7 @@ void ZSectionsRegistration::doWork()
   LOG(INFO) << "Transform: " << m_transform;
   LOG(INFO) << "Optimizer: " << m_optimizer;
 
-  IMG_TYPED_CALL(calcSecInfs, srcImg, srcImg);
+  IMG_TYPED_CALL(calcSecInfs, srcImg.info(), srcImg)
 
   double totalNumPairs = srcImg.depth() * m_numNeighbors;
 
@@ -73,7 +73,7 @@ void ZSectionsRegistration::doWork()
         break;
       double cost;
       ZImageTransform* tfm = nullptr;
-      IMG_TYPED_CALL(alignSection, srcImg, srcImg, i, j, cost, tfm);
+      IMG_TYPED_CALL(alignSection, srcImg.info(), srcImg, i, j, cost, tfm)
       idxPairs[std::make_pair(i, j)] = std::make_pair(std::unique_ptr<ZImageTransform>(tfm), cost);
       progress += 1;
       reportProgress(progress / totalNumPairs);
@@ -91,7 +91,7 @@ void ZSectionsRegistration::doWork()
   }
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> tfmmap = tfmResolve.resolve();
 
-  IMG_TYPED_CALL(transformSections, srcImg, tfmmap, srcImg, m_resultFilename);
+  IMG_TYPED_CALL(transformSections, srcImg.info(), tfmmap, srcImg, m_resultFilename)
 
   reportProgress(1.0);
 }

@@ -140,7 +140,7 @@ double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVo
       movingImg = movingImg.castTo<double>();
     }
   }
-  IMG_RETURN_TYPED_CALL(getNCCOfOffset_Impl, fixedImg, fixedImg, movingImg);
+  IMG_RETURN_TYPED_CALL(getNCCOfOffset_Impl, fixedImg.info(), fixedImg, movingImg)
   return -2;
 }
 
@@ -475,8 +475,8 @@ ZImg xCorrPart(const ZImg& fixedImg, const ZImg& movingImg, size_t xStart, size_
   info.bytesPerVoxel = 8;
   ZImg res(info);
 
-  IMG_TYPED_CALL_2TYPE(xCorrPart_Impl, fixedImg, movingImg, fixedImg, movingImg, xStart, xEnd,
-                       yStart, yEnd, zStart, zEnd, res);
+  IMG_TYPED_CALL_2TYPE(xCorrPart_Impl, fixedImg.info(), movingImg.info(), fixedImg, movingImg, xStart, xEnd,
+                       yStart, yEnd, zStart, zEnd, res)
 
   return res;
 }

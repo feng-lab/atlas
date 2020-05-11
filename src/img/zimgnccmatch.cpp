@@ -641,7 +641,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
 
 void ZImgNCCMatch::removeBackground(ZImg& img)
 {
-  IMG_TYPED_CALL(removeBG, img, img);
+  IMG_TYPED_CALL(removeBG, img.info(), img)
 }
 
 // reference: matlab code normxcorr2_general.m

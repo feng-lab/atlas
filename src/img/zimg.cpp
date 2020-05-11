@@ -491,7 +491,7 @@ QString ZImg::toQString() const
   if (isEmpty()) {
     return res;
   }
-  IMG_TYPED_CALL(showContentAsQString_Impl, (*this), res)
+  IMG_TYPED_CALL(showContentAsQString_Impl, m_info, res)
   return res;
 }
 
@@ -595,7 +595,7 @@ const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
 template<typename TValue>
 void ZImg::computeMinMax(TValue& min, TValue& max) const
 {
-  IMG_TYPED_CALL(computeMinMax_Impl, (*this), min, max)
+  IMG_TYPED_CALL(computeMinMax_Impl, m_info, min, max)
 }
 
 template void ZImg::computeMinMax(uint8_t&, uint8_t&) const;
@@ -626,9 +626,9 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   std::vector<size_t> res(nbins, 0);
 
   if (mask.isEmpty()) {
-    IMG_TYPED_CALL(histogram_Impl, (*this), res)
+    IMG_TYPED_CALL(histogram_Impl, m_info, res)
   } else if (isSameSize(mask)) {
-    IMG_TYPED_CALL_2TYPE(histogramMask_Impl, (*this), mask, res, mask)
+    IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, mask)
   } else {
     throw ZImgException(QString("histogram mask has different size <%1> than current img <%2>")
                           .arg(mask.info().toQString()).arg(m_info.toQString()));
@@ -832,7 +832,7 @@ void ZImg::fillRandom_Impl()
 
 ZImg& ZImg::fillRandom()
 {
-  IMG_TYPED_CALL(fillRandom_Impl, (*this))
+  IMG_TYPED_CALL(fillRandom_Impl, m_info)
   return *this;
 }
 
@@ -913,7 +913,7 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
       }
     }
   } else {
-    IMG_TYPED_CALL_2TYPE(pasteImg_Impl, (*this), img, img, start)
+    IMG_TYPED_CALL_2TYPE(pasteImg_Impl, m_info, img.info(), img, start)
   }
 
   return *this;
@@ -946,7 +946,7 @@ ZImg& ZImg::pasteImgMax(const ZImg& img, const ZVoxelCoordinate& start, bool war
     return *this;
   }
 
-  IMG_TYPED_CALL_2TYPE(pasteImgMax_Impl, (*this), img, img, start)
+  IMG_TYPED_CALL_2TYPE(pasteImgMax_Impl, m_info, img.info(), img, start)
 
   return *this;
 }
@@ -1112,7 +1112,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
     }
   }
 
-  IMG_RETURN_TYPED_CALL(combine_Impl, (*firstImg), imgs, mode)
+  IMG_RETURN_TYPED_CALL(combine_Impl, firstInfo, imgs, mode)
 
   return ZImg();
 }
@@ -1266,7 +1266,7 @@ ZImg& ZImg::normalize()
   if (isEmpty()) {
     return *this;
   }
-  IMG_RETURN_TYPED_CALL(normalize_Impl, (*this))
+  IMG_RETURN_TYPED_CALL(normalize_Impl, m_info)
   return *this;
 }
 
@@ -1281,7 +1281,7 @@ ZImg ZImg::castTo() const
   info.setVoxelFormat<TDesVoxel>();
   ZImg res(info);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(cast_Impl, (*this), TDesVoxel, res)
+  IMG_TYPED_CALL_FIX2NDTYPE(cast_Impl, m_info, TDesVoxel, res)
 
   return res;
 }
@@ -1326,7 +1326,7 @@ ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
   info.validBitCount = 0;
   ZImg res(info);
 
-  IMG_TYPED_CALL_2TYPE(cast_Impl, (*this), res, res)
+  IMG_TYPED_CALL_2TYPE(cast_Impl, m_info, info, res)
 
   return res;
 }
@@ -1352,7 +1352,7 @@ ZImg ZImg::resized(size_t desWidth, size_t desHeight, size_t desDepth,
   info.depth = desDepth;
 
   res = ZImg(info);
-  IMG_TYPED_CALL(resize_Impl, (*this), res, interpolant, antialiasing, antialiasingForNearest)
+  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest)
 
   return res;
 }
@@ -1381,7 +1381,7 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
     return res;
   }
 
-  IMG_TYPED_CALL(blockDownsampled_Impl, (*this), res, blockWidth, blockHeight, blockDepth, mode)
+  IMG_TYPED_CALL(blockDownsampled_Impl, m_info, res, blockWidth, blockHeight, blockDepth, mode)
   return res;
 }
 
@@ -1444,7 +1444,7 @@ ZImg& ZImg::flip(Dimension dim)
       }
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(flip_Impl, (*this), dim)
+    IMG_TYPED_CALL(flip_Impl, m_info, dim)
   }
   return *this;
 }
@@ -1457,7 +1457,7 @@ ZImg& ZImg::reflect()
   // reflect time
   flip(Dimension::T);
   // reflect others
-  IMG_TYPED_CALL(reflect_Impl, (*this))
+  IMG_TYPED_CALL(reflect_Impl, m_info)
   return *this;
 }
 
@@ -1477,7 +1477,7 @@ ZImg ZImg::cumulativeSum(Dimension dim) const
       currentCh += lastCh;
     }
   } else if (dim < Dimension::C) {
-    IMG_TYPED_CALL(cumulativeSum_Impl, (*this), res, dim)
+    IMG_TYPED_CALL(cumulativeSum_Impl, m_info, res, dim)
   }
   return res;
 }
@@ -1501,7 +1501,7 @@ ZImg ZImg::blockSum(size_t twidth, size_t theight, size_t tdepth) const
     res.fill(0);
   }
 
-  IMG_TYPED_CALL(blockSum_Impl, (*this), res, twidth, theight, tdepth)
+  IMG_TYPED_CALL(blockSum_Impl, m_info, res, twidth, theight, tdepth)
 
   return res;
 }
@@ -1532,7 +1532,7 @@ ZImg ZImg::blockSumPart(size_t twidth, size_t theight, size_t tdepth, size_t xSt
     res.fill(0);
   }
 
-  IMG_TYPED_CALL(blockSumPart_Impl, (*this), res, twidth, theight, tdepth, xStart,
+  IMG_TYPED_CALL(blockSumPart_Impl, m_info, res, twidth, theight, tdepth, xStart,
                  yStart, zStart)
 
   return res;
@@ -1544,7 +1544,7 @@ ZImg& ZImg::operator+=(const ZImg& rhs)
     throw ZImgException(QString("img addition requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(addImg_Impl, (*this), rhs, rhs)
+  IMG_TYPED_CALL_2TYPE(addImg_Impl, m_info, rhs.info(), rhs)
   return *this;
 }
 
@@ -1554,7 +1554,7 @@ ZImg& ZImg::operator-=(const ZImg& rhs)
     throw ZImgException(QString("img subtraction requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(subImg_Impl, (*this), rhs, rhs)
+  IMG_TYPED_CALL_2TYPE(subImg_Impl, m_info, rhs.info(), rhs)
   return *this;
 }
 
@@ -1564,7 +1564,7 @@ ZImg& ZImg::operator*=(const ZImg& rhs)
     throw ZImgException(QString("img multiplies requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(mulImg_Impl, (*this), rhs, rhs)
+  IMG_TYPED_CALL_2TYPE(mulImg_Impl, m_info, rhs.info(), rhs)
   return *this;
 }
 
@@ -1574,7 +1574,7 @@ ZImg& ZImg::operator/=(const ZImg& rhs)
     throw ZImgException(QString("img divides requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(divImg_Impl, (*this), rhs, rhs)
+  IMG_TYPED_CALL_2TYPE(divImg_Impl, m_info, rhs.info(), rhs)
   return *this;
 }
 
@@ -1584,7 +1584,7 @@ ZImg& ZImg::secureDivideBy(const ZImg& rhs)
     throw ZImgException(QString("img divides requires same size img as input: this <%1>, other <%2>")
                           .arg(m_info.toQString()).arg(rhs.info().toQString()));
   }
-  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, (*this), rhs, rhs)
+  IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, m_info, rhs.info(), rhs)
   return *this;
 }
 

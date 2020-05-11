@@ -31,9 +31,9 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
   res = ZImg(info);
   res.fill(1);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(regionalExtrema_Impl, img,
+  IMG_TYPED_CALL_FIX2NDTYPE(regionalExtrema_Impl, img.info(),
                             Compare,
-                            res, img, conn);
+                            res, img, conn)
 
   return res;
 }
