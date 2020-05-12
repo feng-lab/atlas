@@ -5,13 +5,10 @@
 
 namespace nim {
 
-ZPunctaTableModel::ZPunctaTableModel(ZPuncta& p, QObject* parent)
+ZPunctaTableModel::ZPunctaTableModel(ZPunctaPack& p, QObject* parent)
   : QAbstractTableModel(parent)
   , m_puncta(p)
 {
-  for (auto it = m_puncta.begin(); it != m_puncta.end(); ++it) {
-    m_iters.push_back(it);
-  }
 }
 
 QVariant ZPunctaTableModel::data(const QModelIndex& index, int role) const
@@ -20,7 +17,7 @@ QVariant ZPunctaTableModel::data(const QModelIndex& index, int role) const
     return QVariant();
   }
 
-  const auto& p = *m_iters[index.row()];
+  const auto& p = *m_puncta.punctaPts()[index.row()];
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
@@ -90,7 +87,7 @@ int ZPunctaTableModel::rowCount(const QModelIndex& parent) const
   if (parent.isValid()) {
     return 0;
   } else {
-    return m_puncta.size();
+    return m_puncta.punctaPts().size();
   }
 }
 

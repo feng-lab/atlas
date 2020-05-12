@@ -150,7 +150,7 @@ void Z3DPunctaFilter::process(Z3DEye /*eye*/)
   //  }
 }
 
-void Z3DPunctaFilter::setData(ZPuncta& puncta)
+void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
 {
   m_origPuncta = &puncta;
   updateData();
@@ -339,11 +339,11 @@ void Z3DPunctaFilter::updateData()
   double maxMeanInten = std::numeric_limits<double>::lowest();
   double minMaxInten = std::numeric_limits<double>::max();
   double maxMaxInten = std::numeric_limits<double>::lowest();
-  for (const auto& p : *m_origPuncta) {
-    minMeanInten = std::min(minMeanInten, p.meanIntensity());
-    maxMeanInten = std::max(maxMeanInten, p.meanIntensity());
-    minMaxInten = std::min(minMaxInten, p.maxIntensity());
-    maxMaxInten = std::max(maxMaxInten, p.maxIntensity());
+  for (const auto& p : m_origPuncta->punctaPts()) {
+    minMeanInten = std::min(minMeanInten, p->meanIntensity());
+    maxMeanInten = std::max(maxMeanInten, p->meanIntensity());
+    minMaxInten = std::min(minMaxInten, p->maxIntensity());
+    maxMaxInten = std::max(maxMaxInten, p->maxIntensity());
   }
   //todo: set correct range for colormap
 
@@ -368,8 +368,8 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.reset();
   ZBBox<glm::dvec3> boundBox;
-  for (const auto& p : *m_origPuncta) {
-    notTransformedPunctumBound(p, boundBox);
+  for (const auto& p : m_origPuncta->punctaPts()) {
+    notTransformedPunctumBound(*p, boundBox);
     m_notTransformedBoundBox.expand(boundBox);
   }
 }
@@ -377,8 +377,8 @@ void Z3DPunctaFilter::updateNotTransformedBoundBoxImpl()
 void Z3DPunctaFilter::addSelectionLines()
 {
   ZBBox<glm::dvec3> boundBox;
-  for (const auto& p : *m_origPuncta) {
-    punctumBound(p, boundBox);
+  for (const auto& p : m_origPuncta->punctaPts()) {
+    punctumBound(*p, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);
   }
 }
@@ -495,11 +495,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 
 void Z3DPunctaFilter::getVisibleData()
 {
-  m_punctaList.clear();
-  for (auto& p : *m_origPuncta) {
-    //if (m_origPuncta[i]->isVisible())
-    m_punctaList.push_back(&p);
-  }
+  m_punctaList = m_origPuncta->punctaPts();
 }
 
 void Z3DPunctaFilter::updatePunctumVisibleState()

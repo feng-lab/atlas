@@ -15,7 +15,7 @@ void Z3DPunctaView::docPunctasAdded(const QList<size_t>& objs)
     for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
       Z3DPunctaFilter* viewControl = new Z3DPunctaFilter(globalParas(), this);
-      viewControl->setData(m_doc.puncta(id));
+      viewControl->setData(m_doc.punctaPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
@@ -47,7 +47,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
 {
   try {
     Z3DPunctaFilter* viewControl = new Z3DPunctaFilter(globalParas(), this);
-    viewControl->setData(m_doc.puncta(id));
+    viewControl->setData(m_doc.punctaPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);

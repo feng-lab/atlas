@@ -200,7 +200,7 @@ QString ZROIDoc::objTooltip(size_t id) const
   return m_idToROIPacks.at(id)->tooltip();
 }
 
-QUndoStack* ZROIDoc::objUndoStack(size_t id)
+const QUndoStack* ZROIDoc::objUndoStack(size_t id) const
 {
   return m_idToROIPacks.at(id)->roi->undoStack();
 }
@@ -403,18 +403,21 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
 ZROIDoc::ROIPack::ROIPack(ZROI* roi_, const QString& path_)
   : roi(roi_), path(QFileInfo(path_).canonicalFilePath())
 {
+  if (path.isEmpty() && path_.endsWith("_roi")) {
+    path = path_;
+  }
   updateDerivedData();
-  if (path.isEmpty()) {
+  if (m_name.isEmpty()) {
     hasUnsavedChange = true;
-    m_name = path_.endsWith("_roi") ? path_ : generateUniqueName();
+    static size_t num = 1;
+    m_name = QString("Unsaved ROI %1").arg(num++);
   }
 }
 
 void ZROIDoc::ROIPack::updateDerivedData()
 {
   m_info.clear();
-  if (!path.isEmpty())
-    m_name = QFileInfo(path).fileName();
+  m_name = QFileInfo(path).fileName();
   m_tooltip = path;
 }
 
@@ -424,12 +427,6 @@ const QString& ZROIDoc::ROIPack::info() const
     m_info = QString("%1 slices").arg(roi->numSlices());
   }
   return m_info;
-}
-
-QString ZROIDoc::ROIPack::generateUniqueName()
-{
-  static size_t num = 1;
-  return QString("Unsaved ROI %1").arg(num++);
 }
 
 void ZROIDoc::createActions()

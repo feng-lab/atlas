@@ -7,7 +7,7 @@
 #include "znumericparameter.h"
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
-#include "zpuncta.h"
+#include "zpunctapack.h"
 #include "z3dtextureglowrenderer.h"
 #include "z3drenderport.h"
 #include "z3dtexturecopyrenderer.h"
@@ -24,10 +24,7 @@ Q_OBJECT
 public:
   explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setData(ZPuncta& puncta);
-
-  inline void setSelectedPuncta(std::set<ZPunctum*>* list)
-  { m_selectedPuncta = list; }
+  void setData(ZPunctaPack& puncta);
 
   bool isReady(Z3DEye eye) const override;
 
@@ -46,7 +43,7 @@ public:
 
 signals:
 
-  void punctumSelected(ZPunctum*, bool append);
+  void punctumSelected(const ZPunctum*, bool append);
 
 protected:
   void prepareColor();
@@ -113,13 +110,12 @@ private:
   // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
   // hidden because they are unchecked from the object model. This allows us to control
   // the visibility of each single punctum.
-  std::vector<ZPunctum*> m_punctaList;
-  std::vector<ZPunctum*> m_registeredPunctaList;    // used for picking
+  std::vector<const ZPunctum*> m_punctaList;
+  std::vector<const ZPunctum*> m_registeredPunctaList;    // used for picking
 
   ZEventListenerParameter m_selectPunctumEvent;
   glm::ivec2 m_startCoord;
-  ZPunctum* m_pressedPunctum = nullptr;
-  std::set<ZPunctum*>* m_selectedPuncta = nullptr;   //point to all selected puncta, managed by other class
+  const ZPunctum* m_pressedPunctum = nullptr;
 
   std::vector<glm::vec4> m_pointAndRadius;
   std::vector<glm::vec4> m_specularAndShininess;
@@ -136,7 +132,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid = false;
 
-  ZPuncta* m_origPuncta = nullptr;
+  ZPunctaPack* m_origPuncta = nullptr;
 };
 
 } // namespace nim

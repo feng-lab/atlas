@@ -10,7 +10,7 @@
 
 namespace nim {
 
-ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPuncta& p, ZDoc& doc, QWidget* parent)
+ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& p, ZDoc& doc, QWidget* parent)
   : QTableView(parent)
   , m_ratModel(objModel)
   , m_puncta(p)

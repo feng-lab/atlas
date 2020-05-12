@@ -55,7 +55,7 @@ public:
 
   QString objTooltip(size_t id) const override;
 
-  QUndoStack* objUndoStack(size_t id) override;
+  const QUndoStack* objUndoStack(size_t id) const override;
 
   QJsonValue jsonValue(size_t id) const override;
 
@@ -99,9 +99,6 @@ private:
     std::unique_ptr<ZROI> roi;
     QString path;
     bool hasUnsavedChange = false;
-
-  private:
-    QString generateUniqueName();
 
     // derived data
   private:

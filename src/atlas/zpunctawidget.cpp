@@ -6,7 +6,7 @@
 
 namespace nim {
 
-ZPunctaWidget::ZPunctaWidget(ZPuncta& p, ZDoc& doc, QWidget* parent)
+ZPunctaWidget::ZPunctaWidget(ZPunctaPack& p, ZDoc& doc, QWidget* parent)
   : QWidget(parent)
   , m_puncta(p)
   , m_doc(doc)

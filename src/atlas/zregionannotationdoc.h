@@ -51,7 +51,7 @@ public:
 
   [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  QUndoStack* objUndoStack(size_t id) override;
+  const QUndoStack* objUndoStack(size_t id) const override;
 
   [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
@@ -70,17 +70,17 @@ protected:
 
   void exportLabelImage();
 
-  void setModified();
+  // void setModified();
 
   void setModified(bool clean);
 
   // append another RegionAnnotation into this doc
-  size_t addRegionAnnotation(ZRegionAnnotation* regionAnnotation, const QString& path, bool unsaved = false);
+  size_t addRegionAnnotation(ZRegionAnnotation* regionAnnotation, const QString& path);
 
 private:
   struct RegionAnnotationPack
   { // RegionAnnotation and its associated data
-    RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn, const QString& pathIn, bool unsaved = false);
+    RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn, const QString& pathIn);
 
     void updateDerivedData();
 

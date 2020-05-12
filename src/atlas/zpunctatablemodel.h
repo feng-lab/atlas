@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zpuncta.h"
+#include "zpunctapack.h"
 #include <QAbstractTableModel>
 #include <QModelIndex>
 #include <QVariant>
@@ -20,7 +20,7 @@ public:
     ColumnCount
   };
 
-  explicit ZPunctaTableModel(ZPuncta& p, QObject* parent = nullptr);
+  explicit ZPunctaTableModel(ZPunctaPack& p, QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
@@ -38,8 +38,7 @@ public:
   void activated(const QModelIndex& idxIn);
 
 protected:
-  ZPuncta& m_puncta;
-  std::vector<ZPuncta::iterator> m_iters;
+  ZPunctaPack& m_puncta;
 };
 
 } // namespace nim

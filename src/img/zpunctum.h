@@ -44,6 +44,7 @@ public:
     std::swap(m_score, rhs.m_score);
     m_voxelLocations.swap(rhs.m_voxelLocations);
     m_voxelIntensities.swap(rhs.m_voxelIntensities);
+    std::swap(m_selected, rhs.m_selected);
   }
 
   bool operator==(const ZPunctum& rhs) const
@@ -219,6 +220,12 @@ public:
 
   QString toQString() const;
 
+  inline bool isSelected()
+  { return m_selected; }
+
+  inline void setSelected(bool v)
+  { m_selected = v; }
+
 private:
   QString m_name;
   QString m_comment;
@@ -240,6 +247,8 @@ private:
   // info of voxels belong to this punctum
   Eigen::MatrixXi m_voxelLocations;   // n x 3 matrix
   Eigen::VectorXd m_voxelIntensities;
+
+  bool m_selected = false;
 };
 
 //   template  //

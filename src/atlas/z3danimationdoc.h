@@ -51,7 +51,7 @@ public:
 
   QString objTooltip(size_t id) const override;
 
-  QUndoStack* objUndoStack(size_t id) override;
+  const QUndoStack* objUndoStack(size_t id) const override;
 
   QJsonValue jsonValue(size_t id) const override;
 

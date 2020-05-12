@@ -91,7 +91,12 @@ public:
 
   [[nodiscard]] virtual QString objTooltip(size_t id) const = 0;
 
-  virtual QUndoStack* objUndoStack(size_t id)
+  inline QUndoStack* objUndoStack(size_t id)
+  {
+    return const_cast<QUndoStack*>(const_cast<const ZObjDoc*>(this)->objUndoStack(id));
+  }
+
+  virtual const QUndoStack* objUndoStack(size_t id) const
   {
     Q_UNUSED(id)
     return nullptr;

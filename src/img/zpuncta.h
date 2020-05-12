@@ -156,6 +156,8 @@ public:
 private:
   friend class ZPunctaIO;
 
+  friend class ZPunctaPack;
+
   std::list<ZPunctum> m_d;
 };
 

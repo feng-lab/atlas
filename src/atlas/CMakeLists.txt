@@ -603,7 +603,7 @@ set(SOURCES
     zpunctatablemodel.cpp
     zpunctatableview.cpp
     zpunctatableview.h
-    )
+    zpunctapack.cpp zpunctapack.h)
 
 # our target
 set(APP_NAME Atlas)

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjdoc.h"
-#include "zpuncta.h"
+#include "zpunctapack.h"
 
 namespace nim {
 
@@ -12,8 +12,8 @@ public:
   explicit ZPunctaDoc(ZDoc& doc);
 
   // return info of puncta with id, assume puncta exist, otherwise crash
-  ZPuncta& puncta(size_t id)
-  { return m_idToPunctaPacks.at(id)->puncta; }
+  ZPunctaPack& punctaPack(size_t id)
+  { return *m_idToPunctaPacks.at(id); }
 
   // ZObjDoc interface
 public:
@@ -49,7 +49,7 @@ public:
 
   QString objTooltip(size_t id) const override;
 
-  QUndoStack* objUndoStack(size_t id) override;
+  const QUndoStack* objUndoStack(size_t id) const override;
 
   QJsonValue jsonValue(size_t id) const override;
 
@@ -72,40 +72,15 @@ protected:
   size_t addPuncta(ZPuncta& puncta, const QString& path);
 
 private:
-  struct PunctaPack
-  { // puncta and its associated data
-    PunctaPack(ZPuncta& punctaIn, const QString& path_);
-
-    void updateDerivedData();
-
-    const QString& info() const;
-
-    inline const QString& name() const
-    { return m_name; }
-
-    inline const QString& tooltip() const
-    { return m_tooltip; }
-
-    ZPuncta puncta;
-    QString path;
-    bool hasUnsavedChange = false;
-
-    // derived data
-  private:
-    mutable QString m_info;
-    QString m_name;
-    QString m_tooltip;
-  };
-
   void createActions();
 
-  bool savePuncta(PunctaPack* pack, const QString& fileName, QString& errorMsg, const QString& format = "");
+  bool savePuncta(ZPunctaPack* pack, const QString& fileName, QString& errorMsg, const QString& format = "");
 
   // notify obj manager about the update
-  void packInfoUpdated(PunctaPack* pack);
+  void packInfoUpdated(ZPunctaPack* pack);
 
 private:
-  std::map<size_t, std::shared_ptr<PunctaPack>> m_idToPunctaPacks;
+  std::map<size_t, std::shared_ptr<ZPunctaPack>> m_idToPunctaPacks;
 
   QAction* m_loadPunctaAction;
 

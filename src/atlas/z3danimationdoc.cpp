@@ -169,7 +169,7 @@ QString Z3DAnimationDoc::objTooltip(size_t id) const
   return m_idToAnimationPacks.at(id)->tooltip();
 }
 
-QUndoStack* Z3DAnimationDoc::objUndoStack(size_t id)
+const QUndoStack* Z3DAnimationDoc::objUndoStack(size_t id) const
 {
   return m_idToAnimationPacks.at(id)->animation->undoStack();
 }

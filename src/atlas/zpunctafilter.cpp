@@ -10,18 +10,18 @@
 
 namespace nim {
 
-ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPuncta& puncta, QGraphicsItem* parent)
+ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPunctaPack& puncta, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
 {
-  for (const auto& p : m_puncta) {
-    int slice = roundTo<int>(p.z());
-    m_boundBox.expand(glm::ivec4(roundTo<int>(p.x() - p.radius()),
-                                 roundTo<int>(p.y() - p.radius()),
+  for (const auto& p : m_puncta.punctaPts()) {
+    int slice = roundTo<int>(p->z());
+    m_boundBox.expand(glm::ivec4(roundTo<int>(p->x() - p->radius()),
+                                 roundTo<int>(p->y() - p->radius()),
                                  slice,
                                  0));
-    m_boundBox.expand(glm::ivec4(roundTo<int>(p.x() + p.radius()),
-                                 roundTo<int>(p.y() + p.radius()),
+    m_boundBox.expand(glm::ivec4(roundTo<int>(p->x() + p->radius()),
+                                 roundTo<int>(p->y() + p->radius()),
                                  slice,
                                  0));
   }
@@ -104,14 +104,14 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
   m_outlineColor.setAlpha(m_opacity * 255);
   painter->setPen(QPen(m_outlineColor, 1));
   if (m_mip) {
-    for (const auto& p : m_puncta) {
-      painter->drawEllipse(QRectF(p.x() - p.radius(), p.y() - p.radius(), p.radius() * 2, p.radius() * 2));
+    for (const auto& p : m_puncta.punctaPts()) {
+      painter->drawEllipse(QRectF(p->x() - p->radius(), p->y() - p->radius(), p->radius() * 2, p->radius() * 2));
     }
   } else {
-    for (const auto& p : m_puncta) {
-      int slice = roundTo<int>(p.z());
+    for (const auto& p : m_puncta.punctaPts()) {
+      int slice = roundTo<int>(p->z());
       if (slice == m_z) {
-        painter->drawEllipse(QRectF(p.x() - p.radius(), p.y() - p.radius(), p.radius() * 2, p.radius() * 2));
+        painter->drawEllipse(QRectF(p->x() - p->radius(), p->y() - p->radius(), p->radius() * 2, p->radius() * 2));
       }
     }
   }
@@ -141,7 +141,7 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   addParameter(&m_opacity);
 }
 
-void ZPunctaFilter::setData(ZPuncta& puncta)
+void ZPunctaFilter::setData(ZPunctaPack& puncta)
 {
   m_puncta = &puncta;
   m_item.reset(new ZPunctaGraphicsItem(puncta));

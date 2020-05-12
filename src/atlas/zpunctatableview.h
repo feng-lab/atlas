@@ -14,7 +14,7 @@ class ZPunctaTableView : public QTableView
 {
 Q_OBJECT
 public:
-  ZPunctaTableView(ZPunctaTableModel& objModel, ZPuncta& p, ZDoc& doc, QWidget* parent = nullptr);
+  ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& p, ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
   void contextMenu(const QPoint& pos);
@@ -33,7 +33,7 @@ protected:
 
 private:
   ZPunctaTableModel& m_ratModel;
-  ZPuncta& m_puncta;
+  ZPunctaPack& m_puncta;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel = nullptr;
   QMenu* m_contextMenu = nullptr;

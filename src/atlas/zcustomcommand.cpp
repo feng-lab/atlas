@@ -1496,9 +1496,9 @@ void exportSceneForGlance()
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
 
-        auto puncta = doc->puncta(id);
+        auto& puncta = doc->punctaPack(id);
         ZMesh mesh;
-        ZMesh::createPunctaMesh(puncta, mesh, 8, filter->coordTransform());
+        ZMesh::createPunctaMesh(puncta.puncta(), mesh, 8, filter->coordTransform());
         mesh.generateNormals();
         mesh.save(QString("/Users/feng/Google Drive/eeum/static/data/%1.vtp").arg(doc->objName(id)));
       }

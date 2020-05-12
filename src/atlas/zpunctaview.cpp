@@ -13,7 +13,7 @@ void ZPunctaView::docPunctasAdded(const QList<size_t>& objs)
 {
   for (int i = 0; i < objs.size(); ++i) {
     ZPunctaFilter* viewControl = new ZPunctaFilter(m_view);
-    viewControl->setData(m_doc.puncta(objs[i]));
+    viewControl->setData(m_doc.punctaPack(objs[i]));
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[objs[i]].reset(viewControl);
     connect(viewControl, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaView::updateBoundBox);
@@ -29,7 +29,7 @@ void ZPunctaView::docPunctasAdded(const QList<size_t>& objs)
 void ZPunctaView::docPunctaAdded(size_t id)
 {
   ZPunctaFilter* viewControl = new ZPunctaFilter(m_view);
-  viewControl->setData(m_doc.puncta(id));
+  viewControl->setData(m_doc.punctaPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();

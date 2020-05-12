@@ -3,7 +3,7 @@
 #include "zobjfilter.h"
 #include "zparameter.h"
 #include "znumericparameter.h"
-#include "zpuncta.h"
+#include "zpunctapack.h"
 #include "zgraphicsitemtype.h"
 #include <QList>
 #include <QGraphicsEllipseItem>
@@ -25,7 +25,7 @@ public:
   int type() const override
   { return Type; }
 
-  explicit ZPunctaGraphicsItem(ZPuncta& puncta, QGraphicsItem* parent = nullptr);
+  explicit ZPunctaGraphicsItem(ZPunctaPack& p, QGraphicsItem* parent = nullptr);
 
   void setOutlineColor(const QColor& c)
   {
@@ -68,7 +68,7 @@ public:
   void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 protected:
-  ZPuncta& m_puncta;
+  ZPunctaPack& m_puncta;
   ZBBox<glm::ivec4> m_boundBox;
   QColor m_outlineColor{255, 0, 0};
   double m_opacity = 1;
@@ -89,7 +89,7 @@ public:
     return vp++;
   }
 
-  void setData(ZPuncta& puncta);
+  void setData(ZPunctaPack& puncta);
 
   void releaseItemsOwnership();
 
@@ -121,7 +121,7 @@ private:
   void opacityChanged();
 
 private:
-  ZPuncta* m_puncta = nullptr;
+  ZPunctaPack* m_puncta = nullptr;
   std::unique_ptr<ZPunctaGraphicsItem> m_item;
 
   ZBoolParameter m_visible;
