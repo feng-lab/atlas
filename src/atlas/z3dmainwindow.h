@@ -22,7 +22,7 @@ class Z3DMainWindow : public QMainWindow
 {
 Q_OBJECT
 public:
-  explicit Z3DMainWindow(ZDoc* doc, ZMainWindow& win2d, bool stereoView = false,
+  explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false,
                          QWidget* parent = nullptr);
 
   Z3DView* view()
@@ -155,7 +155,7 @@ private:
   QAction* m_helpAction;
 
   //
-  ZDoc* m_doc;
+  ZDoc& m_doc;
   Z3DView* m_view;
 
   bool m_isStereoView;

@@ -7,13 +7,14 @@
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
+#include <set>
 
 namespace nim {
 
-ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& p, ZDoc& doc, QWidget* parent)
+ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun, ZDoc& doc, QWidget* parent)
   : QTableView(parent)
   , m_ratModel(objModel)
-  , m_puncta(p)
+  , m_puncta(pun)
   , m_doc(doc)
 {
   setSortingEnabled(true);
@@ -51,6 +52,22 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& p, 
   connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
           this, &ZPunctaTableView::adaptColumns);
   adaptColumns();
+
+  for (size_t i = 0; i < m_puncta.punctaPts().size(); ++i) {
+    m_punctumToRow[m_puncta.punctaPts()[i]] = i;
+  }
+
+  bool first = true;
+  for (auto p : m_puncta.selectedPuncta()) {
+    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
+    selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+    if (first) {
+      scrollTo(index);
+      first = false;
+    }
+  }
+
+  connect(&m_puncta, &ZPunctaPack::selectionChanged, this, &ZPunctaTableView::onPunctaSelectionChanged);
 }
 
 void ZPunctaTableView::contextMenu(const QPoint& /*pos*/)
@@ -68,6 +85,10 @@ void ZPunctaTableView::indexClicked(const QModelIndex& index)
 void ZPunctaTableView::indexDoubleClicked(const QModelIndex& index)
 {
   m_ratModel.doubleClicked(m_ratProxyModel->mapToSource(index));
+
+  auto row = m_ratProxyModel->mapToSource(index).row();
+  auto p = m_puncta.punctaPts()[row];
+  m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
 }
 
 void ZPunctaTableView::indexActivated(const QModelIndex& index)
@@ -89,8 +110,55 @@ void ZPunctaTableView::keyPressEvent(QKeyEvent* /*e*/)
 {
 }
 
+void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
+{
+  QTableView::selectionChanged(selected, deselected);
+
+  if (m_skipSelectionChangedProcessing) {
+    return;
+  }
+
+  std::set<int> selectedRows;
+  for (const auto& sindex : selectedIndexes()) {
+    selectedRows.insert(m_ratProxyModel->mapToSource(sindex).row());
+  }
+  // LOG(INFO) << selectedRows.size();
+  std::set<const ZPunctum*> selectedPuncta;
+  for (auto r : selectedRows) {
+    selectedPuncta.insert(m_puncta.punctaPts()[r]);
+  }
+  m_ignoreSelectionChangedSignal = true;
+  m_puncta.setSelectedPuncta(selectedPuncta);
+  m_ignoreSelectionChangedSignal = false;
+}
+
 void ZPunctaTableView::createContextMenu()
 {
+}
+
+void ZPunctaTableView::onPunctaSelectionChanged()
+{
+  if (m_ignoreSelectionChangedSignal) {
+    return;
+  }
+
+  blockSignals(true);
+  m_skipSelectionChangedProcessing = true;
+
+  bool first = true;
+  for (auto p : m_puncta.selectedPuncta()) {
+    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
+    if (first) {
+      selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
+      scrollTo(index);
+      first = false;
+    } else {
+      selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+    }
+  }
+
+  m_skipSelectionChangedProcessing = false;
+  blockSignals(false);
 }
 
 } // namespace nim

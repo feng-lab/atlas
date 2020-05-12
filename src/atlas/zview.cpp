@@ -83,6 +83,9 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   connect(m_imgTime, &ZIntParameter::valueChanged, this, &ZView::sliceChanged);
 
   setLayout(m_layout);
+
+  connect(&m_doc, &ZDoc::requestToAdjustViewToPosition,
+          this, &ZView::gotoPosition);
 }
 
 ZView::~ZView()
@@ -303,9 +306,9 @@ void ZView::fitContentIntoWindow()
   m_view->fitRect(sceneRect);
 }
 
-void ZView::gotoPosition(int x, int y, int z, int radius)
+void ZView::gotoPosition(double x, double y, double z, double radius)
 {
-  m_imgSlice->set(z);
+  m_imgSlice->set(std::round(z));
   QRectF sceneRect(x - radius, y - radius,
                    radius * 2 + 1, radius * 2 + 1);
   m_view->fitRect(sceneRect);

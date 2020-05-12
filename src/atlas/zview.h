@@ -155,7 +155,7 @@ public:
 
   void fitContentIntoWindow();
 
-  void gotoPosition(int x, int y, int z, int radius = 100);
+  void gotoPosition(double x, double y, double z, double radius = 128.);
 
   int minViewPrecedence() const;
 

@@ -220,7 +220,7 @@ public:
 
   QString toQString() const;
 
-  inline bool isSelected()
+  inline bool isSelected() const
   { return m_selected; }
 
   inline void setSelected(bool v)

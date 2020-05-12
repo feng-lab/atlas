@@ -12,6 +12,9 @@ ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, QObject* parent)
   updateDerivedData();
   for (const auto& p : m_puncta) {
     m_punctaPts.push_back(&p);
+    if (p.isSelected()) {
+      m_selectedPuncta.insert(&p);
+    }
   }
 }
 
@@ -38,5 +41,43 @@ void ZPunctaPack::save(const QString &fileName, const QString &format)
   m_hasUnsavedChange = false;
   updateDerivedData();
 }
+
+void ZPunctaPack::setSelectedPuncta(const std::set<const ZPunctum*>& sp)
+{
+  if (m_selectedPuncta == sp) {
+    return;
+  }
+  m_selectedPuncta = sp;
+  emit selectionChanged();
+}
+
+void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
+{
+  if (append) {
+    if (p && m_selectedPuncta.find(p) == m_selectedPuncta.end()) {
+      const_cast<ZPunctum*>(p)->setSelected(true);
+      m_selectedPuncta.insert(p);
+      emit selectionChanged();
+    }
+  } else {
+    if (!p && m_selectedPuncta.empty()) {
+      return;
+    }
+    if (p && m_selectedPuncta.size() == 1 && m_selectedPuncta.find(p) != m_selectedPuncta.end()) {
+      return;
+    }
+    for (auto& mp : m_puncta) {
+      mp.setSelected(&mp == p);
+    }
+    if (p) {
+      m_selectedPuncta = std::set<const ZPunctum*>{p};
+    } else {
+      m_selectedPuncta.clear();
+    }
+    emit selectionChanged();
+  }
+}
+
+
 
 } // namespace nim

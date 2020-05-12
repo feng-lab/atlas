@@ -77,6 +77,8 @@ protected:
 
   void addSelectionLines() override;
 
+  void addEditingSelectionLines() override;
+
 private:
   // get visible data from origPunctaList put into punctaList
   void getVisibleData();

@@ -2,6 +2,8 @@
 
 #include "zpuncta.h"
 #include <QUndoStack>
+#include <vector>
+#include <set>
 
 namespace nim {
 
@@ -32,8 +34,18 @@ public:
   const std::vector<const ZPunctum*>& punctaPts() const
   { return m_punctaPts; }
 
+  const std::set<const ZPunctum*>& selectedPuncta() const
+  { return m_selectedPuncta; }
+
+  void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
+
   const ZPuncta& puncta() const
   { return m_puncta; }
+
+  void onPunctumSelected(const ZPunctum* p, bool append);
+
+signals:
+  void selectionChanged();
 
 protected:
   ZPuncta m_puncta;
@@ -47,6 +59,7 @@ private:
   QString m_name;
   QString m_tooltip;
   std::vector<const ZPunctum*> m_punctaPts;
+  std::set<const ZPunctum*> m_selectedPuncta;
 };
 
 } // namespace nim

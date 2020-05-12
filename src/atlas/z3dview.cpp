@@ -81,19 +81,21 @@ int numDigits(int32_t x)
 
 namespace nim {
 
-Z3DView::Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent)
+Z3DView::Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent)
   : QObject(parent)
   , m_doc(doc)
   , m_isStereoView(stereo)
   , m_mainWin(parent)
-  , m_numObjsBefore(m_doc->numObjs())
+  , m_numObjsBefore(m_doc.numObjs())
 {
-  CHECK(m_doc);
   m_canvas = new Z3DCanvas("", 512, 512, m_mainWin);
 
   createActions();
 
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DView::init);
+
+  connect(&m_doc, &ZDoc::requestToAdjustViewToPosition,
+          this, qOverload<double, double, double, double>(&Z3DView::cameraFocusesOn));
 }
 
 Z3DView::~Z3DView()
@@ -103,7 +105,7 @@ Z3DView::~Z3DView()
 
 const ZDoc& Z3DView::doc() const
 {
-  return *m_doc;
+  return m_doc;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
@@ -193,12 +195,12 @@ void Z3DView::updateBoundBox()
     m_boundBox.setMaxCorner(glm::dvec3(.01));
   }
   m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner(), m_boundBox.minCorner() + .01));
-  if (m_numObjsBefore == 0 && m_doc->numObjs() > 0) {
+  if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
     resetCamera();
   } else {
     resetCameraClippingRange();
   }
-  m_numObjsBefore = m_doc->numObjs();
+  m_numObjsBefore = m_doc.numObjs();
 }
 
 void Z3DView::read(size_t id, const QJsonObject& json)
@@ -451,7 +453,7 @@ void Z3DView::init()
   m_networkEvaluator.reset(new Z3DNetworkEvaluator(*m_canvasPainter));
 
   //packages
-  for (auto objDoc : m_doc->objDocs()) {
+  for (auto objDoc : m_doc.objDocs()) {
     if (ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       Z3DImgView* imgView = new Z3DImgView(*imgDoc, *this);
       connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);

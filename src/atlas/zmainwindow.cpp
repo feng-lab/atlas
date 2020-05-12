@@ -347,7 +347,7 @@ void ZMainWindow::open3DWindow()
   if (ZSystemInfo::instance().is3DSupported()) {
     try {
       if (!m_3dWindow) {
-        m_3dWindow = new Z3DMainWindow(m_doc.get(), *this, false);
+        m_3dWindow = new Z3DMainWindow(*m_doc, *this, false);
         m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
         connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
         connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
@@ -735,7 +735,7 @@ void ZMainWindow::createDockWindows()
   m_viewSettingDockWidget = new QDockWidget(tr("Object View Setting"), this);
   m_viewSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_viewSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(m_doc.get(), m_view.get(), this));
+  m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(*m_doc, m_view.get(), this));
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
@@ -744,7 +744,7 @@ void ZMainWindow::createDockWindows()
                                               QDockWidget::DockWidgetMovable |
                                               QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(m_doc.get(), this));
+  m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(*m_doc, this));
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
   m_objectDetailedInfoDockWidget->setVisible(false);
@@ -781,7 +781,7 @@ void ZMainWindow::createDockWindows()
   m_editObjDockWidget = new QDockWidget(tr("Edit and Output"), this);
   m_editObjDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_editObjDockWidget->setAllowedAreas(Qt::BottomDockWidgetArea);
-  m_objEditWidget = new ZObjEditWidget(m_doc.get(), this);
+  m_objEditWidget = new ZObjEditWidget(*m_doc, this);
   m_editObjDockWidget->setWidget(m_objEditWidget);
   addDockWidget(Qt::BottomDockWidgetArea, m_editObjDockWidget);
   m_windowMenu->addAction(m_editObjDockWidget->toggleViewAction());

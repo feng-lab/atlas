@@ -12,7 +12,7 @@ class ZViewSettingWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, QWidget* mw = nullptr);
+  explicit ZViewSettingWidget(ZDoc& doc, ZViewSettingInterface* view, QWidget* mw = nullptr);
 
   void showDefaultWidget();
 
@@ -30,7 +30,7 @@ private:
   void updateWidget();
 
 protected:
-  ZDoc* m_doc;
+  ZDoc& m_doc;
   ZViewSettingInterface* m_view;
   QStackedWidget* m_widget;
   QWidget* m_defaultWidget;

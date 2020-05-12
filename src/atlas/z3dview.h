@@ -30,7 +30,7 @@ class Z3DView : public QObject, public ZViewSettingInterface
 {
 Q_OBJECT
 public:
-  Z3DView(ZDoc* doc, bool stereo, Z3DMainWindow* parent = nullptr);
+  Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent = nullptr);
 
   ~Z3DView();
 
@@ -151,7 +151,7 @@ private:
   void createActions();
 
 private:
-  ZDoc* m_doc;
+  ZDoc& m_doc;
   bool m_isStereoView;
   QMainWindow* m_mainWin;
 

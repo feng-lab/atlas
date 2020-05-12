@@ -144,6 +144,8 @@ public:
 
   void renderSelectionBox(Z3DEye eye);
 
+  void renderEditingSelectionBox(Z3DEye eye);
+
   void rotateX() override;
 
   void rotateY() override;
@@ -203,6 +205,10 @@ protected:
 
   // besides the big selection box, other additional lines can be added through this function
   virtual void addSelectionLines()
+  {}
+
+  // for select-and-editing
+  virtual void addEditingSelectionLines()
   {}
 
   // reimplement this if cut range has different behavior
@@ -266,10 +272,11 @@ protected:
   std::vector<glm::vec3> m_axisAlignedBoundBoxLines;
   std::vector<glm::vec4> m_boundBoxLineColors;
 
-  std::vector<glm::vec3> m_selectionLines;
+  std::vector<glm::vec3> m_selectionLines;  // selection lines for the whole object
   ZMesh m_selectionCornerCubes;
   std::vector<ZMesh*> m_selectionCornerCubesWrapper;
   std::vector<glm::vec4> m_selectionLineColors;
+  std::vector<glm::vec3> m_editingSelectionLines; // selection lines for select-and-editing
 
   std::vector<glm::vec4> m_handleCenterAndRadius;
   std::vector<glm::vec4> m_handleCenterColors;

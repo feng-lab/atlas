@@ -8,7 +8,7 @@
 
 namespace nim {
 
-ZViewSettingWidget::ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, QWidget* mw)
+ZViewSettingWidget::ZViewSettingWidget(ZDoc& doc, ZViewSettingInterface* view, QWidget* mw)
   : QWidget(mw)
   , m_doc(doc)
   , m_view(view)
@@ -20,10 +20,10 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc* doc, ZViewSettingInterface* view, Q
   layout->addWidget(m_widget);
   layout->setMargin(0);
   setLayout(layout);
-  connect(m_doc, &ZDoc::showViewSetting, this, &ZViewSettingWidget::showViewSettingWidgetOfObj);
-  connect(m_doc, &ZDoc::hideViewSetting, this, &ZViewSettingWidget::hideViewSettingWidget);
-  connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZViewSettingWidget::removeViewSettingWidgetOfObj);
-  connect(m_doc, &ZDoc::objInfoChanged, this, &ZViewSettingWidget::updateViewSettingWidgetLabelOfObj);
+  connect(&m_doc, &ZDoc::showViewSetting, this, &ZViewSettingWidget::showViewSettingWidgetOfObj);
+  connect(&m_doc, &ZDoc::hideViewSetting, this, &ZViewSettingWidget::hideViewSettingWidget);
+  connect(&m_doc, &ZDoc::objAboutToBeRemoved, this, &ZViewSettingWidget::removeViewSettingWidgetOfObj);
+  connect(&m_doc, &ZDoc::objInfoChanged, this, &ZViewSettingWidget::updateViewSettingWidgetLabelOfObj);
   setMinimumHeight(250);
 }
 
@@ -43,7 +43,7 @@ void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
   }
   std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
   if (wg) {
-    QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
+    QLabel* label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(id));
     label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
@@ -89,7 +89,7 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 {
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
+      m_subWidgets[i].label->setText(m_doc.objNameWithModifiedMarkerAndID(id));
       break;
     }
   }
@@ -108,7 +108,7 @@ void ZViewSettingWidget::updateWidget()
         m_widget->removeWidget(m_subWidgets[i].widget);
         delete m_subWidgets[i].widget;
 
-        m_subWidgets[i].label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
+        m_subWidgets[i].label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
         m_subWidgets[i].label->setTextInteractionFlags(Qt::TextSelectableByMouse);
         m_subWidgets[i].label->setWordWrap(true);
         m_subWidgets[i].widget = wg->createWidget(false, true, m_subWidgets[i].label);

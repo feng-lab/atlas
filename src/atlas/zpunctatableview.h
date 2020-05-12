@@ -3,6 +3,7 @@
 #include "zdoc.h"
 #include "zpunctatablemodel.h"
 #include <QTableView>
+#include <map>
 
 class QSortFilterProxyModel;
 
@@ -29,7 +30,11 @@ protected:
 
   void keyPressEvent(QKeyEvent* e) override;
 
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+
   void createContextMenu();
+
+  void onPunctaSelectionChanged();
 
 private:
   ZPunctaTableModel& m_ratModel;
@@ -37,6 +42,9 @@ private:
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel = nullptr;
   QMenu* m_contextMenu = nullptr;
+  std::map<const ZPunctum*, int> m_punctumToRow;
+  bool m_ignoreSelectionChangedSignal = false;
+  bool m_skipSelectionChangedProcessing = false;
 };
 
 } // namespace nim

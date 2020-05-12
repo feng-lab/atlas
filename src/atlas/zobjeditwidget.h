@@ -13,7 +13,7 @@ class ZObjEditWidget : public QTabWidget
 {
 Q_OBJECT
 public:
-  explicit ZObjEditWidget(ZDoc* doc, QWidget* mw = nullptr);
+  explicit ZObjEditWidget(ZDoc& doc, QWidget* mw = nullptr);
 
   bool showObjEditWidgetOfObj(size_t id);
 
@@ -25,7 +25,7 @@ private:
   void closeTab(int index);
 
 protected:
-  ZDoc* m_doc;
+  ZDoc& m_doc;
 
   struct SubWidget
   {

@@ -12,7 +12,7 @@ class ZObjDetailedInfoWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZObjDetailedInfoWidget(ZDoc* doc, QWidget* mw = nullptr);
+  explicit ZObjDetailedInfoWidget(ZDoc& doc, QWidget* mw = nullptr);
 
 public:
   void showDefaultWidget();
@@ -29,7 +29,7 @@ private:
   void updateWidgetLabelOfObj(size_t id);
 
 protected:
-  ZDoc* m_doc;
+  ZDoc& m_doc;
   QStackedWidget* m_widget;
   QWidget* m_defaultWidget;
 

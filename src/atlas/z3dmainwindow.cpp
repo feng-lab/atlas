@@ -28,7 +28,7 @@
 
 namespace nim {
 
-Z3DMainWindow::Z3DMainWindow(ZDoc* doc, ZMainWindow& win2d, bool stereoView, QWidget* parent)
+Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWidget* parent)
   : QMainWindow(parent)
   , m_doc(doc)
   , m_isStereoView(stereoView)
@@ -42,11 +42,11 @@ Z3DMainWindow::Z3DMainWindow(ZDoc* doc, ZMainWindow& win2d, bool stereoView, QWi
 
 void Z3DMainWindow::openEditWidget(size_t id)
 {
-  ZObjDoc* doc = m_doc->idToDoc(id);
+  ZObjDoc* doc = m_doc.idToDoc(id);
   if (doc->objUndoStack(id)) {
     doc->objUndoStack(id)->setActive();
   } else {
-    m_doc->activateEmptyUndoStack();
+    m_doc.activateEmptyUndoStack();
   }
   if (!doc->typeName().contains("2D", Qt::CaseInsensitive)) {
     if (m_objEditWidget->showObjEditWidgetOfObj(id)) {
@@ -102,7 +102,7 @@ void Z3DMainWindow::dropEvent(QDropEvent* event)
     }
   }
   if (!fileList.isEmpty())
-    m_doc->loadFileList(fileList);
+    m_doc.loadFileList(fileList);
 }
 
 void Z3DMainWindow::open()
@@ -111,12 +111,12 @@ void Z3DMainWindow::open()
 
 bool Z3DMainWindow::save()
 {
-  return m_doc->saveAllObjs();
+  return m_doc.saveAllObjs();
 }
 
 bool Z3DMainWindow::saveAs()
 {
-  return m_doc->saveSelectedObjsAs();
+  return m_doc.saveSelectedObjsAs();
 }
 
 void Z3DMainWindow::openRecentFile()
@@ -126,7 +126,7 @@ void Z3DMainWindow::openRecentFile()
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
       emit loadJsonScene(fn);
     } else {
-      m_doc->loadFile(action->data().toString());
+      m_doc.loadFile(action->data().toString());
     }
   }
 }
@@ -222,7 +222,7 @@ void Z3DMainWindow::init()
 
   readSettings();
 
-  //const QList<QAction*> &loadActList = m_doc->loadFileActions();
+  //const QList<QAction*> &loadActList = m_doc.loadFileActions();
   //for (int i=0; i<loadActList.size(); ++i)
   //connect(loadActList[i], &QAction::triggered, this, &Z3DMainWindow::activateWindowIfNot);
 }
@@ -312,7 +312,7 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  const QList<QAction*>& fileActList = m_doc->fileActions();
+  const QList<QAction*>& fileActList = m_doc.fileActions();
   for (int i = 0; i < fileActList.size(); ++i)
     m_fileMenu->addAction(fileActList[i]);
   m_separatorAction = m_fileMenu->addSeparator();
@@ -324,8 +324,8 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_exitAction);
 
   m_editMenu = menuBar()->addMenu(tr("&Edit"));
-  m_editMenu->addAction(m_doc->undoAction());
-  m_editMenu->addAction(m_doc->redoAction());
+  m_editMenu->addAction(m_doc.undoAction());
+  m_editMenu->addAction(m_doc.redoAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
   m_viewMenu->addAction(m_view->zoomInAction());
@@ -337,14 +337,14 @@ void Z3DMainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_screenShotAction);
 
-  const QList<QMenu*>& menuList = m_doc->processObjMenu();
+  const QList<QMenu*>& menuList = m_doc.processObjMenu();
   for (int i = 0; i < menuList.size(); ++i) {
     menuBar()->addMenu(menuList[i]);
   }
 
   m_animationMenu = menuBar()->addMenu(tr("&Animation"));
-  m_animationMenu->addAction(m_doc->make3DAnimationAction());
-  m_animationMenu->addAction(m_doc->changeAnimationSettingAction());
+  m_animationMenu->addAction(m_doc.make3DAnimationAction());
+  m_animationMenu->addAction(m_doc.changeAnimationSettingAction());
 
   m_windowMenu = menuBar()->addMenu(tr("&Window"));
 
@@ -365,14 +365,14 @@ void Z3DMainWindow::createToolBars()
   m_fileToolBar = addToolBar(tr("File"));
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
-  //const QList<QAction*> &loadFileActList = m_doc->loadFileActions();
+  //const QList<QAction*> &loadFileActList = m_doc.loadFileActions();
   //for (int i=0; i<loadFileActList.size(); ++i)
   //m_fileToolBar->addAction(loadFileActList[i]);
   m_fileToolBar->setIconSize(iconSize);
 
   m_editToolBar = addToolBar(tr("Edit"));
-  m_editToolBar->addAction(m_doc->undoAction());
-  m_editToolBar->addAction(m_doc->redoAction());
+  m_editToolBar->addAction(m_doc.undoAction());
+  m_editToolBar->addAction(m_doc.redoAction());
   m_editToolBar->setIconSize(iconSize);
 
   m_viewToolBar = addToolBar(tr("View"));
@@ -399,14 +399,14 @@ void Z3DMainWindow::createDockWindows()
   m_objectsDockWidget = new QDockWidget(tr("Objects Manager"), this);
   m_objectsDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_objectsDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  connect(m_doc, &ZDoc::openEditWidget, this, &Z3DMainWindow::openEditWidget);
+  connect(&m_doc, &ZDoc::openEditWidget, this, &Z3DMainWindow::openEditWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectsDockWidget);
   m_windowMenu->addAction(m_objectsDockWidget->toggleViewAction());
 
   m_viewSettingDockWidget = new QDockWidget(tr("Object View Setting"), this);
   m_viewSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_viewSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
-  connect(m_doc, &ZDoc::showViewSetting, this, &Z3DMainWindow::raiseViewSettingDockWidget);
+  connect(&m_doc, &ZDoc::showViewSetting, this, &Z3DMainWindow::raiseViewSettingDockWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
@@ -416,8 +416,8 @@ void Z3DMainWindow::createDockWindows()
                                               QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_objDetailedInfoWidget = new ZObjDetailedInfoWidget(m_doc, this);
-  if (m_doc->viewSettingId() > 0)
-    m_objDetailedInfoWidget->showWidgetOfObj(m_doc->viewSettingId());
+  if (m_doc.viewSettingId() > 0)
+    m_objDetailedInfoWidget->showWidgetOfObj(m_doc.viewSettingId());
   m_objectDetailedInfoDockWidget->setWidget(m_objDetailedInfoWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
@@ -480,12 +480,12 @@ void Z3DMainWindow::createDockWindows()
 
 void Z3DMainWindow::fillDockWindows()
 {
-  ZObjWidget* objWidget = m_doc->createObjWidget(this);
+  ZObjWidget* objWidget = m_doc.createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
 
   m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_view, this);
-  if (m_doc->viewSettingId() > 0)
-    m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc->viewSettingId());
+  if (m_doc.viewSettingId() > 0)
+    m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc.viewSettingId());
   m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
 
   m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());

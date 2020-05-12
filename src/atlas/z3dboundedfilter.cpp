@@ -183,6 +183,27 @@ void Z3DBoundedFilter::renderSelectionBox(Z3DEye eye)
   }
 }
 
+void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
+{
+  if (!m_isSelected) {
+    m_editingSelectionLines.clear();
+    addEditingSelectionLines();
+    if (m_editingSelectionLines.empty()) {
+      return;
+    }
+    m_selectionBoundBoxRenderer.setData(&m_editingSelectionLines);
+    if (m_selectionLineColors.size() < m_editingSelectionLines.size()) {
+      for (size_t i = m_selectionLineColors.size(); i < m_editingSelectionLines.size(); ++i) {
+        m_selectionLineColors.push_back(m_selectionLineColor.get());
+      }
+      m_selectionBoundBoxRenderer.setDataColors(&m_selectionLineColors);
+    }
+    m_rendererBase.setClipEnabled(false);
+    m_rendererBase.render(eye, m_selectionBoundBoxRenderer);
+    m_rendererBase.setClipEnabled(true);
+  }
+}
+
 void Z3DBoundedFilter::rotateX()
 {
   if (!m_isSelected || !m_transformEnabled)

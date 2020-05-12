@@ -79,6 +79,10 @@ QVariant ZPunctaTableModel::headerData(int section, Qt::Orientation orientation,
     }
   }
 
+  if (orientation == Qt::Vertical && role == Qt::DisplayRole) {
+    return section;
+  }
+
   return QVariant();
 }
 

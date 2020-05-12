@@ -9,7 +9,7 @@
 
 namespace nim {
 
-ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc* doc, QWidget* mw)
+ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc& doc, QWidget* mw)
   : QWidget(mw)
   , m_doc(doc)
 {
@@ -19,10 +19,10 @@ ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc* doc, QWidget* mw)
   m_widget->addWidget(m_defaultWidget);
   layout->addWidget(m_widget);
   setLayout(layout);
-  connect(m_doc, &ZDoc::showViewSetting, this, &ZObjDetailedInfoWidget::showWidgetOfObj);
-  connect(m_doc, &ZDoc::hideViewSetting, this, &ZObjDetailedInfoWidget::hideWidget);
-  connect(m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjDetailedInfoWidget::removeWidgetOfObj);
-  connect(m_doc, &ZDoc::objInfoChanged, this, &ZObjDetailedInfoWidget::updateWidgetLabelOfObj);
+  connect(&m_doc, &ZDoc::showViewSetting, this, &ZObjDetailedInfoWidget::showWidgetOfObj);
+  connect(&m_doc, &ZDoc::hideViewSetting, this, &ZObjDetailedInfoWidget::hideWidget);
+  connect(&m_doc, &ZDoc::objAboutToBeRemoved, this, &ZObjDetailedInfoWidget::removeWidgetOfObj);
+  connect(&m_doc, &ZDoc::objInfoChanged, this, &ZObjDetailedInfoWidget::updateWidgetLabelOfObj);
   setMinimumHeight(250);
 }
 
@@ -41,7 +41,7 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
     }
   }
 
-  QString info = m_doc->objDetailedInfo(id);
+  QString info = m_doc.objDetailedInfo(id);
   if (!info.isEmpty()) {
     ZWidgetsGroup wg("Info", 1);
     auto infoLabel = new QTextEdit();
@@ -50,7 +50,7 @@ void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
     infoLabel->setWordWrapMode(QTextOption::WordWrap);
     infoLabel->setPlainText(info);
     wg.addChild(*infoLabel, 1);
-    QLabel* label = new QLabel(m_doc->objNameWithModifiedMarkerAndID(id));
+    QLabel* label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(id));
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
     QWidget* wt = wg.createWidget(false, false, label, true);
@@ -95,8 +95,8 @@ void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
   //LOG(INFO) << "..";
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      m_subWidgets[i].infoLabel->setPlainText(m_doc->objDetailedInfo(id));
-      m_subWidgets[i].label->setText(m_doc->objNameWithModifiedMarkerAndID(id));
+      m_subWidgets[i].infoLabel->setPlainText(m_doc.objDetailedInfo(id));
+      m_subWidgets[i].label->setText(m_doc.objNameWithModifiedMarkerAndID(id));
       break;
     }
   }

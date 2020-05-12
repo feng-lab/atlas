@@ -152,7 +152,10 @@ void Z3DPunctaFilter::process(Z3DEye /*eye*/)
 
 void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
 {
+  CHECK(!m_origPuncta);
   m_origPuncta = &puncta;
+  connect(m_origPuncta, &ZPunctaPack::selectionChanged, this, &Z3DPunctaFilter::invalidateResult);
+  connect(this, &Z3DPunctaFilter::punctumSelected, m_origPuncta, &ZPunctaPack::onPunctumSelected);
   updateData();
 }
 
@@ -235,6 +238,7 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
   //  }
   m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
+  renderEditingSelectionBox(eye);
 }
 
 void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
@@ -251,6 +255,7 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
   //  }
   m_rendererBase.render(eye, m_sphereRenderer);
   renderBoundBox(eye);
+  renderEditingSelectionBox(eye);
 }
 
 void Z3DPunctaFilter::renderPicking(Z3DEye eye)
@@ -380,6 +385,15 @@ void Z3DPunctaFilter::addSelectionLines()
   for (const auto& p : m_origPuncta->punctaPts()) {
     punctumBound(*p, boundBox);
     appendBoundboxLines(boundBox, m_selectionLines);
+  }
+}
+
+void Z3DPunctaFilter::addEditingSelectionLines()
+{
+  ZBBox<glm::dvec3> boundBox;
+  for (auto p : m_origPuncta->selectedPuncta()) {
+    punctumBound(*p, boundBox);
+    appendBoundboxLines(boundBox, m_editingSelectionLines);
   }
 }
 

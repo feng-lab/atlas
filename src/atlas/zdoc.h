@@ -212,6 +212,8 @@ signals:
 
   void objInfoChanged(size_t id);
 
+  void requestToAdjustViewToPosition(double x, double y, double z, double radius = 128.);
+
 protected:
   friend class ZObjModel;
 
