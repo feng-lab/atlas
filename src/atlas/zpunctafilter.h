@@ -77,6 +77,40 @@ protected:
   int m_t = 0;
 };
 
+class ZPunctumGraphicsItem : public QGraphicsEllipseItem
+{
+public:
+  enum
+  {
+    Type = GraphicsItemType::ZPunctumGraphicsItem
+  };
+
+  int type() const override
+  { return Type; }
+
+  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, const QTransform& tfm, ZView& view,
+                       QGraphicsItem* parent = nullptr);
+
+  void updateValue();
+
+  void setTransform_(const QTransform& tfm)
+  { m_transform = tfm; updateValue(); }
+
+  // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
+
+protected:
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+private:
+  ZPunctaPack& m_punctaPack;
+  const ZPunctum& m_punctum;
+
+  QPointF m_basePos;
+  bool m_doubleClicked = false;
+  QTransform m_transform;
+  ZView& m_view;
+};
+
 class ZPunctaFilter : public ZObjFilter
 {
 Q_OBJECT
@@ -113,23 +147,38 @@ protected:
 
   void offsetChanged() override;
 
+  void createPunctumItems();
+
+  void updateItemSelectedState();
+
+  void onSceneItemSelectionChanged();
+
 private:
   void visibleChanged();
 
   void outlineColorChanged();
 
+  void regionColorChanged();
+
   void opacityChanged();
 
 private:
   ZPunctaPack* m_puncta = nullptr;
-  std::unique_ptr<ZPunctaGraphicsItem> m_item;
+  // std::unique_ptr<ZPunctaGraphicsItem> m_item;
+  std::vector<std::unique_ptr<ZPunctumGraphicsItem>> m_puntumItems;
+  std::map<const ZPunctum*, ZPunctumGraphicsItem*> m_punctumToItem;
+  std::map<QGraphicsItem*, const ZPunctum*> m_itemToPunctum;
 
   ZBoolParameter m_visible;
   ZVec3Parameter m_outlineColor;
+  ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;
   bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
+
+  bool m_ignoreSelectionChangedSignal = false;
+  bool m_skipSelectionChangedProcessing = false;
 };
 
 } // namespace nim

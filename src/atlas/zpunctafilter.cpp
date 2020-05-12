@@ -7,6 +7,7 @@
 #include "zgraphicsscene.h"
 #include <QStyleOption>
 #include <QPushButton>
+#include <QGraphicsSceneMouseEvent>
 
 namespace nim {
 
@@ -120,18 +121,59 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
     qt_graphicsItem_highlightSelected(this, painter, option);
 }
 
+ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum,
+                                           const QTransform& tfm, ZView& view,
+                                           QGraphicsItem* parent)
+  : QGraphicsEllipseItem(parent)
+  , m_punctaPack(punctaPack)
+  , m_punctum(punctum)
+  , m_transform(tfm)
+  , m_view(view)
+{
+  setFlags(QGraphicsItem::ItemIsSelectable);
+
+  m_basePos = m_transform.map(QPointF(m_punctum.x(), m_punctum.y()));
+  setPos(m_basePos);
+  QString tooltip = QString("Punctum:(%1,%2,%3,%4)").
+    arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
+  setToolTip(tooltip);
+  QRectF rect(-m_punctum.radius(), -m_punctum.radius(), m_punctum.radius() * 2, m_punctum.radius() * 2);
+  setRect(rect);
+}
+
+void ZPunctumGraphicsItem::updateValue()
+{
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
+  m_basePos = m_transform.map(QPointF(m_punctum.x(), m_punctum.y()));
+  setPos(m_basePos);
+  QString tooltip = QString("Punctum:(%1,%2,%3,%4)").
+    arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
+  setToolTip(tooltip);
+  setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
+void ZPunctumGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
+{
+  if (!isSelected()) {
+    return;
+  }
+}
+
 ZPunctaFilter::ZPunctaFilter(ZView& view)
   : ZObjFilter(view)
   , m_visible("Visible", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 1), glm::vec3(0), glm::vec3(1))
+  , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZPunctaFilter::visibleChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
+  connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::regionColorChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_visible);
   addParameter(&m_outlineColor);
+  addParameter(&m_regionColor);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
@@ -139,55 +181,60 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   addParameter(&m_transform);
   addParameter(&m_offsetPara);
   addParameter(&m_opacity);
+
+  connect(&view.scene(), &ZGraphicsScene::selectionChanged, this, &ZPunctaFilter::onSceneItemSelectionChanged);
 }
 
 void ZPunctaFilter::setData(ZPunctaPack& puncta)
 {
   m_puncta = &puncta;
-  m_item.reset(new ZPunctaGraphicsItem(puncta));
-  m_item->setZValue(m_viewPrecedencePara.get());
-  m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
-                                 m_outlineColor.get().y * 255,
-                                 m_outlineColor.get().z * 255));
-  m_item->setOpacity(m_opacity.get());
-  m_item->setTransform(getQTransform());
-  if (m_view.isMaxZProjView()) {
-    m_item->setMaxZProjView(realT());
-  } else {
-    m_item->setNormalView(realZ(), realT());
-  }
-  m_view.scene().addItem(m_item.get());
+  createPunctumItems();
 
+  connect(m_puncta, &ZPunctaPack::selectionChanged, this, &ZPunctaFilter::updateItemSelectedState);
   //connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
 }
 
 void ZPunctaFilter::releaseItemsOwnership()
 {
-  m_item.release();
+  for (auto& item : m_puntumItems) {
+    item.release();
+  }
 }
 
 void ZPunctaFilter::setSelected(bool v)
 {
-  if (m_item->isSelected() != v) {
-    m_item->setSelected(v);
+  if (v) {
+    for (auto& item : m_puntumItems) {
+      item->setSelected(v);
+    }
+  } else {
+    updateItemSelectedState();
   }
 }
 
 void ZPunctaFilter::setNormalView(int z, int t)
 {
-  m_item->setNormalView(realZ(z), realT(t));
+  if (!m_visible.get()) {
+    return;
+  }
+  createPunctumItems();
 }
 
 void ZPunctaFilter::setMaxZProjView(int t)
 {
-  m_item->setMaxZProjView(realT(t));
+  if (!m_visible.get()) {
+    return;
+  }
+  createPunctumItems();
 }
 
 ZBBox<glm::ivec4> ZPunctaFilter::boundBox() const
 {
-  ZBBox<glm::ivec4> res = m_item->boundBox();
-  updateBoundBoxWithOffsetPara(res);
-  return res;
+  if (m_puncta) {
+    ZBBox<glm::ivec4> res = m_puncta->boundBox();
+    updateBoundBoxWithOffsetPara(res);
+    return res;
+  }
 }
 
 std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
@@ -206,6 +253,7 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
+    m_widgetsGroup->addChild(m_regionColor, 1);
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
@@ -215,41 +263,156 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
 
 void ZPunctaFilter::viewPrecedenceChanged()
 {
-  m_item->setZValue(m_viewPrecedencePara.get());
+  for (auto& item : m_puntumItems) {
+    item->setZValue(m_viewPrecedencePara.get());
+  }
   ZObjFilter::viewPrecedenceChanged();
 }
 
 void ZPunctaFilter::transformChanged()
 {
-  m_item->setTransform(getQTransform());
+  auto trans = getQTransform();
+  for (auto& item : m_puntumItems) {
+    item->setTransform_(trans);
+  }
   ZObjFilter::transformChanged();
 }
 
 void ZPunctaFilter::offsetChanged()
 {
-  if (m_view.isMaxZProjView()) {
-    m_item->setMaxZProjView(realT());
-  } else {
-    m_item->setNormalView(realZ(), realT());
-  }
+  createPunctumItems();
   ZObjFilter::offsetChanged();
+}
+
+void ZPunctaFilter::createPunctumItems()
+{
+  m_puntumItems.clear();
+  m_punctumToItem.clear();
+  m_itemToPunctum.clear();
+  if (!m_visible.get()) {
+    return;
+  }
+
+  std::vector<std::unique_ptr<ZPunctumGraphicsItem>> items;
+  QTransform trans = getQTransform();
+  QPen pen(QColor(m_outlineColor.get().x * 255,
+                  m_outlineColor.get().y * 255,
+                  m_outlineColor.get().z * 255),
+           2);
+  pen.setCosmetic(true);
+  QBrush brush(QColor(m_regionColor.get().x * 255,
+                      m_regionColor.get().y * 255,
+                      m_regionColor.get().z * 255,
+                      m_opacity.get() * 255));
+  for (const auto& p : m_puncta->puncta()) {
+    if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p.z())) > 1.0) {
+      continue;
+    }
+    auto item = new ZPunctumGraphicsItem(*m_puncta, p, trans, m_view);
+    item->setZValue(m_viewPrecedencePara.get());
+    item->setBrush(brush);
+    item->setPen(pen);
+    m_view.scene().addItem(item);
+    items.emplace_back(item);
+    m_punctumToItem[&p] = item;
+    m_itemToPunctum[item] = &p;
+  }
+  m_puntumItems.swap(items);
+
+  // LOG(INFO) << "here";
+  updateItemSelectedState();
+}
+
+void ZPunctaFilter::updateItemSelectedState()
+{
+  if (m_ignoreSelectionChangedSignal) {
+    return;
+  }
+  m_skipSelectionChangedProcessing = true;
+  // LOG(INFO) << m_puncta->selectedPuncta().size();
+  for (auto&[p, item] : m_punctumToItem) {
+    item->setSelected(m_puncta->selectedPuncta().find(p) != m_puncta->selectedPuncta().end());
+  }
+  m_skipSelectionChangedProcessing = false;
+}
+
+void ZPunctaFilter::onSceneItemSelectionChanged()
+{
+  if (m_skipSelectionChangedProcessing) {
+    return;
+  }
+  if (!m_puncta) {
+    return;
+  }
+  std::set<const ZPunctum*> selectedPuncta;
+  for (auto item : m_view.scene().selectedItems()) {
+    if (auto it = m_itemToPunctum.find(item); it != m_itemToPunctum.end()) {
+      selectedPuncta.insert(it->second);
+    }
+  }
+  // LOG(INFO) << selectedPuncta.size();
+  m_ignoreSelectionChangedSignal = true;
+  m_puncta->setSelectedPuncta(selectedPuncta);
+  m_ignoreSelectionChangedSignal = false;
 }
 
 void ZPunctaFilter::visibleChanged()
 {
-  m_item->setVisible(m_visible.get());
+  if (!m_puncta) {
+    return;
+  }
+  if (m_visible.get()) {
+    if (m_view.isMaxZProjView()) {
+      setMaxZProjView(m_view.currentTime());
+    } else {
+      setNormalView(m_view.currentSlice(), m_view.currentTime());
+    }
+  } else {
+    for (auto& item : m_puntumItems) {
+      item->setVisible(false);
+    }
+  }
 }
 
 void ZPunctaFilter::outlineColorChanged()
 {
-  m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
-                                 m_outlineColor.get().y * 255,
-                                 m_outlineColor.get().z * 255));
+  if (!m_puncta) {
+    return;
+  }
+  QPen pen(QColor(m_outlineColor.get().x * 255,
+                  m_outlineColor.get().y * 255,
+                  m_outlineColor.get().z * 255),
+           2);
+  pen.setCosmetic(true);
+  for (auto& item : m_puntumItems) {
+    item->setPen(pen);
+  }
+}
+
+void ZPunctaFilter::regionColorChanged()
+{
+  if (!m_puncta) {
+    return;
+  }
+  for (auto& item : m_puntumItems) {
+    item->setBrush(QColor(m_regionColor.get().x * 255,
+                          m_regionColor.get().y * 255,
+                          m_regionColor.get().z * 255,
+                          m_opacity.get() * 255));
+  }
 }
 
 void ZPunctaFilter::opacityChanged()
 {
-  m_item->setOpacity(m_opacity.get());
+  if (!m_puncta) {
+    return;
+  }
+  for (auto& item : m_puntumItems) {
+    item->setBrush(QColor(m_regionColor.get().x * 255,
+                          m_regionColor.get().y * 255,
+                          m_regionColor.get().z * 255,
+                          m_opacity.get() * 255));
+  }
 }
 
 } // namespace nim

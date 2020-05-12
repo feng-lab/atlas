@@ -1,6 +1,8 @@
 #pragma once
 
 #include "zpuncta.h"
+#include "zglmutils.h"
+#include "zbbox.h"
 #include <QUndoStack>
 #include <vector>
 #include <set>
@@ -43,6 +45,8 @@ public:
   { return m_puncta; }
 
   void onPunctumSelected(const ZPunctum* p, bool append);
+
+  ZBBox<glm::ivec4> boundBox() const;
 
 signals:
   void selectionChanged();

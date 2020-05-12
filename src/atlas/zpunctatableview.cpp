@@ -88,7 +88,7 @@ void ZPunctaTableView::indexDoubleClicked(const QModelIndex& index)
 
   auto row = m_ratProxyModel->mapToSource(index).row();
   auto p = m_puncta.punctaPts()[row];
-  m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
+  emit m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
 }
 
 void ZPunctaTableView::indexActivated(const QModelIndex& index)
@@ -122,11 +122,11 @@ void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QI
   for (const auto& sindex : selectedIndexes()) {
     selectedRows.insert(m_ratProxyModel->mapToSource(sindex).row());
   }
-  // LOG(INFO) << selectedRows.size();
   std::set<const ZPunctum*> selectedPuncta;
   for (auto r : selectedRows) {
     selectedPuncta.insert(m_puncta.punctaPts()[r]);
   }
+  // LOG(INFO) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
   m_puncta.setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;
@@ -145,15 +145,19 @@ void ZPunctaTableView::onPunctaSelectionChanged()
   blockSignals(true);
   m_skipSelectionChangedProcessing = true;
 
-  bool first = true;
-  for (auto p : m_puncta.selectedPuncta()) {
-    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
-    if (first) {
-      selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
-      scrollTo(index);
-      first = false;
-    } else {
-      selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+  if (m_puncta.selectedPuncta().empty()) {
+    selectionModel()->clearSelection();
+  } else {
+    bool first = true;
+    for (auto p : m_puncta.selectedPuncta()) {
+      auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
+      if (first) {
+        selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
+        scrollTo(index);
+        first = false;
+      } else {
+        selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+      }
     }
   }
 

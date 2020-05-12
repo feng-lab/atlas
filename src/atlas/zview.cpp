@@ -308,7 +308,9 @@ void ZView::fitContentIntoWindow()
 
 void ZView::gotoPosition(double x, double y, double z, double radius)
 {
-  m_imgSlice->set(std::round(z));
+  if (isNormalView()) {
+    m_imgSlice->set(std::round(z));
+  }
   QRectF sceneRect(x - radius, y - radius,
                    radius * 2 + 1, radius * 2 + 1);
   m_view->fitRect(sceneRect);

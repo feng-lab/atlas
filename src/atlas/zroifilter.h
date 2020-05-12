@@ -223,8 +223,6 @@ protected:
 
   void transformChanged() override;
 
-  void offsetChanged() override;
-
   void createShapeItem(int slice, size_t shapeID);
 
   void createCtrlPtItems(int slice, size_t shapeID);
@@ -273,7 +271,6 @@ private:
   bool m_hasSelectedItems = false;
   QPointF m_startPoint;
 
-  bool m_lazyRendering = true;
   const RegionNode* m_regionNode = nullptr;
 };
 
