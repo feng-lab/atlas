@@ -243,7 +243,7 @@ void ZPunctaDoc::generateAnalysisTextFiles()
 size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path);
+  m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path, *this);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);

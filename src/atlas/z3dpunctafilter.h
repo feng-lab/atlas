@@ -54,6 +54,8 @@ protected:
 
   void selectPuncta(QMouseEvent* e, int w, int h);
 
+  void contextMenuEvent(QContextMenuEvent* e, int w, int h);
+
   void updateData();
 
   void process(Z3DEye eye) override;
@@ -119,6 +121,7 @@ private:
 
   ZEventListenerParameter m_selectPunctumEvent;
   ZEventListenerParameter m_deleteSelectedPunctaEvent;
+  ZEventListenerParameter m_contextMenuEvent;
   glm::ivec2 m_startCoord;
   const ZPunctum* m_pressedPunctum = nullptr;
 

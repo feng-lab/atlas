@@ -264,7 +264,7 @@ ZPunctum ZPunctum::merge(InputIterator first, InputIterator last, double conf)
     if (!hasSignal)
       break;
   }
-  ZPunctum res(*(*first));
+  ZPunctum res(*first);
   if (hasSignal) {
     it = first;
     ++it;

@@ -31,6 +31,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   //  , m_textureCopyRenderer(m_rendererBase)
   , m_selectPunctumEvent("Select Puncta", false)
   , m_deleteSelectedPunctaEvent("Delete Selected Puncta", true)
+  , m_contextMenuEvent("Context Menu", false)
 {
   addPrivateRenderPort(m_monoEyeOutport);
   addPrivateRenderPort(m_leftEyeOutport);
@@ -96,6 +97,11 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   connect(&m_deleteSelectedPunctaEvent, &ZEventListenerParameter::keyEventTriggered,
           this, &Z3DPunctaFilter::deleteSelectedPuncta);
   addEventListener(m_deleteSelectedPunctaEvent);
+
+  m_contextMenuEvent.listenToContextMenuEvent();
+  connect(&m_contextMenuEvent, &ZEventListenerParameter::contextMenuEventTriggered,
+          this, &Z3DPunctaFilter::contextMenuEvent);
+  addEventListener(m_contextMenuEvent);
 
   adjustWidgets();
 }
@@ -523,6 +529,29 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
       }
     }
     m_pressedPunctum = nullptr;
+  }
+}
+
+void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int w, int h)
+{
+  if (isVisible() && !isSelected() && m_origPuncta && !m_origPuncta->selectedPuncta().empty()) {
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+    if (!obj) {
+      return;
+    }
+
+    bool hasSelectedPunctumUnderMouse = false;
+    for (auto p : m_punctaList) {
+      if (p == obj && p->isSelected()) {
+        hasSelectedPunctumUnderMouse = true;
+        break;
+      }
+    }
+    if (!hasSelectedPunctumUnderMouse) {
+      return;
+    }
+
+    m_origPuncta->contextMenu().popup(e->globalPos());
   }
 }
 

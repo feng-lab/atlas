@@ -73,11 +73,11 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
   connect(&m_puncta, &ZPunctaPack::punctaChanged, this, &ZPunctaTableView::onPunctaChanged);
 }
 
-void ZPunctaTableView::contextMenu(const QPoint& /*pos*/)
+void ZPunctaTableView::contextMenu(const QPoint& pos)
 {
-//  if (m_doc->numSelectedObjs() > 0) {
-//    m_contextMenu->popup(mapToGlobal(pos));
-//  }
+  if (!m_puncta.selectedPuncta().empty()) {
+    m_puncta.contextMenu().popup(mapToGlobal(pos));
+  }
 }
 
 void ZPunctaTableView::indexClicked(const QModelIndex& index)

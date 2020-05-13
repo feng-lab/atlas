@@ -154,9 +154,10 @@ void ZPunctumGraphicsItem::updateValue()
 
 void ZPunctumGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  if (!isSelected()) {
+  if (!isSelected() || !isVisible() || m_punctaPack.selectedPuncta().empty()) { // feels weird
     return;
   }
+  m_punctaPack.contextMenu().popup(event->screenPos());
 }
 
 ZPunctaFilter::ZPunctaFilter(ZView& view)
@@ -231,11 +232,12 @@ void ZPunctaFilter::setMaxZProjView(int t)
 
 ZBBox<glm::ivec4> ZPunctaFilter::boundBox() const
 {
+  ZBBox<glm::ivec4> res;
   if (m_punctaPack) {
-    ZBBox<glm::ivec4> res = m_punctaPack->boundBox();
+    res = m_punctaPack->boundBox();
     updateBoundBoxWithOffsetPara(res);
-    return res;
   }
+  return res;
 }
 
 std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
@@ -244,7 +246,7 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("Puncta", 1);
     m_widgetsGroup->addChild(m_visible, 1);
 
-    QPushButton* pb = new QPushButton("Bring to Front");
+    auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZPunctaFilter::bringToFront);
     m_widgetsGroup->addChild(*pb, 1);
 

@@ -35,16 +35,16 @@ void Z3DInteractionHandler::setSharing(bool sharing)
 void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)
 {
   if (e->type() == QEvent::MouseButtonPress) {
-    LOG(INFO) << "MouseButtonPress";
+    //LOG(INFO) << "MouseButtonPress";
     emit mousePressed();
   } else if (e->type() == QEvent::MouseButtonRelease) {
-    LOG(INFO) << "MouseButtonRelease";
+    //LOG(INFO) << "MouseButtonRelease";
     emit mouseReleased();
   } else if (e->type() == QEvent::KeyPress && dynamic_cast<QKeyEvent*>(e)->modifiers() == Qt::ControlModifier) {
-    LOG(INFO) << "control pressed";
+    //LOG(INFO) << "control pressed";
     emit controlPressed();
   } else if (e->type() == QEvent::KeyRelease && dynamic_cast<QKeyEvent*>(e)->key() == Qt::Key_Control) {
-    LOG(INFO) << "control released";
+    //LOG(INFO) << "control released";
     emit controlReleased();
   }
   for (size_t j = 0; j < m_eventListeners.size() && !e->isAccepted(); ++j) {

@@ -4,17 +4,21 @@
 #include "zglmutils.h"
 #include "zbbox.h"
 #include <QUndoStack>
+#include <QMenu>
+#include <QAction>
 #include <utility>
 #include <vector>
 #include <set>
 
 namespace nim {
 
+class ZPunctaDoc;
+
 class ZPunctaPack : public QObject
 {
 Q_OBJECT
 public:
-  ZPunctaPack(ZPuncta puncta, const QString& path, QObject* parent = nullptr);
+  ZPunctaPack(ZPuncta puncta, const QString& path, ZPunctaDoc& pd, QObject* parent = nullptr);
 
   ~ZPunctaPack() override;
 
@@ -33,6 +37,8 @@ public:
 
   QUndoStack* undoStack()
   { return &m_undoStack; }
+
+  QMenu& contextMenu();
 
   void save(const QString& fileName, const QString& format = "");
 
@@ -53,9 +59,17 @@ public:
 
   void deleteSelectedPuncta();
 
+  void transferSelectedPuncta();
+
+  void mergeSelectedPuncta();
+
+  void splitSelectedPunctum();
+
 protected:
 
   void updatePtsAndSelectedPuncta();
+
+  void createContextMenu();
 
 signals:
 
@@ -68,7 +82,14 @@ signals:
 protected:
   ZPuncta m_puncta;
   QString m_path;
+  ZPunctaDoc& m_doc;
   QUndoStack m_undoStack;
+
+  QAction* m_deleteSelectedPunctaAction = nullptr;
+  QAction* m_transferSelectedPunctaToAnotherFileAction = nullptr;
+  QAction* m_mergeSelectedPuntaAction = nullptr;
+  QAction* m_splitSelectedPunctumAction = nullptr;
+  QMenu m_contextMenu;
 
   // derived data
 private:
