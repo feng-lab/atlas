@@ -92,7 +92,7 @@ private:
     inline const QString& tooltip() const
     { return m_tooltip; }
 
-    ZRegionAnnotation* regionAnnotation;
+    std::unique_ptr<ZRegionAnnotation> regionAnnotation;
     QString path;
     bool hasUnsavedChange;
 

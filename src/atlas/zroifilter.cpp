@@ -444,6 +444,7 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   , m_outlineColor("Outline Color", glm::vec3(1, 1, 0), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", .5, 0., 1.)
+  , m_highlightRegionOnMouseHover("Highlight Region On Mouse Hover", true)
   , m_regionNode(regionNode)
 {
   m_outlineColor.setStyle("COLOR");
@@ -454,6 +455,7 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::outlineColorChanged);
   connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::regionColorChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZROIFilter::opacityChanged);
+  connect(&m_highlightRegionOnMouseHover, &ZBoolParameter::valueChanged, this, &ZROIFilter::highlightRegionOnMouseHoverChanged);
   addParameter(&m_visible);
   addParameter(&m_showControlPoints);
   addParameter(&m_fixedControlPointsSize);
@@ -906,6 +908,26 @@ void ZROIFilter::transformChanged()
   ZObjFilter::transformChanged();
 }
 
+void ZROIFilter::offsetChanged()
+{
+  if (!m_visible.get()) {
+    return;
+  }
+
+  m_sliceToROIItem.clear();
+  m_sliceToCtrlPtItems.clear();
+  if (m_ROI) {
+    for (const auto& sliceROI : *m_ROI) {
+      int slice = sliceROI.first;
+      for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
+        createShapeItem(slice, shapeID);
+        createCtrlPtItems(slice, shapeID);
+      }
+    }
+  }
+  ZObjFilter::offsetChanged();
+}
+
 void ZROIFilter::createShapeItem(int slice, size_t shapeID)
 {
   if (!((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get())) {
@@ -1086,12 +1108,13 @@ void ZROIFilter::regionColorChanged()
   if (!m_ROI) {
     return;
   }
+  QBrush brush(QColor(m_regionColor.get().x * 255,
+                      m_regionColor.get().y * 255,
+                      m_regionColor.get().z * 255,
+                      m_opacity.get() * 255));
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setBrush(QColor(m_regionColor.get().x * 255,
-                                 m_regionColor.get().y * 255,
-                                 m_regionColor.get().z * 255,
-                                 m_opacity.get() * 255));
+      shapeItem->setBrush(brush);
     }
   }
 }
@@ -1101,12 +1124,25 @@ void ZROIFilter::opacityChanged()
   if (!m_ROI) {
     return;
   }
+  QBrush brush(QColor(m_regionColor.get().x * 255,
+                      m_regionColor.get().y * 255,
+                      m_regionColor.get().z * 255,
+                      m_opacity.get() * 255));
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setBrush(QColor(m_regionColor.get().x * 255,
-                                 m_regionColor.get().y * 255,
-                                 m_regionColor.get().z * 255,
-                                 m_opacity.get() * 255));
+      shapeItem->setBrush(brush);
+    }
+  }
+}
+
+void ZROIFilter::highlightRegionOnMouseHoverChanged()
+{
+  if (!m_ROI) {
+    return;
+  }
+  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
+    for (auto&[id, shapeItem] : sliceItem) {
+      shapeItem->setHighlightOnHover(m_highlightRegionOnMouseHover.get());
     }
   }
 }

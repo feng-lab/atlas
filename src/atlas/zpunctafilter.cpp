@@ -187,10 +187,11 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
 
 void ZPunctaFilter::setData(ZPunctaPack& puncta)
 {
-  m_puncta = &puncta;
+  m_punctaPack = &puncta;
   createPunctumItems();
 
-  connect(m_puncta, &ZPunctaPack::selectionChanged, this, &ZPunctaFilter::updateItemSelectedState);
+  connect(m_punctaPack, &ZPunctaPack::selectionChanged, this, &ZPunctaFilter::updateItemSelectedState);
+  connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &ZPunctaFilter::onPunctaChanged);
   //connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
 }
 
@@ -230,8 +231,8 @@ void ZPunctaFilter::setMaxZProjView(int t)
 
 ZBBox<glm::ivec4> ZPunctaFilter::boundBox() const
 {
-  if (m_puncta) {
-    ZBBox<glm::ivec4> res = m_puncta->boundBox();
+  if (m_punctaPack) {
+    ZBBox<glm::ivec4> res = m_punctaPack->boundBox();
     updateBoundBoxWithOffsetPara(res);
     return res;
   }
@@ -259,6 +260,11 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
+}
+
+void ZPunctaFilter::deleteKeyPressed()
+{
+  m_punctaPack->deleteSelectedPuncta();
 }
 
 void ZPunctaFilter::viewPrecedenceChanged()
@@ -289,7 +295,7 @@ void ZPunctaFilter::createPunctumItems()
   m_puntumItems.clear();
   m_punctumToItem.clear();
   m_itemToPunctum.clear();
-  if (!m_visible.get()) {
+  if (!m_visible.get() || !m_punctaPack) {
     return;
   }
 
@@ -304,11 +310,11 @@ void ZPunctaFilter::createPunctumItems()
                       m_regionColor.get().y * 255,
                       m_regionColor.get().z * 255,
                       m_opacity.get() * 255));
-  for (const auto& p : m_puncta->puncta()) {
+  for (const auto& p : m_punctaPack->puncta()) {
     if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p.z())) > 1.0) {
       continue;
     }
-    auto item = new ZPunctumGraphicsItem(*m_puncta, p, trans, m_view);
+    auto item = new ZPunctumGraphicsItem(*m_punctaPack, p, trans, m_view);
     item->setZValue(m_viewPrecedencePara.get());
     item->setBrush(brush);
     item->setPen(pen);
@@ -331,9 +337,19 @@ void ZPunctaFilter::updateItemSelectedState()
   m_skipSelectionChangedProcessing = true;
   // LOG(INFO) << m_puncta->selectedPuncta().size();
   for (auto&[p, item] : m_punctumToItem) {
-    item->setSelected(m_puncta->selectedPuncta().find(p) != m_puncta->selectedPuncta().end());
+    item->setSelected(m_punctaPack->selectedPuncta().find(p) != m_punctaPack->selectedPuncta().end());
   }
   m_skipSelectionChangedProcessing = false;
+}
+
+void ZPunctaFilter::onPunctaChanged()
+{
+  if (!m_visible.get()) {
+    return;
+  }
+  createPunctumItems();
+
+  emit boundBoxChanged();
 }
 
 void ZPunctaFilter::onSceneItemSelectionChanged()
@@ -341,7 +357,7 @@ void ZPunctaFilter::onSceneItemSelectionChanged()
   if (m_skipSelectionChangedProcessing) {
     return;
   }
-  if (!m_puncta) {
+  if (!m_punctaPack) {
     return;
   }
   std::set<const ZPunctum*> selectedPuncta;
@@ -352,13 +368,13 @@ void ZPunctaFilter::onSceneItemSelectionChanged()
   }
   // LOG(INFO) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
-  m_puncta->setSelectedPuncta(selectedPuncta);
+  m_punctaPack->setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;
 }
 
 void ZPunctaFilter::visibleChanged()
 {
-  if (!m_puncta) {
+  if (!m_punctaPack) {
     return;
   }
   if (m_visible.get()) {
@@ -376,7 +392,7 @@ void ZPunctaFilter::visibleChanged()
 
 void ZPunctaFilter::outlineColorChanged()
 {
-  if (!m_puncta) {
+  if (!m_punctaPack) {
     return;
   }
   QPen pen(QColor(m_outlineColor.get().x * 255,
@@ -391,7 +407,7 @@ void ZPunctaFilter::outlineColorChanged()
 
 void ZPunctaFilter::regionColorChanged()
 {
-  if (!m_puncta) {
+  if (!m_punctaPack) {
     return;
   }
   for (auto& item : m_puntumItems) {
@@ -404,7 +420,7 @@ void ZPunctaFilter::regionColorChanged()
 
 void ZPunctaFilter::opacityChanged()
 {
-  if (!m_puncta) {
+  if (!m_punctaPack) {
     return;
   }
   for (auto& item : m_puntumItems) {

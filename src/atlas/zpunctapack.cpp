@@ -10,19 +10,14 @@ ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, QObject* parent)
   , m_path(QFileInfo(path).canonicalFilePath())
 {
   updateDerivedData();
-  for (const auto& p : m_puncta) {
-    m_punctaPts.push_back(&p);
-    if (p.isSelected()) {
-      m_selectedPuncta.insert(&p);
-    }
-  }
+  updatePtsAndSelectedPuncta();
+  connect(&m_undoStack, &QUndoStack::cleanChanged,
+          this, &ZPunctaPack::undoStackCleanChanged);
 }
 
-void ZPunctaPack::updateDerivedData()
+ZPunctaPack::~ZPunctaPack()
 {
-  m_info.clear();
-  m_name = QFileInfo(m_path).fileName();
-  m_tooltip = m_path;
+  m_undoStack.disconnect(this);
 }
 
 const QString& ZPunctaPack::info() const
@@ -38,7 +33,6 @@ void ZPunctaPack::save(const QString &fileName, const QString &format)
   m_puncta.save(fileName, format);
   m_path = QFileInfo(fileName).canonicalFilePath();
   m_undoStack.setClean();
-  m_hasUnsavedChange = false;
   updateDerivedData();
 }
 
@@ -89,6 +83,33 @@ ZBBox<glm::ivec4> ZPunctaPack::boundBox() const
     res.expand(glm::ivec4(p.x() + p.radius(), p.y() + p.radius(), std::ceil(p.z()), 0));
   }
   return res;
+}
+
+void ZPunctaPack::deleteSelectedPuncta()
+{
+  if (!m_selectedPuncta.empty()) {
+    m_undoStack.push(new ZPunctaEditCommand(QString("Deleted Selected %1 Puncta").arg(m_selectedPuncta.size()),
+                                            *this, m_selectedPuncta));
+  }
+}
+
+void ZPunctaPack::updateDerivedData()
+{
+  m_info.clear();
+  m_name = QFileInfo(m_path).fileName();
+  m_tooltip = m_path;
+}
+
+void ZPunctaPack::updatePtsAndSelectedPuncta()
+{
+  m_punctaPts.clear();
+  m_selectedPuncta.clear();
+  for (const auto& p : m_puncta) {
+    m_punctaPts.push_back(&p);
+    if (p.isSelected()) {
+      m_selectedPuncta.insert(&p);
+    }
+  }
 }
 
 } // namespace nim

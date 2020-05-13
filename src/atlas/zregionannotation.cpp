@@ -99,6 +99,7 @@ ZRegionAnnotation::ZRegionAnnotation(const QString& filename, QObject* parent)
 
 ZRegionAnnotation::~ZRegionAnnotation()
 {
+  m_undoStack.disconnect(this);
   clear();
 }
 

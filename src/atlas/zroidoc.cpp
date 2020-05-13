@@ -282,6 +282,7 @@ void ZROIDoc::setModified()
 
 void ZROIDoc::setModified(bool clean)
 {
+  // todo: this is not correct
   if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
     for (const auto& idPack : m_idToROIPacks) {
       if (idPack.second->roi.get() == roi) {
@@ -417,7 +418,9 @@ ZROIDoc::ROIPack::ROIPack(ZROI* roi_, const QString& path_)
 void ZROIDoc::ROIPack::updateDerivedData()
 {
   m_info.clear();
-  m_name = QFileInfo(path).fileName();
+  if (!m_name.startsWith("Unsaved ROI ")) {
+    m_name = QFileInfo(path).fileName();
+  }
   m_tooltip = path;
 }
 

@@ -69,7 +69,9 @@ protected:
   void generateAnalysisTextFiles();
 
   // append another puncta into this doc
-  size_t addPuncta(ZPuncta& puncta, const QString& path);
+  size_t addPuncta(ZPuncta puncta, const QString& path);
+
+  void setModified(bool clean);
 
 private:
   void createActions();

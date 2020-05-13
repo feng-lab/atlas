@@ -58,6 +58,9 @@ public:
   ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, const RegionNode* regionNode = nullptr,
                   QGraphicsItem* parent = nullptr);
 
+  void setHighlightOnHover(bool v)
+  { setAcceptHoverEvents(v); }
+
   void updateValue();
 
   QPainterPath shape() const override;
@@ -223,6 +226,8 @@ protected:
 
   void transformChanged() override;
 
+  void offsetChanged() override;
+
   void createShapeItem(int slice, size_t shapeID);
 
   void createCtrlPtItems(int slice, size_t shapeID);
@@ -243,6 +248,8 @@ private:
   void regionColorChanged();
 
   void opacityChanged();
+
+  void highlightRegionOnMouseHoverChanged();
 
   void onRoiChanged(int slice, const std::vector<size_t>& newShapes,
                     const std::vector<size_t>& deletedShapes,
@@ -265,6 +272,7 @@ private:
   ZVec3Parameter m_outlineColor;
   ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;
+  ZBoolParameter m_highlightRegionOnMouseHover;
   bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;

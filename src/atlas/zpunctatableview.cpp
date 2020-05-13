@@ -7,6 +7,7 @@
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>
+#include <QKeySequence>
 #include <set>
 
 namespace nim {
@@ -57,17 +58,19 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
     m_punctumToRow[m_puncta.punctaPts()[i]] = i;
   }
 
-  bool first = true;
-  for (auto p : m_puncta.selectedPuncta()) {
-    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
-    selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
-    if (first) {
-      scrollTo(index);
-      first = false;
-    }
-  }
+//  bool first = true;
+//  for (auto p : m_puncta.selectedPuncta()) {
+//    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
+//    selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+//    if (first) {
+//      scrollTo(index);
+//      first = false;
+//    }
+//  }
+  onPunctaSelectionChanged();
 
   connect(&m_puncta, &ZPunctaPack::selectionChanged, this, &ZPunctaTableView::onPunctaSelectionChanged);
+  connect(&m_puncta, &ZPunctaPack::punctaChanged, this, &ZPunctaTableView::onPunctaChanged);
 }
 
 void ZPunctaTableView::contextMenu(const QPoint& /*pos*/)
@@ -106,8 +109,18 @@ void ZPunctaTableView::adaptColumns()
   resizeColumnToContents(ZPunctaTableModel::VolSizeColumn);
 }
 
-void ZPunctaTableView::keyPressEvent(QKeyEvent* /*e*/)
+void ZPunctaTableView::keyPressEvent(QKeyEvent* e)
 {
+  // LOG(INFO) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
+  switch (e->key()) {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace:
+      m_puncta.deleteSelectedPuncta();
+      break;
+    default:
+      QTableView::keyPressEvent(e);
+      break;
+  }
 }
 
 void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
@@ -142,7 +155,7 @@ void ZPunctaTableView::onPunctaSelectionChanged()
     return;
   }
 
-  blockSignals(true);
+  // blockSignals(true);
   m_skipSelectionChangedProcessing = true;
 
   if (m_puncta.selectedPuncta().empty()) {
@@ -162,7 +175,19 @@ void ZPunctaTableView::onPunctaSelectionChanged()
   }
 
   m_skipSelectionChangedProcessing = false;
-  blockSignals(false);
+  // blockSignals(false);
+}
+
+void ZPunctaTableView::onPunctaChanged()
+{
+  m_ratModel.updateModel();
+
+  m_punctumToRow.clear();
+  for (size_t i = 0; i < m_puncta.punctaPts().size(); ++i) {
+    m_punctumToRow[m_puncta.punctaPts()[i]] = i;
+  }
+
+  onPunctaSelectionChanged();
 }
 
 } // namespace nim

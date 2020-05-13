@@ -37,6 +37,8 @@ public:
 
   void activated(const QModelIndex& idxIn);
 
+  void updateModel();
+
 protected:
   ZPunctaPack& m_puncta;
 };

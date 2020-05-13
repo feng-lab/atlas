@@ -36,6 +36,8 @@ protected:
 
   void onPunctaSelectionChanged();
 
+  void onPunctaChanged();
+
 private:
   ZPunctaTableModel& m_ratModel;
   ZPunctaPack& m_puncta;

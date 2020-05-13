@@ -74,8 +74,7 @@ size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
       return idPack.first;
   }
   try {
-    ZPuncta puncta(fileName);
-    size_t id = addPuncta(puncta, fileName);
+    size_t id = addPuncta(ZPuncta(fileName), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -98,8 +97,7 @@ size_t ZPunctaDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
   QString fileName = jValue.toString();
   try {
-    ZPuncta puncta(fileName);
-    size_t id = addPuncta(puncta, fileName);
+    size_t id = addPuncta(ZPuncta(fileName), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -242,14 +240,29 @@ void ZPunctaDoc::generateAnalysisTextFiles()
   dia.exec();
 }
 
-size_t ZPunctaDoc::addPuncta(ZPuncta& puncta, const QString& path)
+size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
+  connect(m_idToPunctaPacks[id].get(), &ZPunctaPack::undoStackCleanChanged,
+          this, &ZPunctaDoc::setModified);
   return id;
+}
+
+void ZPunctaDoc::setModified(bool clean)
+{
+  if (auto ra = qobject_cast<ZPunctaPack*>(sender())) {
+    for (const auto& idPack : m_idToPunctaPacks) {
+      if (idPack.second.get() == ra) {
+        idPack.second->updateDerivedData();
+        m_doc.updateObjInfo(idPack.first);
+        return;
+      }
+    }
+  }
 }
 
 void ZPunctaDoc::createActions()

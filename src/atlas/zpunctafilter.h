@@ -140,6 +140,8 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
+  void deleteKeyPressed() override;
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -150,6 +152,8 @@ protected:
   void createPunctumItems();
 
   void updateItemSelectedState();
+
+  void onPunctaChanged();
 
   void onSceneItemSelectionChanged();
 
@@ -163,7 +167,7 @@ private:
   void opacityChanged();
 
 private:
-  ZPunctaPack* m_puncta = nullptr;
+  ZPunctaPack* m_punctaPack = nullptr;
   // std::unique_ptr<ZPunctaGraphicsItem> m_item;
   std::vector<std::unique_ptr<ZPunctumGraphicsItem>> m_puntumItems;
   std::map<const ZPunctum*, ZPunctumGraphicsItem*> m_punctumToItem;
@@ -173,7 +177,6 @@ private:
   ZVec3Parameter m_outlineColor;
   ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;
-  bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 

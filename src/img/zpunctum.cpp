@@ -107,9 +107,9 @@ void ZPunctum::merge(const ZPunctum& other, double conf)
   }
 }
 
-QList<ZPunctum> ZPunctum::split(int num, double conf) const
+std::list<ZPunctum> ZPunctum::split(int num, double conf) const
 {
-  QList<ZPunctum> res;
+  std::list<ZPunctum> res;
   if (containsSignal()) {
     Eigen::MatrixXd locs = m_voxelLocations.cast<double>();
     ZGMM<double, double> gmm(locs, m_voxelIntensities, num, true, ZGMM<double, double>::CovarianceType::Full,

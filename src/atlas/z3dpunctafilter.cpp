@@ -30,6 +30,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   //  , m_glowPercentage("Glow Percentage", 0.2f, 0.f, 1.f)
   //  , m_textureCopyRenderer(m_rendererBase)
   , m_selectPunctumEvent("Select Puncta", false)
+  , m_deleteSelectedPunctaEvent("Delete Selected Puncta", true)
 {
   addPrivateRenderPort(m_monoEyeOutport);
   addPrivateRenderPort(m_leftEyeOutport);
@@ -84,8 +85,17 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier,
                                 QEvent::MouseButtonRelease);
-  connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DPunctaFilter::selectPuncta);
+  connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered,
+          this, &Z3DPunctaFilter::selectPuncta);
   addEventListener(m_selectPunctumEvent);
+
+  m_deleteSelectedPunctaEvent.listenTo("delete", Qt::Key_Delete, Qt::NoModifier,
+                                       QEvent::KeyPress);
+  m_deleteSelectedPunctaEvent.listenTo("backspace", Qt::Key_Backspace, Qt::NoModifier,
+                                       QEvent::KeyPress);
+  connect(&m_deleteSelectedPunctaEvent, &ZEventListenerParameter::keyEventTriggered,
+          this, &Z3DPunctaFilter::deleteSelectedPuncta);
+  addEventListener(m_deleteSelectedPunctaEvent);
 
   adjustWidgets();
 }
@@ -157,6 +167,7 @@ void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
   connect(m_origPuncta, &ZPunctaPack::selectionChanged, this, &Z3DPunctaFilter::invalidateResult);
   connect(this, &Z3DPunctaFilter::punctumSelected, m_origPuncta, &ZPunctaPack::onPunctumSelected);
   updateData();
+  connect(m_origPuncta, &ZPunctaPack::punctaChanged, this, &Z3DPunctaFilter::updateData);
 }
 
 bool Z3DPunctaFilter::isReady(Z3DEye eye) const
@@ -193,16 +204,17 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (auto para : paras) {
-      if (para->name() == "Coord Transform")
+      if (para->name() == "Coord Transform") {
         m_widgetsGroup->addChild(*para, 2);
-      else if (para->name() == "Size Scale")
+      } else if (para->name() == "Size Scale") {
         m_widgetsGroup->addChild(*para, 3);
-      else if (para->name() == "Rendering Method")
+      } else if (para->name() == "Rendering Method") {
         m_widgetsGroup->addChild(*para, 4);
-      else if (para->name() == "Opacity")
+      } else if (para->name() == "Opacity") {
         m_widgetsGroup->addChild(*para, 5);
-      else
+      } else {
         m_widgetsGroup->addChild(*para, 7);
+      }
     }
 
     //    m_widgetsGroup->addChild(&m_randomGlow, 5);
@@ -260,8 +272,9 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 
 void Z3DPunctaFilter::renderPicking(Z3DEye eye)
 {
-  if (!m_pickingObjectsRegistered)
+  if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
+  }
   m_rendererBase.renderPicking(eye, m_sphereRenderer);
 }
 
@@ -299,8 +312,9 @@ void Z3DPunctaFilter::deregisterPickingObjects()
 
 void Z3DPunctaFilter::prepareData()
 {
-  if (!m_dataIsInvalid)
+  if (!m_dataIsInvalid) {
     return;
+  }
 
   deregisterPickingObjects();
 
@@ -308,11 +322,12 @@ void Z3DPunctaFilter::prepareData()
   m_specularAndShininess.clear();
   m_pointAndRadius.clear();
   for (auto punctum : m_punctaList) {
-    if (m_useSameSizeForAllPuncta.get())
+    if (m_useSameSizeForAllPuncta.get()) {
       m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), 2.f);
-    else
+    } else {
       m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(),
                                     punctum->radius());
+    }
     m_specularAndShininess.emplace_back(punctum->maxIntensity() / 255.f,
                                         punctum->maxIntensity() / 255.f,
                                         punctum->maxIntensity() / 255.f,
@@ -331,8 +346,9 @@ void Z3DPunctaFilter::prepareData()
 void Z3DPunctaFilter::punctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
-  if (m_useSameSizeForAllPuncta.get())
+  if (m_useSameSizeForAllPuncta.get()) {
     radius = 2.0 * m_rendererBase.sizeScale();
+  }
   glm::dvec3 cent = glm::dvec3(glm::applyMatrix(coordTransform(), glm::vec3(p.x(), p.y(), p.z())));
   result.setMinCorner(cent - radius);
   result.setMaxCorner(cent + radius);
@@ -362,8 +378,9 @@ void Z3DPunctaFilter::updateData()
 void Z3DPunctaFilter::notTransformedPunctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const
 {
   double radius = p.radius() * m_rendererBase.sizeScale();
-  if (m_useSameSizeForAllPuncta.get())
+  if (m_useSameSizeForAllPuncta.get()) {
     radius = 2.0 * m_rendererBase.sizeScale();
+  }
   glm::dvec3 cent(p.x(), p.y(), p.z());
   result.setMinCorner(cent - radius);
   result.setMaxCorner(cent + radius);
@@ -452,8 +469,9 @@ void Z3DPunctaFilter::adjustWidgets()
 
 void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (m_punctaList.empty())
+  if (m_punctaList.empty()) {
     return;
+  }
 
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
@@ -497,11 +515,12 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
       if (e->modifiers() == Qt::ControlModifier)
-        emit punctumSelected(m_pressedPunctum, true);
+        emit { punctumSelected(m_pressedPunctum, true); }
       else
-        emit punctumSelected(m_pressedPunctum, false);
-      if (m_pressedPunctum)
+        emit { punctumSelected(m_pressedPunctum, false); }
+      if (m_pressedPunctum) {
         e->accept();
+      }
     }
     m_pressedPunctum = nullptr;
   }
@@ -522,13 +541,19 @@ void Z3DPunctaFilter::updatePunctumVisibleState()
 void Z3DPunctaFilter::changePunctaSize()
 {
   for (size_t i = 0; i < m_pointAndRadius.size(); ++i) {
-    if (m_useSameSizeForAllPuncta.get())
+    if (m_useSameSizeForAllPuncta.get()) {
       m_pointAndRadius[i].w = 2.f;
-    else
+    } else {
       m_pointAndRadius[i].w = m_punctaList[i]->radius();
+    }
   }
   m_sphereRenderer.setData(&m_pointAndRadius, &m_specularAndShininess);
   updateBoundBox();
+}
+
+void Z3DPunctaFilter::deleteSelectedPuncta()
+{
+  m_origPuncta->deleteSelectedPuncta();
 }
 
 } // namespace nim

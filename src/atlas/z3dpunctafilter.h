@@ -85,6 +85,8 @@ private:
 
   void updatePunctumVisibleState();
 
+  void deleteSelectedPuncta();
+
 private:
   Z3DRenderOutputPort m_monoEyeOutport;
   Z3DRenderOutputPort m_leftEyeOutport;
@@ -116,6 +118,7 @@ private:
   std::vector<const ZPunctum*> m_registeredPunctaList;    // used for picking
 
   ZEventListenerParameter m_selectPunctumEvent;
+  ZEventListenerParameter m_deleteSelectedPunctaEvent;
   glm::ivec2 m_startCoord;
   const ZPunctum* m_pressedPunctum = nullptr;
 

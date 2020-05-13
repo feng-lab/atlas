@@ -4,6 +4,7 @@
 #include "zimginterface.h"
 #include <QString>
 #include <cmath>
+#include <list>
 
 namespace nim {
 
@@ -94,7 +95,7 @@ public:
 
   // use gmm to split this punctum into num puncta, image signal (voxelLocations and voxelIntensities) must exist, otherwise
   // return empty list. depends on image signal, returned list size might be less than num
-  QList<ZPunctum> split(int num, double conf = 0.95) const;
+  std::list<ZPunctum> split(int num, double conf = 0.95) const;
 
   inline double x() const
   { return m_x; }

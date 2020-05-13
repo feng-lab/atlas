@@ -137,6 +137,9 @@ public:
   inline const std::list<ZPunctum>& data() const
   { return m_d; }
 
+  inline std::list<ZPunctum>& data()
+  { return m_d; }
+
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename);
 

@@ -354,14 +354,9 @@ void ZRegionAnnotationDoc::setModified(bool clean)
 {
   if (auto ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (const auto& idPack : m_idToRegionAnnotationPacks) {
-      if (idPack.second->regionAnnotation == ra) {
-        if (clean && idPack.second->path.endsWith(ZRegionAnnotation::fileExtension(), Qt::CaseInsensitive)) {
-          idPack.second->updateDerivedData();
-          m_doc.updateObjInfo(idPack.first);
-        } else if (!objHasUnsavedChange(idPack.first)) {
-          idPack.second->updateDerivedData();
-          m_doc.updateObjInfo(idPack.first);
-        }
+      if (idPack.second->regionAnnotation.get() == ra) {
+        idPack.second->updateDerivedData();
+        m_doc.updateObjInfo(idPack.first);
         return;
       }
     }
@@ -397,7 +392,9 @@ ZRegionAnnotationDoc::RegionAnnotationPack::RegionAnnotationPack(ZRegionAnnotati
 void ZRegionAnnotationDoc::RegionAnnotationPack::updateDerivedData()
 {
   m_info.clear();
-  m_name = QFileInfo(path).fileName();
+  if (!m_name.startsWith("Unsaved RegionAnnotation ")) {
+    m_name = QFileInfo(path).fileName();
+  }
   m_tooltip = path;
 }
 

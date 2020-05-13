@@ -152,5 +152,11 @@ void ZPunctaTableModel::activated(const QModelIndex& /*idxIn*/)
   //  }
 }
 
+void ZPunctaTableModel::updateModel()
+{
+  beginResetModel();
+  endResetModel();
+}
+
 } // namespace nim
 
