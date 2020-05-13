@@ -18,14 +18,14 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_colorMode("Color Mode")
   , m_swcTreeColor("Color", glm::vec4(1, 0, 0, 1))
   , m_colorMapBranchType("Branch Type Color Map")
-  , m_selectSwcEvent("Select Puncta", false)
+  , m_selectSwcEvent("Select Swc", false)
   , m_pressedSwc(nullptr)
   , m_selectedSwcs(nullptr)
   , m_pressedSwcTreeNode(nullptr)
   , m_selectedSwcTreeNodes(nullptr)
   , m_dataIsInvalid(false)
-  , m_swcTree(nullptr)
-  , m_registeredSwcTree(nullptr)
+  , m_swcPack(nullptr)
+  , m_registeredSwcPack(nullptr)
   , m_interactionMode(InteractionMode::Select)
 {
   initTopologyColor();
@@ -56,15 +56,15 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_swcTreeColor);
 
   for (const auto& color : m_colorsForDifferentType) {
-    addParameter(*color.get());
+    addParameter(*color);
   }
 
   for (const auto& color : m_colorsForDifferentTopology) {
-    addParameter(*color.get());
+    addParameter(*color);
   }
 
   for (const auto& color : m_colorsForSubclassType) {
-    addParameter(*color.get());
+    addParameter(*color);
   }
 
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
@@ -264,16 +264,16 @@ void Z3DSwcFilter::initSubclassTypeColor()
 void Z3DSwcFilter::registerPickingObjects()
 {
   if (!m_pickingObjectsRegistered) {
-    pickingManager().registerObject(m_swcTree);
-    for (size_t j = 0; j < m_decomposedNodes.size(); ++j) {
-      pickingManager().registerObject(&m_decomposedNodes[j]);
-      m_registeredSwcTreeNodeList.push_back(&m_decomposedNodes[j]);
+    pickingManager().registerObject(m_swcPack);
+    for (auto& m_decomposedNode : m_decomposedNodes) {
+      pickingManager().registerObject(&m_decomposedNode);
+      m_registeredSwcTreeNodeList.push_back(&m_decomposedNode);
     }
-    m_registeredSwcTree = m_swcTree;
+    m_registeredSwcPack = m_swcPack;
     m_swcPickingColors.clear();
     m_linePickingColors.clear();
     m_pointPickingColors.clear();
-    glm::col4 pickingColor = pickingManager().colorOfObject(m_swcTree);
+    glm::col4 pickingColor = pickingManager().colorOfObject(m_swcPack);
     glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
                             pickingColor[3] / 255.f);
     for (size_t j = 0; j < m_decompsedNodePairs.size(); ++j) {
@@ -302,21 +302,22 @@ void Z3DSwcFilter::registerPickingObjects()
 void Z3DSwcFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    if (m_registeredSwcTree)
-      pickingManager().deregisterObject(m_registeredSwcTree);
+    if (m_registeredSwcPack) {
+      pickingManager().deregisterObject(m_registeredSwcPack);
+    }
     for (const auto& node : m_registeredSwcTreeNodeList) {
       pickingManager().deregisterObject(node);
     }
-    m_registeredSwcTree = nullptr;
+    m_registeredSwcPack = nullptr;
     m_registeredSwcTreeNodeList.clear();
   }
 
   m_pickingObjectsRegistered = false;
 }
 
-void Z3DSwcFilter::setData(ZSwc& tree)
+void Z3DSwcFilter::setData(ZSwcPack& swcPack)
 {
-  m_swcTree = &tree;
+  m_swcPack = &swcPack;
   m_dataIsInvalid = true;
   invalidateResult();
 
@@ -325,7 +326,7 @@ void Z3DSwcFilter::setData(ZSwc& tree)
 
 bool Z3DSwcFilter::isReady(Z3DEye eye) const
 {
-  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_swcTree;
+  return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_swcPack;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
@@ -351,16 +352,17 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (auto para : paras) {
-      if (para->name() == "Coord Transform")
+      if (para->name() == "Coord Transform") {
         m_widgetsGroup->addChild(*para, 2);
-      else if (para->name() == "Size Scale")
+      } else if (para->name() == "Size Scale") {
         m_widgetsGroup->addChild(*para, 3);
-      else if (para->name() == "Rendering Method")
+      } else if (para->name() == "Rendering Method") {
         m_widgetsGroup->addChild(*para, 4);
-      else if (para->name() == "Opacity")
+      } else if (para->name() == "Opacity") {
         m_widgetsGroup->addChild(*para, 5);
-      else
+      } else {
         m_widgetsGroup->addChild(*para, 7);
+      }
     }
     m_widgetsGroup->addChild(m_xCut, 5);
     m_widgetsGroup->addChild(m_yCut, 5);
@@ -406,8 +408,9 @@ void Z3DSwcFilter::renderTransparent(Z3DEye eye)
 
 void Z3DSwcFilter::renderPicking(Z3DEye eye)
 {
-  if (!m_pickingObjectsRegistered)
+  if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
+  }
 
   if (m_renderingPrimitive.isSelected("Normal")) {
     m_rendererBase.renderPicking(eye, m_coneRenderer, m_sphereRendererForCone);
@@ -526,18 +529,20 @@ void Z3DSwcFilter::addSelectionBox(
 
 void Z3DSwcFilter::prepareData()
 {
-  if (!m_dataIsInvalid)
+  if (!m_dataIsInvalid) {
     return;
+  }
 
   decompseSwcTree();
 
   // get min max of type for colormap
   m_colorMapBranchType.blockSignals(true);
-  if (m_allNodeType.empty())
+  if (m_allNodeType.empty()) {
     m_colorMapBranchType.get().reset();
-  else
+  } else {
     m_colorMapBranchType.get().reset(m_allNodeType.begin(), m_allNodeType.end(),
                                      glm::col4(0, 0, 255, 255), glm::col4(255, 0, 0, 255));
+  }
   m_colorMapBranchType.blockSignals(false);
 
   deregisterPickingObjects();
@@ -549,9 +554,9 @@ void Z3DSwcFilter::prepareData()
   m_lines.clear();
 
   bool checkRadius = false; //m_renderingPrimitive.isSelected("Normal") || m_renderingPrimitive.isSelected("Cylinder");
-  for (size_t j = 0; j < m_decompsedNodePairs.size(); ++j) {
-    const SwcTreeNode& n1 = m_decompsedNodePairs[j].first;
-    const SwcTreeNode& n2 = m_decompsedNodePairs[j].second;
+  for (auto& m_decompsedNodePair : m_decompsedNodePairs) {
+    const SwcTreeNode& n1 = m_decompsedNodePair.first;
+    const SwcTreeNode& n2 = m_decompsedNodePair.second;
 
     if (checkRadius && n1->radius < std::numeric_limits<double>::epsilon() &&
         n2->radius < std::numeric_limits<double>::epsilon()) {
@@ -560,9 +565,9 @@ void Z3DSwcFilter::prepareData()
                                qApp->applicationName(),
                                "Reset SWC Rendering Mode.\n"
                                "SWC contains segments with zero radius. "
-                                 "The geometrical primitive of SWC rendering "
-                                 "will be set to 'Line' to "
-                                 "make those segments visible.");
+                               "The geometrical primitive of SWC rendering "
+                               "will be set to 'Line' to "
+                               "make those segments visible.");
       m_renderingPrimitive.select("Line");
     }
 
@@ -584,8 +589,7 @@ void Z3DSwcFilter::prepareData()
     m_lines.push_back(baseAndbRadius.xyz());
     m_lines.push_back(glm::vec3(baseAndbRadius.xyz()) + glm::vec3(axisAndtRadius.xyz()));
   }
-  for (size_t j = 0; j < m_decomposedNodes.size(); ++j) {
-    const SwcTreeNode& tn = m_decomposedNodes[j];
+  for (auto& tn : m_decomposedNodes) {
     m_pointAndRadius.emplace_back(tn->x, tn->y, tn->z, std::max(.5, tn->radius));
   }
 
@@ -601,11 +605,11 @@ void Z3DSwcFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DSwcFilter::treeBound(ZSwc* tree, ZBBox<glm::dvec3>& res) const
+void Z3DSwcFilter::treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& res) const
 {
   res.reset();
   ZBBox<glm::dvec3> nodeBound;
-  for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
+  for (auto tn = swcPack->swc().begin(); tn != swcPack->swc().end(); ++tn) {
     treeNodeBound(tn, nodeBound);
     res.expand(nodeBound);
   }
@@ -620,11 +624,11 @@ void Z3DSwcFilter::treeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& resul
                       + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
-void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& res) const
+void Z3DSwcFilter::notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& res) const
 {
   res.reset();
   ZBBox<glm::dvec3> nodeBound;
-  for (ZSwc::Iterator tn = tree->begin(); tn != tree->end(); ++tn) {
+  for (auto tn = swcPack->swc().begin(); tn != swcPack->swc().end(); ++tn) {
     notTransformedTreeNodeBound(tn, nodeBound);
     res.expand(nodeBound);
   }
@@ -637,18 +641,17 @@ void Z3DSwcFilter::notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& res) c
 
 void Z3DSwcFilter::updateNotTransformedBoundBoxImpl()
 {
-  notTransformedTreeBound(m_swcTree, m_notTransformedBoundBox);
+  notTransformedTreeBound(m_swcPack, m_notTransformedBoundBox);
 }
 
 void Z3DSwcFilter::addSelectionLines()
 {
-  for (size_t j = 0; j < m_decompsedNodePairs.size(); ++j) {
-    addSelectionBox(m_decompsedNodePairs[j], m_selectionLines);
+  for (auto& m_decompsedNodePair : m_decompsedNodePairs) {
+    addSelectionBox(m_decompsedNodePair, m_selectionLines);
   }
-  for (size_t j = 0; j < m_decomposedNodes.size(); ++j) {
-    const SwcTreeNode& tn = m_decomposedNodes[j];
+  for (auto& tn : m_decomposedNodes) {
     if (ZSwc::isRoot(tn) && ZSwc::isLeaf(tn)) {
-      addSelectionBox(m_decomposedNodes[j], m_selectionLines);
+      addSelectionBox(tn, m_selectionLines);
     }
   }
 }
@@ -677,10 +680,10 @@ void Z3DSwcFilter::prepareColor()
   if (m_colorMode.isSelected("Branch Type") ||
       m_colorMode.isSelected("Colormap Branch Type") ||
       m_colorMode.isSelected("Subclass")) {
-    for (size_t j = 0; j < m_decompsedNodePairs.size(); ++j) {
-      glm::vec4 color1 = colorByType(m_decompsedNodePairs[j].first);
-      glm::vec4 color2 = colorByType(m_decompsedNodePairs[j].second);
-      if (m_decompsedNodePairs[j].first->radius > m_decompsedNodePairs[j].second->radius) {
+    for (auto& m_decompsedNodePair : m_decompsedNodePairs) {
+      glm::vec4 color1 = colorByType(m_decompsedNodePair.first);
+      glm::vec4 color2 = colorByType(m_decompsedNodePair.second);
+      if (m_decompsedNodePair.first->radius > m_decompsedNodePair.second->radius) {
         std::swap(color1, color2);
       }
 
@@ -689,8 +692,8 @@ void Z3DSwcFilter::prepareColor()
       m_lineColors.push_back(color1);
       m_lineColors.push_back(color2);
     }
-    for (size_t j = 0; j < m_decomposedNodes.size(); ++j) {
-      m_pointColors.push_back(colorByType(m_decomposedNodes[j]));
+    for (auto& m_decomposedNode : m_decomposedNodes) {
+      m_pointColors.push_back(colorByType(m_decomposedNode));
     }
 
   } else if (m_colorMode.isSelected("Single Color")) {
@@ -705,26 +708,28 @@ void Z3DSwcFilter::prepareColor()
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Topology")) {
-    for (size_t j = 0; j < m_decompsedNodePairs.size(); ++j) {
-      const SwcTreeNode& n1 = m_decompsedNodePairs[j].first;
-      const SwcTreeNode& n2 = m_decompsedNodePairs[j].second;
+    for (auto& m_decompsedNodePair : m_decompsedNodePairs) {
+      const SwcTreeNode& n1 = m_decompsedNodePair.first;
+      const SwcTreeNode& n2 = m_decompsedNodePair.second;
       glm::vec4 color1, color2;
-      if (ZSwc::isRoot(n1))
+      if (ZSwc::isRoot(n1)) {
         color1 = m_colorsForDifferentTopology[0]->get();
-      else if (ZSwc::isBranchNode(n1))
+      } else if (ZSwc::isBranchNode(n1)) {
         color1 = m_colorsForDifferentTopology[1]->get();
-      else if (ZSwc::isLeaf(n1))
+      } else if (ZSwc::isLeaf(n1)) {
         color1 = m_colorsForDifferentTopology[2]->get();
-      else
+      } else {
         color1 = m_colorsForDifferentTopology[3]->get();
-      if (ZSwc::isRoot(n2))
+      }
+      if (ZSwc::isRoot(n2)) {
         color2 = m_colorsForDifferentTopology[0]->get();
-      else if (ZSwc::isBranchNode(n2))
+      } else if (ZSwc::isBranchNode(n2)) {
         color2 = m_colorsForDifferentTopology[1]->get();
-      else if (ZSwc::isLeaf(n2))
+      } else if (ZSwc::isLeaf(n2)) {
         color2 = m_colorsForDifferentTopology[2]->get();
-      else
+      } else {
         color2 = m_colorsForDifferentTopology[3]->get();
+      }
       if (n1->radius > n2->radius) {
         std::swap(color1, color2);
       }
@@ -734,17 +739,17 @@ void Z3DSwcFilter::prepareColor()
       m_lineColors.push_back(color1);
       m_lineColors.push_back(color2);
     }
-    for (size_t j = 0; j < m_decomposedNodes.size(); ++j) {
-      const SwcTreeNode& n1 = m_decomposedNodes[j];
+    for (auto& n1 : m_decomposedNodes) {
       glm::vec4 color1;
-      if (ZSwc::isRoot(n1))
+      if (ZSwc::isRoot(n1)) {
         color1 = m_colorsForDifferentTopology[0]->get();
-      else if (ZSwc::isBranchNode(n1))
+      } else if (ZSwc::isBranchNode(n1)) {
         color1 = m_colorsForDifferentTopology[1]->get();
-      else if (ZSwc::isLeaf(n1))
+      } else if (ZSwc::isLeaf(n1)) {
         color1 = m_colorsForDifferentTopology[2]->get();
-      else
+      } else {
         color1 = m_colorsForDifferentTopology[3]->get();
+      }
       m_pointColors.push_back(color1);
     }
   }
@@ -761,7 +766,7 @@ void Z3DSwcFilter::adjustWidgets()
 
   for (size_t i = 0; i < m_colorsForDifferentType.size(); ++i) {
     m_colorsForDifferentType[i]->setVisible(m_allNodeType.find(i) != m_allNodeType.end() &&
-                                              m_colorMode.isSelected("Branch Type"));
+                                            m_colorMode.isSelected("Branch Type"));
   }
   for (const auto& color : m_colorsForSubclassType) {
     color->setVisible(m_colorMode.isSelected("Subclass"));
@@ -774,8 +779,9 @@ void Z3DSwcFilter::adjustWidgets()
 
 void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (!m_swcTree)
+  if (!m_swcPack) {
     return;
+  }
 
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
@@ -786,7 +792,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
       emit objDeselected();
       return;
     }
-    bool hit = obj == m_swcTree;
+    bool hit = obj == m_swcPack;
     if (isNodeRendering()) {
       hit = m_allNodesSet.find(const_cast<SwcTreeNode*>(static_cast<const SwcTreeNode*>(obj))) != m_allNodesSet.end();
     }
@@ -805,14 +811,15 @@ void Z3DSwcFilter::decompseSwcTree()
   m_decomposedNodes.clear();
   m_allNodesSet.clear();
 
-  for (ZSwc::Iterator tn = m_swcTree->begin(); tn != m_swcTree->end(); ++tn) {
+  for (ZSwc::ConstIterator tn = m_swcPack->swc().begin(); tn != m_swcPack->swc().end(); ++tn) {
     m_allNodeType.insert(tn->type);
     m_decomposedNodes.push_back(tn);
-    if (!ZSwc::isRoot(tn))
+    if (!ZSwc::isRoot(tn)) {
       m_decompsedNodePairs.emplace_back(tn, ZSwc::parent(tn));
+    }
   }
-  for (size_t i = 0; i < m_decomposedNodes.size(); ++i) {
-    m_allNodesSet.insert(&m_decomposedNodes[i]);
+  for (auto& m_decomposedNode : m_decomposedNodes) {
+    m_allNodesSet.insert(&m_decomposedNode);
   }
 }
 

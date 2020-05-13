@@ -28,7 +28,7 @@ bool ZSvgDoc::saveAs(size_t /*id*/)
   return false;
 }
 
-bool ZSvgDoc::canReadFile(const QString& fileName)
+bool ZSvgDoc::canReadFile(const QString& fileName) const
 {
   return fileName.endsWith(".svg", Qt::CaseInsensitive);
 }

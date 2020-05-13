@@ -77,7 +77,7 @@ bool Z3DAnimationDoc::saveAs(size_t id)
   return false;
 }
 
-bool Z3DAnimationDoc::canReadFile(const QString& fileName)
+bool Z3DAnimationDoc::canReadFile(const QString& fileName) const
 {
   return fileName.endsWith(".animation3d", Qt::CaseInsensitive);
 }

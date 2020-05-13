@@ -156,7 +156,7 @@ ZMeshIO::ZMeshIO()
   m_writeFilters.push_back(filter);
 }
 
-bool ZMeshIO::canReadFile(const QString& filename)
+bool ZMeshIO::canReadFile(const QString& filename) const
 {
   for (int i = 0; i < m_readExts.size(); ++i) {
     if (filename.endsWith(QString(".%1").arg(m_readExts[i]), Qt::CaseInsensitive))
@@ -165,7 +165,7 @@ bool ZMeshIO::canReadFile(const QString& filename)
   return false;
 }
 
-bool ZMeshIO::canWriteFile(const QString& filename)
+bool ZMeshIO::canWriteFile(const QString& filename) const
 {
   for (int i = 0; i < m_writeExts.size(); ++i) {
     if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))

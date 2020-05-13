@@ -3,12 +3,13 @@
 #include "z3dcameraparameter.h"
 #include "zlog.h"
 #include <boost/math/constants/constants.hpp>
+#include <utility>
 
 namespace nim {
 
-Z3DInteractionHandler::Z3DInteractionHandler(const QString& name, QObject* parent)
+Z3DInteractionHandler::Z3DInteractionHandler(QString  name, QObject* parent)
   : QObject(parent)
-  , m_name(name)
+  , m_name(std::move(name))
   , m_state(State::None)
   , m_mouseWheelMotionFactor(1.f)
 {

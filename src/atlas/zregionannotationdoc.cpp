@@ -66,7 +66,7 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZRegionAnnotationDoc::canReadFile(const QString& fileName)
+bool ZRegionAnnotationDoc::canReadFile(const QString& fileName) const
 {
   return ZRegionAnnotation::canReadFile(fileName);
 }

@@ -98,7 +98,7 @@ bool ZROIDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZROIDoc::canReadFile(const QString& fileName)
+bool ZROIDoc::canReadFile(const QString& fileName) const
 {
   return ZROI::canReadFile(fileName);
 }

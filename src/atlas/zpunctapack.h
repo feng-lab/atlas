@@ -42,15 +42,15 @@ public:
 
   void save(const QString& fileName, const QString& format = "");
 
-  const std::vector<const ZPunctum*>& punctaPts() const
+  inline const std::vector<const ZPunctum*>& punctaPts() const
   { return m_punctaPts; }
 
-  const std::set<const ZPunctum*>& selectedPuncta() const
+  inline const std::set<const ZPunctum*>& selectedPuncta() const
   { return m_selectedPuncta; }
 
   void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  const ZPuncta& puncta() const
+  inline const ZPuncta& puncta() const
   { return m_puncta; }
 
   void onPunctumSelected(const ZPunctum* p, bool append);

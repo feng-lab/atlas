@@ -62,7 +62,7 @@ bool ZPunctaDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZPunctaDoc::canReadFile(const QString& fileName)
+bool ZPunctaDoc::canReadFile(const QString& fileName) const
 {
   return ZPuncta::canReadFile(fileName);
 }
@@ -117,7 +117,7 @@ QList<QAction*> ZPunctaDoc::loadFileActions() const
 
 QMenu* ZPunctaDoc::processObjMenu() const
 {
-  QMenu* res = new QMenu(typeName());
+  auto res = new QMenu(typeName());
   res->addAction(m_detectPunctaAction);
   res->addAction(m_generateAnalysisTextFilesAction);
   return res;
@@ -252,7 +252,7 @@ size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
   return id;
 }
 
-void ZPunctaDoc::setModified(bool clean)
+void ZPunctaDoc::setModified(bool)
 {
   if (auto ra = qobject_cast<ZPunctaPack*>(sender())) {
     for (const auto& idPack : m_idToPunctaPacks) {

@@ -11,11 +11,11 @@
 
 namespace nim {
 
-ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent)
+ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent)
   : QGraphicsItem(parent)
-  , m_swc(swc)
+  , m_swcPack(swcPack)
 {
-  for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
+  for (auto it = m_swcPack.swc().begin(); it != m_swcPack.swc().end(); ++it) {
     int slice = roundTo<int>(it->z);
     m_boundBox.expand(glm::ivec4(roundTo<int>(it->x - std::max(it->radius, .5)),
                                  roundTo<int>(it->y - std::max(it->radius, .5)),
@@ -26,7 +26,7 @@ ZSwcGraphicsItem::ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent)
                                  slice,
                                  0));
     if (!ZSwc::isRoot(it)) {
-      ZSwc::Iterator par = ZSwc::parent(it);
+      auto par = ZSwc::parent(it);
       m_lines.push_back(QLineF(it->x, it->y, par->x, par->y));
     }
   }
@@ -124,7 +124,7 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));
     //painter->drawLines(m_lines);
-    for (const auto& node : m_swc) {
+    for (const auto& node : m_swcPack.swc()) {
       painter->drawEllipse(
         QRectF(node.x - std::max(node.radius, .5), node.y - std::max(node.radius, .5), std::max(node.radius, .5) * 2,
                std::max(node.radius, .5) * 2));
@@ -137,14 +137,14 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
     //}
     m_outlineColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_outlineColor, 1));
-    for (ZSwc::Iterator it = m_swc.begin(); it != m_swc.end(); ++it) {
+    for (auto it = m_swcPack.swc().begin(); it != m_swcPack.swc().end(); ++it) {
       int slice = roundTo<int>(it->z);
       if (slice == m_z) {
         painter->drawEllipse(
           QRectF(it->x - std::max(it->radius, .5), it->y - std::max(it->radius, .5), std::max(it->radius, .5) * 2,
                  std::max(it->radius, .5) * 2));
         if (!ZSwc::isRoot(it)) {
-          ZSwc::Iterator par = ZSwc::parent(it);
+          auto par = ZSwc::parent(it);
           painter->drawLine(QLineF(it->x, it->y, par->x, par->y));
         }
       }
@@ -200,9 +200,9 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   addParameter(&m_opacity);
 }
 
-void ZSwcFilter::setData(ZSwc& swc)
+void ZSwcFilter::setData(ZSwcPack& swcPack)
 {
-  m_item.reset(new ZSwcGraphicsItem(swc));
+  m_item.reset(new ZSwcGraphicsItem(swcPack));
   m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setShowSkeleton(m_showSkeleton.get());
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,

@@ -29,7 +29,7 @@ public:
   [[nodiscard]] QString typePluralName() const override
   { return "RegionAnnotations"; }
 
-  bool canReadFile(const QString& fileName) override;
+  bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 

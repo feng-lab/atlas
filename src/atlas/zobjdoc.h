@@ -53,7 +53,7 @@ public:
 
   [[nodiscard]] virtual QString typePluralName() const = 0;
 
-  virtual bool canReadFile(const QString& fileName) = 0;
+  virtual bool canReadFile(const QString& fileName) const = 0;
 
   // return object id, if object already exist, return its old id, if can not load, return 0
   // return last id if more than one object loaded from file

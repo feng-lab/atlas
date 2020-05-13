@@ -73,7 +73,7 @@ bool ZImgDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZImgDoc::canReadFile(const QString& fileName)
+bool ZImgDoc::canReadFile(const QString& fileName) const
 {
   return ZImg::fileExtensionReadSupported(fileName);
 }

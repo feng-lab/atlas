@@ -1472,7 +1472,7 @@ void exportSceneForGlance()
         LOG(INFO) << doc->objName(id);
         LOG(INFO) << filter->coordTransform();
 
-        ZSwc swc = doc->swc(id);
+        ZSwc swc = doc->swcPack(id).swc();
         swc.labelSomaAndOthers();
         ZMesh rootMesh;
         ZMesh somaMesh;

@@ -10,12 +10,12 @@ class Z3DInteractionHandler : public QObject
 {
 Q_OBJECT
 public:
-  explicit Z3DInteractionHandler(const QString& name, QObject* parent = nullptr);
+  explicit Z3DInteractionHandler(QString  name, QObject* parent = nullptr);
 
   void setName(const QString& name)
   { m_name = name; }
 
-  inline QString name() const
+  [[nodiscard]] inline QString name() const
   { return m_name; }
 
   // Default to 1.0. Set it to a different value to emphasize or de-emphasize the action triggered by
@@ -23,7 +23,7 @@ public:
   void setMouseWheelMotionFactor(float f)
   { m_mouseWheelMotionFactor = f; }
 
-  float mouseWheelMotionFactor() const
+  [[nodiscard]] float mouseWheelMotionFactor() const
   { return m_mouseWheelMotionFactor; }
 
   void setEnabled(bool enabled);
@@ -79,7 +79,7 @@ Q_OBJECT
 public:
   Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = nullptr);
 
-  Z3DCameraParameter* camera() const
+  [[nodiscard]] Z3DCameraParameter* camera() const
   { return m_camera; }
 
   void setCamera(Z3DCameraParameter* camera)
@@ -97,27 +97,27 @@ public:
   void setMouseMotionFactor(float f)
   { m_mouseMotionFactor = f; }
 
-  float mouseMotionFactor() const
+  [[nodiscard]] float mouseMotionFactor() const
   { return m_mouseMotionFactor; }
 
   // angle per key press
   void setKeyPressAngle(float angle)
   { m_keyPressAngle = angle; }
 
-  float keyPressAngle() const
+  [[nodiscard]] float keyPressAngle() const
   { return m_keyPressAngle; }
 
   // distance per key press in pixels
   void setKeyPressDistance(int d)
   { m_keyPressDistance = d; }
 
-  int keyPressDistance() const
+  [[nodiscard]] int keyPressDistance() const
   { return m_keyPressDistance; }
 
   void setMoveObjects(bool v)
   { m_moveObjects = v; }
 
-  bool isMovingObjects() const
+  [[nodiscard]] bool isMovingObjects() const
   { return m_moveObjects; }
 
 signals:
@@ -166,7 +166,7 @@ protected:
 protected:
   ZEventListenerParameter* m_rotateEvent;
   ZEventListenerParameter* m_shiftEvent;
-  ZEventListenerParameter* m_mouseDollyEvent;
+  ZEventListenerParameter* m_mouseDollyEvent{};
   ZEventListenerParameter* m_wheelDollyEvent;
   ZEventListenerParameter* m_rollEvent;
   ZEventListenerParameter* m_keyRotateEvent;
@@ -175,8 +175,8 @@ protected:
   ZEventListenerParameter* m_keyRollEvent;
 
   Z3DCameraParameter* m_camera;
-  glm::ivec2 m_lastMousePosition;
-  float m_lastCenterDistance;
+  glm::ivec2 m_lastMousePosition{};
+  float m_lastCenterDistance{};
 
   bool m_mouseWheelUpDollyIn;
   bool m_mouseWheelUpRollLeft;

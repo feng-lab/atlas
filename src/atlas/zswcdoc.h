@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjdoc.h"
-#include "zswc.h"
+#include "zswcpack.h"
 
 namespace nim {
 
@@ -12,8 +12,8 @@ public:
   explicit ZSwcDoc(ZDoc& doc);
 
   // return info of swc with id, assume swc exist, otherwise crash
-  ZSwc& swc(size_t id)
-  { return m_idToSwcPacks.at(id)->swc; }
+  ZSwcPack& swcPack(size_t id)
+  { return *m_idToSwcPacks.at(id); }
 
   // ZObjDoc interface
 public:
@@ -21,39 +21,41 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "Swc"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "Swcs"; }
 
-  bool canReadFile(const QString& fileName) override;
+  bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] QList<QAction*> loadFileActions() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
+
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
 protected:
   void loadSwc();
@@ -61,43 +63,20 @@ protected:
   // append another swc into this doc
   size_t addSwc(ZSwc& tree, const QString& path);
 
+  void setModified(bool clean);
+
 private:
-  struct SwcPack
-  { // swc and its associated data
-    SwcPack(ZSwc& tree, const QString& path_);
-
-    void updateDerivedData();
-
-    const QString& info() const;
-
-    inline const QString& name() const
-    { return m_name; }
-
-    inline const QString& tooltip() const
-    { return m_tooltip; }
-
-    ZSwc swc;
-    QString path;
-    bool hasUnsavedChange = false;
-
-    // derived data
-  private:
-    mutable QString m_info;
-    QString m_name;
-    QString m_tooltip;
-  };
-
   void createActions();
 
-  bool saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg);
+  bool saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg);
 
   // notify obj manager about the update
-  void packInfoUpdated(SwcPack* pack);
+  void packInfoUpdated(ZSwcPack* pack);
 
 private:
-  std::map<size_t, std::shared_ptr<SwcPack>> m_idToSwcPacks;
+  std::map<size_t, std::shared_ptr<ZSwcPack>> m_idToSwcPacks;
 
-  QAction* m_loadSwcAction;
+  QAction* m_loadSwcAction = nullptr;
 };
 
 } // namespace nim

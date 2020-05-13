@@ -21,52 +21,52 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "Puncta"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "Puncta"; }
 
-  bool canReadFile(const QString& fileName) override;
+  bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] QList<QAction*> loadFileActions() const override;
 
-  QMenu* processObjMenu() const override;
+  [[nodiscard]] QMenu* processObjMenu() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  const QUndoStack* objUndoStack(size_t id) const override;
+  [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
   QWidget* createObjEditWidget(size_t id) override;
 
 protected:
   void loadPuncta();
 
-  void detectPuncta();
+  static void detectPuncta();
 
-  void generateAnalysisTextFiles();
+  static void generateAnalysisTextFiles();
 
   // append another puncta into this doc
   size_t addPuncta(ZPuncta puncta, const QString& path);
@@ -84,10 +84,10 @@ private:
 private:
   std::map<size_t, std::shared_ptr<ZPunctaPack>> m_idToPunctaPacks;
 
-  QAction* m_loadPunctaAction;
+  QAction* m_loadPunctaAction = nullptr;
 
-  QAction* m_detectPunctaAction;
-  QAction* m_generateAnalysisTextFilesAction;
+  QAction* m_detectPunctaAction = nullptr;
+  QAction* m_generateAnalysisTextFilesAction = nullptr;
 };
 
 } // namespace nim

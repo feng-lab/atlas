@@ -93,7 +93,7 @@ bool ZMeshDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZMeshDoc::canReadFile(const QString& fileName)
+bool ZMeshDoc::canReadFile(const QString& fileName) const
 {
   return ZMesh::canReadFile(fileName);
 }

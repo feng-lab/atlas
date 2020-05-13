@@ -11,15 +11,15 @@ ZSwcView::ZSwcView(ZSwcDoc& doc, ZView& view)
 
 void ZSwcView::docSwcsAdded(const QList<size_t>& objs)
 {
-  for (int i = 0; i < objs.size(); ++i) {
-    ZSwcFilter* viewControl = new ZSwcFilter(m_view);
-    viewControl->setData(m_doc.swc(objs[i]));
+  for (auto obj : objs) {
+    auto viewControl = new ZSwcFilter(m_view);
+    viewControl->setData(m_doc.swcPack(obj));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]].reset(viewControl);
+    m_idToFilter[obj].reset(viewControl);
     connect(viewControl, &ZSwcFilter::boundBoxChanged, this, &ZSwcView::updateBoundBox);
     connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
     connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
-    emit objViewReady(objs[i]);
+    emit objViewReady(obj);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -28,8 +28,8 @@ void ZSwcView::docSwcsAdded(const QList<size_t>& objs)
 
 void ZSwcView::docSwcAdded(size_t id)
 {
-  ZSwcFilter* viewControl = new ZSwcFilter(m_view);
-  viewControl->setData(m_doc.swc(id));
+  auto viewControl = new ZSwcFilter(m_view);
+  viewControl->setData(m_doc.swcPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();

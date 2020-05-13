@@ -82,11 +82,6 @@ protected:
   void addEditingSelectionLines() override;
 
 private:
-  // get visible data from origPunctaList put into punctaList
-  void getVisibleData();
-
-  void updatePunctumVisibleState();
-
   void deleteSelectedPuncta();
 
 private:
@@ -116,7 +111,6 @@ private:
   // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
   // hidden because they are unchecked from the object model. This allows us to control
   // the visibility of each single punctum.
-  std::vector<const ZPunctum*> m_punctaList;
   std::vector<const ZPunctum*> m_registeredPunctaList;    // used for picking
 
   ZEventListenerParameter m_selectPunctumEvent;
@@ -140,7 +134,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid = false;
 
-  ZPunctaPack* m_origPuncta = nullptr;
+  ZPunctaPack* m_punctaPack = nullptr;
 };
 
 } // namespace nim

@@ -21,10 +21,10 @@ public:
     Type = GraphicsItemType::ZSwcGraphicsItem
   };
 
-  int type() const override
+  [[nodiscard]] int type() const override
   { return Type; }
 
-  explicit ZSwcGraphicsItem(ZSwc& swc, QGraphicsItem* parent = nullptr);
+  explicit ZSwcGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent = nullptr);
 
   void setShowSkeleton(bool v)
   {
@@ -63,17 +63,17 @@ public:
     }
   }
 
-  const ZBBox<glm::ivec4>& boundBox() const
+  [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
   // QGraphicsItem interface
 public:
-  QRectF boundingRect() const override;
+  [[nodiscard]] QRectF boundingRect() const override;
 
   void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
 
 protected:
-  ZSwc& m_swc;
+  ZSwcPack& m_swcPack;
   ZBBox<glm::ivec4> m_boundBox;
   bool m_showSkeleton = true;
   QColor m_outlineColor{255, 0, 0};
@@ -96,7 +96,7 @@ public:
     return vp++;
   }
 
-  void setData(ZSwc& swc);
+  void setData(ZSwcPack& swcPack);
 
   void releaseItemsOwnership();
 

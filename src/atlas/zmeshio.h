@@ -15,9 +15,9 @@ public:
 
   ZMeshIO();
 
-  bool canReadFile(const QString& filename);
+  bool canReadFile(const QString& filename) const;
 
-  bool canWriteFile(const QString& filename);
+  bool canWriteFile(const QString& filename) const;
 
   const QString& getQtReadNameFilter() const
   { return m_readFilter; }

@@ -12,10 +12,9 @@ Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DView& view)
 void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
 {
   try {
-    for (int i = 0; i < objs.size(); ++i) {
-      size_t id = objs[i];
-      Z3DSwcFilter* viewControl = new Z3DSwcFilter(globalParas(), this);
-      viewControl->setData(m_doc.swc(id));
+    for (auto id : objs) {
+      auto viewControl = new Z3DSwcFilter(globalParas(), this);
+      viewControl->setData(m_doc.swcPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
@@ -31,8 +30,8 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (int i = 0; i < objs.size(); ++i) {
-        emit objViewReady(objs[i]);
+      for (auto obj : objs) {
+        emit objViewReady(obj);
       }
     }
   }
@@ -46,8 +45,8 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
 void Z3DSwcView::docSwcAdded(size_t id)
 {
   try {
-    Z3DSwcFilter* viewControl = new Z3DSwcFilter(globalParas(), this);
-    viewControl->setData(m_doc.swc(id));
+    auto viewControl = new Z3DSwcFilter(globalParas(), this);
+    viewControl->setData(m_doc.swcPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);

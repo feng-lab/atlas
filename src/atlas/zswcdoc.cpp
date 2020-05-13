@@ -7,7 +7,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
 
 namespace nim {
@@ -24,14 +23,14 @@ bool ZSwcDoc::save(size_t id)
     return true;
 
   auto& pack = m_idToSwcPacks.at(id);
-  if (ZSwc::canWriteFile(pack->path)) {
+  if (ZSwc::canWriteFile(pack->path())) {
     QString err;
-    if (saveSwc(pack.get(), pack->path, err)) {
+    if (saveSwc(pack.get(), pack->path(), err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
+                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path()).arg(err));
     return false;
   }
   return saveAs(id);
@@ -57,7 +56,7 @@ bool ZSwcDoc::saveAs(size_t id)
   return false;
 }
 
-bool ZSwcDoc::canReadFile(const QString& fileName)
+bool ZSwcDoc::canReadFile(const QString& fileName) const
 {
   return ZSwc::canReadFile(fileName);
 }
@@ -65,7 +64,7 @@ bool ZSwcDoc::canReadFile(const QString& fileName)
 size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToSwcPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path() == fileName)
       return idPack.first;
   }
   try {
@@ -128,12 +127,12 @@ QString ZSwcDoc::objName(size_t id) const
 
 QString ZSwcDoc::objPath(size_t id) const
 {
-  return m_idToSwcPacks.at(id)->path;
+  return m_idToSwcPacks.at(id)->path();
 }
 
 bool ZSwcDoc::objHasUnsavedChange(size_t id) const
 {
-  return m_idToSwcPacks.at(id)->hasUnsavedChange;
+  return !(canReadFile(m_idToSwcPacks.at(id)->path()) && objUndoStack(id)->isClean());
 }
 
 QString ZSwcDoc::objInfo(size_t id) const
@@ -146,9 +145,14 @@ QString ZSwcDoc::objTooltip(size_t id) const
   return m_idToSwcPacks.at(id)->tooltip();
 }
 
+const QUndoStack* ZSwcDoc::objUndoStack(size_t id) const
+{
+  return m_idToSwcPacks.at(id)->undoStack();
+}
+
 QJsonValue ZSwcDoc::jsonValue(size_t id) const
 {
-  return QJsonValue(m_idToSwcPacks.at(id)->path);
+  return QJsonValue(m_idToSwcPacks.at(id)->path());
 }
 
 bool ZSwcDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
@@ -207,33 +211,26 @@ void ZSwcDoc::loadSwc()
 size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToSwcPacks[id] = std::make_shared<SwcPack>(tree, path);
+  m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, *this);
   m_doc.registerNewObj(id, this);
 
   emit objAdded(id, this);
+  connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged,
+          this, &ZSwcDoc::setModified);
   return id;
 }
 
-ZSwcDoc::SwcPack::SwcPack(ZSwc& tree, const QString& path_)
-  : path(QFileInfo(path_).canonicalFilePath())
+void ZSwcDoc::setModified(bool)
 {
-  swc.swap(tree);
-  updateDerivedData();
-}
-
-void ZSwcDoc::SwcPack::updateDerivedData()
-{
-  m_info.clear();
-  m_name = QFileInfo(path).fileName();
-  m_tooltip = path;
-}
-
-const QString& ZSwcDoc::SwcPack::info() const
-{
-  if (m_info.isEmpty()) {
-    m_info = QString("size %1").arg(swc.size());
+  if (auto ra = qobject_cast<ZSwcPack*>(sender())) {
+    for (const auto& idPack : m_idToSwcPacks) {
+      if (idPack.second.get() == ra) {
+        idPack.second->updateDerivedData();
+        m_doc.updateObjInfo(idPack.first);
+        return;
+      }
+    }
   }
-  return m_info;
 }
 
 void ZSwcDoc::createActions()
@@ -243,14 +240,10 @@ void ZSwcDoc::createActions()
   connect(m_loadSwcAction, &QAction::triggered, this, &ZSwcDoc::loadSwc);
 }
 
-bool ZSwcDoc::saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg)
+bool ZSwcDoc::saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
-    pack->swc.resortID();
-    pack->swc.save(fileName);
-    pack->path = QFileInfo(fileName).canonicalFilePath();
-    pack->hasUnsavedChange = false;
-    pack->updateDerivedData();
+    pack->save(fileName);
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -262,7 +255,7 @@ bool ZSwcDoc::saveSwc(SwcPack* pack, const QString& fileName, QString& errorMsg)
   }
 }
 
-void ZSwcDoc::packInfoUpdated(SwcPack* pack)
+void ZSwcDoc::packInfoUpdated(ZSwcPack* pack)
 {
   for (const auto& idPack : m_idToSwcPacks) {
     if (idPack.second.get() == pack)

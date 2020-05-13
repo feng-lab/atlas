@@ -31,7 +31,7 @@ public:
   QString typePluralName() const override
   { return "Animation3Ds"; }
 
-  bool canReadFile(const QString& fileName) override;
+  bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 

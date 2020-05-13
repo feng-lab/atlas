@@ -2,7 +2,7 @@
 
 #include "z3dgeometryfilter.h"
 #include "zoptionparameter.h"
-#include "zswc.h"
+#include "zswcpack.h"
 #include "zcolormap.h"
 #include "zwidgetsgroup.h"
 #include "z3dlinerenderer.h"
@@ -20,7 +20,7 @@ namespace nim {
 class Z3DSwcFilter : public Z3DGeometryFilter
 {
 Q_OBJECT
-  using SwcTreeNode = ZSwc::Iterator;
+  using SwcTreeNode = ZSwc::ConstIterator;
 public:
   enum class InteractionMode
   {
@@ -29,7 +29,7 @@ public:
 
   explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void setData(ZSwc& tree);
+  void setData(ZSwcPack& swcPack);
 
   inline void setSelectedSwcs(std::set<ZSwc*>* list)
   {
@@ -103,12 +103,12 @@ protected:
   void prepareData();
 
   //get bounding box of swc tree in world coordinate
-  void treeBound(ZSwc* tree, ZBBox<glm::dvec3>& result) const;
+  void treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
   //get bounding box of swc tree node in world coordinate
   void treeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
-  void notTransformedTreeBound(ZSwc* tree, ZBBox<glm::dvec3>& result) const;
+  void notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
   //void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
@@ -130,7 +130,7 @@ private:
 
   glm::vec4 colorByDirection(const SwcTreeNode& n);
 
-  glm::dvec3 projectPointOnRay(
+  static glm::dvec3 projectPointOnRay(
     const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
   void addSelectionBox(const std::pair<SwcTreeNode, SwcTreeNode>& nodePair,
@@ -160,7 +160,7 @@ private:
   std::vector<SwcTreeNode*> m_registeredSwcTreeNodeList;    // used for picking
 
   ZEventListenerParameter m_selectSwcEvent;
-  glm::ivec2 m_startCoord;
+  glm::ivec2 m_startCoord{};
   ZSwc* m_pressedSwc;
   std::set<ZSwc*>* m_selectedSwcs;   //point to all selected swcs, managed by other class
   SwcTreeNode* m_pressedSwcTreeNode;
@@ -187,8 +187,8 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
-  ZSwc* m_swcTree;
-  ZSwc* m_registeredSwcTree;
+  ZSwcPack* m_swcPack;
+  ZSwcPack* m_registeredSwcPack;
 
   InteractionMode m_interactionMode;
 };

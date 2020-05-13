@@ -77,7 +77,7 @@ bool Z2DAnimationDoc::saveAs(size_t id)
   return false;
 }
 
-bool Z2DAnimationDoc::canReadFile(const QString& fileName)
+bool Z2DAnimationDoc::canReadFile(const QString& fileName) const
 {
   return fileName.endsWith(".animation2d", Qt::CaseInsensitive);
 }
