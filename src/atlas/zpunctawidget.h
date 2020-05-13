@@ -16,7 +16,7 @@ private:
   void createWidget();
 
 private:
-  ZPunctaPack& m_puncta;
+  ZPunctaPack& m_punctaPack;
   ZDoc& m_doc;
 };
 

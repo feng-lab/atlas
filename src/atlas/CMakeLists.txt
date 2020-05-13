@@ -606,7 +606,13 @@ set(SOURCES
     zpunctapack.cpp
     zpunctapack.h
     zswcpack.cpp
-    zswcpack.h)
+    zswcpack.h
+    zswcwidget.cpp
+    zswcwidget.h
+    zswctreeview.cpp
+    zswctreeview.h
+    zswctreemodel.cpp
+    zswctreemodel.h)
 
 # our target
 set(APP_NAME Atlas)

@@ -57,6 +57,8 @@ public:
 
   [[nodiscard]] bool isAlias(size_t id) const override;
 
+  QWidget* createObjEditWidget(size_t id) override;
+
 protected:
   void loadSwc();
 

@@ -3,6 +3,7 @@
 #include "zexception.h"
 #include "zlog.h"
 #include "ztheme.h"
+#include "zswcwidget.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
@@ -187,6 +188,13 @@ bool ZSwcDoc::isAlias(size_t id) const
       return true;
   }
   return false;
+}
+
+QWidget* ZSwcDoc::createObjEditWidget(size_t id)
+{
+  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+
+  return new ZSwcWidget(swcPack(id), m_doc);
 }
 
 void ZSwcDoc::loadSwc()

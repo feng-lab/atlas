@@ -32,8 +32,6 @@ protected:
 
   void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
 
-  void createContextMenu();
-
   void onPunctaSelectionChanged();
 
   void onPunctaChanged();
@@ -43,7 +41,6 @@ private:
   ZPunctaPack& m_puncta;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel = nullptr;
-  QMenu* m_contextMenu = nullptr;
   std::map<const ZPunctum*, int> m_punctumToRow;
   bool m_ignoreSelectionChangedSignal = false;
   bool m_skipSelectionChangedProcessing = false;

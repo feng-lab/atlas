@@ -40,8 +40,6 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
   //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
   //setPalette(p);
 
-  createContextMenu();
-
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
           this, &ZPunctaTableView::adaptColumns);
   connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
@@ -143,10 +141,6 @@ void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QI
   m_ignoreSelectionChangedSignal = true;
   m_puncta.setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;
-}
-
-void ZPunctaTableView::createContextMenu()
-{
 }
 
 void ZPunctaTableView::onPunctaSelectionChanged()

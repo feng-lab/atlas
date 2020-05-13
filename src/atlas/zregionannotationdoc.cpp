@@ -350,7 +350,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
 //  }
 //}
 
-void ZRegionAnnotationDoc::setModified(bool clean)
+void ZRegionAnnotationDoc::setModified(bool)
 {
   if (auto ra = qobject_cast<ZRegionAnnotation*>(sender())) {
     for (const auto& idPack : m_idToRegionAnnotationPacks) {

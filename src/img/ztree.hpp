@@ -1112,7 +1112,7 @@ public:
 
   // size of subtree
   template<typename Iter>
-  size_t size(const Iter& parent)
+  size_t size(const Iter& parent) const
   { return std::distance(begin(parent), end(parent)); }
 
   size_t numRoots() const
