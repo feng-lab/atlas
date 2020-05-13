@@ -24,7 +24,7 @@ ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
   m_ratProxyModel->setDynamicSortFilter(true);
   setModel(m_ratProxyModel);
   setContextMenuPolicy(Qt::CustomContextMenu);
-  // sortByColumn(ZSwcTreeModel::IDColumn, Qt::AscendingOrder);
+  sortByColumn(ZSwcTreeModel::IDColumn, Qt::AscendingOrder);
 
   connect(this, &ZSwcTreeView::customContextMenuRequested, this, &ZSwcTreeView::contextMenu);
   connect(this, &ZSwcTreeView::clicked, this, &ZSwcTreeView::indexClicked);

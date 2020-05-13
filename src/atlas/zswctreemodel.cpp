@@ -13,9 +13,13 @@ ZSwcTreeModel::ZSwcTreeModel(ZSwcPack& swcPack, QObject* parent)
   m_rootToChildren.clear();
   for (auto rit = m_swcPack.swc().beginRoot(); rit != m_swcPack.swc().endRoot(); ++rit) {
     m_roots.push_back(rit);
-    m_rootToChildren[&m_roots[m_roots.size() - 1]].clear();
-    for (auto it = m_swcPack.swc().begin(rit); it != m_swcPack.swc().end(rit); ++it) {
-      m_rootToChildren[&m_roots[m_roots.size() - 1]].push_back(it);
+  }
+  for (auto& rit : m_roots) {
+    m_rootToChildren[&rit].clear();
+    auto it = m_swcPack.swc().begin(rit);
+    CHECK(it == rit);
+    for (++it; it != m_swcPack.swc().end(rit); ++it) {
+      m_rootToChildren[&rit].push_back(it);
     }
   }
 }
@@ -64,26 +68,6 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
   return QVariant();
 }
 
-Qt::ItemFlags ZSwcTreeModel::flags(const QModelIndex& index) const
-{
-  if (!index.isValid()) {
-    return 0;
-  }
-
-  Qt::ItemFlags flags = Qt::ItemIsEnabled;
-
-  return flags;
-}
-
-bool ZSwcTreeModel::setData(const QModelIndex& index, const QVariant& /*value*/, int /*role*/)
-{
-  if (!index.isValid()) {
-    return false;
-  }
-
-  return false;
-}
-
 QVariant ZSwcTreeModel::headerData(int section, Qt::Orientation orientation,
                                    int role) const
 {
@@ -125,19 +109,11 @@ QModelIndex ZSwcTreeModel::index(int row, int column, const QModelIndex& parent)
     CHECK(row < static_cast<int>(m_roots.size()));
     return createIndex(row, column, reinterpret_cast<std::uintptr_t>(&m_roots[row]));
   } else {
-    LOG(INFO) << "1";
-    CHECK(
-      row < static_cast<int>(m_rootToChildren.at(&m_roots[parent.row()]).size()))
-        <<
-        m_rootToChildren.at(&m_roots[parent.row()]).size()
-        << " " << row;
-    LOG(INFO) << "1";
     CHECK(parent.row() < static_cast<int>(m_roots.size())) << m_roots.size() << " " << parent.row();
-    LOG(INFO) << "2";
+    CHECK(row < static_cast<int>(m_rootToChildren.at(&m_roots[parent.row()]).size()))
+        << m_rootToChildren.at(&m_roots[parent.row()]).size() << " " << row;
     auto res = createIndex(row, column,
-                       reinterpret_cast<std::uintptr_t>(
-                         &m_rootToChildren.at(&m_roots[parent.row()])[row]));
-    LOG(INFO) << "1";
+                           reinterpret_cast<std::uintptr_t>(&m_rootToChildren.at(&m_roots[parent.row()])[row]));
     return res;
   }
 }
@@ -170,19 +146,19 @@ QModelIndex ZSwcTreeModel::parent(const QModelIndex& index) const
 
 int ZSwcTreeModel::rowCount(const QModelIndex& parent) const
 {
-  LOG(INFO) << "here";
   if (parent.column() > 0) {
     return 0;
   }
-  LOG(INFO) << "here";
 
   if (!parent.isValid()) {
     return m_roots.size();
   } else {
-    LOG(INFO) << parent.row() << " " << m_roots.size();
-    auto res =  m_rootToChildren.at(&m_roots[parent.row()]).size();
-    LOG(INFO) << "1";
-    return res;
+    auto it = *reinterpret_cast<ZSwc::ConstIterator*>(parent.internalId());
+    if (!ZSwc::isRoot(it)) {
+      return 0;
+    }
+    CHECK(parent.row() < static_cast<int>(m_roots.size())) << m_roots.size() << " " << parent.row();
+    return m_rootToChildren.at(&m_roots[parent.row()]).size();
   }
 }
 
