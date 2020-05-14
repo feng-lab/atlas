@@ -1,39 +1,47 @@
-#include "zswcpack.h"
+#include "zregionannotationpack.h"
 
-#include "zswcdoc.h"
+#include "zregionannotationdoc.h"
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QApplication>
 
 namespace nim {
 
-ZSwcPack::ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& doc, QObject* parent)
+ZRegionAnnotationPack::ZRegionAnnotationPack(ZRegionAnnotation* ra, const QString& path, size_t id,
+                                             ZRegionAnnotationDoc& doc, QObject* parent)
   : ZObjPack(id, &doc, parent)
-  , m_swc(std::move(swc))
+  , m_regionAnnotation(ra)
   , m_path(QFileInfo(path).canonicalFilePath())
   , m_doc(doc)
 {
   updateDerivedData();
   updatePtsAndSelectedPuncta();
   createContextMenu();
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZSwcPack::undoStackCleanChanged);
+  connect(undoStack(), &QUndoStack::cleanChanged,
+          this, &ZRegionAnnotationPack::undoStackCleanChanged);
+  if (m_path.isEmpty() && path.endsWith("_anno")) {
+    m_path = path;
+  }
+  if (m_name.isEmpty()) {
+    static size_t num = 1;
+    m_name = QString("Unsaved RegionAnnotation %1").arg(num++);
+  }
 }
 
-ZSwcPack::~ZSwcPack()
+ZRegionAnnotationPack::~ZRegionAnnotationPack()
 {
-  m_undoStack.disconnect(this);
+  undoStack()->disconnect(this);
 }
 
-const QString& ZSwcPack::info() const
+const QString& ZRegionAnnotationPack::info() const
 {
   if (m_info.isEmpty()) {
-    m_info = QString("size %1").arg(m_swc.size());
+    m_info = QString("%1 regions").arg(m_regionAnnotation->numRegions());
   }
   return m_info;
 }
 
-QMenu& ZSwcPack::contextMenu()
+QMenu& ZRegionAnnotationPack::contextMenu()
 {
 //  m_deleteSelectedPunctaAction->setEnabled(!m_selectedPuncta.empty());
 //  m_transferSelectedPunctaToAnotherFileAction->setEnabled(!m_selectedPuncta.empty() && m_doc.objs().size() > 1);
@@ -42,33 +50,24 @@ QMenu& ZSwcPack::contextMenu()
   return m_contextMenu;
 }
 
-void ZSwcPack::save(const QString &fileName)
+void ZRegionAnnotationPack::save(const QString& fileName)
 {
-  m_swc.resortID();
-  m_swc.save(fileName);
+  m_regionAnnotation->save(fileName);
   m_path = QFileInfo(fileName).canonicalFilePath();
-  m_undoStack.setClean();
+  undoStack()->setClean();
   updateDerivedData();
 }
 
-ZBBox<glm::ivec4> ZSwcPack::boundBox() const
-{
-  ZBBox<glm::ivec4> res;
-  for (auto& p : m_swc) {
-    res.expand(glm::ivec4(p.x - p.radius, p.y - p.radius, std::floor(p.z), 0));
-    res.expand(glm::ivec4(p.x + p.radius, p.y + p.radius, std::ceil(p.z), 0));
-  }
-  return res;
-}
-
-void ZSwcPack::updateDerivedData()
+void ZRegionAnnotationPack::updateDerivedData()
 {
   m_info.clear();
-  m_name = QFileInfo(m_path).fileName();
+  if (!m_name.startsWith("Unsaved RegionAnnotation ")) {
+    m_name = QFileInfo(m_path).fileName();
+  }
   m_tooltip = m_path;
 }
 
-void ZSwcPack::updatePtsAndSelectedPuncta()
+void ZRegionAnnotationPack::updatePtsAndSelectedPuncta()
 {
 //  m_punctaPts.clear();
 //  m_selectedPuncta.clear();
@@ -80,24 +79,24 @@ void ZSwcPack::updatePtsAndSelectedPuncta()
 //  }
 }
 
-void ZSwcPack::createContextMenu()
+void ZRegionAnnotationPack::createContextMenu()
 {
 //  m_deleteSelectedPunctaAction = new QAction(tr("Delete Selected Puncta"), this);
 //  m_deleteSelectedPunctaAction->setStatusTip(tr("Delete all selected puncta"));
-//  connect(m_deleteSelectedPunctaAction, &QAction::triggered, this, &ZSwcPack::deleteSelectedPuncta);
+//  connect(m_deleteSelectedPunctaAction, &QAction::triggered, this, &ZRegionAnnotationPack::deleteSelectedPuncta);
 //
 //  m_transferSelectedPunctaToAnotherFileAction = new QAction(tr("Transfer Selected Puncta to Another File..."), this);
 //  m_transferSelectedPunctaToAnotherFileAction->setStatusTip(tr("Transfer the selected puncta to another puncta file"));
 //  connect(m_transferSelectedPunctaToAnotherFileAction, &QAction::triggered,
-//          this, &ZSwcPack::transferSelectedPuncta);
+//          this, &ZRegionAnnotationPack::transferSelectedPuncta);
 //
 //  m_mergeSelectedPuntaAction = new QAction(tr("Merge Selected Puncta"), this);
 //  m_mergeSelectedPuntaAction->setStatusTip(tr("Merge selected puncta into 1 punctum"));
-//  connect(m_mergeSelectedPuntaAction, &QAction::triggered, this, &ZSwcPack::mergeSelectedPuncta);
+//  connect(m_mergeSelectedPuntaAction, &QAction::triggered, this, &ZRegionAnnotationPack::mergeSelectedPuncta);
 //
 //  m_splitSelectedPunctumAction = new QAction(tr("Split Punctum..."), this);
 //  m_splitSelectedPunctumAction->setStatusTip(tr("Split the selected punctum into several parts using GMM"));
-//  connect(m_splitSelectedPunctumAction, &QAction::triggered, this, &ZSwcPack::splitSelectedPunctum);
+//  connect(m_splitSelectedPunctumAction, &QAction::triggered, this, &ZRegionAnnotationPack::splitSelectedPunctum);
 //
 //  m_contextMenu.addAction(m_deleteSelectedPunctaAction);
 //  m_contextMenu.addAction(m_transferSelectedPunctaToAnotherFileAction);
@@ -106,5 +105,9 @@ void ZSwcPack::createContextMenu()
 }
 
 } // namespace nim
+
+
+
+
 
 

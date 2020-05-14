@@ -9,6 +9,8 @@
 
 namespace nim {
 
+class ZDoc;
+
 class ZSwcTreeModel : public QAbstractItemModel
 {
 Q_OBJECT
@@ -18,7 +20,7 @@ public:
     IDColumn, TypeColumn, XColumn, YColumn, ZColumn, RadiusColumn, TopologyColumn, ParentIDColumn, LabelColumn, ColumnCount
   };
 
-  explicit ZSwcTreeModel(ZSwcPack& swcPack, QObject* parent = nullptr);
+  explicit ZSwcTreeModel(ZSwcPack& swcPack, ZDoc& doc, QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
@@ -42,6 +44,7 @@ public:
 
 protected:
   ZSwcPack& m_swcPack;
+  ZDoc& m_doc;
   std::vector<ZSwc::ConstIterator> m_roots;
   std::map<const ZSwc::ConstIterator*, std::vector<ZSwc::ConstIterator>> m_rootToChildren;
 };

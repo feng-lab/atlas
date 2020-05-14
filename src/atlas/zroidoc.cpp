@@ -22,13 +22,17 @@ ZROIDoc::ZROIDoc(ZDoc& doc)
   createActions();
 }
 
-ZROI& ZROIDoc::currentROI()
+ZROIPack& ZROIDoc::currentROIPack()
 {
-  if (m_idToROIPacks.empty()) {
-    ZROI* roi = new ZROI(nullptr, this);
-    addROI(roi, "");
+  for (auto& [id, roiPack] : m_idToROIPacks) {
+    if (!roiPack->isLocked()) {
+      return *roiPack;
+    }
   }
-  return *m_idToROIPacks.begin()->second->roi;
+  auto roi = new ZROI(nullptr, this);
+  auto id = addROI(roi, "");
+  CHECK(!m_idToROIPacks.at(id)->isLocked());
+  return *m_idToROIPacks.at(id);
 }
 
 void ZROIDoc::askToSave(const ZROI& roi, const QString& title)
@@ -63,14 +67,14 @@ bool ZROIDoc::save(size_t id)
     return true;
 
   auto& pack = m_idToROIPacks.at(id);
-  if (ZROI::canWriteFile(pack->path)) {
+  if (ZROI::canWriteFile(pack->path())) {
     QString err;
-    if (saveROI(pack.get(), pack->path, err)) {
+    if (saveROI(pack.get(), pack->path(), err)) {
       m_doc.updateObjInfo(id);
       return true;
     }
     QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
-                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path).arg(err));
+                          tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path()).arg(err));
     return false;
   }
   return saveAs(id);
@@ -106,7 +110,7 @@ bool ZROIDoc::canReadFile(const QString& fileName) const
 size_t ZROIDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToROIPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path() == fileName)
       return idPack.first;
   }
   size_t id;
@@ -161,7 +165,7 @@ QList<QAction*> ZROIDoc::loadFileActions() const
 
 QMenu* ZROIDoc::processObjMenu() const
 {
-  QMenu* res = new QMenu(typeName());
+  auto res = new QMenu(typeName());
   res->addAction(m_importMaskImageAction);
   res->addAction(m_createMaskImageAction);
   return res;
@@ -182,12 +186,12 @@ QString ZROIDoc::objName(size_t id) const
 
 QString ZROIDoc::objPath(size_t id) const
 {
-  return m_idToROIPacks.at(id)->path;
+  return m_idToROIPacks.at(id)->path();
 }
 
 bool ZROIDoc::objHasUnsavedChange(size_t id) const
 {
-  return m_idToROIPacks.at(id)->hasUnsavedChange;
+  return m_idToROIPacks.at(id)->hasUnsavedChange();
 }
 
 QString ZROIDoc::objInfo(size_t id) const
@@ -202,12 +206,12 @@ QString ZROIDoc::objTooltip(size_t id) const
 
 const QUndoStack* ZROIDoc::objUndoStack(size_t id) const
 {
-  return m_idToROIPacks.at(id)->roi->undoStack();
+  return m_idToROIPacks.at(id)->undoStack();
 }
 
 QJsonValue ZROIDoc::jsonValue(size_t id) const
 {
-  return QJsonValue(m_idToROIPacks.at(id)->path);
+  return QJsonValue(m_idToROIPacks.at(id)->path());
 }
 
 bool ZROIDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
@@ -244,7 +248,7 @@ QWidget* ZROIDoc::createObjEditWidget(size_t id)
   CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
 
   auto& pack = m_idToROIPacks.at(id);
-  return new ZROIWidget(*pack->roi, m_doc);
+  return new ZROIWidget(*pack, m_doc);
 }
 
 void ZROIDoc::loadROI()
@@ -270,9 +274,9 @@ void ZROIDoc::setModified()
 {
   if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
     for (const auto& idPack : m_idToROIPacks) {
-      if (idPack.second->roi.get() == roi) {
+      if (&(idPack.second->roi()) == roi) {
         idPack.second->updateDerivedData();
-        idPack.second->hasUnsavedChange = true;
+        idPack.second->setHasUnsavedChange(true);
         m_doc.updateObjInfo(idPack.first);
         return;
       }
@@ -280,26 +284,18 @@ void ZROIDoc::setModified()
   }
 }
 
-void ZROIDoc::setModified(bool clean)
-{
-  // todo: this is not correct
-  if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
-    for (const auto& idPack : m_idToROIPacks) {
-      if (idPack.second->roi.get() == roi) {
-        if (clean && idPack.second->path.endsWith(ZROI::fileExtension(), Qt::CaseInsensitive)) {
-          idPack.second->updateDerivedData();
-          idPack.second->hasUnsavedChange = false;
-          m_doc.updateObjInfo(idPack.first);
-        } else if (!idPack.second->hasUnsavedChange) {
-          idPack.second->updateDerivedData();
-          idPack.second->hasUnsavedChange = true;
-          m_doc.updateObjInfo(idPack.first);
-        }
-        return;
-      }
-    }
-  }
-}
+//void ZROIDoc::setModified(bool clean)
+//{
+//  if (ZROI* roi = qobject_cast<ZROI*>(sender())) {
+//    for (const auto& idPack : m_idToROIPacks) {
+//      if (&(idPack.second->roi()) == roi) {
+//        idPack.second->updateDerivedData();
+//        m_doc.updateObjInfo(idPack.first);
+//        return;
+//      }
+//    }
+//  }
+//}
 
 void ZROIDoc::importMaskImage()
 {
@@ -346,7 +342,7 @@ void ZROIDoc::createMaskImage()
     return;
   }
 
-  ZROI& roi = currentROI();
+  ZROI& roi = currentROIPack().roi();
   if (roi.isEmpty()) {
     QMessageBox::information(QApplication::activeWindow(), qApp->applicationName(),
                              tr("Empty ROI"));
@@ -386,11 +382,11 @@ void ZROIDoc::createMaskImage()
 size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToROIPacks[id] = std::make_shared<ROIPack>(roi, path);
+  m_idToROIPacks[id] = std::make_shared<ZROIPack>(roi, path, id, *this);
   if (unsaved) {
-    m_idToROIPacks[id]->hasUnsavedChange = true;
+    m_idToROIPacks[id]->setHasUnsavedChange(true);
   }
-  m_doc.registerNewObj(id, *this);
+  m_doc.registerNewObj(m_idToROIPacks[id]);
 
   emit objAdded(id, this);
   connect(roi, &ZROI::roiChanged, this, qOverload<>(&ZROIDoc::setModified));
@@ -399,37 +395,6 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
 //  connect(roi, &ZROI::undoStackCleanChanged,
 //          this, qOverload<bool>(&ZROIDoc::setModified));
   return id;
-}
-
-ZROIDoc::ROIPack::ROIPack(ZROI* roi_, const QString& path_)
-  : roi(roi_), path(QFileInfo(path_).canonicalFilePath())
-{
-  if (path.isEmpty() && path_.endsWith("_roi")) {
-    path = path_;
-  }
-  updateDerivedData();
-  if (m_name.isEmpty()) {
-    hasUnsavedChange = true;
-    static size_t num = 1;
-    m_name = QString("Unsaved ROI %1").arg(num++);
-  }
-}
-
-void ZROIDoc::ROIPack::updateDerivedData()
-{
-  m_info.clear();
-  if (!m_name.startsWith("Unsaved ROI ")) {
-    m_name = QFileInfo(path).fileName();
-  }
-  m_tooltip = path;
-}
-
-const QString& ZROIDoc::ROIPack::info() const
-{
-  if (m_info.isEmpty()) {
-    m_info = QString("%1 slices").arg(roi->numSlices());
-  }
-  return m_info;
 }
 
 void ZROIDoc::createActions()
@@ -447,14 +412,10 @@ void ZROIDoc::createActions()
   connect(m_createMaskImageAction, &QAction::triggered, this, &ZROIDoc::createMaskImage);
 }
 
-bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
+bool ZROIDoc::saveROI(ZROIPack* pack, const QString& fileName, QString& errorMsg)
 {
   try {
-    pack->roi->save(fileName);
-    pack->path = QFileInfo(fileName).canonicalFilePath();
-    pack->roi->undoStack()->setClean();
-    pack->hasUnsavedChange = false;
-    pack->updateDerivedData();
+    pack->save(fileName);
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -467,7 +428,7 @@ bool ZROIDoc::saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg)
   }
 }
 
-void ZROIDoc::packInfoUpdated(ROIPack* pack)
+void ZROIDoc::packInfoUpdated(ZROIPack* pack)
 {
   for (const auto& idPack : m_idToROIPacks) {
     if (idPack.second.get() == pack)

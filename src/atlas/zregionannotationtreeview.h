@@ -14,7 +14,7 @@ class ZRegionAnnotationTreeView : public QTreeView
 {
 Q_OBJECT
 public:
-  ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotation& anno, ZDoc& doc,
+  ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotationPack& rap, ZDoc& doc,
                             QWidget* parent = nullptr);
 
 protected:
@@ -36,7 +36,7 @@ protected:
 
 private:
   ZRegionAnnotationTreeModel& m_ratModel;
-  ZRegionAnnotation& m_regionAnnotation;
+  ZRegionAnnotationPack& m_regionAnnotationPack;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel;
   QMenu* m_contextMenu;

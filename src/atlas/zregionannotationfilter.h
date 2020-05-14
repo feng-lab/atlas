@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjfilter.h"
-#include "zregionannotation.h"
+#include "zregionannotationpack.h"
 #include "zroifilter.h"
 
 namespace nim {
@@ -18,7 +18,7 @@ public:
     return vp++;
   }
 
-  void setData(ZRegionAnnotation& regionAnnotation);
+  void setData(ZRegionAnnotationPack& regionAnnotationPack);
 
   void releaseItemsOwnership();
 
@@ -55,8 +55,10 @@ private:
 
   void allROIChanged();
 
+  void onLockedStateChanged(bool l);
+
 private:
-  ZRegionAnnotation* m_regionAnnotation = nullptr;
+  ZRegionAnnotationPack* m_regionAnnotationPack = nullptr;
   std::map<int, std::unique_ptr<ZROIFilter>> m_idToROIFilters;
   std::map<int, QString> m_idToRegionNames;
   std::map<QString, int> m_nameToID;
@@ -64,7 +66,11 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView& m_view;
 
+  ZBoolParameter m_highlightRegionOnMouseHover;
+
   std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;
+
+  size_t m_numParametersWithoutRegionSepcificParas = 0;
 };
 
 } // namespace nim

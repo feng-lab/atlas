@@ -27,16 +27,17 @@ void Z3DRegionAnnotationFilter::process(Z3DEye eye)
   }
 }
 
-void Z3DRegionAnnotationFilter::setData(ZRegionAnnotation& regAnno)
+void Z3DRegionAnnotationFilter::setData(ZRegionAnnotationPack& rap)
 {
-  m_regionAnnotation = &regAnno;
+  m_regionAnnotationPack = &rap;
   allMeshChanged();
-  connect(m_regionAnnotation, &ZRegionAnnotation::allMeshChanged, this, &Z3DRegionAnnotationFilter::allMeshChanged);
+  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::allMeshChanged,
+          this, &Z3DRegionAnnotationFilter::allMeshChanged);
 }
 
 bool Z3DRegionAnnotationFilter::isReady(Z3DEye eye) const
 {
-  return Z3DGeometryFilter::isReady(eye) && m_regionAnnotation;
+  return Z3DGeometryFilter::isReady(eye) && m_regionAnnotationPack;
 }
 
 std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
@@ -59,9 +60,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_manipulatorSize, 7);
 
     auto model =
-      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
+      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters), 9);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
   }
   return m_widgetsGroup;
@@ -145,35 +146,35 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   m_idToRegionNames.clear();
   m_nameToID.clear();
 
-  for (const auto& node : m_regionAnnotation->annotationTree()) {
+  for (const auto& node : m_regionAnnotationPack->regionAnnotation().annotationTree()) {
     int id = node.id;
-    Z3DMeshFilter* flt = new Z3DMeshFilter(m_rendererBase.globalParas(), &node);
+    auto flt = new Z3DMeshFilter(m_rendererBase.globalParas(), &node);
     if (node.mesh) {
       QList<ZMesh*> meshList;
       meshList.push_back(node.mesh.get());
       flt->setData(&meshList);
     }
-    //flt->setVisible(false);
+    flt->setVisible(m_visible.get());
     flt->setMeshColor(glm::vec4(node.red / 255.f, node.green / 255.f, node.blue / 255.f, 1.f));
     flt->setOpacity(0.5);
     m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
     std::vector<ZParameter*> paras = flt->parameters();
-    for (size_t i = 0; i < paras.size(); ++i) {
-      if (paras[i]->name().contains("Coord Transform")) {
+    for (auto & para : paras) {
+      if (para->name().contains("Coord Transform")) {
         connect(&m_rendererBase.coordTransformPara(), &Z3DTransformParameter::valueChanged,
-                paras[i], &ZParameter::updateFromSender);
-      } else if (paras[i]->name() == "Visible" ||
-                 paras[i]->name() == "Mesh Color" ||
-                 paras[i]->name().contains("Wireframe") ||
-                 paras[i]->name() == "Opacity" ||
-                 paras[i]->name().contains("Material") ||
-                 paras[i]->name() == "X Cut" ||
-                 paras[i]->name() == "Y Cut" ||
-                 paras[i]->name() == "Z Cut" ||
-                 paras[i]->name() == "Bound Box") {
-        paras[i]->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(paras[i]->name()));
-        addParameter(*paras[i]);
+                para, &ZParameter::updateFromSender);
+      } else if (para->name() == "Visible" ||
+                 para->name() == "Mesh Color" ||
+                 para->name().contains("Wireframe") ||
+                 para->name() == "Opacity" ||
+                 para->name().contains("Material") ||
+                 para->name() == "X Cut" ||
+                 para->name() == "Y Cut" ||
+                 para->name() == "Z Cut" ||
+                 para->name() == "Bound Box") {
+        para->setName(QString("%1 %2").arg(m_idToRegionNames[id]).arg(para->name()));
+        addParameter(*para);
       }
     }
     m_idToMeshFilters[id] = std::unique_ptr<Z3DMeshFilter>(flt);
@@ -186,9 +187,9 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
 
   if (m_widgetsGroup) {
     auto model =
-      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToMeshFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToMeshFilters), 9);
+      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters), 9);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
@@ -209,8 +210,8 @@ void Z3DRegionAnnotationFilter::deregisterPickingObjects()
 
 void Z3DRegionAnnotationFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_regionAnnotation->boundBox().minCorner()));
-  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_regionAnnotation->boundBox().maxCorner()));
+  m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_regionAnnotationPack->boundBox().minCorner()));
+  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_regionAnnotationPack->boundBox().maxCorner()));
 }
 
 } // namespace nim

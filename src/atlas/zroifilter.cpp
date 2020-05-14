@@ -13,6 +13,7 @@
 #include <QPushButton>
 #include <QGraphicsItemGroup>
 #include <boost/math/constants/constants.hpp>
+#include <utility>
 
 namespace nim {
 
@@ -112,6 +113,14 @@ QPainterPath ROIGraphicsItem::shape() const
   return m_roi.shapePainterPath(m_slice, m_id);
 }
 
+void ROIGraphicsItem::setLocked(bool l)
+{
+  m_locked = l;
+  if (l) {
+    setFlags(0);
+  }
+}
+
 //void ROIGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent *event)
 //{
 ////  setCursor(Qt::ClosedHandCursor);
@@ -130,6 +139,9 @@ QPainterPath ROIGraphicsItem::shape() const
 //
 QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
+  if (m_locked) {
+    return value;
+  }
 //  if (change == ItemPositionChange && scene()) {
 //    QPointF newPos = value.toPointF() - m_offset;
 ////    QRectF boundRect = path().boundingRect();
@@ -156,6 +168,9 @@ QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, c
 
 void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
+  if (m_locked) {
+    return;
+  }
   const auto& shapeOps = m_roi.shapeOperations(m_slice, m_id);
   for (const auto& shapeOp : shapeOps) {
     if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
@@ -176,14 +191,14 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
       } else if (selectedAction == toRegionAction) {
         try {
-          ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+          ZChooseRegionDialog dlg(m_view.regionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
             if (m_regionNode) {
-              m_view.regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
-                                                        dlg.selectedID());
+              m_view.regionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
+                                                                               dlg.selectedID());
             } else {
-              m_view.regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
-                                                         dlg.selectedID());
+              m_view.regionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
+                                                                                dlg.selectedID());
             }
           }
         }
@@ -218,14 +233,14 @@ void ROIGraphicsItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
   setPen(p);
 }
 
-ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm,
+ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, QTransform  tfm,
                                              ZView& view, double viewScale, const RegionNode* regionNode,
                                              QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_roi(roi)
   , m_controlPoint(controlPoint)
   , m_viewScale(viewScale)
-  , m_transform(tfm)
+  , m_transform(std::move(tfm))
   , m_view(view)
   , m_regionNode(regionNode)
 {
@@ -277,6 +292,16 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
   }
 }
 
+void ROICtrlPtGraphicsItem::setLocked(bool l)
+{
+  m_locked = l;
+  if (l) {
+    setFlags(0);
+  } else {
+    setFlags(QGraphicsItem::ItemIsSelectable);
+  }
+}
+
 //void ROICtrlPtGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget)
 //{
 //  if (isSelected()) {
@@ -310,6 +335,9 @@ void ROICtrlPtGraphicsItem::setViewScale(double s)
 
 QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
+  if (m_locked) {
+    return value;
+  }
 //  if (change == ItemPositionChange && scene()) {
 //    QPointF newPos = value.toPointF() - m_offset;
 ////    QRectF sceneRect = scene()->sceneRect();
@@ -337,6 +365,9 @@ QVariant ROICtrlPtGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange cha
 
 void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
+  if (m_locked) {
+    return;
+  }
   if (!isSelected()) {
     return;
   }
@@ -354,14 +385,16 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
       QAction* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == toRegionAction) {
         try {
-          ZChooseRegionDialog dlg(m_view.regionAnnotation(), &m_view.graphicsView());
+          ZChooseRegionDialog dlg(m_view.regionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
             if (m_regionNode) {
-              m_view.regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice, m_controlPoint.shapeID,
-                                                        dlg.selectedID());
+              m_view.regionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
+                                                                               m_controlPoint.shapeID,
+                                                                               dlg.selectedID());
             } else {
-              m_view.regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice, m_controlPoint.shapeID,
-                                                         dlg.selectedID());
+              m_view.regionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice,
+                                                                                m_controlPoint.shapeID,
+                                                                                dlg.selectedID());
             }
           }
         }
@@ -389,6 +422,9 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
 
 void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 {
+  if (m_locked) {
+    return;
+  }
   if (!m_doubleClicked && event->modifiers() != Qt::AltModifier) {
     QGraphicsRectItem::mouseReleaseEvent(event);
   }
@@ -397,6 +433,9 @@ void ROICtrlPtGraphicsItem::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
 
 void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
 {
+  if (m_locked) {
+    return;
+  }
   if (event->button() == Qt::LeftButton) {
     if (event->modifiers() == Qt::AltModifier) {
       emit m_roi.deselectShape(m_controlPoint.slice, m_controlPoint.shapeID);
@@ -463,13 +502,16 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_opacity);
+  addParameter(&m_highlightRegionOnMouseHover);
 
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZROIFilter::viewScaleChanged);
 }
 
-void ZROIFilter::setData(ZROI& roi)
+void ZROIFilter::setData(ZROI& roi, ZROIPack& roiPack)
 {
+  CHECK(m_regionNode == nullptr);
   m_ROI = &roi;
+  m_ROIPack = &roiPack;
   m_sliceToROIItem.clear();
   m_sliceToCtrlPtItems.clear();
   if (!m_ROI->isEmpty()) {
@@ -488,6 +530,41 @@ void ZROIFilter::setData(ZROI& roi)
   connect(m_ROI, &ZROI::roiDeleted, this, &ZROIFilter::onRoiDeleted);
   connect(m_ROI, &ZROI::selectShape, this, &ZROIFilter::selectCtrlPtItems);
   connect(m_ROI, &ZROI::deselectShape, this, &ZROIFilter::deselectCtrlPtItems);
+
+  connect(m_ROIPack, &ZROIPack::lockedStateChanged, this, &ZROIFilter::onLockedStateChanged);
+}
+
+void ZROIFilter::setData(ZROI& roi, ZRegionAnnotationPack& raPack)
+{
+  CHECK(m_regionNode);
+  m_ROI = &roi;
+  m_regionAnnotationPack = &raPack;
+  m_sliceToROIItem.clear();
+  m_sliceToCtrlPtItems.clear();
+  if (!m_ROI->isEmpty()) {
+    for (const auto& sliceROI : *m_ROI) {
+      int slice = sliceROI.first;
+      for (auto shapeID :m_ROI->sliceShapeIDs(slice)) {
+        createShapeItem(slice, shapeID);
+        createCtrlPtItems(slice, shapeID);
+      }
+    }
+  }
+
+  connect(m_ROI, &ZROI::boundBoxChanged, this, &ZROIFilter::boundBoxChanged);
+  connect(m_ROI, &ZROI::roiChanged, this, &ZROIFilter::onRoiChanged);
+  connect(m_ROI, &ZROI::roiMoved, this, &ZROIFilter::onRoiMoved);
+  connect(m_ROI, &ZROI::roiDeleted, this, &ZROIFilter::onRoiDeleted);
+  connect(m_ROI, &ZROI::selectShape, this, &ZROIFilter::selectCtrlPtItems);
+  connect(m_ROI, &ZROI::deselectShape, this, &ZROIFilter::deselectCtrlPtItems);
+
+  connect(m_regionAnnotationPack, &ZRegionAnnotationPack::lockedStateChanged,
+          this, &ZROIFilter::onLockedStateChanged);
+}
+
+bool ZROIFilter::isLocked() const
+{
+  return (m_ROIPack && m_ROIPack->isLocked()) || (m_regionAnnotationPack && m_regionAnnotationPack->isLocked());
 }
 
 void ZROIFilter::releaseItemsOwnership()
@@ -584,7 +661,7 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("ROI", 1);
     m_widgetsGroup->addChild(m_visible, 1);
 
-    QPushButton* pb = new QPushButton("Bring to Front");
+    auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZROIFilter::bringToFront);
     m_widgetsGroup->addChild(*pb, 1);
 
@@ -600,6 +677,7 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
     m_widgetsGroup->addChild(m_opacity, 1);
+    m_widgetsGroup->addChild(m_highlightRegionOnMouseHover, 1);
   }
   return m_widgetsGroup;
 }
@@ -630,6 +708,10 @@ void ZROIFilter::deleteKeyPressed()
 //    m_ROI->deleteSliceROI(slices[i]);
 //  }
 
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -651,6 +733,10 @@ void ZROIFilter::deleteKeyPressed()
 
 void ZROIFilter::copyKeyPressed()
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -674,6 +760,10 @@ void ZROIFilter::copyKeyPressed()
 
 void ZROIFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -684,6 +774,10 @@ void ZROIFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFli
 void ZROIFilter::pasteKeyPressed(int slice, QPointF point, const nim::ZBBox<glm::ivec4>& srcBoundBox, bool hFlip,
                                  bool vFlip)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -693,6 +787,10 @@ void ZROIFilter::pasteKeyPressed(int slice, QPointF point, const nim::ZBBox<glm:
 
 void ZROIFilter::mousePressed(const QPointF& scenePos)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -736,6 +834,10 @@ void ZROIFilter::mousePressed(const QPointF& scenePos)
 
 void ZROIFilter::mouseMoved(const QPointF& scenePos)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -766,6 +868,10 @@ void ZROIFilter::mouseMoved(const QPointF& scenePos)
 
 void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -778,6 +884,10 @@ void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
 
 void ZROIFilter::rotateClockwise()
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -800,6 +910,10 @@ void ZROIFilter::rotateClockwise()
 
 void ZROIFilter::rotateCounterclockwise()
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -947,6 +1061,8 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
   m_view.scene().addItem(roiItem);
   roiItem->setTransformOriginPoint(roiItem->mapFromScene(QPointF(0, 0)));
   roiItem->setTransform(trans);
+  roiItem->setHighlightOnHover(m_highlightRegionOnMouseHover.get());
+  roiItem->setLocked(isLocked());
 
 //  QList<QGraphicsItem*> items{roiItem};
 //  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items);
@@ -968,13 +1084,14 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
   std::vector<ZROIControlPoint> controlPoints = m_ROI->sliceControlPoints(slice, shapeID);
   QTransform trans = getQTransform();
   for (const auto& controlPoint : controlPoints) {
-    ROICtrlPtGraphicsItem* rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, trans, m_view,
-                                                                m_view.graphicsView().currentScale(), m_regionNode);
+    auto rectItem = new ROICtrlPtGraphicsItem(*m_ROI, controlPoint, trans, m_view,
+                                              m_view.graphicsView().currentScale(), m_regionNode);
     int zValue = m_ROI->shapeOperations(slice, shapeID)[controlPoint.shapeIndex].isAdd ? m_viewPrecedencePara.get() + 1
                                                                                        : m_viewPrecedencePara.get();
     rectItem->setZValue(zValue);
     rectItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get() && m_showControlPoints.get());
     rectItem->setFixedSize(m_fixedControlPointsSize.get());
+    rectItem->setLocked(isLocked());
     m_view.scene().addItem(rectItem);
     items.emplace_back(rectItem);
     //items_all.push_front(rectItem);
@@ -989,6 +1106,10 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
 
 void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -1006,6 +1127,10 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
 
 void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)
 {
+  if (isLocked()) {
+    return;
+  }
+
   if (!m_ROI) {
     return;
   }
@@ -1225,6 +1350,22 @@ void ZROIFilter::viewScaleChanged(double s)
         for (auto& item : ctrlItems) {
           item->setViewScale(s);
         }
+      }
+    }
+  }
+}
+
+void ZROIFilter::onLockedStateChanged(bool)
+{
+  for (auto&[slice, sliceItem] : m_sliceToROIItem) {
+    for (auto&[id, shapeItem] : sliceItem) {
+      shapeItem->setLocked(isLocked());
+    }
+  }
+  for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
+    for (auto&[id, ctrlItems] : sliceItem) {
+      for (auto& item : ctrlItems) {
+        item->setLocked(isLocked());
       }
     }
   }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjdoc.h"
-#include "zroi.h"
+#include "zroipack.h"
 
 namespace nim {
 
@@ -11,13 +11,13 @@ Q_OBJECT
 public:
   explicit ZROIDoc(ZDoc& doc);
 
-  inline ZROI& roi(size_t id)
-  { return *m_idToROIPacks.at(id)->roi; }
+  inline ZROIPack& roiPack(size_t id)
+  { return *m_idToROIPacks.at(id); }
 
-  inline const ZROI& roi(size_t id) const
-  { return *m_idToROIPacks.at(id)->roi; }
+  [[nodiscard]] inline const ZROIPack& roiPack(size_t id) const
+  { return *m_idToROIPacks.at(id); }
 
-  ZROI& currentROI();
+  ZROIPack& currentROIPack();
 
   void askToSave(const ZROI& roi, const QString& title = "");
 
@@ -27,43 +27,43 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "ROI"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "ROI"; }
 
-  bool canReadFile(const QString& fileName) const override;
+  [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] QList<QAction*> loadFileActions() const override;
 
-  QMenu* processObjMenu() const override;
+  [[nodiscard]] QMenu* processObjMenu() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  const QUndoStack* objUndoStack(size_t id) const override;
+  [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
   QWidget* createObjEditWidget(size_t id) override;
 
@@ -72,7 +72,7 @@ protected:
 
   void setModified();
 
-  void setModified(bool clean);
+  // void setModified(bool clean);
 
   void importMaskImage();
 
@@ -82,45 +82,19 @@ protected:
   size_t addROI(ZROI* roi, const QString& path, bool unsaved = false);
 
 private:
-  struct ROIPack
-  { // ROI and its associated data
-    ROIPack(ZROI* roi_, const QString& path_);
-
-    void updateDerivedData();
-
-    const QString& info() const;
-
-    inline const QString& name() const
-    { return m_name; }
-
-    inline const QString& tooltip() const
-    { return m_tooltip; }
-
-    std::unique_ptr<ZROI> roi;
-    QString path;
-    bool hasUnsavedChange = false;
-
-    // derived data
-  private:
-    mutable QString m_info;
-    QString m_name;
-    QString m_tmpName;
-    QString m_tooltip;
-  };
-
   void createActions();
 
-  bool saveROI(ROIPack* pack, const QString& fileName, QString& errorMsg);
+  bool saveROI(ZROIPack* pack, const QString& fileName, QString& errorMsg);
 
   // notify obj manager about the update
-  void packInfoUpdated(ROIPack* pack);
+  void packInfoUpdated(ZROIPack* pack);
 
 private:
-  std::map<size_t, std::shared_ptr<ROIPack>> m_idToROIPacks;
+  std::map<size_t, std::shared_ptr<ZROIPack>> m_idToROIPacks;
 
-  QAction* m_loadROIAction;
-  QAction* m_importMaskImageAction;
-  QAction* m_createMaskImageAction;
+  QAction* m_loadROIAction = nullptr;
+  QAction* m_importMaskImageAction = nullptr;
+  QAction* m_createMaskImageAction = nullptr;
 };
 
 } // namespace nim

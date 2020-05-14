@@ -25,6 +25,9 @@ public:
   virtual bool isVisible() const
   { return m_visible.get(); }
 
+  ZBoolParameter& visiblePara()
+  { return m_visible; }
+
   virtual void setNormalView(int z, int t) = 0;
 
   virtual void setMaxZProjView(int t) = 0;

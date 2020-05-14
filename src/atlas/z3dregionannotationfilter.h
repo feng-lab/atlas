@@ -1,7 +1,7 @@
 #pragma once
 
 #include "z3dmeshfilter.h"
-#include "zregionannotation.h"
+#include "zregionannotationpack.h"
 
 namespace nim {
 
@@ -13,7 +13,7 @@ public:
 
   void process(Z3DEye eye) override;
 
-  void setData(ZRegionAnnotation& regAnno);
+  void setData(ZRegionAnnotationPack& rap);
 
   bool isReady(Z3DEye eye) const override;
 
@@ -55,9 +55,9 @@ protected:
 
 private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
-  bool m_dataIsInvalid;
+  bool m_dataIsInvalid = true;
 
-  ZRegionAnnotation* m_regionAnnotation;
+  ZRegionAnnotationPack* m_regionAnnotationPack = nullptr;
 
   std::map<int, std::unique_ptr<Z3DMeshFilter>> m_idToMeshFilters;
   std::map<int, QString> m_idToRegionNames;

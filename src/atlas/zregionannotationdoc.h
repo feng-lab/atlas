@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjdoc.h"
-#include "zregionannotation.h"
+#include "zregionannotationpack.h"
 
 namespace nim {
 
@@ -12,10 +12,10 @@ public:
   explicit ZRegionAnnotationDoc(ZDoc& doc);
 
   // return info of RegionAnnotation with id, assume RegionAnnotation exist, otherwise crash
-  ZRegionAnnotation& regionAnnotation(size_t id)
-  { return *m_idToRegionAnnotationPacks.at(id)->regionAnnotation; }
+  ZRegionAnnotationPack& regionAnnotationPack(size_t id)
+  { return *m_idToRegionAnnotationPacks.at(id); }
 
-  ZRegionAnnotation& currentRegionAnnotation();
+  ZRegionAnnotationPack& currentRegionAnnotationPack();
 
   // ZObjDoc interface
 public:
@@ -29,7 +29,7 @@ public:
   [[nodiscard]] QString typePluralName() const override
   { return "RegionAnnotations"; }
 
-  bool canReadFile(const QString& fileName) const override;
+  [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
@@ -51,7 +51,7 @@ public:
 
   [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  const QUndoStack* objUndoStack(size_t id) const override;
+  [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
   [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
@@ -78,40 +78,15 @@ protected:
   size_t addRegionAnnotation(ZRegionAnnotation* regionAnnotation, const QString& path);
 
 private:
-  struct RegionAnnotationPack
-  { // RegionAnnotation and its associated data
-    RegionAnnotationPack(ZRegionAnnotation* regionAnnotationIn, const QString& pathIn);
-
-    void updateDerivedData();
-
-    const QString& info() const;
-
-    inline const QString& name() const
-    { return m_name; }
-
-    inline const QString& tooltip() const
-    { return m_tooltip; }
-
-    std::unique_ptr<ZRegionAnnotation> regionAnnotation;
-    QString path;
-    bool hasUnsavedChange;
-
-    // derived data
-  private:
-    mutable QString m_info;
-    QString m_name;
-    QString m_tooltip;
-  };
-
   void createActions();
 
-  bool saveRegionAnnotation(RegionAnnotationPack* pack, const QString& fileName, QString& errorMsg);
+  bool saveRegionAnnotation(ZRegionAnnotationPack* pack, const QString& fileName, QString& errorMsg);
 
   // notify obj manager about the update
-  void packInfoUpdated(RegionAnnotationPack* pack);
+  void packInfoUpdated(ZRegionAnnotationPack* pack);
 
 private:
-  std::map<size_t, std::shared_ptr<RegionAnnotationPack>> m_idToRegionAnnotationPacks;
+  std::map<size_t, std::shared_ptr<ZRegionAnnotationPack>> m_idToRegionAnnotationPacks;
 
   QAction* m_loadRegionAnnotationAction = nullptr;
   QAction* m_importLabelImageAction = nullptr;

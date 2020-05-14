@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjpack.h"
-#include "zswc.h"
+#include "zroi.h"
 #include "zglmutils.h"
 #include "zbbox.h"
 #include <QUndoStack>
@@ -13,15 +13,15 @@
 
 namespace nim {
 
-class ZSwcDoc;
+class ZROIDoc;
 
-class ZSwcPack : public ZObjPack
+class ZROIPack : public ZObjPack
 {
 Q_OBJECT
 public:
-  ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& pd, QObject* parent = nullptr);
+  ZROIPack(ZROI* roi, const QString& path, size_t id, ZROIDoc& pd, QObject* parent = nullptr);
 
-  ~ZSwcPack() override;
+  ~ZROIPack() override;
 
   void updateDerivedData();
 
@@ -37,7 +37,13 @@ public:
   { return m_path; }
 
   QUndoStack* undoStack()
-  { return &m_undoStack; }
+  { return m_roi->undoStack(); }
+
+  void setHasUnsavedChange(bool v)
+  { m_hasUnsavedChange = v; }
+
+  bool hasUnsavedChange() const
+  { return m_hasUnsavedChange; }
 
   QMenu& contextMenu();
 
@@ -45,10 +51,14 @@ public:
 
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZSwc& swc() const
-  { return m_swc; }
+  inline const ZROI& roi() const
+  { return *m_roi; }
 
-  ZBBox<glm::ivec4> boundBox() const;
+  inline ZROI& roi()
+  { return *m_roi; }
+
+  ZBBox<glm::ivec4> boundBox() const
+  { return m_roi->boundBox(); }
 
 protected:
 
@@ -60,15 +70,16 @@ signals:
 
   void selectionChanged();
 
-  void swcChanged();
+  void ROIChanged();
 
   void undoStackCleanChanged(bool clean);
 
 protected:
-  ZSwc m_swc;
+  std::unique_ptr<ZROI> m_roi;
   QString m_path;
-  ZSwcDoc& m_doc;
-  QUndoStack m_undoStack;
+  ZROIDoc& m_doc;
+  // QUndoStack m_undoStack;
+  bool m_hasUnsavedChange = false;
 
   QMenu m_contextMenu;
 
@@ -80,3 +91,5 @@ private:
 };
 
 } // namespace nim
+
+

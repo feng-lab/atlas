@@ -5,14 +5,15 @@
 
 namespace nim {
 
-ZSwcTreeModel::ZSwcTreeModel(ZSwcPack& swcPack, QObject* parent)
+ZSwcTreeModel::ZSwcTreeModel(ZSwcPack& swcPack, ZDoc& doc, QObject* parent)
   : QAbstractItemModel(parent)
   , m_swcPack(swcPack)
+  , m_doc(doc)
 {
   m_roots.clear();
   m_rootToChildren.clear();
   for (auto rit = m_swcPack.swc().beginRoot(); rit != m_swcPack.swc().endRoot(); ++rit) {
-    m_roots.push_back(rit);
+    m_roots.emplace_back(rit);
   }
   for (auto& rit : m_roots) {
     m_rootToChildren[&rit].clear();
@@ -206,8 +207,14 @@ void ZSwcTreeModel::clicked(const QModelIndex& /*idxIn*/)
   //  }
 }
 
-void ZSwcTreeModel::doubleClicked(const QModelIndex& /*unused*/)
+void ZSwcTreeModel::doubleClicked(const QModelIndex& index)
 {
+  if (!index.isValid()) {
+    return;
+  }
+
+  auto p = *reinterpret_cast<ZSwc::ConstIterator*>(index.internalId());
+  emit m_doc.requestToAdjustViewToPosition(p->x, p->y, p->z, 128);
 }
 
 void ZSwcTreeModel::activated(const QModelIndex& /*idxIn*/)

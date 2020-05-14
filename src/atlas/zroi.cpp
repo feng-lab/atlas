@@ -695,7 +695,7 @@ void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
 
   LOG(INFO) << "Finish importing mask image";
 
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 }
 
 ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation) const
@@ -742,8 +742,8 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
         if (distMapImgs.find(nextSlice) == distMapImgs.end()) {
           distMapImgs[nextSlice] = distMap.run<double>(img.createView(nextSlice, 0, 0), false);
         }
-        double* prevData = distMapImgs[prevSlice].channelData<double>(0);
-        double* nextData = distMapImgs[nextSlice].channelData<double>(0);
+        auto prevData = distMapImgs[prevSlice].channelData<double>(0);
+        auto nextData = distMapImgs[nextSlice].channelData<double>(0);
         size_t numSlice = nextSlice - prevSlice - 1;
         std::vector<uint8_t*> dataPts;
         std::vector<double> progresses;

@@ -27,9 +27,9 @@ class ZObjView;
 
 class ZActionGroup;
 
-class ZROI;
+class ZROIPack;
 
-class ZRegionAnnotation;
+class ZRegionAnnotationPack;
 
 class ZIntParameter;
 
@@ -126,9 +126,9 @@ public:
   inline const ZGraphicsView& graphicsView() const
   { return *m_view; }
 
-  ZROI& roi();
+  ZROIPack& roiPack();
 
-  ZRegionAnnotation& regionAnnotation();
+  ZRegionAnnotationPack& regionAnnotationPack();
 
   State state() const;
 

@@ -5,10 +5,10 @@
 
 namespace nim {
 
-ZRegionAnnotationTreeModel::ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, QObject* parent)
+ZRegionAnnotationTreeModel::ZRegionAnnotationTreeModel(ZRegionAnnotationPack& rap, QObject* parent)
   : QAbstractItemModel(parent)
-  , m_regionAnnotation(anno)
-  , m_annotationTree(m_regionAnnotation.annotationTree())
+  , m_regionAnnotationPack(rap)
+  , m_annotationTree(m_regionAnnotationPack.regionAnnotation().annotationTree())
 {
   for (auto it = m_annotationTree.begin(); it != m_annotationTree.end(); ++it) {
     m_nodeToIter[&(*it)] = it;

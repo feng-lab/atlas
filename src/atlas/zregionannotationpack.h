@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zobjpack.h"
-#include "zswc.h"
+#include "zregionannotation.h"
 #include "zglmutils.h"
 #include "zbbox.h"
 #include <QUndoStack>
@@ -13,15 +13,16 @@
 
 namespace nim {
 
-class ZSwcDoc;
+class ZRegionAnnotationDoc;
 
-class ZSwcPack : public ZObjPack
+class ZRegionAnnotationPack : public ZObjPack
 {
 Q_OBJECT
 public:
-  ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& pd, QObject* parent = nullptr);
+  ZRegionAnnotationPack(ZRegionAnnotation* roi, const QString& path,
+                        size_t id, ZRegionAnnotationDoc& pd, QObject* parent = nullptr);
 
-  ~ZSwcPack() override;
+  ~ZRegionAnnotationPack() override;
 
   void updateDerivedData();
 
@@ -37,7 +38,7 @@ public:
   { return m_path; }
 
   QUndoStack* undoStack()
-  { return &m_undoStack; }
+  { return m_regionAnnotation->undoStack(); }
 
   QMenu& contextMenu();
 
@@ -45,10 +46,14 @@ public:
 
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZSwc& swc() const
-  { return m_swc; }
+  inline const ZRegionAnnotation& regionAnnotation() const
+  { return *m_regionAnnotation; }
 
-  ZBBox<glm::ivec4> boundBox() const;
+  inline ZRegionAnnotation& regionAnnotation()
+  { return *m_regionAnnotation; }
+
+  ZBBox<glm::ivec4> boundBox() const
+  { return m_regionAnnotation->boundBox(); }
 
 protected:
 
@@ -60,15 +65,15 @@ signals:
 
   void selectionChanged();
 
-  void swcChanged();
+  void ROIChanged();
 
   void undoStackCleanChanged(bool clean);
 
 protected:
-  ZSwc m_swc;
+  std::unique_ptr<ZRegionAnnotation> m_regionAnnotation;
   QString m_path;
-  ZSwcDoc& m_doc;
-  QUndoStack m_undoStack;
+  ZRegionAnnotationDoc& m_doc;
+  // QUndoStack m_undoStack;
 
   QMenu m_contextMenu;
 
@@ -80,3 +85,7 @@ private:
 };
 
 } // namespace nim
+
+
+
+

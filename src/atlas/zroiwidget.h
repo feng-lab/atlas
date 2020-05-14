@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zdoc.h"
-#include "zroi.h"
+#include "zroipack.h"
 #include <QWidget>
 
 namespace nim {
@@ -10,7 +10,7 @@ class ZROIWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZROIWidget(ZROI& roi, ZDoc& doc, QWidget* parent = nullptr);
+  explicit ZROIWidget(ZROIPack& roiPack, ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
 
@@ -18,7 +18,7 @@ private:
   void createWidget();
 
 private:
-  ZROI& m_roi;
+  ZROIPack& m_roiPack;
   ZDoc& m_doc;
 };
 

@@ -14,8 +14,8 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& obj
   try {
     for (int i = 0; i < objs.size(); ++i) {
       size_t id = objs[i];
-      Z3DRegionAnnotationFilter* viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
-      viewControl->setData(m_doc.regionAnnotation(id));
+      auto viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
+      viewControl->setData(m_doc.regionAnnotationPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
@@ -49,8 +49,8 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& obj
 void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
 {
   try {
-    Z3DRegionAnnotationFilter* viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
-    viewControl->setData(m_doc.regionAnnotation(id));
+    auto viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
+    viewControl->setData(m_doc.regionAnnotationPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);

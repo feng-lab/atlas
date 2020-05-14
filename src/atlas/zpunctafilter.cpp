@@ -154,8 +154,7 @@ void ZPunctumGraphicsItem::updateValue()
 
 void ZPunctumGraphicsItem::setLocked(bool l)
 {
-  m_locked = l;
-  if (m_locked) {
+  if (l) {
     setFlags(0);
   } else {
     setFlags(QGraphicsItem::ItemIsSelectable);
@@ -164,7 +163,10 @@ void ZPunctumGraphicsItem::setLocked(bool l)
 
 void ZPunctumGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  if (m_locked || !isSelected() || !isVisible() || m_punctaPack.selectedPuncta().empty()) { // feels weird
+  if (m_punctaPack.isLocked()) {
+    return;
+  }
+  if (!isSelected() || !isVisible() || m_punctaPack.selectedPuncta().empty()) { // feels weird
     return;
   }
   m_punctaPack.contextMenu().popup(event->screenPos());

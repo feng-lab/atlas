@@ -13,11 +13,11 @@
 
 namespace nim {
 
-ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotation& anno,
+ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotationPack& rap,
                                                      ZDoc& doc, QWidget* parent)
   : QTreeView(parent)
   , m_ratModel(objModel)
-  , m_regionAnnotation(anno)
+  , m_regionAnnotationPack(rap)
   , m_doc(doc)
 {
   setSortingEnabled(true);
@@ -102,6 +102,10 @@ void ZRegionAnnotationTreeView::adaptColumns()
 
 void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
 {
+  if (m_regionAnnotationPack.isLocked()) {
+    return;
+  }
+
   bool ok;
   int64_t regionID = ud.toLongLong(&ok);
   int64_t action = std::abs(regionID % 10);
@@ -116,18 +120,18 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
     size_t objID = m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID),
                                                          this);
     if (objID)
-      m_regionAnnotation.mergeROIToRegion(m_doc.roiDoc().roi(objID), regionID);
+      m_regionAnnotationPack.regionAnnotation().mergeROIToRegion(m_doc.roiDoc().roiPack(objID).roi(), regionID);
   } else if (action == 2) {
-    if (m_regionAnnotation.roiOfRegion(regionID)) {
-      m_doc.roiDoc().askToSave(*m_regionAnnotation.roiOfRegion(regionID),
+    if (m_regionAnnotationPack.regionAnnotation().roiOfRegion(regionID)) {
+      m_doc.roiDoc().askToSave(*m_regionAnnotationPack.regionAnnotation().roiOfRegion(regionID),
                                QString("Export ROI of Region %1").arg(regionID));
     } else {
       QMessageBox::critical(this, qApp->applicationName(), tr("Region %1 is empty and contains no roi").arg(regionID));
       return;
     }
   } else if (action == 3) {
-    if (m_regionAnnotation.meshOfRegion(regionID)) {
-      m_doc.meshDoc().askToSave(*m_regionAnnotation.meshOfRegion(regionID),
+    if (m_regionAnnotationPack.regionAnnotation().meshOfRegion(regionID)) {
+      m_doc.meshDoc().askToSave(*m_regionAnnotationPack.regionAnnotation().meshOfRegion(regionID),
                                 QString("Export Mesh of Region %1").arg(regionID));
     } else {
       QMessageBox::critical(this, qApp->applicationName(), tr("Region %1 is empty or contains no mesh").arg(regionID));

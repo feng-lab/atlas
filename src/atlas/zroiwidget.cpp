@@ -8,9 +8,9 @@
 
 namespace nim {
 
-ZROIWidget::ZROIWidget(ZROI& roi, ZDoc& doc, QWidget* parent)
+ZROIWidget::ZROIWidget(ZROIPack& roiPack, ZDoc& doc, QWidget* parent)
   : QWidget(parent)
-  , m_roi(roi)
+  , m_roiPack(roiPack)
   , m_doc(doc)
 {
   createWidget();

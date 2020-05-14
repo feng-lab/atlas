@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zregionannotation.h"
+#include "zregionannotationpack.h"
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
@@ -18,7 +18,7 @@ public:
     AbbreviationColumn, IDColumn, NameColumn, MergeROIColumn, ExportROIColumn, ExportMeshColumn, ColumnCount
   };
 
-  explicit ZRegionAnnotationTreeModel(ZRegionAnnotation& anno, QObject* parent = nullptr);
+  explicit ZRegionAnnotationTreeModel(ZRegionAnnotationPack& rap, QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
@@ -45,7 +45,7 @@ public:
   void activated(const QModelIndex& idxIn);
 
 protected:
-  ZRegionAnnotation& m_regionAnnotation;
+  ZRegionAnnotationPack& m_regionAnnotationPack;
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
 };

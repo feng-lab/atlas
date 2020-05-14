@@ -18,7 +18,7 @@ void ZSwcWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
 
-  auto model = new ZSwcTreeModel(m_swcPack, this);
+  auto model = new ZSwcTreeModel(m_swcPack, m_doc, this);
   auto view = new ZSwcTreeView(*model, m_swcPack, m_doc, this);
   vlo->addWidget(view);
 

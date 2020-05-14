@@ -15,22 +15,30 @@ namespace nim {
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
   , m_view(view)
+  , m_highlightRegionOnMouseHover("Highlight Region On Mouse Hover", true)
 {
-  connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZRegionAnnotationFilter::visibleChanged);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_highlightRegionOnMouseHover);
+  m_numParametersWithoutRegionSepcificParas = m_parameters.size();
 }
 
-void ZRegionAnnotationFilter::setData(ZRegionAnnotation& regionAnnotation)
+void ZRegionAnnotationFilter::setData(ZRegionAnnotationPack& regionAnnotationPack)
 {
-  m_regionAnnotation = &regionAnnotation;
+  m_regionAnnotationPack = &regionAnnotationPack;
 
   allROIChanged();
 
-  connect(m_regionAnnotation, &ZRegionAnnotation::boundBoxChanged, this, &ZRegionAnnotationFilter::boundBoxChanged);
-  connect(m_regionAnnotation, &ZRegionAnnotation::allROIChanged, this, &ZRegionAnnotationFilter::allROIChanged);
-  connect(m_regionAnnotation, &ZRegionAnnotation::regionROIAdded, this, &ZRegionAnnotationFilter::regionROIAdded);
+  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::boundBoxChanged,
+          this, &ZRegionAnnotationFilter::boundBoxChanged);
+  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::allROIChanged,
+          this, &ZRegionAnnotationFilter::allROIChanged);
+  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::regionROIAdded,
+          this, &ZRegionAnnotationFilter::regionROIAdded);
+
+  connect(m_regionAnnotationPack, &ZRegionAnnotationPack::lockedStateChanged,
+          this, &ZRegionAnnotationFilter::onLockedStateChanged);
 }
 
 void ZRegionAnnotationFilter::releaseItemsOwnership()
@@ -63,7 +71,7 @@ void ZRegionAnnotationFilter::setMaxZProjView(int t)
 
 ZBBox<glm::ivec4> ZRegionAnnotationFilter::boundBox() const
 {
-  auto res = m_regionAnnotation->boundBox();
+  auto res = m_regionAnnotationPack->boundBox();
   updateBoundBoxWithOffsetPara(res);
   return res;
 }
@@ -85,11 +93,12 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_transform, 2);
     m_widgetsGroup->addChild(m_offsetPara, 2);
+    m_widgetsGroup->addChild(m_highlightRegionOnMouseHover, 2);
 
     auto model =
-      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters), 4);
+      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
   }
   return m_widgetsGroup;
@@ -97,6 +106,9 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
 
 void ZRegionAnnotationFilter::deleteKeyPressed()
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->deleteKeyPressed();
   }
@@ -104,6 +116,9 @@ void ZRegionAnnotationFilter::deleteKeyPressed()
 
 void ZRegionAnnotationFilter::copyKeyPressed()
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->copyKeyPressed();
   }
@@ -111,7 +126,10 @@ void ZRegionAnnotationFilter::copyKeyPressed()
 
 void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
 {
-  auto srcBoundBox = m_regionAnnotation->copiedItemBoundBox();
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
+  auto srcBoundBox = m_regionAnnotationPack->regionAnnotation().copiedItemBoundBox();
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->pasteKeyPressed(slice, point, srcBoundBox, hFlip, vFlip);
   }
@@ -119,6 +137,9 @@ void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point, bool hFl
 
 void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->mousePressed(scenePos);
   }
@@ -126,6 +147,9 @@ void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
 
 void ZRegionAnnotationFilter::mouseMoved(const QPointF& scenePos)
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->mouseMoved(scenePos);
   }
@@ -133,6 +157,9 @@ void ZRegionAnnotationFilter::mouseMoved(const QPointF& scenePos)
 
 void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->mouseReleased(scenePos);
   }
@@ -140,6 +167,9 @@ void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
 
 void ZRegionAnnotationFilter::rotateClockwise()
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->rotateClockwise();
   }
@@ -147,22 +177,18 @@ void ZRegionAnnotationFilter::rotateClockwise()
 
 void ZRegionAnnotationFilter::rotateCounterclockwise()
 {
+  if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
+    return;
+  }
   for (const auto& idFilter : m_idToROIFilters) {
     idFilter.second->rotateCounterclockwise();
-  }
-}
-
-void ZRegionAnnotationFilter::visibleChanged()
-{
-  for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->setVisible(m_visible.get());
   }
 }
 
 void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 {
   CHECK(roi);
-  m_idToROIFilters.at(id)->setData(*roi);
+  m_idToROIFilters.at(id)->setData(*roi, *m_regionAnnotationPack);
 }
 
 void ZRegionAnnotationFilter::allROIChanged()
@@ -178,27 +204,33 @@ void ZRegionAnnotationFilter::allROIChanged()
   m_idToRegionNames.clear();
   m_nameToID.clear();
 
-  while (m_parameters.size() > 4) {
+  while (m_parameters.size() > static_cast<int>(m_numParametersWithoutRegionSepcificParas)) {
     m_parameters.pop_back();
   }
 
-  for (const auto& node : m_regionAnnotation->annotationTree()) {
+  for (const auto& node : m_regionAnnotationPack->regionAnnotation().annotationTree()) {
     int id = node.id;
     auto flt = new ZROIFilter(m_view, &node);
     if (node.roi) {
-      flt->setData(*(node.roi));
+      flt->setData(*(node.roi), *m_regionAnnotationPack);
     }
-    flt->setVisible(true);
+    flt->setVisible(m_visible.get());
     flt->setOutlineColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->setRegionColor(glm::vec3(node.red / 255.f, node.green / 255.f, node.blue / 255.f));
     flt->viewPrecedencePara().setValue(m_viewPrecedencePara.get());
     flt->transformPara().set(m_transform.get());
+    flt->offsetPara().set(m_offsetPara.get());
+    flt->highlightRegionOnMouseHoverPara().set(m_highlightRegionOnMouseHover.get());
+    connect(&m_visible, &ZBoolParameter::valueChanged,
+            &flt->visiblePara(), &ZBoolParameter::updateFromSender);
     connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,
             &flt->viewPrecedencePara(), &ZIntParameter::updateFromSender);
     connect(&m_transform, &Z2DTransformParameter::valueChanged,
             &flt->transformPara(), &Z2DTransformParameter::updateFromSender);
     connect(&m_offsetPara, &ZDVec2Parameter::valueChanged,
             &flt->offsetPara(), &ZDVec2Parameter::updateFromSender);
+    connect(&m_highlightRegionOnMouseHover, &ZBoolParameter::valueChanged,
+            &flt->highlightRegionOnMouseHoverPara(), &ZBoolParameter::updateFromSender);
 
     m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
@@ -215,14 +247,17 @@ void ZRegionAnnotationFilter::allROIChanged()
 
   if (m_widgetsGroup) {
     auto model =
-      new ZRegionAnnotationViewSettingTreeModel(*m_regionAnnotation, m_idToROIFilters, this);
+      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters, this);
     m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, *m_regionAnnotation, m_idToROIFilters), 4);
+      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters), 4);
     m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
 }
+
+void ZRegionAnnotationFilter::onLockedStateChanged(bool)
+{}
 
 } // namespace nim
 

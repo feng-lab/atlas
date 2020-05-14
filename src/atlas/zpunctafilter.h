@@ -108,7 +108,6 @@ private:
   const ZPunctum& m_punctum;
 
   QPointF m_basePos;
-  bool m_locked = false;
   QTransform m_transform;
   ZView& m_view;
 };

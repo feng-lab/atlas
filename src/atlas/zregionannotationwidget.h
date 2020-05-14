@@ -1,8 +1,10 @@
 #pragma once
 
 #include "zdoc.h"
-#include "zregionannotation.h"
+#include "zregionannotationpack.h"
 #include <QWidget>
+
+class QPushButton;
 
 namespace nim {
 
@@ -10,7 +12,7 @@ class ZRegionAnnotationWidget : public QWidget
 {
 Q_OBJECT
 public:
-  explicit ZRegionAnnotationWidget(ZRegionAnnotation& anno, ZDoc& doc, QWidget* parent = nullptr);
+  explicit ZRegionAnnotationWidget(ZRegionAnnotationPack& rap, ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
   void exportLabelImage();
@@ -20,9 +22,15 @@ protected:
 private:
   void createWidget();
 
+  void onLockedStateChanged(bool v);
+
 private:
-  ZRegionAnnotation& m_regionAnnotation;
+  ZRegionAnnotationPack& m_regionAnnotationPack;
   ZDoc& m_doc;
+
+  QPushButton* m_update3DMeshFromROIButton = nullptr;
+  QPushButton* m_transform3DMeshButton = nullptr;
+  QPushButton* m_exportLableImageButton = nullptr;
 };
 
 } // namespace nim

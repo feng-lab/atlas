@@ -614,7 +614,7 @@ set(SOURCES
     zswctreemodel.cpp
     zswctreemodel.h
     zobjpack.cpp
-    zobjpack.h)
+    zobjpack.h zroipack.cpp zroipack.h zregionannotationpack.cpp zregionannotationpack.h)
 
 # our target
 set(APP_NAME Atlas)

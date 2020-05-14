@@ -1,39 +1,47 @@
-#include "zswcpack.h"
+#include "zroipack.h"
 
-#include "zswcdoc.h"
+#include "zroidoc.h"
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QApplication>
 
 namespace nim {
 
-ZSwcPack::ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& doc, QObject* parent)
+ZROIPack::ZROIPack(ZROI* roi, const QString& path, size_t id, ZROIDoc& doc, QObject* parent)
   : ZObjPack(id, &doc, parent)
-  , m_swc(std::move(swc))
+  , m_roi(roi)
   , m_path(QFileInfo(path).canonicalFilePath())
   , m_doc(doc)
 {
   updateDerivedData();
   updatePtsAndSelectedPuncta();
   createContextMenu();
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZSwcPack::undoStackCleanChanged);
+  connect(undoStack(), &QUndoStack::cleanChanged,
+          this, &ZROIPack::undoStackCleanChanged);
+  if (m_path.isEmpty() && path.endsWith("_roi")) {
+    m_path = path;
+  }
+  if (m_name.isEmpty()) {
+    m_hasUnsavedChange = true;
+    static size_t num = 1;
+    m_name = QString("Unsaved ROI %1").arg(num++);
+  }
 }
 
-ZSwcPack::~ZSwcPack()
+ZROIPack::~ZROIPack()
 {
-  m_undoStack.disconnect(this);
+  undoStack()->disconnect(this);
 }
 
-const QString& ZSwcPack::info() const
+const QString& ZROIPack::info() const
 {
   if (m_info.isEmpty()) {
-    m_info = QString("size %1").arg(m_swc.size());
+    m_info = QString("%1 slices").arg(m_roi->numSlices());
   }
   return m_info;
 }
 
-QMenu& ZSwcPack::contextMenu()
+QMenu& ZROIPack::contextMenu()
 {
 //  m_deleteSelectedPunctaAction->setEnabled(!m_selectedPuncta.empty());
 //  m_transferSelectedPunctaToAnotherFileAction->setEnabled(!m_selectedPuncta.empty() && m_doc.objs().size() > 1);
@@ -42,33 +50,25 @@ QMenu& ZSwcPack::contextMenu()
   return m_contextMenu;
 }
 
-void ZSwcPack::save(const QString &fileName)
+void ZROIPack::save(const QString &fileName)
 {
-  m_swc.resortID();
-  m_swc.save(fileName);
+  m_roi->save(fileName);
   m_path = QFileInfo(fileName).canonicalFilePath();
-  m_undoStack.setClean();
+  undoStack()->setClean();
+  m_hasUnsavedChange = false;
   updateDerivedData();
 }
 
-ZBBox<glm::ivec4> ZSwcPack::boundBox() const
-{
-  ZBBox<glm::ivec4> res;
-  for (auto& p : m_swc) {
-    res.expand(glm::ivec4(p.x - p.radius, p.y - p.radius, std::floor(p.z), 0));
-    res.expand(glm::ivec4(p.x + p.radius, p.y + p.radius, std::ceil(p.z), 0));
-  }
-  return res;
-}
-
-void ZSwcPack::updateDerivedData()
+void ZROIPack::updateDerivedData()
 {
   m_info.clear();
-  m_name = QFileInfo(m_path).fileName();
+  if (!m_name.startsWith("Unsaved ROI ")) {
+    m_name = QFileInfo(m_path).fileName();
+  }
   m_tooltip = m_path;
 }
 
-void ZSwcPack::updatePtsAndSelectedPuncta()
+void ZROIPack::updatePtsAndSelectedPuncta()
 {
 //  m_punctaPts.clear();
 //  m_selectedPuncta.clear();
@@ -80,24 +80,24 @@ void ZSwcPack::updatePtsAndSelectedPuncta()
 //  }
 }
 
-void ZSwcPack::createContextMenu()
+void ZROIPack::createContextMenu()
 {
 //  m_deleteSelectedPunctaAction = new QAction(tr("Delete Selected Puncta"), this);
 //  m_deleteSelectedPunctaAction->setStatusTip(tr("Delete all selected puncta"));
-//  connect(m_deleteSelectedPunctaAction, &QAction::triggered, this, &ZSwcPack::deleteSelectedPuncta);
+//  connect(m_deleteSelectedPunctaAction, &QAction::triggered, this, &ZROIPack::deleteSelectedPuncta);
 //
 //  m_transferSelectedPunctaToAnotherFileAction = new QAction(tr("Transfer Selected Puncta to Another File..."), this);
 //  m_transferSelectedPunctaToAnotherFileAction->setStatusTip(tr("Transfer the selected puncta to another puncta file"));
 //  connect(m_transferSelectedPunctaToAnotherFileAction, &QAction::triggered,
-//          this, &ZSwcPack::transferSelectedPuncta);
+//          this, &ZROIPack::transferSelectedPuncta);
 //
 //  m_mergeSelectedPuntaAction = new QAction(tr("Merge Selected Puncta"), this);
 //  m_mergeSelectedPuntaAction->setStatusTip(tr("Merge selected puncta into 1 punctum"));
-//  connect(m_mergeSelectedPuntaAction, &QAction::triggered, this, &ZSwcPack::mergeSelectedPuncta);
+//  connect(m_mergeSelectedPuntaAction, &QAction::triggered, this, &ZROIPack::mergeSelectedPuncta);
 //
 //  m_splitSelectedPunctumAction = new QAction(tr("Split Punctum..."), this);
 //  m_splitSelectedPunctumAction->setStatusTip(tr("Split the selected punctum into several parts using GMM"));
-//  connect(m_splitSelectedPunctumAction, &QAction::triggered, this, &ZSwcPack::splitSelectedPunctum);
+//  connect(m_splitSelectedPunctumAction, &QAction::triggered, this, &ZROIPack::splitSelectedPunctum);
 //
 //  m_contextMenu.addAction(m_deleteSelectedPunctaAction);
 //  m_contextMenu.addAction(m_transferSelectedPunctaToAnotherFileAction);
@@ -106,5 +106,7 @@ void ZSwcPack::createContextMenu()
 }
 
 } // namespace nim
+
+
 
 

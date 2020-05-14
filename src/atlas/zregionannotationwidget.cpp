@@ -14,12 +14,15 @@
 
 namespace nim {
 
-ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotation& anno, ZDoc& doc, QWidget* parent)
+ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotationPack& rap, ZDoc& doc, QWidget* parent)
   : QWidget(parent)
-  , m_regionAnnotation(anno)
+  , m_regionAnnotationPack(rap)
   , m_doc(doc)
 {
   createWidget();
+  onLockedStateChanged(m_regionAnnotationPack.isLocked());
+  connect(&m_regionAnnotationPack, &ZRegionAnnotationPack::lockedStateChanged,
+          this, &ZRegionAnnotationWidget::onLockedStateChanged);
 }
 
 void ZRegionAnnotationWidget::exportLabelImage()
@@ -54,7 +57,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
     try {
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];
-      m_regionAnnotation.exportLabelImage(fn, formats[fmtIdx], paras);
+      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, formats[fmtIdx], paras);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
@@ -70,7 +73,7 @@ void ZRegionAnnotationWidget::transformMesh()
   Z3DTransformParameter para("Transform Mesh");
   ZParameterEditDialog dialog(para);
   if (dialog.exec()) {
-    m_regionAnnotation.transformMesh(para.get());
+    m_regionAnnotationPack.regionAnnotation().transformMesh(para.get());
   }
 }
 
@@ -78,29 +81,36 @@ void ZRegionAnnotationWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
 
-  QPushButton* pb = new QPushButton("Update 3D Mesh From Modified ROIs");
-  pb->setToolTip("Update 3D mesh with current region contours");
-  pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(pb, &QPushButton::clicked, &m_regionAnnotation, &ZRegionAnnotation::updateMesh);
+  m_update3DMeshFromROIButton = new QPushButton("Update 3D Mesh From Modified ROIs");
+  m_update3DMeshFromROIButton->setToolTip("Update 3D mesh with current region contours");
+  m_update3DMeshFromROIButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_update3DMeshFromROIButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_update3DMeshFromROIButton, &QPushButton::clicked,
+    &m_regionAnnotationPack.regionAnnotation(), &ZRegionAnnotation::updateMesh);
 
-  pb = new QPushButton("Transform 3D Mesh...");
-  pb->setToolTip("Apply transformation to 3D mesh");
-  pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::transformMesh);
+  m_transform3DMeshButton = new QPushButton("Transform 3D Mesh...");
+  m_transform3DMeshButton->setToolTip("Apply transformation to 3D mesh");
+  m_transform3DMeshButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_transform3DMeshButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_transform3DMeshButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::transformMesh);
 
-  pb = new QPushButton("Export Label Image...");
-  pb->setToolTip("Export Region Annotation To Label Image");
-  pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  vlo->addWidget(pb, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(pb, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
+  m_exportLableImageButton = new QPushButton("Export Label Image...");
+  m_exportLableImageButton->setToolTip("Export Region Annotation To Label Image");
+  m_exportLableImageButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_exportLableImageButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_exportLableImageButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
 
-  auto model = new ZRegionAnnotationTreeModel(m_regionAnnotation, this);
-  auto view = new ZRegionAnnotationTreeView(*model, m_regionAnnotation, m_doc, this);
+  auto model = new ZRegionAnnotationTreeModel(m_regionAnnotationPack, this);
+  auto view = new ZRegionAnnotationTreeView(*model, m_regionAnnotationPack, m_doc, this);
   vlo->addWidget(view);
 
   setLayout(vlo);
+}
+
+void ZRegionAnnotationWidget::onLockedStateChanged(bool)
+{
+  m_update3DMeshFromROIButton->setEnabled(!m_regionAnnotationPack.isLocked());
+  m_transform3DMeshButton->setEnabled(!m_regionAnnotationPack.isLocked());
 }
 
 } // namespace nim

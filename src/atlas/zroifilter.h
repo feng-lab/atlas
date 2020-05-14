@@ -3,7 +3,8 @@
 #include "zobjfilter.h"
 #include "zparameter.h"
 #include "znumericparameter.h"
-#include "zroi.h"
+#include "zroipack.h"
+#include "zregionannotationpack.h"
 #include "zgraphicsitemtype.h"
 #include <QGraphicsRectItem>
 #include <QGraphicsPathItem>
@@ -26,7 +27,7 @@ public:
     Type = GraphicsItemType::SliceROIGraphicsItem
   };
 
-  int type() const override
+  [[nodiscard]] int type() const override
   { return Type; }
 
   SliceROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent = nullptr);
@@ -52,7 +53,7 @@ public:
     Type = GraphicsItemType::ROIGraphicsItem
   };
 
-  int type() const override
+  [[nodiscard]] int type() const override
   { return Type; }
 
   ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, const RegionNode* regionNode = nullptr,
@@ -63,7 +64,9 @@ public:
 
   void updateValue();
 
-  QPainterPath shape() const override;
+  [[nodiscard]] QPainterPath shape() const override;
+
+  void setLocked(bool l);
 
 protected:
   //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
@@ -86,6 +89,7 @@ private:
   const RegionNode* m_regionNode = nullptr;
 
   QPointF m_basePos;
+  bool m_locked = false;
 };
 
 class ROICtrlPtGraphicsItem : public QGraphicsRectItem
@@ -99,7 +103,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm, ZView& view,
+  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, QTransform  tfm, ZView& view,
                         double viewScale = 1., const RegionNode* regionNode = nullptr,
                         QGraphicsItem* parent = nullptr);
 
@@ -114,6 +118,8 @@ public:
 
   ZROIControlPoint controlPoint() const
   { return m_controlPoint; }
+
+  void setLocked(bool l);
 
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
@@ -141,6 +147,7 @@ private:
   QTransform m_transform;
   ZView& m_view;
   const RegionNode* m_regionNode = nullptr;
+  bool m_locked = false;
 };
 
 class ZROIFilter : public ZObjFilter
@@ -155,7 +162,11 @@ public:
     return vp++;
   }
 
-  void setData(ZROI& roi);
+  void setData(ZROI& roi, ZROIPack& roiPack);
+
+  void setData(ZROI& roi, ZRegionAnnotationPack& raPack);
+
+  bool isLocked() const;
 
   void releaseItemsOwnership();
 
@@ -215,6 +226,9 @@ public:
   ZDVec2Parameter& offsetPara()
   { return m_offsetPara; }
 
+  ZBoolParameter& highlightRegionOnMouseHoverPara()
+  { return m_highlightRegionOnMouseHover; }
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -255,8 +269,12 @@ private:
 
   void viewScaleChanged(double s);
 
+  void onLockedStateChanged(bool l);
+
 private:
   ZROI* m_ROI = nullptr;
+  ZROIPack* m_ROIPack = nullptr;
+  ZRegionAnnotationPack* m_regionAnnotationPack = nullptr;
   std::map<int, std::map<size_t, std::unique_ptr<ROIGraphicsItem>>> m_sliceToROIItem;
   std::map<int, std::map<size_t, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>>> m_sliceToCtrlPtItems;
 
@@ -266,7 +284,6 @@ private:
   ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;
   ZBoolParameter m_highlightRegionOnMouseHover;
-  bool m_sliceValid;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_hasSelectedItems = false;

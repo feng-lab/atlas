@@ -219,8 +219,8 @@ void ZSwcDoc::loadSwc()
 size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, *this);
-  m_doc.registerNewObj(id, *this);
+  m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, id, *this);
+  m_doc.registerNewObj(m_idToSwcPacks[id]);
 
   emit objAdded(id, this);
   connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged,

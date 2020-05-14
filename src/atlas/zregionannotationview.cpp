@@ -11,18 +11,18 @@ ZRegionAnnotationView::ZRegionAnnotationView(ZRegionAnnotationDoc& doc, ZView& v
 
 void ZRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& objs)
 {
-  for (int i = 0; i < objs.size(); ++i) {
-    ZRegionAnnotationFilter* viewControl = new ZRegionAnnotationFilter(m_view);
-    viewControl->setData(m_doc.regionAnnotation(objs[i]));
+  for (unsigned long obj : objs) {
+    auto viewControl = new ZRegionAnnotationFilter(m_view);
+    viewControl->setData(m_doc.regionAnnotationPack(obj));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]].reset(viewControl);
+    m_idToFilter[obj].reset(viewControl);
     connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
     connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this,
             &ZRegionAnnotationView::onObjDeselectedFromView);
     connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
     connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged,
             this, &ZRegionAnnotationView::onObjVisibleChangedFromView);
-    emit objViewReady(objs[i]);
+    emit objViewReady(obj);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -31,8 +31,8 @@ void ZRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& objs)
 
 void ZRegionAnnotationView::docRegionAnnotationAdded(size_t id)
 {
-  ZRegionAnnotationFilter* viewControl = new ZRegionAnnotationFilter(m_view);
-  viewControl->setData(m_doc.regionAnnotation(id));
+  auto viewControl = new ZRegionAnnotationFilter(m_view);
+  viewControl->setData(m_doc.regionAnnotationPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
   m_view.updateBoundBox();
