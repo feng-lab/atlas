@@ -7,8 +7,8 @@
 
 namespace nim {
 
-ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, ZPunctaDoc& doc, QObject* parent)
-  : QObject(parent)
+ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPunctaDoc& doc, QObject* parent)
+  : ZObjPack(id, &doc, parent)
   , m_puncta(std::move(puncta))
   , m_path(QFileInfo(path).canonicalFilePath())
   , m_doc(doc)

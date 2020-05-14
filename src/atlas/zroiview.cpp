@@ -19,6 +19,7 @@ void ZROIView::docROIsAdded(const QList<size_t>& objs)
     connect(viewControl, &ZROIFilter::boundBoxChanged, this, &ZROIView::updateBoundBox);
     connect(viewControl, &ZROIFilter::objDeselected, this, &ZROIView::onObjDeselectedFromView);
     connect(viewControl, &ZROIFilter::objSelected, this, &ZROIView::onObjSelectedFromView);
+    connect(viewControl, &ZROIFilter::objVisibleChanged, this, &ZROIView::onObjVisibleChangedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -36,6 +37,7 @@ void ZROIView::docROIAdded(size_t id)
   connect(viewControl, &ZROIFilter::boundBoxChanged, this, &ZROIView::updateBoundBox);
   connect(viewControl, &ZROIFilter::objDeselected, this, &ZROIView::onObjDeselectedFromView);
   connect(viewControl, &ZROIFilter::objSelected, this, &ZROIView::onObjSelectedFromView);
+  connect(viewControl, &ZROIFilter::objVisibleChanged, this, &ZROIView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

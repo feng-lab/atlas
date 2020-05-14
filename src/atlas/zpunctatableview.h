@@ -36,9 +36,11 @@ protected:
 
   void onPunctaChanged();
 
+  void onLockedStateChanged(bool l);
+
 private:
   ZPunctaTableModel& m_ratModel;
-  ZPunctaPack& m_puncta;
+  ZPunctaPack& m_punctaPack;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel = nullptr;
   std::map<const ZPunctum*, int> m_punctumToRow;

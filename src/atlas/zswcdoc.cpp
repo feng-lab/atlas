@@ -174,7 +174,7 @@ size_t ZSwcDoc::makeAlias(size_t id)
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToSwcPacks[aliasId] = m_idToSwcPacks[id];
-  m_doc.registerNewObj(aliasId, this);
+  m_doc.registerNewObj(aliasId, *this);
 
   emit objAdded(aliasId, this);
   return aliasId;
@@ -220,7 +220,7 @@ size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, *this);
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
 
   emit objAdded(id, this);
   connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged,

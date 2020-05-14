@@ -60,6 +60,7 @@ void ZImgView::docImgsAdded(const QList<size_t>& objs)
     connect(viewControl, &ZImgFilter::boundBoxChanged, this, &ZImgView::updateBoundBox);
     connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
     connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
+    connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -77,6 +78,7 @@ void ZImgView::docImgAdded(size_t id)
   connect(viewControl, &ZImgFilter::boundBoxChanged, this, &ZImgView::updateBoundBox);
   connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
   connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
+  connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

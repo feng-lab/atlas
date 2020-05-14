@@ -101,16 +101,13 @@ public:
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
 
   void setMaxZProjView(int t) override;
 
-  inline bool isVisible() const
+  bool isVisible() const override
   { return m_isVisible; }
 
   ZBBox<glm::ivec4> boundBox() const;
@@ -177,7 +174,6 @@ private:
   std::unique_ptr<ZGraphicsItemGroup> m_item;
   std::unique_ptr<ZImgScaleBarGraphicsItem> m_scaleBarItem;
 
-  ZBoolParameter m_visible;
   bool m_sliceValid;
   bool m_hasVisibleChannel;
   bool m_isVisible;

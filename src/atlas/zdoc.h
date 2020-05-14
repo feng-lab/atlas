@@ -36,6 +36,8 @@ class ZRegionAnnotationDoc;
 
 class ZMeshDoc;
 
+class ZObjPack;
+
 class ZDoc : public QObject
 {
 Q_OBJECT
@@ -65,6 +67,8 @@ public:
   bool isObjSelected(size_t id) const;
 
   void setObjVisible(size_t id, bool v);
+
+  void setObjLocked(size_t id, bool v);
 
   void setObjSelected(size_t id, bool v);
 
@@ -128,7 +132,9 @@ public:
   { return m_nextObjId++; }
 
   // let doc know objD has a new obj with id
-  void registerNewObj(size_t id, ZObjDoc* objD);
+  void registerNewObj(size_t id, ZObjDoc& objD);
+
+  void registerNewObj(const std::shared_ptr<ZObjPack>& op);
 
   void removeObj(size_t id);
 
@@ -181,6 +187,10 @@ public:
   void showSelectedObjs();
 
   void hideSelectedObjs();
+
+  void lockSelectedObjs();
+
+  void unlockSelectedObjs();
 
   void makeAliasOfSelectedObjs();
 
@@ -253,28 +263,28 @@ private:
   bool loadFile(const QString& fileName, QString& errMsg);
 
 private:
-  QUndoGroup* m_undoGroup;
-  QUndoStack* m_emptyUndoStack;
-  QAction* m_undoAction;
-  QAction* m_redoAction;
-  QAction* m_removeAllAction;
-  QAction* m_make2DAnimationAction;
-  QAction* m_make3DAnimationAction;
-  QAction* m_changeAnimationSettingAction;
+  QUndoGroup* m_undoGroup = nullptr;
+  QUndoStack* m_emptyUndoStack = nullptr;
+  QAction* m_undoAction = nullptr;
+  QAction* m_redoAction = nullptr;
+  QAction* m_removeAllAction = nullptr;
+  QAction* m_make2DAnimationAction = nullptr;
+  QAction* m_make3DAnimationAction = nullptr;
+  QAction* m_changeAnimationSettingAction = nullptr;
 
-  ZObjModel* m_objModel;
-  ZItemSelectionModel* m_objSelectionModel;
+  ZObjModel* m_objModel = nullptr;
+  ZItemSelectionModel* m_objSelectionModel = nullptr;
   QList<DocPack> m_docPacks;
   size_t m_nextObjId;
 
   size_t m_viewSettingId;
 
-  ZImgDoc* m_imgDoc;
-  Z2DAnimationDoc* m_animation2DDoc;
-  Z3DAnimationDoc* m_animation3DDoc;
-  ZROIDoc* m_roiDoc;
-  ZMeshDoc* m_meshDoc;
-  ZRegionAnnotationDoc* m_regionAnnotationDoc;
+  ZImgDoc* m_imgDoc = nullptr;
+  Z2DAnimationDoc* m_animation2DDoc = nullptr;
+  Z3DAnimationDoc* m_animation3DDoc = nullptr;
+  ZROIDoc* m_roiDoc = nullptr;
+  ZMeshDoc* m_meshDoc = nullptr;
+  ZRegionAnnotationDoc* m_regionAnnotationDoc = nullptr;
 };
 
 } // namespace nim

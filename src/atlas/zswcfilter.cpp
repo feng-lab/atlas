@@ -178,7 +178,6 @@ void ZSwcGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem* 
 
 ZSwcFilter::ZSwcFilter(ZView& view)
   : ZObjFilter(view)
-  , m_visible("Visible", true)
   , m_showSkeleton("Show Skeleton", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 0), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
@@ -188,15 +187,11 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   connect(&m_showSkeleton, &ZBoolParameter::valueChanged, this, &ZSwcFilter::showSkeletonChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZSwcFilter::outlineColorChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::opacityChanged);
-  addParameter(&m_visible);
   addParameter(&m_showSkeleton);
   addParameter(&m_outlineColor);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
 

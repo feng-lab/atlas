@@ -9,7 +9,7 @@ namespace nim {
 ZObjModel::ZObjModel(ZDoc* doc)
   : QAbstractItemModel(doc)
   , m_doc(doc)
-  , m_rootItem(std::make_unique<ObjItem>(0, nullptr, nullptr))
+  , m_rootItem(std::make_unique<ZObjPack>(0, nullptr, nullptr))
   , m_viewSettingCurrentItem(nullptr)
 {
 }
@@ -19,40 +19,38 @@ QVariant ZObjModel::data(const QModelIndex& index, int role) const
   if (!index.isValid())
     return QVariant();
 
-  ObjItem* item = static_cast<ObjItem*>(index.internalPointer());
+  auto item = static_cast<ZObjPack*>(index.internalPointer());
 
   if (role == Qt::CheckStateRole && index.column() == ShowHideNameColumn && needCheckbox(index))
-    return item->checkState;
+    return item->m_show ? Qt::Checked : Qt::Unchecked;
 
-  if (role == Qt::ToolTipRole)
-    return item->doc->objTooltip(item->id);
+  if (role == Qt::ToolTipRole) {
+    switch (index.column()) {
+      case LockColumn:
+        return "Lock from editing";
+      default:
+        return item->m_objDoc->objTooltip(item->m_id);
+    }
+  }
 
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case ShowHideNameColumn:
-        return item->doc->objNameWithModifiedMarker(item->id);
-        break;
-      case ShowHideColumn:
-        return "";
-        break;
+        return item->m_objDoc->objNameWithModifiedMarker(item->m_id);
       case LockColumn:
         return "";
-        break;
-      case NameColumn:
-        return item->doc->objNameWithModifiedMarker(item->id);
-        break;
       case TypeColumn:
-        return item->doc->typeName();
-        break;
+        return item->m_objDoc->typeName();
       case InfoColumn:
-        return item->doc->objInfo(item->id);
-        break;
+        return item->m_objDoc->objInfo(item->m_id);
       case IDColumn:
-        return static_cast<qlonglong>(item->id);
-        break;
+        return static_cast<qlonglong>(item->m_id);
+      case ShowHideColumn:
+        return "";
+      case NameColumn:
+        return item->m_objDoc->objNameWithModifiedMarker(item->m_id);
       case ViewSettingColumn:
         return "";
-        break;
       default:
         break;
     }
@@ -61,10 +59,10 @@ QVariant ZObjModel::data(const QModelIndex& index, int role) const
   if (role == Qt::DecorationRole) {
     switch (index.column()) {
       case ShowHideColumn:
-        return item->show ?
+        return item->m_show ?
                ZTheme::instance().icon(ZTheme::EyeOpenIcon) : ZTheme::instance().icon(ZTheme::EyeCloseIcon);
       case LockColumn:
-        return item->locked ?
+        return item->m_locked ?
                ZTheme::instance().icon(ZTheme::LockedIcon) : ZTheme::instance().icon(ZTheme::UnlockedIcon);
       case ViewSettingColumn:
         return ZTheme::instance().icon(ZTheme::SettingsIcon);
@@ -110,7 +108,7 @@ bool ZObjModel::setData(const QModelIndex& index, const QVariant& value, int rol
     return false;
 
   if (role == Qt::CheckStateRole && index.column() == ShowHideNameColumn && needCheckbox(index)) {
-    Qt::CheckState cs = static_cast<Qt::CheckState>(value.toInt());
+    auto cs = static_cast<Qt::CheckState>(value.toInt());
 
     setModelIndexCheckState(index, cs);
     // update child items check state
@@ -132,12 +130,8 @@ QVariant ZObjModel::headerData(int section, Qt::Orientation orientation,
       case ShowHideNameColumn:
         return QString("Name");
         break;
-      case ShowHideColumn:
       case LockColumn:
         return QString();
-        break;
-      case NameColumn:
-        return QString("Name");
         break;
       case TypeColumn:
         return QString("Type");
@@ -147,6 +141,12 @@ QVariant ZObjModel::headerData(int section, Qt::Orientation orientation,
         break;
       case IDColumn:
         return QString("ID");
+        break;
+      case ShowHideColumn:
+        return QString();
+        break;
+      case NameColumn:
+        return QString("Name");
         break;
       case ViewSettingColumn:
         return QString("View Settings");
@@ -183,12 +183,11 @@ QModelIndex ZObjModel::index(int row, int column, const QModelIndex& parent) con
   if (!hasIndex(row, column, parent))
     return QModelIndex();
 
-  ObjItem* parentItem;
-
+  ZObjPack* parentItem = nullptr;
   if (!parent.isValid()) {
     parentItem = m_rootItem.get();
   } else {
-    parentItem = static_cast<ObjItem*>(parent.internalPointer());
+    parentItem = static_cast<ZObjPack*>(parent.internalPointer());
   }
 
   auto& childItem = parentItem->children[row];
@@ -203,8 +202,8 @@ QModelIndex ZObjModel::parent(const QModelIndex& index) const
   if (!index.isValid())
     return QModelIndex();
 
-  ObjItem* childItem = static_cast<ObjItem*>(index.internalPointer());
-  ObjItem* parentItem = childItem->parent;
+  auto childItem = static_cast<ZObjPack*>(index.internalPointer());
+  auto parentItem = childItem->parent;
 
   if (parentItem == m_rootItem.get())
     return QModelIndex();
@@ -214,15 +213,14 @@ QModelIndex ZObjModel::parent(const QModelIndex& index) const
 
 int ZObjModel::rowCount(const QModelIndex& parent) const
 {
-  ObjItem* parentItem;
   if (parent.column() > 0)
     return 0;
 
   if (!parent.isValid()) {
-    parentItem = m_rootItem.get();
+    auto parentItem = m_rootItem.get();
     return parentItem->children.size();
   } else {
-    parentItem = static_cast<ObjItem*>(parent.internalPointer());
+    auto parentItem = static_cast<ZObjPack*>(parent.internalPointer());
     return parentItem->children.size();
   }
 }
@@ -230,7 +228,7 @@ int ZObjModel::rowCount(const QModelIndex& parent) const
 int ZObjModel::columnCount(const QModelIndex& /*parent*/) const
 {
 #ifdef CONFIG_OLD
-  return ColumnCount - 4;
+  return ColumnCount - 3;
 #else
   return ColumnCount - 2;
 #endif
@@ -250,10 +248,10 @@ QList<size_t> ZObjModel::objs() const
   QList<size_t> res;
   for (const auto& c : m_rootItem->children) {
     if (c->children.empty()) {
-      res.push_back(c->id);
+      res.push_back(c->m_id);
     } else {
       for (const auto& cc : c->children) {
-        res.push_back(cc->id);
+        res.push_back(cc->m_id);
       }
     }
   }
@@ -264,13 +262,13 @@ QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc* doc) const
 {
   QList<size_t> res;
   for (const auto& c : m_rootItem->children) {
-    if (c->doc != doc)
+    if (c->m_objDoc != doc)
       continue;
     if (c->children.empty()) {
-      res.push_back(c->id);
+      res.push_back(c->m_id);
     } else {
       for (const auto& cc : c->children) {
-        res.push_back(cc->id);
+        res.push_back(cc->m_id);
       }
     }
   }
@@ -281,12 +279,12 @@ bool ZObjModel::isObjVisible(size_t id) const
 {
   for (const auto& c : m_rootItem->children) {
     if (c->children.empty()) {
-      if (c->id == id)
-        return c->show;
+      if (c->m_id == id)
+        return c->m_show;
     } else {
       for (const auto& cc : c->children) {
-        if (cc->id == id)
-          return cc->show;
+        if (cc->m_id == id)
+          return cc->m_show;
       }
     }
   }
@@ -299,8 +297,36 @@ void ZObjModel::setObjVisible(size_t id, bool v)
     QModelIndex idx = idToIndex(id, 0);
     if (idx.isValid()) {
       setData(idx, v ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
-      ObjItem* item = static_cast<ObjItem*>(idx.internalPointer());
-      item->show = v;
+//      auto item = static_cast<ZObjPack*>(idx.internalPointer());
+//      item->setVisible(v);
+      emit dataChanged(idx, idx);
+    }
+  }
+}
+
+bool ZObjModel::isObjLocked(size_t id) const
+{
+  for (const auto& c : m_rootItem->children) {
+    if (c->children.empty()) {
+      if (c->m_id == id)
+        return c->m_locked;
+    } else {
+      for (const auto& cc : c->children) {
+        if (cc->m_id == id)
+          return cc->m_locked;
+      }
+    }
+  }
+  return false;
+}
+
+void ZObjModel::setObjLocked(size_t id, bool v)
+{
+  if (isObjLocked(id) != v) {
+    QModelIndex idx = idToIndex(id, 0);
+    if (idx.isValid()) {
+      auto item = static_cast<ZObjPack*>(idx.internalPointer());
+      item->setLocked(v);
       emit dataChanged(idx, idx);
     }
   }
@@ -310,12 +336,12 @@ ZObjDoc* ZObjModel::idToDoc(size_t id) const
 {
   for (const auto& c : m_rootItem->children) {
     if (c->children.empty()) {
-      if (c->id == id)
-        return c->doc;
+      if (c->m_id == id)
+        return c->m_objDoc;
     } else {
       for (const auto& cc : c->children) {
-        if (cc->id == id)
-          return cc->doc;
+        if (cc->m_id == id)
+          return cc->m_objDoc;
       }
     }
   }
@@ -324,21 +350,31 @@ ZObjDoc* ZObjModel::idToDoc(size_t id) const
 
 void ZObjModel::updateObj(size_t id)
 {
-  emit dataChanged(idToIndex(id, 0), idToIndex(id, 3));
+  emit dataChanged(idToIndex(id, 0), idToIndex(id, 4));
 }
 
-void ZObjModel::addObj(size_t id, ZObjDoc* doc)
+void ZObjModel::addObj(size_t id, ZObjDoc& doc)
 {
   int row = m_rootItem->children.size();
   emit beginInsertRows(QModelIndex(), row, row);
-  m_rootItem->children.emplace_back(std::make_unique<ObjItem>(id, doc, m_rootItem.get()));
+  m_rootItem->children.emplace_back(std::make_unique<ZObjPack>(id, &doc));
+  m_rootItem->children[row]->parent = m_rootItem.get();
+  emit endInsertRows();
+}
+
+void ZObjModel::addObj(const std::shared_ptr<ZObjPack>& obj)
+{
+  int row = m_rootItem->children.size();
+  emit beginInsertRows(QModelIndex(), row, row);
+  obj->parent = m_rootItem.get();
+  m_rootItem->children.push_back(obj);
   emit endInsertRows();
 }
 
 void ZObjModel::removeObj(size_t id)
 {
   for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-    if (m_rootItem->children[i]->id == id) {
+    if (m_rootItem->children[i]->m_id == id) {
       emit beginRemoveRows(QModelIndex(), i, i);
       if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
         m_viewSettingCurrentItem = nullptr;
@@ -357,7 +393,7 @@ void ZObjModel::removeObjsOfDoc(ZObjDoc* doc)
   while (cont) {
     cont = false;
     for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
-      if (m_rootItem->children[i]->doc == doc) {
+      if (m_rootItem->children[i]->m_objDoc == doc) {
         emit beginRemoveRows(QModelIndex(), i, i);
         if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
           m_viewSettingCurrentItem = nullptr;
@@ -383,7 +419,7 @@ void ZObjModel::removeAllObjs()
 
 size_t ZObjModel::indexToId(const QModelIndex& index)
 {
-  return index.isValid() ? static_cast<ObjItem*>(index.internalPointer())->id : 0;
+  return index.isValid() ? static_cast<ZObjPack*>(index.internalPointer())->m_id : 0;
 }
 
 QModelIndex ZObjModel::idToIndex(size_t id, int col)
@@ -391,16 +427,16 @@ QModelIndex ZObjModel::idToIndex(size_t id, int col)
   QModelIndex res;
   for (int row = 0; row < rowCount(QModelIndex()); ++row) {
     QModelIndex idx = index(row, col, QModelIndex());
-    ObjItem* objItem = static_cast<ObjItem*>(idx.internalPointer());
-    if (objItem->id == id) {
+    auto objItem = static_cast<ZObjPack*>(idx.internalPointer());
+    if (objItem->m_id == id) {
       res = idx;
       break;
     }
     if (rowCount(idx) > 0) {
       for (int subRow = 0; subRow < rowCount(idx); ++subRow) {
         QModelIndex subIdx = index(subRow, col, idx);
-        objItem = static_cast<ObjItem*>(subIdx.internalPointer());
-        if (objItem->id == id) {
+        objItem = static_cast<ZObjPack*>(subIdx.internalPointer());
+        if (objItem->m_id == id) {
           res = subIdx;
           break;
         }
@@ -414,55 +450,18 @@ QModelIndex ZObjModel::idToIndex(size_t id, int col)
 
 ZObjDoc* ZObjModel::indexToDoc(const QModelIndex& index)
 {
-  return index.isValid() ? static_cast<ObjItem*>(index.internalPointer())->doc : nullptr;
+  return index.isValid() ? static_cast<ZObjPack*>(index.internalPointer())->m_objDoc : nullptr;
 }
 
 void ZObjModel::clicked(const QModelIndex& idxIn)
 {
   if (idxIn.isValid()) {
     if (idxIn.column() == ShowHideNameColumn || idxIn.column() == NameColumn) {
-      ObjItem* item = static_cast<ObjItem*>(idxIn.internalPointer());
-      m_doc->sendShowViewSettingSignal(item->id);
-    } else if (idxIn.column() == ShowHideColumn) {
-      ObjItem* item = static_cast<ObjItem*>(idxIn.internalPointer());
-      item->show = !item->show;
-      emit dataChanged(idxIn, idxIn);
-      item->doc->setObjVisible(item->id, item->show);
+      auto item = static_cast<ZObjPack*>(idxIn.internalPointer());
+      m_doc->sendShowViewSettingSignal(item->m_id);
     } else if (idxIn.column() == LockColumn) {
-      ObjItem* item = static_cast<ObjItem*>(idxIn.internalPointer());
-      item->locked = !item->locked;
-      emit dataChanged(idxIn, idxIn);
-    } else if (idxIn.column() == ViewSettingColumn) {
-      ObjItem* item = static_cast<ObjItem*>(idxIn.internalPointer());
-      if (m_viewSettingCurrentItem == item) {
-        m_viewSettingCurrentItem = nullptr;
-        m_doc->sendHideViewSettingSignal();
-      } else {
-        QModelIndex prevIdx;
-        for (int row = 0; row < rowCount(QModelIndex()); ++row) {
-          QModelIndex idx = index(row, ViewSettingColumn, QModelIndex());
-          if (static_cast<ObjItem*>(idx.internalPointer()) == m_viewSettingCurrentItem) {
-            prevIdx = idx;
-            break;
-          }
-          if (rowCount(idx) > 0) {
-            for (int subRow = 0; subRow < rowCount(idx); ++subRow) {
-              QModelIndex subIdx = index(subRow, ViewSettingColumn, idx);
-              if (static_cast<ObjItem*>(subIdx.internalPointer()) == m_viewSettingCurrentItem) {
-                prevIdx = subIdx;
-                break;
-              }
-            }
-          }
-          if (prevIdx.isValid())
-            break;
-        }
-
-        m_viewSettingCurrentItem = item;
-        if (prevIdx.isValid())
-          emit dataChanged(prevIdx, prevIdx);
-        m_doc->sendShowViewSettingSignal(item->id);
-      }
+      auto item = static_cast<ZObjPack*>(idxIn.internalPointer());
+      item->setLocked(!item->m_locked);
       emit dataChanged(idxIn, idxIn);
     }
   }
@@ -542,37 +541,19 @@ void ZObjModel::updateParentCheckState(const QModelIndex& child)
 
 void ZObjModel::setModelIndexCheckState(const QModelIndex& index, Qt::CheckState cs)
 {
-  auto item = static_cast<ObjItem*>(index.internalPointer());
-  item->checkState = cs;
+  auto item = static_cast<ZObjPack*>(index.internalPointer());
+  item->setVisible(cs == Qt::Checked);
   emit dataChanged(index, index);
-  item->doc->setObjVisible(item->id, item->checkState == Qt::Checked);
 }
 
 Qt::CheckState ZObjModel::getModelIndexCheckState(const QModelIndex& index) const
 {
-  return static_cast<ObjItem*>(index.internalPointer())->checkState;
+  return static_cast<ZObjPack*>(index.internalPointer())->m_show ? Qt::Checked : Qt::Unchecked;
 }
 
 bool ZObjModel::needCheckbox(const QModelIndex& index) const
 {
   return index.internalPointer() != m_rootItem.get();
-}
-
-ZObjModel::ObjItem::ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_)
-  : parent(parent_), id(id_), doc(doc_)
-{
-}
-
-int ZObjModel::ObjItem::row() const
-{
-  if (parent) {
-    for (size_t i = 0; i < parent->children.size(); ++i) {
-      if (parent->children[i].get() == this) {
-        return i;
-      }
-    }
-  }
-  return 0;
 }
 
 } // namespace nim

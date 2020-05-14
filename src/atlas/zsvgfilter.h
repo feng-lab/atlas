@@ -29,9 +29,6 @@ public:
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
@@ -57,7 +54,6 @@ private:
 private:
   std::unique_ptr<QGraphicsSvgItem> m_item;
 
-  ZBoolParameter m_visible;
   ZDoubleParameter m_opacity;
   bool m_sliceValid;
 

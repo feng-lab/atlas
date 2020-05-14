@@ -19,6 +19,7 @@ void ZPunctaView::docPunctasAdded(const QList<size_t>& objs)
     connect(viewControl, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaView::updateBoundBox);
     connect(viewControl, &ZPunctaFilter::objDeselected, this, &ZPunctaView::onObjDeselectedFromView);
     connect(viewControl, &ZPunctaFilter::objSelected, this, &ZPunctaView::onObjSelectedFromView);
+    connect(viewControl, &ZPunctaFilter::objVisibleChanged, this, &ZPunctaView::onObjVisibleChangedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -36,6 +37,7 @@ void ZPunctaView::docPunctaAdded(size_t id)
   connect(viewControl, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaView::updateBoundBox);
   connect(viewControl, &ZPunctaFilter::objDeselected, this, &ZPunctaView::onObjDeselectedFromView);
   connect(viewControl, &ZPunctaFilter::objSelected, this, &ZPunctaView::onObjSelectedFromView);
+  connect(viewControl, &ZPunctaFilter::objVisibleChanged, this, &ZPunctaView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

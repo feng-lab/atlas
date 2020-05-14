@@ -12,18 +12,13 @@ namespace nim {
 
 ZSvgFilter::ZSvgFilter(ZView& view)
   : ZObjFilter(view)
-  , m_visible("Visible", true)
   , m_opacity("Opacity", 1, 0., 1.)
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSvgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSvgFilter::opacityChanged);
-  addParameter(&m_visible);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 }
 

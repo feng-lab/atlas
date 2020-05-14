@@ -264,7 +264,7 @@ size_t ZImgDoc::makeAlias(size_t id)
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToImgPacks[aliasId] = m_idToImgPacks[id];
-  m_doc.registerNewObj(aliasId, this);
+  m_doc.registerNewObj(aliasId, *this);
 
   emit objAdded(aliasId, this);
   return aliasId;
@@ -351,7 +351,7 @@ size_t ZImgDoc::addImgPack(ZImgPack* imgPack)
 
   size_t id = m_doc.getNewObjId();
   m_idToImgPacks[id] = std::shared_ptr<ZImgPack>(imgPack);
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
 
   emit objAdded(id, this);
   return id;

@@ -390,7 +390,7 @@ size_t ZROIDoc::addROI(ZROI* roi, const QString& path, bool unsaved)
   if (unsaved) {
     m_idToROIPacks[id]->hasUnsavedChange = true;
   }
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
 
   emit objAdded(id, this);
   connect(roi, &ZROI::roiChanged, this, qOverload<>(&ZROIDoc::setModified));

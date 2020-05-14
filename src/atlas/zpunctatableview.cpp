@@ -15,7 +15,7 @@ namespace nim {
 ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun, ZDoc& doc, QWidget* parent)
   : QTableView(parent)
   , m_ratModel(objModel)
-  , m_puncta(pun)
+  , m_punctaPack(pun)
   , m_doc(doc)
 {
   setSortingEnabled(true);
@@ -52,8 +52,8 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
           this, &ZPunctaTableView::adaptColumns);
   adaptColumns();
 
-  for (size_t i = 0; i < m_puncta.punctaPts().size(); ++i) {
-    m_punctumToRow[m_puncta.punctaPts()[i]] = i;
+  for (size_t i = 0; i < m_punctaPack.punctaPts().size(); ++i) {
+    m_punctumToRow[m_punctaPack.punctaPts()[i]] = i;
   }
 
 //  bool first = true;
@@ -67,14 +67,18 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
 //  }
   onPunctaSelectionChanged();
 
-  connect(&m_puncta, &ZPunctaPack::selectionChanged, this, &ZPunctaTableView::onPunctaSelectionChanged);
-  connect(&m_puncta, &ZPunctaPack::punctaChanged, this, &ZPunctaTableView::onPunctaChanged);
+  connect(&m_punctaPack, &ZPunctaPack::selectionChanged, this, &ZPunctaTableView::onPunctaSelectionChanged);
+  connect(&m_punctaPack, &ZPunctaPack::punctaChanged, this, &ZPunctaTableView::onPunctaChanged);
+  connect(&m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &ZPunctaTableView::onLockedStateChanged);
 }
 
 void ZPunctaTableView::contextMenu(const QPoint& pos)
 {
-  if (!m_puncta.selectedPuncta().empty()) {
-    m_puncta.contextMenu().popup(mapToGlobal(pos));
+  if (m_punctaPack.isLocked()) {
+    return;
+  }
+  if (!m_punctaPack.selectedPuncta().empty()) {
+    m_punctaPack.contextMenu().popup(mapToGlobal(pos));
   }
 }
 
@@ -88,7 +92,7 @@ void ZPunctaTableView::indexDoubleClicked(const QModelIndex& index)
   m_ratModel.doubleClicked(m_ratProxyModel->mapToSource(index));
 
   auto row = m_ratProxyModel->mapToSource(index).row();
-  auto p = m_puncta.punctaPts()[row];
+  auto p = m_punctaPack.punctaPts()[row];
   emit m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
 }
 
@@ -109,11 +113,14 @@ void ZPunctaTableView::adaptColumns()
 
 void ZPunctaTableView::keyPressEvent(QKeyEvent* e)
 {
+  if (m_punctaPack.isLocked()) {
+    return;
+  }
   // LOG(INFO) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
   switch (e->key()) {
     case Qt::Key_Delete:
     case Qt::Key_Backspace:
-      m_puncta.deleteSelectedPuncta();
+      m_punctaPack.deleteSelectedPuncta();
       break;
     default:
       QTableView::keyPressEvent(e);
@@ -125,6 +132,10 @@ void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QI
 {
   QTableView::selectionChanged(selected, deselected);
 
+  if (m_punctaPack.isLocked()) {
+    return;
+  }
+
   if (m_skipSelectionChangedProcessing) {
     return;
   }
@@ -135,11 +146,11 @@ void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QI
   }
   std::set<const ZPunctum*> selectedPuncta;
   for (auto r : selectedRows) {
-    selectedPuncta.insert(m_puncta.punctaPts()[r]);
+    selectedPuncta.insert(m_punctaPack.punctaPts()[r]);
   }
   // LOG(INFO) << selectedPuncta.size();
   m_ignoreSelectionChangedSignal = true;
-  m_puncta.setSelectedPuncta(selectedPuncta);
+  m_punctaPack.setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;
 }
 
@@ -152,11 +163,11 @@ void ZPunctaTableView::onPunctaSelectionChanged()
   // blockSignals(true);
   m_skipSelectionChangedProcessing = true;
 
-  if (m_puncta.selectedPuncta().empty()) {
+  if (m_punctaPack.selectedPuncta().empty()) {
     selectionModel()->clearSelection();
   } else {
     bool first = true;
-    for (auto p : m_puncta.selectedPuncta()) {
+    for (auto p : m_punctaPack.selectedPuncta()) {
       auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
       if (first) {
         selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
@@ -177,11 +188,15 @@ void ZPunctaTableView::onPunctaChanged()
   m_ratModel.updateModel();
 
   m_punctumToRow.clear();
-  for (size_t i = 0; i < m_puncta.punctaPts().size(); ++i) {
-    m_punctumToRow[m_puncta.punctaPts()[i]] = i;
+  for (size_t i = 0; i < m_punctaPack.punctaPts().size(); ++i) {
+    m_punctumToRow[m_punctaPack.punctaPts()[i]] = i;
   }
 
   onPunctaSelectionChanged();
+}
+
+void ZPunctaTableView::onLockedStateChanged(bool)
+{
 }
 
 } // namespace nim

@@ -190,7 +190,7 @@ size_t ZRegionAnnotationDoc::makeAlias(size_t id)
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[aliasId] = m_idToRegionAnnotationPacks[id];
-  m_doc.registerNewObj(aliasId, this);
+  m_doc.registerNewObj(aliasId, *this);
 
   emit objAdded(aliasId, this);
   return aliasId;
@@ -367,7 +367,7 @@ size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation* regionAnnota
 {
   size_t id = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[id] = std::make_shared<RegionAnnotationPack>(regionAnnotation, path);
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
 
   emit objAdded(id, this);
   connect(regionAnnotation, &ZRegionAnnotation::undoStackCleanChanged,

@@ -22,9 +22,6 @@ public:
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
@@ -63,8 +60,6 @@ private:
   std::map<int, std::unique_ptr<ZROIFilter>> m_idToROIFilters;
   std::map<int, QString> m_idToRegionNames;
   std::map<QString, int> m_nameToID;
-
-  ZBoolParameter m_visible;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView& m_view;

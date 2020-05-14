@@ -263,7 +263,7 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
 {
   size_t id = m_doc.getNewObjId();
   m_idToAnimationPacks[id] = std::make_shared<AnimationPack>(animation, path, name);
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
   animation->bindView(m_view);
 
   emit objAdded(id, this);

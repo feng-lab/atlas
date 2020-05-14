@@ -137,7 +137,7 @@ size_t ZSvgDoc::makeAlias(size_t id)
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToSvgPacks[aliasId] = m_idToSvgPacks[id];
-  m_doc.registerNewObj(aliasId, this);
+  m_doc.registerNewObj(aliasId, *this);
 
   emit objAdded(aliasId, this);
   return aliasId;
@@ -175,7 +175,7 @@ size_t ZSvgDoc::addSvg(std::unique_ptr<QSvgRenderer> svg, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
   m_idToSvgPacks[id] = std::make_shared<SvgPack>(std::move(svg), path);
-  m_doc.registerNewObj(id, this);
+  m_doc.registerNewObj(id, *this);
 
   emit objAdded(id, this);
   return id;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zobjpack.h"
 #include <QAbstractItemModel>
 #include <QModelIndex>
 #include <QVariant>
@@ -22,11 +23,11 @@ public:
   {
 #ifdef CONFIG_OLD
     ShowHideNameColumn = 0,
+    LockColumn,
     TypeColumn,
     InfoColumn,
     IDColumn,
     ShowHideColumn,
-    LockColumn,
     NameColumn,
     ViewSettingColumn,
     ColumnCount
@@ -68,11 +69,17 @@ public:
 
   void setObjVisible(size_t id, bool v);
 
+  [[nodiscard]] bool isObjLocked(size_t id) const;
+
+  void setObjLocked(size_t id, bool v);
+
   [[nodiscard]] ZObjDoc* idToDoc(size_t id) const;
 
   void updateObj(size_t id);
 
-  void addObj(size_t id, ZObjDoc* doc);
+  void addObj(size_t id, ZObjDoc& doc);
+
+  void addObj(const std::shared_ptr<ZObjPack>& obj);
 
   void removeObj(size_t id);
 
@@ -107,24 +114,8 @@ protected:
 protected:
   ZDoc* m_doc;
 
-  struct ObjItem
-  {
-    ObjItem(size_t id_, ZObjDoc* doc_, ObjItem* parent_);
-
-    [[nodiscard]] int row() const;
-
-    std::vector<std::unique_ptr<ObjItem>> children;
-    ObjItem* parent;
-
-    size_t id;
-    ZObjDoc* doc;
-    Qt::CheckState checkState = Qt::Checked;
-    bool locked = false;
-    bool show = true;
-  };
-
-  std::unique_ptr<ObjItem> m_rootItem;
-  ObjItem* m_viewSettingCurrentItem;
+  std::unique_ptr<ZObjPack> m_rootItem;
+  ZObjPack* m_viewSettingCurrentItem = nullptr;
 };
 
 } // namespace nim

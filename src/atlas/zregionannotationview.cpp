@@ -20,6 +20,8 @@ void ZRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& objs)
     connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this,
             &ZRegionAnnotationView::onObjDeselectedFromView);
     connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
+    connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged,
+            this, &ZRegionAnnotationView::onObjVisibleChangedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -37,6 +39,8 @@ void ZRegionAnnotationView::docRegionAnnotationAdded(size_t id)
   connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
   connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this, &ZRegionAnnotationView::onObjDeselectedFromView);
   connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
+  connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged, this,
+          &ZRegionAnnotationView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

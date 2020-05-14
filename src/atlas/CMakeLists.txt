@@ -612,7 +612,9 @@ set(SOURCES
     zswctreeview.cpp
     zswctreeview.h
     zswctreemodel.cpp
-    zswctreemodel.h)
+    zswctreemodel.h
+    zobjpack.cpp
+    zobjpack.h)
 
 # our target
 set(APP_NAME Atlas)

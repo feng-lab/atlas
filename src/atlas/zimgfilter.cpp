@@ -76,7 +76,6 @@ void ZImgScaleBarGraphicsItem::updatePos()
 ZImgFilter::ZImgFilter(ZView& view)
   : ZObjFilter(view)
   , m_imgPack(nullptr)
-  , m_visible("Visible", true)
   , m_hasVisibleChannel(true)
   , m_isVisible(false)
   , m_opacity(QString("Opacity"), 1.0, 0.0, 1.0)
@@ -91,7 +90,6 @@ ZImgFilter::ZImgFilter(ZView& view)
   , m_lastViewport()
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
-  addParameter(&m_visible);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
   addParameter(&m_opacity);
   connect(&m_showScaleBar, &ZBoolParameter::valueChanged, this, &ZImgFilter::showScaleBarChanged);
@@ -110,9 +108,6 @@ ZImgFilter::ZImgFilter(ZView& view)
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZImgFilter::viewScaleChanged);
 }

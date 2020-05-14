@@ -438,7 +438,6 @@ void ROICtrlPtGraphicsItem::updateRectSize()
 
 ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   : ZObjFilter(view)
-  , m_visible("Visible", true)
   , m_showControlPoints("Show Control Points", true)
   , m_fixedControlPointsSize("Fixed Control Points Size", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 1, 0), glm::vec3(0), glm::vec3(1))
@@ -456,7 +455,6 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZROIFilter::regionColorChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZROIFilter::opacityChanged);
   connect(&m_highlightRegionOnMouseHover, &ZBoolParameter::valueChanged, this, &ZROIFilter::highlightRegionOnMouseHoverChanged);
-  addParameter(&m_visible);
   addParameter(&m_showControlPoints);
   addParameter(&m_fixedControlPointsSize);
   addParameter(&m_outlineColor);
@@ -464,9 +462,6 @@ ZROIFilter::ZROIFilter(ZView& view, const RegionNode* regionNode)
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZROIFilter::viewScaleChanged);

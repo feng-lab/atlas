@@ -17,17 +17,17 @@ Q_OBJECT
 public:
   explicit Z3DObjView(Z3DView& view);
 
-  const ZBBox<glm::dvec3>& boundBox() const
+  [[nodiscard]] const ZBBox<glm::dvec3>& boundBox() const
   { return m_boundBox; }
 
-  virtual const ZObjDoc& doc() const = 0;
+  [[nodiscard]] virtual const ZObjDoc& doc() const = 0;
 
-  virtual bool hasObj(size_t id) const = 0;
+  [[nodiscard]] virtual bool hasObj(size_t id) const = 0;
 
   // return default ZBBox if object id is not the current type
-  virtual ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const = 0;
+  [[nodiscard]] virtual ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const = 0;
 
-  virtual ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const = 0;
+  [[nodiscard]] virtual ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const = 0;
 
   virtual void read(size_t id, const QJsonObject& json) = 0;
 

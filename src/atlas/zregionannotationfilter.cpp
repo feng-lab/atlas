@@ -14,11 +14,9 @@ namespace nim {
 
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
-  , m_visible("Visible", true)
   , m_view(view)
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZRegionAnnotationFilter::visibleChanged);
-  //addParameter(&m_visible);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
@@ -180,11 +178,9 @@ void ZRegionAnnotationFilter::allROIChanged()
   m_idToRegionNames.clear();
   m_nameToID.clear();
 
-  m_parameters.clear();
-  //addParameter(&m_visible);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
+  while (m_parameters.size() > 4) {
+    m_parameters.pop_back();
+  }
 
   for (const auto& node : m_regionAnnotation->annotationTree()) {
     int id = node.id;

@@ -174,6 +174,7 @@ void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
   connect(this, &Z3DPunctaFilter::punctumSelected, m_punctaPack, &ZPunctaPack::onPunctumSelected);
   updateData();
   connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &Z3DPunctaFilter::updateData);
+  connect(m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &Z3DPunctaFilter::invalidateResult);
 }
 
 bool Z3DPunctaFilter::isReady(Z3DEye eye) const
@@ -412,6 +413,9 @@ void Z3DPunctaFilter::addSelectionLines()
 
 void Z3DPunctaFilter::addEditingSelectionLines()
 {
+  if (m_punctaPack->isLocked()) {
+    return;
+  }
   ZBBox<glm::dvec3> boundBox;
   for (auto p : m_punctaPack->selectedPuncta()) {
     punctumBound(*p, boundBox);
@@ -499,6 +503,10 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
     return;
   }
 
+  if (m_punctaPack->isLocked()) {
+    return;
+  }
+
   e->ignore();
   // Mouse button pressend
   // can not accept the event in button press, because we don't know if it is a selection or interaction
@@ -522,10 +530,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
-      if (e->modifiers() == Qt::ControlModifier)
-        emit { punctumSelected(m_pressedPunctum, true); }
-      else
-        emit { punctumSelected(m_pressedPunctum, false); }
+      emit punctumSelected(m_pressedPunctum, e->modifiers() == Qt::ControlModifier);
       if (m_pressedPunctum) {
         e->accept();
       }
@@ -536,6 +541,10 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 
 void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
 {
+  if (m_punctaPack->isLocked()) {
+    return;
+  }
+
   if (isVisible() && !isSelected() && m_punctaPack && !m_punctaPack->selectedPuncta().empty()) {
     const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
     if (!obj) {
@@ -572,6 +581,9 @@ void Z3DPunctaFilter::changePunctaSize()
 
 void Z3DPunctaFilter::deleteSelectedPuncta()
 {
+  if (m_punctaPack->isLocked()) {
+    return;
+  }
   m_punctaPack->deleteSelectedPuncta();
 }
 

@@ -53,7 +53,7 @@ public:
 
   [[nodiscard]] virtual QString typePluralName() const = 0;
 
-  virtual bool canReadFile(const QString& fileName) const = 0;
+  [[nodiscard]] virtual bool canReadFile(const QString& fileName) const = 0;
 
   // return object id, if object already exist, return its old id, if can not load, return 0
   // return last id if more than one object loaded from file
@@ -96,7 +96,7 @@ public:
     return const_cast<QUndoStack*>(const_cast<const ZObjDoc*>(this)->objUndoStack(id));
   }
 
-  virtual const QUndoStack* objUndoStack(size_t id) const
+  [[nodiscard]] virtual const QUndoStack* objUndoStack(size_t id) const
   {
     Q_UNUSED(id)
     return nullptr;
@@ -119,9 +119,13 @@ public:
 
   void write(QJsonObject& json) const;
 
-  // show/hide obj with id
-  void setObjVisible(size_t id, bool v)
-  { emit objVisibleChanged(id, v); }
+//  // show/hide obj with id
+//  void setObjVisible(size_t id, bool v)
+//  { emit objVisibleChanged(id, v); }
+//
+//  // lock/unlock obj from editing with id
+//  void setObjLocked(size_t id, bool v)
+//  { emit objLockedChanged(id, v); }
 
   //
   void sendObjSelectionChangedFromDocSignal(const QList<size_t>& selected, const QList<size_t>& deselected)

@@ -159,12 +159,6 @@ public:
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
-  bool isVisible() const
-  { return m_visible.get(); }
-
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
@@ -266,7 +260,6 @@ private:
   std::map<int, std::map<size_t, std::unique_ptr<ROIGraphicsItem>>> m_sliceToROIItem;
   std::map<int, std::map<size_t, std::vector<std::unique_ptr<ROICtrlPtGraphicsItem>>>> m_sliceToCtrlPtItems;
 
-  ZBoolParameter m_visible;
   ZBoolParameter m_showControlPoints;
   ZBoolParameter m_fixedControlPointsSize;
   ZVec3Parameter m_outlineColor;

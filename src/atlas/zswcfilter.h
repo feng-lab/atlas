@@ -100,9 +100,6 @@ public:
 
   void releaseItemsOwnership();
 
-  void setVisible(bool v)
-  { m_visible.set(v); }
-
   void setSelected(bool v);
 
   void setNormalView(int z, int t) override;
@@ -132,7 +129,6 @@ private:
 private:
   std::unique_ptr<ZSwcGraphicsItem> m_item;
 
-  ZBoolParameter m_visible;
   ZBoolParameter m_showSkeleton;
   ZVec3Parameter m_outlineColor;
   ZDoubleParameter m_opacity;

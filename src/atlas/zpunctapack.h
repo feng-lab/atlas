@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zobjpack.h"
 #include "zpuncta.h"
 #include "zglmutils.h"
 #include "zbbox.h"
@@ -14,11 +15,11 @@ namespace nim {
 
 class ZPunctaDoc;
 
-class ZPunctaPack : public QObject
+class ZPunctaPack : public ZObjPack
 {
 Q_OBJECT
 public:
-  ZPunctaPack(ZPuncta puncta, const QString& path, ZPunctaDoc& pd, QObject* parent = nullptr);
+  ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPunctaDoc& pd, QObject* parent = nullptr);
 
   ~ZPunctaPack() override;
 

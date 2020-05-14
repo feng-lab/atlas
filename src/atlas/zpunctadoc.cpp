@@ -184,7 +184,7 @@ size_t ZPunctaDoc::makeAlias(size_t id)
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToPunctaPacks[aliasId] = m_idToPunctaPacks[id];
-  m_doc.registerNewObj(aliasId, this);
+  m_doc.registerNewObj(aliasId, *this);
 
   emit objAdded(aliasId, this);
   return aliasId;
@@ -243,8 +243,8 @@ void ZPunctaDoc::generateAnalysisTextFiles()
 size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
 {
   size_t id = m_doc.getNewObjId();
-  m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path, *this);
-  m_doc.registerNewObj(id, this);
+  m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path, id, *this);
+  m_doc.registerNewObj(m_idToPunctaPacks[id]);
 
   emit objAdded(id, this);
   connect(m_idToPunctaPacks[id].get(), &ZPunctaPack::undoStackCleanChanged,

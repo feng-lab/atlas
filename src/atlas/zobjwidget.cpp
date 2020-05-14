@@ -99,10 +99,10 @@ void ZObjWidget::adaptColumns()
 {
   //header()->resizeSection(0, 20);
   resizeColumnToContents(ZObjModel::ShowHideNameColumn);
-  resizeColumnToContents(ZObjModel::NameColumn);
-  resizeColumnToContents(ZObjModel::TypeColumn);
-  resizeColumnToContents(ZObjModel::ShowHideColumn);
   resizeColumnToContents(ZObjModel::LockColumn);
+  // resizeColumnToContents(ZObjModel::NameColumn);
+  resizeColumnToContents(ZObjModel::TypeColumn);
+  //resizeColumnToContents(ZObjModel::ShowHideColumn);
 }
 
 void ZObjWidget::keyPressEvent(QKeyEvent* e)
@@ -123,6 +123,9 @@ void ZObjWidget::createContextMenu()
   m_contextMenu = new QMenu(this);
   m_contextMenu->addAction(QString("Show"), m_doc, &ZDoc::showSelectedObjs);
   m_contextMenu->addAction(QString("Hide"), m_doc, &ZDoc::hideSelectedObjs);
+  m_contextMenu->addSeparator();
+  m_contextMenu->addAction(QString("Lock"), m_doc, &ZDoc::lockSelectedObjs);
+  m_contextMenu->addAction(QString("Unlock"), m_doc, &ZDoc::unlockSelectedObjs);
   m_contextMenu->addSeparator();
   m_contextMenu->addAction(QString("Make Alias"), m_doc, &ZDoc::makeAliasOfSelectedObjs);
   m_contextMenu->addAction(QString("Remove"), m_doc, &ZDoc::removeSelectedObjs);

@@ -19,6 +19,7 @@ void ZSwcView::docSwcsAdded(const QList<size_t>& objs)
     connect(viewControl, &ZSwcFilter::boundBoxChanged, this, &ZSwcView::updateBoundBox);
     connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
     connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
+    connect(viewControl, &ZSwcFilter::objVisibleChanged, this, &ZSwcView::onObjVisibleChangedFromView);
     emit objViewReady(obj);
   }
   if (!objs.empty()) {
@@ -36,6 +37,7 @@ void ZSwcView::docSwcAdded(size_t id)
   connect(viewControl, &ZSwcFilter::boundBoxChanged, this, &ZSwcView::updateBoundBox);
   connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
   connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
+  connect(viewControl, &ZSwcFilter::objVisibleChanged, this, &ZSwcView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

@@ -7,6 +7,7 @@ namespace nim {
 
 ZObjFilter::ZObjFilter(ZView& view)
   : m_view(view)
+  , m_visible("Visible", true)
   , m_viewPrecedencePara(QString("View Precedence"), 0,
                          std::numeric_limits<int>::min(),
                          std::numeric_limits<int>::max())
@@ -16,6 +17,7 @@ ZObjFilter::ZObjFilter(ZView& view)
                  glm::dvec2(std::numeric_limits<int>::max()))
 {
   m_viewPrecedencePara.setStyle("SPINBOX");
+  connect(&m_visible, &ZBoolParameter::boolChanged, this, &ZObjFilter::objVisibleChanged);
   connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged, this, &ZObjFilter::viewPrecedenceChanged);
   connect(&m_transform, &Z2DTransformParameter::valueChanged, this, &ZObjFilter::transformChanged);
   QList<QString> names;
@@ -25,6 +27,11 @@ ZObjFilter::ZObjFilter(ZView& view)
   m_offsetPara.setSingleStep(1);
   m_offsetPara.setStyle("SPINBOX");
   connect(&m_offsetPara, &ZDVec2Parameter::valueChanged, this, &ZObjFilter::offsetChanged);
+
+  addParameter(&m_visible);
+  addParameter(&m_viewPrecedencePara);
+  addParameter(&m_transform);
+  addParameter(&m_offsetPara);
 }
 
 void ZObjFilter::read(const QJsonObject& json)

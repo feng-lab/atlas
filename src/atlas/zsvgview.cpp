@@ -19,6 +19,7 @@ void ZSvgView::docSvgsAdded(const QList<size_t>& objs)
     connect(viewControl, &ZSvgFilter::boundBoxChanged, this, &ZSvgView::updateBoundBox);
     connect(viewControl, &ZSvgFilter::objDeselected, this, &ZSvgView::onObjDeselectedFromView);
     connect(viewControl, &ZSvgFilter::objSelected, this, &ZSvgView::onObjSelectedFromView);
+    connect(viewControl, &ZSvgFilter::objVisibleChanged, this, &ZSvgView::onObjVisibleChangedFromView);
     emit objViewReady(objs[i]);
   }
   if (!objs.empty()) {
@@ -36,6 +37,7 @@ void ZSvgView::docSvgAdded(size_t id)
   connect(viewControl, &ZSvgFilter::boundBoxChanged, this, &ZSvgView::updateBoundBox);
   connect(viewControl, &ZSvgFilter::objDeselected, this, &ZSvgView::onObjDeselectedFromView);
   connect(viewControl, &ZSvgFilter::objSelected, this, &ZSvgView::onObjSelectedFromView);
+  connect(viewControl, &ZSvgFilter::objVisibleChanged, this, &ZSvgView::onObjVisibleChangedFromView);
   emit objViewReady(id);
 }
 

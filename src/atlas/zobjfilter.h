@@ -19,6 +19,12 @@ public:
 
   virtual void write(QJsonObject& json) const;
 
+  void setVisible(bool v)
+  { m_visible.set(v); }
+
+  virtual bool isVisible() const
+  { return m_visible.get(); }
+
   virtual void setNormalView(int z, int t) = 0;
 
   virtual void setMaxZProjView(int t) = 0;
@@ -68,6 +74,8 @@ signals:
 
   void objDeselected();
 
+  void objVisibleChanged(bool v);
+
 protected:
   void addParameter(ZParameter* para);
 
@@ -110,6 +118,7 @@ protected:
 
   ZView& m_view;
 
+  ZBoolParameter m_visible;
   ZIntParameter m_viewPrecedencePara;
   Z2DTransformParameter m_transform;
   ZDVec2Parameter m_offsetPara;

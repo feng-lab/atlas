@@ -84,6 +84,8 @@ protected:
 
   virtual void onObjDeselectedFromView() = 0;
 
+  virtual void onObjVisibleChangedFromView(bool v) = 0;
+
   inline void resetBoundBox()
   { m_boundBox.reset(); }
 

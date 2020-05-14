@@ -124,6 +124,11 @@ void ZDoc::setObjVisible(size_t id, bool v)
   m_objModel->setObjVisible(id, v);
 }
 
+void ZDoc::setObjLocked(size_t id, bool v)
+{
+  m_objModel->setObjLocked(id, v);
+}
+
 void ZDoc::setObjSelected(size_t id, bool v)
 {
   m_objSelectionModel->setObjSelected(id, v);
@@ -294,9 +299,14 @@ void ZDoc::registerObjDoc(ZObjDoc* objD)
   connect(objD, &ZObjDoc::objRemoved, this, &ZDoc::objRemoved);
 }
 
-void ZDoc::registerNewObj(size_t id, ZObjDoc* objD)
+void ZDoc::registerNewObj(size_t id, ZObjDoc& objD)
 {
   m_objModel->addObj(id, objD);
+}
+
+void ZDoc::registerNewObj(const std::shared_ptr<ZObjPack>& op)
+{
+  m_objModel->addObj(op);
 }
 
 void ZDoc::removeObj(size_t id)
@@ -512,6 +522,22 @@ void ZDoc::hideSelectedObjs()
   QList<size_t> objs = m_objSelectionModel->selectedObjs();
   for (int i = 0; i < objs.size(); ++i) {
     setObjVisible(objs[i], false);
+  }
+}
+
+void ZDoc::lockSelectedObjs()
+{
+  QList<size_t> objs = m_objSelectionModel->selectedObjs();
+  for (int i = 0; i < objs.size(); ++i) {
+    setObjLocked(objs[i], true);
+  }
+}
+
+void ZDoc::unlockSelectedObjs()
+{
+  QList<size_t> objs = m_objSelectionModel->selectedObjs();
+  for (int i = 0; i < objs.size(); ++i) {
+    setObjLocked(objs[i], false);
   }
 }
 

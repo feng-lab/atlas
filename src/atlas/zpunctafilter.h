@@ -96,6 +96,8 @@ public:
   void setTransform_(const QTransform& tfm)
   { m_transform = tfm; updateValue(); }
 
+  void setLocked(bool l);
+
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
 protected:
@@ -106,7 +108,7 @@ private:
   const ZPunctum& m_punctum;
 
   QPointF m_basePos;
-  bool m_doubleClicked = false;
+  bool m_locked = false;
   QTransform m_transform;
   ZView& m_view;
 };
@@ -126,9 +128,6 @@ public:
   void setData(ZPunctaPack& puncta);
 
   void releaseItemsOwnership();
-
-  void setVisible(bool v)
-  { m_visible.set(v); }
 
   void setSelected(bool v);
 
@@ -157,6 +156,8 @@ protected:
 
   void onSceneItemSelectionChanged();
 
+  void onLockedStateChanged(bool lock);
+
 private:
   void visibleChanged();
 
@@ -173,7 +174,6 @@ private:
   std::map<const ZPunctum*, ZPunctumGraphicsItem*> m_punctumToItem;
   std::map<QGraphicsItem*, const ZPunctum*> m_itemToPunctum;
 
-  ZBoolParameter m_visible;
   ZVec3Parameter m_outlineColor;
   ZVec3Parameter m_regionColor;
   ZDoubleParameter m_opacity;

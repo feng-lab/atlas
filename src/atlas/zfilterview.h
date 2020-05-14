@@ -280,6 +280,21 @@ protected:
     }
   }
 
+  void onObjVisibleChangedFromView(bool v) override
+  {
+    if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
+      for (const auto& idFilter : m_idToFilter) {
+        if (idFilter.second.get() == filter) {
+          if (m_doc.doc().isObjVisible(idFilter.first) != v) {
+            m_doc.doc().setObjVisible(idFilter.first, v);  // slow
+            // updateBoundBox();
+          }
+          return;
+        }
+      }
+    }
+  }
+
 protected:
   DocType& m_doc;
   std::map<size_t, std::unique_ptr<FilterType>> m_idToFilter;

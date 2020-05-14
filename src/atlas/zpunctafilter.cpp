@@ -152,9 +152,19 @@ void ZPunctumGraphicsItem::updateValue()
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
 
+void ZPunctumGraphicsItem::setLocked(bool l)
+{
+  m_locked = l;
+  if (m_locked) {
+    setFlags(0);
+  } else {
+    setFlags(QGraphicsItem::ItemIsSelectable);
+  }
+}
+
 void ZPunctumGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  if (!isSelected() || !isVisible() || m_punctaPack.selectedPuncta().empty()) { // feels weird
+  if (m_locked || !isSelected() || !isVisible() || m_punctaPack.selectedPuncta().empty()) { // feels weird
     return;
   }
   m_punctaPack.contextMenu().popup(event->screenPos());
@@ -162,7 +172,6 @@ void ZPunctumGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* even
 
 ZPunctaFilter::ZPunctaFilter(ZView& view)
   : ZObjFilter(view)
-  , m_visible("Visible", true)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 1), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
   , m_opacity("Opacity", 1, 0., 1.)
@@ -172,15 +181,11 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
   connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::regionColorChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
-  addParameter(&m_visible);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
-  addParameter(&m_viewPrecedencePara);
-  addParameter(&m_transform);
-  addParameter(&m_offsetPara);
   addParameter(&m_opacity);
 
   connect(&view.scene(), &ZGraphicsScene::selectionChanged, this, &ZPunctaFilter::onSceneItemSelectionChanged);
@@ -193,6 +198,7 @@ void ZPunctaFilter::setData(ZPunctaPack& puncta)
 
   connect(m_punctaPack, &ZPunctaPack::selectionChanged, this, &ZPunctaFilter::updateItemSelectedState);
   connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &ZPunctaFilter::onPunctaChanged);
+  connect(m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &ZPunctaFilter::onLockedStateChanged);
   //connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
 }
 
@@ -214,7 +220,7 @@ void ZPunctaFilter::setSelected(bool v)
   }
 }
 
-void ZPunctaFilter::setNormalView(int z, int t)
+void ZPunctaFilter::setNormalView(int, int)
 {
   if (!m_visible.get()) {
     return;
@@ -222,7 +228,7 @@ void ZPunctaFilter::setNormalView(int z, int t)
   createPunctumItems();
 }
 
-void ZPunctaFilter::setMaxZProjView(int t)
+void ZPunctaFilter::setMaxZProjView(int)
 {
   if (!m_visible.get()) {
     return;
@@ -266,6 +272,9 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
 
 void ZPunctaFilter::deleteKeyPressed()
 {
+  if (m_punctaPack->isLocked()) {
+    return;
+  }
   m_punctaPack->deleteSelectedPuncta();
 }
 
@@ -320,6 +329,7 @@ void ZPunctaFilter::createPunctumItems()
     item->setZValue(m_viewPrecedencePara.get());
     item->setBrush(brush);
     item->setPen(pen);
+    item->setLocked(m_punctaPack->isLocked());
     m_view.scene().addItem(item);
     items.emplace_back(item);
     m_punctumToItem[&p] = item;
@@ -372,6 +382,13 @@ void ZPunctaFilter::onSceneItemSelectionChanged()
   m_ignoreSelectionChangedSignal = true;
   m_punctaPack->setSelectedPuncta(selectedPuncta);
   m_ignoreSelectionChangedSignal = false;
+}
+
+void ZPunctaFilter::onLockedStateChanged(bool lock)
+{
+  for (auto& item : m_puntumItems) {
+    item->setLocked(lock);
+  }
 }
 
 void ZPunctaFilter::visibleChanged()
