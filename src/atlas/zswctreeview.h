@@ -30,11 +30,21 @@ protected:
 
   void keyPressEvent(QKeyEvent* e) override;
 
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+
+  void onSwcSelectionChanged();
+
+  void onSwcChanged();
+
+  void onLockedStateChanged(bool l);
+
 private:
   ZSwcTreeModel& m_ratModel;
   ZSwcPack& m_swcPack;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel;
+  bool m_ignoreSelectionChangedSignal = false;
+  bool m_skipSelectionChangedProcessing = false;
 };
 
 } // namespace nim

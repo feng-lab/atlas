@@ -52,19 +52,6 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
           this, &ZPunctaTableView::adaptColumns);
   adaptColumns();
 
-  for (size_t i = 0; i < m_punctaPack.punctaPts().size(); ++i) {
-    m_punctumToRow[m_punctaPack.punctaPts()[i]] = i;
-  }
-
-//  bool first = true;
-//  for (auto p : m_puncta.selectedPuncta()) {
-//    auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
-//    selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
-//    if (first) {
-//      scrollTo(index);
-//      first = false;
-//    }
-//  }
   onPunctaSelectionChanged();
 
   connect(&m_punctaPack, &ZPunctaPack::selectionChanged, this, &ZPunctaTableView::onPunctaSelectionChanged);
@@ -168,7 +155,7 @@ void ZPunctaTableView::onPunctaSelectionChanged()
   } else {
     bool first = true;
     for (auto p : m_punctaPack.selectedPuncta()) {
-      auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctumToRow[p], 0));
+      auto index = m_ratProxyModel->mapFromSource(m_ratModel.index(m_punctaPack.punctumToRow().at(p), 0));
       if (first) {
         selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
         scrollTo(index);
@@ -186,11 +173,6 @@ void ZPunctaTableView::onPunctaSelectionChanged()
 void ZPunctaTableView::onPunctaChanged()
 {
   m_ratModel.updateModel();
-
-  m_punctumToRow.clear();
-  for (size_t i = 0; i < m_punctaPack.punctaPts().size(); ++i) {
-    m_punctumToRow[m_punctaPack.punctaPts()[i]] = i;
-  }
 
   onPunctaSelectionChanged();
 }

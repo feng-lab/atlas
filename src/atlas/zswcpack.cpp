@@ -14,7 +14,7 @@ ZSwcPack::ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& doc, QObje
   , m_doc(doc)
 {
   updateDerivedData();
-  updatePtsAndSelectedPuncta();
+  updateViewRelatedData();
   createContextMenu();
   connect(&m_undoStack, &QUndoStack::cleanChanged,
           this, &ZSwcPack::undoStackCleanChanged);
@@ -61,6 +61,55 @@ ZBBox<glm::ivec4> ZSwcPack::boundBox() const
   return res;
 }
 
+void ZSwcPack::setSelectedNodes(const std::set<ZSwc::ConstIterator>& sn)
+{
+  if (m_selectedNodes == sn) {
+    return;
+  }
+  m_selectedNodes = sn;
+  for (auto it = m_swc.begin(); it != m_swc.end(); ++it) {
+    it->selected = m_selectedNodes.find(it) != m_selectedNodes.end();
+  }
+  emit selectionChanged();
+}
+
+std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::ConstIterator& node) const
+{
+  CHECK(!ZSwc::isNull(node));
+  if (ZSwc::isRoot(node)) {
+    for (size_t r = 0; r < m_rootNodes.size(); ++r) {
+      if (node == m_rootNodes[r]) {
+        return std::make_tuple(static_cast<int>(r), -1);
+      }
+    }
+    CHECK(false);
+  } else {
+    auto pit = ZSwc::parent(node);
+    while (!ZSwc::isRoot(pit)) {
+      pit = ZSwc::parent(pit);
+    }
+    auto it = std::find(m_rootNodes.begin(), m_rootNodes.end(), pit);
+    CHECK(it != m_rootNodes.end());
+    int parentRow = static_cast<int>(std::distance(m_rootNodes.begin(), it));
+    auto& children = m_rootToChildrenNodes.at(m_rootNodes[parentRow]);
+    it = std::find(children.begin(), children.end(), node);
+    CHECK(it != children.end());
+    int row = static_cast<int>(std::distance(children.begin(), it));
+    return std::make_tuple(parentRow, row);
+  }
+}
+
+ZSwc::ConstIterator ZSwcPack::getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const
+{
+  auto [parentRow, row] = prar;
+  CHECK(parentRow >= 0) << parentRow;
+  if (row < 0) {
+    return m_rootNodes[parentRow];
+  } else {
+    return m_rootToChildrenNodes.at(m_rootNodes[parentRow])[row];
+  }
+}
+
 void ZSwcPack::updateDerivedData()
 {
   m_info.clear();
@@ -68,16 +117,28 @@ void ZSwcPack::updateDerivedData()
   m_tooltip = m_path;
 }
 
-void ZSwcPack::updatePtsAndSelectedPuncta()
+void ZSwcPack::updateViewRelatedData()
 {
-//  m_punctaPts.clear();
-//  m_selectedPuncta.clear();
-//  for (const auto& p : m_puncta) {
-//    m_punctaPts.push_back(&p);
-//    if (p.isSelected()) {
-//      m_selectedPuncta.insert(&p);
-//    }
-//  }
+  m_rootNodes.clear();
+  m_rootToChildrenNodes.clear();
+  m_selectedNodes.clear();
+  for (auto rit = m_swc.cbeginRoot(); rit != m_swc.cendRoot(); ++rit) {
+    m_rootNodes.emplace_back(rit);
+  }
+  for (auto& rit : m_rootNodes) {
+    m_rootToChildrenNodes[rit].clear();
+    auto it = m_swc.cbegin(rit);
+    if (it->selected) {
+      m_selectedNodes.insert(it);
+    }
+    CHECK(it == rit);
+    for (++it; it != m_swc.cend(rit); ++it) {
+      m_rootToChildrenNodes[rit].push_back(it);
+      if (it->selected) {
+        m_selectedNodes.insert(it);
+      }
+    }
+  }
 }
 
 void ZSwcPack::createContextMenu()

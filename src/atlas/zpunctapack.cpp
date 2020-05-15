@@ -14,7 +14,7 @@ ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPuncta
   , m_doc(doc)
 {
   updateDerivedData();
-  updatePtsAndSelectedPuncta();
+  updateViewRelatedData();
   createContextMenu();
   connect(&m_undoStack, &QUndoStack::cleanChanged,
           this, &ZPunctaPack::undoStackCleanChanged);
@@ -168,15 +168,18 @@ void ZPunctaPack::updateDerivedData()
   m_tooltip = m_path;
 }
 
-void ZPunctaPack::updatePtsAndSelectedPuncta()
+void ZPunctaPack::updateViewRelatedData()
 {
   m_punctaPts.clear();
   m_selectedPuncta.clear();
+  m_punctumToRow.clear();
+  int idx = 0;
   for (const auto& p : m_puncta) {
     m_punctaPts.push_back(&p);
     if (p.isSelected()) {
       m_selectedPuncta.insert(&p);
     }
+    m_punctumToRow[&p] = idx++;
   }
 }
 

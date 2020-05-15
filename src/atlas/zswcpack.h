@@ -50,9 +50,24 @@ public:
 
   ZBBox<glm::ivec4> boundBox() const;
 
+  inline const std::vector<ZSwc::ConstIterator>& rootNodes() const
+  { return m_rootNodes; }
+
+  inline const std::map<ZSwc::ConstIterator, std::vector<ZSwc::ConstIterator>>& rootToChildrenNodes() const
+  { return m_rootToChildrenNodes; }
+
+  inline const std::set<ZSwc::ConstIterator>& selectedNodes() const
+  { return m_selectedNodes; }
+
+  void setSelectedNodes(const std::set<ZSwc::ConstIterator>& sn);
+
+  std::tuple<int, int> getParentRowAndRowOfNode(const ZSwc::ConstIterator& node) const;
+
+  ZSwc::ConstIterator getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const;
+
 protected:
 
-  void updatePtsAndSelectedPuncta();
+  void updateViewRelatedData();
 
   void createContextMenu();
 
@@ -77,6 +92,10 @@ private:
   mutable QString m_info;
   QString m_name;
   QString m_tooltip;
+  // for views
+  std::vector<ZSwc::ConstIterator> m_rootNodes;
+  std::map<ZSwc::ConstIterator, std::vector<ZSwc::ConstIterator>> m_rootToChildrenNodes;
+  std::set<ZSwc::ConstIterator> m_selectedNodes;
 };
 
 } // namespace nim

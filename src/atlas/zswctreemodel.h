@@ -42,11 +42,11 @@ public:
 
   void activated(const QModelIndex& idxIn);
 
+  void updateModel();
+
 protected:
   ZSwcPack& m_swcPack;
   ZDoc& m_doc;
-  std::vector<ZSwc::ConstIterator> m_roots;
-  std::map<const ZSwc::ConstIterator*, std::vector<ZSwc::ConstIterator>> m_rootToChildren;
 };
 
 } // namespace nim

@@ -10,19 +10,6 @@ ZSwcTreeModel::ZSwcTreeModel(ZSwcPack& swcPack, ZDoc& doc, QObject* parent)
   , m_swcPack(swcPack)
   , m_doc(doc)
 {
-  m_roots.clear();
-  m_rootToChildren.clear();
-  for (auto rit = m_swcPack.swc().beginRoot(); rit != m_swcPack.swc().endRoot(); ++rit) {
-    m_roots.emplace_back(rit);
-  }
-  for (auto& rit : m_roots) {
-    m_rootToChildren[&rit].clear();
-    auto it = m_swcPack.swc().begin(rit);
-    CHECK(it == rit);
-    for (++it; it != m_swcPack.swc().end(rit); ++it) {
-      m_rootToChildren[&rit].push_back(it);
-    }
-  }
 }
 
 QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
@@ -39,6 +26,17 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
     topologyType = "Branch Node";
   } else if (ZSwc::isLeaf(item)) {
     topologyType = "Leaf";
+  }
+
+  if (role == Qt::BackgroundRole)
+  {
+    if (ZSwc::isRoot(item)) {
+      return QColor(0, 0, 128);
+    } else if (ZSwc::isBranchNode(item)) {
+      return QColor(0, 128, 0);
+    } else if (ZSwc::isLeaf(item)) {
+      return QColor(128, 128, 0);
+    }
   }
 
   if (role == Qt::DisplayRole) {
@@ -107,14 +105,16 @@ QModelIndex ZSwcTreeModel::index(int row, int column, const QModelIndex& parent)
   }
 
   if (!parent.isValid()) {
-    CHECK(row < static_cast<int>(m_roots.size()));
-    return createIndex(row, column, reinterpret_cast<std::uintptr_t>(&m_roots[row]));
+    CHECK(row < static_cast<int>(m_swcPack.rootNodes().size()));
+    return createIndex(row, column, reinterpret_cast<std::uintptr_t>(&m_swcPack.rootNodes()[row]));
   } else {
-    CHECK(parent.row() < static_cast<int>(m_roots.size())) << m_roots.size() << " " << parent.row();
-    CHECK(row < static_cast<int>(m_rootToChildren.at(&m_roots[parent.row()]).size()))
-        << m_rootToChildren.at(&m_roots[parent.row()]).size() << " " << row;
+    CHECK(parent.row() < static_cast<int>(m_swcPack.rootNodes().size()))
+        << m_swcPack.rootNodes().size() << " " << parent.row();
+    CHECK(row < static_cast<int>(m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size()))
+        << m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size() << " " << row;
     auto res = createIndex(row, column,
-                           reinterpret_cast<std::uintptr_t>(&m_rootToChildren.at(&m_roots[parent.row()])[row]));
+                           reinterpret_cast<std::uintptr_t>(&m_swcPack.rootToChildrenNodes().at(
+                             m_swcPack.rootNodes()[parent.row()])[row]));
     return res;
   }
 }
@@ -134,9 +134,9 @@ QModelIndex ZSwcTreeModel::parent(const QModelIndex& index) const
   while (!ZSwc::isRoot(pit)) {
     pit = ZSwc::parent(pit);
   }
-  for (size_t r = 0; r < m_roots.size(); ++r) {
-    if (pit == m_roots[r]) {
-      return createIndex(r, 0, reinterpret_cast<std::uintptr_t>(&m_roots[r]));
+  for (size_t r = 0; r < m_swcPack.rootNodes().size(); ++r) {
+    if (pit == m_swcPack.rootNodes()[r]) {
+      return createIndex(r, 0, reinterpret_cast<std::uintptr_t>(&m_swcPack.rootNodes()[r]));
     }
   }
 
@@ -152,14 +152,15 @@ int ZSwcTreeModel::rowCount(const QModelIndex& parent) const
   }
 
   if (!parent.isValid()) {
-    return m_roots.size();
+    return m_swcPack.rootNodes().size();
   } else {
     auto it = *reinterpret_cast<ZSwc::ConstIterator*>(parent.internalId());
     if (!ZSwc::isRoot(it)) {
       return 0;
     }
-    CHECK(parent.row() < static_cast<int>(m_roots.size())) << m_roots.size() << " " << parent.row();
-    return m_rootToChildren.at(&m_roots[parent.row()]).size();
+    CHECK(parent.row() < static_cast<int>(m_swcPack.rootNodes().size()))
+        << m_swcPack.rootNodes().size() << " " << parent.row();
+    return m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size();
   }
 }
 
@@ -224,6 +225,12 @@ void ZSwcTreeModel::activated(const QModelIndex& /*idxIn*/)
   //    //LOG(INFO) << id;
   //    m_regionAnnotation->sendOpenEditWidgetSignal(id);
   //  }
+}
+
+void ZSwcTreeModel::updateModel()
+{
+  beginResetModel();
+  endResetModel();
 }
 
 } // namespace nim

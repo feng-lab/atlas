@@ -36,6 +36,8 @@ ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
   //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
   //setPalette(p);
 
+  setSelectionMode(QTreeView::ExtendedSelection);
+
   connect(this, &ZSwcTreeView::expanded,
           this, &ZSwcTreeView::adaptColumns);
 
@@ -52,6 +54,12 @@ ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
   adaptColumns();
 
   header()->setStretchLastSection(false);
+
+  onSwcSelectionChanged();
+
+  connect(&m_swcPack, &ZSwcPack::selectionChanged, this, &ZSwcTreeView::onSwcSelectionChanged);
+  connect(&m_swcPack, &ZSwcPack::swcChanged, this, &ZSwcTreeView::onSwcChanged);
+  connect(&m_swcPack, &ZSwcPack::lockedStateChanged, this, &ZSwcTreeView::onLockedStateChanged);
 }
 
 void ZSwcTreeView::contextMenu(const QPoint& /*pos*/)
@@ -90,6 +98,80 @@ void ZSwcTreeView::adaptColumns()
 }
 
 void ZSwcTreeView::keyPressEvent(QKeyEvent* /*e*/)
+{
+}
+
+void ZSwcTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
+{
+  QTreeView::selectionChanged(selected, deselected);
+
+  if (m_swcPack.isLocked()) {
+    return;
+  }
+
+  if (m_skipSelectionChangedProcessing) {
+    return;
+  }
+
+  std::set<std::tuple<int, int>> selectedRows;
+  for (const auto& sindex : selectedIndexes()) {
+    auto index = m_ratProxyModel->mapToSource(sindex);
+    if (!index.parent().isValid()) {
+      selectedRows.insert(std::make_tuple(index.row(), -1));
+    } else {
+      selectedRows.insert(std::make_tuple(index.parent().row(), index.row()));
+    }
+  }
+  std::set<ZSwc::ConstIterator> selectedNodes;
+  for (const auto& r : selectedRows) {
+    selectedNodes.insert(m_swcPack.getNodeOfParentRowAndRow(r));
+  }
+  // LOG(INFO) << selectedNodes.size();
+  m_ignoreSelectionChangedSignal = true;
+  m_swcPack.setSelectedNodes(selectedNodes);
+  m_ignoreSelectionChangedSignal = false;
+}
+
+void ZSwcTreeView::onSwcSelectionChanged()
+{
+  if (m_ignoreSelectionChangedSignal) {
+    return;
+  }
+
+  // blockSignals(true);
+  m_skipSelectionChangedProcessing = true;
+
+  if (m_swcPack.selectedNodes().empty()) {
+    selectionModel()->clearSelection();
+  } else {
+    bool first = true;
+    for (auto p : m_swcPack.selectedNodes()) {
+      auto [parentRow, row] = m_swcPack.getParentRowAndRowOfNode(p);
+      auto index = m_ratProxyModel->mapFromSource(row >= 0 ?
+        m_ratModel.index(row, 0, m_ratModel.index(parentRow, 0, QModelIndex())) :
+        m_ratModel.index(parentRow, 0, QModelIndex()));
+      if (first) {
+        selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
+        scrollTo(index);
+        first = false;
+      } else {
+        selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::Select);
+      }
+    }
+  }
+
+  m_skipSelectionChangedProcessing = false;
+  // blockSignals(false);
+}
+
+void ZSwcTreeView::onSwcChanged()
+{
+  m_ratModel.updateModel();
+
+  onSwcSelectionChanged();
+}
+
+void ZSwcTreeView::onLockedStateChanged(bool)
 {
 }
 

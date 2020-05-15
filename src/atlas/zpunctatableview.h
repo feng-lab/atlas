@@ -43,7 +43,6 @@ private:
   ZPunctaPack& m_punctaPack;
   ZDoc& m_doc;
   QSortFilterProxyModel* m_ratProxyModel = nullptr;
-  std::map<const ZPunctum*, int> m_punctumToRow;
   bool m_ignoreSelectionChangedSignal = false;
   bool m_skipSelectionChangedProcessing = false;
 };

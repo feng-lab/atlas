@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 #include <set>
+#include <map>
 
 namespace nim {
 
@@ -49,6 +50,9 @@ public:
   inline const std::set<const ZPunctum*>& selectedPuncta() const
   { return m_selectedPuncta; }
 
+  inline const std::map<const ZPunctum*, int>& punctumToRow() const
+  { return m_punctumToRow; }
+
   void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
   inline const ZPuncta& puncta() const
@@ -68,7 +72,7 @@ public:
 
 protected:
 
-  void updatePtsAndSelectedPuncta();
+  void updateViewRelatedData();
 
   void createContextMenu();
 
@@ -99,7 +103,9 @@ private:
   mutable QString m_info;
   QString m_name;
   QString m_tooltip;
+  // for views
   std::vector<const ZPunctum*> m_punctaPts;
+  std::map<const ZPunctum*, int> m_punctumToRow;
   std::set<const ZPunctum*> m_selectedPuncta;
 };
 
@@ -137,7 +143,7 @@ public:
     CHECK(m_addedPuncta.size() == m_addedSet.size()) << m_addedPuncta.size() << " " << m_addedSet.size();
     m_punctaPack.m_puncta.data().splice(m_punctaPack.m_puncta.data().end(), m_deletedPuncta,
                                         m_deletedPuncta.begin(), m_deletedPuncta.end());
-    m_punctaPack.updatePtsAndSelectedPuncta();
+    m_punctaPack.updateViewRelatedData();
     emit m_punctaPack.punctaChanged();
   }
 
@@ -159,7 +165,7 @@ public:
     CHECK(m_deletedPuncta.size() == m_deletedSet.size()) << m_deletedPuncta.size() << " " << m_deletedSet.size();
     m_punctaPack.m_puncta.data().splice(m_punctaPack.m_puncta.data().end(), m_addedPuncta,
                                         m_addedPuncta.begin(), m_addedPuncta.end());
-    m_punctaPack.updatePtsAndSelectedPuncta();
+    m_punctaPack.updateViewRelatedData();
     emit m_punctaPack.punctaChanged();
   }
 
