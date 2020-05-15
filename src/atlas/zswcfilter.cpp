@@ -8,6 +8,7 @@
 #include <QWindow>
 #include <QStyleOption>
 #include <QPushButton>
+#include <memory>
 
 namespace nim {
 
@@ -197,7 +198,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
 
 void ZSwcFilter::setData(ZSwcPack& swcPack)
 {
-  m_item.reset(new ZSwcGraphicsItem(swcPack));
+  m_item = std::make_unique<ZSwcGraphicsItem>(swcPack);
   m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setShowSkeleton(m_showSkeleton.get());
   m_item->setOutlineColor(QColor(m_outlineColor.get().x * 255,
@@ -248,7 +249,7 @@ std::shared_ptr<ZWidgetsGroup> ZSwcFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
 
-    QPushButton* pb = new QPushButton("Bring to Front");
+    auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZSwcFilter::bringToFront);
     m_widgetsGroup->addChild(*pb, 1);
 

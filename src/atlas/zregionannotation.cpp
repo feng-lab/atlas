@@ -145,7 +145,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   m_voxelSizeY = origLabelImg.info().voxelSizeYInUm();
   m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
 
-  for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {
+  for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
     if (createMesh) {
       it->mesh.reset();
     }
@@ -177,7 +177,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   imFill.setForegroundValue(1);
 
   LOG(INFO) << "Importing Label Image...";
-  for (auto it = m_ontology.beginPost(); it != m_ontology.endPost(); ++it) {
+  for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg ||
         labels.find(it->id) == labels.end()) {

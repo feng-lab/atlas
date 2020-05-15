@@ -1355,17 +1355,24 @@ void ZROIFilter::viewScaleChanged(double s)
   }
 }
 
-void ZROIFilter::onLockedStateChanged(bool)
+void ZROIFilter::onLockedStateChanged(bool l)
 {
+  CHECK(isLocked() == l);
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setLocked(isLocked());
+      if (l) {
+        shapeItem->setSelected(false);
+      }
+      shapeItem->setLocked(l);
     }
   }
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
       for (auto& item : ctrlItems) {
-        item->setLocked(isLocked());
+        if (l) {
+          item->setSelected(false);
+        }
+        item->setLocked(l);
       }
     }
   }

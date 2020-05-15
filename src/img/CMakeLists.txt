@@ -295,6 +295,7 @@ if (WIN32)
   endif()
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
+  target_compile_options(${LIBRARY_NAME} PUBLIC /experimental:preprocessor)
 
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
@@ -354,7 +355,8 @@ endif (WIN32)
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
                       hdf5_cpp-static hdf5-static ceres Folly::folly Eigen3::Eigen Boost::headers
-                      GeometricTools glm::glm WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
+                      GeometricTools glm::glm range-v3::range-v3
+                      WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
                       glog::glog Qt5::Core Qt5::Gui)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

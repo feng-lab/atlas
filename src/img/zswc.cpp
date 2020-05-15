@@ -76,9 +76,9 @@ void ZSwc::resortPyramidal(int basalType, int apicalType, int somaType)
     if (parent(it)->type == somaType && it->type != somaType)
       somaChildren.push_back(it);
   }
-  for (size_t i = 0; i < somaChildren.size(); ++i) {
-    if (somaChildren[i]->y > soma->y) { // apical
-      for (SwcTreeNode tn = begin(somaChildren[i]); tn != end(somaChildren[i]); ++tn) {
+  for (auto& sch : somaChildren) {
+    if (sch->y > soma->y) { // apical
+      for (SwcTreeNode tn = begin(sch); tn != end(sch); ++tn) {
         tn->type = apicalType;
       }
     }
@@ -153,10 +153,10 @@ void ZSwc::load(const QString& filename)
 
     std::map<int, Iterator> itMap;
     while (!nodeMap.empty()) {
-      std::map<int, SwcNode>::iterator it = nodeMap.begin();
+      auto it = nodeMap.begin();
       while (it != nodeMap.end()) {
         int parentID = it->second.parentID;
-        std::map<int, Iterator>::const_iterator nodeIt = itMap.find(parentID);
+        auto nodeIt = itMap.find(parentID);
         if (nodeIt != itMap.end()) {
           itMap[it->first] = appendChild(nodeIt->second, it->second);
           it = nodeMap.erase(it);

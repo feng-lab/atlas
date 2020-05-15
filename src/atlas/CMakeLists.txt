@@ -614,7 +614,11 @@ set(SOURCES
     zswctreemodel.cpp
     zswctreemodel.h
     zobjpack.cpp
-    zobjpack.h zroipack.cpp zroipack.h zregionannotationpack.cpp zregionannotationpack.h)
+    zobjpack.h
+    zroipack.cpp
+    zroipack.h
+    zregionannotationpack.cpp
+    zregionannotationpack.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -656,6 +660,7 @@ if (WIN32)
   endif()
   target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${APP_NAME} PUBLIC /permissive-)
+  target_compile_options(${APP_NAME} PUBLIC /experimental:preprocessor)
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.

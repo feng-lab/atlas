@@ -224,6 +224,11 @@ set_target_properties(glm::glm PROPERTIES
                       INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/glm")
 print_target_properties(glm::glm)
 
+add_library(range-v3::range-v3 INTERFACE IMPORTED)
+set_target_properties(range-v3::range-v3 PROPERTIES
+                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/range-v3/include")
+print_target_properties(range-v3::range-v3)
+
 find_package(HDF5 REQUIRED
              COMPONENTS C CXX static
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

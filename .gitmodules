@@ -106,3 +106,6 @@
 	path = src/3rdparty/bzip2
 	url = https://gitlab.com/federicomenaquintero/bzip2.git
 	branch = master
+[submodule "src/3rdparty/range-v3"]
+	path = src/3rdparty/range-v3
+	url = https://github.com/ericniebler/range-v3.git

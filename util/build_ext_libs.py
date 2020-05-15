@@ -1778,27 +1778,30 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(xz_src_dir)
         build_xz(xz_src_dir, ext_build_dir())
 
+    if libs['zstd']:
+        zstd_src_dir = os.path.join(ext_dir(), 'zstd')
+        if update_src:
+            update_git_submodule(zstd_src_dir)
+        build_zstd(zstd_src_dir, ext_build_dir())
+
     if libs['folly-deps']:
         bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
         fmt_src_dir = os.path.join(ext_dir(), 'fmt')
         le_src_dir = os.path.join(ext_dir(), 'libevent')
         snappy_src_dir = os.path.join(ext_dir(), 'snappy')
-        zstd_src_dir = os.path.join(ext_dir(), 'zstd')
         if update_src:
             update_git_submodule(bz2_src_dir)
             # update_git_submodule(jm_src_dir)
             update_git_submodule(fmt_src_dir)
             update_git_submodule(le_src_dir)
             update_git_submodule(snappy_src_dir)
-            update_git_submodule(zstd_src_dir)
         build_bzip2(bz2_src_dir, ext_build_dir())
         build_fmt(fmt_src_dir, ext_build_dir())
         # if is_linux():
         #     build_jemalloc(jm_src_dir, ext_build_dir())
         build_libevent(le_src_dir, ext_build_dir())
         build_snappy(snappy_src_dir, ext_build_dir())
-        build_zstd(zstd_src_dir, ext_build_dir())
         #
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
         src_dir = get_package_top_level_folder(package_name, ext_dir())
@@ -2004,6 +2007,7 @@ def parse_inputs(argv: list):
             'double-conversion': False,
             'lz4': False,
             'xz': False,
+            'zstd': False,
             'folly-deps': False,
             'folly': False,
             'ceres-solver': False,
@@ -2039,8 +2043,9 @@ def parse_inputs(argv: list):
                             'boost': ['folly'],
                             'folly-deps': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],
-                            'lz4': ['vtk'],
-                            'xz': ['vtk'],
+                            'lz4': ['vtk', 'folly'],
+                            'xz': ['vtk', 'folly'],
+                            'zstd': ['folly'],
                             'openjpeg': ['opencv'],
                             'libwebp': ['opencv'],
                             }

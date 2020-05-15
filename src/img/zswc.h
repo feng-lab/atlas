@@ -13,27 +13,15 @@ struct SwcNode
     : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
   {}
 
-  int id;
-  int type;
-  double x;
-  double y;
-  double z;
-  double radius;
-  int parentID;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
-  int label;
-
-//  bool operator==(const SwcNode &rhs) const
-//  {
-//    return id == rhs.id &&
-//        type == rhs.type &&
-//        x == rhs.x &&
-//        y == rhs.y &&
-//        z == rhs.z &&
-//        radius == rhs.radius &&
-//        parentID == rhs.parentID &&
-//        label == rhs.label;
-//  }
-//  inline bool operator!=(const SwcNode &rhs) const { return !(*this == rhs); }
+  int id = -1;
+  int type = -1;
+  double x = 0;
+  double y = 0;
+  double z = 0;
+  double radius = -1;
+  int parentID = -2;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
+  int label = -1;
+  bool selected = false;
 };
 
 class ZSwc : public ZTree<SwcNode>
