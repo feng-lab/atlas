@@ -41,6 +41,10 @@ QMenu& ZSwcPack::contextMenu()
   m_selectUpstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
   m_selectDownstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
   m_selectEntireTreeAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_deleteSelectedNodesAction->setEnabled(!m_selectedNodes.empty());
+  m_setSelectedNodeAsRootAction->setEnabled(m_selectedNodes.size() == 1);
+  m_breakSelectedNodesAction->setEnabled(m_selectedNodes.size() > 1);
+  m_connectSelectedNodesAction->setEnabled(m_selectedNodes.size() > 1);
   return m_contextMenu;
 }
 
@@ -227,6 +231,7 @@ void ZSwcPack::updateViewRelatedData()
   for (auto& decomposedNode : m_decomposedNodes) {
     m_allNodesSet.insert(&decomposedNode);
   }
+  m_extentedSelectionAnchor = m_selectedNodes.empty() ? m_selectedNodes.end() : m_selectedNodes.begin();
 }
 
 void ZSwcPack::createContextMenu()
@@ -255,6 +260,22 @@ void ZSwcPack::createContextMenu()
   m_selectEntireTreeAction->setStatusTip(tr("Select the entire tree"));
   connect(m_selectEntireTreeAction, &QAction::triggered, this, &ZSwcPack::selectEntireTree);
 
+  m_deleteSelectedNodesAction = new QAction(tr("Delete Selected Nodes"), this);
+  m_deleteSelectedNodesAction->setStatusTip(tr("Delete all selected nodes"));
+  connect(m_deleteSelectedNodesAction, &QAction::triggered, this, &ZSwcPack::deleteSelectedNodes);
+
+  m_setSelectedNodeAsRootAction = new QAction(tr("Set Selected Node As Root"), this);
+  m_setSelectedNodeAsRootAction->setStatusTip(tr("Set selected node as the root of tree"));
+  connect(m_setSelectedNodeAsRootAction, &QAction::triggered, this, &ZSwcPack::setSelectedNodeAsRoot);
+
+  m_breakSelectedNodesAction = new QAction(tr("Break Selected Nodes"), this);
+  m_breakSelectedNodesAction->setStatusTip(tr("Break the connections between selected nodes"));
+  connect(m_breakSelectedNodesAction, &QAction::triggered, this, &ZSwcPack::breakSelectedNodes);
+
+  m_connectSelectedNodesAction = new QAction(tr("Connect Selected Nodes"), this);
+  m_connectSelectedNodesAction->setStatusTip(tr("Connect the selected nodes so they are in one tree"));
+  connect(m_connectSelectedNodesAction, &QAction::triggered, this, &ZSwcPack::connectSelectedNodes);
+
   auto selectMenu = m_contextMenu.addMenu("Select");
   selectMenu->addAction(m_selectCurrentBranchAction);
   selectMenu->addAction(m_selectBranchUpstreamAction);
@@ -262,6 +283,10 @@ void ZSwcPack::createContextMenu()
   selectMenu->addAction(m_selectUpstreamAction);
   selectMenu->addAction(m_selectDownstreamAction);
   selectMenu->addAction(m_selectEntireTreeAction);
+  m_contextMenu.addAction(m_deleteSelectedNodesAction);
+  m_contextMenu.addAction(m_setSelectedNodeAsRootAction);
+  m_contextMenu.addAction(m_breakSelectedNodesAction);
+  m_contextMenu.addAction(m_connectSelectedNodesAction);
 }
 
 void ZSwcPack::selectCurrentBranch()
@@ -394,6 +419,81 @@ void ZSwcPack::selectEntireTree()
   if (hasChange) {
     emit selectionChanged();
   }
+}
+
+void ZSwcPack::deleteSelectedNodes()
+{
+  if (m_selectedNodes.empty()) {
+    return;
+  }
+  ZSwc swcBeforeChange = m_swc;
+  for (auto p : m_selectedNodes) {
+    m_swc.erase(p);
+  }
+  m_undoStack.push(new ZSwcEditCommand(QString("Deleted Selected %1 Nodes").arg(m_selectedNodes.size()),
+                                       *this, swcBeforeChange));
+}
+
+void ZSwcPack::setSelectedNodeAsRoot()
+{
+  if (m_selectedNodes.size() != 1) {
+    return;
+  }
+  ZSwc swcBeforeChange = m_swc;
+  m_swc.setAsRoot(*m_selectedNodes.begin());
+  m_undoStack.push(new ZSwcEditCommand(QString("Set Selected Node As Root"),
+                                       *this, swcBeforeChange));
+}
+
+void ZSwcPack::breakSelectedNodes()
+{
+  // todo: handle more than two nodes
+  if (m_selectedNodes.size() != 2) {
+    return;
+  }
+  auto it = m_selectedNodes.begin();
+  auto node1 = *it;
+  ++it;
+  auto node2 = *it;
+  if (!ZSwc::inSameTree(node1, node2)) {
+    return;
+  }
+  ZSwc swcBeforeChange = m_swc;
+  auto canode = m_swc.lowestCommonAncestor(node1, node2);
+  if (canode == node1) {
+    m_swc.appendRoot(node2);
+  } else if (canode == node2) {
+    m_swc.appendRoot(node1);
+  } else {
+    m_swc.appendRoot(node1->radius > node2->radius ? node1 : node2);
+  }
+  m_undoStack.push(new ZSwcEditCommand(QString("Break Selected %1 Nodes").arg(m_selectedNodes.size()),
+                                       *this, swcBeforeChange));
+}
+
+void ZSwcPack::connectSelectedNodes()
+{
+  // todo: handle more than two nodes
+  if (m_selectedNodes.size() != 2) {
+    return;
+  }
+  auto it = m_selectedNodes.begin();
+  auto node1 = *it;
+  ++it;
+  auto node2 = *it;
+  if (ZSwc::inSameTree(node1, node2)) {
+    return;
+  }
+  ZSwc swcBeforeChange = m_swc;
+  m_swc.setAsRoot(node1);
+  m_swc.setAsRoot(node2);
+  if (node1->radius > node2->radius) {
+    m_swc.appendChild(node1, node2);
+  } else {
+    m_swc.appendChild(node2, node1);
+  }
+  m_undoStack.push(new ZSwcEditCommand(QString("Connect Selected %1 Nodes").arg(m_selectedNodes.size()),
+                                       *this, swcBeforeChange));
 }
 
 } // namespace nim

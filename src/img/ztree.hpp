@@ -1433,9 +1433,15 @@ public:
   }
 
   template<typename Iter1, typename Iter2>
-  static bool inSameTree(const Iter1& pos1, const Iter2& pos2)
+  static bool inSameForest(const Iter1& pos1, const Iter2& pos2)
   {
     return getHeadNode(pos1) == getHeadNode(pos2);
+  }
+
+  template<typename Iter1, typename Iter2>
+  static bool inSameTree(const Iter1& pos1, const Iter2& pos2)
+  {
+    return getRootNode(pos1) == getRootNode(pos2);
   }
 
   template<typename Iter>
@@ -1557,7 +1563,7 @@ public:
   template<typename Iter>
   void appendChild(Iter parent, Iter child)
   {
-    CHECK(isValid(parent) && isValid(child) && this->inSameTree(parent, child) && parent != child);
+    CHECK(isValid(parent) && isValid(child) && parent != child);
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1597,7 +1603,7 @@ public:
   template<typename Iter>
   void prependChild(Iter parent, Iter child)
   {
-    CHECK(isValid(parent) && isValid(child) && this->inSameTree(parent, child) && parent != child);
+    CHECK(isValid(parent) && isValid(child) && parent != child);
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1617,7 +1623,7 @@ public:
   void copy(IterTo to, const ZTree<T>& fromTree, const IterFrom& from)
   {
     CHECK(isValid(to) && fromTree.isValid(from));
-    CHECK(!this->inSameTree(to, from)); // not necessary but otherwise not very meaningful
+    CHECK(!this->inSameForest(to, from)); // not necessary but otherwise not very meaningful
     eraseChildren(to);
     to.node->data = from.node->data;
     // pre order copy
@@ -1678,7 +1684,6 @@ public:
     if (isRoot(pos))
       return;
     std::vector<AncestorIterator> chain;
-    chain.push_back(pos);
     for (AncestorIterator it = beginAncestor(pos); it != endAncestor(pos); ++it) {
       chain.push_back(it);
     }

@@ -921,7 +921,10 @@ void Z3DSwcFilter::setColorMode(const std::string& mode)
 
 void Z3DSwcFilter::deleteSelectedNodes()
 {
-
+  if (m_swcPack->isLocked()) {
+    return;
+  }
+  m_swcPack->deleteSelectedNodes();
 }
 
 } // namespace nim

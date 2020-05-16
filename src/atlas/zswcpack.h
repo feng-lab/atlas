@@ -79,6 +79,8 @@ public:
 
   void onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool extend);
 
+  void deleteSelectedNodes();
+
 protected:
 
   void updateViewRelatedData();
@@ -96,6 +98,12 @@ protected:
   void selectSubtree();
 
   void selectEntireTree();
+
+  void setSelectedNodeAsRoot();
+
+  void breakSelectedNodes();
+
+  void connectSelectedNodes();
 
 signals:
 
@@ -117,10 +125,16 @@ protected:
   QAction* m_selectUpstreamAction = nullptr;
   QAction* m_selectDownstreamAction = nullptr;
   QAction* m_selectEntireTreeAction = nullptr;
+  QAction* m_deleteSelectedNodesAction = nullptr;
+  QAction* m_setSelectedNodeAsRootAction = nullptr;
+  QAction* m_breakSelectedNodesAction = nullptr;
+  QAction* m_connectSelectedNodesAction = nullptr;
   QMenu m_contextMenu;
 
   // derived data
 private:
+  friend class ZSwcEditCommand;
+
   mutable QString m_info;
   QString m_name;
   QString m_tooltip;
@@ -133,6 +147,40 @@ private:
   std::vector<ZSwc::SwcTreeNode> m_decomposedNodes;
   std::set<const ZSwc::SwcTreeNode*> m_allNodesSet;  // for fast search
   std::set<int> m_allNodeType;   // all node type of current swc, used for adjust widget (hide irrelavant stuff)
+};
+
+class ZSwcEditCommand : public QUndoCommand
+{
+public:
+  explicit ZSwcEditCommand(const QString& text, ZSwcPack& sp, ZSwc& swcBeforeChange)
+    : QUndoCommand(text)
+    , m_swcPack(sp)
+  {
+    m_swcBeforeChange.swap(swcBeforeChange);
+  }
+
+  void undo() override
+  {
+    m_swcPack.m_swc.swap(m_swcBeforeChange);
+    m_swcPack.updateViewRelatedData();
+    emit m_swcPack.swcChanged();
+  }
+
+  void redo() override
+  {
+    if (!m_firstTimeRedo) {
+      m_swcPack.m_swc.swap(m_swcBeforeChange);
+    } else {
+      m_firstTimeRedo = false;
+    }
+    m_swcPack.updateViewRelatedData();
+    emit m_swcPack.swcChanged();
+  }
+
+protected:
+  ZSwcPack& m_swcPack;
+  ZSwc m_swcBeforeChange;
+  bool m_firstTimeRedo = true;
 };
 
 } // namespace nim

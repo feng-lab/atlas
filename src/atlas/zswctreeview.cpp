@@ -100,8 +100,21 @@ void ZSwcTreeView::adaptColumns()
   resizeColumnToContents(ZSwcTreeModel::LabelColumn);
 }
 
-void ZSwcTreeView::keyPressEvent(QKeyEvent* /*e*/)
+void ZSwcTreeView::keyPressEvent(QKeyEvent* e)
 {
+  if (m_swcPack.isLocked()) {
+    return;
+  }
+  // LOG(INFO) << QKeySequence::listToString(QKeySequence::keyBindings(QKeySequence::Delete));
+  switch (e->key()) {
+    case Qt::Key_Delete:
+    case Qt::Key_Backspace:
+      m_swcPack.deleteSelectedNodes();
+      break;
+    default:
+      QTreeView::keyPressEvent(e);
+      break;
+  }
 }
 
 void ZSwcTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
