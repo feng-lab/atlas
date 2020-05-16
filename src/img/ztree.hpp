@@ -6,12 +6,16 @@
 #include <range/v3/view/subrange.hpp>
 #include <deque>
 #include <vector>
+#include <list>
 
 namespace nim {
 
 // all Iterators are standard-conforming BidirectionalIterator
 // Iterator can be constructed from different type of Iterator and will behave correctly
 // see ztreetest.h for usage
+
+// for funtions that take iter as input, we could have checked whether the input iter belongs to the current
+// tree but the check is a little expensive so user should be careful to know the correct source of each input iter
 
 namespace impl {
 
@@ -31,6 +35,7 @@ struct TreeNode
   TreeNode<T>* lastChild = nullptr;
   TreeNode<T>* prevSibling = nullptr;
   TreeNode<T>* nextSibling = nullptr;
+  typename std::list<TreeNode<T>>::const_iterator iteratorOfContainer; // point to its own container
   T data;
 };
 
@@ -489,31 +494,29 @@ public:
   using ConstReverseRootIterator = ConstReverseChildIterator;
 
   ZTree()
-  { init(); }
+  {
+    clear();
+  }
 
   template<typename Iter>
-  explicit ZTree(const Iter& it)
+  ZTree(const ZTree<T>& fromTree, const Iter& it)
   {
-    init();
-    copy(appendRoot(*it), it);
+    clear();
+    copy(appendRoot(*it), fromTree, it);
   }
 
   ZTree(const ZTree& rhs)
   {
-    init();
     deepCopy(rhs);
   }
 
   ZTree(ZTree&& rhs) noexcept
   {
-    init();
+    clear();
     swap(rhs);
   }
 
-  virtual ~ZTree()
-  {
-    clear();
-  }
+  virtual ~ZTree() noexcept = default;
 
   ZTree<T>& operator=(ZTree rhs) noexcept
   {
@@ -523,15 +526,26 @@ public:
 
   void swap(ZTree<T>& rhs) noexcept
   {
+    m_nodes.swap(rhs.m_nodes);
     std::swap(m_head, rhs.m_head);
     std::swap(m_tail, rhs.m_tail);
+  }
+
+  inline void clear() noexcept
+  {
+    m_nodes.resize(2);
+    m_head = &m_nodes.front();
+    m_tail = &m_nodes.back();
+
+    m_head->nextSibling = m_tail;
+    m_tail->prevSibling = m_head;
   }
 
   Iterator begin() noexcept
   { return Iterator(m_head->nextSibling); }
 
   Iterator end() noexcept
-  { return Iterator(m_tail.get()); }
+  { return Iterator(m_tail); }
 
   ReverseIterator rbegin() noexcept
   { return std::make_reverse_iterator(end()); }
@@ -565,7 +579,7 @@ public:
   { return ConstIterator(m_head->nextSibling); }
 
   ConstIterator end() const noexcept
-  { return ConstIterator(m_tail.get()); }
+  { return ConstIterator(m_tail); }
 
   ConstReverseIterator rbegin() const noexcept
   { return std::make_reverse_iterator(end()); }
@@ -626,7 +640,7 @@ public:
   PostOrderIterator beginPostOrder() noexcept
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail.get()) {
+    if (n != m_tail) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -634,7 +648,7 @@ public:
   }
 
   PostOrderIterator endPostOrder() noexcept
-  { return PostOrderIterator(m_tail.get()); }
+  { return PostOrderIterator(m_tail); }
 
   ReversePostOrderIterator rbeginPostOrder() noexcept
   { return std::make_reverse_iterator(endPostOrder()); }
@@ -670,7 +684,7 @@ public:
   ConstPostOrderIterator beginPostOrder() const noexcept
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail.get()) {
+    if (n != m_tail) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -678,7 +692,7 @@ public:
   }
 
   ConstPostOrderIterator endPostOrder() const noexcept
-  { return ConstPostOrderIterator(m_tail.get()); }
+  { return ConstPostOrderIterator(m_tail); }
 
   ConstReversePostOrderIterator rbeginPostOrder() const noexcept
   { return std::make_reverse_iterator(endPostOrder()); }
@@ -743,7 +757,7 @@ public:
   { return BreadthFirstIterator(m_head->nextSibling); }
 
   BreadthFirstIterator endBreadthFirst() noexcept
-  { return BreadthFirstIterator(m_tail.get()); }
+  { return BreadthFirstIterator(m_tail); }
 
   ReverseBreadthFirstIterator rbeginBreadthFirst() noexcept
   { return std::make_reverse_iterator(endBreadthFirst()); }
@@ -777,7 +791,7 @@ public:
   { return ConstBreadthFirstIterator(m_head->nextSibling); }
 
   ConstBreadthFirstIterator endBreadthFirst() const noexcept
-  { return ConstBreadthFirstIterator(m_tail.get()); }
+  { return ConstBreadthFirstIterator(m_tail); }
 
   ConstReverseBreadthFirstIterator rbeginBreadthFirst() const noexcept
   { return std::make_reverse_iterator(endBreadthFirst()); }
@@ -839,7 +853,7 @@ public:
   { return RootIterator(m_head->nextSibling); }
 
   RootIterator endRoot() noexcept
-  { return RootIterator(m_tail.get()); }
+  { return RootIterator(m_tail); }
 
   ReverseRootIterator rbeginRoot() noexcept
   { return std::make_reverse_iterator(endRoot()); }
@@ -851,7 +865,7 @@ public:
   { return ConstRootIterator(m_head->nextSibling); }
 
   ConstRootIterator endRoot() const noexcept
-  { return ConstRootIterator(m_tail.get()); }
+  { return ConstRootIterator(m_tail); }
 
   ConstReverseRootIterator rbeginRoot() const noexcept
   { return std::make_reverse_iterator(endRoot()); }
@@ -994,7 +1008,7 @@ public:
   LeafIterator beginLeaf() noexcept
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail.get()) {
+    if (n != m_tail) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -1002,7 +1016,7 @@ public:
   }
 
   LeafIterator endLeaf() noexcept
-  { return LeafIterator(m_tail.get()); }
+  { return LeafIterator(m_tail); }
 
   ReverseLeafIterator rbeginLeaf() noexcept
   { return std::make_reverse_iterator(endLeaf()); }
@@ -1038,7 +1052,7 @@ public:
   ConstLeafIterator beginLeaf() const noexcept
   {
     TreeNode* n = m_head->nextSibling;
-    if (n != m_tail.get()) {
+    if (n != m_tail) {
       while (n->firstChild)
         n = n->firstChild;
     }
@@ -1046,7 +1060,7 @@ public:
   }
 
   ConstLeafIterator endLeaf() const noexcept
-  { return ConstLeafIterator(m_tail.get()); }
+  { return ConstLeafIterator(m_tail); }
 
   ConstReverseLeafIterator rbeginLeaf() const noexcept
   { return std::make_reverse_iterator(endLeaf()); }
@@ -1376,7 +1390,7 @@ public:
   { return size(parent) - 1; }
 
   [[nodiscard]] bool empty() const
-  { return m_head->nextSibling == m_tail.get(); }
+  { return m_head->nextSibling == m_tail; }
 
   template<typename Iter>
   static bool isRoot(const Iter& pos)
@@ -1402,17 +1416,30 @@ public:
   static Iter firstChild(const Iter& pos)
   { return Iter(pos.node->firstChild); }
 
-  void clear()
+  template<typename Iter>
+  static Iter root(const Iter& pos)
   {
-    if (m_head) {
-      PostOrderIterator it = beginPostOrder();
-      PostOrderIterator tmp;
-      PostOrderIterator end = endPostOrder();
-      while (it != end) {
-        tmp = it++;
-        erase(tmp);
+    if (isRoot(pos)) {
+      return Iter(pos.node);
+    } else {
+      auto pit = parent(pos);
+      while (!isRoot(pit)) {
+        pit = parent(pit);
       }
+      return Iter(pit.node);
     }
+  }
+
+  template<typename Iter1, typename Iter2>
+  static bool inSameTree(const Iter1& pos1, const Iter2& pos2)
+  {
+    return getHeadNode(pos1) == getHeadNode(pos2);
+  }
+
+  template<typename Iter>
+  bool containsNode(const Iter& pos) const
+  {
+    return isValid(pos) && getHeadNode(pos) == m_head;
   }
 
   template<typename Iter>
@@ -1420,7 +1447,7 @@ public:
   {
     flatten(pos);
     detachParent(pos);
-    delete pos.node;
+    m_nodes.erase(pos.node->iteratorOfContainer);
   }
 
   template<typename Iter>
@@ -1450,17 +1477,38 @@ public:
 
   Iterator appendRoot(const T& v)
   {
-    auto node = new TreeNode(v);
+    auto iterator = m_nodes.emplace(m_nodes.end(), v);
+    auto node = &*iterator;
+    node->iteratorOfContainer = iterator;
+
     node->prevSibling = m_tail->prevSibling;
-    node->nextSibling = m_tail.get();
+    node->nextSibling = m_tail;
     m_tail->prevSibling->nextSibling = node;
     m_tail->prevSibling = node;
     return Iterator(node);
   }
 
+  // child will be detached from previous parent (or siblings in case it is root)
+  template<typename Iter>
+  void appendRoot(Iter child)
+  {
+    CHECK(isValid(child) && containsNode(child));
+    if (this->isRoot(child))
+      return;
+    detachParent(child);
+    CHECK(!child.node->parent && !child.node->prevSibling && !child.node->nextSibling);
+    child.node->prevSibling = m_tail->prevSibling;
+    child.node->nextSibling = m_tail;
+    m_tail->prevSibling->nextSibling = child.node;
+    m_tail->prevSibling = child.node;
+  }
+
   Iterator prependRoot(const T& v)
   {
-    auto node = new TreeNode(v);
+    auto iterator = m_nodes.emplace(m_nodes.end(), v);
+    auto node = &*iterator;
+    node->iteratorOfContainer = iterator;
+
     node->prevSibling = m_head;
     node->nextSibling = m_head->nextSibling;
     m_head->nextSibling->prevSibling = node;
@@ -1468,11 +1516,28 @@ public:
     return Iterator(node);
   }
 
+  // child will be detached from previous parent (or siblings in case it is root)
+  template<typename Iter>
+  void prependRoot(Iter child)
+  {
+    CHECK(isValid(child) && containsNode(child));
+    if (this->isRoot(child))
+      return;
+    detachParent(child);
+    CHECK(!child.node->parent && !child.node->prevSibling && !child.node->nextSibling);
+    child.node->prevSibling = m_head;
+    child.node->nextSibling = m_head->nextSibling;
+    m_head->nextSibling->prevSibling = child.node;
+    m_head->nextSibling = child.node;
+  }
+
   template<typename Iter>
   Iter appendChild(Iter parent, const T& v)
   {
     CHECK(isValid(parent));
-    auto node = new TreeNode(v);
+    auto iterator = m_nodes.emplace(m_nodes.end(), v);
+    auto node = &*iterator;
+    node->iteratorOfContainer = iterator;
     node->parent = parent.node;
     if (parent.node->lastChild) {
       parent.node->lastChild->nextSibling = node;
@@ -1486,10 +1551,11 @@ public:
   }
 
   // child will be detached from previous parent (or siblings in case it is root)
+  // parent and child should come from same tree
   template<typename Iter>
   void appendChild(Iter parent, Iter child)
   {
-    CHECK(isValid(parent) && isValid(child));
+    CHECK(isValid(parent) && isValid(child) && this->inSameTree(parent, child) && parent != child);
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1509,7 +1575,9 @@ public:
   Iter prependChild(Iter parent, const T& v)
   {
     CHECK(isValid(parent));
-    auto node = new TreeNode(v);
+    auto iterator = m_nodes.emplace(m_nodes.end(), v);
+    auto node = &*iterator;
+    node->iteratorOfContainer = iterator;
     node->parent = parent.node;
     if (parent.node->firstChild) {
       parent.node->firstChild->prevSibling = node;
@@ -1523,14 +1591,14 @@ public:
   }
 
   // child will be detached from previous parent (if any)
+  // parent and child should come from same tree
   template<typename Iter>
   void prependChild(Iter parent, Iter child)
   {
-    CHECK(isValid(parent) && isValid(child));
+    CHECK(isValid(parent) && isValid(child) && this->inSameTree(parent, child) && parent != child);
     if (parent == this->parent(child))
       return;
-    if (!isRoot(child))
-      detachParent(child);
+    detachParent(child);
     CHECK(!child.node->parent && !child.node->prevSibling && !child.node->nextSibling);
     child.node->parent = parent.node;
     if (parent.node->firstChild) {
@@ -1544,9 +1612,10 @@ public:
   }
 
   template<typename IterTo, typename IterFrom>
-  void copy(IterTo to, const IterFrom& from)
+  void copy(IterTo to, const ZTree<T>& fromTree, const IterFrom& from)
   {
-    CHECK(isValid(to) && isValid(from));
+    CHECK(isValid(to) && fromTree.isValid(from));
+    CHECK(!this->inSameTree(to, from)); // not necessary but otherwise not very meaningful
     eraseChildren(to);
     to.node->data = from.node->data;
     // pre order copy
@@ -1620,6 +1689,8 @@ public:
   template<typename Iter, typename Iter2>
   Iter lowestCommonAncestor(Iter n1, Iter2 n2)
   {
+    CHECK(isValid(n1) && isValid(n2));
+
     std::vector<AncestorIterator> chain1;
     for (AncestorIterator it = beginAncestor(n1); it != endAncestor(n1); ++it) {
       chain1.push_back(it);
@@ -1630,6 +1701,7 @@ public:
     }
     size_t i1 = chain1.size() - 1;
     size_t i2 = chain2.size() - 1;
+
     TreeNode* res = nullptr;
     while (i1 != static_cast<size_t>(-1) && i2 != static_cast<size_t>(-1) && chain1[i1] == chain2[i2]) {
       res = chain1[i1].node;
@@ -1640,32 +1712,23 @@ public:
   }
 
 protected:
-  void init()
-  {
-    m_head = std::make_unique<TreeNode>();
-    m_tail = std::make_unique<TreeNode>();
-
-    m_head->nextSibling = m_tail.get();
-    m_tail->prevSibling = m_head.get();
-  }
-
   void deepCopy(const ZTree<T>& rhs)
   {
     clear();
     for (ConstRootIterator it = rhs.beginRoot(); it != rhs.endRoot(); ++it) {
       appendRoot(*it);
     }
-    RootIterator to = beginRoot();
-    ConstRootIterator from = rhs.beginRoot();
+    auto to = beginRoot();
+    auto from = rhs.cbeginRoot();
     while (to != endRoot()) {
-      copy(to, from);
+      copy(to, rhs, from);
       ++to;
       ++from;
     }
   }
 
   template<typename Iter>
-  void detachParent(Iter pos)
+  static void detachParent(Iter pos)
   {
     if (pos.node->prevSibling) {
       pos.node->prevSibling->nextSibling = pos.node->nextSibling;
@@ -1704,7 +1767,24 @@ protected:
   template<typename Iter>
   inline bool isValid(Iter it) const
   {
-    return it.node && it.node != m_head.get() && it.node != m_tail.get();
+    return it.node && it.node != m_head && it.node != m_tail;
+  }
+
+  template<typename Iter>
+  static const TreeNode* getRootNode(const Iter& it)
+  {
+    return root(it).node;
+  }
+
+  template<typename Iter>
+  static const TreeNode* getHeadNode(const Iter& it)
+  {
+    auto res = getRootNode(it);
+    CHECK(res->prevSibling);
+    while (res->prevSibling) {
+      res = res->prevSibling;
+    }
+    return res;
   }
 
 protected:
@@ -1712,8 +1792,9 @@ protected:
   //          / | \     / | \     / |
   //         nodes...  nodes...  nodes...
   //
-  std::unique_ptr<TreeNode> m_head;
-  std::unique_ptr<TreeNode> m_tail;
+  std::list<TreeNode> m_nodes;
+  TreeNode* m_head = nullptr; // point to the first element of the m_nodes list
+  TreeNode* m_tail = nullptr; // point to the second element of the m_nodes list
 };
 
 }  // namespace nim

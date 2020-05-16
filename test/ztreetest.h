@@ -1540,6 +1540,14 @@ TEST(SWC, ChildIterator)
       ++c;
     }
     ASSERT_EQ(c, 3);
+    c = 0;
+    sres = 5;
+    for (auto& node : std::as_const(smallSwc).rChildRange(sit)) {
+      ASSERT_EQ(node.id, --sres);
+      ASSERT_LT(c, 3);
+      ++c;
+    }
+    ASSERT_EQ(c, 3);
 
     std::advance(sit, 11); // use 12 as start
     ASSERT_EQ(sit->id, 12);

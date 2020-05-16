@@ -532,9 +532,9 @@ void stnTrajectory()
             }
           }
           if (ZSwc::isNull(desParent)) {
-            swc.copy(swc.appendRoot(*oit), oit);
+            swc.copy(swc.appendRoot(*oit), origSwc, oit);
           } else if (!ZSwc::isNull(srcChild)) {
-            swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
+            swc.copy(swc.appendChild(desParent, *srcChild), origSwc, srcChild);
           }
         }
 
@@ -599,9 +599,9 @@ void mergeTraces()
         }
       }
       if (ZSwc::isNull(desParent)) {
-        swc.copy(swc.appendRoot(*oit), oit);
+        swc.copy(swc.appendRoot(*oit), origSwc, oit);
       } else if (!ZSwc::isNull(srcChild)) {
-        swc.copy(swc.appendChild(desParent, *srcChild), srcChild);
+        swc.copy(swc.appendChild(desParent, *srcChild), origSwc, srcChild);
       }
     }
 
