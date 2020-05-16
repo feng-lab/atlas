@@ -1620,6 +1620,8 @@ TEST(SWC, AncestorIterator)
     int c = 0;
     auto sit = smallSwc.cbegin();
     ASSERT_EQ(sit->id, 1);
+    std::advance(sit, 3); // use 5 as start
+    ASSERT_EQ(sit->id, 5);
     const int smallSwcRes[] = {5, 3, 1};
     size_t sidx = 0;
     for (auto it = smallSwc.cbeginAncestor(sit); it != smallSwc.cendAncestor(sit); ++it) {
@@ -1631,33 +1633,34 @@ TEST(SWC, AncestorIterator)
       ASSERT_LT(c, 3);
     }
 
-    std::advance(sit, 6); // use 6 as start
+    const int smallSwcRes2[] = {6, 3, 1};
+    std::advance(sit, 3); // use 6 as start
     ASSERT_EQ(sit->id, 6);
     c = 0;
-    sidx = 1;
+    sidx = 0;
     for (auto it = smallSwc.cbeginAncestor(sit); it != smallSwc.cendAncestor(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, smallSwcRes[sidx++]);
-      ASSERT_LT(c, 2);
+      ASSERT_EQ(it->id, smallSwcRes2[sidx++]);
+      ASSERT_LT(c, 3);
     }
     c = 0;
     sidx = std::extent<decltype(smallSwcRes)>::value;
     for (auto it = smallSwc.crbeginAncestor(sit); it != smallSwc.crendAncestor(sit); ++it, ++c) {
-      ASSERT_EQ(it->id, smallSwcRes[--sidx]);
-      ASSERT_LT(c, 2);
+      ASSERT_EQ(it->id, smallSwcRes2[--sidx]);
+      ASSERT_LT(c, 3);
     }
 
     c = 0;
-    sidx = 1;
+    sidx = 0;
     for (auto& node : smallSwc.cAncestorRange(sit)) {
-      ASSERT_EQ(node.id, smallSwcRes[sidx++]);
-      ASSERT_LT(c, 2);
+      ASSERT_EQ(node.id, smallSwcRes2[sidx++]);
+      ASSERT_LT(c, 3);
       ++c;
     }
     c = 0;
     sidx = std::extent<decltype(smallSwcRes)>::value;
     for (auto& node : smallSwc.crAncestorRange(sit)) {
-      ASSERT_EQ(node.id, smallSwcRes[--sidx]);
-      ASSERT_LT(c, 2);
+      ASSERT_EQ(node.id, smallSwcRes2[--sidx]);
+      ASSERT_LT(c, 3);
       ++c;
     }
 
@@ -1665,11 +1668,11 @@ TEST(SWC, AncestorIterator)
     ASSERT_EQ(sit->id, 11);
     c = 0;
     for (auto it = smallSwc.cbeginAncestor(sit); it != smallSwc.cendAncestor(sit); ++it, ++c) {
-      ASSERT_TRUE(false);
+      ASSERT_LT(c, 1);
     }
     c = 0;
     for (auto it = smallSwc.crbeginAncestor(sit); it != smallSwc.crendAncestor(sit); ++it, ++c) {
-      ASSERT_TRUE(false);
+      ASSERT_LT(c, 1);
     }
   }
   catch (const ZIOException & e) {

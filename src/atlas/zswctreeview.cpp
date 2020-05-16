@@ -62,11 +62,14 @@ ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
   connect(&m_swcPack, &ZSwcPack::lockedStateChanged, this, &ZSwcTreeView::onLockedStateChanged);
 }
 
-void ZSwcTreeView::contextMenu(const QPoint& /*pos*/)
+void ZSwcTreeView::contextMenu(const QPoint& pos)
 {
-//  if (m_doc->numSelectedObjs() > 0) {
-//    m_contextMenu->popup(mapToGlobal(pos));
-//  }
+  if (m_swcPack.isLocked()) {
+    return;
+  }
+  if (!m_swcPack.selectedNodes().empty()) {
+    m_swcPack.contextMenu().popup(mapToGlobal(pos));
+  }
 }
 
 void ZSwcTreeView::indexClicked(const QModelIndex& index)
@@ -122,7 +125,7 @@ void ZSwcTreeView::selectionChanged(const QItemSelection &selected, const QItemS
       selectedRows.insert(std::make_tuple(index.parent().row(), index.row()));
     }
   }
-  std::set<ZSwc::ConstIterator> selectedNodes;
+  std::set<ZSwc::SwcTreeNode> selectedNodes;
   for (const auto& r : selectedRows) {
     selectedNodes.insert(m_swcPack.getNodeOfParentRowAndRow(r));
   }

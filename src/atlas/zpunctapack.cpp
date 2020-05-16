@@ -65,9 +65,17 @@ void ZPunctaPack::setSelectedPuncta(const std::set<const ZPunctum*>& sp)
 void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
 {
   if (append) {
-    if (p && m_selectedPuncta.find(p) == m_selectedPuncta.end()) {
+    if (!p) {
+      return;
+    }
+    auto it = m_selectedPuncta.find(p);
+    if (it == m_selectedPuncta.end()) {
       const_cast<ZPunctum*>(p)->setSelected(true);
       m_selectedPuncta.insert(p);
+      emit selectionChanged();
+    } else {
+      const_cast<ZPunctum*>(p)->setSelected(false);
+      m_selectedPuncta.erase(it);
       emit selectionChanged();
     }
   } else {

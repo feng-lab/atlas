@@ -107,12 +107,6 @@ private:
   //  ZFloatParameter m_glowPercentage;
   //  Z3DTextureCopyRenderer m_textureCopyRenderer;
 
-  //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
-  // puncta list used for rendering, it is a subset of m_origPunctaList. Some puncta are
-  // hidden because they are unchecked from the object model. This allows us to control
-  // the visibility of each single punctum.
-  std::vector<const ZPunctum*> m_registeredPunctaList;    // used for picking
-
   ZEventListenerParameter m_selectPunctumEvent;
   ZEventListenerParameter m_deleteSelectedPunctaEvent;
   ZEventListenerParameter m_contextMenuEvent;

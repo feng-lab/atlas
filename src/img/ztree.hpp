@@ -17,6 +17,8 @@ namespace nim {
 // for funtions that take iter as input, we could have checked whether the input iter belongs to the current
 // tree but the check is a little expensive so user should be careful to know the correct source of each input iter
 
+// note: ancestor iterator starts from the input child node
+
 namespace impl {
 
 template<typename T>
@@ -338,8 +340,8 @@ protected:
   void decrement()
   {
     // assume this->parent
-    CHECK(this->parent->parent != this->node);  // crash on purpose if we are decreasing begin iterator
-    NodeType* n = this->parent->parent;
+    CHECK(this->parent != this->node);  // crash on purpose if we are decreasing begin iterator
+    NodeType* n = this->parent;
     while (n && n->parent != this->node)
       n = n->parent;
     this->node = n;
@@ -949,7 +951,7 @@ public:
   AncestorIterator beginAncestor(const Iter& child) noexcept
   {
     CHECK(isValid(child));
-    return AncestorIterator(child.node->parent, child.node);
+    return AncestorIterator(child.node, child.node);
   }
 
   template<typename Iter>
@@ -971,7 +973,7 @@ public:
   ConstAncestorIterator beginAncestor(const Iter& child) const noexcept
   {
     CHECK(isValid(child));
-    return ConstAncestorIterator(child.node->parent, child.node);
+    return ConstAncestorIterator(child.node, child.node);
   }
 
   template<typename Iter>
@@ -1686,6 +1688,7 @@ public:
   }
 
   // note: return Null Iter if n1 and n2 has different root
+  // input n1 and n2 are also considered as candidate ancestor
   template<typename Iter, typename Iter2>
   Iter lowestCommonAncestor(Iter n1, Iter2 n2)
   {
@@ -1693,17 +1696,24 @@ public:
 
     std::vector<AncestorIterator> chain1;
     for (AncestorIterator it = beginAncestor(n1); it != endAncestor(n1); ++it) {
+      if (it == n2) {
+        return Iter(n2.node);
+      }
       chain1.push_back(it);
     }
     std::vector<AncestorIterator> chain2;
     for (AncestorIterator it = beginAncestor(n2); it != endAncestor(n2); ++it) {
+      if (it == n1) {
+        return Iter(n1.node);
+      }
       chain2.push_back(it);
     }
-    size_t i1 = chain1.size() - 1;
-    size_t i2 = chain2.size() - 1;
+    int i1 = chain1.size() - 1;
+    int i2 = chain2.size() - 1;
+    CHECK(i1 >= 0 && i2 >= 0);
 
     TreeNode* res = nullptr;
-    while (i1 != static_cast<size_t>(-1) && i2 != static_cast<size_t>(-1) && chain1[i1] == chain2[i2]) {
+    while (i1 >= 0 && i2 >= 0 && chain1[i1] == chain2[i2]) {
       res = chain1[i1].node;
       --i1;
       --i2;

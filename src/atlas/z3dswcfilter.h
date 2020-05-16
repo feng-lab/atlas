@@ -20,7 +20,6 @@ namespace nim {
 class Z3DSwcFilter : public Z3DGeometryFilter
 {
 Q_OBJECT
-  using SwcTreeNode = ZSwc::ConstIterator;
 public:
   enum class InteractionMode
   {
@@ -30,16 +29,6 @@ public:
   explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
   void setData(ZSwcPack& swcPack);
-
-  inline void setSelectedSwcs(std::set<ZSwc*>* list)
-  {
-    m_selectedSwcs = list;
-  }
-
-  inline void setSelectedSwcTreeNodes(std::set<SwcTreeNode>* list)
-  {
-    m_selectedSwcTreeNodes = list;
-  }
 
   bool isReady(Z3DEye eye) const override;
 
@@ -71,11 +60,9 @@ public:
 
 signals:
 
-  void treeSelected(ZSwc*, bool append);
+  void treeNodeSelected(const ZSwc::SwcTreeNode*, bool append, bool extend);
 
-  void treeNodeSelected(SwcTreeNode, bool append);
-
-  void connectingSwcTreeNode(SwcTreeNode);
+  void connectingSwcTreeNode(ZSwc::SwcTreeNode);
 
   void treeNodeSelectConnection();
 
@@ -90,6 +77,8 @@ protected:
 
   void selectSwc(QMouseEvent* e, int w, int h);
 
+  void contextMenuEvent(QContextMenuEvent* e, int w, int h);
+
   void setColorMode(const std::string& mode);
 
   void process(Z3DEye /*unused*/) override;
@@ -102,11 +91,13 @@ protected:
 
   void prepareData();
 
+  void updateData();
+
   //get bounding box of swc tree in world coordinate
   void treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
   //get bounding box of swc tree node in world coordinate
-  void treeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
+  void treeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
   void notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
@@ -115,7 +106,9 @@ protected:
 
   void addSelectionLines() override;
 
-  void notTransformedTreeNodeBound(const SwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
+  void addEditingSelectionLines() override;
+
+  void notTransformedTreeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
 private:
   void initTopologyColor();
@@ -124,19 +117,19 @@ private:
 
   void initSubclassTypeColor();
 
-  void decompseSwcTree();
+  glm::vec4 colorByType(const ZSwc::ConstSwcTreeNode& n);
 
-  glm::vec4 colorByType(const SwcTreeNode& n);
-
-  glm::vec4 colorByDirection(const SwcTreeNode& n);
+  glm::vec4 colorByDirection(const ZSwc::ConstSwcTreeNode& n);
 
   static glm::dvec3 projectPointOnRay(
     const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
-  void addSelectionBox(const std::pair<SwcTreeNode, SwcTreeNode>& nodePair,
+  void addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc::ConstSwcTreeNode>& nodePair,
                        std::vector<glm::vec3>& lines);
 
-  void addSelectionBox(const SwcTreeNode& tn, std::vector<glm::vec3>& lines);
+  void addSelectionBox(const ZSwc::ConstSwcTreeNode& tn, std::vector<glm::vec3>& lines);
+
+  void deleteSelectedNodes();
 
 private:
   Z3DLineRenderer m_lineRenderer;
@@ -153,18 +146,12 @@ private:
   std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForDifferentTopology;
   ZColorMapParameter m_colorMapBranchType;
 
-  //std::map<std::string, size_t> m_sourceColorMapper;   // should use unordered_map
-  // swc list used for rendering, it is a subset of m_origSwcList. Some swcs are
-  // hidden because they are unchecked from the object model. This allows us to control
-  // the visibility of each single swc tree.
-  std::vector<SwcTreeNode*> m_registeredSwcTreeNodeList;    // used for picking
-
   ZEventListenerParameter m_selectSwcEvent;
+  ZEventListenerParameter m_deleteSelectedNodesEvent;
+  ZEventListenerParameter m_contextMenuEvent;
   glm::ivec2 m_startCoord{};
-  ZSwc* m_pressedSwc;
-  std::set<ZSwc*>* m_selectedSwcs;   //point to all selected swcs, managed by other class
-  SwcTreeNode* m_pressedSwcTreeNode;
-  std::set<SwcTreeNode>* m_selectedSwcTreeNodes;   //point to all selected swcs, managed by other class
+  ZSwc* m_pressedSwc = nullptr;
+  const ZSwc::SwcTreeNode* m_pressedSwcTreeNode = nullptr;
 
   std::vector<glm::vec4> m_baseAndBaseRadius;
   std::vector<glm::vec4> m_axisAndTopRadius;
@@ -179,16 +166,11 @@ private:
   std::vector<glm::vec4> m_pointColors;
   std::vector<glm::vec4> m_pointPickingColors;
 
-  std::vector<std::pair<SwcTreeNode, SwcTreeNode>> m_decompsedNodePairs;
-  std::vector<SwcTreeNode> m_decomposedNodes;
-  std::set<SwcTreeNode*> m_allNodesSet;  // for fast search
-  std::set<int> m_allNodeType;   // all node type of current opened swc, used for adjust widget (hide irrelavant stuff)
-
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid;
 
-  ZSwcPack* m_swcPack;
-  ZSwcPack* m_registeredSwcPack;
+  ZSwcPack* m_swcPack = nullptr;
+  ZSwcPack* m_registeredSwcPack = nullptr;
 
   InteractionMode m_interactionMode;
 };

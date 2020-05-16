@@ -50,26 +50,52 @@ public:
 
   ZBBox<glm::ivec4> boundBox() const;
 
-  inline const std::vector<ZSwc::ConstIterator>& rootNodes() const
+  inline const std::vector<ZSwc::SwcTreeNode>& rootNodes() const
   { return m_rootNodes; }
 
-  inline const std::map<ZSwc::ConstIterator, std::vector<ZSwc::ConstIterator>>& rootToChildrenNodes() const
+  inline const std::map<ZSwc::SwcTreeNode, std::vector<ZSwc::SwcTreeNode>>& rootToChildrenNodes() const
   { return m_rootToChildrenNodes; }
 
-  inline const std::set<ZSwc::ConstIterator>& selectedNodes() const
+  inline const std::set<ZSwc::SwcTreeNode>& selectedNodes() const
   { return m_selectedNodes; }
 
-  void setSelectedNodes(const std::set<ZSwc::ConstIterator>& sn);
+  inline const std::vector<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>>& decompsedNodePairs() const
+  { return m_decompsedNodePairs; }
 
-  std::tuple<int, int> getParentRowAndRowOfNode(const ZSwc::ConstIterator& node) const;
+  inline const std::vector<ZSwc::SwcTreeNode>& decomposedNodes() const
+  { return m_decomposedNodes; }
 
-  ZSwc::ConstIterator getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const;
+  inline const std::set<const ZSwc::SwcTreeNode*>& allNodesSet() const
+  { return m_allNodesSet; }
+
+  inline const std::set<int>& allNodeType() const
+  { return m_allNodeType; }
+
+  void setSelectedNodes(const std::set<ZSwc::SwcTreeNode>& sn);
+
+  std::tuple<int, int> getParentRowAndRowOfNode(const ZSwc::SwcTreeNode& node) const;
+
+  ZSwc::SwcTreeNode getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const;
+
+  void onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool extend);
 
 protected:
 
   void updateViewRelatedData();
 
   void createContextMenu();
+
+  void selectCurrentBranch();
+
+  void selectBranchUpstream();
+
+  void selectBranchDownstream();
+
+  void selectUpstream();
+
+  void selectSubtree();
+
+  void selectEntireTree();
 
 signals:
 
@@ -85,6 +111,12 @@ protected:
   ZSwcDoc& m_doc;
   QUndoStack m_undoStack;
 
+  QAction* m_selectCurrentBranchAction = nullptr;
+  QAction* m_selectBranchUpstreamAction = nullptr;
+  QAction* m_selectBranchDownstreamAction = nullptr;
+  QAction* m_selectUpstreamAction = nullptr;
+  QAction* m_selectDownstreamAction = nullptr;
+  QAction* m_selectEntireTreeAction = nullptr;
   QMenu m_contextMenu;
 
   // derived data
@@ -93,9 +125,14 @@ private:
   QString m_name;
   QString m_tooltip;
   // for views
-  std::vector<ZSwc::ConstIterator> m_rootNodes;
-  std::map<ZSwc::ConstIterator, std::vector<ZSwc::ConstIterator>> m_rootToChildrenNodes;
-  std::set<ZSwc::ConstIterator> m_selectedNodes;
+  std::vector<ZSwc::SwcTreeNode> m_rootNodes;
+  std::map<ZSwc::SwcTreeNode, std::vector<ZSwc::SwcTreeNode>> m_rootToChildrenNodes;
+  std::set<ZSwc::SwcTreeNode> m_selectedNodes;
+  std::set<ZSwc::SwcTreeNode>::iterator m_extentedSelectionAnchor;
+  std::vector<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>> m_decompsedNodePairs;
+  std::vector<ZSwc::SwcTreeNode> m_decomposedNodes;
+  std::set<const ZSwc::SwcTreeNode*> m_allNodesSet;  // for fast search
+  std::set<int> m_allNodeType;   // all node type of current swc, used for adjust widget (hide irrelavant stuff)
 };
 
 } // namespace nim

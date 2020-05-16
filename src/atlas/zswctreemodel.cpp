@@ -18,7 +18,7 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
     return QVariant();
   }
 
-  auto item = *reinterpret_cast<ZSwc::ConstIterator*>(index.internalId());
+  auto item = *reinterpret_cast<ZSwc::SwcTreeNode*>(index.internalId());
   QString topologyType = "continuous";
   if (ZSwc::isRoot(item)) {
     topologyType = "Root";
@@ -125,15 +125,12 @@ QModelIndex ZSwcTreeModel::parent(const QModelIndex& index) const
     return QModelIndex();
   }
 
-  auto it = *reinterpret_cast<ZSwc::ConstIterator*>(index.internalId());
+  auto it = *reinterpret_cast<ZSwc::SwcTreeNode*>(index.internalId());
   if (ZSwc::isRoot(it)) {
     return QModelIndex();
   }
 
-  auto pit = ZSwc::parent(it);
-  while (!ZSwc::isRoot(pit)) {
-    pit = ZSwc::parent(pit);
-  }
+  auto pit = ZSwc::root(it);
   for (size_t r = 0; r < m_swcPack.rootNodes().size(); ++r) {
     if (pit == m_swcPack.rootNodes()[r]) {
       return createIndex(r, 0, reinterpret_cast<std::uintptr_t>(&m_swcPack.rootNodes()[r]));
@@ -154,7 +151,7 @@ int ZSwcTreeModel::rowCount(const QModelIndex& parent) const
   if (!parent.isValid()) {
     return m_swcPack.rootNodes().size();
   } else {
-    auto it = *reinterpret_cast<ZSwc::ConstIterator*>(parent.internalId());
+    auto it = *reinterpret_cast<ZSwc::SwcTreeNode*>(parent.internalId());
     if (!ZSwc::isRoot(it)) {
       return 0;
     }
@@ -214,7 +211,7 @@ void ZSwcTreeModel::doubleClicked(const QModelIndex& index)
     return;
   }
 
-  auto p = *reinterpret_cast<ZSwc::ConstIterator*>(index.internalId());
+  auto p = *reinterpret_cast<ZSwc::SwcTreeNode*>(index.internalId());
   emit m_doc.requestToAdjustViewToPosition(p->x, p->y, p->z, 128);
 }
 

@@ -35,10 +35,12 @@ const QString& ZSwcPack::info() const
 
 QMenu& ZSwcPack::contextMenu()
 {
-//  m_deleteSelectedPunctaAction->setEnabled(!m_selectedPuncta.empty());
-//  m_transferSelectedPunctaToAnotherFileAction->setEnabled(!m_selectedPuncta.empty() && m_doc.objs().size() > 1);
-//  m_mergeSelectedPuntaAction->setEnabled(m_selectedPuncta.size() > 1);
-//  m_splitSelectedPunctumAction->setEnabled(m_selectedPuncta.size() == 1);
+  m_selectCurrentBranchAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_selectBranchUpstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_selectBranchDownstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_selectUpstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_selectDownstreamAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
+  m_selectEntireTreeAction->setEnabled(m_extentedSelectionAnchor != m_selectedNodes.end());
   return m_contextMenu;
 }
 
@@ -61,19 +63,20 @@ ZBBox<glm::ivec4> ZSwcPack::boundBox() const
   return res;
 }
 
-void ZSwcPack::setSelectedNodes(const std::set<ZSwc::ConstIterator>& sn)
+void ZSwcPack::setSelectedNodes(const std::set<ZSwc::SwcTreeNode>& sn)
 {
   if (m_selectedNodes == sn) {
     return;
   }
   m_selectedNodes = sn;
+  m_extentedSelectionAnchor = m_selectedNodes.empty() ? m_selectedNodes.end() : m_selectedNodes.begin();
   for (auto it = m_swc.begin(); it != m_swc.end(); ++it) {
     it->selected = m_selectedNodes.find(it) != m_selectedNodes.end();
   }
   emit selectionChanged();
 }
 
-std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::ConstIterator& node) const
+std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::SwcTreeNode& node) const
 {
   CHECK(!ZSwc::isNull(node));
   if (ZSwc::isRoot(node)) {
@@ -99,7 +102,7 @@ std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::ConstIterato
   }
 }
 
-ZSwc::ConstIterator ZSwcPack::getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const
+ZSwc::SwcTreeNode ZSwcPack::getNodeOfParentRowAndRow(const std::tuple<int, int>& prar) const
 {
   auto [parentRow, row] = prar;
   CHECK(parentRow >= 0) << parentRow;
@@ -107,6 +110,79 @@ ZSwc::ConstIterator ZSwcPack::getNodeOfParentRowAndRow(const std::tuple<int, int
     return m_rootNodes[parentRow];
   } else {
     return m_rootToChildrenNodes.at(m_rootNodes[parentRow])[row];
+  }
+}
+
+void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool extend)
+{
+  CHECK(!(append && extend));
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    extend = false;
+  }
+  if (extend) {
+    CHECK(m_extentedSelectionAnchor != m_selectedNodes.end());
+    if (!p || *p == *m_extentedSelectionAnchor) {
+      return;
+    }
+    // select everything between anchor and p
+    auto root = m_swc.lowestCommonAncestor(*m_extentedSelectionAnchor, *p);
+    if (ZSwc::isNull(root)) {
+      return;
+    }
+    bool hasChange = m_selectedNodes.find(root) == m_selectedNodes.end();
+    if (hasChange) {
+      m_selectedNodes.insert(root);
+    }
+    for (auto it = m_swc.beginAncestor(*p); it != root; ++it) {
+      it->selected = true;
+      const auto& [ignore, ok] = m_selectedNodes.insert(it);
+      hasChange = hasChange || ok;
+    }
+    for (auto it = m_swc.beginAncestor(*m_extentedSelectionAnchor); it != root; ++it) {
+      it->selected = true;
+      const auto& [ignore, ok] = m_selectedNodes.insert(it);
+      hasChange = hasChange || ok;
+    }
+    if (hasChange) {
+      emit selectionChanged();
+    }
+  } else if (append) {
+    if (!p) {
+      return;
+    }
+    auto pit = m_selectedNodes.find(*p);
+    if (pit == m_selectedNodes.end()) {
+      const_cast<ZSwc::SwcTreeNode*>(p)->node->data.selected = true;
+      auto ip = m_selectedNodes.insert(*p);
+      m_extentedSelectionAnchor = ip.first;
+      emit selectionChanged();
+    } else {
+      const_cast<ZSwc::SwcTreeNode*>(p)->node->data.selected = false;
+      m_selectedNodes.erase(pit);
+      m_extentedSelectionAnchor = m_selectedNodes.end();
+      emit selectionChanged();
+    }
+  } else {
+    if (!p && m_selectedNodes.empty()) {
+      return;
+    }
+    if (p && m_selectedNodes.size() == 1 && m_selectedNodes.find(*p) != m_selectedNodes.end()) {
+      return;
+    }
+    if (p) {
+      for (auto it = m_swc.begin(); it != m_swc.end(); ++it) {
+        it->selected = it == *p;
+      }
+      m_selectedNodes = std::set<ZSwc::SwcTreeNode>{*p};
+      m_extentedSelectionAnchor = m_selectedNodes.begin();
+    } else {
+      for (auto& tn : m_swc) {
+        tn.selected = false;
+      }
+      m_selectedNodes.clear();
+      m_extentedSelectionAnchor = m_selectedNodes.end();
+    }
+    emit selectionChanged();
   }
 }
 
@@ -122,48 +198,202 @@ void ZSwcPack::updateViewRelatedData()
   m_rootNodes.clear();
   m_rootToChildrenNodes.clear();
   m_selectedNodes.clear();
-  for (auto rit = m_swc.cbeginRoot(); rit != m_swc.cendRoot(); ++rit) {
+  m_allNodeType.clear();
+  m_decompsedNodePairs.clear();
+  m_decomposedNodes.clear();
+  m_allNodesSet.clear();
+
+  for (auto rit = m_swc.beginRoot(); rit != m_swc.endRoot(); ++rit) {
     m_rootNodes.emplace_back(rit);
-  }
-  for (auto& rit : m_rootNodes) {
+
     m_rootToChildrenNodes[rit].clear();
-    auto it = m_swc.cbegin(rit);
+    auto it = m_swc.begin(rit);
+    CHECK(it == rit);
+    m_allNodeType.insert(it->type);
+    m_decomposedNodes.push_back(it);
     if (it->selected) {
       m_selectedNodes.insert(it);
     }
-    CHECK(it == rit);
-    for (++it; it != m_swc.cend(rit); ++it) {
+    for (++it; it != m_swc.end(rit); ++it) {
       m_rootToChildrenNodes[rit].push_back(it);
+      m_allNodeType.insert(it->type);
+      m_decomposedNodes.push_back(it);
       if (it->selected) {
         m_selectedNodes.insert(it);
       }
+      m_decompsedNodePairs.emplace_back(it, ZSwc::parent(it));
     }
+  }
+  for (auto& decomposedNode : m_decomposedNodes) {
+    m_allNodesSet.insert(&decomposedNode);
   }
 }
 
 void ZSwcPack::createContextMenu()
 {
-//  m_deleteSelectedPunctaAction = new QAction(tr("Delete Selected Puncta"), this);
-//  m_deleteSelectedPunctaAction->setStatusTip(tr("Delete all selected puncta"));
-//  connect(m_deleteSelectedPunctaAction, &QAction::triggered, this, &ZSwcPack::deleteSelectedPuncta);
-//
-//  m_transferSelectedPunctaToAnotherFileAction = new QAction(tr("Transfer Selected Puncta to Another File..."), this);
-//  m_transferSelectedPunctaToAnotherFileAction->setStatusTip(tr("Transfer the selected puncta to another puncta file"));
-//  connect(m_transferSelectedPunctaToAnotherFileAction, &QAction::triggered,
-//          this, &ZSwcPack::transferSelectedPuncta);
-//
-//  m_mergeSelectedPuntaAction = new QAction(tr("Merge Selected Puncta"), this);
-//  m_mergeSelectedPuntaAction->setStatusTip(tr("Merge selected puncta into 1 punctum"));
-//  connect(m_mergeSelectedPuntaAction, &QAction::triggered, this, &ZSwcPack::mergeSelectedPuncta);
-//
-//  m_splitSelectedPunctumAction = new QAction(tr("Split Punctum..."), this);
-//  m_splitSelectedPunctumAction->setStatusTip(tr("Split the selected punctum into several parts using GMM"));
-//  connect(m_splitSelectedPunctumAction, &QAction::triggered, this, &ZSwcPack::splitSelectedPunctum);
-//
-//  m_contextMenu.addAction(m_deleteSelectedPunctaAction);
-//  m_contextMenu.addAction(m_transferSelectedPunctaToAnotherFileAction);
-//  m_contextMenu.addAction(m_mergeSelectedPuntaAction);
-//  m_contextMenu.addAction(m_splitSelectedPunctumAction);
+  m_selectCurrentBranchAction = new QAction(tr("Select Current Branch"), this);
+  m_selectCurrentBranchAction->setStatusTip(tr("Select current branch"));
+  connect(m_selectCurrentBranchAction, &QAction::triggered, this, &ZSwcPack::selectCurrentBranch);
+
+  m_selectBranchUpstreamAction = new QAction(tr("Select Branch Upstream"), this);
+  m_selectBranchUpstreamAction->setStatusTip(tr("Select upstream till branch start"));
+  connect(m_selectBranchUpstreamAction, &QAction::triggered, this, &ZSwcPack::selectBranchUpstream);
+
+  m_selectBranchDownstreamAction = new QAction(tr("Select Branch Downstream"), this);
+  m_selectBranchDownstreamAction->setStatusTip(tr("Select downstream till branch end"));
+  connect(m_selectBranchDownstreamAction, &QAction::triggered, this, &ZSwcPack::selectBranchDownstream);
+
+  m_selectUpstreamAction = new QAction(tr("Select Upstream"), this);
+  m_selectUpstreamAction->setStatusTip(tr("Select upstream till root"));
+  connect(m_selectUpstreamAction, &QAction::triggered, this, &ZSwcPack::selectUpstream);
+
+  m_selectDownstreamAction = new QAction(tr("Select Downstream (subtree)"), this);
+  m_selectDownstreamAction->setStatusTip(tr("Select subtree"));
+  connect(m_selectDownstreamAction, &QAction::triggered, this, &ZSwcPack::selectSubtree);
+
+  m_selectEntireTreeAction = new QAction(tr("Select Entire Tree"), this);
+  m_selectEntireTreeAction->setStatusTip(tr("Select the entire tree"));
+  connect(m_selectEntireTreeAction, &QAction::triggered, this, &ZSwcPack::selectEntireTree);
+
+  auto selectMenu = m_contextMenu.addMenu("Select");
+  selectMenu->addAction(m_selectCurrentBranchAction);
+  selectMenu->addAction(m_selectBranchUpstreamAction);
+  selectMenu->addAction(m_selectBranchDownstreamAction);
+  selectMenu->addAction(m_selectUpstreamAction);
+  selectMenu->addAction(m_selectDownstreamAction);
+  selectMenu->addAction(m_selectEntireTreeAction);
+}
+
+void ZSwcPack::selectCurrentBranch()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = *m_extentedSelectionAnchor;
+  if (ZSwc::isRoot(startNode)) {
+    return;
+  }
+  bool hasChange = false;
+  for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode);) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+    ++it;
+    if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
+      break;
+    }
+  }
+  if (!ZSwc::isBranchNode(startNode)) {
+    for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
+      it->selected = true;
+      const auto&[ignore, ok] = m_selectedNodes.insert(it);
+      hasChange = hasChange || ok;
+      if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
+        break;
+      }
+    }
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
+}
+
+void ZSwcPack::selectBranchUpstream()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = *m_extentedSelectionAnchor;
+  if (ZSwc::isRoot(startNode)) {
+    return;
+  }
+  bool hasChange = false;
+  for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode);) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+    ++it;
+    if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
+      break;
+    }
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
+}
+
+void ZSwcPack::selectBranchDownstream()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = *m_extentedSelectionAnchor;
+  if (ZSwc::isRoot(startNode)) {
+    return;
+  }
+  bool hasChange = false;
+  for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+    if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
+      break;
+    }
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
+}
+
+void ZSwcPack::selectUpstream()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = *m_extentedSelectionAnchor;
+  bool hasChange = false;
+  for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode); ++it) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
+}
+
+void ZSwcPack::selectSubtree()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = *m_extentedSelectionAnchor;
+  bool hasChange = false;
+  for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
+}
+
+void ZSwcPack::selectEntireTree()
+{
+  if (m_extentedSelectionAnchor == m_selectedNodes.end()) {
+    return;
+  }
+  auto startNode = ZSwc::root(*m_extentedSelectionAnchor);
+  bool hasChange = false;
+  for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
+    it->selected = true;
+    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    hasChange = hasChange || ok;
+  }
+  if (hasChange) {
+    emit selectionChanged();
+  }
 }
 
 } // namespace nim

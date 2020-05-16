@@ -170,9 +170,10 @@ void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
 {
   CHECK(!m_punctaPack);
   m_punctaPack = &puncta;
+  updateData();
+
   connect(m_punctaPack, &ZPunctaPack::selectionChanged, this, &Z3DPunctaFilter::invalidateResult);
   connect(this, &Z3DPunctaFilter::punctumSelected, m_punctaPack, &ZPunctaPack::onPunctumSelected);
-  updateData();
   connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &Z3DPunctaFilter::updateData);
   connect(m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &Z3DPunctaFilter::invalidateResult);
 }
@@ -291,7 +292,6 @@ void Z3DPunctaFilter::registerPickingObjects()
     for (auto punctum : m_punctaPack->punctaPts()) {
       pickingManager().registerObject(punctum);
     }
-    m_registeredPunctaList = m_punctaPack->punctaPts();
     m_pointPickingColors.clear();
     for (auto punctum : m_punctaPack->punctaPts()) {
       glm::col4 pickingColor = pickingManager().colorOfObject(punctum);
@@ -308,10 +308,9 @@ void Z3DPunctaFilter::registerPickingObjects()
 void Z3DPunctaFilter::deregisterPickingObjects()
 {
   if (m_pickingObjectsRegistered) {
-    for (auto punctum : m_registeredPunctaList) {
+    for (auto punctum : m_punctaPack->punctaPts()) {
       pickingManager().deregisterObject(punctum);
     }
-    m_registeredPunctaList.clear();
   }
 
   m_pickingObjectsRegistered = false;
@@ -552,8 +551,8 @@ void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
     }
 
     bool hasSelectedPunctumUnderMouse = false;
-    for (auto p : m_punctaPack->punctaPts()) {
-      if (p == obj && p->isSelected()) {
+    for (auto p : m_punctaPack->selectedPuncta()) {
+      if (p == obj) {
         hasSelectedPunctumUnderMouse = true;
         break;
       }
