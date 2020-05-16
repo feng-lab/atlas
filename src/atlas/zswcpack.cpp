@@ -1,6 +1,7 @@
 #include "zswcpack.h"
 
 #include "zswcdoc.h"
+#include "zminimumspanningtree.h"
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QApplication>
@@ -447,25 +448,33 @@ void ZSwcPack::setSelectedNodeAsRoot()
 
 void ZSwcPack::breakSelectedNodes()
 {
-  // todo: handle more than two nodes
-  if (m_selectedNodes.size() != 2) {
+  if (m_selectedNodes.size() < 2) {
     return;
   }
-  auto it = m_selectedNodes.begin();
-  auto node1 = *it;
-  ++it;
-  auto node2 = *it;
-  if (!ZSwc::inSameTree(node1, node2)) {
-    return;
+  std::vector<const ZSwc::SwcTreeNode*> selectedNodeVector;
+  for (auto& p : m_selectedNodes) {
+    selectedNodeVector.push_back(&p);
   }
+  bool hasChange = false;
   ZSwc swcBeforeChange = m_swc;
-  auto canode = m_swc.lowestCommonAncestor(node1, node2);
-  if (canode == node1) {
-    m_swc.appendRoot(node2);
-  } else if (canode == node2) {
-    m_swc.appendRoot(node1);
-  } else {
-    m_swc.appendRoot(node1->radius > node2->radius ? node1 : node2);
+  for (size_t i = 1; i < selectedNodeVector.size(); ++i) {
+    auto node1 = *selectedNodeVector[i - 1];
+    auto node2 = *selectedNodeVector[i];
+    if (!ZSwc::inSameTree(node1, node2)) {
+      continue;
+    }
+    auto canode = m_swc.lowestCommonAncestor(node1, node2);
+    if (canode == node1) {
+      m_swc.appendRoot(node2);
+    } else if (canode == node2) {
+      m_swc.appendRoot(node1);
+    } else {
+      m_swc.appendRoot(node1->radius > node2->radius ? node1 : node2);
+    }
+    hasChange = true;
+  }
+  if (!hasChange) {
+    return;
   }
   m_undoStack.push(new ZSwcEditCommand(QString("Break Selected %1 Nodes").arg(m_selectedNodes.size()),
                                        *this, swcBeforeChange));
@@ -473,24 +482,49 @@ void ZSwcPack::breakSelectedNodes()
 
 void ZSwcPack::connectSelectedNodes()
 {
-  // todo: handle more than two nodes
-  if (m_selectedNodes.size() != 2) {
+  if (m_selectedNodes.size() < 2) {
     return;
   }
-  auto it = m_selectedNodes.begin();
-  auto node1 = *it;
-  ++it;
-  auto node2 = *it;
-  if (ZSwc::inSameTree(node1, node2)) {
+  std::vector<const ZSwc::SwcTreeNode*> selectedNodeVector;
+  for (auto& p : m_selectedNodes) {
+    selectedNodeVector.push_back(&p);
+  }
+  bool hasChange = false;
+  ZMinimumSpanningTree mst;
+  for (size_t i = 0; i < selectedNodeVector.size(); ++i) {
+    for (size_t j = i + 1; j < selectedNodeVector.size(); ++j) {
+      auto node1 = *selectedNodeVector[i];
+      auto node2 = *selectedNodeVector[j];
+      double weight = -1e4;
+      if (!ZSwc::inSameTree(node1, node2)) {
+        hasChange = true;
+        weight = glm::length(glm::dvec3(node1->x, node1->y, node1->z) -
+                             glm::dvec3(node2->x, node2->y, node2->z)) -
+                               node1->radius -
+                               node2->radius;
+      }
+      mst.addEdge(i, j, weight);
+    }
+  }
+  if (!hasChange) {
     return;
   }
   ZSwc swcBeforeChange = m_swc;
-  m_swc.setAsRoot(node1);
-  m_swc.setAsRoot(node2);
-  if (node1->radius > node2->radius) {
-    m_swc.appendChild(node1, node2);
-  } else {
-    m_swc.appendChild(node2, node1);
+
+  for (auto&& [i1, i2] : mst.runMST()) {
+    // LOG(INFO) << i1 << " " << i2;
+    auto node1 = *selectedNodeVector[i1];
+    auto node2 = *selectedNodeVector[i2];
+    if (ZSwc::inSameTree(node1, node2)) {
+      continue;
+    }
+    m_swc.setAsRoot(node1);
+    m_swc.setAsRoot(node2);
+    if (node1->radius > node2->radius) {
+      m_swc.appendChild(node1, node2);
+    } else {
+      m_swc.appendChild(node2, node1);
+    }
   }
   m_undoStack.push(new ZSwcEditCommand(QString("Connect Selected %1 Nodes").arg(m_selectedNodes.size()),
                                        *this, swcBeforeChange));

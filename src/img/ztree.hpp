@@ -1385,7 +1385,7 @@ public:
 
   template<typename Iter>
   size_t numAncestors(const Iter& child) const
-  { return std::distance(beginAncestor(child), endAncestor(child)); }
+  { return std::distance(beginAncestor(child), endAncestor(child)) - 1; }
 
   template<typename Iter>
   size_t numDescendants(const Iter& parent) const
@@ -1564,6 +1564,7 @@ public:
   void appendChild(Iter parent, Iter child)
   {
     CHECK(isValid(parent) && isValid(child) && parent != child);
+    CHECK(!isAncestor(parent, child));
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1604,6 +1605,7 @@ public:
   void prependChild(Iter parent, Iter child)
   {
     CHECK(isValid(parent) && isValid(child) && parent != child);
+    CHECK(!isAncestor(parent, child));
     if (parent == this->parent(child))
       return;
     detachParent(child);
@@ -1700,14 +1702,14 @@ public:
     CHECK(isValid(n1) && isValid(n2));
 
     std::vector<AncestorIterator> chain1;
-    for (AncestorIterator it = beginAncestor(n1); it != endAncestor(n1); ++it) {
+    for (auto it = beginAncestor(n1); it != endAncestor(n1); ++it) {
       if (it == n2) {
         return Iter(n2.node);
       }
       chain1.push_back(it);
     }
     std::vector<AncestorIterator> chain2;
-    for (AncestorIterator it = beginAncestor(n2); it != endAncestor(n2); ++it) {
+    for (auto it = beginAncestor(n2); it != endAncestor(n2); ++it) {
       if (it == n1) {
         return Iter(n1.node);
       }
@@ -1800,6 +1802,19 @@ protected:
       res = res->prevSibling;
     }
     return res;
+  }
+
+  // return true if other is child's ancestor (or equal to child)
+  template<typename Iter>
+  inline bool isAncestor(const Iter& child, const Iter& other)
+  {
+    CHECK(isValid(child) && isValid(other));
+    for (auto it = beginAncestor(child); it != endAncestor(child); ++it) {
+      if (it == other) {
+        return true;
+      }
+    }
+    return false;
   }
 
 protected:

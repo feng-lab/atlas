@@ -608,7 +608,7 @@ void ZGenerateAnalysisTextFile::removeSmallLeafBranch(ZSwc& tree, int numNodeThr
     ZSwc::LeafIterator tnnext = tn;
     ++tnnext;
     double branchLength = 0;
-    int nNodes = 0;
+    int nNodes = -1; // ancestor iterator starts from input iter now
     SwcTreeNode nodeBeforeBranchNode;
     ZSwc::AncestorIterator lasttn = tn;
     for (ZSwc::AncestorIterator tmptn = tree.beginAncestor(tn); tmptn != tree.endAncestor(tn); ++tmptn) {

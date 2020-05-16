@@ -160,8 +160,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     if (labels.find(it->id) != labels.end()) {
-      for (auto pit = m_ontology.cbeginAncestor(it);
-           pit != m_ontology.cendAncestor(it); ++pit) {
+      for (auto pit = m_ontology.cbeginAncestor(it); pit != m_ontology.cendAncestor(it); ++pit) {
         labels.insert(pit->id);
       }
     }
@@ -281,20 +280,13 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 {
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
-      if (!it->roi) {
-        it->roi = createROI();
-        emit regionROIAdded(it->id, it->roi.get());
-      }
-      it->roi->mergeWith(roi);
-
       for (auto pit = m_ontology.beginAncestor(it); pit != m_ontology.endAncestor(it); ++pit) {
         if (!pit->roi) {
           pit->roi = createROI();
-          emit regionROIAdded(it->id, it->roi.get());
+          emit regionROIAdded(pit->id, pit->roi.get());
         }
         pit->roi->mergeWith(roi);
       }
-
       return;
     }
   }

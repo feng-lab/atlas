@@ -243,7 +243,9 @@ set(IMG_SOURCES
     zroiutils.cpp
     zroiutils.h
     zlogcache.cpp
-    zlogcache.h)
+    zlogcache.h
+    zminimumspanningtree.cpp
+    zminimumspanningtree.h)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
