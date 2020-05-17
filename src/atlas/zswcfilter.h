@@ -5,6 +5,7 @@
 #include "znumericparameter.h"
 #include "zswcdoc.h"
 #include "zgraphicsitemtype.h"
+#include "zswccolorparameters.h"
 #include <QGraphicsEllipseItem>
 #include <QGraphicsLineItem>
 #include <QList>
@@ -13,6 +14,7 @@
 
 namespace nim {
 
+#if 0
 class ZSwcGraphicsItem : public QGraphicsItem
 {
 public:
@@ -32,9 +34,9 @@ public:
     update();
   }
 
-  void setOutlineColor(const QColor& c)
+  void setSkeletonColor(const QColor& c)
   {
-    m_outlineColor = c;
+    m_skeletonColor = c;
     update();
   }
 
@@ -76,12 +78,134 @@ protected:
   ZSwcPack& m_swcPack;
   ZBBox<glm::ivec4> m_boundBox;
   bool m_showSkeleton = true;
-  QColor m_outlineColor{255, 0, 0};
+  QColor m_skeletonColor{255, 0, 0};
   double m_opacity = 1;
   bool m_mip = false;
   int m_z = 0;
   int m_t = 0;
   QVector<QLineF> m_lines;
+};
+#endif
+
+class ZSwcSkeletonGraphicsItem : public QGraphicsItem
+{
+public:
+  enum
+  {
+    Type = GraphicsItemType::ZSwcSkeletonGraphicsItem
+  };
+
+  [[nodiscard]] int type() const override
+  { return Type; }
+
+  explicit ZSwcSkeletonGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent = nullptr);
+
+  void setShowSkeleton(bool v)
+  {
+    m_showSkeleton = v;
+    update();
+  }
+
+  void setSkeletonColor(const QColor& c)
+  {
+    m_skeletonColor = c;
+    update();
+  }
+
+//  void setOpacity(double v)
+//  {
+//    m_opacity = v;
+//    update();
+//  }
+
+  void setSizeScale(double sizeScale)
+  {
+    m_sizeScale = sizeScale;
+    update();
+  }
+
+  void setNormalView(int z, int t)
+  {
+    if (m_mip || m_z != z || m_t != t) {
+      m_mip = false;
+      m_z = z;
+      m_t = t;
+      update();
+    }
+  }
+
+  void setMaxZProjView(int t)
+  {
+    if (!m_mip || m_t != t) {
+      m_mip = true;
+      m_t = t;
+      update();
+    }
+  }
+
+  // QGraphicsItem interface
+public:
+  [[nodiscard]] QRectF boundingRect() const override;
+
+  void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget) override;
+
+protected:
+  ZSwcPack& m_swcPack;
+  bool m_showSkeleton = true;
+  QColor m_skeletonColor{255, 0, 0};
+  double m_opacity = 1.;
+  bool m_mip = false;
+  int m_z = 0;
+  int m_t = 0;
+  double m_sizeScale = 1.;
+  QVector<QLineF> m_lines;
+};
+
+class ZSwcNodeGraphicsItem : public QGraphicsEllipseItem
+{
+public:
+  enum
+  {
+    Type = GraphicsItemType::ZSwcNodeGraphicsItem
+  };
+
+  int type() const override
+  { return Type; }
+
+  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& punctum, QTransform  tfm, ZView& view,
+                       QGraphicsItem* parent = nullptr);
+
+  void updateValue();
+
+  void updateRectSize();
+
+  inline void setTransform_(const QTransform& tfm)
+  { m_transform = tfm; updateValue(); }
+
+  inline void setSizeScale(double sizeScale)
+  {
+    if (m_sizeScale != sizeScale) {
+      m_sizeScale = sizeScale;
+      updateRectSize();
+    }
+  }
+
+  void setLocked(bool l);
+
+  // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
+
+protected:
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
+
+private:
+  ZSwcPack& m_swcPack;
+  const ZSwc::SwcTreeNode& m_swcNode;
+
+  QPointF m_basePos;
+  QTransform m_transform;
+  ZView& m_view;
+
+  double m_sizeScale = 1.0;
 };
 
 class ZSwcFilter : public ZObjFilter
@@ -110,6 +234,8 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
+  void deleteKeyPressed() override;
+
 protected:
   void viewPrecedenceChanged() override;
 
@@ -117,23 +243,48 @@ protected:
 
   void offsetChanged() override;
 
+  void createSwcSkeletonItem();
+
+  void createSwcNodeItems();
+
+  void updateItemSelectedState();
+
+  void onSwcChanged();
+
+  void updateSwcNodeColor();
+
+  void onSceneItemSelectionChanged();
+
+  void onLockedStateChanged(bool lock);
+
 private:
   void visibleChanged();
 
   void showSkeletonChanged();
 
-  void outlineColorChanged();
+  void skeletonColorChanged();
+
+  void sizeScaleChanged();
 
   void opacityChanged();
 
 private:
-  std::unique_ptr<ZSwcGraphicsItem> m_item;
+  ZSwcPack* m_swcPack = nullptr;
+  std::unique_ptr<ZSwcSkeletonGraphicsItem> m_item;
+  std::vector<std::unique_ptr<ZSwcNodeGraphicsItem>> m_swcNodeItems;
+  std::map<ZSwc::SwcTreeNode, ZSwcNodeGraphicsItem*> m_swcNodeToItem;
+  std::map<QGraphicsItem*, ZSwc::SwcTreeNode> m_itemToSwcNode;
 
   ZBoolParameter m_showSkeleton;
-  ZVec3Parameter m_outlineColor;
+  ZVec3Parameter m_skeletonColor;
+  ZSwcColorParameters m_swcColorParameters;
+  ZFloatParameter m_sizeScale;
   ZDoubleParameter m_opacity;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
+
+  bool m_ignoreSelectionChangedSignal = false;
+  bool m_skipSelectionChangedProcessing = false;
 };
 
 } // namespace nim

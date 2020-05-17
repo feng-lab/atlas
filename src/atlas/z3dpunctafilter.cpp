@@ -50,7 +50,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   // Color Mode
   m_colorMode.addOptions("Single Color", "Random Color", "Original Point Color", "Colormap Score");
-  m_colorMode.select("Original Point Color");
+  m_colorMode.select("Single Color");
 
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
   connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DPunctaFilter::adjustWidgets);
@@ -213,13 +213,13 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (auto para : paras) {
       if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 2);
+        m_widgetsGroup->addChild(*para, 5);
       } else if (para->name() == "Size Scale") {
-        m_widgetsGroup->addChild(*para, 3);
+        m_widgetsGroup->addChild(*para, 2);
       } else if (para->name() == "Rendering Method") {
         m_widgetsGroup->addChild(*para, 4);
       } else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 5);
+        m_widgetsGroup->addChild(*para, 3);
       } else {
         m_widgetsGroup->addChild(*para, 7);
       }

@@ -8,9 +8,11 @@
 #include <QStyleOption>
 #include <QPushButton>
 #include <QGraphicsSceneMouseEvent>
+#include <utility>
 
 namespace nim {
 
+#if 0
 ZPunctaGraphicsItem::ZPunctaGraphicsItem(ZPunctaPack& puncta, QGraphicsItem* parent)
   : QGraphicsItem(parent)
   , m_puncta(puncta)
@@ -120,14 +122,15 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
   if (option->state & QStyle::State_Selected)
     qt_graphicsItem_highlightSelected(this, painter, option);
 }
+#endif
 
 ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum,
-                                           const QTransform& tfm, ZView& view,
+                                           QTransform tfm, ZView& view,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
   , m_punctaPack(punctaPack)
   , m_punctum(punctum)
-  , m_transform(tfm)
+  , m_transform(std::move(tfm))
   , m_view(view)
 {
   setFlags(QGraphicsItem::ItemIsSelectable);
@@ -137,8 +140,7 @@ ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunct
   QString tooltip = QString("Punctum:(%1,%2,%3,%4)").
     arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
   setToolTip(tooltip);
-  QRectF rect(-m_punctum.radius(), -m_punctum.radius(), m_punctum.radius() * 2, m_punctum.radius() * 2);
-  setRect(rect);
+  updateRectSize();
 }
 
 void ZPunctumGraphicsItem::updateValue()
@@ -150,6 +152,16 @@ void ZPunctumGraphicsItem::updateValue()
     arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
   setToolTip(tooltip);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
+}
+
+void ZPunctumGraphicsItem::updateRectSize()
+{
+  double radius = m_punctum.radius() * m_sizeScale;
+  if (m_useSameSize) {
+    radius = 2.0 * m_sizeScale;
+  }
+  QRectF rect(-radius, -radius, radius * 2, radius * 2);
+  setRect(rect);
 }
 
 void ZPunctumGraphicsItem::setLocked(bool l)
@@ -176,18 +188,27 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   : ZObjFilter(view)
   , m_outlineColor("Outline Color", glm::vec3(1, 0, 1), glm::vec3(0), glm::vec3(1))
   , m_regionColor("Region Color", glm::vec3(.2, .2, .2), glm::vec3(0), glm::vec3(1))
+  , m_useSameSizeForAllPuncta("Use Same Size", false)
+  , m_sizeScale("Size Scale", 1.f, .01f, std::numeric_limits<float>::max())
   , m_opacity("Opacity", 1, 0., 1.)
 {
   m_outlineColor.setStyle("COLOR");
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZPunctaFilter::visibleChanged);
   connect(&m_outlineColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::outlineColorChanged);
   connect(&m_regionColor, &ZVec3Parameter::valueChanged, this, &ZPunctaFilter::regionColorChanged);
+  connect(&m_useSameSizeForAllPuncta, &ZBoolParameter::valueChanged, this, &ZPunctaFilter::useSameSizeChanged);
+  connect(&m_sizeScale, &ZFloatParameter::valueChanged, this, &ZPunctaFilter::sizeScaleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_useSameSizeForAllPuncta);
+  m_sizeScale.setSingleStep(0.1);
+  m_sizeScale.setDecimal(1);
+  m_sizeScale.setStyle("SPINBOX");
+  addParameter(&m_sizeScale);
   addParameter(&m_opacity);
 
   connect(&view.scene(), &ZGraphicsScene::selectionChanged, this, &ZPunctaFilter::onSceneItemSelectionChanged);
@@ -265,9 +286,11 @@ std::shared_ptr<ZWidgetsGroup> ZPunctaFilter::viewSettingWidgetsGroup()
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_regionColor, 1);
+    m_widgetsGroup->addChild(m_useSameSizeForAllPuncta, 1);
+    m_widgetsGroup->addChild(m_sizeScale, 1);
+    m_widgetsGroup->addChild(m_opacity, 1);
     m_widgetsGroup->addChild(m_transform, 1);
     m_widgetsGroup->addChild(m_offsetPara, 1);
-    m_widgetsGroup->addChild(m_opacity, 1);
   }
   return m_widgetsGroup;
 }
@@ -332,6 +355,8 @@ void ZPunctaFilter::createPunctumItems()
     item->setBrush(brush);
     item->setPen(pen);
     item->setLocked(m_punctaPack->isLocked());
+    item->setUseSameSize(m_useSameSizeForAllPuncta.get());
+    item->setSizeScale(m_sizeScale.get());
     m_view.scene().addItem(item);
     items.emplace_back(item);
     m_punctumToItem[&p] = item;
@@ -436,6 +461,26 @@ void ZPunctaFilter::regionColorChanged()
                           m_regionColor.get().y * 255,
                           m_regionColor.get().z * 255,
                           m_opacity.get() * 255));
+  }
+}
+
+void ZPunctaFilter::useSameSizeChanged()
+{
+  if (!m_punctaPack) {
+    return;
+  }
+  for (auto& item : m_puntumItems) {
+    item->setUseSameSize(m_useSameSizeForAllPuncta.get());
+  }
+}
+
+void ZPunctaFilter::sizeScaleChanged()
+{
+  if (!m_punctaPack) {
+    return;
+  }
+  for (auto& item : m_puntumItems) {
+    item->setSizeScale(m_sizeScale.get());
   }
 }
 

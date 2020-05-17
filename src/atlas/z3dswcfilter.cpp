@@ -15,53 +15,41 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_sphereRenderer(m_rendererBase)
   , m_sphereRendererForCone(m_rendererBase)
   , m_renderingPrimitive("Rendering Mode")
-  , m_colorMode("Color Mode")
-  , m_swcTreeColor("Color", glm::vec4(1, 0, 0, 1))
-  , m_colorMapBranchType("Branch Type Color Map")
   , m_selectSwcEvent("Select Swc", false)
   , m_deleteSelectedNodesEvent("Delete Selected Swc Nodes", true)
   , m_contextMenuEvent("Context Menu", false)
   , m_dataIsInvalid(false)
   , m_interactionMode(InteractionMode::Select)
 {
-  initTopologyColor();
-  initTypeColor();
-  initSubclassTypeColor();
-
   // rendering primitive
   m_renderingPrimitive.addOptions("Normal", "Line", "Sphere", "Cylinder");
   m_renderingPrimitive.select("Normal");
   connect(&m_renderingPrimitive, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::updateBoundBox);
-
-  m_colorMode.addOptions("Single Color",
-                         "Branch Type",
-                         "Topology",
-                         "Colormap Branch Type",
-                         "Subclass");
-
-  m_colorMode.select("Branch Type");
-
-  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
-  connect(&m_colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::adjustWidgets);
-
   addParameter(m_renderingPrimitive);
-  addParameter(m_colorMode);
 
-  m_swcTreeColor.setStyle("COLOR");
-  connect(&m_swcTreeColor, &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
-  addParameter(m_swcTreeColor);
+  connect(&m_swcColorParameters.colorMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  addParameter(m_swcColorParameters.colorMode);
 
-  for (const auto& color : m_colorsForDifferentType) {
+  connect(&m_swcColorParameters.swcTreeColor, &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  addParameter(m_swcColorParameters.swcTreeColor);
+
+  for (const auto& color : m_swcColorParameters.colorsForDifferentType) {
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
     addParameter(*color);
   }
 
-  for (const auto& color : m_colorsForDifferentTopology) {
+  for (const auto& color : m_swcColorParameters.colorsForDifferentTopology) {
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
     addParameter(*color);
   }
 
-  for (const auto& color : m_colorsForSubclassType) {
+  for (const auto& color : m_swcColorParameters.colorsForSubclassType) {
+    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
     addParameter(*color);
   }
+
+  addParameter(m_swcColorParameters.colorMapBranchType);
+  connect(&m_swcColorParameters.colorMapBranchType, &ZColorMapParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
 
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
                             Qt::NoModifier, QEvent::MouseButtonPress);
@@ -109,164 +97,12 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_contextMenuEvent, &ZEventListenerParameter::contextMenuEventTriggered,
           this, &Z3DSwcFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
-
-  addParameter(m_colorMapBranchType);
-  connect(&m_colorMapBranchType, &ZColorMapParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
-
-  adjustWidgets();
 }
 
 void Z3DSwcFilter::process(Z3DEye /*unused*/)
 {
   if (m_dataIsInvalid) {
     prepareData();
-  }
-}
-
-void Z3DSwcFilter::initTopologyColor()
-{
-  // topology colors (root, branch point, leaf, others)
-  m_colorsForDifferentTopology.emplace_back(
-    std::make_unique<ZVec4Parameter>("Root Color", glm::vec4(0 / 255.f, 0 / 255.f, 255 / 255.f, 1.f)));
-  m_colorsForDifferentTopology.emplace_back(
-    std::make_unique<ZVec4Parameter>("Branch Point Color", glm::vec4(0 / 255.f, 255 / 255.f, 0 / 255.f, 1.f)));
-  m_colorsForDifferentTopology.emplace_back(
-    std::make_unique<ZVec4Parameter>("Leaf Color", glm::vec4(255 / 255.f, 255 / 255.f, 0 / 255.f, 1.f)));
-  m_colorsForDifferentTopology.emplace_back(
-    std::make_unique<ZVec4Parameter>("Other", glm::vec4(255 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
-  for (const auto& color : m_colorsForDifferentTopology) {
-    color->setStyle("COLOR");
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
-  }
-}
-
-void Z3DSwcFilter::initTypeColor()
-{
-  // type colors
-  int index = 0;
-  QString name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(255 / 255.f, 255 / 255.f, 255 / 255.f, 1.f))); //white
-  // 1
-  name = QString("Type %1 (Soma) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(20 / 255.f, 20 / 255.f, 20 / 255.f, 1.f))); //black
-  // 2
-  name = QString("Type %1 (Axon) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 20 / 255.f, 0 / 255.f, 1.f))); //red
-  // 3
-  name = QString("Type %1 (Basal Dendrite) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 20 / 255.f, 200 / 255.f, 1.f))); //blue
-  // 4
-  name = QString("Type %1 (Apical Dendrite) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 0 / 255.f, 200 / 255.f, 1.f))); //purple
-  // 5
-  name = QString("Type %1 (Main Trunk) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); //cyan
-  // 6
-  name = QString("Type %1 (Basal Intermediate) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(220 / 255.f, 200 / 255.f, 0 / 255.f, 1.f))); //yellow
-  // 7
-  name = QString("Type %1 (Basal Terminal) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 20 / 255.f, 1.f))); //green
-  // 8
-  name = QString("Type %1 (Apical Oblique Intermediate) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(188 / 255.f, 94 / 255.f, 37 / 255.f, 1.f))); //coffee
-  // 9
-  name = QString("Type %1 (Apical Oblique Terminal) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(180 / 255.f, 200 / 255.f, 120 / 255.f, 1.f))); //asparagus
-  // 10
-  name = QString("Type %1 (Apical Tuft) Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(250 / 255.f, 100 / 255.f, 120 / 255.f, 1.f))); //salmon
-  // 11
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(120 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); //ice
-  // 12
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(100 / 255.f, 120 / 255.f, 200 / 255.f, 1.f))); //orchid
-  // 13
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(255 / 255.f, 128 / 255.f, 168 / 255.f, 1.f)));
-  // 14
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(128 / 255.f, 255 / 255.f, 168 / 255.f, 1.f)));
-  // 15
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(128 / 255.f, 168 / 255.f, 255 / 255.f, 1.f)));
-  // 16
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(128 / 255.f, 255 / 255.f, 168 / 255.f, 1.f)));
-  // 17
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(255 / 255.f, 168 / 255.f, 128 / 255.f, 1.f)));
-  // 18
-  name = QString("Type %1 Color").arg(index++);
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(168 / 255.f, 128 / 255.f, 255 / 255.f, 1.f)));
-  // 19
-  name = QString("Undefined Type Color");
-  m_colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0xcc / 255.f, 0xcc / 255.f, 1.f)));
-
-  for (const auto& color : m_colorsForDifferentType) {
-    color->setStyle("COLOR");
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
-  }
-}
-
-void Z3DSwcFilter::initSubclassTypeColor()
-{
-  // subclass type color
-  QString name = QString("Soma Color");
-  m_subclassTypeColorMapper[1] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
-  name = QString("Main Trunk Color");
-  m_subclassTypeColorMapper[5] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
-  name = QString("Basal Intermediate Color");
-  m_subclassTypeColorMapper[6] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0x33 / 255.f, 0xcc / 255.f, 0xff / 255.f, 1.f)));
-  name = QString("Basal Terminal Color");
-  m_subclassTypeColorMapper[7] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0x33 / 255.f, 0x66 / 255.f, 0xcc / 255.f, 1.f)));
-  name = QString("Apical Oblique Intermediate Color");
-  m_subclassTypeColorMapper[8] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0xff / 255.f, 0xff / 255.f, 0 / 255.f, 1.f)));
-  name = QString("Apical Oblique Terminal Color");
-  m_subclassTypeColorMapper[9] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0x33 / 255.f, 0x66 / 255.f, 1.f)));
-  name = QString("Apical Tuft Color");
-  m_subclassTypeColorMapper[10] = m_colorsForSubclassType.size();
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 0x99 / 255.f, 0 / 255.f, 1.f)));
-  name = QString("Other Undefined class Color");
-  m_colorsForSubclassType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0xcc / 255.f, 0xcc / 255.f, 0xcc / 255.f, 1.f)));
-  for (const auto& color : m_colorsForSubclassType) {
-    color->setStyle("COLOR");
-    connect(color.get(), &ZVec4Parameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
   }
 }
 
@@ -325,6 +161,7 @@ void Z3DSwcFilter::deregisterPickingObjects()
 void Z3DSwcFilter::setData(ZSwcPack& swcPack)
 {
   m_swcPack = &swcPack;
+  m_swcColorParameters.setData(m_swcPack);
   updateData();
 
   connect(m_swcPack, &ZSwcPack::selectionChanged, this, &Z3DSwcFilter::invalidateResult);
@@ -345,30 +182,30 @@ std::shared_ptr<ZWidgetsGroup> Z3DSwcFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_visible, 1);
     m_widgetsGroup->addChild(m_stayOnTop, 1);
     m_widgetsGroup->addChild(m_renderingPrimitive, 1);
-    m_widgetsGroup->addChild(m_colorMode, 1);
-    m_widgetsGroup->addChild(m_swcTreeColor, 1);
+    m_widgetsGroup->addChild(m_swcColorParameters.colorMode, 1);
+    m_widgetsGroup->addChild(m_swcColorParameters.swcTreeColor, 1);
 
-    for (const auto& color : m_colorsForDifferentType) {
+    for (const auto& color : m_swcColorParameters.colorsForDifferentType) {
       m_widgetsGroup->addChild(*color, 1);
     }
-    for (const auto& color : m_colorsForSubclassType) {
+    for (const auto& color : m_swcColorParameters.colorsForSubclassType) {
       m_widgetsGroup->addChild(*color, 1);
     }
-    for (const auto& color : m_colorsForDifferentTopology) {
+    for (const auto& color : m_swcColorParameters.colorsForDifferentTopology) {
       m_widgetsGroup->addChild(*color, 1);
     }
-    m_widgetsGroup->addChild(m_colorMapBranchType, 1);
+    m_widgetsGroup->addChild(m_swcColorParameters.colorMapBranchType, 1);
 
     const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
     for (auto para : paras) {
       if (para->name() == "Coord Transform") {
-        m_widgetsGroup->addChild(*para, 2);
+        m_widgetsGroup->addChild(*para, 5);
       } else if (para->name() == "Size Scale") {
-        m_widgetsGroup->addChild(*para, 3);
+        m_widgetsGroup->addChild(*para, 2);
       } else if (para->name() == "Rendering Method") {
         m_widgetsGroup->addChild(*para, 4);
       } else if (para->name() == "Opacity") {
-        m_widgetsGroup->addChild(*para, 5);
+        m_widgetsGroup->addChild(*para, 3);
       } else {
         m_widgetsGroup->addChild(*para, 7);
       }
@@ -544,16 +381,6 @@ void Z3DSwcFilter::prepareData()
     return;
   }
 
-  // get min max of type for colormap
-  m_colorMapBranchType.blockSignals(true);
-  if (m_swcPack->allNodeType().empty()) {
-    m_colorMapBranchType.get().reset();
-  } else {
-    m_colorMapBranchType.get().reset(m_swcPack->allNodeType().begin(), m_swcPack->allNodeType().end(),
-                                     glm::col4(0, 0, 255, 255), glm::col4(255, 0, 0, 255));
-  }
-  m_colorMapBranchType.blockSignals(false);
-
   deregisterPickingObjects();
 
   //convert swc to format that glsl can use
@@ -607,7 +434,6 @@ void Z3DSwcFilter::prepareData()
   m_sphereRenderer.setData(&m_pointAndRadius);
   m_sphereRendererForCone.setData(&m_pointAndRadius);
   prepareColor();
-  adjustWidgets();
   m_dataIsInvalid = false;
 }
 
@@ -690,11 +516,6 @@ void Z3DSwcFilter::notTransformedTreeNodeBound(const ZSwc::ConstSwcTreeNode& tn,
                       + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
-glm::vec4 Z3DSwcFilter::colorByDirection(const ZSwc::ConstSwcTreeNode& /*n*/)
-{
-  return glm::vec4(0);
-}
-
 void Z3DSwcFilter::prepareColor()
 {
   m_swcColors1.clear();
@@ -702,12 +523,13 @@ void Z3DSwcFilter::prepareColor()
   m_lineColors.clear();
   m_pointColors.clear();
 
-  if (m_colorMode.isSelected("Branch Type") ||
-      m_colorMode.isSelected("Colormap Branch Type") ||
-      m_colorMode.isSelected("Subclass")) {
+#if 1
+  if (m_swcColorParameters.colorMode.isSelected("Branch Type") ||
+      m_swcColorParameters.colorMode.isSelected("Colormap Branch Type") ||
+      m_swcColorParameters.colorMode.isSelected("Subclass")) {
     for (auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
-      glm::vec4 color1 = colorByType(n1);
-      glm::vec4 color2 = colorByType(n2);
+      glm::vec4 color1 = m_swcColorParameters.colorByType(n1);
+      glm::vec4 color2 = m_swcColorParameters.colorByType(n2);
       if (n1->radius > n2->radius) {
         std::swap(color1, color2);
       }
@@ -718,11 +540,10 @@ void Z3DSwcFilter::prepareColor()
       m_lineColors.push_back(color2);
     }
     for (auto& decomposedNode : m_swcPack->decomposedNodes()) {
-      m_pointColors.push_back(colorByType(decomposedNode));
+      m_pointColors.push_back(m_swcColorParameters.colorByType(decomposedNode));
     }
-
-  } else if (m_colorMode.isSelected("Single Color")) {
-    glm::vec4 color = m_swcTreeColor.get();
+  } else if (m_swcColorParameters.colorMode.isSelected("Single Color")) {
+    glm::vec4 color = m_swcColorParameters.swcTreeColor.get();
     for (size_t j = 0; j < m_swcPack->decompsedNodePairs().size(); ++j) {
       m_swcColors1.push_back(color);
       m_swcColors2.push_back(color);
@@ -732,26 +553,26 @@ void Z3DSwcFilter::prepareColor()
     for (size_t j = 0; j < m_swcPack->decomposedNodes().size(); ++j) {
       m_pointColors.push_back(color);
     }
-  } else if (m_colorMode.isSelected("Topology")) {
+  } else if (m_swcColorParameters.colorMode.isSelected("Topology")) {
     for (const auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
       glm::vec4 color1, color2;
       if (ZSwc::isRoot(n1)) {
-        color1 = m_colorsForDifferentTopology[0]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[0]->get();
       } else if (ZSwc::isBranchNode(n1)) {
-        color1 = m_colorsForDifferentTopology[1]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[1]->get();
       } else if (ZSwc::isLeaf(n1)) {
-        color1 = m_colorsForDifferentTopology[2]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[2]->get();
       } else {
-        color1 = m_colorsForDifferentTopology[3]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[3]->get();
       }
       if (ZSwc::isRoot(n2)) {
-        color2 = m_colorsForDifferentTopology[0]->get();
+        color2 = m_swcColorParameters.colorsForDifferentTopology[0]->get();
       } else if (ZSwc::isBranchNode(n2)) {
-        color2 = m_colorsForDifferentTopology[1]->get();
+        color2 = m_swcColorParameters.colorsForDifferentTopology[1]->get();
       } else if (ZSwc::isLeaf(n2)) {
-        color2 = m_colorsForDifferentTopology[2]->get();
+        color2 = m_swcColorParameters.colorsForDifferentTopology[2]->get();
       } else {
-        color2 = m_colorsForDifferentTopology[3]->get();
+        color2 = m_swcColorParameters.colorsForDifferentTopology[3]->get();
       }
       if (n1->radius > n2->radius) {
         std::swap(color1, color2);
@@ -765,40 +586,39 @@ void Z3DSwcFilter::prepareColor()
     for (auto& n1 : m_swcPack->decomposedNodes()) {
       glm::vec4 color1;
       if (ZSwc::isRoot(n1)) {
-        color1 = m_colorsForDifferentTopology[0]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[0]->get();
       } else if (ZSwc::isBranchNode(n1)) {
-        color1 = m_colorsForDifferentTopology[1]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[1]->get();
       } else if (ZSwc::isLeaf(n1)) {
-        color1 = m_colorsForDifferentTopology[2]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[2]->get();
       } else {
-        color1 = m_colorsForDifferentTopology[3]->get();
+        color1 = m_swcColorParameters.colorsForDifferentTopology[3]->get();
       }
       m_pointColors.push_back(color1);
     }
   }
+#else
+  for (auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
+    glm::vec4 color1 = m_swcColorParameters.colorOfNode(n1);
+    glm::vec4 color2 = m_swcColorParameters.colorOfNode(n2);
+    if (n1->radius > n2->radius) {
+      std::swap(color1, color2);
+    }
+
+    m_swcColors1.push_back(color1);
+    m_swcColors2.push_back(color2);
+    m_lineColors.push_back(color1);
+    m_lineColors.push_back(color2);
+  }
+  for (auto& decomposedNode : m_swcPack->decomposedNodes()) {
+    m_pointColors.push_back(m_swcColorParameters.colorOfNode(decomposedNode));
+  }
+#endif
 
   m_coneRenderer.setDataColors(&m_swcColors1, &m_swcColors2);
   m_lineRenderer.setDataColors(&m_lineColors);
   m_sphereRenderer.setDataColors(&m_pointColors);
   m_sphereRendererForCone.setDataColors(&m_pointColors);
-}
-
-void Z3DSwcFilter::adjustWidgets()
-{
-  m_swcTreeColor.setVisible(m_colorMode.isSelected("Single Color"));
-
-  for (size_t i = 0; i < m_colorsForDifferentType.size(); ++i) {
-    m_colorsForDifferentType[i]->setVisible(m_swcPack &&
-                                            m_swcPack->allNodeType().find(i) != m_swcPack->allNodeType().end() &&
-                                            m_colorMode.isSelected("Branch Type"));
-  }
-  for (const auto& color : m_colorsForSubclassType) {
-    color->setVisible(m_colorMode.isSelected("Subclass"));
-  }
-  for (const auto& color : m_colorsForDifferentTopology) {
-    color->setVisible(m_colorMode.isSelected("Topology"));
-  }
-  m_colorMapBranchType.setVisible(m_colorMode.isSelected("Colormap Branch Type"));
 }
 
 void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
@@ -890,33 +710,9 @@ void Z3DSwcFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
   }
 }
 
-glm::vec4 Z3DSwcFilter::colorByType(const ZSwc::ConstSwcTreeNode& n)
-{
-  if (m_colorMode.isSelected("Branch Type")) {
-    if (static_cast<size_t>(n->type) + 1 < m_colorsForDifferentType.size()) {
-      return m_colorsForDifferentType[n->type]->get();
-    } else {
-      return m_colorsForDifferentType[m_colorsForDifferentType.size() - 1]->get();
-    }
-  } else if (m_colorMode.isSelected("Subclass")) {
-    if (m_subclassTypeColorMapper.find(n->type) != m_subclassTypeColorMapper.end()) {
-      return m_colorsForSubclassType[m_subclassTypeColorMapper[n->type]]->get();
-    } else {
-      return m_colorsForSubclassType[m_colorsForSubclassType.size() - 1]->get();
-    }
-  } else  /*if (m_colorMode.get() == "ColorMap Branch Type")*/ {
-    return m_colorMapBranchType.get().mappedFColor(n->type);
-  }
-}
-
 glm::dvec3 Z3DSwcFilter::projectPointOnRay(const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2)
 {
   return v1 + glm::dot(pt - v1, v2 - v1) * (v2 - v1);
-}
-
-void Z3DSwcFilter::setColorMode(const std::string& mode)
-{
-  m_colorMode.select(mode.c_str());
 }
 
 void Z3DSwcFilter::deleteSelectedNodes()

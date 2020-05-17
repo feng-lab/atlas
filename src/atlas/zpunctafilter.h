@@ -14,6 +14,7 @@ class ZWidgetsGroup;
 
 namespace nim {
 
+#if 0
 class ZPunctaGraphicsItem : public QGraphicsItem
 {
 public:
@@ -76,6 +77,7 @@ protected:
   int m_z = 0;
   int m_t = 0;
 };
+#endif
 
 class ZPunctumGraphicsItem : public QGraphicsEllipseItem
 {
@@ -88,13 +90,31 @@ public:
   int type() const override
   { return Type; }
 
-  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, const QTransform& tfm, ZView& view,
+  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, QTransform  tfm, ZView& view,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
-  void setTransform_(const QTransform& tfm)
+  void updateRectSize();
+
+  inline void setTransform_(const QTransform& tfm)
   { m_transform = tfm; updateValue(); }
+
+  inline void setUseSameSize(bool v)
+  {
+    if (m_useSameSize != v) {
+      m_useSameSize = v;
+      updateRectSize();
+    }
+  }
+
+  inline void setSizeScale(double sizeScale)
+  {
+    if (m_sizeScale != sizeScale) {
+      m_sizeScale = sizeScale;
+      updateRectSize();
+    }
+  }
 
   void setLocked(bool l);
 
@@ -110,6 +130,9 @@ private:
   QPointF m_basePos;
   QTransform m_transform;
   ZView& m_view;
+
+  bool m_useSameSize = false;
+  double m_sizeScale = 1.0;
 };
 
 class ZPunctaFilter : public ZObjFilter
@@ -164,6 +187,10 @@ private:
 
   void regionColorChanged();
 
+  void useSameSizeChanged();
+
+  void sizeScaleChanged();
+
   void opacityChanged();
 
 private:
@@ -175,6 +202,8 @@ private:
 
   ZVec3Parameter m_outlineColor;
   ZVec3Parameter m_regionColor;
+  ZBoolParameter m_useSameSizeForAllPuncta;
+  ZFloatParameter m_sizeScale;
   ZDoubleParameter m_opacity;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;

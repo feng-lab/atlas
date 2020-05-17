@@ -62,8 +62,8 @@ ZBBox<glm::ivec4> ZSwcPack::boundBox() const
 {
   ZBBox<glm::ivec4> res;
   for (auto& p : m_swc) {
-    res.expand(glm::ivec4(p.x - p.radius, p.y - p.radius, std::floor(p.z), 0));
-    res.expand(glm::ivec4(p.x + p.radius, p.y + p.radius, std::ceil(p.z), 0));
+    res.expand(glm::ivec4(p.x - std::max(0.5, p.radius), p.y - std::max(0.5, p.radius), std::floor(p.z), 0));
+    res.expand(glm::ivec4(p.x + std::max(0.5, p.radius), p.y + std::max(0.5, p.radius), std::ceil(p.z), 0));
   }
   return res;
 }

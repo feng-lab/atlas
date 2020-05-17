@@ -618,7 +618,7 @@ set(SOURCES
     zroipack.cpp
     zroipack.h
     zregionannotationpack.cpp
-    zregionannotationpack.h)
+    zregionannotationpack.h zswccolorparameters.cpp zswccolorparameters.h)
 
 # our target
 set(APP_NAME Atlas)

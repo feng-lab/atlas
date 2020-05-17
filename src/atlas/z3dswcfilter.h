@@ -9,6 +9,7 @@
 #include "z3dconerenderer.h"
 #include "z3dsphererenderer.h"
 #include "zeventlistenerparameter.h"
+#include "zswccolorparameters.h"
 #include <QObject>
 #include <QString>
 #include <map>
@@ -33,11 +34,6 @@ public:
   bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
-
-  inline void setRenderingPrimitive(const std::string& mode)
-  {
-    m_renderingPrimitive.select(mode.c_str());
-  }
 
   bool isNodeRendering() const
   { return m_renderingPrimitive.isSelected("Sphere"); }
@@ -73,13 +69,9 @@ signals:
 protected:
   void prepareColor();
 
-  void adjustWidgets();
-
   void selectSwc(QMouseEvent* e, int w, int h);
 
   void contextMenuEvent(QContextMenuEvent* e, int w, int h);
-
-  void setColorMode(const std::string& mode);
 
   void process(Z3DEye /*unused*/) override;
 
@@ -111,16 +103,6 @@ protected:
   void notTransformedTreeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
 private:
-  void initTopologyColor();
-
-  void initTypeColor();
-
-  void initSubclassTypeColor();
-
-  glm::vec4 colorByType(const ZSwc::ConstSwcTreeNode& n);
-
-  glm::vec4 colorByDirection(const ZSwc::ConstSwcTreeNode& n);
-
   static glm::dvec3 projectPointOnRay(
     const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
@@ -138,13 +120,7 @@ private:
   Z3DSphereRenderer m_sphereRendererForCone;
 
   ZStringIntOptionParameter m_renderingPrimitive;
-  ZStringIntOptionParameter m_colorMode;
-  ZVec4Parameter m_swcTreeColor;
-  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForDifferentType;
-  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForSubclassType;
-  std::map<int, size_t> m_subclassTypeColorMapper;
-  std::vector<std::unique_ptr<ZVec4Parameter>> m_colorsForDifferentTopology;
-  ZColorMapParameter m_colorMapBranchType;
+  ZSwcColorParameters m_swcColorParameters;
 
   ZEventListenerParameter m_selectSwcEvent;
   ZEventListenerParameter m_deleteSelectedNodesEvent;

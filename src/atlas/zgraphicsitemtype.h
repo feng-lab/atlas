@@ -15,6 +15,8 @@ enum Type
   ZGraphicsItemGroup,
   ZImgScaleBarGraphicsItem,
   ZPunctumGraphicsItem,
+  ZSwcSkeletonGraphicsItem,
+  ZSwcNodeGraphicsItem
 };
 
 } // namespace GraphicsItemType
