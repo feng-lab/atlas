@@ -188,8 +188,6 @@ ZSwcSkeletonGraphicsItem::ZSwcSkeletonGraphicsItem(ZSwcPack& swcPack, QGraphicsI
   for (auto& [it1, it2] : m_swcPack.decompsedNodePairs()) {
     m_lines.push_back(QLineF(it1->x, it1->y, it2->x, it2->y));
   }
-
-  // setFlag(QGraphicsItem::ItemIsSelectable, true);
 }
 
 QRectF ZSwcSkeletonGraphicsItem::boundingRect() const
@@ -207,12 +205,21 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
   if (m_t != 0)
     return;
 
+  if (m_selected) {
+    // LOG(INFO) << "here";
+    QPen pen(QBrush(QColor(255, 255, 255)), 2);
+    pen.setCosmetic(true);
+    painter->setPen(pen);
+    // LOG(INFO) << boundingRect();
+    painter->drawRect(boundingRect());
+  }
+
   if (!m_mip) {
     m_skeletonColor.setAlpha(m_opacity * 255);
     painter->setPen(QPen(m_skeletonColor, 1 * m_sizeScale));
     for (auto it = m_swcPack.swc().begin(); it != m_swcPack.swc().end(); ++it) {
       int slice = roundTo<int>(it->z);
-      if (slice == m_z) {
+      if (std::abs(slice - m_z) < 2) {
         if (!ZSwc::isRoot(it)) {
           auto par = ZSwc::parent(it);
           painter->drawLine(QLineF(it->x, it->y, par->x, par->y));
@@ -315,6 +322,9 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::opacityChanged);
   addParameter(&m_showSkeleton);
   addParameter(&m_skeletonColor);
+  m_sizeScale.setSingleStep(0.1);
+  m_sizeScale.setDecimal(1);
+  m_sizeScale.setStyle("SPINBOX");
   addParameter(&m_sizeScale);
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
@@ -370,9 +380,8 @@ void ZSwcFilter::releaseItemsOwnership()
 
 void ZSwcFilter::setSelected(bool v)
 {
-  if (m_item->isSelected() != v) {
-    m_item->setSelected(v);
-  }
+  m_item->setSelected_(v);
+#if 0  // too slow if we have many swc nodes
   if (v) {
     for (auto& item : m_swcNodeItems) {
       item->setSelected(v);
@@ -380,6 +389,7 @@ void ZSwcFilter::setSelected(bool v)
   } else {
     updateItemSelectedState();
   }
+#endif
 }
 
 void ZSwcFilter::setNormalView(int z, int t)

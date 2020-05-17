@@ -100,6 +100,10 @@ public:
 
   explicit ZSwcSkeletonGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent = nullptr);
 
+  // item is not selectable (otherwise it will be hard to select swc nodes), we just fake some visual clue here
+  inline void setSelected_(bool v)
+  { m_selected = v; update(); }
+
   void setShowSkeleton(bool v)
   {
     m_showSkeleton = v;
@@ -159,6 +163,7 @@ protected:
   int m_t = 0;
   double m_sizeScale = 1.;
   QVector<QLineF> m_lines;
+  bool m_selected = false;
 };
 
 class ZSwcNodeGraphicsItem : public QGraphicsEllipseItem
@@ -172,7 +177,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& punctum, QTransform  tfm, ZView& view,
+  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, QTransform  tfm, ZView& view,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -199,7 +204,7 @@ protected:
 
 private:
   ZSwcPack& m_swcPack;
-  const ZSwc::SwcTreeNode& m_swcNode;
+  ZSwc::SwcTreeNode m_swcNode;
 
   QPointF m_basePos;
   QTransform m_transform;
