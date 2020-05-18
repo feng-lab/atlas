@@ -573,8 +573,11 @@ void ZSwcFilter::onSwcChanged()
   if (!m_visible.get()) {
     return;
   }
+
+  m_skipSelectionChangedProcessing = true;
   createSwcSkeletonItem();
   createSwcNodeItems();
+  m_skipSelectionChangedProcessing = false;
 
   emit boundBoxChanged();
 }

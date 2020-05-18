@@ -150,7 +150,7 @@ void ZSwcTreeView::selectionChanged(const QItemSelection &selected, const QItemS
 
 void ZSwcTreeView::onSwcSelectionChanged()
 {
-  if (m_ignoreSelectionChangedSignal) {
+  if (m_ignoreSelectionChangedSignal || !isVisible()) {
     return;
   }
 

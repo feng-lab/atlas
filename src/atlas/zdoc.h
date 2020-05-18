@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QList>
 #include <QUndoGroup>
+#include <memory>
 
 class QUndoStack;
 

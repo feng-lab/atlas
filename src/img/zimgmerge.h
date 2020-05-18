@@ -13,15 +13,15 @@ namespace nim {
 class ZImgTileSubBlock : public ZImgSubBlock
 {
 public:
-  ZImgTileSubBlock(const ZImgSource& source,
-                   size_t downsampleBlockWidth = 1,
-                   size_t downsampleBlockHeight = 1,
-                   size_t downsampleBlockDepth = 1,
-                   ImgMergeMode downsampleCombineMode = ImgMergeMode::Mean);
+  explicit ZImgTileSubBlock(ZImgSource source,
+                            size_t downsampleBlockWidth = 1,
+                            size_t downsampleBlockHeight = 1,
+                            size_t downsampleBlockDepth = 1,
+                            ImgMergeMode downsampleCombineMode = ImgMergeMode::Mean);
 
-  std::shared_ptr<ZImg> read() const override;
+  [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
-  ZImgInfo readInfo() const override;
+  [[nodiscard]] ZImgInfo readInfo() const override;
 
 private:
   ZImgSource m_source;
@@ -60,7 +60,7 @@ public:
   void setMergeMode(ImgMergeMode mode = ImgMergeMode::Max)
   { m_mergeMode = mode; }
 
-  const ZImgInfo& imgInfo() const override
+  [[nodiscard]] const ZImgInfo& imgInfo() const override
   { return m_imgInfo; }
 
 //  ZImg slice(size_t z, size_t t, size_t ratio) const override;
@@ -69,13 +69,13 @@ public:
 //
 //  ZImg wholeImg(size_t ratio) const override;
 
-  size_t numBlocks() const override;
+  [[nodiscard]] size_t numBlocks() const override;
 
-  ZImg block(size_t blockIdx) const override;
+  [[nodiscard]] ZImg block(size_t blockIdx) const override;
 
-  ZVoxelCoordinate blockCoord(size_t blockIdx) const override;
+  [[nodiscard]] ZVoxelCoordinate blockCoord(size_t blockIdx) const override;
 
-  ZImg wholeImg() const override;
+  [[nodiscard]] ZImg wholeImg() const override;
 
   // resolveLocations() needs to be called before this
   void save(const QString& fileName, FileFormat format = FileFormat::Unknown,
@@ -83,7 +83,7 @@ public:
 
 protected:
   void resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
-                             const ZImgSubBlock* refImg, double minCost, QStringList& summary) const;
+                             const ZImgSubBlock& refImg, double minCost, QStringList& summary) const;
 
   void mergeImgs(ZImg& res, const std::map<const ZImgSubBlock*, ZVoxelCoordinate>& imgs,
                  ImgMergeMode mode, QString& summary) const;

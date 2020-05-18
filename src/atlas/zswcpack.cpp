@@ -70,6 +70,7 @@ ZBBox<glm::ivec4> ZSwcPack::boundBox() const
 
 void ZSwcPack::setSelectedNodes(const std::set<ZSwc::SwcTreeNode>& sn)
 {
+  // LOG(INFO) << "here" << sn.size();
   if (m_selectedNodes == sn) {
     return;
   }
@@ -136,6 +137,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
     }
     bool hasChange = m_selectedNodes.find(root) == m_selectedNodes.end();
     if (hasChange) {
+      root->selected = true;
       m_selectedNodes.insert(root);
     }
     for (auto it = m_swc.beginAncestor(*p); it != root; ++it) {
@@ -171,7 +173,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
     if (!p && m_selectedNodes.empty()) {
       return;
     }
-    if (p && m_selectedNodes.size() == 1 && m_selectedNodes.find(*p) != m_selectedNodes.end()) {
+    if (p && (m_selectedNodes.size() == 1) && (m_selectedNodes.find(*p) != m_selectedNodes.end())) {
       return;
     }
     if (p) {
@@ -229,6 +231,7 @@ void ZSwcPack::updateViewRelatedData()
       m_decompsedNodePairs.emplace_back(it, ZSwc::parent(it));
     }
   }
+  // LOG(INFO) << m_selectedNodes.size() << " selected";
   for (auto& decomposedNode : m_decomposedNodes) {
     m_allNodesSet.insert(&decomposedNode);
   }

@@ -143,7 +143,7 @@ void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QI
 
 void ZPunctaTableView::onPunctaSelectionChanged()
 {
-  if (m_ignoreSelectionChangedSignal) {
+  if (m_ignoreSelectionChangedSignal || !isVisible()) {
     return;
   }
 

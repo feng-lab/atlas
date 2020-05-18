@@ -386,7 +386,9 @@ void ZPunctaFilter::onPunctaChanged()
   if (!m_visible.get()) {
     return;
   }
+  m_skipSelectionChangedProcessing = true;
   createPunctumItems();
+  m_skipSelectionChangedProcessing = false;
 
   emit boundBoxChanged();
 }
@@ -399,6 +401,7 @@ void ZPunctaFilter::onSceneItemSelectionChanged()
   if (!m_punctaPack) {
     return;
   }
+  // LOG(INFO) << "puncta";
   std::set<const ZPunctum*> selectedPuncta;
   for (auto item : m_view.scene().selectedItems()) {
     if (auto it = m_itemToPunctum.find(item); it != m_itemToPunctum.end()) {
