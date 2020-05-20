@@ -112,6 +112,8 @@ private:
   Z3DRenderOutputPort m_tempPort3;
   Z3DRenderOutputPort m_tempPort4;
   Z3DRenderOutputPort m_tempPort5;
+  Z3DRenderOutputPort m_imgTempPort1;
+  Z3DRenderOutputPort m_imgTempPort2;
   Z3DRenderOutputPort m_pickingPort;
   Z3DFilterInputPort<Z3DGeometryFilter> m_gPPort;
   Z3DFilterInputPort<Z3DImgFilter> m_vPPort;

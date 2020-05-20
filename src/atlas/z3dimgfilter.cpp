@@ -508,8 +508,8 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
     QAction* selectedAction = menu.exec(event->globalPos());
     if (enterSubregionViewAction && selectedAction == enterSubregionViewAction) {
       LOG(INFO) << "open subregion at image coord " << pos3D;
-      auto minCoord = pos3D - 128.f;
-      auto maxCoord = pos3D + 128.f;
+      auto minCoord = pos3D - 64.f;
+      auto maxCoord = pos3D + 64.f;
       m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
       m_yCut.set(glm::vec2(minCoord.y, maxCoord.y));
       m_zCut.set(glm::vec2(minCoord.z, maxCoord.z));
