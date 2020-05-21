@@ -90,7 +90,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, QTransform  tfm, ZView& view,
+  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, QTransform  tfm,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -129,7 +129,6 @@ private:
 
   QPointF m_basePos;
   QTransform m_transform;
-  ZView& m_view;
 
   bool m_useSameSize = false;
   double m_sizeScale = 1.0;

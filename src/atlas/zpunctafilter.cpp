@@ -125,13 +125,12 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
 #endif
 
 ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum,
-                                           QTransform tfm, ZView& view,
+                                           QTransform tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
   , m_punctaPack(punctaPack)
   , m_punctum(punctum)
   , m_transform(std::move(tfm))
-  , m_view(view)
 {
   setFlags(QGraphicsItem::ItemIsSelectable);
 
@@ -350,7 +349,7 @@ void ZPunctaFilter::createPunctumItems()
     if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p.z())) > 1.0) {
       continue;
     }
-    auto item = new ZPunctumGraphicsItem(*m_punctaPack, p, trans, m_view);
+    auto item = new ZPunctumGraphicsItem(*m_punctaPack, p, trans);
     item->setZValue(m_viewPrecedencePara.get());
     item->setBrush(brush);
     item->setPen(pen);

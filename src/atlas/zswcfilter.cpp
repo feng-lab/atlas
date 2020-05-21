@@ -248,13 +248,12 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
 }
 
 ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode,
-                                           QTransform tfm, ZView& view,
+                                           QTransform tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
   , m_swcPack(swcPack)
   , m_swcNode(swcNode)
   , m_transform(std::move(tfm))
-  , m_view(view)
 {
   setFlags(QGraphicsItem::ItemIsSelectable);
 
@@ -520,7 +519,7 @@ void ZSwcFilter::createSwcNodeItems()
     if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p->z)) > 1.0) {
       continue;
     }
-    auto item = new ZSwcNodeGraphicsItem(*m_swcPack, p, trans, m_view);
+    auto item = new ZSwcNodeGraphicsItem(*m_swcPack, p, trans);
     item->setZValue(m_viewPrecedencePara.get());
     auto color = m_swcColorParameters.colorOfNode(p);
     QPen pen(QColor(color.x * 255,

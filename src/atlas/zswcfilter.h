@@ -177,7 +177,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, QTransform  tfm, ZView& view,
+  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, QTransform  tfm,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -208,7 +208,6 @@ private:
 
   QPointF m_basePos;
   QTransform m_transform;
-  ZView& m_view;
 
   double m_sizeScale = 1.0;
 };
