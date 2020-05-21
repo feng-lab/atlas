@@ -72,9 +72,7 @@ signals:
 protected:
   virtual void updateBoundBox() = 0;
 
-  virtual void onObjRemoved(size_t id) = 0;
-
-  virtual void onAllObjsRemoved() = 0;
+  virtual void onObjAboutToBeRemoved(size_t id) = 0;
 
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
 

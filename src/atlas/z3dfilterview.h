@@ -12,8 +12,7 @@ public:
     : Z3DObjView(view)
     , m_doc(doc)
   {
-    connect(&m_doc, &DocType::objRemoved, this, &Z3DFilterView::onObjRemoved);
-    connect(&m_doc, &DocType::allObjsRemoved, this, &Z3DFilterView::onAllObjsRemoved);
+    connect(&m_doc, &DocType::objAboutToBeRemoved, this, &Z3DFilterView::onObjAboutToBeRemoved);
     connect(&m_doc, &DocType::objVisibleChanged, this, &Z3DFilterView::onObjVisibleChanged);
     connect(&m_doc, &DocType::selectionChangedFromDoc, this, &Z3DFilterView::onSelectionChanged);
   }
@@ -80,7 +79,7 @@ protected:
     m_view.updateBoundBox();
   }
 
-  void onObjRemoved(size_t id) override
+  void onObjAboutToBeRemoved(size_t id) override
   {
     auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
@@ -89,18 +88,6 @@ protected:
     canvas().removeEventListener(*viewControl);
     m_view.canvas().getGLFocus();
     m_idToFilter.erase(it);
-    networkEvaluator().updateNetwork();
-    updateBoundBox();
-  }
-
-  void onAllObjsRemoved() override
-  {
-    if (m_idToFilter.empty())
-      return;
-    for (const auto& idFilter : m_idToFilter) {
-      canvas().removeEventListener(*idFilter.second);
-    }
-    m_idToFilter.clear();
     networkEvaluator().updateNetwork();
     updateBoundBox();
   }

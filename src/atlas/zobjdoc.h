@@ -143,8 +143,6 @@ signals:
 
   void objRemoved(size_t id, ZObjDoc* doc);
 
-  void allObjsRemoved(ZObjDoc* doc);
-
   void objVisibleChanged(size_t id, bool v);
 
   void selectionChangedFromDoc(const QList<size_t>& selected, const QList<size_t>& deselected);

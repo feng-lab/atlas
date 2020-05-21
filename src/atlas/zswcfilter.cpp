@@ -378,15 +378,6 @@ void ZSwcFilter::releaseItemsOwnership()
 void ZSwcFilter::setSelected(bool v)
 {
   m_item->setSelected_(v);
-#if 0  // too slow if we have many swc nodes
-  if (v) {
-    for (auto& item : m_swcNodeItems) {
-      item->setSelected(v);
-    }
-  } else {
-    updateItemSelectedState();
-  }
-#endif
 }
 
 void ZSwcFilter::setNormalView(int z, int t)

@@ -196,7 +196,6 @@ private:
 private:
   ZPunctaPack* m_punctaPack = nullptr;
   // std::unique_ptr<ZPunctaGraphicsItem> m_item;
-  std::vector<std::unique_ptr<ZPunctumGraphicsItem>> m_puntumItems;
   std::map<const ZPunctum*, ZPunctumGraphicsItem*> m_punctumToItem;
   std::map<QGraphicsItem*, const ZPunctum*> m_itemToPunctum;
 
@@ -210,6 +209,8 @@ private:
 
   bool m_ignoreSelectionChangedSignal = false;
   bool m_skipSelectionChangedProcessing = false;
+
+  std::vector<std::unique_ptr<ZPunctumGraphicsItem>> m_puntumItems;
 };
 
 } // namespace nim

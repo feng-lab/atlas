@@ -15,8 +15,7 @@ public:
     : ZObjView(view)
     , m_doc(doc)
   {
-    connect(&m_doc, &DocType::objRemoved, this, &ZFilterView::onObjRemoved);
-    connect(&m_doc, &DocType::allObjsRemoved, this, &ZFilterView::onAllObjsRemoved);
+    connect(&m_doc, &DocType::objAboutToBeRemoved, this, &ZFilterView::onObjAboutToBeRemoved);
     connect(&m_doc, &DocType::objVisibleChanged, this, &ZFilterView::onObjVisibleChanged);
     connect(&m_doc, &DocType::selectionChangedFromDoc, this, &ZFilterView::onSelectionChanged);
   }
@@ -212,20 +211,12 @@ protected:
     m_view.updateBoundBox();
   }
 
-  void onObjRemoved(size_t id) override
+  void onObjAboutToBeRemoved(size_t id) override
   {
     auto it = m_idToFilter.find(id);
     if (it == m_idToFilter.end())
       return;
     m_idToFilter.erase(it);
-    updateBoundBox();
-  }
-
-  void onAllObjsRemoved() override
-  {
-    if (m_idToFilter.empty())
-      return;
-    m_idToFilter.clear();
     updateBoundBox();
   }
 
