@@ -23,7 +23,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection
                                     QStringList() << m_objDoc->objName(id)
                                                   << QDir::toNativeSeparators(m_objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
-    item->setSelected(i == 0);
+    item->setSelected(i == 0 && !m_multipleSelection);
   }
 
   m_treeWidget->resizeColumnToContents(0);
@@ -46,7 +46,7 @@ ZChooseObjDialog::ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWid
                                     QStringList() << objDoc->objName(id)
                                                   << QDir::toNativeSeparators(objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
-    item->setSelected(i == 0);
+    item->setSelected(i == 0 && !m_multipleSelection);
   }
 
   m_treeWidget->resizeColumnToContents(0);
@@ -78,7 +78,7 @@ void ZChooseObjDialog::createWidget()
   m_treeWidget->setItemsExpandable(true);
   m_treeWidget->setMinimumWidth(500);
   m_treeWidget->setSelectionMode(
-    m_multipleSelection ? QAbstractItemView::MultiSelection : QAbstractItemView::SingleSelection);
+    m_multipleSelection ? QAbstractItemView::ExtendedSelection : QAbstractItemView::SingleSelection);
   connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZChooseObjDialog::updateSelectedIDs);
   m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
