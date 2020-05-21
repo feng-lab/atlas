@@ -376,7 +376,7 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
 
     m_widgetsGroup->addChild(m_visible, 1);
 
-    QPushButton* pb = new QPushButton("Bring to Front");
+    auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZImgFilter::bringToFront);
     m_widgetsGroup->addChild(*pb, 1);
 
