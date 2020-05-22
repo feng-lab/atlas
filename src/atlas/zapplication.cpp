@@ -36,7 +36,7 @@ bool ZApplication::notify(QObject* object, QEvent* event)
 bool ZApplication::event(QEvent* event)
 {
   if (event->type() == QEvent::FileOpen) {
-    QFileOpenEvent* openEvent = static_cast<QFileOpenEvent*>(event);
+    auto openEvent = static_cast<QFileOpenEvent*>(event);
     LOG(INFO) << "Open file: " << openEvent->file();
     QList<QUrl> list;
     list << openEvent->url();

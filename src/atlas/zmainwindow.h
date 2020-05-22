@@ -53,6 +53,18 @@ public:
 
   ZView* view();
 
+  QAction* exitAction()
+  { return m_exitAction; }
+
+  QAction* aboutAction()
+  { return m_aboutAction; }
+
+  QAction* aboutQtAction()
+  { return m_aboutQtAction; }
+
+  QAction* checkForUpdatesAction()
+  { return m_checkForUpdatesAction; }
+
 protected:
   //void appAboutToQuit();
 
@@ -134,6 +146,8 @@ private:
   bool loadJsonSceneImpl(const QString& fn, QString& err);
 
   bool saveJsonSceneImpl(const QString& fn, QString& err);
+
+  void checkForUpdates() const;
 
 private:
   QMenu* m_fileMenu;

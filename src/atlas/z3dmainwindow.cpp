@@ -131,10 +131,6 @@ void Z3DMainWindow::openRecentFile()
   }
 }
 
-void Z3DMainWindow::about()
-{
-}
-
 void Z3DMainWindow::activateWindowIfNot()
 {
   if (!isActiveWindow())
@@ -279,27 +275,6 @@ void Z3DMainWindow::createActions()
   connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
 
   //
-  m_exitAction = new QAction(tr("E&xit"), this);
-  m_exitAction->setShortcuts(QKeySequence::Quit);
-  m_exitAction->setStatusTip(tr("Exit the application"));
-  connect(m_exitAction, &QAction::triggered, qApp, &QApplication::closeAllWindows);
-
-  m_aboutAction = new QAction(tr("&About"), this);
-  m_aboutAction->setStatusTip(tr("Show the application's About box"));
-  connect(m_aboutAction, &QAction::triggered, this, &Z3DMainWindow::about);
-  m_aboutAction->setMenuRole(QAction::AboutRole);
-
-  m_aboutQtAction = new QAction(tr("About &Qt"), this);
-  m_aboutQtAction->setStatusTip(tr("Show the Qt library's About box"));
-  connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
-  m_aboutQtAction->setMenuRole(QAction::AboutQtRole);
-
-  m_checkForUpdatesAction = new QAction(tr("Check for Updates..."), this);
-  m_checkForUpdatesAction->setStatusTip(tr("Check for Updates"));
-  connect(m_checkForUpdatesAction, &QAction::triggered, qApp, &QApplication::aboutQt);
-  m_checkForUpdatesAction->setMenuRole(QAction::ApplicationSpecificRole);
-
-  //
   m_viewLogAction = new QAction(tr("&View Log"), this);
   m_viewLogAction->setStatusTip(tr("View Log"));
   connect(m_viewLogAction, &QAction::triggered, this, &Z3DMainWindow::viewLog);
@@ -320,15 +295,15 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
   const QList<QAction*>& fileActList = m_doc.fileActions();
-  for (int i = 0; i < fileActList.size(); ++i)
-    m_fileMenu->addAction(fileActList[i]);
+  for (auto i : fileActList)
+    m_fileMenu->addAction(i);
   m_separatorAction = m_fileMenu->addSeparator();
   const QList<QAction*>& recentFileActions = m_2dWindow.recentFileActions();
-  for (int i = 0; i < recentFileActions.size(); ++i)
-    m_fileMenu->addAction(recentFileActions[i]);
+  for (auto recentFileAction : recentFileActions)
+    m_fileMenu->addAction(recentFileAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
-  m_fileMenu->addAction(m_exitAction);
+  m_fileMenu->addAction(m_2dWindow.exitAction());
 
   m_editMenu = menuBar()->addMenu(tr("&Edit"));
   m_editMenu->addAction(m_doc.undoAction());
@@ -345,8 +320,8 @@ void Z3DMainWindow::createMenus()
   m_viewMenu->addAction(m_screenShotAction);
 
   const QList<QMenu*>& menuList = m_doc.processObjMenu();
-  for (int i = 0; i < menuList.size(); ++i) {
-    menuBar()->addMenu(menuList[i]);
+  for (auto i : menuList) {
+    menuBar()->addMenu(i);
   }
 
   m_animationMenu = menuBar()->addMenu(tr("&Animation"));
@@ -358,9 +333,9 @@ void Z3DMainWindow::createMenus()
   menuBar()->addSeparator();
 
   m_helpMenu = menuBar()->addMenu(tr("&Help"));
-  m_helpMenu->addAction(m_aboutAction);
-  m_helpMenu->addAction(m_aboutQtAction);
-  m_helpMenu->addAction(m_checkForUpdatesAction);
+  m_helpMenu->addAction(m_2dWindow.aboutAction());
+  m_helpMenu->addAction(m_2dWindow.aboutQtAction());
+  m_helpMenu->addAction(m_2dWindow.checkForUpdatesAction());
   m_helpMenu->addAction(m_helpAction);
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_viewLogAction);

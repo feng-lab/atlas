@@ -56,8 +56,6 @@ private:
 
   void openRecentFile();
 
-  void about();
-
   void activateWindowIfNot();  //mac bug?
 
   void viewLog();
@@ -126,11 +124,6 @@ private:
   QAction* m_loadSceneAction;
   QAction* m_saveSceneAction;
   QAction* m_closeAction;
-
-  QAction* m_exitAction;
-  QAction* m_aboutAction;
-  QAction* m_aboutQtAction;
-  QAction* m_checkForUpdatesAction;
 
   QAction* m_viewLogAction;
   QAction* m_openLogFolderAction;

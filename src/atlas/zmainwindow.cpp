@@ -36,6 +36,7 @@
 #include "zfileutils.h"
 #include "ztheme.h"
 #include "zlogdialog.h"
+#include "zapplication.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -54,6 +55,7 @@
 #include <QDesktopServices>
 #include <QProcess>
 #include <QTextStream>
+#include <QProcess>
 
 namespace nim {
 
@@ -179,6 +181,22 @@ ZView* ZMainWindow::view()
   return m_view.get();
 }
 
+void ZMainWindow::checkForUpdates() const
+{
+  QString updaterName("MaintenanceTool");
+#ifdef Q_OS_OSX
+  QString program = ZApplication::applicationDirPath() + QString("/../../../%1.app/Contents/MacOS/%1").arg(updaterName);
+#elif defined(Q_OS_WIN32)
+  QString program = ZApplication::applicationDirPath() + QString("./%1.exe").arg(updaterName);
+#else
+  QString program = ZApplication::applicationDirPath() + QString("./%1").arg(updaterName);
+#endif
+  QStringList arguments;
+  arguments << "--checkupdates";
+  LOG(INFO) << program << " " << arguments.join(" ");
+  QProcess::startDetached(program, arguments);
+}
+
 void ZMainWindow::closeEvent(QCloseEvent* event)
 {
   // Qt mac bug, use dock icon context menu -> quit will call this function twice and crash
@@ -243,7 +261,7 @@ void ZMainWindow::openRecentFile()
 
 void ZMainWindow::about()
 {
-  QMessageBox::about(this, QString("About Atlas"),
+  QMessageBox::about(QApplication::activeWindow(), QString("About Atlas"),
                      QString("<p>Atlas version %1</p>"
                              "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
                              "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
@@ -563,7 +581,7 @@ void ZMainWindow::createActions()
 
   m_checkForUpdatesAction = new QAction(tr("Check for Updates..."), this);
   m_checkForUpdatesAction->setStatusTip(tr("Check for Updates"));
-  connect(m_checkForUpdatesAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+  connect(m_checkForUpdatesAction, &QAction::triggered, this, &ZMainWindow::checkForUpdates);
   m_checkForUpdatesAction->setMenuRole(QAction::ApplicationSpecificRole);
 
 #ifdef Q_OS_LINUX
