@@ -554,10 +554,17 @@ void ZMainWindow::createActions()
   m_aboutAction = new QAction(tr("&About"), this);
   m_aboutAction->setStatusTip(tr("Show the application's About box"));
   connect(m_aboutAction, &QAction::triggered, this, &ZMainWindow::about);
+  m_aboutAction->setMenuRole(QAction::AboutRole);
 
   m_aboutQtAction = new QAction(tr("About &Qt"), this);
   m_aboutQtAction->setStatusTip(tr("Show the Qt library's About box"));
   connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+  m_aboutQtAction->setMenuRole(QAction::AboutQtRole);
+
+  m_checkForUpdatesAction = new QAction(tr("Check for Updates..."), this);
+  m_checkForUpdatesAction->setStatusTip(tr("Check for Updates"));
+  connect(m_checkForUpdatesAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+  m_checkForUpdatesAction->setMenuRole(QAction::ApplicationSpecificRole);
 
 #ifdef Q_OS_LINUX
   m_createDesktopEntryAction = new QAction(tr("Create Desktop Entry..."), this);
@@ -650,6 +657,7 @@ void ZMainWindow::createMenus()
   m_helpMenu = menuBar()->addMenu(tr("&Help"));
   m_helpMenu->addAction(m_aboutAction);
   m_helpMenu->addAction(m_aboutQtAction);
+  m_helpMenu->addAction(m_checkForUpdatesAction);
   m_helpMenu->addAction(m_helpAction);
 #ifdef Q_OS_LINUX
   m_helpMenu->addAction(m_createDesktopEntryAction);

@@ -130,6 +130,7 @@ private:
   QAction* m_exitAction;
   QAction* m_aboutAction;
   QAction* m_aboutQtAction;
+  QAction* m_checkForUpdatesAction;
 
   QAction* m_viewLogAction;
   QAction* m_openLogFolderAction;

@@ -57,7 +57,7 @@ public:
   { return m_volumes; }
 
   static glm::uvec3 imageBlockSize()
-  { return glm::uvec3(28, 28, 28); }
+  { return glm::uvec3(252, 252, 60); }
 
   static glm::uvec3 imageBlockSizePad()
   { return glm::uvec3(4, 4, 4); }
