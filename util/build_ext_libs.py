@@ -1451,15 +1451,22 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_doubleconversion:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON',
-                         '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=' + 'OFF' if is_windows() else 'ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON',
-                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=' + 'OFF' if is_windows() else 'ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO'])
+
+        # if is_windows():
+        #     cmakecmd.extend([
+        #         # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
+        #         # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
+        #         '-DHDF5_ROOT:PATH=' + ext_build_dir(),
+        #     ])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -1816,7 +1823,7 @@ def build_libs(libs: dict, update_src: bool):
         if update_src:
             update_git_submodule(src_dir)
         # vs2019 build error https://github.com/facebook/folly/issues/1324
-        build_folly(src_dir, ext_build_dir(), header_only=is_windows())
+        build_folly(src_dir, ext_build_dir())
 
     if libs['ceres-solver']:
         src_dir = os.path.join(ext_dir(), 'ceres-solver')

@@ -258,16 +258,6 @@ else (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
   print_target_properties(Boost::headers)
 endif (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
 
-if (WIN32)
-  add_library(Folly::folly INTERFACE IMPORTED)
-  set_target_properties(Folly::folly PROPERTIES
-                        INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/folly"
-                        INTERFACE_LINK_LIBRARIES "Boost::headers")
-  print_target_properties(Folly::folly)
-else (WIN32)
-  IF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
-    MESSAGE ("It is greater than 1.2")
-  ENDIF (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
 find_package(folly REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Boost::context)
@@ -280,7 +270,6 @@ print_target_properties(Folly::folly)
 print_target_properties(Folly::folly_deps)
 print_target_properties(fmt::fmt)
 print_target_properties(Threads::Threads)
-endif (WIN32)
 
 message(STATUS "QT_PATHS: " ${QT_PATHS})
 set(CMAKE_AUTOMOC ON)
