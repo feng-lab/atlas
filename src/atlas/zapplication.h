@@ -18,6 +18,8 @@ public:
 
   static QString resourcesDirPath();
 
+  static QString applicationInstallDirPath();
+
 signals:
   void fileOpenRequest(QList<QUrl> urlList);
 };

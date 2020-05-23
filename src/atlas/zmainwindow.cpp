@@ -43,7 +43,6 @@
 #include <QActionGroup>
 #include <QToolBar>
 #include <QMenu>
-#include <QModelIndex>
 #include <QSettings>
 #include <QApplication>
 #include <QDockWidget>
@@ -181,20 +180,25 @@ ZView* ZMainWindow::view()
   return m_view.get();
 }
 
-void ZMainWindow::checkForUpdates() const
+void ZMainWindow::checkForUpdates()
 {
   QString updaterName("MaintenanceTool");
-#ifdef Q_OS_OSX
-  QString program = ZApplication::applicationDirPath() + QString("/../../../%1.app/Contents/MacOS/%1").arg(updaterName);
-#elif defined(Q_OS_WIN32)
-  QString program = ZApplication::applicationDirPath() + QString("./%1.exe").arg(updaterName);
+#ifdef Q_OS_MACOS
+  QString program = ZApplication::applicationInstallDirPath() + QString("/%1.app/Contents/MacOS/%1").arg(updaterName);
+#elif defined(Q_OS_WIN64)
+  QString program = ZApplication::applicationInstallDirPath() + QString("/%1.exe").arg(updaterName);
 #else
-  QString program = ZApplication::applicationDirPath() + QString("./%1").arg(updaterName);
+  QString program = ZApplication::applicationInstallDirPath() + QString("/%1").arg(updaterName);
 #endif
-  QStringList arguments;
-  arguments << "--checkupdates";
-  LOG(INFO) << program << " " << arguments.join(" ");
-  QProcess::startDetached(program, arguments);
+  if (QFileInfo(program).exists()) {
+    QStringList arguments;
+    arguments << "--checkupdates";
+    LOG(INFO) << program << " " << arguments.join(" ");
+    QProcess::startDetached(program, arguments);
+  } else {
+    QMessageBox::critical(QApplication::activeWindow(), QString("Could not find updater"),
+                          QString("Path to MaintenanceTool could not be determined or does not exist."));
+  }
 }
 
 void ZMainWindow::closeEvent(QCloseEvent* event)
@@ -249,7 +253,7 @@ bool ZMainWindow::saveAs()
 
 void ZMainWindow::openRecentFile()
 {
-  if (QAction* action = qobject_cast<QAction*>(sender())) {
+  if (auto action = qobject_cast<QAction*>(sender())) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
       loadJsonScene(fn);
@@ -452,7 +456,7 @@ void ZMainWindow::loadJsonScene(const QString& fn)
 
 void ZMainWindow::openNewInstance()
 {
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
   QDir dir = QDir(QCoreApplication::applicationDirPath());
   dir.cdUp();
   dir.cdUp();
@@ -475,17 +479,17 @@ void ZMainWindow::init()
 
   m_view->registerObjView(std::make_unique<ZROIView>(m_doc->roiDoc(), *m_view));
 
-  ZPunctaDoc* punctaDoc = new ZPunctaDoc(*m_doc);
+  auto punctaDoc = new ZPunctaDoc(*m_doc);
   m_doc->registerObjDoc(punctaDoc);
   m_view->registerObjView(std::make_unique<ZPunctaView>(*punctaDoc, *m_view));
 
-  ZSwcDoc* swcDoc = new ZSwcDoc(*m_doc);
+  auto swcDoc = new ZSwcDoc(*m_doc);
   m_doc->registerObjDoc(swcDoc);
   m_view->registerObjView(std::make_unique<ZSwcView>(*swcDoc, *m_view));
 
   m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(m_doc->regionAnnotationDoc(), *m_view));
 
-  ZSvgDoc* svgDoc = new ZSvgDoc(*m_doc);
+  auto svgDoc = new ZSvgDoc(*m_doc);
   m_doc->registerObjDoc(svgDoc);
   m_view->registerObjView(std::make_unique<ZSvgView>(*svgDoc, *m_view));
 
@@ -630,11 +634,11 @@ void ZMainWindow::createMenus()
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
   const QList<QAction*>& fileActList = m_doc->fileActions();
-  for (int i = 0; i < fileActList.size(); ++i)
-    m_fileMenu->addAction(fileActList[i]);
+  for (auto i : fileActList)
+    m_fileMenu->addAction(i);
   m_separatorAction = m_fileMenu->addSeparator();
-  for (int i = 0; i < m_recentFileActions.size(); ++i)
-    m_fileMenu->addAction(m_recentFileActions[i]);
+  for (auto& m_recentFileAction : m_recentFileActions)
+    m_fileMenu->addAction(m_recentFileAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
   m_fileMenu->addAction(m_exitAction);
@@ -660,8 +664,8 @@ void ZMainWindow::createMenus()
   m_viewMenu->addAction(m_screenShotAction);
 
   const QList<QMenu*>& menuList = m_doc->processObjMenu();
-  for (int i = 0; i < menuList.size(); ++i) {
-    menuBar()->addMenu(menuList[i]);
+  for (auto i : menuList) {
+    menuBar()->addMenu(i);
   }
 
   m_animationMenu = menuBar()->addMenu(tr("&Animation"));
@@ -691,7 +695,7 @@ void ZMainWindow::createMenus()
 
   m_dockMenu = new QMenu(this);
   m_dockMenu->addAction(m_openNewInstanceAction);
-#ifdef Q_OS_OSX
+#ifdef Q_OS_MACOS
   m_dockMenu->setAsDockMenu();
 #endif
 }
@@ -882,7 +886,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 
   QByteArray saveData = file.readAll();
 
-  QJsonParseError jsonError;
+  QJsonParseError jsonError{};
   QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
   if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
     err = QString("Incorrect file format <%1>").arg(jsonError.errorString());
@@ -967,8 +971,7 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
   sceneObj.insert("Doc", docObj);
 
   QList<size_t> objs = m_doc->objs();
-  for (int i = 0; i < objs.size(); ++i) {
-    size_t id = objs[i];
+  for (size_t id : objs) {
     QJsonObject jObj;
 
     QJsonObject view2DObj;

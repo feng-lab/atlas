@@ -10,8 +10,6 @@ class QActionGroup;
 
 class QMenu;
 
-class QModelIndex;
-
 namespace nim {
 
 class ZDoc;
@@ -33,7 +31,7 @@ public:
 
   void initOpenglContext();
 
-  const QList<QAction*>& recentFileActions() const
+  [[nodiscard]] const QList<QAction*>& recentFileActions() const
   { return m_recentFileActions; }
 
   void updateRecentFileActions();
@@ -64,6 +62,12 @@ public:
 
   QAction* checkForUpdatesAction()
   { return m_checkForUpdatesAction; }
+
+  QAction* viewLogAction()
+  { return m_viewLogAction; }
+
+  QAction* openLogFolderAction()
+  { return m_openLogFolderAction; }
 
 protected:
   //void appAboutToQuit();
@@ -96,19 +100,19 @@ private:
 
   void openHelpPanel();
 
-  void viewLog();
+  static void viewLog();
 
-  void openLogFolder();
+  static void openLogFolder();
 
 #ifdef ATLAS_WITH_TESTS
 
-  void runBenchmark();
+  static void runBenchmark();
 
-  void runUnitTest();
+  static void runUnitTest();
 
 #endif
 
-  void runCustomCommand();
+  static void runCustomCommand();
 
   void open3DWindow();
 
@@ -116,7 +120,7 @@ private:
 
   void saveScene();
 
-  void openNewInstance();
+  static void openNewInstance();
 
   void init();
 
@@ -139,15 +143,15 @@ private:
   //void loadWorkspace(const QString &fileName);
   //bool saveFile(const QString &fileName);
   //void setCurrentFile(const QString &fileName);
-  QString strippedName(const QString& fullFileName);
+  static QString strippedName(const QString& fullFileName);
 
-  ZMainWindow* findMainWindow(const QString& fileName);
+  static ZMainWindow* findMainWindow(const QString& fileName);
 
   bool loadJsonSceneImpl(const QString& fn, QString& err);
 
   bool saveJsonSceneImpl(const QString& fn, QString& err);
 
-  void checkForUpdates() const;
+  static void checkForUpdates();
 
 private:
   QMenu* m_fileMenu;

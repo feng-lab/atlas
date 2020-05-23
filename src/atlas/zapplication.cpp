@@ -47,10 +47,19 @@ bool ZApplication::event(QEvent* event)
 
 QString ZApplication::resourcesDirPath()
 {
-#if defined(__APPLE__)
+#ifdef Q_OS_MACOS
   return applicationDirPath() + QString("/../Resources");
 #else
   return applicationDirPath() + QString("/Resources");
+#endif
+}
+
+QString ZApplication::applicationInstallDirPath()
+{
+#ifdef Q_OS_MACOS
+  return applicationDirPath() + QString("/../../..");
+#else
+  return applicationDirPath();
 #endif
 }
 

@@ -137,25 +137,6 @@ void Z3DMainWindow::activateWindowIfNot()
     this->activateWindow();
 }
 
-void Z3DMainWindow::viewLog()
-{
-  //ZLogDialog logDialog(logModelSinkInstance(), this);
-  //logDialog.exec();
-  QStringList filters;
-  filters << "atlas*_log.txt";
-  QFileInfoList list = ZSystemInfo::instance().logDir().entryInfoList(filters,
-                                                                      QDir::Files | QDir::NoSymLinks,
-                                                                      QDir::Name);  // sorted by modification time
-  if (!list.isEmpty()) {
-    QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
-  }
-}
-
-void Z3DMainWindow::openLogFolder()
-{
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().logDir().absolutePath()));
-}
-
 void Z3DMainWindow::changeBackground()
 {
   if (m_backgroundDockWidget->isHidden()) {
@@ -273,15 +254,6 @@ void Z3DMainWindow::createActions()
   m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
   m_helpAction->setStatusTip(tr("Help"));
   connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
-
-  //
-  m_viewLogAction = new QAction(tr("&View Log"), this);
-  m_viewLogAction->setStatusTip(tr("View Log"));
-  connect(m_viewLogAction, &QAction::triggered, this, &Z3DMainWindow::viewLog);
-
-  m_openLogFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Log Folder"), this);
-  m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
-  connect(m_openLogFolderAction, &QAction::triggered, this, &Z3DMainWindow::openLogFolder);
 }
 
 void Z3DMainWindow::createMenus()
@@ -338,8 +310,8 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addAction(m_2dWindow.checkForUpdatesAction());
   m_helpMenu->addAction(m_helpAction);
   m_helpMenu->addSeparator();
-  m_helpMenu->addAction(m_viewLogAction);
-  m_helpMenu->addAction(m_openLogFolderAction);
+  m_helpMenu->addAction(m_2dWindow.viewLogAction());
+  m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
 }
 
 void Z3DMainWindow::createToolBars()
@@ -541,16 +513,6 @@ void Z3DMainWindow::setCurrentFile(const QString& fileName)
   }
 
   setWindowModified(false);
-}
-
-QString Z3DMainWindow::strippedName(const QString& fullFileName)
-{
-  return QFileInfo(fullFileName).fileName();
-}
-
-Z3DMainWindow* Z3DMainWindow::findMainWindow(const QString& /*unused*/)
-{
-  return nullptr;
 }
 
 void Z3DMainWindow::onViewReady()

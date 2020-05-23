@@ -2,8 +2,6 @@
 
 #include <QMainWindow>
 
-class QModelIndex;
-
 namespace nim {
 
 class ZDoc;
@@ -58,10 +56,6 @@ private:
 
   void activateWindowIfNot();  //mac bug?
 
-  void viewLog();
-
-  void openLogFolder();
-
   void changeBackground();
 
   void changeAxis();
@@ -100,10 +94,6 @@ private:
 
   void setCurrentFile(const QString& fileName);
 
-  QString strippedName(const QString& fullFileName);
-
-  Z3DMainWindow* findMainWindow(const QString& fileName);
-
   void onViewReady();
 
 private:
@@ -124,9 +114,6 @@ private:
   QAction* m_loadSceneAction;
   QAction* m_saveSceneAction;
   QAction* m_closeAction;
-
-  QAction* m_viewLogAction;
-  QAction* m_openLogFolderAction;
 
   QAction* m_separatorAction;
 
