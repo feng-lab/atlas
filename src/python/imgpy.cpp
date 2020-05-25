@@ -564,7 +564,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<const QString&>(), "filename"_a)
     .def("save", &ZPuncta::save,
          "filename"_a, "format"_a = QString())
-    .def_property_readonly("data", &ZPuncta::data)
+    .def_property_readonly("data", py::overload_cast<>(&ZPuncta::data, py::const_))
     .def("__repr__", [](const ZPuncta& v) {
       return QString("<_imgpy.ZPuncta %1>").arg(v.toQString()).toStdString();
     });
