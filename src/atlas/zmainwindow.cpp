@@ -192,7 +192,7 @@ void ZMainWindow::checkForUpdates()
 #endif
   if (QFileInfo(program).exists()) {
     QStringList arguments;
-    arguments << "--checkupdates";
+    arguments << "--updater";
     LOG(INFO) << program << " " << arguments.join(" ");
     QProcess::startDetached(program, arguments);
   } else {
