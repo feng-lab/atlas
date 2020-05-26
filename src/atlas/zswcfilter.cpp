@@ -286,7 +286,7 @@ void ZSwcNodeGraphicsItem::updateRectSize()
 void ZSwcNodeGraphicsItem::setLocked(bool l)
 {
   if (l) {
-    setFlags(0);
+    setFlags(QGraphicsItem::GraphicsItemFlags());
   } else {
     setFlags(QGraphicsItem::ItemIsSelectable);
   }

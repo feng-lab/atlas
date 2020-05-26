@@ -363,19 +363,19 @@ void Z3DTrackballInteractionHandler::wheelEvent(QWheelEvent* e, int /*unused*/, 
   setState(NONE);
   m_delta = 0;
 #else
-  if (e->delta() == 0)
+  if (e->angleDelta().y() == 0)
     return;
   if (m_state == State::Dolly) {
     float factor = m_mouseMotionFactor * 0.2f * m_mouseWheelMotionFactor;
-    bool dollyIn = (m_mouseWheelUpDollyIn && (e->delta() > 0)) ||
-                   (!m_mouseWheelUpDollyIn && (e->delta() < 0));
+    bool dollyIn = (m_mouseWheelUpDollyIn && (e->angleDelta().y() > 0)) ||
+                   (!m_mouseWheelUpDollyIn && (e->angleDelta().y() < 0));
     if (!dollyIn)
       factor = -factor;
     m_camera->dolly(std::pow(1.1f, factor));
     e->accept();
   } else if (m_state == State::Roll) {
-    bool rollLeft = (m_mouseWheelUpRollLeft && (e->delta() > 0)) ||
-                    (!m_mouseWheelUpRollLeft && (e->delta() < 0));
+    bool rollLeft = (m_mouseWheelUpRollLeft && (e->angleDelta().y() > 0)) ||
+                    (!m_mouseWheelUpRollLeft && (e->angleDelta().y() < 0));
     if (rollLeft) {
       m_camera->roll(m_keyPressAngle);
     } else {

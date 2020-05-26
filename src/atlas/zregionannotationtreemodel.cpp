@@ -63,7 +63,7 @@ QVariant ZRegionAnnotationTreeModel::data(const QModelIndex& index, int role) co
 Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex& index) const
 {
   if (!index.isValid())
-    return 0;
+    return Qt::ItemFlags();
 
   Qt::ItemFlags flags = Qt::ItemIsEnabled;
 

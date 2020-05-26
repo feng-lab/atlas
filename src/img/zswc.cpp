@@ -113,7 +113,7 @@ void ZSwc::load(const QString& filename)
         throw ZIOException("Error while reading file.");
       }
       removeComment(line, QString("#"), true);
-      QStringList fieldList = line.split(QRegularExpression("\\s+"), QString::SkipEmptyParts);
+      QStringList fieldList = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
       if (fieldList.size() >= 7) {
         SwcNode node;
         bool ok;

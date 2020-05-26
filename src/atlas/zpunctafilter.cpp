@@ -166,7 +166,7 @@ void ZPunctumGraphicsItem::updateRectSize()
 void ZPunctumGraphicsItem::setLocked(bool l)
 {
   if (l) {
-    setFlags(0);
+    setFlags(QGraphicsItem::GraphicsItemFlags());
   } else {
     setFlags(QGraphicsItem::ItemIsSelectable);
   }

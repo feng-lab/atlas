@@ -108,9 +108,10 @@ class Z3DCanvas : public QGraphicsView
 {
 Q_OBJECT
 public:
-  Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr, Qt::WindowFlags f = 0);
+  Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr,
+            Qt::WindowFlags f = Qt::WindowFlags());
 
-  QSurfaceFormat format() const;
+  [[nodiscard]] QSurfaceFormat format() const;
 
   void setNetworkEvaluator(Z3DNetworkEvaluator* n);
 

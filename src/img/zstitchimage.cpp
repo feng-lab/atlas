@@ -50,7 +50,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
     QTextStream in(&inputFile);
     while (!in.atEnd()) {
       QString line = in.readLine();
-      QStringList list = line.split(rx, QString::SkipEmptyParts);
+      QStringList list = line.split(rx, Qt::SkipEmptyParts);
 
       if (list.empty() || list.at(0).startsWith("#")) {
         continue;

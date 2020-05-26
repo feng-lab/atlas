@@ -534,10 +534,10 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
   if (lscpu.waitForFinished(-1)) {
     QString lscpuOutput(lscpu.readAllStandardOutput());
-    QStringList cpuInfos = lscpuOutput.split(QChar('\n'), QString::SkipEmptyParts);
+    QStringList cpuInfos = lscpuOutput.split(QChar('\n'), Qt::SkipEmptyParts);
     int64_t threadsPerCore = 0;
     for (const auto& cpuInfo : cpuInfos) {
-      QStringList cInfo = cpuInfo.split(QChar(':'), QString::SkipEmptyParts);
+      QStringList cInfo = cpuInfo.split(QChar(':'), Qt::SkipEmptyParts);
       if (cInfo.size() == 2) {
         bool ok = false;
         if (cInfo[0] == "CPU(s)") {

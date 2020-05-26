@@ -203,7 +203,7 @@ template<size_t L, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
 {
   QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, QString::SkipEmptyParts);
+  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
   for (size_t i = 0; i < std::min(L, size_t(numList.size())); ++i) {
     toVal(numList[i], v[i]);
   }
@@ -230,7 +230,7 @@ template<size_t C, size_t R, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 {
   QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, QString::SkipEmptyParts);
+  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
   for (size_t i = 0; i < std::min(C * R, size_t(numList.size())); ++i) {
     toVal(numList[i], m[i % C][i / R]);
   }
@@ -250,7 +250,7 @@ template<typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::tquat<T, Q>& q)
 {
   QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
-  QStringList numList = str.split(rx, QString::SkipEmptyParts);
+  QStringList numList = str.split(rx, Qt::SkipEmptyParts);
   for (size_t i = 0; i < std::min(q.length(), size_t(numList.size())); ++i) {
     toVal(numList[i], q[i]);
   }

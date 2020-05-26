@@ -78,7 +78,7 @@ QxtCsvModel::QxtCsvModel(QIODevice *file, QObject *parent, bool withHeader, QCha
 }
 
 /*!
-  \overload 
+  \overload
 
   Creates a QxtCsvModel with the parent \a parent and content loaded from \a file.
 
@@ -160,7 +160,7 @@ void QxtCsvModel::setSource(const QString filename, bool withHeader, QChar separ
   The value of \a separator will be used to delimit fields, subject to the specified \a quoteMode.
   If \a withHeader is set to true, the first line of the file will be used to populate the model's
   horizontal header.
-  
+
   \sa quoteMode
   */
 void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, QTextCodec* codec)
@@ -187,12 +187,12 @@ void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, Q
     }
     while(!stream.atEnd()) {
         if(buffer != QChar(0)) {
-            ch = buffer; 
+            ch = buffer;
             buffer = QChar(0);
         } else {
             stream >> ch;
         }
-        if(ch == '\n' && readCR) 
+        if(ch == '\n' && readCR)
             continue;
         else if(ch == '\r')
             readCR = true;
@@ -239,7 +239,7 @@ void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, Q
             field.append(ch);
         }
     }
-    if(!field.isEmpty()) 
+    if(!field.isEmpty())
         row << field;
     if(!row.isEmpty()) {
         if(!headerSet)
@@ -413,14 +413,14 @@ static QString qxt_addCsvQuotes(QxtCsvModel::QuoteMode mode, QString field)
             addDoubleQuotes = true;
         else if(mode & QxtCsvModel::SingleQuote)
             addSingleQuotes = true;
-    } 
+    }
     if(mode & QxtCsvModel::BackslashEscape) {
-        if(addDoubleQuotes) 
+        if(addDoubleQuotes)
             return '"' + field.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
         if(addSingleQuotes)
             return '\'' + field.replace("\\", "\\\\").replace("'", "\\'") + '\'';
     } else {
-        if(addDoubleQuotes) 
+        if(addDoubleQuotes)
             return '"' + field.replace("\"", "\"\"") + '"';
         if(addSingleQuotes)
             return '\'' + field.replace("'", "''") + '\'';
@@ -433,7 +433,7 @@ static QString qxt_addCsvQuotes(QxtCsvModel::QuoteMode mode, QString field)
 
   Fields in the output file will be separated by \a separator. Set \a withHeader to true
   to output a row of headers at the top of the file.
- */ 
+ */
 void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QTextCodec* codec) const
 {
     const QxtCsvModelPrivate& d_ptr = qxt_d();
@@ -448,9 +448,9 @@ void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QText
         data = "";
         for(col = 0; col < cols; ++col) {
             if(col > 0) data += separator;
-            data += qxt_addCsvQuotes(d_ptr.quoteMode, d_ptr.header.at(col)); 
+            data += qxt_addCsvQuotes(d_ptr.quoteMode, d_ptr.header.at(col));
         }
-        stream << data << endl;
+        stream << data << Qt::endl;
     }
     for(row = 0; row < rows; ++row)
     {
@@ -459,13 +459,13 @@ void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QText
         for(col = 0; col < cols; ++col) {
             if(col > 0) data += separator;
             if(col < rowData.length())
-                data += qxt_addCsvQuotes(d_ptr.quoteMode, rowData.at(col)); 
+                data += qxt_addCsvQuotes(d_ptr.quoteMode, rowData.at(col));
             else
-                data += qxt_addCsvQuotes(d_ptr.quoteMode, QString());; 
+                data += qxt_addCsvQuotes(d_ptr.quoteMode, QString());;
         }
-        stream << data << endl;
+        stream << data << Qt::endl;
     }
-    stream << flush;
+    stream << Qt::flush;
     dest->close();
 }
 
@@ -476,7 +476,7 @@ void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QText
 
   Fields in the output file will be separated by \a separator. Set \a withHeader to true
   to output a row of headers at the top of the file.
- */ 
+ */
 void QxtCsvModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec* codec) const
 {
     QFile dest(filename);
@@ -514,7 +514,7 @@ void QxtCsvModel::setQuoteMode(QuoteMode mode)
 
 /*!
   Sets the content of the cell at row \a row and column \a column to \a value.
-  
+
   \sa text
   */
 void QxtCsvModel::setText(int row, int column, const QString& value)
@@ -524,7 +524,7 @@ void QxtCsvModel::setText(int row, int column, const QString& value)
 
 /*!
   Fetches the content of the cell at row \a row and column \a column.
-  
+
   \sa setText
   */
 QString QxtCsvModel::text(int row, int column) const
@@ -534,7 +534,7 @@ QString QxtCsvModel::text(int row, int column) const
 
 /*!
   Sets the content of the header for column \a column to \a value.
-  
+
   \sa headerText
   */
 void QxtCsvModel::setHeaderText(int column, const QString& value)
@@ -544,7 +544,7 @@ void QxtCsvModel::setHeaderText(int column, const QString& value)
 
 /*!
   Fetches the content of the cell at row \a row and column \a column.
-  
+
   \sa setText
   */
 QString QxtCsvModel::headerText(int column) const

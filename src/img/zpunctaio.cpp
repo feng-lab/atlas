@@ -316,7 +316,7 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
       throw ZIOException("Error while reading file.");
     }
     removeComment(line, QString("#"), true);
-    QStringList fieldList = line.split(",", QString::KeepEmptyParts);
+    QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
     if (fieldList.size() >= 12) {
       ZPunctum punctum;
       bool ok;
@@ -430,7 +430,7 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
       throw ZIOException("Error while reading file.");
     }
     removeComment(line, QString("#"), true);
-    QStringList fieldList = line.split(",", QString::KeepEmptyParts);
+    QStringList fieldList = line.split(",", Qt::KeepEmptyParts);
     if (fieldList.size() >= 10) {
       ZPunctum punctum;
       bool ok;

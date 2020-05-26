@@ -134,7 +134,7 @@ ZMeshIO::ZMeshIO()
   importer.GetExtensionList(tmp);
   QString exts = QString::fromStdString(tmp);
   exts.replace("*.", "");
-  m_readExts = exts.split(";", QString::SkipEmptyParts);
+  m_readExts = exts.split(";", Qt::SkipEmptyParts);
   m_readExts.push_back("msh");
   m_readExts.push_back("vtp");
 

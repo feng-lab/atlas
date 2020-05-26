@@ -12,6 +12,8 @@
 #include "sources/filechecker.h"
 #include "sources/contentiterator.h"
 
+#include <random>
+
 using namespace QtCSV;
 
 // Class TempFileHandler is a helper class. Its main purpose is to delete file
@@ -180,8 +182,11 @@ QString WriterPrivate::getTempFileName()
 
     for (int counter = 0; counter < std::numeric_limits<int>::max(); ++counter)
     {
-        QString name = nameTemplate.arg(QString::number(qrand()));
-        if ( false == QFile::exists(name) )
+        std::random_device rd;  //Will be used to obtain a seed for the random number engine
+        std::mt19937 gen(rd()); //Standard mersenne_twister_engine seeded with rd()
+        std::uniform_int_distribution<> dis(0);
+        QString name = nameTemplate.arg(QString::number(dis(gen)));
+        if (!QFile::exists(name))
         {
             return name;
         }

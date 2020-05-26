@@ -117,7 +117,7 @@ void ROIGraphicsItem::setLocked(bool l)
 {
   m_locked = l;
   if (l) {
-    setFlags(0);
+    setFlags(QGraphicsItem::GraphicsItemFlags());
   }
 }
 
@@ -296,7 +296,7 @@ void ROICtrlPtGraphicsItem::setLocked(bool l)
 {
   m_locked = l;
   if (l) {
-    setFlags(0);
+    setFlags(QGraphicsItem::GraphicsItemFlags());
   } else {
     setFlags(QGraphicsItem::ItemIsSelectable);
   }

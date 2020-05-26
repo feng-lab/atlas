@@ -586,7 +586,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                 if (!ok)
                   throw ZIOException("Can not parse leica TimeStampList NumberOfTimeStamps");
                 QString tsText = xml.readElementText();
-                QStringList nums = tsText.split(" ", QString::SkipEmptyParts);
+                QStringList nums = tsText.split(" ", Qt::SkipEmptyParts);
                 if (uint64_t(nums.size()) != nts)
                   throw ZIOException("TimeStampList NumberOfTimeStamps does not match actual number");
                 for (const auto& num : nums) {
