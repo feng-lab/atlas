@@ -58,8 +58,10 @@ QString ZApplication::applicationInstallDirPath()
 {
 #ifdef Q_OS_MACOS
   return applicationDirPath() + QString("/../../..");
-#else
+#elif defined(Q_OS_WIN64)
   return applicationDirPath();
+#else
+  return applicationDirPath() + QString("/..");
 #endif
 }
 
