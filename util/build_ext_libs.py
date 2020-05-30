@@ -930,6 +930,17 @@ def build_eigen(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_suitesparse(src_dir: str, install_dir: str):
+    if is_windows():
+        return
+    env = get_vcvars_environment() if is_windows() else os.environ.copy()
+    env['INSTALL'] = install_dir
+    subprocess.run(['make', 'config'],
+                   cwd=src_dir, shell=False, check=True, env=env)
+    subprocess.run(['make', 'static'],
+                   cwd=src_dir, shell=False, check=True, env=env)
+
+
 def build_ceres_solver(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -945,8 +956,12 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                               to_texts=[r'if (FALSE)'])
         orig_file1 = os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake')
         bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
-                               to_texts=[r'if (FALSE)'])
+                               from_texts=[r'if (HOMEBREW_EXECUTABLE)',
+                                           r'${LAPACK_LIBRARIES}',
+                                           r'${BLAS_LIBRARIES}'],
+                               to_texts=[r'if (FALSE)',
+                                         r' ',
+                                         r' '])
         orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
         bak_file2 = patch_file(orig_file2,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
@@ -961,10 +976,13 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                from_texts=[r' ${LAPACK_LIBRARIES}'],
                                to_texts=[r' '])
 
+        if not is_windows():
+            os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                         '-DSUITESPARSE:BOOL=OFF',
+                         '-DSUITESPARSE:BOOL=' + 'OFF' if is_windows() else 'ON',
                          '-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_BENCHMARKS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -983,6 +1001,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
+        cleanup_git_submodule(src_dir)
 
 
 def build_libpng(src_dir: str, install_dir: str):
@@ -1825,6 +1844,15 @@ def build_libs(libs: dict, update_src: bool):
         # vs2019 build error https://github.com/facebook/folly/issues/1324
         build_folly(src_dir, ext_build_dir())
 
+    if libs['suitesparse']:
+        package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'SuiteSparse*'))
+        src_dir = get_package_top_level_folder(package_name, ext_dir())
+        if not os.path.exists(src_dir):
+            remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'SuiteSparse*'))
+            unpack_file_to_folder(package_name, ext_dir())
+            assert os.path.exists(src_dir)
+        build_suitesparse(src_dir, ext_build_dir())
+
     if libs['ceres-solver']:
         src_dir = os.path.join(ext_dir(), 'ceres-solver')
         if update_src:
@@ -2017,6 +2045,7 @@ def parse_inputs(argv: list):
             'zstd': False,
             'folly-deps': False,
             'folly': False,
+            'suitesparse': False,
             'ceres-solver': False,
             'glbinding': False,
             'libjpeg': False,
@@ -2046,7 +2075,8 @@ def parse_inputs(argv: list):
                             'openssl': ['grpc', 'folly'],
                             'tbb': ['itk', 'opencv'],
                             'hdf5': ['itk', 'vtk'],
-                            'ceres-solver': ['opencv'],
+                            'suitesparse': ['ceres-solver'],
+                            # 'ceres-solver': ['opencv'],   # only if we need opencv sfm
                             'boost': ['folly'],
                             'folly-deps': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],

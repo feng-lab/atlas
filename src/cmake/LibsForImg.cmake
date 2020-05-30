@@ -238,7 +238,7 @@ print_target_properties(hdf5-static)
 find_package(Ceres REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Eigen3::Eigen)
-print_target_properties(ceres)
+print_target_properties(Ceres::ceres)
 
 if (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
   set(Boost_USE_STATIC_LIBS ON)

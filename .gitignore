@@ -38,6 +38,7 @@
 /src/3rdparty/openjpeg*
 /src/3rdparty/libwebp*
 /src/3rdparty/ospray*
+/src/3rdparty/SuiteSparse*
 
 !/neurolabi/lib/Mingw/*.zip
 
