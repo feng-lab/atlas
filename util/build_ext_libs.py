@@ -163,7 +163,7 @@ def get_common_build_flags():
         res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
-        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
+        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX'
     return res
 
 
@@ -1454,21 +1454,13 @@ def build_itk(src_dir: str, install_dir: str):
 def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
     try:
-        orig_file = os.path.join(src_dir, 'Filters', 'FlowPaths', 'vtkModifiedBSPTree.cxx')
-        from_texts = [r'struct Isort : public std::binary_function<Intersection, Intersection, bool>',
-                      r'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }']
-        to_texts = [r'struct Isort',
-                    'typedef Intersection first_argument_type;\n'
-                    'typedef Intersection second_argument_type;\n'
-                    'typedef bool result_type;\n'
-                    'bool operator()(const Intersection& x, const Intersection& y) { return x.first < y.first; }']
-        bak_file = patch_file(orig_file,
-                              from_texts=from_texts,
-                              to_texts=to_texts)
-
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        for idx, cmd in enumerate(cmakecmd):
+            if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
+                cmakecmd[idx] = cmd.replace('/std:c++17', '/std:c++14')
+
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1498,7 +1490,6 @@ def build_vtk(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
