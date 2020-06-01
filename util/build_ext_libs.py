@@ -959,10 +959,17 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)',
                                            r'${LAPACK_LIBRARIES}',
-                                           r'${BLAS_LIBRARIES}'],
+                                           r'${BLAS_LIBRARIES}',
+                                           r'find_package(BLAS QUIET)',
+                                           r'find_package(LAPACK QUIET)',
+                                           ],
                                to_texts=[r'if (FALSE)',
                                          r' ',
-                                         r' '])
+                                         r' ',
+                                         r'set(BLAS_FOUND ON CACHE BOOL "")',
+                                         r'set(LAPACK_FOUND ON CACHE BOOL "")',
+                                         ]
+                               )
         orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
         bak_file2 = patch_file(orig_file2,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
