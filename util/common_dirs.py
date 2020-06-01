@@ -420,7 +420,7 @@ def get_ffmpeg_binary() -> str:
         folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*win*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*static'))
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*amd64*'))
         return os.path.join(folder, 'ffmpeg')
     else:
         folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*macos*'))
