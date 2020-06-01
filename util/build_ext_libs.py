@@ -984,8 +984,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                from_texts=[r' ${LAPACK_LIBRARIES}'],
                                to_texts=[r' '])
 
-        if not is_windows():
-            os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
+        os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
