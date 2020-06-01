@@ -1457,9 +1457,10 @@ def build_vtk(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        for idx, cmd in enumerate(cmakecmd):
-            if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
-                cmakecmd[idx] = cmd.replace('/std:c++17', '/std:c++14')
+        if is_windows():
+            for idx, cmd in enumerate(cmakecmd):
+                if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
+                    cmakecmd[idx] = cmd.replace('/std:c++17', '/std:c++14')
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -1497,6 +1498,12 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        if is_windows():
+            for idx, cmd in enumerate(cmakecmd):
+                if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
+                    cmakecmd[idx] = cmd + ' /DWIN32_LEAN_AND_MEAN'
+
         cmakecmd.extend([
             '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
             '-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF',
