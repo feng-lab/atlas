@@ -931,14 +931,15 @@ def build_eigen(src_dir: str, install_dir: str):
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
-    if is_windows():
-        return
-    env = get_vcvars_environment() if is_windows() else os.environ.copy()
-    env['INSTALL'] = install_dir
-    subprocess.run(['make', 'config'],
-                   cwd=src_dir, shell=False, check=True, env=env)
-    subprocess.run(['make', 'static'],
-                   cwd=src_dir, shell=False, check=True, env=env)
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
@@ -982,7 +983,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                         '-DSUITESPARSE:BOOL=' + 'OFF' if is_windows() else 'ON',
+                         '-DSUITESPARSE:BOOL=ON',
                          '-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_BENCHMARKS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
