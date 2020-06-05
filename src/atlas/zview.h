@@ -126,9 +126,13 @@ public:
   inline const ZGraphicsView& graphicsView() const
   { return *m_view; }
 
-  ZROIPack& roiPack();
+  ZROIPack& roiPack(size_t id);
 
-  ZRegionAnnotationPack& regionAnnotationPack();
+  ZRegionAnnotationPack& regionAnnotationPack(size_t id);
+
+  ZROIPack& currentROIPack();
+
+  ZRegionAnnotationPack& currentRegionAnnotationPack();
 
   State state() const;
 

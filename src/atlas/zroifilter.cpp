@@ -191,14 +191,14 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
       } else if (selectedAction == toRegionAction) {
         try {
-          ZChooseRegionDialog dlg(m_view.regionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
+          ZChooseRegionDialog dlg(m_view.currentRegionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
             if (m_regionNode) {
-              m_view.regionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
-                                                                               dlg.selectedID());
+              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
+                                                                                      dlg.selectedID());
             } else {
-              m_view.regionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
-                                                                                dlg.selectedID());
+              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
+                                                                                       dlg.selectedID());
             }
           }
         }
@@ -385,16 +385,16 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
       QAction* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == toRegionAction) {
         try {
-          ZChooseRegionDialog dlg(m_view.regionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
+          ZChooseRegionDialog dlg(m_view.currentRegionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
             if (m_regionNode) {
-              m_view.regionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
-                                                                               m_controlPoint.shapeID,
-                                                                               dlg.selectedID());
+              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
+                                                                                      m_controlPoint.shapeID,
+                                                                                      dlg.selectedID());
             } else {
-              m_view.regionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice,
-                                                                                m_controlPoint.shapeID,
-                                                                                dlg.selectedID());
+              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice,
+                                                                                       m_controlPoint.shapeID,
+                                                                                       dlg.selectedID());
             }
           }
         }

@@ -142,12 +142,22 @@ std::pair<int, int> ZView::currentSliceRange() const
   }
 }
 
-ZROIPack& ZView::roiPack()
+ZROIPack& ZView::roiPack(size_t id)
+{
+  return m_doc.roiDoc().roiPack(id);
+}
+
+ZRegionAnnotationPack& ZView::regionAnnotationPack(size_t id)
+{
+  return m_doc.regionAnnotationDoc().regionAnnotationPack(id);
+}
+
+ZROIPack& ZView::currentROIPack()
 {
   return m_doc.roiDoc().currentROIPack();
 }
 
-ZRegionAnnotationPack& ZView::regionAnnotationPack()
+ZRegionAnnotationPack& ZView::currentRegionAnnotationPack()
 {
   return m_doc.regionAnnotationDoc().currentRegionAnnotationPack();
 }

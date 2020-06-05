@@ -216,11 +216,11 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             for (int i = sliceRange.first; i < sliceRange.second; ++i) {
               if (m_roiAction == ROIAction::New) {
-                m_view->roiPack().roi().newSpline(i, m_spline);
+                m_view->currentROIPack().roi().newSpline(i, m_spline);
               } else if (m_roiAction == ROIAction::Add) {
-                m_view->roiPack().roi().addSpline(i, m_spline);
+                m_view->currentROIPack().roi().addSpline(i, m_spline);
               } else if (m_roiAction == ROIAction::Subtract) {
-                m_view->roiPack().roi().subtractSpline(i, m_spline);
+                m_view->currentROIPack().roi().subtractSpline(i, m_spline);
               }
             }
           }
@@ -301,11 +301,11 @@ void ZGraphicsView::mousePressEvent(QMouseEvent* event)
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             for (int i = sliceRange.first; i < sliceRange.second; ++i) {
               if (m_roiAction == ROIAction::New) {
-                m_view->roiPack().roi().newPolygon(i, m_polygon);
+                m_view->currentROIPack().roi().newPolygon(i, m_polygon);
               } else if (m_roiAction == ROIAction::Add) {
-                m_view->roiPack().roi().addPolygon(i, m_polygon);
+                m_view->currentROIPack().roi().addPolygon(i, m_polygon);
               } else if (m_roiAction == ROIAction::Subtract) {
-                m_view->roiPack().roi().subtractPolygon(i, m_polygon);
+                m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
               }
             }
           }
@@ -461,11 +461,11 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
           //m_view->roi().addSpline(i, m_spline);
           if (m_roiAction == ROIAction::New) {
-            m_view->roiPack().roi().newSpline(i, m_spline);
+            m_view->currentROIPack().roi().newSpline(i, m_spline);
           } else if (m_roiAction == ROIAction::Add) {
-            m_view->roiPack().roi().addSpline(i, m_spline);
+            m_view->currentROIPack().roi().addSpline(i, m_spline);
           } else if (m_roiAction == ROIAction::Subtract) {
-            m_view->roiPack().roi().subtractSpline(i, m_spline);
+            m_view->currentROIPack().roi().subtractSpline(i, m_spline);
           }
         }
       }
@@ -479,11 +479,11 @@ void ZGraphicsView::mouseDoubleClickEvent(QMouseEvent* event)
         for (int i = sliceRange.first; i < sliceRange.second; ++i) {
           //m_view->roi().addPolygon(i, m_polygon);
           if (m_roiAction == ROIAction::New) {
-            m_view->roiPack().roi().newPolygon(i, m_polygon);
+            m_view->currentROIPack().roi().newPolygon(i, m_polygon);
           } else if (m_roiAction == ROIAction::Add)
-            m_view->roiPack().roi().addPolygon(i, m_polygon);
+            m_view->currentROIPack().roi().addPolygon(i, m_polygon);
           else if (m_roiAction == ROIAction::Subtract)
-            m_view->roiPack().roi().subtractPolygon(i, m_polygon);
+            m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
         }
       }
       m_startPtItem.reset();
@@ -544,11 +544,11 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
         if (m_roiAction == ROIAction::New) {
-          m_view->roiPack().roi().newRect(i, rect);
+          m_view->currentROIPack().roi().newRect(i, rect);
         } else if (m_roiAction == ROIAction::Add) {
-          m_view->roiPack().roi().addRect(i, rect);
+          m_view->currentROIPack().roi().addRect(i, rect);
         } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->roiPack().roi().subtractRect(i, rect);
+          m_view->currentROIPack().roi().subtractRect(i, rect);
         }
       }
     }
@@ -560,11 +560,11 @@ void ZGraphicsView::mouseReleaseEvent(QMouseEvent* event)
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       for (int i = sliceRange.first; i < sliceRange.second; ++i) {
         if (m_roiAction == ROIAction::New) {
-          m_view->roiPack().roi().newEllipse(i, rect);
+          m_view->currentROIPack().roi().newEllipse(i, rect);
         } else if (m_roiAction == ROIAction::Add) {
-          m_view->roiPack().roi().addEllipse(i, rect);
+          m_view->currentROIPack().roi().addEllipse(i, rect);
         } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->roiPack().roi().subtractEllipse(i, rect);
+          m_view->currentROIPack().roi().subtractEllipse(i, rect);
         }
       }
     }
