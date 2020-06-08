@@ -530,7 +530,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   nCacheLine = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
 
   QProcess lscpu;
-  lscpu.start("lscpu");
+  lscpu.start("lscpu", QStringList());
 
   if (lscpu.waitForFinished(-1)) {
     QString lscpuOutput(lscpu.readAllStandardOutput());
