@@ -364,8 +364,13 @@ void ZView::paste()
 {
   LOG(INFO) << "paste";
   for (const auto& view : m_objViews) {
-    view->pasteKeyPressed(currentSlice(), m_view->lastPressedPoint(), false, false);
+    view->pasteKeyPressed(currentSlice(), m_scene->lastPressedPoint(), false, false);
   }
+}
+
+void ZView::checkViewport()
+{
+  m_view->checkViewport();
 }
 
 void ZView::sliceChanged()
@@ -490,9 +495,14 @@ void ZView::selectionChanged()
 void ZView::setViewDragMode(QAction* act)
 {
   if (act == m_scrollHandDragAction) {
-    m_view->setScrollHandDragMode();
+    m_view->setDragMode(QGraphicsView::ScrollHandDrag);
+    m_view->setInteractive(false);
   } else if (act == m_rubberBandDragAction) {
-    m_view->setRubberBandDragMode();
+    m_view->setDragMode(QGraphicsView::RubberBandDrag);
+    m_view->setInteractive(true);
+  } else {
+    m_view->setDragMode(QGraphicsView::NoDrag);
+    m_view->setInteractive(true);
   }
 }
 
@@ -539,6 +549,9 @@ void ZView::keyPressEvent(QKeyEvent* event)
           view->rotateCounterclockwise();
         }
       }
+      break;
+    case Qt::Key_Escape:
+      m_scene->escKeyPressed();
       break;
     default:
       break;
@@ -644,13 +657,13 @@ void ZView::createActions()
   //m_roiLineAction->setCheckable(true);
   //m_roiLineAction->setStatusTip(tr("Make Line Selections"));
 
-  m_roiStyleActionGroup = new ZActionGroup(this);
-  m_roiStyleActionGroup->addAction(m_roiSplineAction);
-  m_roiStyleActionGroup->addAction(m_roiPolygonAction);
-  m_roiStyleActionGroup->addAction(m_roiRectangleAction);
-  m_roiStyleActionGroup->addAction(m_roiEllipseAction);
-  //m_roiStyleActionGroup->addAction(m_roiFFPolygonAction);
-  //m_roiStyleActionGroup->addAction(m_roiLineAction);
+  // m_roiStyleActionGroup = new ZActionGroup(this);
+  m_dragModeActionGroup->addAction(m_roiSplineAction);
+  m_dragModeActionGroup->addAction(m_roiPolygonAction);
+  m_dragModeActionGroup->addAction(m_roiRectangleAction);
+  m_dragModeActionGroup->addAction(m_roiEllipseAction);
+  //m_dragModeActionGroup->addAction(m_roiFFPolygonAction);
+  //m_dragModeActionGroup->addAction(m_roiLineAction);
 }
 
 void ZView::updateViewportPara() const

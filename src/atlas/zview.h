@@ -171,6 +171,8 @@ public:
 
   void paste();
 
+  void checkViewport();
+
 signals:
 
   void objViewReady(size_t id);

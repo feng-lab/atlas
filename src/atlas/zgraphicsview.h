@@ -15,11 +15,6 @@ class ZGraphicsView : public QGraphicsView
 {
 Q_OBJECT
 public:
-  enum class ROIAction
-  {
-    New, Add, Subtract
-  };
-
   explicit ZGraphicsView(QGraphicsScene* scene, ZView* parent);
 
   // call if scenerect changed
@@ -45,12 +40,7 @@ public:
 
   bool renderToImage(const QString& filename, int width, int height, QString* err = nullptr);
 
-  void setScrollHandDragMode();
-
-  void setRubberBandDragMode();
-
-  QPointF lastPressedPoint()
-  { return m_lastPressedPt; }
+  void checkViewport();
 
 signals:
 
@@ -61,24 +51,11 @@ signals:
 protected:
   void scaleParaChanged();
 
-  void checkViewport();
-
-  void mousePressEvent(QMouseEvent* event) override;
-
-  void mouseDoubleClickEvent(QMouseEvent* event) override;
-
-  void mouseMoveEvent(QMouseEvent* event) override;
-
-  void mouseReleaseEvent(QMouseEvent* event) override;
-
   void dragEnterEvent(QDragEnterEvent* event) override;
 
   void dropEvent(QDropEvent* event) override;
 
   void wheelEvent(QWheelEvent* event) override;
-
-  inline bool isScenePtOverlap(const QPointF& p1, const QPointF& p2) const
-  { return mapFromScene(p1) == mapFromScene(p2) || p1.toPoint() == p2.toPoint(); }
 
   bool event(QEvent *event) override;
 
@@ -91,22 +68,7 @@ private:
   ZView* m_view;
   ZDoubleParameter m_scale;
 
-  ROIAction m_roiAction = ROIAction::New;
-  QPointF m_startScenePt;
-  std::unique_ptr<QGraphicsPolygonItem> m_startPtItem;
-  std::vector<std::unique_ptr<QGraphicsPolygonItem>> m_ctrlPtsItem;
-  std::unique_ptr<QGraphicsEllipseItem> m_ellipseItem;
-  std::unique_ptr<QGraphicsRectItem> m_rectItem;
-  QPolygonF m_polygon;
-  std::unique_ptr<QGraphicsPathItem> m_polygonItem;
-  QPolygonF m_spline;
-  std::unique_ptr<QGraphicsPathItem> m_splineItem;
-  QPolygonF m_ffpolygon;
-  std::unique_ptr<QGraphicsPathItem> m_ffpolygonItem;
-
   double m_currentStepScaleFactor = 1.;
-
-  QPointF m_lastPressedPt;
 };
 
 } // namespace nim
