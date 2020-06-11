@@ -37,13 +37,15 @@ class ZBoolParameter;
 
 class ZDVec4Parameter;
 
+class ZStringIntOptionParameter;
+
 class ZView : public QWidget, public ZViewSettingInterface
 {
 Q_OBJECT
 public:
   enum class State
   {
-    Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROIFFPolygon
+    Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROICut
   };
 
   explicit ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
@@ -80,6 +82,8 @@ public:
   { return m_rubberBandDragAction; }
 
   QToolButton* createROIToolButton(QWidget* parent);
+
+  QWidget* createROIModeWidget(QWidget* parent);
 
   inline bool isNormalView() const
   { return m_normalViewAction->isChecked(); }
@@ -173,6 +177,10 @@ public:
 
   void checkViewport();
 
+  bool isRegionAnnotationMode() const;
+
+  bool isROIMode() const;
+
 signals:
 
   void objViewReady(size_t id);
@@ -250,7 +258,9 @@ private:
   QAction* m_roiEllipseAction;
   QAction* m_roiPolygonAction;
   QAction* m_roiSplineAction;
-  QAction* m_roiFFPolygonAction;
+  QAction* m_roiCutLineAction;
+
+  ZStringIntOptionParameter* m_roiMode;
 
   bool m_doNotReceiveSliceSignal;
   ZBBox<glm::ivec4> m_boundBox;

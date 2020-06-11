@@ -278,34 +278,37 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 
 void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 {
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID) {
-      for (auto pit = m_ontology.beginAncestor(it); pit != m_ontology.endAncestor(it); ++pit) {
-        if (!pit->roi) {
-          pit->roi = createROI();
-          emit regionROIAdded(pit->id, pit->roi.get());
-        }
-        pit->roi->mergeWith(roi);
-      }
-      return;
-    }
-  }
-}
-
-void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
-{
+  m_undoStack.beginMacro("Add Region");
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID) {
       if (!it->roi) {
         it->roi = createROI();
         emit regionROIAdded(it->id, it->roi.get());
       }
-      it->roi->mergeWith(roi, slice, id);
-
-      return;
+      it->roi->mergeWith(roi);
+    } else {
+      if (it->roi) {
+        it->roi->subtractROI(roi);
+      }
     }
   }
+  m_undoStack.endMacro();
 }
+
+//void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
+//{
+//  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+//    if (it->id == regionID) {
+//      if (!it->roi) {
+//        it->roi = createROI();
+//        emit regionROIAdded(it->id, it->roi.get());
+//      }
+//      it->roi->mergeWith(roi, slice, id);
+//
+//      return;
+//    }
+//  }
+//}
 
 void ZRegionAnnotation::changeROIRegion(ZROI &roi, int slice, size_t shapeId, int64_t regionID)
 {

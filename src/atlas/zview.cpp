@@ -6,6 +6,7 @@
 #include "zobjview.h"
 #include "zactiongroup.h"
 #include "znumericparameter.h"
+#include "zoptionparameter.h"
 #include "zroidoc.h"
 #include "zregionannotationdoc.h"
 #include "ztakescreenshotwidget.h"
@@ -86,6 +87,10 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
 
   connect(&m_doc, &ZDoc::requestToAdjustViewToPosition,
           this, &ZView::gotoPosition);
+
+  m_roiMode = new ZStringIntOptionParameter("ROI Mode", this);
+  m_roiMode->addOptions("RegionAnnotation", "ROI");
+  m_roiMode->select("RegionAnnotation");
 }
 
 ZView::~ZView()
@@ -106,11 +111,16 @@ QToolButton* ZView::createROIToolButton(QWidget* parent)
   res->addAction(m_roiPolygonAction);
   res->addAction(m_roiRectangleAction);
   res->addAction(m_roiEllipseAction);
-  //res->addAction(m_roiFFPolygonAction);
+  res->addAction(m_roiCutLineAction);
   connect(res, &QToolButton::triggered, res, &QToolButton::setDefaultAction);
   res->setDefaultAction(m_roiSplineAction);
   res->setPopupMode(QToolButton::MenuButtonPopup);
   return res;
+}
+
+QWidget* ZView::createROIModeWidget(QWidget* parent)
+{
+  return m_roiMode->createWidget(parent);
 }
 
 int ZView::currentSlice() const
@@ -172,8 +182,8 @@ ZView::State ZView::state() const
     return State::ROIPolygon;
   if (m_roiSplineAction->isChecked())
     return State::ROISpline;
-//  if (m_roiFFPolygonAction->isChecked())
-//    return State::ROIFFPolygon;
+  if (m_roiCutLineAction->isChecked())
+    return State::ROICut;
 
   return State::Normal;
 }
@@ -371,6 +381,16 @@ void ZView::paste()
 void ZView::checkViewport()
 {
   m_view->checkViewport();
+}
+
+bool ZView::isRegionAnnotationMode() const
+{
+  return m_roiMode->isSelected("RegionAnnotation");
+}
+
+bool ZView::isROIMode() const
+{
+  return m_roiMode->isSelected("ROI");
 }
 
 void ZView::sliceChanged()
@@ -649,21 +669,16 @@ void ZView::createActions()
   m_roiSplineAction->setCheckable(true);
   m_roiSplineAction->setStatusTip(tr("Make Spline Selections"));
 
-  m_roiFFPolygonAction = new QAction(tr("&Free-form Polygon Selections"), this);
-  m_roiFFPolygonAction->setCheckable(true);
-  m_roiFFPolygonAction->setStatusTip(tr("Make Free-form Polygon Selections"));
-
-  //m_roiLineAction = new QAction(ZTheme::instance().icon(ZTheme::LineIcon), tr("&Line Selections"), this);
-  //m_roiLineAction->setCheckable(true);
-  //m_roiLineAction->setStatusTip(tr("Make Line Selections"));
+  m_roiCutLineAction = new QAction(ZTheme::instance().icon(ZTheme::SplineCutIcon), tr("&Cut ROI"), this);
+  m_roiCutLineAction->setCheckable(true);
+  m_roiCutLineAction->setStatusTip(tr("Draw Line to Cut ROI"));
 
   // m_roiStyleActionGroup = new ZActionGroup(this);
   m_dragModeActionGroup->addAction(m_roiSplineAction);
   m_dragModeActionGroup->addAction(m_roiPolygonAction);
   m_dragModeActionGroup->addAction(m_roiRectangleAction);
   m_dragModeActionGroup->addAction(m_roiEllipseAction);
-  //m_dragModeActionGroup->addAction(m_roiFFPolygonAction);
-  //m_dragModeActionGroup->addAction(m_roiLineAction);
+  m_dragModeActionGroup->addAction(m_roiCutLineAction);
 }
 
 void ZView::updateViewportPara() const

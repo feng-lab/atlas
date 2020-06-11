@@ -827,6 +827,58 @@ std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, in
   return changedSlices;
 }
 
+void ZROI::subtractROI(const ZROI& other, int64_t slice, int64_t shapeID)
+{
+  m_undoStack->push(new ZROISubtractROICommand(*this, other.m_sliceROIs, slice, shapeID));
+}
+
+std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice, int64_t shapeID)
+{
+  std::set<int> changedSlices;
+  if (shapeID >= 0 && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty()) { // subtract one shape
+    changedSlices.insert(slice);
+    const auto& sliceROI = sliceROIs.at(slice);
+    std::vector<size_t> editedShapes;
+
+    for (auto&[id, pp] : m_sliceROIs.at(slice).m_idToPainterPath) {
+      const auto& shapePP = sliceROI.m_idToPainterPath.at(shapeID);
+      if (pp.intersects(shapePP)) {
+        editedShapes.push_back(id);
+        for (auto subShape : sliceROI.m_idToShapeOperations.at(shapeID)) {
+          subShape.isAdd = !subShape.isAdd;
+          m_sliceROIs.at(slice).m_idToShapeOperations[id].push_back(subShape);
+        }
+        pp -= shapePP;
+      }
+    }
+
+    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), editedShapes);
+  } else { // all
+    for (const auto& [slice, sliceROI] : sliceROIs) {
+      if (!sliceROI.isEmpty() && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty()) {
+        changedSlices.insert(slice);
+        std::vector<size_t> editedShapes;
+
+        for (const auto& [shapeID, shapePP] : sliceROI.m_idToPainterPath) {
+          for (auto&[id, pp] : m_sliceROIs.at(slice).m_idToPainterPath) {
+            if (pp.intersects(shapePP)) {
+              editedShapes.push_back(id);
+              for (auto subShape : sliceROI.m_idToShapeOperations.at(shapeID)) {
+                subShape.isAdd = !subShape.isAdd;
+                m_sliceROIs.at(slice).m_idToShapeOperations[id].push_back(subShape);
+              }
+              pp -= shapePP;
+            }
+          }
+        }
+
+        onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), editedShapes);
+      }
+    }
+  }
+  return changedSlices;
+}
+
 QPainterPath ZROI::splineToPainterPath(const QPolygonF& spline, bool makeCloseIfNot)
 {
   QPainterPath res;

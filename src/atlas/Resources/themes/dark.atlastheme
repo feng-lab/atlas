@@ -63,6 +63,7 @@
             "SelectionIcon": ":/icons/selection-dark.svg",
             "CleanupIcon": ":/icons/cleanup-dark.svg",
             "SplineIcon": ":/icons/spline-dark.svg",
+            "SplineCutIcon": ":/icons/spline-cut-dark.svg",
             "PolygonIcon": ":/icons/polygon-dark.svg",
             "EllipseIcon": ":/icons/ellipse-dark.svg",
             "RectangleIcon": ":/icons/rectangle-dark.svg",

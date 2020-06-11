@@ -21,6 +21,7 @@
             "SelectionIcon": ":/icons/selection.svg",
             "CleanupIcon": ":/icons/cleanup.svg",
             "SplineIcon": ":/icons/spline.svg",
+            "SplineCutIcon": ":/icons/spline-cut.svg",
             "PolygonIcon": ":/icons/polygon.svg",
             "EllipseIcon": ":/icons/ellipse.svg",
             "RectangleIcon": ":/icons/rectangle.svg",

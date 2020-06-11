@@ -32,6 +32,8 @@ protected:
 
   void keyPressEvent(QKeyEvent* e) override;
 
+  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+
   void createContextMenu();
 
 private:

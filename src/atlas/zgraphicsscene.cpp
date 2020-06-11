@@ -116,7 +116,8 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
   auto roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);
   bool canUpdateROI = (!roiItem && !roiCtrlPtItem)
                       || event->modifiers() == Qt::ControlModifier
-                      || event->modifiers() == Qt::AltModifier;
+                      || event->modifiers() == Qt::AltModifier
+                      || m_view->isRegionAnnotationMode();
 
   CHECK(!m_rectItem);
   CHECK(!m_ellipseItem);
@@ -124,7 +125,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
   QPointF startPolyHalfWidth(5.0 / m_view->currentScale(), 5.0 / m_view->currentScale());
   QPointF ctrlPtHalfWidth(4.0 / m_view->currentScale(), 4.0 / m_view->currentScale());
 
-  if ((m_splineItem || m_view->state() == ZView::State::ROISpline) && canUpdateROI) {
+  if ((m_splineItem || m_view->state() == ZView::State::ROISpline || m_view->state() == ZView::State::ROICut) && canUpdateROI) {
     QPointF scenePt = event->scenePos();
     if (event->button() == Qt::LeftButton) {
       if (!m_splineItem) {  //new
@@ -149,29 +150,38 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
-        m_startPtItem->setZValue(5000);
+        m_startPtItem->setZValue(m_zValue);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         addItem(m_startPtItem.get());
         m_spline.clear();
         m_spline << m_startScenePt << m_startScenePt;  // pt and next potential pt
         m_splineItem = std::make_unique<QGraphicsPathItem>(ZROI::splineToPainterPath(m_spline));
-        m_splineItem->setZValue(5000);
+        m_splineItem->setZValue(m_zValue);
         m_splineItem->setPen(QPen(QColor(255, 255, 0), 0));
         addItem(m_splineItem.get());
       } else {
-        if (m_startPtItem->contains(m_spline.last())) {  // finish here
+        if (m_startPtItem->contains(m_spline.last()) && m_view->state() == ZView::State::ROISpline) {  // finish here
           m_spline.last() = m_spline[0];
           if (m_spline.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
-            for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-              if (m_roiAction == ROIAction::New) {
-                m_view->currentROIPack().roi().newSpline(i, m_spline);
-              } else if (m_roiAction == ROIAction::Add) {
-                m_view->currentROIPack().roi().addSpline(i, m_spline);
-              } else if (m_roiAction == ROIAction::Subtract) {
-                m_view->currentROIPack().roi().subtractSpline(i, m_spline);
+            if (m_view->isROIMode()) {
+              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+                if (m_roiAction == ROIAction::New) {
+                  m_view->currentROIPack().roi().newSpline(i, m_spline);
+                } else if (m_roiAction == ROIAction::Add) {
+                  m_view->currentROIPack().roi().addSpline(i, m_spline);
+                } else if (m_roiAction == ROIAction::Subtract) {
+                  m_view->currentROIPack().roi().subtractSpline(i, m_spline);
+                }
               }
+            } else {
+              CHECK(m_view->isRegionAnnotationMode());
+              ZROI roi;
+              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+                roi.newSpline(i, m_spline);
+              }
+              m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
             }
           }
           m_startPtItem.reset();
@@ -180,7 +190,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         } else if (!isScenePtOverlap(m_spline.last(), m_spline[m_spline.size() - 2])) {
           QPolygonF ctrlPoly = QRectF(scenePt - ctrlPtHalfWidth, scenePt + ctrlPtHalfWidth);
           auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
-          ctrlPtItem->setZValue(5000);
+          ctrlPtItem->setZValue(m_zValue);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           addItem(ctrlPtItem.get());
@@ -216,7 +226,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
-        m_startPtItem->setZValue(5000);
+        m_startPtItem->setZValue(m_zValue);
         m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
         m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
         addItem(m_startPtItem.get());
@@ -227,7 +237,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         QPainterPath path;
         path.addPolygon(m_polygon);
         m_polygonItem = std::make_unique<QGraphicsPathItem>(path);
-        m_polygonItem->setZValue(5000);
+        m_polygonItem->setZValue(m_zValue);
         m_polygonItem->setPen(QPen(QColor(255, 255, 0), 0));
         addItem(m_polygonItem.get());
       } else {
@@ -235,14 +245,23 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
           m_polygon.last() = m_polygon[0];
           if (m_polygon.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
-            for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-              if (m_roiAction == ROIAction::New) {
-                m_view->currentROIPack().roi().newPolygon(i, m_polygon);
-              } else if (m_roiAction == ROIAction::Add) {
-                m_view->currentROIPack().roi().addPolygon(i, m_polygon);
-              } else if (m_roiAction == ROIAction::Subtract) {
-                m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
+            if (m_view->isROIMode()) {
+              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+                if (m_roiAction == ROIAction::New) {
+                  m_view->currentROIPack().roi().newPolygon(i, m_polygon);
+                } else if (m_roiAction == ROIAction::Add) {
+                  m_view->currentROIPack().roi().addPolygon(i, m_polygon);
+                } else if (m_roiAction == ROIAction::Subtract) {
+                  m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
+                }
               }
+            } else {
+              CHECK(m_view->isRegionAnnotationMode());
+              ZROI roi;
+              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+                roi.newPolygon(i, m_polygon);
+              }
+              m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
             }
           }
           m_startPtItem.reset();
@@ -281,7 +300,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 
           QPolygonF ctrlPoly = QRectF(scenePt - ctrlPtHalfWidth, scenePt + ctrlPtHalfWidth);
           auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
-          ctrlPtItem->setZValue(5000);
+          ctrlPtItem->setZValue(m_zValue);
           ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
           ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
           addItem(ctrlPtItem.get());
@@ -316,12 +335,12 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
-    m_startPtItem->setZValue(5000);
+    m_startPtItem->setZValue(m_zValue);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     addItem(m_startPtItem.get());
     m_rectItem = std::make_unique<QGraphicsRectItem>(QRectF(scenePt, QSizeF(0, 0)));
-    m_rectItem->setZValue(5000);
+    m_rectItem->setZValue(m_zValue);
     m_rectItem->setPen(QPen(QColor(255, 255, 0), 0));
     addItem(m_rectItem.get());
   } else if (m_view->state() == ZView::State::ROIEllipse && event->button() == Qt::LeftButton && canUpdateROI) {
@@ -346,12 +365,12 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
 //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
-    m_startPtItem->setZValue(5000);
+    m_startPtItem->setZValue(m_zValue);
     m_startPtItem->setPen(QPen(QColor(0, 0, 0), 0));
     m_startPtItem->setBrush(QBrush(QColor(255, 255, 255, 128)));
     addItem(m_startPtItem.get());
     m_ellipseItem = std::make_unique<QGraphicsEllipseItem>(QRectF(m_startScenePt, QSizeF(0, 0)));
-    m_ellipseItem->setZValue(5000);
+    m_ellipseItem->setZValue(m_zValue);
     m_ellipseItem->setPen(QPen(QColor(255, 255, 0), 0));
     addItem(m_ellipseItem.get());
   } else {
@@ -373,25 +392,48 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
   auto roiCtrlPtItem = qgraphicsitem_cast<ROICtrlPtGraphicsItem*>(item);
   bool canUpdateROI = (!roiItem && !roiCtrlPtItem)
                       || event->modifiers() == Qt::ControlModifier
-                      || event->modifiers() == Qt::AltModifier;
+                      || event->modifiers() == Qt::AltModifier
+                      || m_view->isRegionAnnotationMode();
 
   CHECK(!m_rectItem);
   CHECK(!m_ellipseItem);
-  if (m_splineItem && m_view->state() == ZView::State::ROISpline && canUpdateROI) {
-    m_spline.last() = m_spline[0];
-    if (m_spline.size() > 3) {
-      std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        //m_view->roi().addSpline(i, m_spline);
-        if (m_roiAction == ROIAction::New) {
-          m_view->currentROIPack().roi().newSpline(i, m_spline);
-        } else if (m_roiAction == ROIAction::Add) {
-          m_view->currentROIPack().roi().addSpline(i, m_spline);
-        } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->currentROIPack().roi().subtractSpline(i, m_spline);
+  if (m_splineItem && (m_view->state() == ZView::State::ROISpline || m_view->state() == ZView::State::ROICut) && canUpdateROI) {
+    if (m_view->state() == ZView::State::ROISpline) {
+      m_spline.last() = m_spline[0];
+
+      if (m_spline.size() > 3) {
+        std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        if (m_view->isROIMode()) {
+          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+            if (m_roiAction == ROIAction::New) {
+              m_view->currentROIPack().roi().newSpline(i, m_spline);
+            } else if (m_roiAction == ROIAction::Add) {
+              m_view->currentROIPack().roi().addSpline(i, m_spline);
+            } else if (m_roiAction == ROIAction::Subtract) {
+              m_view->currentROIPack().roi().subtractSpline(i, m_spline);
+            }
+          }
+        } else {
+          CHECK(m_view->isRegionAnnotationMode());
+          ZROI roi;
+          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+            roi.newSpline(i, m_spline);
+          }
+          m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
         }
       }
+    } else {
+      m_spline.pop_back();
+      m_splineItem->setPath(ZROI::splineToPainterPath(m_spline));
+      m_cutLineItem.swap(m_splineItem);
+      m_cutLineStartPtItem.swap(m_startPtItem);
+      m_cutLineCtrlPtsItem.swap(m_ctrlPtsItem);
+
+      if (m_spline.size() >= 2 && m_view->isRegionAnnotationMode()) {
+
+      }
     }
+
     m_startPtItem.reset();
     m_ctrlPtsItem.clear();
     m_splineItem.reset();
@@ -399,15 +441,23 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     m_polygon.last() = m_polygon[0];
     if (m_polygon.size() > 3) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        //m_view->roi().addPolygon(i, m_polygon);
-        if (m_roiAction == ROIAction::New) {
-          m_view->currentROIPack().roi().newPolygon(i, m_polygon);
-        } else if (m_roiAction == ROIAction::Add) {
-          m_view->currentROIPack().roi().addPolygon(i, m_polygon);
-        } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
+      if (m_view->isROIMode()) {
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          if (m_roiAction == ROIAction::New) {
+            m_view->currentROIPack().roi().newPolygon(i, m_polygon);
+          } else if (m_roiAction == ROIAction::Add) {
+            m_view->currentROIPack().roi().addPolygon(i, m_polygon);
+          } else if (m_roiAction == ROIAction::Subtract) {
+            m_view->currentROIPack().roi().subtractPolygon(i, m_polygon);
+          }
         }
+      } else {
+        CHECK(m_view->isRegionAnnotationMode());
+        ZROI roi;
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          roi.newPolygon(i, m_polygon);
+        }
+        m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
       }
     }
     m_startPtItem.reset();
@@ -425,14 +475,23 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     QRectF rect = m_rectItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::New) {
-          m_view->currentROIPack().roi().newRect(i, rect);
-        } else if (m_roiAction == ROIAction::Add) {
-          m_view->currentROIPack().roi().addRect(i, rect);
-        } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->currentROIPack().roi().subtractRect(i, rect);
+      if (m_view->isROIMode()) {
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          if (m_roiAction == ROIAction::New) {
+            m_view->currentROIPack().roi().newRect(i, rect);
+          } else if (m_roiAction == ROIAction::Add) {
+            m_view->currentROIPack().roi().addRect(i, rect);
+          } else if (m_roiAction == ROIAction::Subtract) {
+            m_view->currentROIPack().roi().subtractRect(i, rect);
+          }
         }
+      } else {
+        CHECK(m_view->isRegionAnnotationMode());
+        ZROI roi;
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          roi.newRect(i, rect);
+        }
+        m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
       }
     }
     m_startPtItem.reset();
@@ -441,14 +500,23 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     QRectF rect = m_ellipseItem->rect();
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
-      for (int i = sliceRange.first; i < sliceRange.second; ++i) {
-        if (m_roiAction == ROIAction::New) {
-          m_view->currentROIPack().roi().newEllipse(i, rect);
-        } else if (m_roiAction == ROIAction::Add) {
-          m_view->currentROIPack().roi().addEllipse(i, rect);
-        } else if (m_roiAction == ROIAction::Subtract) {
-          m_view->currentROIPack().roi().subtractEllipse(i, rect);
+      if (m_view->isROIMode()) {
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          if (m_roiAction == ROIAction::New) {
+            m_view->currentROIPack().roi().newEllipse(i, rect);
+          } else if (m_roiAction == ROIAction::Add) {
+            m_view->currentROIPack().roi().addEllipse(i, rect);
+          } else if (m_roiAction == ROIAction::Subtract) {
+            m_view->currentROIPack().roi().subtractEllipse(i, rect);
+          }
         }
+      } else {
+        CHECK(m_view->isRegionAnnotationMode());
+        ZROI roi;
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          roi.newEllipse(i, rect);
+        }
+        m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
       }
     }
     m_startPtItem.reset();
@@ -474,11 +542,20 @@ void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
       double distThreshold = std::max(20.0, 20.0 / m_view->currentScale());
       distThreshold = distThreshold * distThreshold;
       if (QPointF::dotProduct(m_spline.last() - scenePt, m_spline.last() - scenePt) >= distThreshold) {
+        QPointF ctrlPtHalfWidth(4.0 / m_view->currentScale(), 4.0 / m_view->currentScale());
+        QPolygonF ctrlPoly = QRectF(scenePt - ctrlPtHalfWidth, scenePt + ctrlPtHalfWidth);
+        auto ctrlPtItem = std::make_unique<QGraphicsPolygonItem>(ctrlPoly);
+        ctrlPtItem->setZValue(m_zValue);
+        ctrlPtItem->setPen(QPen(QColor(0, 0, 0), 0));
+        ctrlPtItem->setBrush(QBrush(QColor(255, 255, 0, 128)));
+        addItem(ctrlPtItem.get());
+        m_ctrlPtsItem.push_back(std::move(ctrlPtItem));
         if (isScenePtOverlap(m_spline.last(), m_spline[m_spline.size() - 2])) {
           m_spline.last() = scenePt;
         } else {
           m_spline.push_back(scenePt);
         }
+        m_spline << scenePt;   // add next potential pt
         m_splineItem->setPath(ZROI::splineToPainterPath(m_spline));
       }
     } else if (event->buttons() == Qt::NoButton) {

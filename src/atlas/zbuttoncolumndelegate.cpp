@@ -6,13 +6,14 @@
 #include <QStylePainter>
 #include <QAbstractItemView>
 #include <QApplication>
+#include <memory>
 
 namespace nim {
 
 ZButtonColumnDelegate::ZButtonColumnDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
 {
-  if (QAbstractItemView* wg = qobject_cast<QAbstractItemView*>(parent)) {
+  if (auto wg = qobject_cast<QAbstractItemView*>(parent)) {
     m_widget = wg;
     m_button = std::make_unique<QPushButton>("...", m_widget);
     m_button->hide();
@@ -36,7 +37,7 @@ ZButtonColumnDelegate::createEditor(QWidget* parent, const QStyleOptionViewItem&
 void ZButtonColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+    if (auto btn = qobject_cast<QPushButton*>(editor)) {
       btn->setProperty("user_data", index.data(Qt::UserRole));
     }
     //LOG(INFO) << "set " << btn->property("user_data");
@@ -48,7 +49,7 @@ void ZButtonColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& in
 void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    if (QPushButton* btn = qobject_cast<QPushButton*>(editor)) {
+    if (auto btn = qobject_cast<QPushButton*>(editor)) {
       model->setData(index, btn->property("user_data"), Qt::UserRole);
     }
     //LOG(INFO) << btn->property("user_data");
@@ -83,7 +84,7 @@ void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOp
 QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
-    m_button.reset(new QPushButton(index.data().toString(), m_widget));
+    m_button = std::make_unique<QPushButton>(index.data().toString(), m_widget);
     m_button->hide();
     QSize res = m_button->grab().size();
 
@@ -115,7 +116,7 @@ void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
 
 void ZButtonColumnDelegate::buttonClicked()
 {
-  if (QPushButton* btn = qobject_cast<QPushButton*>(sender())) {
+  if (auto btn = qobject_cast<QPushButton*>(sender())) {
     emit buttonClickedForUserData(btn->property("user_data"));
   }
 }

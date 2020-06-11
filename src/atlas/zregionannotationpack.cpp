@@ -67,6 +67,11 @@ void ZRegionAnnotationPack::updateDerivedData()
   m_tooltip = m_path;
 }
 
+void ZRegionAnnotationPack::mergeROIToCurrentRegion(const ZROI& roi)
+{
+  m_regionAnnotation->mergeROIToRegion(roi, m_currentRegionID);
+}
+
 void ZRegionAnnotationPack::updatePtsAndSelectedPuncta()
 {
 //  m_punctaPts.clear();

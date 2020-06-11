@@ -44,6 +44,8 @@ public:
 
   void activated(const QModelIndex& idxIn);
 
+  int64_t getRegionID(const QModelIndex& index) const;
+
 protected:
   ZRegionAnnotationPack& m_regionAnnotationPack;
   ZTree<RegionNode>& m_annotationTree;

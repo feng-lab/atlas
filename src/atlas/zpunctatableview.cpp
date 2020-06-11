@@ -115,7 +115,7 @@ void ZPunctaTableView::keyPressEvent(QKeyEvent* e)
   }
 }
 
-void ZPunctaTableView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
+void ZPunctaTableView::selectionChanged(const QItemSelection& selected, const QItemSelection& deselected)
 {
   QTableView::selectionChanged(selected, deselected);
 

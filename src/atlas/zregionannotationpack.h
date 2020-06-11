@@ -19,7 +19,7 @@ class ZRegionAnnotationPack : public ZObjPack
 {
 Q_OBJECT
 public:
-  ZRegionAnnotationPack(ZRegionAnnotation* roi, const QString& path,
+  ZRegionAnnotationPack(ZRegionAnnotation* ra, const QString& path,
                         size_t id, ZRegionAnnotationDoc& pd, QObject* parent = nullptr);
 
   ~ZRegionAnnotationPack() override;
@@ -55,6 +55,14 @@ public:
   ZBBox<glm::ivec4> boundBox() const
   { return m_regionAnnotation->boundBox(); }
 
+  void setCurrentRegionID(int64_t id)
+  { m_currentRegionID = id; }
+
+  int64_t currentRegionID() const
+  { return m_currentRegionID; }
+
+  void mergeROIToCurrentRegion(const ZROI& roi);
+
 protected:
 
   void updatePtsAndSelectedPuncta();
@@ -82,6 +90,8 @@ private:
   mutable QString m_info;
   QString m_name;
   QString m_tooltip;
+
+  int64_t m_currentRegionID = -1;
 };
 
 } // namespace nim

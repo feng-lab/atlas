@@ -323,6 +323,10 @@ public:
 
   std::set<int> mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice = -1, int64_t shapeID = -1);
 
+  void subtractROI(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1);
+
+  std::set<int> subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice = -1, int64_t shapeID = -1);
+
   static QPainterPath splineToPainterPath(const QPolygonF& spline, bool makeCloseIfNot = false);
 
   [[nodiscard]] const_iterator begin() const noexcept
@@ -664,6 +668,24 @@ public:
 
   void redo() override
   { m_changedSlices = m_roi.mergeWith_Impl(m_otherSliceROIs, m_slice, m_shapeID); }
+
+protected:
+  std::map<int, ZSliceROI> m_otherSliceROIs;
+  int64_t m_slice;
+  int64_t m_shapeID;
+};
+
+class ZROISubtractROICommand : public ZROICommand
+{
+public:
+  ZROISubtractROICommand(ZROI& roi, std::map<int, ZSliceROI> otherSliceROIs, int64_t slice = -1, int64_t shapeID = -1)
+    : ZROICommand(roi), m_otherSliceROIs(std::move(otherSliceROIs)), m_slice(slice), m_shapeID(shapeID)
+  {
+    setText("Subtract ROI");
+  }
+
+  void redo() override
+  { m_changedSlices = m_roi.subtractROI_Impl(m_otherSliceROIs, m_slice, m_shapeID); }
 
 protected:
   std::map<int, ZSliceROI> m_otherSliceROIs;

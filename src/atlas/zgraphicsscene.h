@@ -69,10 +69,14 @@ private:
   std::unique_ptr<QGraphicsPathItem> m_polygonItem;
   QPolygonF m_spline;
   std::unique_ptr<QGraphicsPathItem> m_splineItem;
-  QPolygonF m_ffpolygon;
-  std::unique_ptr<QGraphicsPathItem> m_ffpolygonItem;
+
+  std::unique_ptr<QGraphicsPathItem> m_cutLineItem;
+  std::unique_ptr<QGraphicsPolygonItem> m_cutLineStartPtItem;
+  std::vector<std::unique_ptr<QGraphicsPolygonItem>> m_cutLineCtrlPtsItem;
 
   QPointF m_lastPressedPt;
+
+  double m_zValue = 60000;
 };
 
 } // namespace nim

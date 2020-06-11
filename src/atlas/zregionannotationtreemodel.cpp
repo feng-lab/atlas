@@ -65,7 +65,7 @@ Qt::ItemFlags ZRegionAnnotationTreeModel::flags(const QModelIndex& index) const
   if (!index.isValid())
     return Qt::ItemFlags();
 
-  Qt::ItemFlags flags = Qt::ItemIsEnabled;
+  Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
 
   return flags;
 }
@@ -242,6 +242,15 @@ void ZRegionAnnotationTreeModel::activated(const QModelIndex& /*idxIn*/)
   //    //LOG(INFO) << id;
   //    m_regionAnnotation->sendOpenEditWidgetSignal(id);
   //  }
+}
+
+int64_t ZRegionAnnotationTreeModel::getRegionID(const QModelIndex& index) const
+{
+  if (!index.isValid())
+    return -1;
+
+  auto item = static_cast<RegionNode*>(index.internalPointer());
+  return item->id;
 }
 
 } // namespace nim

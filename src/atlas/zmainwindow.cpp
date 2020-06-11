@@ -735,6 +735,7 @@ void ZMainWindow::createToolBars()
 
   m_roiToolBar = addToolBar(tr("ROI"));
   m_roiToolBar->addWidget(m_view->createROIToolButton(this));
+  m_roiToolBar->addWidget(m_view->createROIModeWidget(this));
   m_roiToolBar->setIconSize(iconSize);
 
   m_helpToolBar = addToolBar(tr("Help"));

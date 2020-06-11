@@ -177,36 +177,39 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
       QMenu menu;
       QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
 //      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
-//      QAction* addROItoRegionAction = menu.addAction("Add ROI to Region...");
       QAction* toRegionAction = nullptr;
       QAction* subtractNextSelectedShapeAction = nullptr;
       if (m_regionNode) {
-        subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
+        // subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
         toRegionAction = menu.addAction("Change Region ID...");
       } else {
-        toRegionAction = menu.addAction("Add ROI to Region...");
+        subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
+        // toRegionAction = menu.addAction("Add ROI to Region...");
       }
       QAction* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == addCtrlPointAction) {
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
-      } else if (selectedAction == toRegionAction) {
+      } else if (toRegionAction && selectedAction == toRegionAction) {
         try {
           ZChooseRegionDialog dlg(m_view.currentRegionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
-            if (m_regionNode) {
-              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
-                                                                                      dlg.selectedID());
-            } else {
-              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
-                                                                                       dlg.selectedID());
-            }
+            CHECK(m_regionNode);
+            m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
+                                                                                    dlg.selectedID());
+//            if (m_regionNode) {
+//              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice, m_id,
+//                                                                                      dlg.selectedID());
+//            } else {
+//              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice, m_id,
+//                                                                                       dlg.selectedID());
+//            }
           }
         }
         catch (const ZException& e) {
           QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                                 QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
-      } else if (m_regionNode && selectedAction == subtractNextSelectedShapeAction) {
+      } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
         m_view.scene().registerROIForSubtraction(&m_roi, m_slice, m_id);
       }
     }
@@ -375,34 +378,39 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
   for (const auto& shapeOp : shapeOps) {
     if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
       QMenu menu;
-      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
+      QAction* subtractNextSelectedShapeAction = nullptr;
       QAction* toRegionAction = nullptr;
       if (m_regionNode) {
         toRegionAction = menu.addAction("Change Region ID...");
       } else {
-        toRegionAction = menu.addAction("Add ROI to Region...");
+        subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
+        // toRegionAction = menu.addAction("Add ROI to Region...");
       }
       QAction* selectedAction = menu.exec(event->screenPos());
-      if (selectedAction == toRegionAction) {
+      if (toRegionAction && selectedAction == toRegionAction) {
         try {
           ZChooseRegionDialog dlg(m_view.currentRegionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
           if (dlg.exec() == QDialog::Accepted) {
-            if (m_regionNode) {
-              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
-                                                                                      m_controlPoint.shapeID,
-                                                                                      dlg.selectedID());
-            } else {
-              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice,
-                                                                                       m_controlPoint.shapeID,
-                                                                                       dlg.selectedID());
-            }
+            CHECK(m_regionNode);
+            m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
+                                                                                    m_controlPoint.shapeID,
+                                                                                    dlg.selectedID());
+//            if (m_regionNode) {
+//              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_controlPoint.slice,
+//                                                                                      m_controlPoint.shapeID,
+//                                                                                      dlg.selectedID());
+//            } else {
+//              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_controlPoint.slice,
+//                                                                                       m_controlPoint.shapeID,
+//                                                                                       dlg.selectedID());
+//            }
           }
         }
         catch (const ZException& e) {
           QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                                 QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
-      } else if (selectedAction == subtractNextSelectedShapeAction) {
+      } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
         m_view.scene().registerROIForSubtraction(&m_roi, m_controlPoint.slice, m_controlPoint.shapeID);
       }
     }

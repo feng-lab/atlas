@@ -102,6 +102,7 @@ public:
     SelectionIcon,
     CleanupIcon,
     SplineIcon,
+    SplineCutIcon,
     PolygonIcon,
     EllipseIcon,
     RectangleIcon,

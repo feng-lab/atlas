@@ -22,6 +22,8 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
 {
   setSortingEnabled(true);
   setExpandsOnDoubleClick(false);
+  setSelectionBehavior(QTreeView::SelectRows);
+  setSelectionMode(QTreeView::SingleSelection);
   m_ratProxyModel = new QSortFilterProxyModel(this);
   m_ratProxyModel->setSourceModel(&m_ratModel);
   m_ratProxyModel->setDynamicSortFilter(true);
@@ -45,7 +47,9 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
 
   auto delegate = new ZButtonColumnDelegate(this);
   setMouseTracking(true);
-  setItemDelegate(delegate);
+  setItemDelegateForColumn(3, delegate);
+  setItemDelegateForColumn(4, delegate);
+  setItemDelegateForColumn(5, delegate);
   connect(this, &ZRegionAnnotationTreeView::entered, delegate, &ZButtonColumnDelegate::cellEntered);
   connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this,
           &ZRegionAnnotationTreeView::buttonClickedForUserData);
@@ -142,6 +146,20 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
 
 void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* /*e*/)
 {
+}
+
+void ZRegionAnnotationTreeView::selectionChanged(const QItemSelection& selected, const QItemSelection& deselected)
+{
+  QTreeView::selectionChanged(selected, deselected);
+
+  if (m_regionAnnotationPack.isLocked()) {
+    return;
+  }
+
+  for (const auto& sindex : selectedIndexes()) {
+    m_regionAnnotationPack.setCurrentRegionID(m_ratModel.getRegionID(m_ratProxyModel->mapToSource(sindex)));
+    LOG(INFO) << m_regionAnnotationPack.currentRegionID();
+  }
 }
 
 void ZRegionAnnotationTreeView::createContextMenu()
