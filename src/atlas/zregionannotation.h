@@ -38,6 +38,8 @@ public:
 
   void mergeROIToRegion(const ZROI& roi, int64_t regionID);
 
+  void mergeLineROI(const ZROI& roi);
+
   // void mergeROIToRegion(const ZROI& roi, int slice, size_t id, int64_t regionID);
 
   void changeROIRegion(ZROI& roi, int slice, size_t id, int64_t regionID);

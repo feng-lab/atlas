@@ -72,6 +72,11 @@ void ZRegionAnnotationPack::mergeROIToCurrentRegion(const ZROI& roi)
   m_regionAnnotation->mergeROIToRegion(roi, m_currentRegionID);
 }
 
+void ZRegionAnnotationPack::mergeLineROI(const ZROI& roi)
+{
+  m_regionAnnotation->mergeLineROI(roi);
+}
+
 void ZRegionAnnotationPack::updatePtsAndSelectedPuncta()
 {
 //  m_punctaPts.clear();

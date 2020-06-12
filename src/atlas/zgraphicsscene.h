@@ -70,10 +70,6 @@ private:
   QPolygonF m_spline;
   std::unique_ptr<QGraphicsPathItem> m_splineItem;
 
-  std::unique_ptr<QGraphicsPathItem> m_cutLineItem;
-  std::unique_ptr<QGraphicsPolygonItem> m_cutLineStartPtItem;
-  std::vector<std::unique_ptr<QGraphicsPolygonItem>> m_cutLineCtrlPtsItem;
-
   QPointF m_lastPressedPt;
 
   double m_zValue = 60000;

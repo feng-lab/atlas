@@ -1060,10 +1060,10 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
            1);
   pen.setCosmetic(true);
   roiItem->setPen(pen);
-  roiItem->setBrush(QColor(m_regionColor.get().x * 255,
-                           m_regionColor.get().y * 255,
-                           m_regionColor.get().z * 255,
-                           m_opacity.get() * 255));
+  roiItem->setBrush_(QColor(m_regionColor.get().x * 255,
+                            m_regionColor.get().y * 255,
+                            m_regionColor.get().z * 255,
+                            m_opacity.get() * 255));
   //roiItem->setOpacity(m_opacity.get());
   roiItem->setVisible((realZ() == slice || m_view.isMaxZProjView()) && m_visible.get());
   m_view.scene().addItem(roiItem);
@@ -1242,7 +1242,7 @@ void ZROIFilter::regionColorChanged()
                       m_opacity.get() * 255));
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem->setBrush(brush);
+      shapeItem->setBrush_(brush);
     }
   }
 }

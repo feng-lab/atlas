@@ -20,7 +20,8 @@ enum class ROIType
   Rect,
   Ellipse,
   Polygon,
-  Spline
+  Spline,
+  Line
 };
 
 struct ZROIShapeOperation
@@ -37,7 +38,11 @@ struct ZROIShapeOperation
   ZROIShapeOperation(bool isAdd_, ROIType type_, QPolygonF poly_)
     : isAdd(isAdd_), type(type_), poly(std::move(poly_))
   {
-    CHECK(poly.isClosed());
+    if (type != ROIType::Line) {
+      CHECK(poly.isClosed());
+    } else {
+      isAdd = true;
+    }
   }
 
   void translate(double x, double y)
@@ -110,6 +115,8 @@ public:
 
   void newSpline(const QPolygonF& spline, size_t id);
 
+  void newLine(const QPolygonF& line, size_t id);
+
   void addRect(const QRectF& rect, size_t id);
 
   void addEllipse(const QRectF& ellipse, size_t id);
@@ -135,8 +142,6 @@ public:
   bool addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes);
 
   void addCtrlPointToShape(const QPointF& pt, size_t id);
-
-  size_t mergeWith(const ZSliceROI& other, size_t id, std::vector<size_t>& newShapes);
 
   void setTopLeft(double x, double y);
 
@@ -216,6 +221,12 @@ public:
   void newSpline(int slice, const QPolygonF& spline)
   {
     m_sliceROIs[slice].newSpline(spline, m_shapeID++);
+    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+  }
+
+  void newLine(int slice, const QPolygonF& line)
+  {
+    m_sliceROIs[slice].newLine(line, m_shapeID++);
     onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
   }
 

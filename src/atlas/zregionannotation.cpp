@@ -295,6 +295,21 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
   m_undoStack.endMacro();
 }
 
+void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
+{
+  m_undoStack.beginMacro("Add Lines");
+  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+    if (it->id == -1) {
+      if (!it->roi) {
+        it->roi = createROI();
+        emit regionROIAdded(it->id, it->roi.get());
+      }
+      it->roi->mergeWith(roi);
+    }
+  }
+  m_undoStack.endMacro();
+}
+
 //void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
 //{
 //  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {

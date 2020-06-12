@@ -68,6 +68,13 @@ public:
 
   void setLocked(bool l);
 
+  void setBrush_(const QBrush &brush)
+  {
+    if (m_roi.shapeOperations(m_slice, m_id).front().type != ROIType::Line) {
+      setBrush(brush);
+    }
+  }
+
 protected:
   //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 

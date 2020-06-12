@@ -424,13 +424,14 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
       }
     } else {
       m_spline.pop_back();
-      m_splineItem->setPath(ZROI::splineToPainterPath(m_spline));
-      m_cutLineItem.swap(m_splineItem);
-      m_cutLineStartPtItem.swap(m_startPtItem);
-      m_cutLineCtrlPtsItem.swap(m_ctrlPtsItem);
 
       if (m_spline.size() >= 2 && m_view->isRegionAnnotationMode()) {
-
+        std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        ZROI roi;
+        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          roi.newLine(i, m_spline);
+        }
+        m_view->currentRegionAnnotationPack().mergeLineROI(roi);
       }
     }
 

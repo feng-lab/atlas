@@ -38,7 +38,7 @@ void ZROIShapeOperation::flipAround(double x, double y, bool hFlip, bool vFlip)
 QPainterPath ZROIShapeOperation::toPainterPath() const
 {
   QPainterPath res;
-  if (type == ROIType::Spline) {
+  if (type == ROIType::Spline || type == ROIType::Line) {
     res.addPath(ZROIUtils::splineToQPainterPath(poly));
   } else if (type == ROIType::Polygon) {
     res.addPolygon(poly);
@@ -101,6 +101,13 @@ void ZSliceROI::newSpline(const QPolygonF& spline, size_t id)
 {
   CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
   m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Spline, spline)}));
+  updatePaintPath(id);
+}
+
+void ZSliceROI::newLine(const QPolygonF& line, size_t id)
+{
+  CHECK(m_idToShapeOperations.find(id) == m_idToShapeOperations.end());
+  m_idToShapeOperations.emplace(std::make_pair(id, std::vector<ZROIShapeOperation>{ZROIShapeOperation(true, ROIType::Line, line)}));
   updatePaintPath(id);
 }
 
@@ -176,6 +183,13 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
         }
         centerNumber += shapeOp.poly.size() - 1;
       }
+      if ((shapeOp.type == ROIType::Line) && shapeOp.poly.size() > 1) {
+        noOp = false;
+        for (int i = 0; i < shapeOp.poly.size(); ++i) {
+          center += shapeOp.poly[i];
+        }
+        centerNumber += shapeOp.poly.size();
+      }
     }
   }
   if (!noOp) {
@@ -195,6 +209,13 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
           if (controlPoint.pointIndex == 0) {
             shapeOp.poly[shapeOp.poly.size() - 1] = resPt;
           }
+        }
+        if ((shapeOp.type == ROIType::Line) && shapeOp.poly.size() > 1) {
+          shapeChanged = true;
+          QPointF startPt = shapeOp.poly[controlPoint.pointIndex] - center;
+          glm::dvec2 rPt = glm::rotate(glm::dvec2(startPt.x(), startPt.y()), angle);
+          QPointF resPt = QPointF(rPt.x, rPt.y) + center;
+          shapeOp.poly[controlPoint.pointIndex] = resPt;
         }
       }
       if (shapeChanged) {
@@ -218,6 +239,14 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
       auto& shapeOp = shapeOps[controlPoint.shapeIndex];
       if (shapeOp.type == ROIType::Rect || shapeOp.type == ROIType::Ellipse) {
         shapeOp.poly.clear();
+      } else if (shapeOp.type == ROIType::Line) {
+        if (shapeOp.poly.size() <= 1) {
+          shapeOp.poly.clear();
+        } else {
+          size_t idx = controlPoint.pointIndex - shapeIndexToPointIndexSubtract[controlPoint.shapeIndex];
+          shapeIndexToPointIndexSubtract[controlPoint.shapeIndex]++;
+          shapeOp.poly.removeAt(idx);
+        }
       } else {
         if (shapeOp.poly.size() <= 4) {
           shapeOp.poly.clear();
@@ -315,16 +344,6 @@ void ZSliceROI::addCtrlPointToShape(const QPointF &pt, size_t shapeID)
   }
 }
 
-size_t ZSliceROI::mergeWith(const ZSliceROI& other, size_t id, std::vector<size_t>& newShapes)
-{
-  for (const auto&[ido, shape] : other.m_idToShapeOperations) {
-    m_idToShapeOperations[id] = shape;
-    newShapes.push_back(id);
-    m_idToPainterPath[id++] = other.m_idToPainterPath.at(ido);
-  }
-  return id;
-}
-
 void ZSliceROI::setTopLeft(double x, double y)
 {
   QRectF rect = boundingRect();
@@ -405,6 +424,8 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           type = ROIType::Polygon;
         } else if (strBuf == "Spline") {
           type = ROIType::Spline;
+        } else if (strBuf == "Line") {
+          type = ROIType::Line;
         } else {
           throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
         }
@@ -469,6 +490,9 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
 //              subtractSpline(poly, id++);
 //            }
             break;
+          case ROIType::Line:
+            newLine(poly, id++);
+            break;
           default:
             CHECK(false);
             break;
@@ -494,6 +518,8 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
             type = ROIType::Polygon;
           } else if (strBuf == "Spline") {
             type = ROIType::Spline;
+          } else if (strBuf == "Line") {
+            type = ROIType::Line;
           } else {
             throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
           }
@@ -562,6 +588,9 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
                 subtractSpline(poly, id);
               }
               break;
+            case ROIType::Line:
+              newLine(poly, id);
+              break;
             default:
               CHECK(false);
               break;
@@ -618,6 +647,9 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
             break;
           case ROIType::Spline:
             type.write(strType, std::string("Spline"));
+            break;
+          case ROIType::Line:
+            type.write(strType, std::string("Line"));
             break;
           default:
             CHECK(false);
@@ -815,12 +847,18 @@ std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, in
 
     onSliceROIUpdated(slice, newShapes, std::vector<size_t>(), std::vector<size_t>());
   } else { // merge all
-    for (const auto& sliceROI : sliceROIs) {
-      if (!sliceROI.second.isEmpty()) {
-        changedSlices.insert(sliceROI.first);
+    for (const auto& [slice, sliceROI] : sliceROIs) {
+      if (!sliceROI.isEmpty()) {
+        changedSlices.insert(slice);
         std::vector<size_t> newShapes;
-        m_shapeID = m_sliceROIs[sliceROI.first].mergeWith(sliceROI.second, m_shapeID, newShapes);
-        onSliceROIUpdated(sliceROI.first, newShapes, std::vector<size_t>(), std::vector<size_t>());
+
+        for (const auto&[ido, shape] : sliceROI.m_idToShapeOperations) {
+          m_sliceROIs[slice].m_idToShapeOperations[m_shapeID] = shape;
+          newShapes.push_back(m_shapeID);
+          m_sliceROIs[slice].m_idToPainterPath[m_shapeID++] = sliceROI.m_idToPainterPath.at(ido);
+        }
+
+        onSliceROIUpdated(slice, newShapes, std::vector<size_t>(), std::vector<size_t>());
       }
     }
   }
@@ -908,6 +946,10 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const
         for (int j = 0; j < shape.poly.size() - 1; ++j) {
           res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Any, j);
         }
+      } else if (shape.type == ROIType::Line) {
+        for (int j = 0; j < shape.poly.size(); ++j) {
+          res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Any, j);
+        }
       } else {
         res.emplace_back(slice, id, si, ZROIControlPoint::Pos::MidLeft);
         res.emplace_back(slice, id, si, ZROIControlPoint::Pos::BottomMid);
@@ -936,6 +978,10 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice, size_t shapeID
     const auto& shape = shapes[si];
     if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
       for (int j = 0; j < shape.poly.size() - 1; ++j) {
+        res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Any, j);
+      }
+    } else if (shape.type == ROIType::Line) {
+      for (int j = 0; j < shape.poly.size(); ++j) {
         res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Any, j);
       }
     } else {
@@ -1186,7 +1232,7 @@ void ZROI::shiftControlPointsCoords(const std::vector<ZROIControlPoint>& control
         break;
       case ZROIControlPoint::Pos::Any:
         shapeOp.poly[ctrlPt.pointIndex] = newPos;
-        if (ctrlPt.pointIndex == 0)
+        if (ctrlPt.pointIndex == 0 && shapeOp.type != ROIType::Line)
           shapeOp.poly.last() = newPos;
         break;
       default:
@@ -1269,7 +1315,7 @@ QPointF ZROI::setControlPointCoord(const ZROIControlPoint& ctrlPt, const QPointF
       break;
     case ZROIControlPoint::Pos::Any:
       shapeOp.poly[ctrlPt.pointIndex] = newPos;
-      if (ctrlPt.pointIndex == 0)
+      if (ctrlPt.pointIndex == 0 && shapeOp.type != ROIType::Line)
         shapeOp.poly.last() = newPos;
       break;
     default:

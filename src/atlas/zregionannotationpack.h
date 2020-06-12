@@ -63,6 +63,8 @@ public:
 
   void mergeROIToCurrentRegion(const ZROI& roi);
 
+  void mergeLineROI(const ZROI& roi);
+
 protected:
 
   void updatePtsAndSelectedPuncta();
