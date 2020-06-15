@@ -69,6 +69,8 @@
         <file>icons/zoom-out-dark.svg</file>
         <file>icons/projection-view.svg</file>
         <file>icons/projection-view-dark.svg</file>
+        <file>icons/montage-view.svg</file>
+        <file>icons/montage-view-dark.svg</file>
         <file>icons/normal-view.svg</file>
         <file>icons/normal-view-dark.svg</file>
         <file>icons/folder-add.svg</file>

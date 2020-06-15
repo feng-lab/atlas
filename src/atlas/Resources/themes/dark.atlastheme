@@ -57,6 +57,7 @@
             "RedoIcon": ":/icons/redo-dark.svg",
             "NormalViewIcon": ":/icons/normal-view-dark.svg",
             "ProjectionViewIcon": ":/icons/projection-view-dark.svg",
+            "MontageViewIcon": ":/icons/montage-view-dark.svg",
             "CollapseIcon": ":/icons/collapse-dark.svg",
             "ExpandIcon": ":/icons/expand-dark.svg",
             "DragIcon": ":/icons/drag-dark.svg",

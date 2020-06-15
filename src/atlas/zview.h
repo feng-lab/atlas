@@ -3,6 +3,7 @@
 #include "zviewsettinginterface.h"
 #include "zglmutils.h"
 #include "zbbox.h"
+#include "zoptionparameter.h"
 #include <QWidget>
 #include <QAction>
 #include <array>
@@ -37,8 +38,6 @@ class ZBoolParameter;
 
 class ZDVec4Parameter;
 
-class ZStringIntOptionParameter;
-
 class ZView : public QWidget, public ZViewSettingInterface
 {
 Q_OBJECT
@@ -46,6 +45,11 @@ public:
   enum class State
   {
     Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROICut
+  };
+
+  enum class ViewStyle
+  {
+    Normal, MIP, Montage
   };
 
   explicit ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
@@ -72,6 +76,9 @@ public:
   inline QAction* maxZProjViewAction()
   { return m_maxZProjViewAction; }
 
+  inline QAction* montageViewAction()
+  { return m_montageViewAction; }
+
   inline QAction* fitIntoWindowAction()
   { return m_fitIntoWindowAction; }
 
@@ -85,11 +92,8 @@ public:
 
   QWidget* createROIModeWidget(QWidget* parent);
 
-  inline bool isNormalView() const
-  { return m_normalViewAction->isChecked(); }
-
-  inline bool isMaxZProjView() const
-  { return m_maxZProjViewAction->isChecked(); }
+  inline ViewStyle currentViewStyle() const
+  { return m_viewStyle->associatedData(); }
 
   int currentSlice() const;
 
@@ -181,6 +185,8 @@ public:
 
   bool isROIMode() const;
 
+  void estimateMontageColumns() const;
+
 signals:
 
   void objViewReady(size_t id);
@@ -201,7 +207,9 @@ private:
 
   void triggerMaxZProjView(bool v);
 
-  void changeViewStyle(bool mip);
+  void triggerMontageView(bool v);
+
+  void changeViewStyle();
 
   void changeViewport();
 
@@ -223,6 +231,8 @@ private:
 
   void updateViewportPara() const;
 
+  void updateSceneRectFromBoundBox();
+
 private:
   ZDoc& m_doc;
   ZGraphicsScene* m_scene;
@@ -234,7 +244,8 @@ private:
   ZIntParameter* m_imgTime;
   QWidget* m_imgSliceWidget;
   QWidget* m_imgTimeWidget;
-  ZBoolParameter* m_mip;
+  ZOptionParameter<QString, ViewStyle> m_viewStyle;
+  ZIntParameter* m_montageColumns;
   mutable ZDVec4Parameter* m_viewport;
 
   //
@@ -247,6 +258,7 @@ private:
   QActionGroup* m_imgViewStyleActionGroup;
   QAction* m_normalViewAction;
   QAction* m_maxZProjViewAction;
+  QAction* m_montageViewAction;
   QAction* m_fitIntoWindowAction;
   //
   QActionGroup* m_dragModeActionGroup;

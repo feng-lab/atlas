@@ -15,6 +15,7 @@
             "RedoIcon": ":/icons/redo.svg",
             "NormalViewIcon": ":/icons/normal-view.svg",
             "ProjectionViewIcon": ":/icons/projection-view.svg",
+            "MontageViewIcon": ":/icons/montage-view.svg",
             "CollapseIcon": ":/icons/collapse.svg",
             "ExpandIcon": ":/icons/expand.svg",
             "DragIcon": ":/icons/drag.svg",

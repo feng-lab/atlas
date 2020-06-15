@@ -96,6 +96,7 @@ public:
     RedoIcon,
     NormalViewIcon,
     ProjectionViewIcon,
+    MontageViewIcon,
     CollapseIcon,
     ExpandIcon,
     DragIcon,

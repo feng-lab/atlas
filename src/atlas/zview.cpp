@@ -25,14 +25,19 @@ namespace nim {
 ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   : QWidget(parent, f)
   , m_doc(doc)
+  , m_viewStyle("View Style")
   , m_doNotReceiveSliceSignal(false)
   , m_numObjsBefore(m_doc.numObjs())
 {
   m_imgSlice = new ZIntParameter("slice", 0, 0, 0, this);
   m_imgTime = new ZIntParameter("time", 0, 0, 0, this);
 
-  m_mip = new ZBoolParameter("MIP", false, this);
-  connect(m_mip, &ZBoolParameter::boolChanged, this, &ZView::changeViewStyle);
+  m_viewStyle.addOptionsWithData(qMakePair(QString("Normal"), ViewStyle::Normal),
+                                 qMakePair(QString("MIP"), ViewStyle::MIP),
+                                 qMakePair(QString("Montage"), ViewStyle::Montage));
+  connect(&m_viewStyle, &ZOptionParameter<QString, ViewStyle>::valueChanged, this, &ZView::changeViewStyle);
+  m_montageColumns = new ZIntParameter("Montage Columns", 0, 0, 1000, this);
+  connect(m_montageColumns, &ZIntParameter::valueChanged, this, &ZView::changeViewStyle);
   m_viewport = new ZDVec4Parameter("Viewport", this);
   connect(m_viewport, &ZDVec4Parameter::valueChanged, this, &ZView::changeViewport);
 
@@ -145,7 +150,7 @@ QRectF ZView::currentViewport() const
 
 std::pair<int, int> ZView::currentSliceRange() const
 {
-  if (isMaxZProjView()) {
+  if (currentViewStyle() == ViewStyle::MIP) {
     return std::make_pair(m_imgSlice->rangeMin(), m_imgSlice->rangeMax() + 1);
   } else {
     return std::make_pair(m_imgSlice->get(), m_imgSlice->get() + 1);
@@ -217,15 +222,12 @@ void ZView::updateBoundBox()
     m_doNotReceiveSliceSignal = false;
     return;
   }
-  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
-                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
-                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
-  m_scene->setSceneRect(sceneRect);
+  updateSceneRectFromBoundBox();
   m_view->updateScaleFactorRange();
   int sliceBefore = m_imgSlice->get();
   int timeBefore = m_imgTime->get();
   m_imgSlice->setRange(m_boundBox.minCorner().z, m_boundBox.maxCorner().z);
-  m_imgSlice->setVisible(m_boundBox.maxCorner().z > m_boundBox.minCorner().z || m_maxZProjViewAction->isChecked());
+  m_imgSlice->setVisible(m_boundBox.maxCorner().z > m_boundBox.minCorner().z);
   m_imgTime->setRange(m_boundBox.minCorner().w, m_boundBox.maxCorner().w);
   m_imgTime->setVisible(m_boundBox.maxCorner().w > m_boundBox.minCorner().w);
   if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
@@ -246,8 +248,10 @@ void ZView::updateBoundBox()
 void ZView::setInfo(double x, double y)
 {
   QString info;
-  if (m_maxZProjViewAction->isChecked()) {
+  if (currentViewStyle() == ViewStyle::MIP) {
     info += "**Maximum Z Projection**      ";
+  } else if (currentViewStyle() == ViewStyle::Montage) {
+    info += "**Montage**      ";
   }
   for (const auto& view : m_objViews) {
     info += view->infoOfPos(x, y);
@@ -306,7 +310,8 @@ void ZView::read(const QJsonObject& json)
   m_imgTime->read(json);
   updateViewportPara();
   m_viewport->read(json);
-  m_mip->read(json);
+  m_viewStyle.read(json);
+  m_montageColumns->read(json);
 }
 
 void ZView::write(QJsonObject& json) const
@@ -315,20 +320,18 @@ void ZView::write(QJsonObject& json) const
   m_imgTime->write(json);
   updateViewportPara();
   m_viewport->write(json);
-  m_mip->write(json);
+  m_viewStyle.write(json);
+  m_montageColumns->write(json);
 }
 
 void ZView::fitContentIntoWindow()
 {
-  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
-                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
-                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
-  m_view->fitRect(sceneRect);
+  m_view->fitRect(m_scene->sceneRect());
 }
 
 void ZView::gotoPosition(double x, double y, double z, double radius)
 {
-  if (isNormalView()) {
+  if (currentViewStyle() == ViewStyle::Normal) {
     m_imgSlice->set(std::round(z));
   }
   QRectF sceneRect(x - radius, y - radius,
@@ -398,13 +401,17 @@ void ZView::sliceChanged()
   if (m_doNotReceiveSliceSignal)
     return;
 
-  if (isMaxZProjView()) {
+  if (currentViewStyle() == ViewStyle::MIP) {
     for (const auto& view : m_objViews) {
       view->setMaxZProjView(m_imgTime->get());
     }
-  } else {
+  } else if (currentViewStyle() == ViewStyle::Normal) {
     for (const auto& view : m_objViews) {
       view->setNormalView(m_imgSlice->get(), m_imgTime->get());
+    }
+  } else {
+    for (const auto& view : m_objViews) {
+      view->setMontageView(m_imgTime->get());
     }
   }
 }
@@ -421,20 +428,32 @@ void ZView::zoomOut()
 
 void ZView::triggerNormalView(bool v)
 {
-  m_mip->set(!v);
+  if (v) {
+    m_viewStyle.select("Normal")
+  }
 }
 
 void ZView::triggerMaxZProjView(bool v)
 {
-  m_mip->set(v);
+  if (v) {
+    m_viewStyle.select("MIP");
+  }
 }
 
-void ZView::changeViewStyle(bool mip)
+void ZView::triggerMontageView(bool v)
+{
+  if (v) {
+    m_viewStyle.select("Montage");
+  }
+}
+
+void ZView::changeViewStyle()
 {
   if (!m_doc.hasObj())
     return;
 
-  if (mip) {
+  updateSceneRectFromBoundBox();
+  if (currentViewStyle() == ViewStyle::MIP) {
     if (!m_maxZProjViewAction->isChecked())
       m_maxZProjViewAction->setChecked(true);
 
@@ -443,7 +462,7 @@ void ZView::changeViewStyle(bool mip)
     }
 
     m_imgSlice->setEnabled(false);
-  } else {
+  } else if (currentViewStyle() == ViewStyle::Normal) {
     if (!m_normalViewAction->isChecked())
       m_normalViewAction->setChecked(true);
 
@@ -452,6 +471,16 @@ void ZView::changeViewStyle(bool mip)
     }
 
     m_imgSlice->setEnabled(true);
+  } else {
+    if (!m_montageViewAction->isChecked()) {
+      m_montageViewAction->setChecked(true);
+    }
+
+    for (const auto& view : m_objViews) {
+      view->setMontageView(m_imgTime->get());
+    }
+
+    m_imgSlice->setEnabled(false);
   }
   setInfo(-1, -1);
 }
@@ -542,15 +571,6 @@ void ZView::keyPressEvent(QKeyEvent* event)
           m_imgSlice->set(m_imgSlice->get() + 1);
       }
       break;
-    case Qt::Key_M:
-      if (event->modifiers() == Qt::ControlModifier) {
-        if (m_normalViewAction->isChecked()) {
-          m_maxZProjViewAction->setChecked(true);
-        } else {
-          m_normalViewAction->setChecked(true);
-        }
-      }
-      break;
     case Qt::Key_Backspace:
     case Qt::Key_Delete:
       if (event->modifiers() == Qt::NoModifier) {
@@ -621,14 +641,19 @@ void ZView::createActions()
   m_maxZProjViewAction->setStatusTip(tr("Maximum Project Image Along Dimension Z"));
   connect(m_maxZProjViewAction, &QAction::toggled, this, &ZView::triggerMaxZProjView);
 
+  m_montageViewAction = new QAction(ZTheme::instance().icon(ZTheme::MontageViewIcon), tr("&Montage View"), this);
+  m_montageViewAction->setCheckable(true);
+  m_montageViewAction->setStatusTip(tr("Montage View of Z Slices"));
+  connect(m_montageViewAction, &QAction::toggled, this, &ZView::triggerMontageView);
+
   m_imgViewStyleActionGroup = new QActionGroup(this);
   m_imgViewStyleActionGroup->setExclusive(true);
   m_imgViewStyleActionGroup->addAction(m_normalViewAction);
   m_imgViewStyleActionGroup->addAction(m_maxZProjViewAction);
-  if (m_mip->get())
-    m_maxZProjViewAction->setChecked(true);
-  else
-    m_normalViewAction->setChecked(true);
+  m_imgViewStyleActionGroup->addAction(m_montageViewAction);
+  m_normalViewAction->setChecked(currentViewStyle() == ViewStyle::Normal);
+  m_maxZProjViewAction->setChecked(currentViewStyle() == ViewStyle::MIP);
+  m_montageViewAction->setChecked(currentViewStyle() == ViewStyle::Montage);
 
   m_fitIntoWindowAction = new QAction(ZTheme::instance().icon(ZTheme::CollapseIcon), tr("&Fit Into Window"), this);
   m_fitIntoWindowAction->setStatusTip(tr("Fit everything inside window"));
@@ -687,6 +712,21 @@ void ZView::updateViewportPara() const
   m_viewport->blockSignals(true);
   m_viewport->set(glm::dvec4(rect.left(), rect.top(), rect.width(), rect.height()));
   m_viewport->blockSignals(false);
+}
+
+void ZView::updateSceneRectFromBoundBox()
+{
+  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
+                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
+                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
+  if (currentViewStyle() == ViewStyle::Montage && m_boundBox.maxCorner().z > m_boundBox.minCorner().z) {
+    if (m_montageColumns->get() == 0) {
+      estimateMontageColumns();
+    }
+    auto nCols = m_montageColumns->get();
+    auto nRows =
+  }
+  m_scene->setSceneRect(sceneRect);
 }
 
 } // namespace nim
