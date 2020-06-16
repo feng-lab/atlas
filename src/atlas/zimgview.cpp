@@ -28,7 +28,7 @@ QString ZImgView::infoOfPos(double x, double y)
       int ly = p.y();
       if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
           ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
-        int lz = m_view.isNormalView() ? viewControl->imgSlice() : 0;
+        int lz = m_view.isMaxZProjView() ? 0: viewControl->imgSlice();
         int lt = viewControl->imgTime();
         info += imgPack.sizeInfo();
         if (imgPack.imgInfo().numTimes == 1) {

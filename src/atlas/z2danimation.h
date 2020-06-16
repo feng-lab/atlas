@@ -32,7 +32,7 @@ protected:
   // managed by parent class
   ZParameterAnimation* m_sliceAnimation;
   ZParameterAnimation* m_timeAnimation;
-  ZParameterAnimation* m_mipAnimation;
+  ZParameterAnimation* m_viewStyleAnimation;
   ZParameterAnimation* m_viewportAnimation;
 };
 

@@ -3,7 +3,6 @@
 #include "zviewsettinginterface.h"
 #include "zglmutils.h"
 #include "zbbox.h"
-#include "zoptionparameter.h"
 #include <QWidget>
 #include <QAction>
 #include <array>
@@ -15,6 +14,8 @@ class QToolButton;
 class QLabel;
 
 class QActionGroup;
+
+class QGraphicsScene;
 
 namespace nim {
 
@@ -37,6 +38,8 @@ class ZIntParameter;
 class ZBoolParameter;
 
 class ZDVec4Parameter;
+
+class ZStringIntOptionParameter;
 
 class ZView : public QWidget, public ZViewSettingInterface
 {
@@ -92,8 +95,8 @@ public:
 
   QWidget* createROIModeWidget(QWidget* parent);
 
-  inline ViewStyle currentViewStyle() const
-  { return m_viewStyle->associatedData(); }
+  inline bool isMaxZProjView() const
+  { return currentViewStyle() == ViewStyle::MIP; }
 
   int currentSlice() const;
 
@@ -113,8 +116,8 @@ public:
   ZIntParameter& timePara()
   { return *m_imgTime; }
 
-  ZBoolParameter& mipPara()
-  { return *m_mip; }
+  ZStringIntOptionParameter& viewStylePara()
+  { return *m_viewStyle; }
 
   ZDVec4Parameter& viewportPara()
   {
@@ -197,6 +200,8 @@ protected:
   void keyPressEvent(QKeyEvent* e) override;
 
 private:
+  ViewStyle currentViewStyle() const;
+
   void sliceChanged();
 
   void zoomIn();
@@ -233,9 +238,12 @@ private:
 
   void updateSceneRectFromBoundBox();
 
+  void updateMontageScene();
+
 private:
   ZDoc& m_doc;
   ZGraphicsScene* m_scene;
+  QGraphicsScene* m_montageScene;
 
   QVBoxLayout* m_layout;
   QLabel* m_label;
@@ -244,7 +252,7 @@ private:
   ZIntParameter* m_imgTime;
   QWidget* m_imgSliceWidget;
   QWidget* m_imgTimeWidget;
-  ZOptionParameter<QString, ViewStyle> m_viewStyle;
+  ZStringIntOptionParameter* m_viewStyle;
   ZIntParameter* m_montageColumns;
   mutable ZDVec4Parameter* m_viewport;
 

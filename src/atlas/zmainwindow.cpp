@@ -659,6 +659,7 @@ void ZMainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_view->normalViewAction());
   m_viewMenu->addAction(m_view->maxZProjViewAction());
+  m_viewMenu->addAction(m_view->montageViewAction());
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_open3DViewAction);
   m_viewMenu->addAction(m_screenShotAction);
@@ -724,6 +725,7 @@ void ZMainWindow::createToolBars()
   m_viewToolBar->addAction(m_view->fitIntoWindowAction());
   m_viewToolBar->addAction(m_view->normalViewAction());
   m_viewToolBar->addAction(m_view->maxZProjViewAction());
+  m_viewToolBar->addAction(m_view->montageViewAction());
   m_viewToolBar->addAction(m_open3DViewAction);
   m_viewToolBar->addAction(m_screenShotAction);
   m_viewToolBar->setIconSize(iconSize);

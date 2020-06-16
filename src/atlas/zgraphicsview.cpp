@@ -81,6 +81,7 @@ QWidget* ZGraphicsView::createScaleWidget(QWidget* parent)
 void ZGraphicsView::fitRect(const QRectF& rect)
 {
   fitInView(rect, Qt::KeepAspectRatio);
+  // LOG(INFO) << rect << transform().m11();
   setScale(transform().m11());
 }
 

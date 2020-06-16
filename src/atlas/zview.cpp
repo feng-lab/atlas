@@ -25,19 +25,18 @@ namespace nim {
 ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   : QWidget(parent, f)
   , m_doc(doc)
-  , m_viewStyle("View Style")
   , m_doNotReceiveSliceSignal(false)
   , m_numObjsBefore(m_doc.numObjs())
 {
   m_imgSlice = new ZIntParameter("slice", 0, 0, 0, this);
   m_imgTime = new ZIntParameter("time", 0, 0, 0, this);
 
-  m_viewStyle.addOptionsWithData(qMakePair(QString("Normal"), ViewStyle::Normal),
-                                 qMakePair(QString("MIP"), ViewStyle::MIP),
-                                 qMakePair(QString("Montage"), ViewStyle::Montage));
-  connect(&m_viewStyle, &ZOptionParameter<QString, ViewStyle>::valueChanged, this, &ZView::changeViewStyle);
+  m_viewStyle = new ZStringIntOptionParameter("View Style", this);
+  m_viewStyle->addOptions(QString("Normal"), QString("MIP"), QString("Montage"));
+  connect(m_viewStyle, &ZStringIntOptionParameter::valueChanged, this, &ZView::changeViewStyle);
   m_montageColumns = new ZIntParameter("Montage Columns", 0, 0, 1000, this);
-  connect(m_montageColumns, &ZIntParameter::valueChanged, this, &ZView::changeViewStyle);
+  connect(m_montageColumns, &ZIntParameter::valueChanged, this, &ZView::updateSceneRectFromBoundBox);
+  connect(m_montageColumns, &ZIntParameter::valueChanged, this, &ZView::updateMontageScene);
   m_viewport = new ZDVec4Parameter("Viewport", this);
   connect(m_viewport, &ZDVec4Parameter::valueChanged, this, &ZView::changeViewport);
 
@@ -62,6 +61,10 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_view = new ZGraphicsView(m_scene, this);
   connect(m_view, &ZGraphicsView::viewportChanged,
           this, &ZView::viewportChanged);
+
+  m_montageScene = new QGraphicsScene(this);
+  connect(m_scene, &ZGraphicsScene::changed,
+          this, &ZView::updateMontageScene);
 
   m_layout->addWidget(m_view);
   m_layout->addSpacing(15);
@@ -145,7 +148,10 @@ double ZView::currentScale() const
 
 QRectF ZView::currentViewport() const
 {
-  return m_view->getCurrrentlyVisibleRegion().intersected(m_scene->sceneRect());
+  if (currentViewStyle() == ViewStyle::Montage) {
+    return m_scene->sceneRect();
+  }
+  return m_view->getCurrrentlyVisibleRegion().intersected(m_view->scene()->sceneRect());
 }
 
 std::pair<int, int> ZView::currentSliceRange() const
@@ -310,7 +316,7 @@ void ZView::read(const QJsonObject& json)
   m_imgTime->read(json);
   updateViewportPara();
   m_viewport->read(json);
-  m_viewStyle.read(json);
+  m_viewStyle->read(json);
   m_montageColumns->read(json);
 }
 
@@ -320,13 +326,13 @@ void ZView::write(QJsonObject& json) const
   m_imgTime->write(json);
   updateViewportPara();
   m_viewport->write(json);
-  m_viewStyle.write(json);
+  m_viewStyle->write(json);
   m_montageColumns->write(json);
 }
 
 void ZView::fitContentIntoWindow()
 {
-  m_view->fitRect(m_scene->sceneRect());
+  m_view->fitRect(m_view->scene()->sceneRect());
 }
 
 void ZView::gotoPosition(double x, double y, double z, double radius)
@@ -396,6 +402,46 @@ bool ZView::isROIMode() const
   return m_roiMode->isSelected("ROI");
 }
 
+void ZView::estimateMontageColumns() const
+{
+  auto currentNCols = m_montageColumns->get();
+  if (currentNCols == 0) {
+    m_montageColumns->blockSignals(true);
+  }
+  auto width = m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1;
+  auto height = m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1;
+  auto depth = m_boundBox.maxCorner().z - m_boundBox.minCorner().z + 1;
+  if (depth >= 1) {
+    int bestNCols = 0;
+    double bestDist = std::numeric_limits<double>::max();
+    for (int nCols = 1; nCols <= depth; ++nCols) {
+      int nRows = (depth + nCols - 1) / nCols;
+      double dist = std::abs(16.0 / 9.0 - (nCols * width * 1.0) / (nRows * height * 1.0));
+      if (dist < bestDist) {
+        bestNCols = nCols;
+        bestDist = dist;
+      } else {
+        break;
+      }
+    }
+    m_montageColumns->set(bestNCols);
+  }
+  if (currentNCols == 0) {
+    m_montageColumns->blockSignals(false);
+  }
+}
+
+ZView::ViewStyle ZView::currentViewStyle() const
+{
+  if (m_viewStyle->isSelected("Normal")) {
+    return ViewStyle::Normal;
+  } else if (m_viewStyle->isSelected("MIP")) {
+    return ViewStyle::MIP;
+  } else {
+    return ViewStyle::Montage;
+  }
+}
+
 void ZView::sliceChanged()
 {
   if (m_doNotReceiveSliceSignal)
@@ -410,9 +456,7 @@ void ZView::sliceChanged()
       view->setNormalView(m_imgSlice->get(), m_imgTime->get());
     }
   } else {
-    for (const auto& view : m_objViews) {
-      view->setMontageView(m_imgTime->get());
-    }
+    updateMontageScene();
   }
 }
 
@@ -429,21 +473,21 @@ void ZView::zoomOut()
 void ZView::triggerNormalView(bool v)
 {
   if (v) {
-    m_viewStyle.select("Normal")
+    m_viewStyle->select("Normal");
   }
 }
 
 void ZView::triggerMaxZProjView(bool v)
 {
   if (v) {
-    m_viewStyle.select("MIP");
+    m_viewStyle->select("MIP");
   }
 }
 
 void ZView::triggerMontageView(bool v)
 {
   if (v) {
-    m_viewStyle.select("Montage");
+    m_viewStyle->select("Montage");
   }
 }
 
@@ -452,10 +496,14 @@ void ZView::changeViewStyle()
   if (!m_doc.hasObj())
     return;
 
-  updateSceneRectFromBoundBox();
   if (currentViewStyle() == ViewStyle::MIP) {
     if (!m_maxZProjViewAction->isChecked())
       m_maxZProjViewAction->setChecked(true);
+
+    if (m_view->scene() != m_scene) {
+      m_view->setScene(m_scene);
+      fitContentIntoWindow();
+    }
 
     for (const auto& view : m_objViews) {
       view->setMaxZProjView(m_imgTime->get());
@@ -465,6 +513,11 @@ void ZView::changeViewStyle()
   } else if (currentViewStyle() == ViewStyle::Normal) {
     if (!m_normalViewAction->isChecked())
       m_normalViewAction->setChecked(true);
+
+    if (m_view->scene() != m_scene) {
+      m_view->setScene(m_scene);
+      fitContentIntoWindow();
+    }
 
     for (const auto& view : m_objViews) {
       view->setNormalView(m_imgSlice->get(), m_imgTime->get());
@@ -476,9 +529,12 @@ void ZView::changeViewStyle()
       m_montageViewAction->setChecked(true);
     }
 
-    for (const auto& view : m_objViews) {
-      view->setMontageView(m_imgTime->get());
+    if (m_view->scene() != m_montageScene) {
+      m_view->setScene(m_montageScene);
+      fitContentIntoWindow();
     }
+
+    updateMontageScene();
 
     m_imgSlice->setEnabled(false);
   }
@@ -719,14 +775,26 @@ void ZView::updateSceneRectFromBoundBox()
   QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
                    m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
                    m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
-  if (currentViewStyle() == ViewStyle::Montage && m_boundBox.maxCorner().z > m_boundBox.minCorner().z) {
-    if (m_montageColumns->get() == 0) {
-      estimateMontageColumns();
-    }
-    auto nCols = m_montageColumns->get();
-    auto nRows =
+  if (sceneRect != m_scene->sceneRect()) {
+    m_scene->setSceneRect(sceneRect);
   }
-  m_scene->setSceneRect(sceneRect);
+
+  if (m_montageColumns->get() == 0) {
+    estimateMontageColumns();
+  }
+  auto nCols = m_montageColumns->get();
+  auto nRows = (m_boundBox.maxCorner().z - m_boundBox.minCorner().z + nCols) / nCols;
+  sceneRect = QRectF(sceneRect.x(), sceneRect.y(), sceneRect.width() * nCols, sceneRect.height() * nRows);
+  m_montageScene->setSceneRect(sceneRect);
+}
+
+void ZView::updateMontageScene()
+{
+  if (currentViewStyle() != ViewStyle::Montage) {
+    return;
+  }
+
+  
 }
 
 } // namespace nim

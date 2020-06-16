@@ -568,7 +568,7 @@ void ZImgFilter::updateImgItems()
   } else {
     destroyImgItems();
 
-    m_display->setScale(m_view.currentScale());
+    m_display->setScale(m_view.currentScale() * std::max(getQTransform().m11(), getQTransform().m22()));
     QRectF vp = m_view.currentViewport();
     m_display->setViewport(mapFromSceneRect(vp));
 
@@ -609,7 +609,8 @@ double ZImgFilter::getUpperChannelRange(size_t c) const
 void ZImgFilter::viewportChanged()
 {
   QRectF vp = mapFromSceneRect(m_view.currentViewport());
-  if (m_imgPack->needUpdate(vp, m_view.currentScale(), m_lastViewport, m_lastScale,
+  if (m_imgPack->needUpdate(vp, m_view.currentScale() * std::max(getQTransform().m11(), getQTransform().m22()),
+                            m_lastViewport, m_lastScale,
                             realT(), realZ(), m_view.isMaxZProjView())) {
     if (!m_isVisible) {
       destroyImgItems(); // will create new one next time
