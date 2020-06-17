@@ -288,6 +288,8 @@ private:
   std::vector<std::unique_ptr<ZObjView>> m_objViews;
 
   size_t m_numObjsBefore;
+
+  int m_montageZ = 0;
 };
 
 } // namespace nim

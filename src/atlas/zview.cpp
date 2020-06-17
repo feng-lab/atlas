@@ -18,6 +18,7 @@
 #include <QActionGroup>
 #include <QToolButton>
 #include <QMessageBox>
+#include <QGraphicsPixmapItem>
 #include <QApplication>
 
 namespace nim {
@@ -133,6 +134,9 @@ QWidget* ZView::createROIModeWidget(QWidget* parent)
 
 int ZView::currentSlice() const
 {
+  if (currentViewStyle() == ViewStyle::Montage) {
+    return m_montageZ;
+  }
   return m_imgSlice->get();
 }
 
@@ -420,6 +424,7 @@ void ZView::estimateMontageColumns() const
       if (dist < bestDist) {
         bestNCols = nCols;
         bestDist = dist;
+        // LOG(INFO) << bestDist << " " << bestNCols;
       } else {
         break;
       }
@@ -502,6 +507,7 @@ void ZView::changeViewStyle()
 
     if (m_view->scene() != m_scene) {
       m_view->setScene(m_scene);
+      m_view->updateScaleFactorRange();
       fitContentIntoWindow();
     }
 
@@ -516,6 +522,7 @@ void ZView::changeViewStyle()
 
     if (m_view->scene() != m_scene) {
       m_view->setScene(m_scene);
+      m_view->updateScaleFactorRange();
       fitContentIntoWindow();
     }
 
@@ -531,6 +538,7 @@ void ZView::changeViewStyle()
 
     if (m_view->scene() != m_montageScene) {
       m_view->setScene(m_montageScene);
+      m_view->updateScaleFactorRange();
       fitContentIntoWindow();
     }
 
@@ -794,7 +802,26 @@ void ZView::updateMontageScene()
     return;
   }
 
-  
+  m_montageScene->clear();
+
+  for (auto z = 0; z <= m_boundBox.maxCorner().z - m_boundBox.minCorner().z; ++z) {
+    auto r = z / m_montageColumns->get();
+    auto c = z % m_montageColumns->get();
+    int width = std::ceil(m_scene->sceneRect().width() * m_view->currentScale());
+    int height = std::ceil(m_scene->sceneRect().height() * m_view->currentScale());
+    QPixmap img(width, height);
+    QPainter painter(&img);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
+    for (const auto& view : m_objViews) {
+      m_montageZ = z + m_boundBox.minCorner().z;
+      view->setNormalView(m_montageZ, m_imgTime->get());
+    }
+    m_scene->render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
+    auto item = new QGraphicsPixmapItem(img);
+    item->setScale(1.0 / m_view->currentScale());
+    item->setPos(c * m_scene->sceneRect().width(), r * m_scene->sceneRect().height());
+    m_montageScene->addItem(item);
+  }
 }
 
 } // namespace nim
