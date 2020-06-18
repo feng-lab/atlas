@@ -695,8 +695,8 @@ std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroupForAnnotationF
   if (!m_widgetsGroup) {
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
-    m_widgetsGroup->addChild(m_showControlPoints, 1);
-    m_widgetsGroup->addChild(m_fixedControlPointsSize, 1);
+    //m_widgetsGroup->addChild(m_showControlPoints, 1);
+    //m_widgetsGroup->addChild(m_fixedControlPointsSize, 1);
     m_widgetsGroup->addChild(m_outlineColor, 1);
     m_widgetsGroup->addChild(m_regionColor, 1);
     m_widgetsGroup->addChild(m_opacity, 1);

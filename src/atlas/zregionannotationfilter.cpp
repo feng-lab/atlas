@@ -15,11 +15,15 @@ namespace nim {
 ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   : ZObjFilter(view)
   , m_view(view)
+  , m_showControlPoints("Show Control Points", true)
+  , m_fixedControlPointsSize("Fixed Control Points Size", true)
   , m_highlightRegionOnMouseHover("Highlight Region On Mouse Hover", true)
 {
   m_viewPrecedencePara.blockSignals(true);
   m_viewPrecedencePara.set(getViewPrecedence());
   m_viewPrecedencePara.blockSignals(false);
+  addParameter(&m_showControlPoints);
+  addParameter(&m_fixedControlPointsSize);
   addParameter(&m_highlightRegionOnMouseHover);
   m_numParametersWithoutRegionSepcificParas = m_parameters.size();
 }
@@ -91,6 +95,8 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     m_widgetsGroup->addChild(*pb, 1);
 
     m_widgetsGroup->addChild(m_viewPrecedencePara, 1);
+    m_widgetsGroup->addChild(m_showControlPoints, 1);
+    m_widgetsGroup->addChild(m_fixedControlPointsSize, 1);
     m_widgetsGroup->addChild(m_transform, 2);
     m_widgetsGroup->addChild(m_offsetPara, 2);
     m_widgetsGroup->addChild(m_highlightRegionOnMouseHover, 2);
@@ -220,6 +226,8 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->viewPrecedencePara().setValue(m_viewPrecedencePara.get());
     flt->transformPara().set(m_transform.get());
     flt->offsetPara().set(m_offsetPara.get());
+    flt->showControlPointsPara().set(m_showControlPoints.get());
+    flt->fixedControlPointsSizePara().set(m_fixedControlPointsSize.get());
     flt->highlightRegionOnMouseHoverPara().set(m_highlightRegionOnMouseHover.get());
     connect(&m_visible, &ZBoolParameter::valueChanged,
             &flt->visiblePara(), &ZBoolParameter::updateFromSender);
@@ -229,6 +237,10 @@ void ZRegionAnnotationFilter::allROIChanged()
             &flt->transformPara(), &Z2DTransformParameter::updateFromSender);
     connect(&m_offsetPara, &ZDVec2Parameter::valueChanged,
             &flt->offsetPara(), &ZDVec2Parameter::updateFromSender);
+    connect(&m_showControlPoints, &ZBoolParameter::valueChanged,
+            &flt->showControlPointsPara(), &ZBoolParameter::updateFromSender);
+    connect(&m_fixedControlPointsSize, &ZBoolParameter::valueChanged,
+            &flt->fixedControlPointsSizePara(), &ZBoolParameter::updateFromSender);
     connect(&m_highlightRegionOnMouseHover, &ZBoolParameter::valueChanged,
             &flt->highlightRegionOnMouseHoverPara(), &ZBoolParameter::updateFromSender);
 

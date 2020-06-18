@@ -100,6 +100,10 @@ private:
 
   void openHelpPanel();
 
+  void raiseViewSettingDockWidget();
+
+  void raiseGlobalSettingDockWidget();
+
   static void viewLog();
 
   static void openLogFolder();
@@ -204,6 +208,7 @@ private:
   QDockWidget* m_objectsDockWidget;
   QDockWidget* m_viewSettingDockWidget;
   QDockWidget* m_objectDetailedInfoDockWidget;
+  QDockWidget* m_globalSettingDockWidget;
   QDockWidget* m_captureDockWidget;
   QDockWidget* m_helpDockWidget;
   QDockWidget* m_editObjDockWidget;

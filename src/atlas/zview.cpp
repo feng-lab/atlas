@@ -62,10 +62,10 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_view = new ZGraphicsView(m_scene, this);
   connect(m_view, &ZGraphicsView::viewportChanged,
           this, &ZView::viewportChanged);
+  connect(m_view, &ZGraphicsView::viewportChanged,
+          this, &ZView::updateMontageScene);
 
   m_montageScene = new QGraphicsScene(this);
-  connect(m_scene, &ZGraphicsScene::changed,
-          this, &ZView::updateMontageScene);
 
   m_layout->addWidget(m_view);
   m_layout->addSpacing(15);
@@ -287,6 +287,14 @@ std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
   return std::shared_ptr<ZWidgetsGroup>();
 }
 
+QWidget* ZView::globalParasWidget()
+{
+  auto widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
+  widgetsGrp->addChild(*m_viewStyle, 1);
+  widgetsGrp->addChild(*m_montageColumns, 1);
+  return widgetsGrp->createWidget(false);
+}
+
 void ZView::read(size_t id, const QJsonObject& json)
 {
   for (const auto& view : m_objViews) {
@@ -506,6 +514,7 @@ void ZView::changeViewStyle()
       m_maxZProjViewAction->setChecked(true);
 
     if (m_view->scene() != m_scene) {
+      m_scene->disconnect(m_montageScene);
       m_view->setScene(m_scene);
       m_view->updateScaleFactorRange();
       fitContentIntoWindow();
@@ -521,6 +530,7 @@ void ZView::changeViewStyle()
       m_normalViewAction->setChecked(true);
 
     if (m_view->scene() != m_scene) {
+      m_scene->disconnect(m_montageScene);
       m_view->setScene(m_scene);
       m_view->updateScaleFactorRange();
       fitContentIntoWindow();
@@ -543,6 +553,8 @@ void ZView::changeViewStyle()
     }
 
     updateMontageScene();
+//    connect(m_scene, &ZGraphicsScene::changed, this, &ZView::emptyFun);
+    connect(m_scene, &ZGraphicsScene::changed, this, &ZView::updateMontageScene);
 
     m_imgSlice->setEnabled(false);
   }
@@ -793,7 +805,9 @@ void ZView::updateSceneRectFromBoundBox()
   auto nCols = m_montageColumns->get();
   auto nRows = (m_boundBox.maxCorner().z - m_boundBox.minCorner().z + nCols) / nCols;
   sceneRect = QRectF(sceneRect.x(), sceneRect.y(), sceneRect.width() * nCols, sceneRect.height() * nRows);
-  m_montageScene->setSceneRect(sceneRect);
+  if (sceneRect != m_montageScene->sceneRect()) {
+    m_montageScene->setSceneRect(sceneRect);
+  }
 }
 
 void ZView::updateMontageScene()
@@ -802,14 +816,24 @@ void ZView::updateMontageScene()
     return;
   }
 
+  m_scene->blockSignals(true);
+
   m_montageScene->clear();
+
+  auto rgn = m_view->getCurrrentlyVisibleRegion();
 
   for (auto z = 0; z <= m_boundBox.maxCorner().z - m_boundBox.minCorner().z; ++z) {
     auto r = z / m_montageColumns->get();
     auto c = z % m_montageColumns->get();
-    int width = std::ceil(m_scene->sceneRect().width() * m_view->currentScale());
-    int height = std::ceil(m_scene->sceneRect().height() * m_view->currentScale());
+    QRectF sceneRgn(c * m_scene->sceneRect().width(), r * m_scene->sceneRect().height(),
+                    m_scene->sceneRect().width(), m_scene->sceneRect().height());
+    if (!sceneRgn.intersects(rgn)) {
+      continue;
+    }
+    int width = std::ceil(sceneRgn.width() * m_view->currentScale());
+    int height = std::ceil(sceneRgn.height() * m_view->currentScale());
     QPixmap img(width, height);
+    img.fill(Qt::black);
     QPainter painter(&img);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
     for (const auto& view : m_objViews) {
@@ -819,9 +843,17 @@ void ZView::updateMontageScene()
     m_scene->render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
     auto item = new QGraphicsPixmapItem(img);
     item->setScale(1.0 / m_view->currentScale());
-    item->setPos(c * m_scene->sceneRect().width(), r * m_scene->sceneRect().height());
+    item->setPos(sceneRgn.x(), sceneRgn.y());
     m_montageScene->addItem(item);
   }
+
+  QApplication::processEvents();
+  m_scene->blockSignals(false);
+}
+
+void ZView::emptyFun()
+{
+  LOG(INFO) << "here";
 }
 
 } // namespace nim

@@ -66,6 +66,8 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView& m_view;
 
+  ZBoolParameter m_showControlPoints;
+  ZBoolParameter m_fixedControlPointsSize;
   ZBoolParameter m_highlightRegionOnMouseHover;
 
   std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;

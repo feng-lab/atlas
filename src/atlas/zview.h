@@ -160,6 +160,8 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
+  QWidget* globalParasWidget();
+
   void read(size_t id, const QJsonObject& json);
 
   void write(size_t id, QJsonObject& json) const;
@@ -239,6 +241,8 @@ private:
   void updateSceneRectFromBoundBox();
 
   void updateMontageScene();
+
+  void emptyFun();
 
 private:
   ZDoc& m_doc;

@@ -322,6 +322,22 @@ void ZMainWindow::openHelpPanel()
   m_helpDockWidget->raise();
 }
 
+void ZMainWindow::raiseViewSettingDockWidget()
+{
+  if (m_viewSettingDockWidget->isHidden()) {
+    m_viewSettingDockWidget->show();
+  }
+  m_viewSettingDockWidget->raise();
+}
+
+void ZMainWindow::raiseGlobalSettingDockWidget()
+{
+  if (m_globalSettingDockWidget->isHidden()) {
+    m_globalSettingDockWidget->show();
+  }
+  m_globalSettingDockWidget->raise();
+}
+
 void ZMainWindow::viewLog()
 {
   //ZLogDialog logDialog(logModelSinkInstance(), this);
@@ -768,6 +784,7 @@ void ZMainWindow::createDockWindows()
   m_viewSettingDockWidget = new QDockWidget(tr("Object View Setting"), this);
   m_viewSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable);
   m_viewSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  connect(m_doc.get(), &ZDoc::showViewSetting, this, &ZMainWindow::raiseViewSettingDockWidget);
   m_viewSettingDockWidget->setWidget(new ZViewSettingWidget(*m_doc, m_view.get(), this));
   addDockWidget(Qt::RightDockWidgetArea, m_viewSettingDockWidget);
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
@@ -781,6 +798,16 @@ void ZMainWindow::createDockWindows()
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
   m_objectDetailedInfoDockWidget->setVisible(false);
+
+  m_globalSettingDockWidget = new QDockWidget(tr("Global View Setting"), this);
+  m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
+                                         QDockWidget::DockWidgetMovable |
+                                         QDockWidget::DockWidgetFloatable);
+  m_globalSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
+  m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
+  addDockWidget(Qt::RightDockWidgetArea, m_globalSettingDockWidget);
+  m_windowMenu->addAction(m_globalSettingDockWidget->toggleViewAction());
+  tabifyDockWidget(m_viewSettingDockWidget, m_globalSettingDockWidget);
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
   m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable |

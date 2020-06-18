@@ -233,6 +233,12 @@ public:
   ZDVec2Parameter& offsetPara()
   { return m_offsetPara; }
 
+  ZBoolParameter& showControlPointsPara()
+  { return m_showControlPoints; }
+
+  ZBoolParameter& fixedControlPointsSizePara()
+  { return m_fixedControlPointsSize; }
+
   ZBoolParameter& highlightRegionOnMouseHoverPara()
   { return m_highlightRegionOnMouseHover; }
 
