@@ -1181,9 +1181,13 @@ def build_assimp(src_dir: str, install_dir: str):
 
         orig_file3 = os.path.join(src_dir, 'CMakeLists.txt')
         from_texts = [r'SET (ASSIMP_SOVERSION 5)',
-                      r' -lz']
+                      r' -lz',
+                      r' /WX',
+                      ]
         to_texts = [r'SET (ASSIMP_SOVERSION ${ASSIMP_VERSION_MAJOR})',
-                    r' ZLIB::ZLIB']
+                    r' ZLIB::ZLIB',
+                    r' ',
+                    ]
         bak_file3 = patch_file(orig_file3, from_texts=from_texts, to_texts=to_texts)
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
