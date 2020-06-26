@@ -58,6 +58,7 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
         } else {
           display.showChannel(ch, maxProj.dataRangeMin(), max);
         }
+        display.setChannelColor(ch, maxProj.channelColor(ch));
       }
       m_tileimages.push_back(display.toQImage());
     }
@@ -1067,6 +1068,7 @@ void ZStitchImageDialog::getConnFromTileImage()
       double max;
       img.createView(0, 0).computeMinMax(min, max);
       display.showChannel(0, min, max);
+      display.setChannelColor(0, img.channelColor(0));
       m_tileImage = display.toQImage();
 
       if (getTileMatrix(img, m_tileMatrix, m_tileList)) {

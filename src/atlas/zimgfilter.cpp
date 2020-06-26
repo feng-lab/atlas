@@ -185,6 +185,7 @@ void ZImgFilter::setData(ZImgPack& pack)
   }
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
     m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
+    m_display->setChannelColor(c, m_imgPack->imgInfo().channelColors[c]);
     //m_display->setAlpha(m_opacity.get());
 
     addParameter(m_channelVisibleParas[c].get());
@@ -478,7 +479,7 @@ void ZImgFilter::channelColorChanged()
     }
     if (m_channelVisibleParas[c]->get()) {  // only redraw if this channel is visible
       col4 col(para->get().r * 255, para->get().g * 255, para->get().b * 255);
-      m_imgPack->setChannelColor(c, col);
+      m_display->setChannelColor(c, col);
       m_displayValid = false;
     }
   } else {

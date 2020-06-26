@@ -210,7 +210,7 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
       da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
       colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
     } else {
-      col4 maxCol(imgInfo().channelColors[ch]);
+      col4 maxCol(m_channelColors.at(ch));
       if (alphaChannelIdx < 0) {  // no alpha channel, encode global alpha into colormap
         maxCol.r = static_cast<uint8_t>(m_alpha * maxCol.r + 0.5);
         maxCol.g = static_cast<uint8_t>(m_alpha * maxCol.g + 0.5);
@@ -260,7 +260,7 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
     imgDatas[c] = img->rowData<TVoxel>(rowRange.begin(), m_z, ch, m_t);
     chMinValue[c] = m_channels.at(ch).first;
     chMaxValue[c] = m_channels.at(ch).second;
-    chCol[c] = imgInfo().channelColors[ch];
+    chCol[c] = m_channelColors.at(ch);
     chCol[c].r = static_cast<uint8_t>(m_alpha * chCol[c].r + 0.5);
     chCol[c].g = static_cast<uint8_t>(m_alpha * chCol[c].g + 0.5);
     chCol[c].b = static_cast<uint8_t>(m_alpha * chCol[c].b + 0.5);

@@ -693,7 +693,7 @@ if (WIN32)
                      $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
-  target_compile_options(${APP_NAME} PUBLIC -fexceptions)
+  target_compile_options(${APP_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
 

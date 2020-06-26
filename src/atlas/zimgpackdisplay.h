@@ -65,6 +65,11 @@ public:
     }
   }
 
+  void setChannelColor(size_t ch, col4 col)
+  {
+    m_channelColors[ch] = col;
+  }
+
   // show channel ch and map minData to 0, map maxData to 255
   void showChannel(size_t ch, double minData, double maxData);   // todo: long double??
   void hideChannel(size_t ch);
@@ -113,6 +118,7 @@ private:
   double m_scale;
   QRectF m_viewport;
   std::map<size_t, std::pair<double, double>> m_channels;
+  std::map<size_t, col4> m_channelColors;
   mutable double m_alpha;
 
   bool m_mip = false;
