@@ -87,6 +87,7 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     display.setAlpha(m_alpha);
     for (const auto& chRange : m_channels) {
       display.showChannel(chRange.first, chRange.second.first, chRange.second.second);
+      display.setChannelColor(chRange.first, m_channelColors.at(chRange.first));
     }
     return display.toQImagePack(tileWidth, tileHeight);
   }
