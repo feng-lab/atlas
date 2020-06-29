@@ -1685,7 +1685,11 @@ ZImg ZImg::fromJson(const QJsonValue& value)
   ZImgInfo info(0, 0, 0, 0, 0, 4, VoxelFormat::Signed);
 
   QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = size.split(rx, Qt::SkipEmptyParts);
+#else
+  QStringList numList = size.split(rx, QString::SkipEmptyParts);
+#endif
   CHECK(numList.size() == 5);
   info.width = numList[0].toInt();
   info.height = numList[1].toInt();
@@ -1693,7 +1697,11 @@ ZImg ZImg::fromJson(const QJsonValue& value)
   info.numChannels = numList[3].toInt();
   info.numTimes = numList[4].toInt();
   ZImg img(info);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   numList = values.split(rx, Qt::SkipEmptyParts);
+#else
+  numList = values.split(rx, QString::SkipEmptyParts);
+#endif
   CHECK(img.voxelNumber() == size_t(numList.size()));
   for (size_t i = 0; i < size_t(numList.size()); ++i) {
     img.setValue(numList[i].toInt(), i);
