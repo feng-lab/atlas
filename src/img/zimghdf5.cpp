@@ -15,6 +15,18 @@ inline size_t chunkSize()
   return size_t(512);
 }
 
+inline size_t cacheSize()
+{
+  return size_t(1024) * 1024 * 4000;
+}
+
+inline H5::FileAccPropList accPropList()
+{
+  H5::FileAccPropList accPropList = H5::FileAccPropList::DEFAULT;
+  accPropList.setCache(1000000, cacheSize() / chunkSize() / chunkSize() * 100, cacheSize(), 0.75);
+  return accPropList;
+}
+
 void readH5DataToImg(nim::ZImg& img, const H5::DataSet& data, size_t x_, size_t y_)
 {
   H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
@@ -449,7 +461,8 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(m_filename).constData(), H5F_ACC_RDONLY);
+    H5::H5File file(QFile::encodeName(m_filename).constData(), H5F_ACC_RDONLY,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     if (m_tiles.size() == 1) {
       //LOG(INFO) << m_tiles[0] << m_info.toQString();
@@ -499,7 +512,8 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     H5::Group allGrp = file.openGroup("Img");
 
@@ -576,7 +590,8 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     H5::Group allGrp = file.openGroup("Img");
 
@@ -659,7 +674,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     H5::Group allGrp = file.createGroup("Img");
 
@@ -713,7 +729,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
 
@@ -773,7 +790,8 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, accPropList());
 
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
 

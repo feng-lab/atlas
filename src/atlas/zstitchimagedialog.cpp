@@ -3,8 +3,6 @@
 #include "zimg.h"
 #include "zimgio.h"
 #include "zimgdisplay.h"
-#include "zimgnccmatch.h"
-#include "zimgmerge.h"
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
