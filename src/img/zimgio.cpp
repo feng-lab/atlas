@@ -17,6 +17,28 @@
 #include "zimgleica.h"
 #include "zlog.h"
 
+namespace {
+
+QString getTemporaryFilename(const QString& filename)
+{
+  QFileInfo fi(filename);
+  return fi.dir().filePath(QString("~$%1").arg(fi.fileName()));
+}
+
+void renameFile(const QString& oldName, const QString& newName)
+{
+  if (QFile::exists(newName)) {
+    if (!QFile::remove(newName)) {
+      throw nim::ZIOException(QString("Can not remove existing file %1").arg(newName));
+    }
+  }
+  if (!QFile::rename(oldName, newName)) {
+    throw nim::ZIOException(QString("Can not rename file %1").arg(oldName));
+  }
+}
+
+}
+
 namespace nim {
 
 ZImgIO& ZImgIO::instance()
@@ -585,7 +607,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, paras);
+          auto tfn = getTemporaryFilename(filename);
+          writer->writeImg(tfn, img, paras);
+          renameFile(tfn, filename);
           return;
         }
         catch (const ZIOException& e) {
@@ -598,7 +622,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, paras);
+      auto tfn = getTemporaryFilename(filename);
+      m_ioFormats[format]->writeImg(tfn, img, paras);
+      renameFile(tfn, filename);
       return;
     }
     catch (const ZIOException& e) {
@@ -625,7 +651,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, paras);
+          auto tfn = getTemporaryFilename(filename);
+          writer->writeImg(tfn, img, paras);
+          renameFile(tfn, filename);
           return;
         }
         catch (const ZIOException& e) {
@@ -638,7 +666,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, paras);
+      auto tfn = getTemporaryFilename(filename);
+      m_ioFormats[format]->writeImg(tfn, img, paras);
+      renameFile(tfn, filename);
       return;
     }
     catch (const ZIOException& e) {
@@ -665,7 +695,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          writer->writeImg(filename, img, paras);
+          auto tfn = getTemporaryFilename(filename);
+          writer->writeImg(tfn, img, paras);
+          renameFile(tfn, filename);
           return;
         }
         catch (const ZIOException& e) {
@@ -678,7 +710,9 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      m_ioFormats[format]->writeImg(filename, img, paras);
+      auto tfn = getTemporaryFilename(filename);
+      m_ioFormats[format]->writeImg(tfn, img, paras);
+      renameFile(tfn, filename);
       return;
     }
     catch (const ZIOException& e) {
