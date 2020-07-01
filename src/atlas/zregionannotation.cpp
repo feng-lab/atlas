@@ -285,7 +285,12 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
         it->roi = createROI();
         emit regionROIAdded(it->id, it->roi.get());
       }
-      it->roi->mergeWith(roi);
+      if (regionID >= 0) {
+        it->roi->mergeWith(roi);
+      } else {
+        it->roi->subtractROI(roi);
+        it->roi->mergeWith(roi);
+      }
     } else {
       if (it->roi) {
         it->roi->subtractROI(roi);
