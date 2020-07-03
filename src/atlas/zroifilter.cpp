@@ -912,7 +912,7 @@ void ZROIFilter::rotateClockwise()
   }
   using namespace boost::math::double_constants;
   if (!controlPoints.empty()) {
-    m_ROI->rotateROIControlPoints(controlPoints, 5. * degree);
+    m_ROI->rotateROIControlPoints(controlPoints, 1. * degree);
   }
 }
 
@@ -938,7 +938,7 @@ void ZROIFilter::rotateCounterclockwise()
   }
   using namespace boost::math::double_constants;
   if (!controlPoints.empty()) {
-    m_ROI->rotateROIControlPoints(controlPoints, -5. * degree);
+    m_ROI->rotateROIControlPoints(controlPoints, -1. * degree);
   }
 }
 
