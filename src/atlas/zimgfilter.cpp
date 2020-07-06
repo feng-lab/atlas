@@ -199,7 +199,7 @@ void ZImgFilter::setData(ZImgPack& pack)
                                                                 m_scaleBarHeight.get(),
                                                                 m_imgPack->imgInfo().voxelSizeXInUm(),
                                                                 m_view.currentScale(),
-                                                                getQTransform().m11(),
+                                                                getTransformScale().x,
                                                                 mapFromSceneRect(m_view.currentViewport()),
                                                                 m_scaleBarColor.get());
     m_scaleBarItem->setVisible(false);
@@ -352,7 +352,7 @@ void ZImgFilter::transformChanged()
   if (m_item) {
     m_item->setTransform(getQTransform());
     if (m_scaleBarItem) {
-      m_scaleBarItem->setTransformScale(getQTransform().m11());
+      m_scaleBarItem->setTransformScale(getTransformScale().x);
     }
     viewportChanged();
   }
@@ -569,7 +569,7 @@ void ZImgFilter::updateImgItems()
   } else {
     destroyImgItems();
 
-    m_display->setScale(m_view.currentScale() * std::max(getQTransform().m11(), getQTransform().m22()));
+    m_display->setScale(m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y));
     QRectF vp = m_view.currentViewport();
     m_display->setViewport(mapFromSceneRect(vp));
 
@@ -610,7 +610,7 @@ double ZImgFilter::getUpperChannelRange(size_t c) const
 void ZImgFilter::viewportChanged()
 {
   QRectF vp = mapFromSceneRect(m_view.currentViewport());
-  if (m_imgPack->needUpdate(vp, m_view.currentScale() * std::max(getQTransform().m11(), getQTransform().m22()),
+  if (m_imgPack->needUpdate(vp, m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y),
                             m_lastViewport, m_lastScale,
                             realT(), realZ(), m_view.isMaxZProjView())) {
     if (!m_isVisible) {

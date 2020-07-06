@@ -88,6 +88,9 @@ protected:
 
   QTransform getQTransform() const;
 
+  glm::dvec2 getTransformScale() const
+  { return m_transform.scale(); }
+
   QRectF mapToSceneRect(const QRectF& rect) const;
 
   QRectF mapFromSceneRect(const QRectF& rect) const;
