@@ -627,6 +627,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_GFLAGS_PROVIDER:STRING=package',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
                          '-DgRPC_ABSL_PROVIDER:STRING=module',
+                         '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
         # if is_windows():
         #     cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib',
