@@ -55,8 +55,13 @@ void ZSliceROI::updatePaintPath(size_t id)
   auto res = QPainterPath();
   for (const auto& so : m_idToShapeOperations.at(id)) {
     if (so.isAdd) {
+      if (!res.isEmpty()) {
+        CHECK(so.type != ROIType::Line);
+      }
       res += so.toPainterPath();
     } else {
+      CHECK(!res.isEmpty());
+      CHECK(so.type != ROIType::Line);
       res -= so.toPainterPath();
     }
   }
@@ -68,8 +73,13 @@ QPainterPath ZSliceROI::shapeToPainterPath(const std::vector<ZROIShapeOperation>
   auto res = QPainterPath();
   for (const auto& so : shape) {
     if (so.isAdd) {
+      if (!res.isEmpty()) {
+        CHECK(so.type != ROIType::Line);
+      }
       res += so.toPainterPath();
     } else {
+      CHECK(!res.isEmpty());
+      CHECK(so.type != ROIType::Line);
       res -= so.toPainterPath();
     }
   }
@@ -873,12 +883,16 @@ void ZROI::subtractROI(const ZROI& other, int64_t slice, int64_t shapeID)
 std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice, int64_t shapeID)
 {
   std::set<int> changedSlices;
-  if (shapeID >= 0 && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty()) { // subtract one shape
+  if (shapeID >= 0 && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty() &&
+      sliceROIs.at(slice).m_idToShapeOperations.at(shapeID)[0].type != ROIType::Line) { // subtract one shape
     changedSlices.insert(slice);
     const auto& sliceROI = sliceROIs.at(slice);
     std::vector<size_t> editedShapes;
 
     for (auto&[id, pp] : m_sliceROIs.at(slice).m_idToPainterPath) {
+      if (m_sliceROIs.at(slice).m_idToShapeOperations.at(id)[0].type == ROIType::Line) {
+        continue;
+      }
       const auto& shapePP = sliceROI.m_idToPainterPath.at(shapeID);
       if (pp.intersects(shapePP)) {
         editedShapes.push_back(id);
@@ -898,7 +912,13 @@ std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, 
         std::vector<size_t> editedShapes;
 
         for (const auto& [shapeID, shapePP] : sliceROI.m_idToPainterPath) {
+          if (sliceROI.m_idToShapeOperations.at(shapeID)[0].type == ROIType::Line) {
+            continue;
+          }
           for (auto&[id, pp] : m_sliceROIs.at(slice).m_idToPainterPath) {
+            if (m_sliceROIs.at(slice).m_idToShapeOperations.at(id)[0].type == ROIType::Line) {
+              continue;
+            }
             if (pp.intersects(shapePP)) {
               editedShapes.push_back(id);
               for (auto subShape : sliceROI.m_idToShapeOperations.at(shapeID)) {
@@ -1342,6 +1362,9 @@ void ZROI::sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID)
 
 void ZROI::sliceSubtractShape(int slice, size_t shapeID, const std::vector<ZROIShapeOperation> &otherShape)
 {
+  if (otherShape[0].type == ROIType::Line || m_sliceROIs.at(slice).m_idToShapeOperations.at(shapeID)[0].type == ROIType::Line) {
+    return;
+  }
   QPainterPath otherShapePp = ZSliceROI::shapeToPainterPath(otherShape);
   const auto& shapePp = m_sliceROIs.at(slice).m_idToPainterPath.at(shapeID);
   if (otherShapePp.contains(shapePp)) {
