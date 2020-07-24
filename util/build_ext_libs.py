@@ -716,6 +716,7 @@ def build_libevent(src_dir: str, install_dir: str):
                          '-DEVENT__DISABLE_TESTS:BOOL=ON',
                          '-DEVENT__DISABLE_REGRESS:BOOL=ON',
                          '-DEVENT__DISABLE_SAMPLES:BOOL=ON',
+                         '-DEVENT__DISABLE_MBEDTLS:BOOL=ON',
                          '-DEVENT__MSVC_STATIC_RUNTIME:BOOL=OFF',
                          '-DEVENT__DOXYGEN:BOOL=OFF',
                          '-DEVENT__LIBRARY_TYPE=STATIC',
