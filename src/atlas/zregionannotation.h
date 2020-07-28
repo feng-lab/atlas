@@ -29,9 +29,9 @@ public:
 //
 //  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
 
-  void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true);
+  void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true, double scale = 1.0);
 
-  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras) const;
+  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale = 1.0) const;
 
   [[nodiscard]] size_t numRegions() const
   { return m_ontology.size(); }
@@ -85,7 +85,7 @@ public:
   void save(const QString& filename) const;
 
   // update Mesh after editing contours
-  void updateMesh();
+  void updateMesh(double scale = 1.0);
 
   // apply transformation to mesh
   void transformMesh(const glm::mat4& transformation);

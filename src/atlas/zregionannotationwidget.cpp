@@ -11,6 +11,7 @@
 #include <QFileDialog>
 #include <QApplication>
 #include <QMessageBox>
+#include <QInputDialog>
 
 namespace nim {
 
@@ -53,11 +54,15 @@ void ZRegionAnnotationWidget::exportLabelImage()
     dialog.close();
   }
   QApplication::processEvents();
-  if (fmtIdx >= 0 && !fn.isEmpty()) {
+  bool ok;
+  double d = QInputDialog::getDouble(this, tr("Scale Output Label Image"),
+                                     tr("Scale:"), 1.0, 1e-10, 1e10, 6, &ok,
+                                     Qt::WindowFlags(), 1);
+  if (fmtIdx >= 0 && !fn.isEmpty() && ok) {
     try {
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];
-      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, formats[fmtIdx], paras);
+      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, formats[fmtIdx], paras, d);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
@@ -77,6 +82,17 @@ void ZRegionAnnotationWidget::transformMesh()
   }
 }
 
+void ZRegionAnnotationWidget::updateMesh()
+{
+  bool ok;
+  double d = QInputDialog::getDouble(this, tr("Scale ROI before Generating Mesh"),
+                                     tr("Scale:"), 1.0, 1e-10, 1e10, 6, &ok,
+                                     Qt::WindowFlags(), 1);
+  if (ok) {
+    m_regionAnnotationPack.regionAnnotation().updateMesh(d);
+  }
+}
+
 void ZRegionAnnotationWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
@@ -85,8 +101,7 @@ void ZRegionAnnotationWidget::createWidget()
   m_update3DMeshFromROIButton->setToolTip("Update 3D mesh with current region contours");
   m_update3DMeshFromROIButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_update3DMeshFromROIButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(m_update3DMeshFromROIButton, &QPushButton::clicked,
-    &m_regionAnnotationPack.regionAnnotation(), &ZRegionAnnotation::updateMesh);
+  connect(m_update3DMeshFromROIButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::updateMesh);
 
   m_transform3DMeshButton = new QPushButton("Transform 3D Mesh...");
   m_transform3DMeshButton->setToolTip("Apply transformation to 3D mesh");

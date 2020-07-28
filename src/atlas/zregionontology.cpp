@@ -380,7 +380,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
 }
 #endif
 
-void binaryImgToMesh(const ZImg& img, ZMesh& msh)
+void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   vtkSmartPointer<vtkImageData> vimg = vtkSmartPointer<vtkImageData>::New();
@@ -485,6 +485,9 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh)
   }
 
   msh.clear();
+  for (auto& v : vertices) {
+    v *= scale;
+  }
   msh.setVertices(vertices);
   msh.setIndices(indices);
   //msh.setNormals(normals);
@@ -497,7 +500,7 @@ struct ContourNode
   int parentIndex;
 };
 
-void binaryImgToROI(const ZImg& img, ZROI& roi)
+void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   roi.clear();
@@ -558,6 +561,9 @@ void binaryImgToROI(const ZImg& img, ZROI& roi)
           if (!poly.isClosed()) {
             poly.push_back(poly[0]);
           }
+          QTransform tfm;
+          tfm.scale(scale, scale);
+          poly = tfm.map(poly);
           if (contoursTree.numAncestors(it) == 0) {
             roi.newSpline(s, poly);
           } else if (contoursTree.numAncestors(it) % 2 == 0) {

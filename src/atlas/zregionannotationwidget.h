@@ -19,6 +19,8 @@ protected:
 
   void transformMesh();
 
+  void updateMesh();
+
 private:
   void createWidget();
 

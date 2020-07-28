@@ -112,7 +112,7 @@ void ZRegionAnnotation::clear()
   updateBoundBox();
 }
 
-void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, bool createMesh, bool createROI)
+void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, bool createMesh, bool createROI, double scale)
 {
   ZBenchTimer bt;
   bt.start();
@@ -141,8 +141,8 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 //  m_height = origLabelImg.height();
 //  m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
-  m_voxelSizeX = origLabelImg.info().voxelSizeXInUm();
-  m_voxelSizeY = origLabelImg.info().voxelSizeYInUm();
+  m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scale;
+  m_voxelSizeY = origLabelImg.info().voxelSizeYInUm() * scale;
   m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
 
   for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
@@ -195,12 +195,12 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     if (createMesh) {
       // create mesh
       it->mesh = std::make_shared<ZMesh>();
-      binaryImgToMesh(binaryImg, *it->mesh);
+      binaryImgToMesh(binaryImg, *it->mesh, scale);
     }
     if (createROI) {
       // create contours
       it->roi = this->createROI();
-      binaryImgToROI(binaryImg, *it->roi);
+      binaryImgToROI(binaryImg, *it->roi, scale);
     }
 
     // update labelImg: change id to parentID (merge current region to parent region)
@@ -244,21 +244,21 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
 }
 
-void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras) const
+void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale) const
 {
   LOG(INFO) << "Exporting Label Image...";
 
-  ZImgInfo info(m_boundBox.maxCorner().x + 2, m_boundBox.maxCorner().y + 2, m_boundBox.maxCorner().z + 2,
+  ZImgInfo info(m_boundBox.maxCorner().x * scale + 2, m_boundBox.maxCorner().y * scale + 2, m_boundBox.maxCorner().z + 2,
                 1, 1, 2);
   info.voxelSizeUnit = VoxelSizeUnit::um;
-  info.voxelSizeX = m_voxelSizeX;
-  info.voxelSizeY = m_voxelSizeY;
+  info.voxelSizeX = m_voxelSizeX / scale;
+  info.voxelSizeY = m_voxelSizeY / scale;
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
-      ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+      ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale);
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
     }
   }
@@ -558,14 +558,14 @@ void ZRegionAnnotation::save(const QString& filename) const
   }
 }
 
-void ZRegionAnnotation::updateMesh()
+void ZRegionAnnotation::updateMesh(double scale)
 {
   QTemporaryDir dir;
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.mhd");
-    exportLabelImage(fn, FileFormat::MetaImage, ZImgWriteParameters());
+    exportLabelImage(fn, FileFormat::MetaImage, ZImgWriteParameters(), scale);
     auto cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
-    importLabelImage(fn, FileFormat::MetaImage, true, false);
+    importLabelImage(fn, FileFormat::MetaImage, true, false, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
     //emit modified();
