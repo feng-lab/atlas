@@ -56,9 +56,9 @@ public:
   virtual void selectionChanged(const QList<QGraphicsItem*>& items) = 0;
 
   //
-  virtual void rotateClockwise() = 0;
+  virtual void rotateClockwise(double x, double y) = 0;
 
-  virtual void rotateCounterclockwise() = 0;
+  virtual void rotateCounterclockwise(double x, double y) = 0;
 
   //
   virtual int minViewPrecedence() const = 0;

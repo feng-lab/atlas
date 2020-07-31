@@ -171,23 +171,23 @@ void ZRegionAnnotationFilter::mouseReleased(const QPointF& scenePos)
   }
 }
 
-void ZRegionAnnotationFilter::rotateClockwise()
+void ZRegionAnnotationFilter::rotateClockwise(double x, double y)
 {
   if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
     return;
   }
   for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->rotateClockwise();
+    idFilter.second->rotateClockwise(x, y);
   }
 }
 
-void ZRegionAnnotationFilter::rotateCounterclockwise()
+void ZRegionAnnotationFilter::rotateCounterclockwise(double x, double y)
 {
   if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
     return;
   }
   for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->rotateCounterclockwise();
+    idFilter.second->rotateCounterclockwise(x, y);
   }
 }
 

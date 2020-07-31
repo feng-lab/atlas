@@ -185,13 +185,13 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 
     // create binary image
     binaryImg.binaryOperation(labelImg, MarkAsIfOtherEqualsOtherWiseZero(1, it->id));
-    if (it->id == 997) {
-      for (size_t z = 0; z < binaryImg.depth(); ++z) {
-        ZImg simg = binaryImg.createView(z, 0, 0);
-        ZImg fimg = imFill.run(simg);
-        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
-      }
-    }
+//    if (it->id == 997) {
+//      for (size_t z = 0; z < binaryImg.depth(); ++z) {
+//        ZImg simg = binaryImg.createView(z, 0, 0);
+//        ZImg fimg = imFill.run(simg);
+//        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
+//      }
+//    }
     if (createMesh) {
       // create mesh
       it->mesh = std::make_shared<ZMesh>();
@@ -562,10 +562,10 @@ void ZRegionAnnotation::updateMesh(double scale)
 {
   QTemporaryDir dir;
   if (dir.isValid()) {
-    QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.mhd");
-    exportLabelImage(fn, FileFormat::MetaImage, ZImgWriteParameters(), scale);
+    QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
+    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale);
     auto cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
-    importLabelImage(fn, FileFormat::MetaImage, true, false, 1.0 / scale);
+    importLabelImage(fn, FileFormat::Unknown, true, false, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
     //emit modified();

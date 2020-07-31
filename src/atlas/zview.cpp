@@ -658,11 +658,11 @@ void ZView::keyPressEvent(QKeyEvent* event)
     case Qt::Key_R:
       if (event->modifiers() == Qt::ControlModifier) {
         for (const auto& view : m_objViews) {
-          view->rotateClockwise();
+          view->rotateClockwise(m_scene->lastPressedPoint().x(), m_scene->lastPressedPoint().y());
         }
       } else if (event->modifiers() == (Qt::ControlModifier | Qt::AltModifier)) {
         for (const auto& view : m_objViews) {
-          view->rotateCounterclockwise();
+          view->rotateCounterclockwise(m_scene->lastPressedPoint().x(), m_scene->lastPressedPoint().y());
         }
       }
       break;

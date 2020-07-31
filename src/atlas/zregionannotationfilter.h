@@ -44,9 +44,9 @@ public:
 
   void mouseReleased(const QPointF& scenePos) override;
 
-  void rotateClockwise() override;
+  void rotateClockwise(double x, double y) override;
 
-  void rotateCounterclockwise() override;
+  void rotateCounterclockwise(double x, double y) override;
 
 private:
   void visibleChanged();

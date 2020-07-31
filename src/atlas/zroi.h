@@ -133,7 +133,7 @@ public:
 
   void subtractSpline(const QPolygonF& spline, size_t id);
 
-  void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle,
+  void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle, double x, double y,
                         std::vector<size_t>& editedShapes);
 
   void deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
@@ -381,9 +381,9 @@ public:
     return m_sliceROIs.at(slice).m_idToShapeOperations.at(id);
   }
 
-  void rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints, double angle);
+  void rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints, double angle, double x, double y);
 
-  std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle);
+  std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle, double x, double y);
 
   void deleteROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints);
 
@@ -535,18 +535,20 @@ protected:
 class ZROIRotateControlPointsCommand : public ZROICommand
 {
 public:
-  ZROIRotateControlPointsCommand(ZROI& roi, std::vector<ZROIControlPoint> controlPoints, double angle)
-    : ZROICommand(roi), m_controlPoints(std::move(controlPoints)), m_angle(angle)
+  ZROIRotateControlPointsCommand(ZROI& roi, std::vector<ZROIControlPoint> controlPoints, double angle, double x, double y)
+    : ZROICommand(roi), m_controlPoints(std::move(controlPoints)), m_angle(angle), m_x(x), m_y(y)
   {
     setText("Rotate Control Points");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.rotateROIControlPoints_Impl(m_controlPoints, m_angle); }
+  { m_changedSlices = m_roi.rotateROIControlPoints_Impl(m_controlPoints, m_angle, m_x, m_y); }
 
 protected:
   std::vector<ZROIControlPoint> m_controlPoints;
   double m_angle;
+  double m_x = 0;
+  double m_y = 0;
 };
 
 class ZROIDeleteControlPointsCommand : public ZROICommand

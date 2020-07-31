@@ -55,10 +55,10 @@ public:
   virtual void mouseReleased(const QPointF& scenePos)
   { Q_UNUSED(scenePos) }
 
-  virtual void rotateClockwise()
+  virtual void rotateClockwise(double, double)
   {}
 
-  virtual void rotateCounterclockwise()
+  virtual void rotateCounterclockwise(double, double)
   {}
 
   QList<ZParameter*> parameters()

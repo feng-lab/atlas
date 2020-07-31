@@ -408,7 +408,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
   smoother->SetFeatureAngle(120);
   smoother->SetPassBand(0.001);
   smoother->NonManifoldSmoothingOn();
-  smoother->NormalizeCoordinatesOn();
+  // smoother->NormalizeCoordinatesOn();   // todo: VTK bug
   smoother->Update();
 
   vtkSmartPointer<vtkThreshold> selector = vtkSmartPointer<vtkThreshold>::New();
@@ -486,7 +486,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
 
   msh.clear();
   for (auto& v : vertices) {
-    v *= scale;
+    v *= glm::dvec3(scale, scale, 1.);
   }
   msh.setVertices(vertices);
   msh.setIndices(indices);

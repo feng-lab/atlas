@@ -159,11 +159,11 @@ public:
 
   }
 
-  void rotateClockwise() override
+  void rotateClockwise(double x, double y) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
-        idFilter.second->rotateClockwise();
+        idFilter.second->rotateClockwise(x, y);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
@@ -171,11 +171,11 @@ public:
     }
   }
 
-  void rotateCounterclockwise() override
+  void rotateCounterclockwise(double x, double y) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
-        idFilter.second->rotateCounterclockwise();
+        idFilter.second->rotateCounterclockwise(x, y);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());

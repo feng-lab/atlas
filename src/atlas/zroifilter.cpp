@@ -890,7 +890,7 @@ void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
   }
 }
 
-void ZROIFilter::rotateClockwise()
+void ZROIFilter::rotateClockwise(double x, double y)
 {
   if (isLocked()) {
     return;
@@ -912,11 +912,11 @@ void ZROIFilter::rotateClockwise()
   }
   using namespace boost::math::double_constants;
   if (!controlPoints.empty()) {
-    m_ROI->rotateROIControlPoints(controlPoints, 1. * degree);
+    m_ROI->rotateROIControlPoints(controlPoints, 1. * degree, x, y);
   }
 }
 
-void ZROIFilter::rotateCounterclockwise()
+void ZROIFilter::rotateCounterclockwise(double x, double y)
 {
   if (isLocked()) {
     return;
@@ -938,7 +938,7 @@ void ZROIFilter::rotateCounterclockwise()
   }
   using namespace boost::math::double_constants;
   if (!controlPoints.empty()) {
-    m_ROI->rotateROIControlPoints(controlPoints, -1. * degree);
+    m_ROI->rotateROIControlPoints(controlPoints, -1. * degree, x, y);
   }
 }
 
