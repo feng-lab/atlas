@@ -21,6 +21,9 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   , camera("Camera", Z3DCamera())
   , pickingManager()
   , interactionHandler("Interaction Handler", &camera)
+  , xCut("X Cut", glm::vec2(0, 0), 0, 0)
+  , yCut("Y Cut", glm::vec2(0, 0), 0, 0)
+  , zCut("Z Cut", glm::vec2(0, 0), 0, 0)
   , m_canvas(canvas)
   , m_view(view)
 {
@@ -54,6 +57,13 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
 
   auto cameraParameterIndex = m_parameters.size();
   addParameter(camera);
+
+  xCut.setSingleStep(1);
+  yCut.setSingleStep(1);
+  zCut.setSingleStep(1);
+  addParameter(xCut);
+  addParameter(yCut);
+  addParameter(zCut);
 
   // lights
   QString lightname = "Key Light";
@@ -242,15 +252,15 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
 
 void Z3DGlobalParameters::read(const QJsonObject& json)
 {
-  for (size_t i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->read(json);
+  for (auto & m_parameter : m_parameters) {
+    m_parameter->read(json);
   }
 }
 
 void Z3DGlobalParameters::write(QJsonObject& json) const
 {
-  for (size_t i = 0; i < m_parameters.size(); ++i) {
-    m_parameters[i]->write(json);
+  for (auto m_parameter : m_parameters) {
+    m_parameter->write(json);
   }
 }
 

@@ -32,7 +32,7 @@ Q_OBJECT
 public:
   Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent = nullptr);
 
-  ~Z3DView();
+  ~Z3DView() override;
 
   const ZDoc& doc() const;
 
@@ -76,13 +76,13 @@ public:
 
   QWidget* globalParasWidget();
 
-  QWidget* captureWidget();
+  QWidget* captureWidget() const;
 
   QWidget* backgroundWidget();
 
   QWidget* axisWidget();
 
-  QWidget* helpWidget();
+  static QWidget* helpWidget();
 
   void updateBoundBox();
 
@@ -101,9 +101,9 @@ public:
   QList<Z3DObjView*> objViews()
   { return m_3dObjViews; }
 
-  ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t> ids) const;
+  ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t>& ids) const;
 
-  ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t> ids) const;
+  ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const;
 
   void cameraFocusesOn(double x, double y, double z, double radius = 64)
   { m_globalParas->cameraFocusesOn(x, y, z, radius); }

@@ -207,6 +207,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_fullResolutionRendering, &ZBoolParameter::valueChanged,
           this, &Z3DImgFilter::fullResolutionRenderingToggled);
 
+  connect(&m_rendererBase.globalXCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
+  connect(&m_rendererBase.globalYCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
+  connect(&m_rendererBase.globalZCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
+
   adjustWidget();
   CHECK_GL_ERROR
 
@@ -858,6 +862,31 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_rendererBase.setViewport(m_exitTarget.size());
     CHECK_GL_ERROR
 
+    float nearPlaneDistToOrigin =
+      glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
+    std::vector<glm::vec4> planes;
+    planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
+    if (m_rendererBase.globalParas().xCut.lowerValue() != m_rendererBase.globalParas().xCut.minimum()) {
+      planes.emplace_back(-1., 0., 0., -m_rendererBase.globalParas().xCut.lowerValue());
+    }
+    if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
+      planes.emplace_back(1., 0., 0., m_rendererBase.globalParas().xCut.upperValue());
+    }
+    if (m_rendererBase.globalParas().yCut.lowerValue() != m_rendererBase.globalParas().yCut.minimum()) {
+      planes.emplace_back(0., -1., 0., -m_rendererBase.globalParas().yCut.lowerValue());
+    }
+    if (m_rendererBase.globalParas().yCut.upperValue() != m_rendererBase.globalParas().yCut.maximum()) {
+      planes.emplace_back(0., 1., 0., m_rendererBase.globalParas().yCut.upperValue());
+    }
+    if (m_rendererBase.globalParas().zCut.lowerValue() != m_rendererBase.globalParas().zCut.minimum()) {
+      planes.emplace_back(0., 0., -1., -m_rendererBase.globalParas().zCut.lowerValue());
+    }
+    if (m_rendererBase.globalParas().zCut.upperValue() != m_rendererBase.globalParas().zCut.maximum()) {
+      planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().zCut.upperValue());
+    }
+    LOG(INFO) << planes.size();
+    ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
+
     // render back texture
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
                                     GL_COLOR_ATTACHMENT1
@@ -867,7 +896,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_BACK : GL_FRONT);
 
-    m_textureAndEyeCoordinateRenderer.setTriangleList(&cube);
+    m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
     m_exitTarget.release();
     CHECK_GL_ERROR
@@ -878,11 +907,6 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_FRONT : GL_BACK);
 
-    float nearPlaneDistToOrigin =
-      glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
-    std::vector<glm::vec4> planes;
-    planes.emplace_back(-globalCamera().viewVector(), nearPlaneDistToOrigin);
-    ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
     m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
     m_entryTarget.release();

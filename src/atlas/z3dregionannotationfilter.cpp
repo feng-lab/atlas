@@ -5,6 +5,7 @@
 #include "zmesh.h"
 #include "zrandom.h"
 #include <QFileInfo>
+#include <QPushButton>
 
 namespace nim {
 
@@ -58,6 +59,14 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_selectionLineWidth, 7);
     m_widgetsGroup->addChild(m_selectionLineColor, 7);
     m_widgetsGroup->addChild(m_manipulatorSize, 7);
+
+    auto pb = new QPushButton("Show All Regions");
+    connect(pb, &QPushButton::clicked, this, &Z3DRegionAnnotationFilter::showAllRegions);
+    m_widgetsGroup->addChild(*pb, 8);
+
+    pb = new QPushButton("Hide All Regions");
+    connect(pb, &QPushButton::clicked, this, &Z3DRegionAnnotationFilter::hideAllRegions);
+    m_widgetsGroup->addChild(*pb, 8);
 
     auto model =
       new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters, this);
@@ -212,6 +221,23 @@ void Z3DRegionAnnotationFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_regionAnnotationPack->boundBox().minCorner()));
   m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_regionAnnotationPack->boundBox().maxCorner()));
+}
+
+void Z3DRegionAnnotationFilter::showAllRegions()
+{
+  if (!isVisible()) {
+    return;
+  }
+  for (auto&[id, flt] : m_idToMeshFilters) {
+    flt->setVisible(true);
+  }
+}
+
+void Z3DRegionAnnotationFilter::hideAllRegions()
+{
+  for (auto&[id, flt] : m_idToMeshFilters) {
+    flt->setVisible(false);
+  }
 }
 
 } // namespace nim

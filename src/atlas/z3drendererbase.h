@@ -59,6 +59,15 @@ public:
   inline Z3DCameraParameter& globalCameraPara()
   { return m_globalParas.camera; }
 
+  inline const ZFloatSpanParameter& globalXCutPara() const
+  { return m_globalParas.xCut; }
+
+  inline const ZFloatSpanParameter& globalYCutPara() const
+  { return m_globalParas.yCut; }
+
+  inline const ZFloatSpanParameter& globalZCutPara() const
+  { return m_globalParas.zCut; }
+
   inline Z3DGlobalParameters& globalParas()
   { return m_globalParas; }
 

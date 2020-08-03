@@ -91,6 +91,9 @@ private:
 
   void setupAxisCamera();
 
+  void setClipPlanes() override
+  {}
+
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
   Z3DTextureBlendRenderer m_firstOnTopBlendRenderer;

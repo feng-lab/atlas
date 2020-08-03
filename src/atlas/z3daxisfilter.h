@@ -33,6 +33,9 @@ public:
 protected:
   void prepareData(Z3DEye eye);
 
+  void setClipPlanes() override
+  {}
+
   void setupCamera();
 
 protected:

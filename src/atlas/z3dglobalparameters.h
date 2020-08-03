@@ -102,6 +102,10 @@ public:
   // must add to network
   Z3DTrackballInteractionHandler interactionHandler;
 
+  ZFloatSpanParameter xCut;
+  ZFloatSpanParameter yCut;
+  ZFloatSpanParameter zCut;
+
 private:
   std::vector<ZParameter*> m_parameters;
 

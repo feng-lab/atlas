@@ -55,6 +55,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_xCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_yCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_zCut, &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_rendererBase.globalXCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_rendererBase.globalYCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
+  connect(&m_rendererBase.globalZCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
   m_boundBoxLineColor.setStyle("COLOR");
   //m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
@@ -288,19 +291,26 @@ void Z3DBoundedFilter::setClipPlanes()
 {
   if (!m_canUpdateClipPlane)
     return;
+
   std::vector<glm::vec4> clipPlanes;
-  if (m_xCut.lowerValue() != m_xCut.minimum())
+  if (m_xCut.lowerValue() != m_xCut.minimum()) {
     clipPlanes.emplace_back(1., 0., 0., -m_xCut.lowerValue());
-  if (m_xCut.upperValue() != m_xCut.maximum())
+  }
+  if (m_xCut.upperValue() != m_xCut.maximum()) {
     clipPlanes.emplace_back(-1., 0., 0., m_xCut.upperValue());
-  if (m_yCut.lowerValue() != m_yCut.minimum())
+  }
+  if (m_yCut.lowerValue() != m_yCut.minimum()) {
     clipPlanes.emplace_back(0., 1., 0., -m_yCut.lowerValue());
-  if (m_yCut.upperValue() != m_yCut.maximum())
+  }
+  if (m_yCut.upperValue() != m_yCut.maximum()) {
     clipPlanes.emplace_back(0., -1., 0., m_yCut.upperValue());
-  if (m_zCut.lowerValue() != m_zCut.minimum())
+  }
+  if (m_zCut.lowerValue() != m_zCut.minimum()) {
     clipPlanes.emplace_back(0., 0., 1., -m_zCut.lowerValue());
-  if (m_zCut.upperValue() != m_zCut.maximum())
+  }
+  if (m_zCut.upperValue() != m_zCut.maximum()) {
     clipPlanes.emplace_back(0., 0., -1., m_zCut.upperValue());
+  }
   m_rendererBase.setClipPlanes(&clipPlanes);
 }
 

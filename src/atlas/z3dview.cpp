@@ -29,6 +29,7 @@
 #include <QMainWindow>
 #include <QScrollArea>
 #include <QPlainTextEdit>
+#include <memory>
 
 namespace {
 // generic solution
@@ -117,8 +118,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   } else if (id == 3) {
     return m_globalParas->widgetsGroup(false);
   } else {
-    for (int i = 0; i < m_3dObjViews.size(); ++i) {
-      std::shared_ptr<ZWidgetsGroup> wg = m_3dObjViews[i]->viewSettingWidgetsGroupOf(id);
+    for (auto & m_3dObjView : m_3dObjViews) {
+      std::shared_ptr<ZWidgetsGroup> wg = m_3dObjView->viewSettingWidgetsGroupOf(id);
       if (wg)
         return wg;
     }
@@ -131,7 +132,7 @@ QWidget* Z3DView::globalParasWidget()
   return m_globalParas->widgetsGroup(true)->createWidget(false);
 }
 
-QWidget* Z3DView::captureWidget()
+QWidget* Z3DView::captureWidget() const
 {
   //auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
@@ -186,8 +187,8 @@ QWidget* Z3DView::helpWidget()
 void Z3DView::updateBoundBox()
 {
   m_boundBox.reset();
-  for (int i = 0; i < m_3dObjViews.size(); ++i) {
-    m_boundBox.expand(m_3dObjViews[i]->boundBox());
+  for (auto & m_3dObjView : m_3dObjViews) {
+    m_boundBox.expand(m_3dObjView->boundBox());
   }
   if (m_boundBox.empty()) {
     // nothing visible
@@ -201,17 +202,28 @@ void Z3DView::updateBoundBox()
     resetCameraClippingRange();
   }
   m_numObjsBefore = m_doc.numObjs();
+
+  // update global cut
+  m_globalParas->xCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().x) - 1,
+                                           std::ceil(m_boundBox.maxCorner().x) + 1);
+
+  m_globalParas->yCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().y) - 1,
+                                           std::ceil(m_boundBox.maxCorner().y) + 1);
+
+  m_globalParas->zCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().z) - 1,
+                                           std::ceil(m_boundBox.maxCorner().z) + 1);
+
 }
 
 void Z3DView::read(size_t id, const QJsonObject& json)
 {
-  for (int i = 0; i < m_3dObjViews.size(); ++i) {
-    if (m_3dObjViews[i]->hasObj(id)) {
-      if (json.value("ViewObjType").toString() == m_3dObjViews[i]->doc().typeName()) {
-        m_3dObjViews[i]->read(id, json);
+  for (auto & m_3dObjView : m_3dObjViews) {
+    if (m_3dObjView->hasObj(id)) {
+      if (json.value("ViewObjType").toString() == m_3dObjView->doc().typeName()) {
+        m_3dObjView->read(id, json);
       } else {
         LOG(WARNING) << "view object type " << json.value("ViewObjType").toString()
-                     << " dones't match object type " << m_3dObjViews[i]->doc().typeName() << ". abort.";
+                     << " dones't match object type " << m_3dObjView->doc().typeName() << ". abort.";
       }
       return;
     }
@@ -220,11 +232,11 @@ void Z3DView::read(size_t id, const QJsonObject& json)
 
 void Z3DView::write(size_t id, QJsonObject& json) const
 {
-  for (int i = 0; i < m_3dObjViews.size(); ++i) {
-    if (m_3dObjViews[i]->hasObj(id)) {
-      json.insert("ViewObjType", m_3dObjViews[i]->doc().typeName());
+  for (auto m_3dObjView : m_3dObjViews) {
+    if (m_3dObjView->hasObj(id)) {
+      json.insert("ViewObjType", m_3dObjView->doc().typeName());
       json.insert("ViewVersion", QJsonValue(1.0));
-      m_3dObjViews[i]->write(id, json);
+      m_3dObjView->write(id, json);
       return;
     }
   }
@@ -316,7 +328,7 @@ bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
   return res;
 }
 
-ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t> ids) const
+ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t>& ids) const
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
@@ -329,7 +341,7 @@ ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t> ids) const
   return res;
 }
 
-ZBBox<glm::dvec3> Z3DView::boundBoxOfObjsAfterClipping(const std::vector<size_t> ids) const
+ZBBox<glm::dvec3> Z3DView::boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
@@ -438,44 +450,44 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
 void Z3DView::init()
 {
   m_canvas->getGLFocus();
-  m_globalParas.reset(new Z3DGlobalParameters(*m_canvas, *this));
+  m_globalParas = std::make_unique<Z3DGlobalParameters>(*m_canvas, *this);
 
   // filters
-  m_canvasPainter.reset(new Z3DCanvasPainter(*m_globalParas, *m_canvas));
+  m_canvasPainter = std::make_unique<Z3DCanvasPainter>(*m_globalParas, *m_canvas);
 
-  m_compositor.reset(new Z3DCompositor(*m_globalParas));
+  m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
   m_compositor->outputPort("Image")->connect(m_canvasPainter->inputPort("Image"));
   m_compositor->outputPort("LeftEyeImage")->connect(m_canvasPainter->inputPort("LeftEyeImage"));
   m_compositor->outputPort("RightEyeImage")->connect(m_canvasPainter->inputPort("RightEyeImage"));
   m_canvas->addEventListenerToBack(*m_compositor);
 
   // build network and connect to canvas
-  m_networkEvaluator.reset(new Z3DNetworkEvaluator(*m_canvasPainter));
+  m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_canvasPainter);
 
   //packages
   for (auto objDoc : m_doc.objDocs()) {
-    if (ZImgDoc* imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
-      Z3DImgView* imgView = new Z3DImgView(*imgDoc, *this);
+    if (auto imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
+      auto imgView = new Z3DImgView(*imgDoc, *this);
       connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(imgView);
-    } else if (ZPunctaDoc* punctaDoc = qobject_cast<ZPunctaDoc*>(objDoc)) {
-      Z3DPunctaView* punctaView = new Z3DPunctaView(*punctaDoc, *this);
+    } else if (auto punctaDoc = qobject_cast<ZPunctaDoc*>(objDoc)) {
+      auto punctaView = new Z3DPunctaView(*punctaDoc, *this);
       connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(punctaView);
-    } else if (ZSwcDoc* swcDoc = qobject_cast<ZSwcDoc*>(objDoc)) {
-      Z3DSwcView* swcView = new Z3DSwcView(*swcDoc, *this);
+    } else if (auto swcDoc = qobject_cast<ZSwcDoc*>(objDoc)) {
+      auto swcView = new Z3DSwcView(*swcDoc, *this);
       connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(swcView);
-    } else if (ZMeshDoc* meshDoc = qobject_cast<ZMeshDoc*>(objDoc)) {
-      Z3DMeshView* meshView = new Z3DMeshView(*meshDoc, *this);
+    } else if (auto meshDoc = qobject_cast<ZMeshDoc*>(objDoc)) {
+      auto meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(meshView);
-    } else if (Z3DAnimationDoc* aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
-      Z3DAnimationView* aniView = new Z3DAnimationView(*aniDoc, *this);
+    } else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
+      auto aniView = new Z3DAnimationView(*aniDoc, *this);
       connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
-    } else if (ZRegionAnnotationDoc* raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
-      Z3DRegionAnnotationView* aniView = new Z3DRegionAnnotationView(*raDoc, *this);
+    } else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
+      auto aniView = new Z3DRegionAnnotationView(*raDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DView::objViewReady);
       m_3dObjViews.push_back(aniView);
     }

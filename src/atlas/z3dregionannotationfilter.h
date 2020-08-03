@@ -53,6 +53,10 @@ protected:
   //void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
 
+  void showAllRegions();
+
+  void hideAllRegions();
+
 private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_dataIsInvalid = true;
