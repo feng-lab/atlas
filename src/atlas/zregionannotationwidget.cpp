@@ -6,6 +6,7 @@
 #include "zregionannotationtreeview.h"
 #include "z3dtransformparameter.h"
 #include "zparametereditdialog.h"
+#include "zmeshdoc.h"
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QFileDialog>
@@ -93,12 +94,38 @@ void ZRegionAnnotationWidget::updateMesh()
   }
 }
 
+void ZRegionAnnotationWidget::exportMeshes()
+{
+  QString dir = QFileDialog::getExistingDirectory(this, tr("Choose Directory for Meshes"),
+                                                  ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"),
+                                                  QFileDialog::ShowDirsOnly
+                                                  | QFileDialog::DontResolveSymlinks);
+  if (!dir.isEmpty()) {
+    QDir outDir(dir);
+    for (const auto& rgn : m_regionAnnotationPack.regionAnnotation().annotationTree()) {
+      if (m_regionAnnotationPack.regionAnnotation().meshOfRegion(rgn.id)) {
+        QString fn = outDir.filePath(m_regionAnnotationPack.regionAnnotation().nameOfRegion(rgn.id) + ".obj");
+        try {
+          m_regionAnnotationPack.regionAnnotation().meshOfRegion(rgn.id)->save(fn);
+
+          ZSystemInfo::instance().addFileToRecentFileList(fn);
+          m_doc.meshDoc().setLastOpenedObjPath(fn);
+        }
+        catch (const ZException& e) {
+          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+                                QString("Save Mesh Error:\n%1").arg(e.what()));
+        }
+      }
+    }
+  }
+}
+
 void ZRegionAnnotationWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
 
-  m_update3DMeshFromROIButton = new QPushButton("Update 3D Mesh From Modified ROIs");
-  m_update3DMeshFromROIButton->setToolTip("Update 3D mesh with current region contours");
+  m_update3DMeshFromROIButton = new QPushButton("Update 3D Meshes From Modified ROIs");
+  m_update3DMeshFromROIButton->setToolTip("Update 3D meshes with current region contours");
   m_update3DMeshFromROIButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_update3DMeshFromROIButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(m_update3DMeshFromROIButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::updateMesh);
@@ -114,6 +141,12 @@ void ZRegionAnnotationWidget::createWidget()
   m_exportLableImageButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_exportLableImageButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(m_exportLableImageButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportLabelImage);
+
+  m_export3DMeshes = new QPushButton("Export 3D Meshes...");
+  m_export3DMeshes->setToolTip("Export Region Annotation To 3D Meshes");
+  m_export3DMeshes->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_export3DMeshes, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_export3DMeshes, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportMeshes);
 
   auto model = new ZRegionAnnotationTreeModel(m_regionAnnotationPack, this);
   auto view = new ZRegionAnnotationTreeView(*model, m_regionAnnotationPack, m_doc, this);

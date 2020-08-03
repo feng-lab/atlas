@@ -21,6 +21,8 @@ protected:
 
   void updateMesh();
 
+  void exportMeshes();
+
 private:
   void createWidget();
 
@@ -33,6 +35,7 @@ private:
   QPushButton* m_update3DMeshFromROIButton = nullptr;
   QPushButton* m_transform3DMeshButton = nullptr;
   QPushButton* m_exportLableImageButton = nullptr;
+  QPushButton* m_export3DMeshes = nullptr;
 };
 
 } // namespace nim
