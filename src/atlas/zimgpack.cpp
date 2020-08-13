@@ -204,31 +204,24 @@ ZImgPack::ZImgPack(const QString& fileName, size_t scene, FileFormat format, siz
   updateDerivedData();
 }
 
-ZImgPack::ZImgPack(const QStringList& files, Dimension catDim, size_t scene, FileFormat format, size_t numScene,
+ZImgPack::ZImgPack(ZImgSource imgSource, size_t numScene,
                    const ZImgInfo* info, const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
-  : m_imgSource(files, catDim, ZImgRegion(), scene, format, true)
+  : m_imgSource(std::move(imgSource))
+  , m_numScenes(numScene)
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
+  CHECK(m_numScenes > 0);
+  if (m_imgSource.scene >= m_numScenes) {
+    throw ZIOException("invalid scene");
+  }
   const std::vector<std::shared_ptr<ZImgSubBlock>>* sceneSubBlock = nullptr;
   std::vector<std::shared_ptr<ZImgSubBlock>> ssb;
-  if (numScene > 0 && info && subBlock) {
+  if (info && subBlock) {
     m_imgInfo = *info;
-    m_numScenes = numScene;
-    if (scene >= m_numScenes) {
-      throw ZIOException("invalid scene");
-    }
     sceneSubBlock = subBlock;
   } else {
-    std::vector<ZImgInfo> infos;
-    std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    ZImgIO::instance().readInfos(m_imgSource.filenames, m_imgSource.catDim, infos, &subBlocks, m_imgSource.format);
-    if (scene >= infos.size()) {
-      throw ZIOException("invalid scene");
-    }
-    m_imgInfo = infos[scene];
-    m_numScenes = infos.size();
-    ssb.swap(subBlocks[scene]);
+    ZImgIO::instance().readInfo(m_imgSource, m_imgInfo, &ssb);
     sceneSubBlock = &ssb;
   }
   // leave m_imgMetaData empty
@@ -930,7 +923,7 @@ void ZImgPack::buildPyramidal()
 {
   if (m_imgInfo.byteNumber() <= ZCpuInfo::instance().nPhysicalRAM / 2) {
     ZImg tImg;
-    tImg.load(m_imgSource.filenames, m_imgSource.catDim, ZImgRegion(), m_imgSource.scene, m_imgSource.format);
+    tImg.load(m_imgSource);
     buildPyramidal(tImg);
     return;
   }
@@ -946,7 +939,7 @@ void ZImgPack::buildPyramidal()
       rgn.start.t = t;
       rgn.end.t = t + 1;
       auto tImg = new ZImg();
-      tImg->load(m_imgSource.filenames, m_imgSource.catDim, rgn, m_imgSource.scene, m_imgSource.format);
+      tImg->load(m_imgSource.filenames, m_imgSource.catDim, m_imgSource.catScenes, rgn, m_imgSource.scene, m_imgSource.format);
       tImg->computeMinMax(minV, maxV);
       m_minIntensity = std::min(m_minIntensity, minV);
       m_maxIntensity = std::max(m_maxIntensity, maxV);
@@ -961,7 +954,7 @@ void ZImgPack::buildPyramidal()
         rgn.start.t = t;
         rgn.end.t = t + 1;
         auto tImg = new ZImg();
-        tImg->load(m_imgSource.filenames, m_imgSource.catDim, rgn, m_imgSource.scene, m_imgSource.format);
+        tImg->load(m_imgSource.filenames, m_imgSource.catDim, m_imgSource.catScenes, rgn, m_imgSource.scene, m_imgSource.format);
         tImg->computeMinMax(minV, maxV);
         m_minIntensity = std::min(m_minIntensity, minV);
         m_maxIntensity = std::max(m_maxIntensity, maxV);

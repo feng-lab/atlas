@@ -25,7 +25,7 @@ void ZSectionsRegistration::doWork()
   LOG(INFO) << "Result Filename: " << m_resultFilename;
 
   ZImg srcImg;
-  srcImg.load(m_imgFilenames, Dimension::Z, 0, FileFormat::Unknown, true, m_brightBackground);
+  srcImg.load(m_imgFilenames, Dimension::Z, true, 0, FileFormat::Unknown, true, m_brightBackground);
   if (srcImg.depth() <= 1) {
     throw ZImgException(QString("Only one slice. Do not need alignment."));
   }

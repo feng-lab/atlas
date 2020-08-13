@@ -71,7 +71,7 @@ QString ZImgThumbernail::toQString() const
 }
 
 ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, FileFormat format_)
-  : region(rgn), scene(scene_), format(format_)
+  : region(rgn), scene(scene_), format(format_), catScenes(false)
 {
   QFileInfo fi(fn);
   if (fi.exists()) {
@@ -84,9 +84,9 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, 
 
 ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_,
                        const ZImgRegion& rgn, size_t scene_, FileFormat format_,
-                       bool expandXY_, bool expandWithMaxValue_)
+                       bool expandXY_, bool expandWithMaxValue_, bool catScenes_)
   : catDim(catDim_), region(rgn), scene(scene_), format(format_), expandXY(expandXY_)
-  , expandWithMaxValue(expandWithMaxValue_)
+  , expandWithMaxValue(expandWithMaxValue_), catScenes(catScenes_)
 {
   for (int i = 0; i < fns.size(); ++i) {
     QFileInfo fi(fns[i]);
@@ -162,14 +162,14 @@ ZImg::ZImg(const QString& filename, ZImgRegion region, size_t scene, size_t rati
   load(filename, region, scene, ratio, format);
 }
 
-ZImg::ZImg(const QStringList& fileList, Dimension catDim,
+ZImg::ZImg(const QStringList& fileList, Dimension catDim, bool catScenes,
            const ZImgRegion& region,
            size_t scene,
            FileFormat format,
            bool expandXY,
            bool expandWithMaxValue)
 {
-  load(fileList, catDim, region, scene, format, expandXY, expandWithMaxValue);
+  load(fileList, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
 }
 
 ZImg::ZImg(const ZImgSource& imgSource)
@@ -243,19 +243,19 @@ void ZImg::save(const QString& filename, FileFormat format, const ZImgWriteParam
   ZImgIO().writeImg(filename, *this, format, paras);
 }
 
-void ZImg::load(const QStringList& fileList, Dimension catDim, size_t scene, FileFormat format,
+void ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene, FileFormat format,
                 bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO().readImg(fileList, catDim, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, catScenes, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 void
-ZImg::load(const QStringList& fileList, Dimension catDim, const ZImgRegion& region, size_t scene, FileFormat format,
+ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene, FileFormat format,
            bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO().readImg(fileList, catDim, region, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, catScenes, region, *this, scene, format, expandXY, expandWithMaxValue);
 }
 
 std::vector<ZImgInfo>
@@ -267,12 +267,12 @@ ZImg::readImgInfos(const QString& filename, std::vector<std::vector<std::shared_
   return res;
 }
 
-std::vector<ZImgInfo> ZImg::readImgInfos(const QStringList& fileList, Dimension catDim,
+std::vector<ZImgInfo> ZImg::readImgInfos(const QStringList& fileList, Dimension catDim, bool catScenes,
                                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
                                          FileFormat format, bool expandXY)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO().readInfos(fileList, catDim, res, subBlocks, format, expandXY);
+  ZImgIO().readInfos(fileList, catDim, catScenes, res, subBlocks, format, expandXY);
   return res;
 }
 
@@ -300,12 +300,12 @@ ZImg ZImg::readSubBlock(const QString& filename, size_t scene, size_t blockIndex
   return res;
 }
 
-ZImg ZImg::readSubBlock(const QStringList& fileList, nim::Dimension catDim, size_t scene, size_t blockIndex,
+ZImg ZImg::readSubBlock(const QStringList& fileList, nim::Dimension catDim, bool catScenes, size_t scene, size_t blockIndex,
                         nim::FileFormat format, bool expandXY)
 {
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO().readInfos(fileList, catDim, infos, &subBlocks, format, expandXY);
+  ZImgIO().readInfos(fileList, catDim, catScenes, infos, &subBlocks, format, expandXY);
   if (scene >= subBlocks.size()) {
     throw ZIOException(QString("scene %1 overflow, max %2").arg(scene).arg(subBlocks.size()));
   }

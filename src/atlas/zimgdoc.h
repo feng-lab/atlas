@@ -89,9 +89,9 @@ protected:
                  const ZImgInfo* info = nullptr,
                  const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
-  size_t loadImg(const QStringList& files, Dimension catDim, FileFormat format, QString& errorMsg);
+  size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg);
 
-  size_t loadImg(const QStringList& files, Dimension catDim, size_t scene, FileFormat format, QString& errorMsg,
+  size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg,
                  size_t numScene = 0, const ZImgInfo* info = nullptr,
                  const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 

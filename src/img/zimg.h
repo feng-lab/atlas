@@ -373,7 +373,7 @@ struct ZImgSource
 
   ZImgSource(const QStringList& fns, Dimension catDim_, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
              FileFormat format_ = FileFormat::Unknown,
-             bool expandXY_ = true, bool expandWithMaxValue_ = false);
+             bool expandXY_ = true, bool expandWithMaxValue_ = false, bool catScenes_ = true);
 
   inline bool operator==(const ZImgSource& other) const
   {
@@ -383,7 +383,8 @@ struct ZImgSource
       }
       return catDim == other.catDim && region == other.region &&
              scene == other.scene && expandXY == other.expandXY &&
-             expandWithMaxValue == other.expandWithMaxValue;
+             expandWithMaxValue == other.expandWithMaxValue &&
+             catScenes == other.catScenes;
     }
     return false;
   }
@@ -403,6 +404,7 @@ struct ZImgSource
   bool expandXY = true;
   bool expandWithMaxValue = false;
   int64_t totalFileSize = 0;
+  bool catScenes = false;
 };
 
 class ZImgSubBlock
@@ -467,7 +469,7 @@ public:
                 size_t ratio = 1,
                 FileFormat format = FileFormat::Unknown);
 
-  explicit ZImg(const QStringList& fileList, Dimension catDim,
+  explicit ZImg(const QStringList& fileList, Dimension catDim, bool catScenes,
                 const ZImgRegion& region = ZImgRegion(),
                 size_t scene = 0,
                 FileFormat format = FileFormat::Unknown,
@@ -509,11 +511,11 @@ public:
   // imgs should have same size in other dimensions and have same type
   // throw ZIOException if io error, might throw ZImgException if can't allocate memory or can't cat imgs
   // expandXY can not be true if catDim is Dimension::X or Dimension::Y
-  void load(const QStringList& fileList, Dimension catDim, size_t scene = 0, FileFormat format = FileFormat::Unknown,
+  void load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene = 0, FileFormat format = FileFormat::Unknown,
             bool expandXY = true,
             bool expandWithMaxValue = false);
 
-  void load(const QStringList& fileList, Dimension catDim, const ZImgRegion& region, size_t scene = 0,
+  void load(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene = 0,
             FileFormat format = FileFormat::Unknown, bool expandXY = true,
             bool expandWithMaxValue = false);
 
@@ -528,7 +530,7 @@ public:
                FileFormat format = FileFormat::Unknown);
 
   // throw ZIOException if sequence is not valid or empty image
-  static std::vector<ZImgInfo> readImgInfos(const QStringList& fileList, Dimension catDim,
+  static std::vector<ZImgInfo> readImgInfos(const QStringList& fileList, Dimension catDim, bool catScenes,
                                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
                                             FileFormat format = FileFormat::Unknown, bool expandXY = true);
 
@@ -537,7 +539,7 @@ public:
   static ZImg readSubBlock(const QString& filename, size_t scene, size_t blockIndex,
                            FileFormat format = FileFormat::Unknown);
 
-  static ZImg readSubBlock(const QStringList& fileList, Dimension catDim, size_t scene, size_t blockIndex,
+  static ZImg readSubBlock(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene, size_t blockIndex,
                            FileFormat format = FileFormat::Unknown, bool expandXY = true);
 
   static std::vector<std::vector<ZImgRegion>> getInternalSubRegions(const QString& filename,

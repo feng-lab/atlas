@@ -2,6 +2,7 @@
 
 #include "zimginterface.h"
 #include "zoptionparameter.h"
+#include "zparameter.h"
 #include <QDialog>
 #include <QDialogButtonBox>
 
@@ -19,12 +20,16 @@ public:
 
   Dimension alongDimension();
 
+  bool catScences() const
+  { return m_catScenes.get(); }
+
 private:
   QPushButton* m_runButton;
   QPushButton* m_exitButton;
   QDialogButtonBox* m_buttonBox;
   ZSelectFileWidget* m_inputImagesFileWidget;
   ZStringIntOptionParameter m_catDimension;
+  ZBoolParameter m_catScenes;
 };
 
 } // namespace nim

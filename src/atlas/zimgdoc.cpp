@@ -314,7 +314,7 @@ void ZImgDoc::importImgSequence()
       return;
 
     QString errorMsg;
-    if (!loadImg(files, dlg.alongDimension(), FileFormat::Unknown, errorMsg)) {
+    if (!loadImg(files, dlg.alongDimension(), dlg.catScences(),FileFormat::Unknown, errorMsg)) {
       QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
                             "Can not load image sequence.\n" + errorMsg);
     }
@@ -399,14 +399,14 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
   }
 }
 
-size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, FileFormat format, QString& errorMsg)
+size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg)
 {
   try {
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-    std::vector<ZImgInfo> infos = ZImg::readImgInfos(files, catDim, &subBlocks, format, true);
+    std::vector<ZImgInfo> infos = ZImg::readImgInfos(files, catDim, catScenes, &subBlocks, format, true);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
-      id = loadImg(files, catDim, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);
+      id = loadImg(files, catDim, catScenes, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);
       if (!id)
         return 0;
     }
@@ -419,18 +419,19 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, FileFormat f
   }
 }
 
-size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, size_t scene, FileFormat format, QString& errorMsg,
+size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg,
                         size_t numScene, const ZImgInfo* info,
                         const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
 {
   try {
     ZImgSource imgSource(files, catDim, ZImgRegion(), scene, format);
+    imgSource.catScenes = catScenes;
     for (const auto& idPack : m_idToImgPacks) {
       if (idPack.second->imgSource() == imgSource)
         return idPack.first;
     }
 
-    size_t id = addImgPack(new ZImgPack(files, catDim, scene, format, numScene, info, subBlock));
+    size_t id = addImgPack(new ZImgPack(imgSource, numScene, info, subBlock));
 
     ZSystemInfo::instance().addFileToRecentFileList(files[0]);
     setLastOpenedObjPath(files[0]);

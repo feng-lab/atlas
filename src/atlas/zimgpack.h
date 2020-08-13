@@ -67,8 +67,8 @@ public:
            const ZImgInfo* info = nullptr,
            const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
-  ZImgPack(const QStringList& files, Dimension catDim, size_t scene, FileFormat format,
-           size_t numScene = 0, const ZImgInfo* info = nullptr,
+  ZImgPack(ZImgSource  imgSource,
+           size_t numScene = 1, const ZImgInfo* info = nullptr,
            const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
   virtual ~ZImgPack();

@@ -18,6 +18,7 @@ namespace nim {
 ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, QWidget* parent)
   : QDialog(parent)
   , m_catDimension("Along Dimension")
+  , m_catScenes("Cat Scenes", true)
 {
   QStringList filters;
   QList<nim::FileFormat> formats;
@@ -42,6 +43,10 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, QWidget
   mainLayout->addWidget(m_inputImagesFileWidget);
   hLayout->addWidget(m_catDimension.createNameLabel());
   hLayout->addWidget(m_catDimension.createWidget());
+  mainLayout->addLayout(hLayout);
+  hLayout = new QHBoxLayout;
+  hLayout->addWidget(m_catScenes.createNameLabel());
+  hLayout->addWidget(m_catScenes.createWidget());
   mainLayout->addLayout(hLayout);
   mainLayout->addWidget(m_buttonBox);
   setLayout(mainLayout);
