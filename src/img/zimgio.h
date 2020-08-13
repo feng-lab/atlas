@@ -32,7 +32,7 @@ public:
 
   void readInfos(const QStringList& fileList, Dimension catDim, std::vector<ZImgInfo>& res,
                  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-                 FileFormat format = FileFormat::Unknown, bool expandXY = false);
+                 FileFormat format = FileFormat::Unknown, bool expandXY = true);
 
   void readInfo(const ZImgSource& imgSource, ZImgInfo& info);
 
@@ -61,11 +61,11 @@ public:
   // imgs should have same size in other dimensions and have same type
   // expandXY can not be true if catDim is Dimension::X or Dimension::Y
   void readImg(const QStringList& fileList, Dimension catDim, ZImg& img, size_t scene = 0,
-               FileFormat format = FileFormat::Unknown, bool expandXY = false,
+               FileFormat format = FileFormat::Unknown, bool expandXY = true,
                bool expandWithMaxValue = false);
 
   void readImg(const QStringList& fileList, Dimension catDim, const ZImgRegion& regionIn, ZImg& img, size_t scene = 0,
-               FileFormat format = FileFormat::Unknown, bool expandXY = false,
+               FileFormat format = FileFormat::Unknown, bool expandXY = true,
                bool expandWithMaxValue = false);
 
   void readImg(const ZImgSource& imgSource, ZImg& img);
