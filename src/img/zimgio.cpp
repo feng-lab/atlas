@@ -16,28 +16,7 @@
 #include "zimghdf5.h"
 #include "zimgleica.h"
 #include "zlog.h"
-
-namespace {
-
-QString getTemporaryFilename(const QString& filename)
-{
-  QFileInfo fi(filename);
-  return fi.dir().filePath(QString("~$%1").arg(fi.fileName()));
-}
-
-void renameFile(const QString& oldName, const QString& newName)
-{
-  if (QFile::exists(newName)) {
-    if (!QFile::remove(newName)) {
-      throw nim::ZIOException(QString("Can not remove existing file %1").arg(newName));
-    }
-  }
-  if (!QFile::rename(oldName, newName)) {
-    throw nim::ZIOException(QString("Can not rename file %1").arg(oldName));
-  }
-}
-
-}
+#include "zioutils.h"
 
 namespace nim {
 

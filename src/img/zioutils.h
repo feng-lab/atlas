@@ -44,5 +44,9 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
 
 #endif
 
+QString getTemporaryFilename(const QString& filename);
+
+void renameFile(const QString& oldName, const QString& newName);
+
 } // namespace nim
 

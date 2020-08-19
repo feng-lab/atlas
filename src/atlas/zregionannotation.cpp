@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zimgfillhole.h"
 #include "zbenchtimer.h"
+#include "zioutils.h"
 #include <QStandardPaths>
 #include <QFile>
 #include <QTemporaryDir>
@@ -486,10 +487,12 @@ void ZRegionAnnotation::load(const QString& filename)
 
 void ZRegionAnnotation::save(const QString& filename) const
 {
+  auto tfn = getTemporaryFilename(filename);
+
   try {
     H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_TRUNC);
+    H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
 
     H5::Group allGrp = file.createGroup("RegionAnnotation");
 
@@ -551,9 +554,11 @@ void ZRegionAnnotation::save(const QString& filename) const
 
     H5::Attribute numRegionAttr = allGrp.createAttribute("RegionNumber", intType, attrDataSpace);
     numRegionAttr.write(intType, &idx);
+
+    renameFile(tfn, filename);
   }
   catch (H5::Exception const& e) {
-    QFile::remove(filename);
+    QFile::remove(tfn);
     throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
   }
 }
