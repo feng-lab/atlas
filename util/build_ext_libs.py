@@ -735,7 +735,7 @@ def build_lz4(src_dir: str, install_dir: str):
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_STATIC_LIBS:BOOL=ON',
                          '-DLZ4_BUILD_LEGACY_LZ4C:BOOL=OFF',
-                         os.path.join(src_dir, 'contrib', 'cmake_unofficial')])
+                         os.path.join(src_dir, 'build', 'cmake')])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
