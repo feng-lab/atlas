@@ -887,7 +887,9 @@ def build_glbinding(src_dir: str, install_dir: str):
         cmakecmd.extend(['-DOPTION_BUILD_TOOLS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DOPTION_BUILD_TESTS:BOOL=OFF',
+                         '-DOPTION_BUILD_DOCS:BOOL=OFF',
                          '-DOPTION_BUILD_EXAMPLES:BOOL=OFF',
+                         '-DOPTION_BUILD_OWN_KHR_HEADERS:BOOL=ON',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
