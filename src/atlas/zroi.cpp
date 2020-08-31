@@ -6,6 +6,7 @@
 #include "zregionontology.h"
 #include "zroiutils.h"
 #include <QFile>
+#include <QTransform>
 #include <cmath>
 
 namespace nim {

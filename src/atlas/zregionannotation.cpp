@@ -8,6 +8,7 @@
 #include "zioutils.h"
 #include <QStandardPaths>
 #include <QFile>
+#include <QTransform>
 #include <QTemporaryDir>
 
 namespace {
