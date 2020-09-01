@@ -64,106 +64,107 @@
                                             "st_level": "null",
                                             "hemisphere_id": 3,
                                             "parent_structure_id": 688,
-                                            "children": []
+                                            "children": [
+                                                {
+                                                    "id": 3159,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L1",
+                                                    "name": "Layer1",
+                                                    "color_hex_triplet": "77FD89",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3158,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L2&3",
+                                                    "name": "Layer2&3",
+                                                    "color_hex_triplet": "589BFC",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3157,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L4",
+                                                    "name": "Layer4",
+                                                    "color_hex_triplet": "979AFC",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3156,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L5",
+                                                    "name": "Layer5",
+                                                    "color_hex_triplet": "CF0C06",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3155,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L6",
+                                                    "name": "Layer6",
+                                                    "color_hex_triplet": "066AB0",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3154,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L6a",
+                                                    "name": "Layer6a",
+                                                    "color_hex_triplet": "C7067E",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3153,
+                                                    "atlas_id": 746,
+                                                    "ontology_id": 1,
+                                                    "acronym": "L6b",
+                                                    "name": "Layer6b",
+                                                    "color_hex_triplet": "890533",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                }
+                                            ]
                                         },
                                         {
                                             "id": 3111,
                                             "atlas_id": 746,
                                             "ontology_id": 1,
-                                            "acronym": "RDM",
-                                            "name": "Random",
+                                            "acronym": "R",
+                                            "name": "Remaining region",
                                             "color_hex_triplet": "A35006",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3159,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L1",
-                                            "name": "Layer1",
-                                            "color_hex_triplet": "77FD89",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3158,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L2&3",
-                                            "name": "Layer2&3",
-                                            "color_hex_triplet": "589BFC",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3157,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L4",
-                                            "name": "Layer4",
-                                            "color_hex_triplet": "979AFC",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3156,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L5",
-                                            "name": "Layer5",
-                                            "color_hex_triplet": "CF0C06",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3155,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L6",
-                                            "name": "Layer6",
-                                            "color_hex_triplet": "066AB0",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3154,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L6a",
-                                            "name": "Layer6a",
-                                            "color_hex_triplet": "C7067E",
-                                            "graph_order": 5,
-                                            "st_level": "null",
-                                            "hemisphere_id": 3,
-                                            "parent_structure_id": 688,
-                                            "children": []
-                                        },
-                                        {
-                                            "id": 3153,
-                                            "atlas_id": 746,
-                                            "ontology_id": 1,
-                                            "acronym": "L6b",
-                                            "name": "Layer6b",
-                                            "color_hex_triplet": "890533",
                                             "graph_order": 5,
                                             "st_level": "null",
                                             "hemisphere_id": 3,
@@ -201,8 +202,8 @@
                                             "id": 1939,
                                             "atlas_id": 135,
                                             "ontology_id": 1,
-                                            "acronym": "HIP",
-                                            "name": "Hippocampus",
+                                            "acronym": "CA",
+                                            "name": "Ammon's horn",
                                             "color_hex_triplet": "EFFB72",
                                             "graph_order": 415,
                                             "st_level": "null",
@@ -214,8 +215,8 @@
                                             "id": 1949,
                                             "atlas_id": 135,
                                             "ontology_id": 1,
-                                            "acronym": "FD",
-                                            "name": "Fascia Dentata",
+                                            "acronym": "DG",
+                                            "name": "Dentate Gyrus",
                                             "color_hex_triplet": "FBA672",
                                             "graph_order": 415,
                                             "st_level": "null",
@@ -241,8 +242,21 @@
                                             "atlas_id": 135,
                                             "ontology_id": 1,
                                             "acronym": "Prs",
-                                            "name": "Regio Preentorhinalis",
+                                            "name": "Presubiculum",
                                             "color_hex_triplet": "FB72A2",
+                                            "graph_order": 415,
+                                            "st_level": "null",
+                                            "hemisphere_id": 3,
+                                            "parent_structure_id": 1089,
+                                            "children": []
+                                        },
+                                        {
+                                            "id": 1979,
+                                            "atlas_id": 135,
+                                            "ontology_id": 1,
+                                            "acronym": "IG",
+                                            "name": "Indusium Griseum",
+                                            "color_hex_triplet": "5358FC",
                                             "graph_order": 415,
                                             "st_level": "null",
                                             "hemisphere_id": 3,
@@ -274,7 +288,34 @@
                                             "st_level": "null",
                                             "hemisphere_id": 3,
                                             "parent_structure_id": 623,
-                                            "children": []
+                                            "children": [
+                                                {
+                                                    "id": 4779,
+                                                    "atlas_id": 342,
+                                                    "ontology_id": 1,
+                                                    "acronym": "Cd",
+                                                    "name": "Caudate Nucleus",
+                                                    "color_hex_triplet": "088F93",
+                                                    "graph_order": 521,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 477,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 4778,
+                                                    "atlas_id": 342,
+                                                    "ontology_id": 1,
+                                                    "acronym": "Put",
+                                                    "name": "Putamen",
+                                                    "color_hex_triplet": "06985A",
+                                                    "graph_order": 521,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 477,
+                                                    "children": []
+                                                }
+                                            ]
                                         },
                                         {
                                             "id": 803,
@@ -287,7 +328,34 @@
                                             "st_level": "null",
                                             "hemisphere_id": 3,
                                             "parent_structure_id": 623,
-                                            "children": []
+                                            "children": [
+                                                {
+                                                    "id": 4777,
+                                                    "atlas_id": 342,
+                                                    "ontology_id": 1,
+                                                    "acronym": "GPe",
+                                                    "name": "Globus Pallidus, external segment",
+                                                    "color_hex_triplet": "ACB906",
+                                                    "graph_order": 521,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 803,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 4776,
+                                                    "atlas_id": 342,
+                                                    "ontology_id": 1,
+                                                    "acronym": "GPi",
+                                                    "name": "Globus Pallidus, internal segment",
+                                                    "color_hex_triplet": "F0FA75",
+                                                    "graph_order": 521,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 803,
+                                                    "children": []
+                                                }
+                                            ]
                                         }
                                     ]
                                 }
@@ -342,6 +410,19 @@
                                             "hemisphere_id": 3,
                                             "parent_structure_id": 1129,
                                             "children": []
+                                        },
+                                        {
+                                            "id": 4775,
+                                            "atlas_id": 342,
+                                            "ontology_id": 1,
+                                            "acronym": "STN",
+                                            "name": "Subthalamic Nucleus",
+                                            "color_hex_triplet": "0F7E32",
+                                            "graph_order": 521,
+                                            "st_level": "null",
+                                            "hemisphere_id": 3,
+                                            "parent_structure_id": 1129,
+                                            "children": []
                                         }
                                     ]
                                 },
@@ -356,7 +437,34 @@
                                     "st_level": "null",
                                     "hemisphere_id": 3,
                                     "parent_structure_id": 343,
-                                    "children": []
+                                    "children": [
+                                        {
+                                            "id": 4774,
+                                            "atlas_id": 342,
+                                            "ontology_id": 1,
+                                            "acronym": "SNc",
+                                            "name": "Substantia nigra, compact part",
+                                            "color_hex_triplet": "3F41B4",
+                                            "graph_order": 521,
+                                            "st_level": "null",
+                                            "hemisphere_id": 3,
+                                            "parent_structure_id": 313,
+                                            "children": []
+                                        },
+                                        {
+                                            "id": 4773,
+                                            "atlas_id": 342,
+                                            "ontology_id": 1,
+                                            "acronym": "SNr",
+                                            "name": "Substantia nigra, reticular part",
+                                            "color_hex_triplet": "040658",
+                                            "graph_order": 521,
+                                            "st_level": "null",
+                                            "hemisphere_id": 3,
+                                            "parent_structure_id": 313,
+                                            "children": []
+                                        }
+                                    ]
                                 },
                                 {
                                     "id": 1065,
