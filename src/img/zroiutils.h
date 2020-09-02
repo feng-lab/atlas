@@ -16,6 +16,8 @@ public:
   // return tight mask, x_start, y_start in which mask could be empty
   static std::tuple<ZImg, int32_t, int32_t> qPainterPathToMask(const QPainterPath& path);
 
+  static std::tuple<ZImg, int32_t, int32_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
+
   inline static std::tuple<ZImg, int32_t, int32_t> splineToMask(const QPolygonF& spline)
   {
     return qPainterPathToMask(splineToQPainterPath(spline));
@@ -148,6 +150,9 @@ public:
         subpp = polygonToQPainterPath(poly);
       } else if (type == "Spline") {
         subpp = splineToQPainterPath(poly);
+      } else if (type == "Line") {
+        CHECK(shapeOps.size() == 1);
+        return qPainterPathToStroke(splineToQPainterPath(poly));
       }
       if (isAdd) {
         pp += subpp;

@@ -598,6 +598,9 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
               }
               break;
             case ROIType::Line:
+              if (poly.isClosed()) {
+                poly.pop_back();
+              }
               newLine(poly, id);
               break;
             default:

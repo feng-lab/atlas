@@ -100,6 +100,46 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
   return std::make_tuple(img, minX, minY);
 }
 
+std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainterPath& path, double width)
+{
+  ZImg img;
+  if (path.isEmpty()) {
+    return std::make_tuple(img, 0_i32, 0_i32);
+  }
+  QRectF pathRect = path.boundingRect();
+  int minX = static_cast<int>(std::floor(pathRect.left()));
+  int maxX = static_cast<int>(std::ceil(pathRect.right()));
+  int minY = static_cast<int>(std::floor(pathRect.top()));
+  int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
+  if (maxX < minX || maxY < minY) {
+    return std::make_tuple(img, 0_i32, 0_i32);
+  }
+
+  int scale = 5;
+  while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
+    --scale;
+  }
+
+  QImage imageOut((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, QImage::Format_Mono);
+  imageOut.fill(0);
+  QPainter painter(&imageOut);
+  painter.setBrush(Qt::NoBrush);
+  painter.setPen(QPen(QBrush(Qt::white), width));
+  painter.scale(scale, scale);
+  painter.translate(-minX, -minY);
+  painter.drawPath(path);
+  // auto image = imageOut.scaled(maxX - minX + 1, maxY - minY + 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+  img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
+  for (size_t y = 0; y < img.height(); ++y) {
+    for (size_t x = 0; x < img.width(); ++x) {
+      *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1 : 0;
+    }
+  }
+  img.resize(maxX - minX + 1, maxY - minY + 1, 1);
+
+  return std::make_tuple(img, minX, minY);
+}
+
 //std::tuple<ZROIUtils::RowMatrixXb, int32_t, int32_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
 //{
 //  RowMatrixXb res;
