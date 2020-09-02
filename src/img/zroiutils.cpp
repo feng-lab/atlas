@@ -107,25 +107,19 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainte
     return std::make_tuple(img, 0_i32, 0_i32);
   }
   QRectF pathRect = path.boundingRect();
-  int minX = static_cast<int>(std::floor(pathRect.left()));
-  int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = static_cast<int>(std::floor(pathRect.top()));
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
+  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left()) - width));
+  int maxX = static_cast<int>(std::ceil(pathRect.right()) + width);
+  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top()) - width));
+  int maxY = static_cast<int>(std::ceil(pathRect.bottom()) + width);
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);
   }
 
-  int scale = 5;
-  while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
-    --scale;
-  }
-
-  QImage imageOut((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, QImage::Format_Mono);
+  QImage imageOut((maxX - minX + 1) , (maxY - minY + 1), QImage::Format_Mono);
   imageOut.fill(0);
   QPainter painter(&imageOut);
   painter.setBrush(Qt::NoBrush);
   painter.setPen(QPen(QBrush(Qt::white), width));
-  painter.scale(scale, scale);
   painter.translate(-minX, -minY);
   painter.drawPath(path);
   // auto image = imageOut.scaled(maxX - minX + 1, maxY - minY + 1, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
