@@ -151,8 +151,9 @@ public:
       } else if (type == "Spline") {
         subpp = splineToQPainterPath(poly);
       } else if (type == "Line") {
-        CHECK(shapeOps.size() == 1);
-        return qPainterPathToStroke(splineToQPainterPath(poly));
+        if(shapeOps.size() == 1) {
+          return qPainterPathToStroke(splineToQPainterPath(poly));
+        }
       }
       if (isAdd) {
         pp += subpp;
