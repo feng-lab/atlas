@@ -362,6 +362,7 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
     QAction* setKeysTimeAction = menu.addAction("Set Time of Selected Keys");
     QAction* addKeysTimeAction = menu.addAction("Add Time to Selected Keys");
     QAction* subtractKeysTimeAction = menu.addAction("Subtract Time to Selected Keys");
+    QAction* scaleKeysTimeAction = menu.addAction("Scale Time of Selected Keys");
     QAction* selectedAction = menu.exec(event->screenPos());
 
     if (selectedAction) {
@@ -378,6 +379,10 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
       } else if (selectedAction == subtractKeysTimeAction) {
         time = QInputDialog::getDouble(m_view, tr("Subtract Time to Selected Keys"),
                                        tr("Subtract Time:"), 0.0, 0.0, 2147483647., 3,
+                                       &ok);
+      } else if (selectedAction == scaleKeysTimeAction) {
+        time = QInputDialog::getDouble(m_view, tr("Scale Time of Selected Keys"),
+                                       tr("Scale Time:"), 1., 0.001, 2147483647., 3,
                                        &ok);
       } else {
         LOG(FATAL) << "wrong selected action";
@@ -404,6 +409,10 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
         } else if (selectedAction == subtractKeysTimeAction) {
           for (auto key : keys) {
             key->setTime(std::max(0.0, key->time() - time));
+          }
+        } else if (selectedAction == scaleKeysTimeAction) {
+          for (auto key : keys) {
+            key->setTime(std::max(0.0, key->time() * time));
           }
         }
         for (auto ani : anis) {
