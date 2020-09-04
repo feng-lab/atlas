@@ -848,10 +848,10 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
         orig_file2 = bak_file2 = None
         orig_file4 = bak_file4 = None
         try:
-            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'-std=${CXX_STD}'],
-                                  to_texts=[r''])
+            # orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
+            # bak_file = patch_file(orig_file,
+            #                       from_texts=[r'-std=${CXX_STD}'],
+            #                       to_texts=[r''])
 
             orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
             bak_file2 = patch_file(orig_file2,
@@ -878,7 +878,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
             build_and_install_cmakecmd(cmakecmd, build_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            os.replace(bak_file, orig_file)
+            # os.replace(bak_file, orig_file)
             os.replace(bak_file2, orig_file2)
             # os.replace(bak_file3, orig_file3)
             os.replace(bak_file4, orig_file4)
