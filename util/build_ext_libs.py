@@ -1,3 +1,6 @@
+import argparse
+from collections import OrderedDict
+import itertools
 import difflib
 from pathlib import Path
 import json
@@ -2033,51 +2036,15 @@ def build_libs(libs: dict, update_src: bool):
 
 
 def parse_inputs(argv: list):
-    libs = {'cmake': True,
-            'ninja': True,
-            'curl': False,
-            'tbb': False,
-            'qt': False,
-            'zlib': False,
-            'ffmpeg': False,
-            'boost': False,
-            'eigen': False,
-            'pybind11': False,
-            'cppitertools': False,
-            'glm': False,
-            'googletest': False,
-            'cpuinfo': False,
-            'gflags': False,
-            'glog': False,
-            'benchmark': False,
-            'openssl': False,
-            'grpc': False,
-            'double-conversion': False,
-            'lz4': False,
-            'xz': False,
-            'zstd': False,
-            'folly-deps': False,
-            'folly': False,
-            'suitesparse': False,
-            'ceres-solver': False,
-            'glbinding': False,
-            'libjpeg': False,
-            'libpng': False,
-            'openjpeg': False,
-            'libwebp': False,
-            'jxrlib': False,
-            'geometrictools': False,
-            'assimp': False,
-            'hdf5': False,
-            'freeimage': False,
-            'itk': False,
-            'vtk': False,
-            'opencv': False,
-            'botan': False,
-            'ospray': False,
-            'java': False,
-            }
-    update_src = False
+    lib_list = ['cmake', 'ninja', 'curl', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
+                'pybind11', 'cppitertools', 'glm', 'googletest', 'cpuinfo', 'gflags', 'glog',
+                'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'folly-deps',
+                'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
+                'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
+                'opencv', 'botan', 'ospray', 'java',
+                ]
+    libs = OrderedDict([(lib, False) for lib in lib_list])
+
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
                             'libjpeg': ['opencv', 'itk', 'vtk'],
@@ -2101,33 +2068,52 @@ def parse_inputs(argv: list):
                             }
 
     print('current interpreter: ' + sys.executable)
-    if len(argv) == 1:
-        usage = 'usage: python3 build_ext_libs.py [updatesrc] [all or components...] [except] [components...]\n' \
-                'valid components:'
-        for lib in libs:
-            usage += ' [' + lib + ']'
-        print(usage)
-        sys.exit(0)
 
-    if len(argv) == 2 and argv[1].lower() == "all":
-        shutil.rmtree(ext_build_dir(), ignore_errors=True)
+    parser = argparse.ArgumentParser(
+        epilog=f"""
+Examples:
 
-    state = True
-    for lib in argv[1:]:
+python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib] [--update-src]
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("libs", nargs='+', choices=list(libs.keys()) + ['all'],
+                        help="all or a list of libs", )
+    parser.add_argument("--exclude-libs", nargs='+', choices=list(libs.keys()),
+                        help="a list of libs to exclude from building", )
+    parser.add_argument("--start-from", choices=list(libs.keys()),
+                        help="skip libs before the specified lib")
+    parser.add_argument("--update-src", action='store_true', help="update source files")
+
+    # parse arguments
+    args = parser.parse_args(args=None if argv[1:] else ['--help'])
+
+    for lib in args.libs:
         if lib.lower() == "all":
             for vlib in libs:
-                libs[vlib] = state
-        elif lib.lower() == "except":
-            state = False
-        elif lib.lower() in libs:
-            libs[lib.lower()] = state
-        elif lib.lower() == 'updatesrc':
-            update_src = True
+                libs[vlib] = True
         else:
-            raise SyntaxError("wrong lib name: " + lib)
+            libs[lib] = True
 
-    libs['cmake'] = True
-    libs['ninja'] = True
+    if args.exclude_libs is not None:
+        for lib in args.exclude_libs:
+            libs[lib] = False
+
+    if args.start_from is not None:
+        started = False
+        for lib in libs:
+            if started:
+                break
+            started = args.start_from.lower() == lib
+            if not started:
+                libs[lib] = False
+
+    build_all = True
+    for lib in libs:
+        build_all = build_all and libs[lib]
+    if build_all:
+        shutil.rmtree(ext_build_dir(), ignore_errors=True)
+
     if is_linux():
         libs['curl'] = False
     elif is_mac():
@@ -2142,7 +2128,7 @@ def parse_inputs(argv: list):
     libs['botan'] = False
     libs['ospray'] = False
 
-    return libs, update_src
+    return libs, args.update_src
 
 
 if __name__ == "__main__":
