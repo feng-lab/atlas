@@ -862,9 +862,11 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
 
             orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
             bak_file4 = patch_file(orig_file4,
-                                   from_texts=[r'project(${PACKAGE_NAME} CXX C)'],
+                                   from_texts=[r'project(${PACKAGE_NAME} CXX C)',
+                                               r'${target_arg}'],
                                    to_texts=['project(${PACKAGE_NAME} CXX C)\n'
-                                             'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
+                                             'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
+                                             r' ',
                                              ])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
