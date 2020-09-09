@@ -846,6 +846,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
 
         orig_file = bak_file = None
         orig_file2 = bak_file2 = None
+        orig_file3 = bak_file3 = None
         orig_file4 = bak_file4 = None
         try:
             # orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
@@ -860,13 +861,17 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                    to_texts=[r'',
                                              r''])
 
+            orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
+            bak_file3 = patch_file(orig_file3,
+                                  from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)'],
+                                  to_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib)'])
+
             orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
             bak_file4 = patch_file(orig_file4,
                                    from_texts=[r'project(${PACKAGE_NAME} CXX C)',
-                                               r'${target_arg}'],
+                                               ],
                                    to_texts=['project(${PACKAGE_NAME} CXX C)\n'
                                              'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
-                                             r' ',
                                              ])
 
             cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -880,7 +885,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
             shutil.rmtree(build_dir, ignore_errors=False)
             # os.replace(bak_file, orig_file)
             os.replace(bak_file2, orig_file2)
-            # os.replace(bak_file3, orig_file3)
+            os.replace(bak_file3, orig_file3)
             os.replace(bak_file4, orig_file4)
 
 
