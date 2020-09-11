@@ -40,7 +40,7 @@ ZAnimationWidget::ZAnimationWidget(ZAnimation& ani, QWidget* parent)
 
   m_timeLine = new QTimeLine(m_animation.duration() * 1000, this);
   m_timeLine->setFrameRange(0, m_animation.duration() * 25);
-  m_timeLine->setCurveShape(QTimeLine::LinearCurve);
+  m_timeLine->setEasingCurve(QEasingCurve::Linear);
   connect(m_duration, &ZDoubleParameter::doubleChanged, &m_animation, &ZAnimation::setDuration);
   connect(m_timeLine, &QTimeLine::frameChanged, this, &ZAnimationWidget::setFrame);
   connect(m_timeLine, &QTimeLine::finished, this, &ZAnimationWidget::timeLineFinished);
