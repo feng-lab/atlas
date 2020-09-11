@@ -21,6 +21,7 @@ public:
   inline void setUseSquaredDistance(bool v)
   { m_useSquaredDistance = v; }
 
+  // TVoxelOut needs to be floating point
   template<typename TVoxelOut>
   ZImg run(const ZImg& img, bool useVoxelSize = false);
 

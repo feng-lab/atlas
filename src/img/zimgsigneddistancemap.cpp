@@ -9,15 +9,7 @@ template<bool ReportProgress>
 template<typename TVoxelOut>
 ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSize)
 {
-  if (useVoxelSize || !m_useSquaredDistance) {
-    if (!std::is_floating_point_v<TVoxelOut>) {
-      throw ZImgException("need float output for distance map");
-    }
-  } else {
-    if (!std::is_signed_v<TVoxelOut> && !std::is_floating_point_v<TVoxelOut>) {
-      throw ZImgException("need signed or float output for distance map");
-    }
-  }
+  static_assert(std::is_floating_point_v<TVoxelOut>);
   ZImgInfo info = img.info();
   info.setVoxelFormat<TVoxelOut>();
   ZImg res(info);
@@ -57,9 +49,10 @@ class ZImgSignedDistanceMap<false>;
 
 //template ZImg ZImgSignedDistanceMap<true>::run<int8_t>(const ZImg&, bool);
 //template ZImg ZImgSignedDistanceMap<true>::run<int16_t>(const ZImg&, bool);
-template ZImg ZImgSignedDistanceMap<true>::run<int32_t>(const ZImg&, bool);
+// integer output not supported by ITK
+// template ZImg ZImgSignedDistanceMap<true>::run<int32_t>(const ZImg&, bool);
 
-template ZImg ZImgSignedDistanceMap<true>::run<int64_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<true>::run<int64_t>(const ZImg&, bool);
 
 template ZImg ZImgSignedDistanceMap<true>::run<float>(const ZImg&, bool);
 
@@ -67,9 +60,9 @@ template ZImg ZImgSignedDistanceMap<true>::run<double>(const ZImg&, bool);
 
 //template ZImg ZImgSignedDistanceMap<false>::run<int8_t>(const ZImg&, bool);
 //template ZImg ZImgSignedDistanceMap<false>::run<int16_t>(const ZImg&, bool);
-template ZImg ZImgSignedDistanceMap<false>::run<int32_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<false>::run<int32_t>(const ZImg&, bool);
 
-template ZImg ZImgSignedDistanceMap<false>::run<int64_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<false>::run<int64_t>(const ZImg&, bool);
 
 template ZImg ZImgSignedDistanceMap<false>::run<float>(const ZImg&, bool);
 

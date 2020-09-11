@@ -1333,7 +1333,7 @@ size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
     ZImgSignedDistanceMap<> signedDM;
     signedDM.setInsideIsPositive(true);
     signedDM.setUseSquaredDistance(true);
-    ZImg dmim = signedDM.run<int>(cropCenter, false);
+    ZImg dmim = signedDM.run<float>(cropCenter, false);
 
     ZImgRegionalExtrema<> regionalExtrema;
     dmim = regionalExtrema.regionalMax(dmim);
