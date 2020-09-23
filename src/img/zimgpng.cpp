@@ -213,7 +213,7 @@ QStringList ZImgPng::extensions() const
 
 void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                       std::vector<std::set<size_t>>* pyramidalRatios)
+                       std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   //ZBenchTimer bt("a");
   //bt.start();
@@ -303,7 +303,7 @@ void ZImgPng::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thum
   // png does not have standard thumbnail chunk
 }
 
-void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   //ZBenchTimer bt("b");
   //bt.start();
@@ -386,10 +386,6 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
     imgTmp.infoRef().voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
   }
   imgTmp.swap(img);
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
   //bt.stopAndLog();
 }
 

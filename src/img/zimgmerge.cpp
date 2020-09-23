@@ -126,43 +126,6 @@ void merge_Impl(const ZVoxelRegion& region, const ZVoxelCoordinate& minCoord, Im
 
 namespace nim {
 
-ZImgTileSubBlock::ZImgTileSubBlock(ZImgSource source, size_t downsampleBlockWidth, size_t downsampleBlockHeight,
-                                   size_t downsampleBlockDepth, ImgMergeMode downsampleCombineMode)
-  : ZImgSubBlock(1, 0, 0, 0, 0, 0, 0)
-  , m_source(std::move(source))
-  , m_downsampleBlockWidth(downsampleBlockWidth)
-  , m_downsampleBlockHeight(downsampleBlockHeight)
-  , m_downsampleBlockDepth(downsampleBlockDepth)
-  , m_downsampleCombineMode(downsampleCombineMode)
-{
-  CHECK(m_downsampleBlockWidth > 0);
-  CHECK(m_downsampleBlockHeight > 0);
-  CHECK(m_downsampleBlockDepth > 0);
-}
-
-std::shared_ptr<ZImg> ZImgTileSubBlock::read() const
-{
-  auto res = std::make_shared<ZImg>(m_source);
-  if (m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1 || m_downsampleBlockDepth > 1) {
-    res->blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
-                         m_downsampleCombineMode);
-  }
-  return res;
-}
-
-ZImgInfo ZImgTileSubBlock::readInfo() const
-{
-  ZImgInfo info;
-  ZImgIO().readInfo(m_source, info);
-  info.voxelSizeX *= m_downsampleBlockWidth;
-  info.voxelSizeY *= m_downsampleBlockHeight;
-  info.voxelSizeZ *= m_downsampleBlockDepth;
-  info.width = info.width / m_downsampleBlockWidth + info.width % m_downsampleBlockWidth;
-  info.height = info.height / m_downsampleBlockHeight + info.height % m_downsampleBlockHeight;
-  info.depth = info.depth / m_downsampleBlockDepth + info.depth % m_downsampleBlockDepth;
-  return info;
-}
-
 void ZImgMerge::addImg(const ZImgSubBlock& img, const ZVoxelCoordinate& loc, const QString& imgName)
 {
   m_imgCoords[&img] = loc;
@@ -557,7 +520,7 @@ void ZImgMerge::resolveLocations_impl(std::map<const ZImgSubBlock*, ZVoxelCoordi
   if (imgCoords.empty())
     imgCoords[&refImg] = ZVoxelCoordinate(0, 0, 0, 0, 0);
 
-  for (const auto [i1, i2] : mst.runMST(refImgIndex, false)) {
+  for (const auto & [i1, i2] : mst.runMST(refImgIndex, false)) {
     auto img1 = imgs[i1];
     auto img2 = imgs[i2];
     bool img1HasLocation = imgCoords.find(img1) != imgCoords.end();

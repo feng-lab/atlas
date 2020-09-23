@@ -220,7 +220,7 @@ class ZImgCZISubBlock : public ZImgSubBlock
 {
 public:
   // mixed tiles has different x and y location
-  ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& tiles, bool mixedTiles = false,
+  ZImgCZISubBlock(QString  fileName, std::vector<CZITile>& tiles, bool mixedTiles = false,
                   size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
 
   std::shared_ptr<ZImg> read() const override;
@@ -276,14 +276,15 @@ public:
 
   void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                std::vector<std::set<size_t>>* pyramidalRatios) override;
+                std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
 
   void
   readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene) override;
 
-  void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio) override;
+  void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
+               size_t xRatio, size_t yRatio, size_t zRatio) override;
 
 private:
   void clearInternalState();

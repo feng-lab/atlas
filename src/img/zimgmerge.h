@@ -10,27 +10,6 @@
 
 namespace nim {
 
-class ZImgTileSubBlock : public ZImgSubBlock
-{
-public:
-  explicit ZImgTileSubBlock(ZImgSource source,
-                            size_t downsampleBlockWidth = 1,
-                            size_t downsampleBlockHeight = 1,
-                            size_t downsampleBlockDepth = 1,
-                            ImgMergeMode downsampleCombineMode = ImgMergeMode::Mean);
-
-  [[nodiscard]] std::shared_ptr<ZImg> read() const override;
-
-  [[nodiscard]] ZImgInfo readInfo() const override;
-
-private:
-  ZImgSource m_source;
-  size_t m_downsampleBlockWidth;
-  size_t m_downsampleBlockHeight;
-  size_t m_downsampleBlockDepth;
-  ImgMergeMode m_downsampleCombineMode;
-};
-
 // use provided absolute locations or relative locations to merge multiple imgs
 // if one img has multiple relative locations, use minimum spanning tree to find the optimal one
 //

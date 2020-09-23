@@ -360,7 +360,7 @@ inline QString enumToString(Dimension d)
 
 enum class ImgMergeMode
 {
-  Max, Min, Mean, Median, First
+  Max, Min, Mean, Median, First, Interpolation
 };
 
 inline QString enumToString(ImgMergeMode m)

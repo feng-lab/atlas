@@ -210,7 +210,7 @@ void Z3DTransferFunctionParameter::readValue(const QJsonValue& jsonValue)
 {
   m_value.m_keys.clear();
   QJsonArray keyArray = jsonValue.toArray();
-  for (const auto & i : keyArray) {
+  for (const auto i : keyArray) {
     QJsonObject keyObj = i.toObject();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&

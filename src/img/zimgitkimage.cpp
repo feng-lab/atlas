@@ -79,7 +79,7 @@ QStringList ZImgITKImage::extensions() const
 
 void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<size_t>>* pyramidalRatios)
+                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
@@ -138,7 +138,7 @@ void ZImgITKImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /
   }
 }
 
-void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -253,10 +253,6 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   }
   catch (itk::ExceptionObject& err) {
     throw ZIOException(err.what());
-  }
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
   }
 }
 

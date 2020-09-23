@@ -27,7 +27,7 @@ QStringList ZImgTiff::extensions() const
 
 void ZImgTiff::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<size_t>>* pyramidalRatios)
+                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   clearInternalState();
   ZTiff tiff;
@@ -67,7 +67,7 @@ ZImgTiff::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
   readThumbnailInternal(thumbnail, region, scene, tiff);
 }
 
-void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   clearInternalState();
   ZTiff tiff;
@@ -138,10 +138,6 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   readMetadataInternal(imgTmp.metadataRef(), scene, tiff);
   readThumbnailInternal(imgTmp.thumbnailRef(), region, scene, tiff);
   imgTmp.swap(img);
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
 }
 
 void ZImgTiff::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)

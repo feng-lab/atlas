@@ -25,7 +25,7 @@ QStringList ZImgV3DRaw::extensions() const
 
 void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                          std::vector<std::set<size_t>>* pyramidalRatios)
+                          std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -105,7 +105,7 @@ void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail& /*thumb
   }
 }
 
-void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -159,10 +159,6 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   if ((hostIsLittleEndian() && (endian == 'B' || endian == 'b')) ||
       (!hostIsLittleEndian() && (endian == 'L' || endian == 'l'))) {
     img.reverseEndianness();
-  }
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
   }
 }
 

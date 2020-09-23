@@ -96,11 +96,12 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg PATHS ${QT_PATHS})
+find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg Concurrent PATHS ${QT_PATHS})
 print_target_properties(Qt5::Core)
 print_target_properties(Qt5::Widgets)
 print_target_properties(Qt5::Network)
 print_target_properties(Qt5::Svg)
+print_target_properties(Qt5::Concurrent)
 
 print_target_properties(img NO_LOCATION)
 
@@ -778,7 +779,7 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
-                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg
+                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg Qt5::Concurrent
                       assimp::assimp gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)

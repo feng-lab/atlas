@@ -8,51 +8,6 @@
 
 namespace nim {
 
-ZImgCommonSubBlock::ZImgCommonSubBlock(const QString& fileName, FileFormat format, size_t scene, size_t ratio, size_t t,
-                                       size_t z, size_t x, size_t y, size_t width, size_t height)
-  : ZImgSubBlock(ratio, t, z, x, y, width, height)
-{
-  ZImgRegion rgn;
-  rgn.start.t = t;
-  rgn.end.t = t + 1;
-  rgn.start.z = z;
-  rgn.end.z = z + 1;
-  rgn.start.x = x;
-  rgn.end.x = x + width;
-  rgn.start.y = y;
-  rgn.end.y = y + height;
-  m_imgSource = ZImgSource(fileName, rgn, scene, format);
-}
-
-ZImgCommonSubBlock::ZImgCommonSubBlock(const QStringList& fileList, Dimension catDim, FileFormat format, size_t scene,
-                                       size_t ratio, size_t t, size_t z, size_t x, size_t y, size_t width,
-                                       size_t height)
-  : ZImgSubBlock(ratio, t, z, x, y, width, height)
-{
-  ZImgRegion rgn;
-  rgn.start.t = t;
-  rgn.end.t = t + 1;
-  rgn.start.z = z;
-  rgn.end.z = z + 1;
-  rgn.start.x = x;
-  rgn.end.x = x + width;
-  rgn.start.y = y;
-  rgn.end.y = y + height;
-  m_imgSource = ZImgSource(fileList, catDim, rgn, scene, format);
-}
-
-std::shared_ptr<ZImg> ZImgCommonSubBlock::read() const
-{
-  return std::make_shared<ZImg>(m_imgSource);
-}
-
-ZImgInfo ZImgCommonSubBlock::readInfo() const
-{
-  ZImgInfo info;
-  ZImgIO().readInfo(m_imgSource, info);
-  return info;
-}
-
 ZImgFormat::~ZImgFormat() = default;
 
 bool ZImgFormat::canRead(const QString& filename) const
@@ -617,11 +572,11 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
 void ZImgFormat::createDefaultSubBlocks(const QString& filename,
                                         const std::vector<ZImgInfo>& infos,
                                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                        std::vector<std::set<size_t>>* pyramidalRatios)
+                                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   if (pyramidalRatios) {
     pyramidalRatios->resize(1);
-    (*pyramidalRatios)[0].insert(1);
+    (*pyramidalRatios)[0].insert({1_usize, 1_usize, 1_usize});
   }
   if (!subBlocks)
     return;
@@ -629,8 +584,11 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
   for (size_t s = 0; s < infos.size(); ++s) {
     for (size_t t = 0; t < infos[s].numTimes; ++t) {
       for (size_t z = 0; z < infos[s].depth; ++z) {
-        (*subBlocks)[s].emplace_back(std::make_shared<ZImgCommonSubBlock>(filename, format(), s, 1, t, z,
-                                                                          0, 0, infos[s].width, infos[s].height));
+        (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
+          ZImgSource(filename,
+                     ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
+                                          ZVoxelCoordinate(infos[s].width, infos[s].height, z + 1, infos[s].numChannels, t + 1)),
+                     s)));
       }
     }
   }
@@ -638,11 +596,11 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
 
 void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
                                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                      std::vector<std::set<size_t>>* pyramidalRatios)
+                                      std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   if (pyramidalRatios) {
     pyramidalRatios->resize(1);
-    (*pyramidalRatios)[0].insert(1);
+    (*pyramidalRatios)[0].insert({1_usize, 1_usize, 1_usize});
   }
   if (!subBlocks)
     return;

@@ -15,6 +15,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <array>
 #include <tuple>
+#include <utility>
 
 //#define DUMP_CZI_INFO
 #define NO_MIXED_TILE
@@ -264,14 +265,14 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
       }
         break;
       case 1:  // Jpeg
-        ZImgJpeg::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+        ZImgJpeg::readMemInfo(fileBuf.data(), sb.dataSize, info);
         res = ZImg(info);
-        ZImgJpeg::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+        ZImgJpeg::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
         break;
       case 4:  // JpegXR
-        ZImgJpegXR::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+        ZImgJpegXR::readMemInfo(fileBuf.data(), sb.dataSize, info);
         res = ZImg(info);
-        ZImgJpegXR::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+        ZImgJpegXR::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
         break;
       default:
         try {
@@ -280,9 +281,9 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
             ZImgFormat::fixDimensionOrder(fileBuf.data(), dimensionOrder, res,
                                           pixelTypeIsBGR(sb.directoryEntry.pixelType));
           } else {
-            ZImgFreeImage::instance().readInfo(fileBuf.data(), sb.dataSize, info);
+            ZImgFreeImage::readMemInfo(fileBuf.data(), sb.dataSize, info);
             res = ZImg(info);
-            ZImgFreeImage::instance().readImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
+            ZImgFreeImage::readMemImg(fileBuf.data(), sb.dataSize, res.timeData<uint8_t>(0), res.byteNumber());
           }
         } catch (const ZException&) {
           throw ZIOException(QString("not supported compression type %1").arg(sb.directoryEntry.compression));
@@ -304,11 +305,11 @@ bool operator<(const CZITile& lhs, const CZITile& rhs)
          std::tie(rhs.ratio, rhs.start.x, rhs.start.y, rhs.start.z, rhs.start.t, rhs.start.c);
 }
 
-ZImgCZISubBlock::ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& tiles,
+ZImgCZISubBlock::ZImgCZISubBlock(QString  fileName, std::vector<CZITile>& tiles,
                                  bool mixedTiles, size_t numChannels, size_t bytePerVoxel, VoxelFormat vf)
-  : ZImgSubBlock(tiles[0].ratio, tiles[0].start.t, tiles[0].start.z, tiles[0].start.x, tiles[0].start.y,
-                 tiles[0].size.x, tiles[0].size.y)
-  , m_filename(fileName)
+  : ZImgSubBlock(tiles[0].start.t, tiles[0].start.x, tiles[0].start.y, tiles[0].start.z,
+                 tiles[0].size.x, tiles[0].size.y, 1, tiles[0].ratio, tiles[0].ratio, 1)
+  , m_filename(std::move(fileName))
   , m_mixedTiles(mixedTiles)
   , m_mixedTilesStart(ZVoxelCoordinate::Init::Maximum)
   , m_numChannels(numChannels)
@@ -329,7 +330,7 @@ ZImgCZISubBlock::ZImgCZISubBlock(const QString& fileName, std::vector<CZITile>& 
     y = m_mixedTilesStart.y;
     width = endx - x;
     height = endy - y;
-    m_scale = 1.0 / ratio;
+    m_scale = 1.0 / xRatio;
     m_width = std::ceil(width * m_scale);
     m_height = std::ceil(height * m_scale);
   }
@@ -606,7 +607,7 @@ QStringList ZImgZeissCZI::extensions() const
 
 void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<size_t>>* pyramidalRatios)
+                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
 #ifdef DUMP_CZI_INFO
   dump(filename);
@@ -769,7 +770,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
       for (size_t s = 0; s < infos.size(); ++s) {
         for (const auto& tile : m_sceneTiles[s]) {
           CHECK(tile.ratio >= 1);
-          (*pyramidalRatios)[s].insert(tile.ratio);
+          (*pyramidalRatios)[s].insert({tile.ratio, tile.ratio, 1});
         }
       }
     }
@@ -796,7 +797,8 @@ ZImgZeissCZI::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thum
   // todo
 }
 
-void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
+                           size_t xRatio, size_t yRatio, size_t zRatio)
 {
   clearInternalState();
 
@@ -837,10 +839,10 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     pyRatios.insert(tile.ratio);
   }
 
-  CHECK(ratio >= 1);
+  CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
   size_t readRatio = 0;
   for (auto r : pyRatios) {
-    if (r <= ratio) {
+    if (r <= xRatio && r <= yRatio) {
       readRatio = r;
     } else {
       break;
@@ -942,8 +944,8 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   ZImgMetatag tag("metadata", dump(filename));
   img.metadataRef().attachToTopLevel(tag);
 
-  if (ratio > readRatio) {
-    img.zoom(1.0 * readRatio / ratio, 1.0 * readRatio / ratio);
+  if (xRatio != readRatio || yRatio != readRatio || zRatio > 1) {
+    img.zoom(1.0 * readRatio / xRatio, 1.0 * readRatio / yRatio, 1.0 / zRatio);
   }
 }
 

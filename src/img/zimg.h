@@ -410,9 +410,10 @@ struct ZImgSource
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t ratio_, size_t t_, int64_t z_,
-               int64_t x_, int64_t y_, int64_t width_, int64_t height_)
-    : ratio(ratio_), t(t_), z(z_), x(x_), y(y_), width(width_), height(height_)
+  ZImgSubBlock(size_t t_, int64_t x_, int64_t y_, int64_t z_, int64_t width_, int64_t height_, int64_t depth_,
+               size_t xRatio_, size_t yRatio_, size_t zRatio_)
+    : t(t_), x(x_), y(y_), z(z_), width(width_), height(height_), depth(depth_)
+    , xRatio(xRatio_), yRatio(yRatio_), zRatio(zRatio_)
   {}
 
   virtual ~ZImgSubBlock();
@@ -430,13 +431,37 @@ public:
 
   [[nodiscard]] virtual ZImgInfo readInfo() const = 0;
 
-  size_t ratio;  // realsize / storedsize, 2 means downsampled by 2
   size_t t;   // start t
-  int64_t z;   // start z
   int64_t x;   // actual start x regardless of ratio
   int64_t y;   // actual start y regardless of ratio
+  int64_t z;   // actual start z regardless of ratio
   int64_t width;  // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
   int64_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
+  int64_t depth; // real image depth regardless of ratio; if ratio is 2, the stored image will have depth: depth/2
+  size_t xRatio;  // realsize / storedsize, 2 means downsampled by 2
+  size_t yRatio;  // realsize / storedsize, 2 means downsampled by 2
+  size_t zRatio;  // realsize / storedsize, 2 means downsampled by 2
+};
+
+class ZImgTileSubBlock : public ZImgSubBlock
+{
+public:
+  explicit ZImgTileSubBlock(ZImgSource source,
+                            size_t xRatio = 1,
+                            size_t yRatio = 1,
+                            size_t zRatio = 1,
+                            ImgMergeMode downsampleCombineMode = ImgMergeMode::Interpolation);
+
+  [[nodiscard]] std::shared_ptr<ZImg> read() const override;
+
+  [[nodiscard]] ZImgInfo readInfo() const override;
+
+private:
+  ZImgSource m_source;
+  size_t m_xRatio;
+  size_t m_yRatio;
+  size_t m_zRatio;
+  ImgMergeMode m_downsampleCombineMode;
 };
 
 // Dimension order of ZImg is XYZCT
@@ -466,17 +491,19 @@ public:
   explicit ZImg(const QString& filename,
                 ZImgRegion region = ZImgRegion(),
                 size_t scene = 0,
-                size_t ratio = 1,
+                size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
                 FileFormat format = FileFormat::Unknown);
 
   explicit ZImg(const QStringList& fileList, Dimension catDim, bool catScenes,
                 const ZImgRegion& region = ZImgRegion(),
                 size_t scene = 0,
+                size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
                 FileFormat format = FileFormat::Unknown,
                 bool expandXY = true,
                 bool expandWithMaxValue = false);
 
-  explicit ZImg(const ZImgSource& imgSource);
+  explicit ZImg(const ZImgSource& imgSource,
+                size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1);
 
   ~ZImg();
 
@@ -502,24 +529,30 @@ public:
   static bool fileExtensionWriteSupported(const QString& filename);
 
   // throw ZIOException if io error or empty image, might throw ZImgException if can't allocate memory
-  void load(const QString& filename, size_t scene = 0, size_t ratio = 1, FileFormat format = FileFormat::Unknown);
+  void load(const QString& filename, size_t scene = 0,
+            size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
+            FileFormat format = FileFormat::Unknown);
 
-  void load(const QString& filename, ZImgRegion region, size_t scene = 0, size_t ratio = 1,
+  void load(const QString& filename, ZImgRegion region, size_t scene = 0,
+            size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
             FileFormat format = FileFormat::Unknown);
 
   // load a sequence of imgs, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
   // throw ZIOException if io error, might throw ZImgException if can't allocate memory or can't cat imgs
   // expandXY can not be true if catDim is Dimension::X or Dimension::Y
-  void load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene = 0, FileFormat format = FileFormat::Unknown,
+  void load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene = 0,
+            size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
+            FileFormat format = FileFormat::Unknown,
             bool expandXY = true,
             bool expandWithMaxValue = false);
 
   void load(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene = 0,
+            size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1,
             FileFormat format = FileFormat::Unknown, bool expandXY = true,
             bool expandWithMaxValue = false);
 
-  void load(const ZImgSource& imgSource);
+  void load(const ZImgSource& imgSource, size_t xRatio = 1, size_t yRatio = 1, size_t zRatio = 1);
 
   void save(const QString& filename, FileFormat format = FileFormat::Unknown,
             const ZImgWriteParameters& paras = ZImgWriteParameters()) const;
@@ -2110,7 +2143,7 @@ private:
   ZImgThumbernail m_thumbnail;
   ZImgInfo m_info;
   ZImgMetadata m_metadata;
-  bool m_ownData;
+  bool m_ownData = true;
 };
 
 template<typename TPixel>

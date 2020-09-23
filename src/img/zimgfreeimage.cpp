@@ -181,7 +181,7 @@ QStringList ZImgFreeImage::extensions() const
 
 void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                             std::vector<std::set<size_t>>* pyramidalRatios)
+                             std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
 #if defined(_WIN32) || defined(_WIN64)
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIFU(filename.toStdWString().c_str());
@@ -229,7 +229,7 @@ void ZImgFreeImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& 
 {
 }
 
-void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   std::vector<ZImgInfo> infos;
   readInfo(filename, infos, nullptr, nullptr);
@@ -353,13 +353,9 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   } else if (!region.containsWholeImg(img.info())) {
     img = img.crop(region);
   }
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
 }
 
-void ZImgFreeImage::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
+void ZImgFreeImage::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);
@@ -369,7 +365,7 @@ void ZImgFreeImage::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   info = readInfoFromFIPImage(fipImg);
 }
 
-void ZImgFreeImage::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgFreeImage::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   fipImage fipImg;
   fipMemoryIO memIO(mem, size);

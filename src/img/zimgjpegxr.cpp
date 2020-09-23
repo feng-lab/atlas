@@ -154,7 +154,7 @@ QStringList ZImgJpegXR::extensions() const
 
 void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                          std::vector<std::set<size_t>>* pyramidalRatios)
+                          std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   ERR err = WMP_errSuccess;
   PKCodecFactory* pCodecFactory = nullptr;
@@ -197,7 +197,7 @@ ZImgJpegXR::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbn
   }
 }
 
-void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -267,10 +267,6 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
     img = img.crop(tmpRegion);
   }
 
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
-
   Cleanup:
   if (pDecoder)
     pDecoder->Release(&pDecoder);
@@ -280,7 +276,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   reportError(err);
 }
 
-void ZImgJpegXR::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
+void ZImgJpegXR::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
@@ -316,7 +312,7 @@ void ZImgJpegXR::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   reportError(err);
 }
 
-void ZImgJpegXR::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;

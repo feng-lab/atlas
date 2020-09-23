@@ -29,7 +29,7 @@ QStringList ZImgMetaImage::extensions() const
 
 void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                             std::vector<std::set<size_t>>* pyramidalRatios)
+                             std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
@@ -51,7 +51,7 @@ void ZImgMetaImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& 
 {
 }
 
-void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -116,10 +116,6 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
     } else {
       img.swap(tmpImg);
     }
-  }
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
   }
 }
 

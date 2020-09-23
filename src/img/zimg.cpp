@@ -118,6 +118,46 @@ QString ZImgSource::toQString() const
 
 ZImgSubBlock::~ZImgSubBlock() = default;
 
+ZImgTileSubBlock::ZImgTileSubBlock(ZImgSource source, size_t xRatio, size_t yRatio,
+                                   size_t zRatio, ImgMergeMode downsampleCombineMode)
+  : ZImgSubBlock(source.region.start.t, source.region.start.x, source.region.start.y, source.region.start.z,
+                 source.region.end.x - source.region.start.x,
+                 source.region.end.y - source.region.start.y,
+                 source.region.end.z - source.region.start.z,
+                 xRatio, yRatio, zRatio)
+  , m_source(std::move(source))
+  , m_xRatio(xRatio)
+  , m_yRatio(yRatio)
+  , m_zRatio(zRatio)
+  , m_downsampleCombineMode(downsampleCombineMode)
+{
+  CHECK(m_xRatio > 0);
+  CHECK(m_yRatio > 0);
+  CHECK(m_zRatio > 0);
+}
+
+std::shared_ptr<ZImg> ZImgTileSubBlock::read() const
+{
+  auto res = std::make_shared<ZImg>(m_source);
+  if (m_xRatio > 1 || m_yRatio > 1 || m_zRatio > 1) {
+    res->blockDownsample(m_xRatio, m_yRatio, m_zRatio, m_downsampleCombineMode);
+  }
+  return res;
+}
+
+ZImgInfo ZImgTileSubBlock::readInfo() const
+{
+  ZImgInfo info;
+  ZImgIO().readInfo(m_source, info);
+  info.voxelSizeX *= m_xRatio;
+  info.voxelSizeY *= m_yRatio;
+  info.voxelSizeZ *= m_zRatio;
+  info.width = (info.width + m_xRatio - 1) / m_xRatio;
+  info.height = (info.height + m_yRatio - 1) / m_yRatio;
+  info.depth = (info.depth + m_zRatio - 1) / m_zRatio;
+  return info;
+}
+
 //-----------------------------------------------------------------------------------
 
 ZImg::ZImg()
@@ -157,24 +197,28 @@ ZImg::ZImg(ZImg&& other) noexcept
   swap(other);
 }
 
-ZImg::ZImg(const QString& filename, ZImgRegion region, size_t scene, size_t ratio, FileFormat format)
+ZImg::ZImg(const QString& filename, ZImgRegion region, size_t scene,
+           size_t xRatio, size_t yRatio, size_t zRatio, FileFormat format)
 {
-  load(filename, region, scene, ratio, format);
+  load(filename, region, scene, xRatio, yRatio, zRatio, format);
 }
 
 ZImg::ZImg(const QStringList& fileList, Dimension catDim, bool catScenes,
            const ZImgRegion& region,
            size_t scene,
+           size_t xRatio, size_t yRatio, size_t zRatio,
            FileFormat format,
            bool expandXY,
            bool expandWithMaxValue)
 {
-  load(fileList, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
+  load(fileList, catDim, catScenes, region, scene,
+       xRatio, yRatio, zRatio,
+       format, expandXY, expandWithMaxValue);
 }
 
-ZImg::ZImg(const ZImgSource& imgSource)
+ZImg::ZImg(const ZImgSource& imgSource, size_t xRatio, size_t yRatio, size_t zRatio)
 {
-  load(imgSource);
+  load(imgSource, xRatio, yRatio, zRatio);
 }
 
 ZImg::~ZImg()
@@ -220,22 +264,23 @@ bool ZImg::fileExtensionWriteSupported(const QString& filename)
   return ZImgIO().fileExtensionWriteSupported(filename);
 }
 
-void ZImg::load(const QString& filename, size_t scene, size_t ratio, FileFormat format)
+void ZImg::load(const QString& filename, size_t scene, size_t xRatio, size_t yRatio, size_t zRatio, FileFormat format)
 {
   clear();
-  ZImgIO().readImg(filename, *this, ZImgRegion(), scene, ratio, format);
+  ZImgIO().readImg(filename, *this, ZImgRegion(), scene, xRatio, yRatio, zRatio, format);
 }
 
-void ZImg::load(const QString& filename, ZImgRegion region, size_t scene, size_t ratio, FileFormat format)
+void ZImg::load(const QString& filename, ZImgRegion region, size_t scene,
+                size_t xRatio, size_t yRatio, size_t zRatio, FileFormat format)
 {
   clear();
-  ZImgIO().readImg(filename, *this, region, scene, ratio, format);
+  ZImgIO().readImg(filename, *this, region, scene, xRatio, yRatio, zRatio, format);
 }
 
-void ZImg::load(const ZImgSource& imgSource)
+void ZImg::load(const ZImgSource& imgSource, size_t xRatio, size_t yRatio, size_t zRatio)
 {
   clear();
-  ZImgIO().readImg(imgSource, *this);
+  ZImgIO().readImg(imgSource, *this, xRatio, yRatio, zRatio);
 }
 
 void ZImg::save(const QString& filename, FileFormat format, const ZImgWriteParameters& paras) const
@@ -243,19 +288,25 @@ void ZImg::save(const QString& filename, FileFormat format, const ZImgWriteParam
   ZImgIO().writeImg(filename, *this, format, paras);
 }
 
-void ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene, FileFormat format,
+void ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene,
+                size_t xRatio, size_t yRatio, size_t zRatio,
+                FileFormat format,
                 bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO().readImg(fileList, catDim, catScenes, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, catScenes, *this, scene, xRatio, yRatio, zRatio,
+                   format, expandXY, expandWithMaxValue);
 }
 
 void
-ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene, FileFormat format,
+ZImg::load(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene,
+           size_t xRatio, size_t yRatio, size_t zRatio,
+           FileFormat format,
            bool expandXY, bool expandWithMaxValue)
 {
   clear();
-  ZImgIO().readImg(fileList, catDim, catScenes, region, *this, scene, format, expandXY, expandWithMaxValue);
+  ZImgIO().readImg(fileList, catDim, catScenes, region, *this, scene, xRatio, yRatio, zRatio,
+                   format, expandXY, expandWithMaxValue);
 }
 
 std::vector<ZImgInfo>
@@ -1375,14 +1426,20 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
   info.width = (m_info.width + blockWidth - 1) / blockWidth;
   info.height = (m_info.height + blockHeight - 1) / blockHeight;
   info.depth = (m_info.depth + blockDepth - 1) / blockDepth;
-  ZImg res(info);
 
-  if (res.isEmpty()) {
+  if (mode == ImgMergeMode::Interpolation) {
+    return resized(info.width, info.height, info.depth);
+  } else {
+    ZImg res(info);
+
+    if (res.isEmpty()) {
+      return res;
+    }
+
+    IMG_TYPED_CALL(blockDownsampled_Impl, m_info, res, blockWidth, blockHeight, blockDepth, mode)
+
     return res;
   }
-
-  IMG_TYPED_CALL(blockDownsampled_Impl, m_info, res, blockWidth, blockHeight, blockDepth, mode)
-  return res;
 }
 
 ZImg& ZImg::resize(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant,

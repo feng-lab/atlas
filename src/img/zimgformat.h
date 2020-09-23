@@ -8,23 +8,6 @@
 
 namespace nim {
 
-class ZImgCommonSubBlock : public ZImgSubBlock
-{
-public:
-  ZImgCommonSubBlock(const QString& fileName, FileFormat format, size_t scene, size_t ratio,
-                     size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
-
-  ZImgCommonSubBlock(const QStringList& fileList, Dimension catDim, FileFormat format, size_t scene, size_t ratio,
-                     size_t t, size_t z, size_t x, size_t y, size_t width, size_t height);
-
-  std::shared_ptr<ZImg> read() const override;
-
-  ZImgInfo readInfo() const override;
-
-protected:
-  ZImgSource m_imgSource;
-};
-
 class ZImgSliceProvider;
 
 class ZImgBlockProvider;
@@ -58,7 +41,7 @@ public:
   // only info, input can be changed even if read failed
   virtual void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<size_t>>* pyramidalRatios) = 0;
+                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios) = 0;
 
   // only metadata, input can be changed even if read failed
   virtual void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) = 0;
@@ -69,8 +52,20 @@ public:
                              const ZImgRegion& region, size_t scene) = 0;
 
   // read everything, input can be changed even if read failed
-  virtual void readImg(const QString& filename, ZImg& img,
-                       const ZImgRegion& region, size_t scene, size_t ratio) = 0;
+  virtual void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
+  {
+    readImg(filename, img, region, scene, 1, 1, 1);
+  }
+
+  virtual void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
+                       size_t xRatio, size_t yRatio, size_t zRatio)
+  {
+    CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
+    readImg(filename, img, region, scene);
+    if (xRatio > 1 || yRatio > 1 || zRatio > 1) {
+      img.zoom(1.0 / xRatio, 1.0 / yRatio, 1.0 / zRatio);
+    }
+  }
 
   // check whether the current img can be represented by the file with the paras
   // base calss only check filename, subclass should do more, throw ioexception with reason
@@ -103,11 +98,11 @@ protected:
 
   void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                              std::vector<std::set<size_t>>* pyramidalRatios);
+                              std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios);
 
   void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<size_t>>* pyramidalRatios);
+                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios);
 };
 
 } // namespace nim

@@ -45,7 +45,7 @@ ZImgIO::ZImgIO()
 
 void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                       std::vector<std::set<size_t> >* pyramidalRatios,
+                       std::vector<std::set<std::array<size_t, 3>> >* pyramidalRatios,
                        FileFormat format)
 {
   res.clear();
@@ -264,8 +264,12 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
     for (size_t s = 0; s < res.size(); ++s) {
       for (size_t t = 0; t < res[s].numTimes; ++t) {
         for (size_t z = 0; z < res[s].depth; ++z) {
-          (*subBlocks)[s].emplace_back(std::make_shared<ZImgCommonSubBlock>(fileList, catDim, format, s, 1, t, z,
-                                                                            0, 0, res[s].width, res[s].height));
+          (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
+            ZImgSource(fileList,
+                       catDim,
+                       ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
+                                                    ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
+                       s)));
         }
       }
     }
@@ -317,35 +321,35 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
     const auto& info = infos[i];
     std::set<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>> tiles;
     for (const auto& block : blocks) {
+      if (block->xRatio != 1 || block->yRatio != 1 || block->zRatio != 1) {
+        continue;
+      }
       tiles.insert(
-        std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->ratio, block->t, block->x, block->y,
+        std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->t, block->x, block->y,
                                                                            block->width,
-                                                                           block->height, block->z));
+                                                                           block->height, block->z, block->depth));
     }
     auto lastTile = std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>();
     for (const auto& tile : tiles) {
-      auto[ratio, t, x, y, width, height, z] = tile;
-      if (ratio != 1) {
-        continue;
-      }
+      auto[t, x, y, width, height, z, depth] = tile;
       if (res[i].empty()) {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x + width, y + width, z + 1, info.numChannels, t + 1);
+        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
         res[i].push_back(ZImgRegion(startC, endC));
         lastTile = tile;
         continue;
       }
-      auto[lratio, lt, lx, ly, lwidth, lheight, lz] = lastTile;
+      auto[lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i][res[i].size() - 1];
         if (z != size_t(rgn.end.z)) {
           throw ZIOException("z jumping");
         } else {
-          rgn.end.z += 1;
+          rgn.end.z += depth;
         }
       } else {
         ZVoxelCoordinate startC(x, y, z, 0, t);
-        ZVoxelCoordinate endC(x + width, y + width, z + 1, info.numChannels, t + 1);
+        ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
         res[i].push_back(ZImgRegion(startC, endC));
         lastTile = tile;
       }
@@ -437,7 +441,8 @@ void ZImgIO::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, 
   throw ZIOException(error);
 }
 
-void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio,
+void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
+                     size_t xRatio, size_t yRatio, size_t zRatio,
                      FileFormat format)
 {
   img.clear();
@@ -451,7 +456,7 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
       for (auto reader : readers) {
         try {
           ZImg tmpImg;
-          reader->readImg(filename, tmpImg, region, scene, ratio);
+          reader->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
           tmpImg.swap(img);
           return;
         }
@@ -466,7 +471,7 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
   } else {
     try {
       ZImg tmpImg;
-      m_ioFormats[format]->readImg(filename, tmpImg, region, scene, ratio);
+      m_ioFormats[format]->readImg(filename, tmpImg, region, scene, xRatio, yRatio, zRatio);
       tmpImg.swap(img);
       return;
     }
@@ -480,10 +485,11 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
 }
 
 void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScenes, ZImg& img, size_t scene,
+                     size_t xRatio, size_t yRatio, size_t zRatio,
                      FileFormat format, bool expandXY, bool expandWithMaxValue)
 {
   if (fileList.size() == 1 && !catScenes) {
-    readImg(fileList[0], img, ZImgRegion(), scene, 1, format);
+    readImg(fileList[0], img, ZImgRegion(), scene, xRatio, yRatio, zRatio, format);
     return;
   }
 
@@ -512,7 +518,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
 
   imgs.resize(imgSources.size());
   for (size_t i = 0; i < imgs.size(); ++i) {
-    imgs[i].load(imgSources[i]);
+    readImg(imgSources[i], imgs[i]);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
       int widthPadBefore = (info.width - imgs[i].width()) / 2;
       int widthPadAfter = info.width - imgs[i].width() - widthPadBefore;
@@ -550,18 +556,24 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
     ZImg catImg = ZImg::cat(imgs, catDim);
     img.swap(catImg);
   }
+
+  CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
+  if (xRatio > 1 || yRatio > 1 || zRatio > 1) {
+    img.zoom(1.0 / xRatio, 1.0 / yRatio, 1.0 / zRatio);
+  }
 }
 
 void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& regionIn, ZImg& img, size_t scene,
+                     size_t xRatio, size_t yRatio, size_t zRatio,
                      FileFormat format, bool expandXY, bool expandWithMaxValue)
 {
   if (fileList.size() == 1 && !catScenes) {
-    readImg(fileList[0], img, regionIn, scene, 1, format);
+    readImg(fileList[0], img, regionIn, scene, xRatio, yRatio, zRatio, format);
     return;
   }
 
   if (regionIn.isDefault()) {
-    readImg(fileList, catDim, catScenes, img, scene, format, expandXY, expandWithMaxValue);
+    readImg(fileList, catDim, catScenes, img, scene, xRatio, yRatio, zRatio, format, expandXY, expandWithMaxValue);
     return;
   }
 
@@ -634,7 +646,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
       sliceRegionFullXY.end.y = -1;
       auto imgSource = imgSources[i];
       imgSource.region = sliceRegionFullXY;
-      imgs[i].load(imgSource);
+      readImg(imgSource, imgs[i]);
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -672,7 +684,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
     } else {
       auto imgSource = imgSources[i];
       imgSource.region = sliceRegion;
-      imgs[i].load(imgSource);
+      readImg(imgSource, imgs[i]);
     }
   }
 
@@ -682,14 +694,20 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
     ZImg catImg = ZImg::cat(imgs, catDim);
     img.swap(catImg);
   }
+
+  CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
+  if (xRatio > 1 || yRatio > 1 || zRatio > 1) {
+    img.zoom(1.0 / xRatio, 1.0 / yRatio, 1.0 / zRatio);
+  }
 }
 
-void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img)
+void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size_t yRatio, size_t zRatio)
 {
   if (imgSource.filenames.size() == 1 && !imgSource.catScenes) {
-    readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, 1, imgSource.format);
+    readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, xRatio, yRatio, zRatio, imgSource.format);
   } else if (!imgSource.filenames.empty()) {
     readImg(imgSource.filenames, imgSource.catDim, imgSource.catScenes, imgSource.region, img, imgSource.scene,
+            xRatio, yRatio, zRatio,
             imgSource.format, imgSource.expandXY, imgSource.expandWithMaxValue);
   } else {
     throw ZIOException("invalid image source");

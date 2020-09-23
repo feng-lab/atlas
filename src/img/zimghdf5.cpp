@@ -431,7 +431,7 @@ namespace nim {
 
 ZImgHDF5SubBlock::ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info,
                                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_)
-  : ZImgSubBlock(ratio_, t_, z_, x_ * ratio_, y_ * ratio_, info.width * ratio_, info.height * ratio_)
+  : ZImgSubBlock(t_, x_ * ratio_, y_ * ratio_, z_, info.width * ratio_, info.height * ratio_, 1, ratio_, ratio_, 1)
   , m_filename(fileName)
   , m_info(info)
   , m_ratio(ratio_)
@@ -443,7 +443,7 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info
       m_tiles.push_back(QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t_).arg(c).arg(z_).toStdString());
     } else {
       m_tiles.push_back(
-        QString("/Img/TimePoint%1/Channel%2/Z%3/DownsampledBy%4Data").arg(t_).arg(c).arg(z_).arg(ratio).toStdString());
+        QString("/Img/TimePoint%1/Channel%2/Z%3/DownsampledBy%4Data").arg(t_).arg(c).arg(z_).arg(m_ratio).toStdString());
     }
   }
 }
@@ -507,7 +507,7 @@ QStringList ZImgHDF5::extensions() const
 
 void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<size_t>>* pyramidalRatios)
+                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   try {
     H5::Exception::dontPrint();
@@ -559,7 +559,9 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     }
     if (pyramidalRatios) {
       pyramidalRatios->resize(infos.size());
-      pyramidalRatios->at(0) = levels;
+      for (auto level : levels) {
+        pyramidalRatios->at(0).insert({level, level, 1});
+      }
     }
   }
   catch (H5::Exception const& e) {
@@ -582,7 +584,8 @@ void ZImgHDF5::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thu
   }
 }
 
-void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
+                       size_t xRatio, size_t yRatio, size_t zRatio)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -608,10 +611,10 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
     std::set<size_t> pyRatios = loadRatiosFromH5Grp(allGrp);
 
-    CHECK(ratio >= 1);
+    CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
     size_t readRatio = 0;
     for (auto r : pyRatios) {
-      if (r <= ratio) {
+      if (r <= xRatio && r <= yRatio) {
         readRatio = r;
       } else {
         break;
@@ -658,8 +661,8 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
       }
     }
 
-    if (ratio > readRatio) {
-      img.zoom(1.0 * readRatio / ratio, 1.0 * readRatio / ratio);
+    if (xRatio != readRatio || yRatio != readRatio || zRatio > 1) {
+      img.zoom(1.0 * readRatio / xRatio, 1.0 * readRatio / yRatio, 1.0 / zRatio);
     }
   }
   catch (H5::Exception const& e) {

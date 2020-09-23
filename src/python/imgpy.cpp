@@ -172,7 +172,8 @@ PYBIND11_MODULE(_imgpy, m)
     .value("Min", ImgMergeMode::Min)
     .value("Mean", ImgMergeMode::Mean)
     .value("Median", ImgMergeMode::Median)
-    .value("First", ImgMergeMode::First);
+    .value("First", ImgMergeMode::First)
+    .value("Interpolation", ImgMergeMode::Interpolation);
 
   py::enum_<FileFormat>(m, "FileFormat", py::arithmetic())
     .value("Unknown", FileFormat::Unknown)
@@ -342,15 +343,21 @@ PYBIND11_MODULE(_imgpy, m)
   py::class_<ZImg>(m, "ZImg")
     .def(py::init<>())
     .def(py::init<const ZImgInfo&>())
-    .def(py::init<const QString&, ZImgRegion, size_t, size_t, FileFormat>(),
-         "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "ratio"_a = 1, "format"_a = FileFormat::Unknown)
+    .def(py::init<const QString&, ZImgRegion, size_t, size_t, size_t, size_t, FileFormat>(),
+         "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1,
+         "format"_a = FileFormat::Unknown)
     .def(py::init<>([](const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& region, size_t scene,
+                       size_t xRatio, size_t yRatio, size_t zRatio,
                        FileFormat format, bool expandXY, bool expandWithMaxValue) {
-           return new ZImg(fileList, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
+           return new ZImg(fileList, catDim, catScenes, region, scene, xRatio, yRatio, zRatio,
+                           format, expandXY, expandWithMaxValue);
          }),
-         "filenames"_a, "catDim"_a, "catScenes"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
+         "filenames"_a, "catDim"_a, "catScenes"_a, "region"_a = ZImgRegion(), "scene"_a = 0,
+         "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1,
+         "format"_a = FileFormat::Unknown,
          "expandXY"_a = false, "expandWithMaxValue"_a = false)
-    .def(py::init<const ZImgSource&>())
+    .def(py::init<const ZImgSource&, size_t, size_t, size_t>(),
+         "imgSource"_a, "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1)
     .def(py::init<>([](const py::array& arr, const ZImgInfo& info_in) {
       auto img = new ZImg();
       auto info = getImgInfoFromNdarray(arr, info_in);
@@ -393,16 +400,19 @@ PYBIND11_MODULE(_imgpy, m)
                   for (size_t s = 0; s < res.size(); ++s) {
                     auto& mat = res[s];
                     const auto& blocks = subBlocks[s];
-                    mat.resize(blocks.size(), 7);
+                    mat.resize(blocks.size(), 10);
                     for (Eigen::Index r = 0; r < mat.rows(); ++r) {
                       const auto& block = blocks[r];
-                      mat(r, 0) = block->ratio;
-                      mat(r, 1) = block->t;
-                      mat(r, 2) = block->z;
-                      mat(r, 3) = block->x;
-                      mat(r, 4) = block->y;
-                      mat(r, 5) = block->width;
-                      mat(r, 6) = block->height;
+                      mat(r, 0) = block->t;
+                      mat(r, 1) = block->x;
+                      mat(r, 2) = block->y;
+                      mat(r, 3) = block->z;
+                      mat(r, 4) = block->width;
+                      mat(r, 5) = block->height;
+                      mat(r, 6) = block->depth;
+                      mat(r, 7) = block->xRatio;
+                      mat(r, 8) = block->yRatio;
+                      mat(r, 9) = block->zRatio;
                     }
                   }
                   return res;
@@ -415,16 +425,19 @@ PYBIND11_MODULE(_imgpy, m)
                   for (size_t s = 0; s < res.size(); ++s) {
                     auto& mat = res[s];
                     const auto& blocks = subBlocks[s];
-                    mat.resize(blocks.size(), 7);
+                    mat.resize(blocks.size(), 10);
                     for (Eigen::Index r = 0; r < mat.rows(); ++r) {
                       const auto& block = blocks[r];
-                      mat(r, 0) = block->ratio;
-                      mat(r, 1) = block->t;
-                      mat(r, 2) = block->z;
-                      mat(r, 3) = block->x;
-                      mat(r, 4) = block->y;
-                      mat(r, 5) = block->width;
-                      mat(r, 6) = block->height;
+                      mat(r, 0) = block->t;
+                      mat(r, 1) = block->x;
+                      mat(r, 2) = block->y;
+                      mat(r, 3) = block->z;
+                      mat(r, 4) = block->width;
+                      mat(r, 5) = block->height;
+                      mat(r, 6) = block->depth;
+                      mat(r, 7) = block->xRatio;
+                      mat(r, 8) = block->yRatio;
+                      mat(r, 9) = block->zRatio;
                     }
                   }
                   return res;
@@ -775,8 +788,8 @@ PYBIND11_MODULE(_imgpy, m)
     });
 
   py::class_<ZImgSubBlock, PyZImgSubBlock<>>(m, "ZImgSubBlock")
-    .def(py::init<size_t, size_t, int64_t, int64_t, int64_t, int64_t, int64_t>(),
-         "ratio"_a, "t"_a, "z"_a, "x"_a, "y"_a, "width"_a, "height"_a)
+    .def(py::init<size_t, int64_t, int64_t, int64_t, int64_t, int64_t, int64_t, size_t, size_t, size_t>(),
+         "t"_a, "x"_a, "y"_a, "z"_a, "width"_a, "height"_a, "depth"_a, "xRatio"_a, "yRatio"_a, "zRatio"_a)
     .def("read", &ZImgSubBlock::read)
     .def("readInfo", &ZImgSubBlock::readInfo)
     .def("__repr__", [](const ZImgSubBlock&) {
@@ -784,8 +797,8 @@ PYBIND11_MODULE(_imgpy, m)
     });
   py::class_<ZImgTileSubBlock, ZImgSubBlock, PyZImgTileSubBlock<>>(m, "ZImgTileSubBlock")
     .def(py::init<const ZImgSource&, size_t, size_t, size_t, ImgMergeMode>(),
-         "source"_a, "downsampleBlockWidth"_a = 1, "downsampleBlockHeight"_a = 1, "downsampleBlockDepth"_a = 1,
-         "downsampleCombineMode"_a = ImgMergeMode::Mean)
+         "source"_a, "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1,
+         "downsampleCombineMode"_a = ImgMergeMode::Interpolation)
     .def("__repr__", [](const ZImgTileSubBlock&) {
       return QString("<_imgpy.ZImgTileSubBlock>").toStdString();
     });

@@ -354,7 +354,7 @@ QStringList ZImgJpeg::extensions() const
 
 void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<size_t>>* pyramidalRatios)
+                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   auto infile = openFile(filename, "rb");
 
@@ -497,7 +497,7 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
   }
 }
 
-void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -520,10 +520,6 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
   readThumbnail(filename, img.thumbnailRef(), region, scene);
   readMetadata(filename, img.metadataRef(), scene);
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
 }
 
 void ZImgJpeg::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
@@ -617,7 +613,7 @@ bool ZImgJpeg::supportWrite() const
   return true;
 }
 
-void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
+void ZImgJpeg::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
@@ -634,7 +630,7 @@ void ZImgJpeg::readInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   readInfoFromJpeg(cinfo, info);
 }
 
-void ZImgJpeg::readImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
 {
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;

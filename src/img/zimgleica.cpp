@@ -97,7 +97,7 @@ QStringList ZImgLeica::extensions() const
 
 void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                         std::vector<std::set<size_t>>* pyramidalRatios)
+                         std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
 {
   clearInternalState();
 
@@ -132,7 +132,7 @@ void ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*th
 {
 }
 
-void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene, size_t ratio)
+void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   clearInternalState();
 
@@ -159,8 +159,6 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
   ZImgRegion rgn = region;
   rgn.resolveRegionEnd(info);
-
-  CHECK(ratio >= 1);
 
   const auto& ii = leicaImageInfos[scene];
   if (!allMemoryOffsetNameLength.empty() ||  // lof or lif
@@ -277,10 +275,6 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
   ZImgMetatag tag("metadata", xml);
   img.metadataRef().attachToTopLevel(tag);
-
-  if (ratio > 1) {
-    img.zoom(1.0 / ratio, 1.0 / ratio);
-  }
 }
 
 void ZImgLeica::clearInternalState()
