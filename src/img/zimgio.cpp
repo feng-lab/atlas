@@ -45,7 +45,6 @@ ZImgIO::ZImgIO()
 
 void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                       std::vector<std::set<std::array<size_t, 3>> >* pyramidalRatios,
                        FileFormat format)
 {
   res.clear();
@@ -61,7 +60,7 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
           std::vector<ZImgInfo> tmpInfo;
           if (subBlocks)
             subBlocks->clear();
-          reader->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
+          reader->readInfo(filename, tmpInfo, subBlocks);
           if (!tmpInfo.empty()) {
             tmpInfo.swap(res);
             return;
@@ -82,7 +81,7 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
       std::vector<ZImgInfo> tmpInfo;
       if (subBlocks)
         subBlocks->clear();
-      m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks, pyramidalRatios);
+      m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks);
       if (!tmpInfo.empty()) {
         tmpInfo.swap(res);
         return;
@@ -103,14 +102,14 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
                        FileFormat format, bool expandXY)
 {
   if (fileList.size() == 1 && !catScenes) {
-    readInfos(fileList[0], res, subBlocks, nullptr, format);
+    readInfos(fileList[0], res, subBlocks, format);
     return;
   }
   if (fileList.empty()) {
     throw ZIOException("Read sequence failed: empty file list");
   }
 
-  readInfos(fileList[0], res, subBlocks, nullptr, format);
+  readInfos(fileList[0], res, subBlocks, format);
   if (res.empty()) {
     throw ZIOException("Read sequence failed: img 0 is empty");
   }
@@ -121,7 +120,7 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
     for (int i = 1; i < fileList.size(); ++i) {
       std::vector<ZImgInfo> tmpInfo;
       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-      readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, nullptr, format);
+      readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
       if (tmpInfo.empty()) {
         throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
       }
@@ -192,7 +191,7 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
     for (int i = 1; i < fileList.size(); ++i) {
       std::vector<ZImgInfo> tmpInfo;
       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-      readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, nullptr, format);
+      readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
       if (tmpInfo.empty()) {
         throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
       }
@@ -282,7 +281,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info,
   if (imgSource.filenames.size() == 1 && !imgSource.catScenes) {
     std::vector<ZImgInfo> res;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-    readInfos(imgSource.filenames[0], res, subBlocks ? &tmpSubBlocks : nullptr, nullptr, imgSource.format);
+    readInfos(imgSource.filenames[0], res, subBlocks ? &tmpSubBlocks : nullptr, imgSource.format);
     if (imgSource.scene >= res.size()) {
       throw ZIOException("invalid scene");
     }
@@ -314,7 +313,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
 {
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  readInfos(filename, infos, &subBlocks, nullptr, format);
+  readInfos(filename, infos, &subBlocks, format);
   std::vector<std::vector<ZImgRegion>> res(infos.size());
   for (size_t i = 0; i < res.size(); ++i) {
     auto& blocks = subBlocks[i];
@@ -358,41 +357,45 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
   return res;
 }
 
-void ZImgIO::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene, FileFormat format)
+void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
 {
   meta.clear();
   QString error;
 
-  if (format == FileFormat::Unknown) {
-    std::vector<ZImgFormat*> readers = getSupportedReader(filename);
-    if (readers.empty()) {
-      error = QString("File %1 is not supported.").arg(filename);
-    } else {
-      for (auto reader : readers) {
-        try {
-          ZImgMetadata tmpMeta;
-          reader->readMetadata(filename, tmpMeta, scene);
-          tmpMeta.swap(meta);
-          return;
-        }
-        catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            reader->fullName()).arg(e.what());
+  if (imgSource.format == FileFormat::Unknown) {
+    for (const auto& filename : imgSource.filenames) {
+      std::vector<ZImgFormat*> readers = getSupportedReader(filename);
+      if (readers.empty()) {
+        error = QString("File %1 is not supported.").arg(filename);
+      } else {
+        for (auto reader : readers) {
+          try {
+            ZImgMetadata tmpMeta;
+            reader->readMetadata(filename, tmpMeta, imgSource.catScenes ? 0 : imgSource.scene);
+            meta.merge(tmpMeta);
+            return;
+          }
+          catch (const ZIOException& e) {
+            error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
+              reader->fullName()).arg(e.what());
+          }
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportRead()) {
-    error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
+  } else if (m_ioFormats.find(imgSource.format) == m_ioFormats.end() || !m_ioFormats[imgSource.format]->supportRead()) {
+    error = QString("Read format '%1' is not supported").arg(m_ioFormats[imgSource.format]->fullName());
   } else {
-    try {
-      ZImgMetadata tmpMeta;
-      m_ioFormats[format]->readMetadata(filename, tmpMeta, scene);
-      tmpMeta.swap(meta);
-      return;
-    }
-    catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+    for (const auto& filename : imgSource.filenames) {
+      try {
+        ZImgMetadata tmpMeta;
+        m_ioFormats[imgSource.format]->readMetadata(filename, tmpMeta, imgSource.catScenes ? 0 : imgSource.scene);
+        meta.merge(tmpMeta);
+        return;
+      }
+      catch (const ZIOException& e) {
+        error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
+          m_ioFormats[imgSource.format]->fullName()).arg(e.what());
+      }
     }
   }
 

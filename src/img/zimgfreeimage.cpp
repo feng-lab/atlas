@@ -180,8 +180,7 @@ QStringList ZImgFreeImage::extensions() const
 }
 
 void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                             std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
 #if defined(_WIN32) || defined(_WIN64)
   FREE_IMAGE_FORMAT fmt = fipImage::identifyFIFU(filename.toStdWString().c_str());
@@ -216,7 +215,7 @@ void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
     infos.push_back(readInfoFromFIPImage(fipImg));
   }
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgFreeImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
@@ -232,7 +231,7 @@ void ZImgFreeImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& 
 void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
   std::vector<ZImgInfo> infos;
-  readInfo(filename, infos, nullptr, nullptr);
+  readInfo(filename, infos, nullptr);
   if (scene >= infos.size()) {
     throw ZIOException("invalid scene");
   }

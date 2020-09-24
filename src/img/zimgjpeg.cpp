@@ -353,8 +353,7 @@ QStringList ZImgJpeg::extensions() const
 }
 
 void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   auto infile = openFile(filename, "rb");
 
@@ -373,7 +372,7 @@ void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   infos.resize(1);
   readInfoFromJpeg(cinfo, infos[0]);
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)

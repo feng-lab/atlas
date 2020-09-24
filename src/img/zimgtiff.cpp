@@ -26,8 +26,7 @@ QStringList ZImgTiff::extensions() const
 }
 
 void ZImgTiff::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   clearInternalState();
   ZTiff tiff;
@@ -35,7 +34,7 @@ void ZImgTiff::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   detectImgInfo(tiff);
   infos = m_imgInfo;
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 
   if (!m_imageDescription.isEmpty()) {
     LOG(INFO) << m_imageDescription;
@@ -172,7 +171,7 @@ void ZImgTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
   }
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      tiffWriter.writeIFD(imgSliceProvider.slice(z, t, 1), 0, 0, -1, true);
+      tiffWriter.writeIFD(imgSliceProvider.slice(z, t), 0, 0, -1, true);
     }
   }
 }

@@ -28,8 +28,7 @@ QStringList ZImgMetaImage::extensions() const
 }
 
 void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                             std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   MetaImage metaImage;
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
@@ -39,7 +38,7 @@ void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
   parseInfo(metaImage, infos[0]);
   LOG(INFO) << infos[0].toQString();
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgMetaImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)

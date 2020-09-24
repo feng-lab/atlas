@@ -314,7 +314,7 @@ ZImg::readImgInfos(const QString& filename, std::vector<std::vector<std::shared_
                    FileFormat format)
 {
   std::vector<ZImgInfo> res;
-  ZImgIO().readInfos(filename, res, subBlocks, nullptr, format);
+  ZImgIO().readInfos(filename, res, subBlocks, format);
   return res;
 }
 
@@ -338,7 +338,7 @@ ZImg ZImg::readSubBlock(const QString& filename, size_t scene, size_t blockIndex
 {
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO().readInfos(filename, infos, &subBlocks, nullptr, format);
+  ZImgIO().readInfos(filename, infos, &subBlocks, format);
   if (scene >= subBlocks.size()) {
     throw ZIOException(QString("scene %1 overflow, max %2").arg(scene).arg(subBlocks.size()));
   }

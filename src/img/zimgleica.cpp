@@ -96,8 +96,7 @@ QStringList ZImgLeica::extensions() const
 }
 
 void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                         std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   clearInternalState();
 
@@ -112,7 +111,7 @@ void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   infos.clear();
   detectInfos(infos, leicaImageInfos);
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)

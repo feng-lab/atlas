@@ -212,8 +212,7 @@ QStringList ZImgPng::extensions() const
 }
 
 void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                       std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   //ZBenchTimer bt("a");
   //bt.start();
@@ -256,7 +255,7 @@ void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     infos[0].voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
   }
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
   //bt.stopAndLog();
 }
 

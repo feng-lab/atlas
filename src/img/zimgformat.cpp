@@ -51,7 +51,7 @@ void ZImgFormat::writeImg(const QString& filename,
                           const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
-  writeImg(filename, imgSliceProvider.wholeImg(1), paras);
+  writeImg(filename, imgSliceProvider.wholeImg(), paras);
 }
 
 void ZImgFormat::writeImg(const QString& filename,
@@ -571,13 +571,8 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
 
 void ZImgFormat::createDefaultSubBlocks(const QString& filename,
                                         const std::vector<ZImgInfo>& infos,
-                                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  if (pyramidalRatios) {
-    pyramidalRatios->resize(1);
-    (*pyramidalRatios)[0].insert({1_usize, 1_usize, 1_usize});
-  }
   if (!subBlocks)
     return;
   subBlocks->resize(infos.size());
@@ -595,13 +590,8 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
 }
 
 void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
-                                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                                      std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                                      std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  if (pyramidalRatios) {
-    pyramidalRatios->resize(1);
-    (*pyramidalRatios)[0].insert({1_usize, 1_usize, 1_usize});
-  }
   if (!subBlocks)
     return;
   subBlocks->resize(infos.size());

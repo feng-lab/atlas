@@ -78,8 +78,7 @@ QStringList ZImgITKImage::extensions() const
 }
 
 void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   try {
     itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
@@ -99,9 +98,9 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
     parseInfo(imageIO.GetPointer(), infos[0], isNd2);
 
     if (isNrrd) {
-      createEmptySubBlocks(infos, subBlocks, pyramidalRatios);
+      createEmptySubBlocks(infos, subBlocks);
     } else {
-      createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+      createDefaultSubBlocks(filename, infos, subBlocks);
     }
   }
   catch (itk::ExceptionObject& err) {

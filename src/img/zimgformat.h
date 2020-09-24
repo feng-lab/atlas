@@ -40,8 +40,7 @@ public:
 
   // only info, input can be changed even if read failed
   virtual void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios) = 0;
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) = 0;
 
   // only metadata, input can be changed even if read failed
   virtual void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) = 0;
@@ -97,12 +96,10 @@ protected:
                   uint64_t dataOffset, const ZImgRegion& region);
 
   void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
-                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                              std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios);
+                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
 
   void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
-                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios);
+                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
 };
 
 } // namespace nim

@@ -9,6 +9,7 @@
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/index/rtree.hpp>
 #include <tuple>
+#include <array>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -18,24 +19,7 @@ namespace nim {
 class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
-  enum class Type
-  {
-    CacheFile, OrigSource, OrigSourceMIP
-  };
-
-  ZImgPackSubBlock(const QString& fn, size_t ratio, size_t t, size_t z,
-                   int64_t x, int64_t y, size_t width, size_t height);
-
-  ZImgPackSubBlock(const ZImgSource& imgSource, size_t ratio, size_t t, size_t z,
-                   int64_t x, int64_t y, size_t width, size_t height);
-
-  ZImgPackSubBlock(const ZImgSource& imgSource, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
-                   int64_t x, int64_t y, size_t width, size_t height);
-
   ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
-                   int64_t x, int64_t y, size_t width, size_t height);
-
-  ZImgPackSubBlock(const std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t sliceStart, size_t sliceEnd,
                    int64_t x, int64_t y, size_t width, size_t height);
 
   std::shared_ptr<ZImg> read() const override;
@@ -43,10 +27,6 @@ public:
   ZImgInfo readInfo() const override;
 
 protected:
-  Type m_type;
-  ZImgSource m_imgSource;
-  size_t m_zStart;
-  size_t m_zEnd;
   std::shared_ptr<ZImg> m_img;
 };
 
@@ -61,14 +41,8 @@ public:
     Invalid, Partial, Complete
   };
 
-  ZImgPack(ZImg& img, const QString& fileName);
-
-  ZImgPack(const QString& fileName, size_t scene, FileFormat format, size_t numScene = 0,
-           const ZImgInfo* info = nullptr,
-           const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
-
   ZImgPack(ZImgSource  imgSource,
-           size_t numScene = 1, const ZImgInfo* info = nullptr,
+           size_t numScene, const ZImgInfo* info = nullptr,
            const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
   virtual ~ZImgPack();
@@ -185,13 +159,11 @@ public:
   const ZImgInfo& imgInfo() const override
   { return m_imgInfo; }
 
-  std::set<size_t> ratios() const override;
+  ZImg slice(size_t z, size_t t) const override;
 
-  ZImg slice(size_t z, size_t t, size_t ratio) const override;
+  ZImg allSlices(size_t t) const override;
 
-  ZImg allSlices(size_t t, size_t ratio) const override;
-
-  ZImg wholeImg(size_t ratio) const override;
+  ZImg wholeImg() const override;
 
 protected:
   // will take ownership of img
@@ -205,20 +177,20 @@ protected:
 
   void createTileIndexStructure();
 
-  ZImg assembleImg(size_t ratio) const;
+  ZImg assembleImg(std::array<size_t, 3> ratio) const;
 
-  ZImg assembleImg(size_t ratio, size_t t) const;
+  ZImg assembleImg(std::array<size_t, 3> ratio, size_t t) const;
 
-  ZImg assembleImg(size_t ratio, size_t t, size_t z) const;
+  ZImg assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) const;
 
   void updateDerivedData();
 
   void updateNameTootip();
 
 private:
-  size_t ratioForScale(double scale) const;
+  std::array<size_t, 3> ratioForScale(double xScale, double yScale, double zScale) const;
 
-  size_t readRatioOf(size_t needRatio) const;
+  std::array<size_t, 3> readRatioOf(size_t xRatio, size_t yRatio, size_t zRatio) const;
 
 protected:
   ZImgInfo m_imgInfo;
@@ -240,15 +212,15 @@ private:
   int64_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024;  // 2000MB
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
-  std::map<size_t, QSize> m_ratioToSize;
-  using RTZType = std::tuple<size_t, size_t, int>;
-  std::map<RTZType, std::vector<size_t>> m_rtzToTileIndice;
-  using TileCornerType = bg::model::point<int64_t, 2, bg::cs::cartesian>;
+  std::set<std::array<size_t, 3>> m_pyramidalRatios;
+  using RTType = std::tuple<size_t, size_t, size_t, size_t>;
+  std::map<RTType, std::vector<size_t>> m_rtToTileIndice;
+  using TileCornerType = bg::model::point<int64_t, 3, bg::cs::cartesian>;
   using TileBoxType = bg::model::box<TileCornerType>;
   using RTreeValueType = std::pair<TileBoxType, size_t>;
   using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;
-  using RTZToTileBoxRTreeType = std::map<RTZType, std::unique_ptr<RTreeType>>;
-  RTZToTileBoxRTreeType m_rtzToTileBoxRTree;
+  using RTToTileBoxRTreeType = std::map<RTType, std::unique_ptr<RTreeType>>;
+  RTToTileBoxRTreeType m_rtToTileBoxRTree;
 
   double m_minIntensity;
   double m_maxIntensity;

@@ -387,7 +387,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
         return idPack.first;
     }
 
-    size_t id = addImgPack(new ZImgPack(fileName, scene, format, numScene, info, subBlock));
+    size_t id = addImgPack(new ZImgPack(ZImgSource(fileName, ZImgRegion(), scene, format), numScene, info, subBlock));
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);

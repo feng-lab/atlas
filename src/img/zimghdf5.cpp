@@ -506,8 +506,7 @@ QStringList ZImgHDF5::extensions() const
 }
 
 void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                        std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   try {
     H5::Exception::dontPrint();
@@ -520,7 +519,7 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     infos.resize(1);
     infos[0] = ZImgInfoIO::load(allGrp);
 
-    //createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+    //createDefaultSubBlocks(filename, infos, subBlocks);
 
     std::set<size_t> levels = loadRatiosFromH5Grp(allGrp);
 
@@ -555,12 +554,6 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
             }
           }
         }
-      }
-    }
-    if (pyramidalRatios) {
-      pyramidalRatios->resize(infos.size());
-      for (auto level : levels) {
-        pyramidalRatios->at(0).insert({level, level, 1});
       }
     }
   }
@@ -763,7 +756,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
         channelGrps.push_back(timeGrp.createGroup(qUtf8Printable(QString("Channel%1").arg(c))));
       }
       for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-        ZImg img = imgSliceProvider.slice(z, t, 1);
+        ZImg img = imgSliceProvider.slice(z, t);
         for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
           H5::Group zGrp = channelGrps[c].createGroup(qUtf8Printable(QString("Z%1").arg(z)));
 

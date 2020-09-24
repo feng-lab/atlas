@@ -153,8 +153,7 @@ QStringList ZImgJpegXR::extensions() const
 }
 
 void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                          std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   ERR err = WMP_errSuccess;
   PKCodecFactory* pCodecFactory = nullptr;
@@ -178,7 +177,7 @@ void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 
   reportError(err);
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgJpegXR::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t scene)

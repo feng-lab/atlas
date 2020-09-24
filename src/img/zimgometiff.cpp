@@ -129,7 +129,7 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& img
   makeImageDescriptionTag(imgSliceProvider.imgInfo(), "XYCZT", tags[0]);
   for (size_t t = 0; t < imgSliceProvider.imgInfo().numTimes; ++t) {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      ZImg img = imgSliceProvider.slice(z, t, 1);
+      ZImg img = imgSliceProvider.slice(z, t);
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
         //LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
         if (t == 0 && z == 0 && c == 0)

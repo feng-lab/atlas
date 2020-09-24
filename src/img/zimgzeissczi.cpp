@@ -606,8 +606,7 @@ QStringList ZImgZeissCZI::extensions() const
 }
 
 void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                            std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
 #ifdef DUMP_CZI_INFO
   dump(filename);
@@ -632,7 +631,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
   detectInfos(infos, inputFileStream, fh);
 
   if (m_someTilesAreNot2D) {
-    createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+    createDefaultSubBlocks(filename, infos, subBlocks);
   } else {
     if (subBlocks) {
       subBlocks->resize(infos.size());
@@ -763,15 +762,6 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
           }
         }
 #endif
-      }
-    }
-    if (pyramidalRatios) {
-      pyramidalRatios->resize(infos.size());
-      for (size_t s = 0; s < infos.size(); ++s) {
-        for (const auto& tile : m_sceneTiles[s]) {
-          CHECK(tile.ratio >= 1);
-          (*pyramidalRatios)[s].insert({tile.ratio, tile.ratio, 1});
-        }
       }
     }
   }

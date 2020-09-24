@@ -20,8 +20,7 @@ public:
   { return FileFormat::Vaa3DRaw; }
 
   void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios) override;
+                std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
 

@@ -49,6 +49,13 @@ public:
   inline void swap(ZImgMetadataBase& other) noexcept
   { m_data.swap(other.m_data); }
 
+  inline void merge(const ZImgMetadataBase& other) noexcept
+  {
+    for (auto & [k, v] : other.m_data) {
+      m_data[k].insert(m_data[k].end(), v.begin(), v.end());
+    }
+  }
+
   inline void clear()
   { m_data.clear(); }
 

@@ -24,8 +24,7 @@ QStringList ZImgV3DRaw::extensions() const
 }
 
 void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
-                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                          std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios)
+                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
@@ -69,7 +68,7 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     infos[0].voxelFormat = VoxelFormat::Unsigned;
   infos[0].createDefaultDescriptions();
 
-  createDefaultSubBlocks(filename, infos, subBlocks, pyramidalRatios);
+  createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
 void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, size_t scene)
@@ -227,13 +226,13 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgS
     //writeImg(filename, imgSliceProvider.allSlices(0), comp);
     for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
       for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-        ZImg img = imgSliceProvider.slice(z, 0, 1);
+        ZImg img = imgSliceProvider.slice(z, 0);
         writeStream(outputFileStream, img.channelData<char>(c, 0), img.channelByteNumber());
       }
     }
   } else {
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
-      ZImg img = imgSliceProvider.slice(z, 0, 1);
+      ZImg img = imgSliceProvider.slice(z, 0);
       writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
     }
   }

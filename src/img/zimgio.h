@@ -27,7 +27,6 @@ public:
   // only info
   void readInfos(const QString& filename, std::vector<ZImgInfo>& res,
                  std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
-                 std::vector<std::set<std::array<size_t, 3>>>* pyramidalRatios = nullptr,
                  FileFormat format = FileFormat::Unknown);
 
   void readInfos(const QStringList& fileList, Dimension catDim, bool catScenes, std::vector<ZImgInfo>& res,
@@ -42,8 +41,7 @@ public:
                                                              FileFormat format = FileFormat::Unknown);
 
   // only metadata
-  void
-  readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene = 0, FileFormat format = FileFormat::Unknown);
+  void readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta);
 
   // only thumbnail
   void readThumbnail(const QString& filename, ZImgThumbernail& thumbnail,
