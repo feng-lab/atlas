@@ -662,6 +662,9 @@ def build_bzip2(src_dir: str, install_dir: str):
                          '-DENABLE_SHARED_LIB=OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+        if not is_windows():
+            shutil.copy2(os.path.join(install_dir, 'lib', 'libbz2_static.a'),
+                         os.path.join(install_dir, 'lib', 'libbz2.a'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -849,10 +852,10 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
         orig_file3 = bak_file3 = None
         orig_file4 = bak_file4 = None
         try:
-            # orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
-            # bak_file = patch_file(orig_file,
-            #                       from_texts=[r'-std=${CXX_STD}'],
-            #                       to_texts=[r''])
+            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'-std=${CXX_STD}'],
+                                  to_texts=[r''])
 
             orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
             bak_file2 = patch_file(orig_file2,
@@ -879,11 +882,12 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                              '-DPYTHON_EXTENSIONS:BOOL=OFF',
                              '-DBUILD_TESTS:BOOL=OFF',
                              '-DBOOST_LINK_STATIC=ON',
+                             #'-DCXX_STD=c++17',
                              src_dir])
             build_and_install_cmakecmd(cmakecmd, build_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            # os.replace(bak_file, orig_file)
+            os.replace(bak_file, orig_file)
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
             os.replace(bak_file4, orig_file4)
@@ -1304,13 +1308,13 @@ def build_freeimage(src_dir: str, install_dir: str):
             orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
-            subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
-                            'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
-                           cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
+            #                cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
+            #                 'PREFIX=' + install_dir],
+            #                cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
+            #                cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count())],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count()), 'install',
@@ -1321,13 +1325,13 @@ def build_freeimage(src_dir: str, install_dir: str):
         else:
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip'), src_dir)
-            subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install',
-                            'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-f', 'Makefile_gnu', 'clean'],
-                           cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count())],
+            #                cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile_gnu', '-j' + str(os.cpu_count()), 'install',
+            #                 'PREFIX=' + install_dir],
+            #                cwd=src_dir, shell=False, check=True)
+            # subprocess.run(['make', '-f', 'Makefile_gnu', 'clean'],
+            #                cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', '-j' + str(os.cpu_count())],
                            cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile_fip', '-j' + str(os.cpu_count()), 'install',
