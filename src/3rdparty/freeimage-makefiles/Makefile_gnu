@@ -15,7 +15,7 @@ LIBRARIES = -lc++
 
 MODULES = $(SRCS:.c=.o)
 MODULES := $(MODULES:.cpp=.o)
-CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -mmacosx-version-min=10.13
+CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -mmacosx-version-min=10.13 -w 
 # OpenJPEG
 CFLAGS += -DOPJ_STATIC
 # LibRaw
@@ -23,7 +23,7 @@ CFLAGS += -DNO_LCMS
 # LibJXR
 CFLAGS += -DDISABLE_PERF_MEASUREMENT -D__ANSI__
 CFLAGS += $(INCLUDE)
-CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -mmacosx-version-min=10.13 -stdlib=libc++ -std=c++14  -fvisibility-inlines-hidden
+CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -mmacosx-version-min=10.13 -stdlib=libc++ -std=c++14  -fvisibility-inlines-hidden -w 
 # LibJXR
 CXXFLAGS += -D__ANSI__
 CXXFLAGS += $(INCLUDE)

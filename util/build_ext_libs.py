@@ -655,7 +655,7 @@ def build_bzip2(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DENABLE_DEBUG=OFF',
-                         '-DENABLE_APP=OFF',
+                         '-DENABLE_APP=ON',
                          '-DENABLE_DOCS=OFF',
                          '-DENABLE_EXAMPLES=OFF',
                          '-DENABLE_STATIC_LIB=ON',
