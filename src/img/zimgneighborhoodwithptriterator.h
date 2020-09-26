@@ -2,8 +2,7 @@
 
 #include "zimg.h"
 #include "zneighborhood.h"
-#include <boost/iterator/iterator_facade.hpp>
-#include <type_traits>
+#include <boost/stl_interfaces/iterator_interface.hpp>
 
 namespace nim {
 
@@ -11,16 +10,17 @@ namespace impl {
 
 template<typename TImg, typename TVoxel>
 class img_neighborhood_with_ptr_iter
-  : public boost::iterator_facade<
-    img_neighborhood_with_ptr_iter<TImg, TVoxel>, TVoxel, boost::random_access_traversal_tag, TVoxel&, int64_t
-  >
+  : public boost::stl_interfaces::iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>,
+  std::random_access_iterator_tag, TVoxel>
 {
-  struct enabler
-  {
-  };
+  using base_type = boost::stl_interfaces::iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>,
+    std::random_access_iterator_tag, TVoxel>;
+
+  template<typename, typename> friend
+  class img_neighborhood_with_ptr_iter;
 public:
   // empty constructor not useful
-  img_neighborhood_with_ptr_iter() = default;
+  constexpr img_neighborhood_with_ptr_iter() noexcept = default;
 
   explicit img_neighborhood_with_ptr_iter(const ZNeighborhood& nb, TImg& img, const ZImgRegion& region = ZImgRegion(),
                                           PadOption padOption = PadOption::Constant, TVoxel padValue = TVoxel(0))
@@ -56,13 +56,12 @@ public:
       m_wrapOffsets[i] = m_img->info().stride(i) * (m_img->info()[i] - m_regionInfo[i]);
   }
 
-  template<typename OtherTImg, typename OtherTVoxel>
-  img_neighborhood_with_ptr_iter(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other,
-                                 typename std::enable_if<
-                                   std::is_convertible_v<OtherTImg*, TImg*> &&
-                                   std::is_convertible_v<OtherTVoxel*, TVoxel*>, enabler
-                                 >::type = enabler()
-  )
+  template<
+    typename OtherTImg,
+    typename OtherTVoxel,
+    typename E = std::enable_if_t<
+      std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
+  constexpr img_neighborhood_with_ptr_iter(const img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel>& other) noexcept
     : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo)
     , m_endIdx(other.m_endIdx), m_idx(other.m_idx), m_coord(other.m_coord)
     , m_padOption(other.m_padOption), m_padValue(other.m_padValue)
@@ -176,14 +175,8 @@ public:
       return m_nbValues[n];
   }
 
-protected:
-  friend class boost::iterator_core_access;
-
-  template<typename, typename> friend
-  class img_neighborhood_with_ptr_iter;
-
   template<typename OtherTImg, typename OtherTVoxel>
-  __forceinline bool equal(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other) const
+  __forceinline constexpr bool operator==(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other) const noexcept
   {
     return this->m_img == other.m_img &&
            this->m_region == other.m_region &&
@@ -203,7 +196,7 @@ protected:
            this->m_nbPtrOffsets == other.m_nbPtrOffsets;
   }
 
-  __forceinline void increment()
+  __forceinline constexpr img_neighborhood_with_ptr_iter& operator++() noexcept
   {
     ++m_idx;
     ++m_centerVoxelPtr;
@@ -226,15 +219,17 @@ protected:
               m_centerVoxelPtr = m_img->template data<TVoxel>(m_coord);
               updateNbInfoOfCurrentVoxel();
             }
-            return;
+            return *this;
           }
         }
       }
     }
     updateNbInfoOfCurrentVoxel();
+    return *this;
   }
+  using base_type::operator++;
 
-  __forceinline void decrement()
+  __forceinline constexpr img_neighborhood_with_ptr_iter& operator--() noexcept
   {
     --m_idx;
     --m_centerVoxelPtr;
@@ -257,20 +252,22 @@ protected:
               m_centerVoxelPtr = m_img->template data<TVoxel>(m_coord);
               updateNbInfoOfCurrentVoxel();
             }
-            return;
+            return *this;
           }
         }
       }
     }
     updateNbInfoOfCurrentVoxel();
+    return *this;
   }
+  using base_type::operator--;
 
-  __forceinline TVoxel& dereference() const
+  __forceinline TVoxel& operator*() const noexcept
   {
     return *m_centerVoxelPtr;
   }
 
-  __forceinline void advance(int64_t n)
+  __forceinline constexpr img_neighborhood_with_ptr_iter& operator+=(std::ptrdiff_t n) noexcept
   {
     m_idx += n;
     ZVoxelCoordinate coordAdvance = ZImg::indexToCoord(n, m_regionInfo);
@@ -294,12 +291,13 @@ protected:
       m_centerVoxelPtr = m_img->template data<TVoxel>(m_coord);
       updateNbInfoOfCurrentVoxel();
     }
+    return *this;
   }
 
   template<typename OtherTImg, typename OtherTVoxel>
-  __forceinline int64_t distance_to(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other) const
+  __forceinline auto operator-(const img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel>& other) const noexcept
   {
-    return other.m_idx - m_idx;
+    return m_idx - other.m_idx;
   }
 
   void initNbInfo()

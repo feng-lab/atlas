@@ -222,7 +222,7 @@ public:
   }
 
   template<typename OtherTImg, typename OtherTVoxel>
-  auto operator-(const img_region_iter<OtherTImg, OtherTVoxel>& other) const noexcept
+  __forceinline auto operator-(const img_region_iter<OtherTImg, OtherTVoxel>& other) const noexcept
   {
     return m_idx - other.m_idx;
   }
