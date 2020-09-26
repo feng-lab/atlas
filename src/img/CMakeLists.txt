@@ -245,7 +245,7 @@ set(IMG_SOURCES
     zlogcache.cpp
     zlogcache.h
     zminimumspanningtree.cpp
-    zminimumspanningtree.h)
+    zminimumspanningtree.h zsubrange.h)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 

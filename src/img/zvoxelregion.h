@@ -2,7 +2,7 @@
 
 #include "zbbox.h"
 #include "zvoxelcoordinate.h"
-#include <boost/iterator/iterator_facade.hpp>
+#include <boost/stl_interfaces/iterator_interface.hpp>
 #include <type_traits>
 #include <vector>
 
@@ -12,48 +12,40 @@ namespace impl {
 
 template<class TVoxelRegion>
 class voxel_iter
-  : public boost::iterator_facade<
-    voxel_iter<TVoxelRegion>, ZVoxelCoordinate, boost::forward_traversal_tag, ZVoxelCoordinate
-  >
+  : public boost::stl_interfaces::iterator_interface<voxel_iter<TVoxelRegion>,
+  std::forward_iterator_tag, ZVoxelCoordinate>
 {
-  struct enabler
-  {
-  };
+  using base_type = boost::stl_interfaces::iterator_interface<voxel_iter<TVoxelRegion>,
+    std::forward_iterator_tag, ZVoxelCoordinate>;
 public:
-  voxel_iter()
+  constexpr voxel_iter() noexcept
     : m_region(nullptr), m_boxIdx(0), m_voxel()
   {}
 
-  explicit voxel_iter(const TVoxelRegion* region, size_t boxIdx)
+  constexpr explicit voxel_iter(const TVoxelRegion* region, size_t boxIdx) noexcept
     : m_region(region), m_boxIdx(boxIdx)
   {
     if (m_region && m_boxIdx < m_region->m_boxes.size())
       m_voxel = m_region->m_boxes[m_boxIdx].minCorner();
   }
 
-  template<class OtherValue>
-  voxel_iter(voxel_iter<OtherValue> const& other, typename std::enable_if<
-    std::is_convertible_v<OtherValue*, TVoxelRegion*>, enabler
-  >::type = enabler()
-  )
+  template<
+    typename OtherValue,
+    typename E = std::enable_if_t<
+      std::is_convertible_v<OtherValue*, TVoxelRegion*>>>
+  constexpr voxel_iter(const voxel_iter<OtherValue>& other) noexcept
     : m_region(other.m_region), m_boxIdx(other.m_boxIdx), m_voxel(other.m_voxel)
   {}
 
-private:
-  friend class boost::iterator_core_access;
-
-  template<class> friend
-  class voxel_iter;
-
   template<class OtherValue>
-  bool equal(voxel_iter<OtherValue> const& other) const
+  constexpr bool operator==(const voxel_iter<OtherValue>& other) const noexcept
   {
     return this->m_region == other.m_region &&
            this->m_boxIdx == other.m_boxIdx &&
            this->m_voxel == other.m_voxel;
   }
 
-  bool visited() const
+  bool visited() const noexcept
   {
     for (size_t i = 0; i < m_boxIdx; ++i) {
       if (m_region->m_boxes[i].contains(m_voxel))
@@ -62,10 +54,13 @@ private:
     return false;
   }
 
-  void increment()
+  constexpr ZVoxelCoordinate operator*() const noexcept
+  { return m_voxel; }
+
+  constexpr voxel_iter& operator++() noexcept
   {
     if (!m_region || m_boxIdx == m_region->m_boxes.size()) {
-      return;
+      return *this;
     }
 
     do {
@@ -94,13 +89,11 @@ private:
         }
       }
     } while (m_boxIdx < m_region->m_boxes.size() && visited());
+    return *this;
   }
+  using base_type::operator++;
 
-  ZVoxelCoordinate dereference() const
-  {
-    return m_voxel;
-  }
-
+private:
   const TVoxelRegion* m_region;
   size_t m_boxIdx;
   ZVoxelCoordinate m_voxel;
