@@ -67,5 +67,5 @@ include(LibsForImg)
 
 # subprojects
 add_subdirectory(src/img)
-add_subdirectory(src/matlab)
+# add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)
