@@ -517,11 +517,10 @@ void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int6
       }
     }
   }
-  if (tmpRes.width() == res.width() && tmpRes.height() == res.height() && tmpRes.depth() == res.depth()) {
-    res.swap(tmpRes);
-  } else {
+  if (tmpRes.width() != res.width() || tmpRes.height() != res.height() || tmpRes.depth() != res.depth()) {
     tmpRes.resize(res.width(), res.height(), res.depth());
   }
+  res.swap(tmpRes);
 }
 
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const
