@@ -87,7 +87,7 @@ void ZRegionAnnotationWidget::updateMesh()
 {
   bool ok;
   double d = QInputDialog::getDouble(this, tr("Scale ROI before Generating Mesh"),
-                                     tr("Scale:"), 1.0, 1e-10, 1e10, 6, &ok,
+                                     tr("Scale:"), 1.0, 1e-6, 1e10, 6, &ok,
                                      Qt::WindowFlags(), 1);
   if (ok) {
     m_regionAnnotationPack.regionAnnotation().updateMesh(d);

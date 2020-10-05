@@ -258,6 +258,9 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+    if (it->id < 0) {
+      continue;
+    }
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
       ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale);
