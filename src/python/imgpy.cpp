@@ -285,6 +285,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("voxelSizeXInUm", &ZImgInfo::voxelSizeXInUm)
     .def("voxelSizeYInUm", &ZImgInfo::voxelSizeYInUm)
     .def("voxelSizeZInUm", &ZImgInfo::voxelSizeZInUm)
+    .def("dataTypeString", &ZImgInfo::typeAsQString)
     .def("__repr__", [](const ZImgInfo& v) {
       return QString("<_imgpy.ZImgInfo %1>").arg(v.toQString()).toStdString();
     });
