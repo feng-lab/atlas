@@ -124,9 +124,9 @@ size_t ZImgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     tileIdx = obj.value("TileIndex").toInt(-1);
   }
   if (paths.size() > 1) {
-    return loadImg(paths, catDim, tileIdx, FileFormat::Unknown, errorMsg);
+    return loadImg(paths, catDim, false, FileFormat::Unknown, errorMsg);
   } else {
-    return loadImg(paths[0], tileIdx, FileFormat::Unknown, errorMsg);
+    return loadImg(paths[0], tileIdx, FileFormat::Unknown, errorMsg, tileIdx + 1);
   }
 }
 
