@@ -4,7 +4,6 @@
 #include "zobjdoc.h"
 #include <QVBoxLayout>
 #include <QLabel>
-#include <QScrollArea>
 
 namespace nim {
 
@@ -35,15 +34,15 @@ void ZViewSettingWidget::showDefaultWidget()
 
 void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
 {
-  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
-    if (m_subWidgets[i].id == id) {
-      m_widget->setCurrentWidget(m_subWidgets[i].widget);
+  for (auto& m_subWidget : m_subWidgets) {
+    if (m_subWidget.id == id) {
+      m_widget->setCurrentWidget(m_subWidget.widget);
       return;
     }
   }
   std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
   if (wg) {
-    QLabel* label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(id));
+    auto label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(id));
     label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setWordWrap(true);
@@ -97,7 +96,7 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 
 void ZViewSettingWidget::updateWidget()
 {
-  if (ZWidgetsGroup* wg = qobject_cast<ZWidgetsGroup*>(sender())) {
+  if (auto wg = qobject_cast<ZWidgetsGroup*>(sender())) {
     for (size_t i = 0; i < m_subWidgets.size(); ++i) {
       if (m_subWidgets[i].widgetsGroup == wg) {
         bool current = false;

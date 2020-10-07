@@ -160,10 +160,13 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   for (size_t i = 0; i < origLabelImg.channelVoxelNumber(); ++i) {
     labels.insert(origLabelImg.value<int64_t>(i));
   }
+  std::set<int64_t> ancestorLabels;
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     if (labels.find(it->id) != labels.end()) {
       for (auto pit = m_ontology.cbeginAncestor(it); pit != m_ontology.cendAncestor(it); ++pit) {
-        labels.insert(pit->id);
+        if (labels.find(pit->id) == labels.end()) {
+          ancestorLabels.insert(pit->id);
+        }
       }
     }
   }
@@ -180,8 +183,14 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   LOG(INFO) << "Importing Label Image...";
   for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
-    if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg ||
-        labels.find(it->id) == labels.end()) {
+    if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg) {
+      continue;
+    }
+
+    bool processMesh = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
+    bool processROI = labels.find(it->id) != labels.end();
+
+    if (!processMesh && ! processROI) {
       continue;
     }
 
@@ -194,12 +203,12 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 //        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
 //      }
 //    }
-    if (createMesh) {
+    if (createMesh && processMesh) {
       // create mesh
       it->mesh = std::make_shared<ZMesh>();
       binaryImgToMesh(binaryImg, *it->mesh, scale);
     }
-    if (createROI) {
+    if (createROI && processROI) {
       // create contours
       it->roi = this->createROI();
       binaryImgToROI(binaryImg, *it->roi, scale);
@@ -567,6 +576,22 @@ void ZRegionAnnotation::save(const QString& filename) const
   }
 }
 
+void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
+{
+  QTemporaryDir dir;
+  if (dir.isValid()) {
+    QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
+    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale);
+    auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
+    importLabelImage(fn, FileFormat::Unknown, false, true, 1.0 / scale);
+    cmd->setNewOntology(m_ontology);
+    m_undoStack.push(cmd);
+    //emit modified();
+  } else {
+    throw ZException(QString("can not create temporary file for region interpolation"));
+  }
+}
+
 void ZRegionAnnotation::updateMesh(double scale)
 {
   QTemporaryDir dir;
@@ -598,6 +623,16 @@ ZBBox<glm::ivec4> ZRegionAnnotation::copiedItemBoundBox() const
     }
   }
   return boundBox;
+}
+
+void ZRegionAnnotation::interpolate_Impl(const ZTree<RegionNode>& newOntology)
+{
+  auto it = m_ontology.begin();
+  auto itn = newOntology.begin();
+  for (; it != m_ontology.end(); ++it, ++itn) {
+    it->roi = itn->roi;
+  }
+  emit allROIChanged();
 }
 
 void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
@@ -647,6 +682,15 @@ std::shared_ptr<ZROI> ZRegionAnnotation::createROI()
   auto res = std::make_shared<ZROI>(undoStack());
   connect(res.get(), &ZROI::boundBoxChanged, this, &ZRegionAnnotation::updateBoundBox);
   return res;
+}
+
+void ZRegionAnnotationInterpolateCommand::redo()
+{
+  if (m_firstRun) {
+    m_firstRun = false;
+  } else {
+    m_regionAnnotation.interpolate_Impl(m_newOntology);
+  }
 }
 
 void ZRegionAnnotationUpdateMeshCommand::redo()

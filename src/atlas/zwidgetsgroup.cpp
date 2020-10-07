@@ -134,10 +134,10 @@ QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* labe
       blo->insertSpacing(1, 20);
     }
   }
-  QWidget* widget = new QWidget();
+  auto widget = new QWidget();
   widget->setLayout(lw);
   if (scroll) {
-    QScrollArea* sa = new QScrollArea();
+    auto sa = new QScrollArea();
     sa->setWidgetResizable(true);
     sa->setWidget(widget);
     sa->setFrameShape(QFrame::NoFrame);
@@ -190,14 +190,14 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
                     m_childGroups[i]->m_visibleLevel <= m_cutOffbetweenBasicAndAdvancedLevel; ++i) {
           QLayout* lw = m_childGroups[i]->createLayout(true);
           if (m_childGroups[i]->isGroup()) {
-            QGroupBox* groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
+            auto groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
             groupBox->setLayout(lw);
             vbl->addWidget(groupBox);
           } else
             vbl->addLayout(lw);
         }
         if (i < m_childGroups.size()) {
-          QPushButton* pb = new QPushButton("Advanced...");
+          auto pb = new QPushButton("Advanced...");
           pb->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
           vbl->addWidget(pb, 0, Qt::AlignHCenter | Qt::AlignVCenter);
           connect(pb, &QPushButton::clicked, this, &ZWidgetsGroup::emitRequestAdvancedWidgetSignal);
@@ -205,7 +205,7 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
       } else {
         for (const auto& childGroup : m_childGroups) {
           if (childGroup->isGroup()) {
-            QGroupBox* groupBox = new QGroupBox(childGroup->getGroupName());
+            auto groupBox = new QGroupBox(childGroup->getGroupName());
             QLayout* lw = childGroup->createLayout(false);
             groupBox->setLayout(lw);
             vbl->addWidget(groupBox);

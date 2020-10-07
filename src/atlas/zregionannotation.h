@@ -84,6 +84,9 @@ public:
 
   void save(const QString& filename) const;
 
+  // generate region annotations for slices without annotations
+  void interpolateRegionAnnotation(double scale = 1.0);
+
   // update Mesh after editing contours
   void updateMesh(double scale = 1.0);
 
@@ -106,6 +109,8 @@ signals:
   void undoStackCleanChanged(bool clean);
 
 private:
+  void interpolate_Impl(const ZTree<RegionNode>& newOntology);
+
   void updateMesh_Impl(const ZTree<RegionNode>& newOntology);
 
   void transformMesh_Impl(const glm::mat4& trans);
@@ -117,6 +122,7 @@ private:
   std::shared_ptr<ZROI> createROI();
 
 private:
+  friend class ZRegionAnnotationInterpolateCommand;
   friend class ZRegionAnnotationUpdateMeshCommand;
   friend class ZRegionAnnotationTransformMeshCommand;
 
@@ -127,6 +133,28 @@ private:
   ZBBox<glm::ivec4> m_boundBox;
 
   QUndoStack m_undoStack;
+};
+
+class ZRegionAnnotationInterpolateCommand : public QUndoCommand
+{
+public:
+  explicit ZRegionAnnotationInterpolateCommand(ZRegionAnnotation& ra)
+    : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.m_ontology), m_firstRun(true)
+  {}
+
+  void setNewOntology(const ZTree<RegionNode>& no)
+  { m_newOntology = no; }
+
+  void undo() override
+  { m_regionAnnotation.interpolate_Impl(m_oldOntology); }
+
+  void redo() override;
+
+protected:
+  ZRegionAnnotation& m_regionAnnotation;
+  ZTree<RegionNode> m_oldOntology;
+  ZTree<RegionNode> m_newOntology;
+  bool m_firstRun;
 };
 
 class ZRegionAnnotationUpdateMeshCommand : public QUndoCommand

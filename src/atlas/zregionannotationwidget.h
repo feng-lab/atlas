@@ -19,6 +19,8 @@ protected:
 
   void transformMesh();
 
+  void interpolateRegionAnnotation();
+
   void updateMesh();
 
   void exportMeshes();
@@ -32,6 +34,7 @@ private:
   ZRegionAnnotationPack& m_regionAnnotationPack;
   ZDoc& m_doc;
 
+  QPushButton* m_interpolateRegionAnnotationButton = nullptr;
   QPushButton* m_update3DMeshFromROIButton = nullptr;
   QPushButton* m_transform3DMeshButton = nullptr;
   QPushButton* m_exportLableImageButton = nullptr;
