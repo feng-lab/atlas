@@ -56,8 +56,9 @@ void ZRegionAnnotationWidget::exportLabelImage()
   }
   QApplication::processEvents();
   bool ok;
+  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
   double d = QInputDialog::getDouble(this, tr("Scale Output Label Image"),
-                                     tr("Scale:"), 1.0, 1e-10, 1e10, 6, &ok,
+                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
                                      Qt::WindowFlags(), 1);
   if (fmtIdx >= 0 && !fn.isEmpty() && ok) {
     try {
@@ -86,8 +87,9 @@ void ZRegionAnnotationWidget::transformMesh()
 void ZRegionAnnotationWidget::interpolateRegionAnnotation()
 {
   bool ok;
+  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
   double d = QInputDialog::getDouble(this, tr("Scale ROI before Interpolating"),
-                                     tr("Scale:"), 1.0, 1e-4, 1e10, 6, &ok,
+                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
                                      Qt::WindowFlags(), 1);
   if (ok) {
     m_regionAnnotationPack.regionAnnotation().interpolateRegionAnnotation(d);
@@ -97,8 +99,9 @@ void ZRegionAnnotationWidget::interpolateRegionAnnotation()
 void ZRegionAnnotationWidget::updateMesh()
 {
   bool ok;
+  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
   double d = QInputDialog::getDouble(this, tr("Scale ROI before Generating Mesh"),
-                                     tr("Scale:"), 1.0, 1e-4, 1e10, 6, &ok,
+                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
                                      Qt::WindowFlags(), 1);
   if (ok) {
     m_regionAnnotationPack.regionAnnotation().updateMesh(d);

@@ -34,6 +34,8 @@ public:
   void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale = 1.0,
                         bool keepOnlyInterpolatedSlices = false) const;
 
+  double getOptimizedScale() const;
+
   void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale = 1.0);
 
   [[nodiscard]] size_t numRegions() const

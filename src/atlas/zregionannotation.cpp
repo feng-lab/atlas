@@ -289,6 +289,11 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
   LOG(INFO) << "Finish exporting label image";
 }
 
+double ZRegionAnnotation::getOptimizedScale() const
+{
+  return std::min(2000. / m_boundBox.maxCorner().x, 2000. / m_boundBox.maxCorner().y);
+}
+
 void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale)
 {
   ZBenchTimer bt;
