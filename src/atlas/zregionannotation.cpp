@@ -291,7 +291,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 
 double ZRegionAnnotation::getOptimizedScale() const
 {
-  return std::min(2000. / m_boundBox.maxCorner().x, 2000. / m_boundBox.maxCorner().y);
+  return std::min(1.0, std::min(2000. / m_boundBox.maxCorner().x, 2000. / m_boundBox.maxCorner().y));
 }
 
 void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale)
