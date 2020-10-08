@@ -75,7 +75,7 @@ void ZWidgetsGroup::addChild(ZParameter& parameter, int visibleLevel)
   addChild(std::make_shared<ZWidgetsGroup>(parameter, visibleLevel));
 }
 
-void ZWidgetsGroup::addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd)
+void ZWidgetsGroup::addChild(const std::shared_ptr<ZWidgetsGroup>& child, bool atEnd)
 {
   if (atEnd) {
     m_childGroups.push_back(child);
@@ -94,8 +94,24 @@ void ZWidgetsGroup::removeAllChildren()
   m_childGroups.clear();
 }
 
+void ZWidgetsGroup::removeChild(const QWidget& widget)
+{
+  const auto origSize = m_childGroups.size();
+  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
+                                     [&widget, this](const std::shared_ptr<ZWidgetsGroup>& child) {
+                                       if (child->m_type == Type::Widget && child->m_widget == &widget) {
+                                         child->disconnect(this);
+                                         return true;
+                                       }
+                                       return false;
+                                     }),
+                      m_childGroups.end());
+  CHECK(m_childGroups.size() < origSize);
+}
+
 void ZWidgetsGroup::removeChild(const ZParameter& para)
 {
+  const auto origSize = m_childGroups.size();
   m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
                                      [&para, this](const std::shared_ptr<ZWidgetsGroup>& child) {
                                        if (child->m_type == Type::Parameter && child->m_parameter == &para) {
@@ -105,19 +121,31 @@ void ZWidgetsGroup::removeChild(const ZParameter& para)
                                        return false;
                                      }),
                       m_childGroups.end());
+  CHECK(m_childGroups.size() < origSize);
 }
 
 void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& childIn)
 {
+  const auto origSize = m_childGroups.size();
   m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
                                      [&childIn, this](const std::shared_ptr<ZWidgetsGroup>& child) {
-                                       if (child->m_type == Type::Group && child == childIn) {
+                                       if (child == childIn) {
                                          child->disconnect(this);
                                          return true;
                                        }
                                        return false;
                                      }),
                       m_childGroups.end());
+  CHECK(m_childGroups.size() < origSize);
+}
+
+void ZWidgetsGroup::protectWidgetChildren()
+{
+  for (const auto& childGroup : m_childGroups) {
+    if (childGroup->m_type == Type::Widget) {
+      childGroup->m_widget->setParent(nullptr);
+    }
+  }
 }
 
 QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* label, bool noStretch)

@@ -1,6 +1,5 @@
 #include "zregionannotationfilter.h"
 
-#include "zregionannotationviewsettingtreemodel.h"
 #include "zregionannotationviewsettingtreeview.h"
 #include "zgraphicsview.h"
 #include "znumericparameter.h"
@@ -101,11 +100,14 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
     m_widgetsGroup->addChild(m_offsetPara, 2);
     m_widgetsGroup->addChild(m_highlightRegionOnMouseHover, 2);
 
-    auto model =
-      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters, this);
-    m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters), 4);
-    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
+    m_viewSettingTreeModel =
+      std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
+                                                              m_idToROIFilters, this);
+    m_viewSettingTreeWidget =
+      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
+                                                             m_regionAnnotationPack->regionAnnotation(),
+                                                             m_idToROIFilters);
+    m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
   }
   return m_widgetsGroup;
 }
@@ -200,9 +202,11 @@ void ZRegionAnnotationFilter::regionROIAdded(int64_t id, ZROI* roi)
 void ZRegionAnnotationFilter::allROIChanged()
 {
   if (m_widgetsGroup) {
-    if (m_viewSettingTreeWidgetGroup) {
-      m_widgetsGroup->removeChild(m_viewSettingTreeWidgetGroup);
-      m_viewSettingTreeWidgetGroup.reset();
+    if (m_viewSettingTreeWidget) {
+      m_widgetsGroup->removeChild(*m_viewSettingTreeWidget);
+      m_viewSettingTreeWidget->setParent(nullptr);
+      m_viewSettingTreeWidget.reset();
+      m_viewSettingTreeModel.reset();
     }
   }
 
@@ -258,11 +262,14 @@ void ZRegionAnnotationFilter::allROIChanged()
   }
 
   if (m_widgetsGroup) {
-    auto model =
-      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters, this);
-    m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToROIFilters), 4);
-    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
+    m_viewSettingTreeModel =
+      std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
+                                                              m_idToROIFilters, this);
+    m_viewSettingTreeWidget =
+      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
+                                                             m_regionAnnotationPack->regionAnnotation(),
+                                                             m_idToROIFilters);
+    m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }

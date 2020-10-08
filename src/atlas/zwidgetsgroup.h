@@ -40,13 +40,17 @@ public:
 
   void addChild(ZParameter& parameter, int visibleLevel);
 
-  void addChild(std::shared_ptr<ZWidgetsGroup> child, bool atEnd = true);
+  void addChild(const std::shared_ptr<ZWidgetsGroup>& child, bool atEnd = true);
 
   void removeAllChildren();
+
+  void removeChild(const QWidget& widget);
 
   void removeChild(const ZParameter& para);
 
   void removeChild(const std::shared_ptr<ZWidgetsGroup>& child);
+
+  void protectWidgetChildren();
 
   inline int visibleLevel() const
   { return m_visibleLevel; }

@@ -1,6 +1,5 @@
 #include "z3dregionannotationfilter.h"
 
-#include "zregionannotationviewsettingtreemodel.h"
 #include "zregionannotationviewsettingtreeview.h"
 #include "zmesh.h"
 #include "zrandom.h"
@@ -68,11 +67,14 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
     connect(pb, &QPushButton::clicked, this, &Z3DRegionAnnotationFilter::hideAllRegions);
     m_widgetsGroup->addChild(*pb, 8);
 
-    auto model =
-      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters, this);
-    m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters), 9);
-    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
+    m_viewSettingTreeModel =
+      std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
+                                                              m_idToMeshFilters, this);
+    m_viewSettingTreeWidget =
+      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
+                                                             m_regionAnnotationPack->regionAnnotation(),
+                                                             m_idToMeshFilters);
+    m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 9);
   }
   return m_widgetsGroup;
 }
@@ -142,9 +144,11 @@ void Z3DRegionAnnotationFilter::visibleChanged(bool v)
 void Z3DRegionAnnotationFilter::allMeshChanged()
 {
   if (m_widgetsGroup) {
-    if (m_viewSettingTreeWidgetGroup) {
-      m_widgetsGroup->removeChild(m_viewSettingTreeWidgetGroup);
-      m_viewSettingTreeWidgetGroup.reset();
+    if (m_viewSettingTreeWidget) {
+      m_widgetsGroup->removeChild(*m_viewSettingTreeWidget);
+      m_viewSettingTreeWidget->setParent(nullptr);
+      m_viewSettingTreeWidget.reset();
+      m_viewSettingTreeModel.reset();
     }
   }
 
@@ -195,11 +199,14 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   updateBoundBox();
 
   if (m_widgetsGroup) {
-    auto model =
-      new ZRegionAnnotationViewSettingTreeModel(m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters, this);
-    m_viewSettingTreeWidgetGroup = std::make_shared<ZWidgetsGroup>(
-      *new ZRegionAnnotationViewSettingTreeView(*model, m_regionAnnotationPack->regionAnnotation(), m_idToMeshFilters), 9);
-    m_widgetsGroup->addChild(m_viewSettingTreeWidgetGroup);
+    m_viewSettingTreeModel =
+      std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
+                                                              m_idToMeshFilters, this);
+    m_viewSettingTreeWidget =
+      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
+                                                             m_regionAnnotationPack->regionAnnotation(),
+                                                             m_idToMeshFilters);
+    m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 9);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }

@@ -86,9 +86,9 @@ void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 
 void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 {
-  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
-    if (m_subWidgets[i].id == id) {
-      m_subWidgets[i].label->setText(m_doc.objNameWithModifiedMarkerAndID(id));
+  for (auto& m_subWidget : m_subWidgets) {
+    if (m_subWidget.id == id) {
+      m_subWidget.label->setText(m_doc.objNameWithModifiedMarkerAndID(id));
       break;
     }
   }
@@ -97,22 +97,23 @@ void ZViewSettingWidget::updateViewSettingWidgetLabelOfObj(size_t id)
 void ZViewSettingWidget::updateWidget()
 {
   if (auto wg = qobject_cast<ZWidgetsGroup*>(sender())) {
-    for (size_t i = 0; i < m_subWidgets.size(); ++i) {
-      if (m_subWidgets[i].widgetsGroup == wg) {
+    for (auto& m_subWidget : m_subWidgets) {
+      if (m_subWidget.widgetsGroup == wg) {
         bool current = false;
-        if (m_widget->currentWidget() == m_subWidgets[i].widget) {
+        if (m_widget->currentWidget() == m_subWidget.widget) {
           current = true;
           m_widget->setCurrentWidget(m_defaultWidget);
         }
-        m_widget->removeWidget(m_subWidgets[i].widget);
-        delete m_subWidgets[i].widget;
+        wg->protectWidgetChildren();
+        m_widget->removeWidget(m_subWidget.widget);
+        delete m_subWidget.widget;
 
-        m_subWidgets[i].label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(m_subWidgets[i].id));
-        m_subWidgets[i].label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        m_subWidgets[i].label->setWordWrap(true);
-        m_subWidgets[i].widget = wg->createWidget(false, true, m_subWidgets[i].label);
+        m_subWidget.label = new QLabel(m_doc.objNameWithModifiedMarkerAndID(m_subWidget.id));
+        m_subWidget.label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        m_subWidget.label->setWordWrap(true);
+        m_subWidget.widget = wg->createWidget(false, true, m_subWidget.label);
         if (current) {
-          m_widget->setCurrentIndex(m_widget->addWidget(m_subWidgets[i].widget));
+          m_widget->setCurrentIndex(m_widget->addWidget(m_subWidget.widget));
         }
       }
     }

@@ -31,7 +31,10 @@ public:
 
   void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true, double scale = 1.0);
 
-  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale = 1.0) const;
+  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale = 1.0,
+                        bool keepOnlyInterpolatedSlices = false) const;
+
+  void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale = 1.0);
 
   [[nodiscard]] size_t numRegions() const
   { return m_ontology.size(); }
@@ -109,13 +112,14 @@ signals:
   void undoStackCleanChanged(bool clean);
 
 private:
-  void interpolate_Impl(const ZTree<RegionNode>& newOntology);
+  void updateROI_Impl(const ZTree<RegionNode>& newOntology);
 
   void updateMesh_Impl(const ZTree<RegionNode>& newOntology);
 
   void transformMesh_Impl(const glm::mat4& trans);
 
-  [[nodiscard]] ZTree<RegionNode> copyAnnotationTreeWithDeepCopyedMesh() const;
+  // deep copy
+  [[nodiscard]] ZTree<RegionNode> copyAnnotationTree();
 
   void updateBoundBox();
 
@@ -139,14 +143,14 @@ class ZRegionAnnotationInterpolateCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationInterpolateCommand(ZRegionAnnotation& ra)
-    : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.m_ontology), m_firstRun(true)
+    : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.copyAnnotationTree()), m_firstRun(true)
   {}
 
   void setNewOntology(const ZTree<RegionNode>& no)
   { m_newOntology = no; }
 
   void undo() override
-  { m_regionAnnotation.interpolate_Impl(m_oldOntology); }
+  { m_regionAnnotation.updateROI_Impl(m_oldOntology); }
 
   void redo() override;
 
@@ -184,7 +188,7 @@ class ZRegionAnnotationTransformMeshCommand : public QUndoCommand
 public:
   explicit ZRegionAnnotationTransformMeshCommand(ZRegionAnnotation& ra, const glm::mat4& trans)
     : QUndoCommand(), m_regionAnnotation(ra), m_trans(trans)
-    , m_oldOntology(m_regionAnnotation.copyAnnotationTreeWithDeepCopyedMesh())
+    , m_oldOntology(m_regionAnnotation.copyAnnotationTree())
   {}
 
   void undo() override

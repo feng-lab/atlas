@@ -12,6 +12,7 @@
 #include <QPointF>
 #include <map>
 #include <vector>
+#include <set>
 
 namespace nim {
 
@@ -272,11 +273,11 @@ private:
 
   void highlightRegionOnMouseHoverChanged();
 
-  void onRoiChanged(int slice, const std::vector<size_t>& newShapes,
-                    const std::vector<size_t>& deletedShapes,
-                    const std::vector<size_t>& changedShapes);
+  void onRoiChanged(int slice, const std::set<size_t>& newShapes,
+                    const std::set<size_t>& deletedShapes,
+                    const std::set<size_t>& changedShapes);
 
-  void onRoiMoved(int slice, const std::vector<size_t>& changedShapes);
+  void onRoiMoved(int slice, const std::set<size_t>& changedShapes);
 
   void onRoiDeleted(int slice);
 

@@ -134,12 +134,12 @@ public:
   void subtractSpline(const QPolygonF& spline, size_t id);
 
   void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle, double x, double y,
-                        std::vector<size_t>& editedShapes);
+                        std::set<size_t>& editedShapes);
 
   void deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
-                        std::vector<size_t>& removedShapes, std::vector<size_t>& editedShapes);
+                        std::set<size_t>& removedShapes, std::set<size_t>& editedShapes);
 
-  bool addCtrlPoint(const QPointF& pt, std::vector<size_t>& editedShapes);
+  bool addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes);
 
   void addCtrlPointToShape(const QPointF& pt, size_t id);
 
@@ -179,7 +179,8 @@ public:
   void importMaskImage(const QString& fn, FileFormat format);
 
   [[nodiscard]] ZImg
-  toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true, double scale = 1.0) const;
+  toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true, double scale = 1.0,
+            bool keepOnlyInterpolatedSlices = false) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
@@ -203,31 +204,31 @@ public:
   void newRect(int slice, const QRectF& rect)
   {
     m_sliceROIs[slice].newRect(rect, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+    onSliceROIUpdated(slice, std::set<size_t>{m_shapeID - 1}, std::set<size_t>(), std::set<size_t>());
   }
 
   void newEllipse(int slice, const QRectF& ellipse)
   {
     m_sliceROIs[slice].newEllipse(ellipse, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+    onSliceROIUpdated(slice, std::set<size_t>{m_shapeID - 1}, std::set<size_t>(), std::set<size_t>());
   }
 
   void newPolygon(int slice, const QPolygonF& poly)
   {
     m_sliceROIs[slice].newPolygon(poly, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+    onSliceROIUpdated(slice, std::set<size_t>{m_shapeID - 1}, std::set<size_t>(), std::set<size_t>());
   }
 
   void newSpline(int slice, const QPolygonF& spline)
   {
     m_sliceROIs[slice].newSpline(spline, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+    onSliceROIUpdated(slice, std::set<size_t>{m_shapeID - 1}, std::set<size_t>(), std::set<size_t>());
   }
 
   void newLine(int slice, const QPolygonF& line)
   {
     m_sliceROIs[slice].newLine(line, m_shapeID++);
-    onSliceROIUpdated(slice, std::vector<size_t>{m_shapeID - 1}, std::vector<size_t>(), std::vector<size_t>());
+    onSliceROIUpdated(slice, std::set<size_t>{m_shapeID - 1}, std::set<size_t>(), std::set<size_t>());
   }
 
   void addRect(int slice, const QRectF& rect, int64_t shapeID = -1)
@@ -240,7 +241,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].addRect(rect, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void addEllipse(int slice, const QRectF& ellipse, int64_t shapeID = -1)
@@ -253,7 +254,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].addEllipse(ellipse, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void addPolygon(int slice, const QPolygonF& poly, int64_t shapeID = -1)
@@ -266,7 +267,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].addPolygon(poly, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void addSpline(int slice, const QPolygonF& spline, int64_t shapeID = -1)
@@ -279,7 +280,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].addSpline(spline, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void subtractRect(int slice, const QRectF& rect, int64_t shapeID = -1)
@@ -291,7 +292,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].subtractRect(rect, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void subtractEllipse(int slice, const QRectF& ellipse, int64_t shapeID = -1)
@@ -303,7 +304,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].subtractEllipse(ellipse, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void subtractPolygon(int slice, const QPolygonF& poly, int64_t shapeID = -1)
@@ -315,7 +316,7 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].subtractPolygon(poly, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void subtractSpline(int slice, const QPolygonF& spline, int64_t shapeID = -1)
@@ -327,10 +328,13 @@ public:
       shapeID = m_sliceROIs[slice].m_idToShapeOperations.crbegin()->first;
     }
     m_sliceROIs[slice].subtractSpline(spline, shapeID);
-    onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), std::vector<size_t>{size_t(shapeID)});
+    onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>{size_t(shapeID)});
   }
 
   void mergeWith(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1);
+
+  std::set<int> mergeWith_Impl(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1)
+  { return mergeWith_Impl(other.m_sliceROIs, slice, shapeID); }
 
   std::set<int> mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice = -1, int64_t shapeID = -1);
 
@@ -421,13 +425,13 @@ public:
 
   void sliceAddCtrlPoint_Impl(int slice, const QPointF& pt, int shapeID = -1)
   {
-    std::vector<size_t> shapes;
+    std::set<size_t> shapes;
     if (shapeID >= 0) {
-      shapes.push_back(shapeID);
+      shapes.insert(shapeID);
       m_sliceROIs.at(slice).addCtrlPointToShape(pt, shapeID);
-      onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+      onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), shapes);
     } else if (m_sliceROIs.at(slice).addCtrlPoint(pt, shapes)) {
-      onSliceROIUpdated(slice, std::vector<size_t>(), std::vector<size_t>(), shapes);
+      onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), shapes);
     }
   }
 
@@ -438,7 +442,7 @@ public:
   void sliceSetTopLeft(int slice, double x, double y)
   {
     m_sliceROIs.at(slice).setTopLeft(x, y);
-    onSliceROIMoved(slice, std::vector<size_t>());
+    onSliceROIMoved(slice, std::set<size_t>());
   }
 
   void startMoveSelectedControlPointsCommand();
@@ -475,13 +479,13 @@ public:
 
 signals:
 
-  void roiChanged(int slice, const std::vector<size_t>& newShapes,
-                  const std::vector<size_t>& deletedShapes,
-                  const std::vector<size_t>& changedShapes);
+  void roiChanged(int slice, const std::set<size_t>& newShapes,
+                  const std::set<size_t>& deletedShapes,
+                  const std::set<size_t>& changedShapes);
 
   void roiDeleted(int slice);
 
-  void roiMoved(int slice, const std::vector<size_t>& changedShapes);
+  void roiMoved(int slice, const std::set<size_t>& changedShapes);
 
   void boundBoxChanged();
 
@@ -495,11 +499,11 @@ protected:
   void resetBoundBox();
 
   void onSliceROIUpdated(int slice,
-                         const std::vector<size_t>& newShapes,
-                         const std::vector<size_t>& deletedShapes,
-                         const std::vector<size_t>& changedShapes);
+                         const std::set<size_t>& newShapes,
+                         const std::set<size_t>& deletedShapes,
+                         const std::set<size_t>& changedShapes);
 
-  void onSliceROIMoved(int slice, const std::vector<size_t>& changedShapes);
+  void onSliceROIMoved(int slice, const std::set<size_t>& changedShapes);
 
 protected:
   friend class ZROICommand;

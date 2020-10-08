@@ -2,6 +2,7 @@
 
 #include "z3dmeshfilter.h"
 #include "zregionannotationpack.h"
+#include "zregionannotationviewsettingtreemodel.h"
 
 namespace nim {
 
@@ -69,7 +70,8 @@ private:
 
   size_t m_numParas;
 
-  std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;
+  std::unique_ptr<ZRegionAnnotationViewSettingTreeModel> m_viewSettingTreeModel;
+  std::unique_ptr<QWidget> m_viewSettingTreeWidget;
 };
 
 } // namespace nim

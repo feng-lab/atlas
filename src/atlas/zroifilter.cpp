@@ -1275,9 +1275,9 @@ void ZROIFilter::highlightRegionOnMouseHoverChanged()
   }
 }
 
-void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
-                              const std::vector<size_t>& deletedShapes,
-                              const std::vector<size_t>& changedShapes)
+void ZROIFilter::onRoiChanged(int slice, const std::set<size_t>& newShapes,
+                              const std::set<size_t>& deletedShapes,
+                              const std::set<size_t>& changedShapes)
 {
   if (!m_ROI) {
     return;
@@ -1300,6 +1300,10 @@ void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
     }
     if (!changedShapes.empty()) {
       for (auto shapeID : changedShapes) {
+        if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end() ||
+            m_sliceToROIItem[slice].find(shapeID) == m_sliceToROIItem[slice].end()) {
+          continue;
+        }
         m_sliceToROIItem[slice][shapeID]->updateValue();
         m_sliceToCtrlPtItems[slice].erase(shapeID);
         createCtrlPtItems(slice, shapeID);
@@ -1314,7 +1318,7 @@ void ZROIFilter::onRoiChanged(int slice, const std::vector<size_t>& newShapes,
   }
 }
 
-void ZROIFilter::onRoiMoved(int slice, const std::vector<size_t>& changedShapes)
+void ZROIFilter::onRoiMoved(int slice, const std::set<size_t>& changedShapes)
 {
   if (!m_ROI) {
     return;

@@ -3,6 +3,7 @@
 #include "zexception.h"
 #include "zjson.h"
 #include "zlog.h"
+#include "zroiutils.h"
 #include "zapplication.h"
 //#include <CGAL/Surface_mesh_default_triangulation_3.h>
 //#include <CGAL/Surface_mesh_default_criteria_3.h>
@@ -524,7 +525,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
       std::map<int, ContourNode> nodeMap;
 
       for (size_t i = 0; i < hierarchy.size(); ++i) {
-        ContourNode node;
+        ContourNode node{};
         node.index = i;
         node.parentIndex = hierarchy[i][3];
         nodeMap[node.index] = node;
@@ -532,10 +533,10 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
 
       std::map<int, ZTree<ContourNode>::Iterator> itMap;
       while (!nodeMap.empty()) {
-        std::map<int, ContourNode>::iterator it = nodeMap.begin();
+        auto it = nodeMap.begin();
         while (it != nodeMap.end()) {
           int parentID = it->second.parentIndex;
-          std::map<int, ZTree<ContourNode>::Iterator>::const_iterator nodeIt = itMap.find(parentID);
+          auto nodeIt = itMap.find(parentID);
           if (nodeIt != itMap.end()) {
             itMap[it->first] = contoursTree.appendChild(nodeIt->second, it->second);
             it = nodeMap.erase(it);
@@ -548,12 +549,19 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
         }
       }
 
-      for (auto it = contoursTree.cbeginBreadthFirst(); it != contoursTree.cendBreadthFirst(); ++it) {
-        //LOG(INFO) << it->index << " " << contours[it->index].size();
-        size_t c = it->index;
-        if (contours[c].size() < 3) {
-          continue;
-        } else {
+      for (auto rit = contoursTree.cbeginRoot(); rit != contoursTree.cendRoot(); ++rit) {
+        for (auto it = contoursTree.cbeginBreadthFirst(rit); it != contoursTree.cendBreadthFirst(rit); ++it) {
+          //LOG(INFO) << it->index << " " << contours[it->index].size();
+          size_t c = it->index;
+
+          if (contours[c].size() < 3) {
+            if (contoursTree.numAncestors(it) == 0) {
+              break;
+            } else {
+              continue;
+            }
+          }
+
           size_t dst = std::max<size_t>(1, std::min<size_t>(30, contours[c].size() / 20));
           QPolygonF poly;
           for (size_t p = 0; p < contours[c].size(); p += dst) {
@@ -565,6 +573,15 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
           QTransform tfm;
           tfm.scale(scale, scale);
           poly = tfm.map(poly);
+
+          if (ZROIUtils::splineToQPainterPath(poly).isEmpty()) {
+            if (contoursTree.numAncestors(it) == 0) {
+              break;
+            } else {
+              continue;
+            }
+          }
+
           if (contoursTree.numAncestors(it) == 0) {
             roi.newSpline(s, poly);
           } else if (contoursTree.numAncestors(it) % 2 == 0) {

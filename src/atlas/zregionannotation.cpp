@@ -176,9 +176,6 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   ZImg binaryImg(info);
   auto maxPossibleLabelInImg = origLabelImg.dataRangeMax<int64_t>();
   auto minPossibleLabelInImg = origLabelImg.dataRangeMin<int64_t>();
-  ZImgFillHole<> imFill;
-  imFill.setFullyConnected(true);
-  imFill.setForegroundValue(1);
 
   LOG(INFO) << "Importing Label Image...";
   for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
@@ -188,7 +185,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     }
 
     bool processMesh = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
-    bool processROI = labels.find(it->id) != labels.end();
+    bool processROI = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
 
     if (!processMesh && ! processROI) {
       continue;
@@ -255,15 +252,16 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
 }
 
-void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale) const
+void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale,
+                                         bool keepOnlyInterpolatedSlices) const
 {
   LOG(INFO) << "Exporting Label Image...";
 
   ZImgInfo info(m_boundBox.maxCorner().x * scale + 2, m_boundBox.maxCorner().y * scale + 2, m_boundBox.maxCorner().z + 2,
                 1, 1, 2);
   info.voxelSizeUnit = VoxelSizeUnit::um;
-  info.voxelSizeX = m_voxelSizeX / scale;
-  info.voxelSizeY = m_voxelSizeY / scale;
+  info.voxelSizeX = std::ceil(m_voxelSizeX / scale);
+  info.voxelSizeY = std::ceil(m_voxelSizeY / scale);
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
@@ -272,7 +270,8 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
     }
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
-      ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale);
+      ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale,
+                                                keepOnlyInterpolatedSlices);
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
     }
   }
@@ -288,6 +287,94 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 //  }
   res.save(fn, format, paras);
   LOG(INFO) << "Finish exporting label image";
+}
+
+void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale)
+{
+  ZBenchTimer bt;
+  bt.start();
+
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
+  if (infos.size() > 1) {
+    throw ZIOException("label image with more than one scene is not supported");
+  }
+  ZImgInfo info = infos[0];
+  if (info.isEmpty()) {
+    throw ZIOException("label image is empty");
+  }
+  if (info.voxelFormat == VoxelFormat::Float) {
+    throw ZIOException("label image can not be a floating point image");
+  }
+  if (info.voxelFormat == VoxelFormat::Unsigned && info.bytesPerVoxel == 8) {
+    throw ZIOException("uint64 label image is not supported");
+  }
+  if (info.numChannels > 1 || info.numTimes > 1) {
+    throw ZIOException("label image can not be time sequence or color image");
+  }
+
+  ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
+  //LOG(INFO) << origLabelImg.info().toQString();
+//  m_width = origLabelImg.width();
+//  m_height = origLabelImg.height();
+//  m_depth = origLabelImg.depth();
+  // todo: ask user if voxel size not exist
+  m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scale;
+  m_voxelSizeY = origLabelImg.info().voxelSizeYInUm() * scale;
+  m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
+
+  std::set<int64_t> labels;
+  for (size_t i = 0; i < origLabelImg.channelVoxelNumber(); ++i) {
+    labels.insert(origLabelImg.value<int64_t>(i));
+  }
+
+  ZImg labelImg = origLabelImg;
+  info.setVoxelFormat<uint8_t>();
+  ZImg binaryImg(info);
+  auto maxPossibleLabelInImg = origLabelImg.dataRangeMax<int64_t>();
+  auto minPossibleLabelInImg = origLabelImg.dataRangeMin<int64_t>();
+
+  LOG(INFO) << "Importing Label Image...";
+  for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
+    LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
+    if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg) {
+      continue;
+    }
+
+    bool processROI = labels.find(it->id) != labels.end();
+
+    if (!processROI) {
+      continue;
+    }
+
+    // create binary image
+    binaryImg.binaryOperation(labelImg, MarkAsIfOtherEqualsOtherWiseZero(1, it->id));
+
+    ZROI roi;
+    binaryImgToROI(binaryImg, roi, scale);
+    if (!it->roi) {
+      it->roi = createROI();
+      emit regionROIAdded(it->id, it->roi.get());
+    }
+    it->roi->mergeWith_Impl(roi);
+
+    // update labelImg: change id to parentID (merge current region to parent region)
+    if (!ZTree<RegionNode>::isRoot(it)) {
+      int64_t parentID = it->parentID;
+      auto pit = ZTree<RegionNode>::parent(it);
+      while ((parentID > maxPossibleLabelInImg || parentID < minPossibleLabelInImg) &&
+             !ZTree<RegionNode>::isRoot(pit)) {
+        parentID = pit->parentID;
+        pit = ZTree<RegionNode>::parent(pit);
+      }
+      if (parentID <= maxPossibleLabelInImg && parentID >= minPossibleLabelInImg) {
+        labelImg.unaryOperation(ChangeValue(it->id, parentID));
+      }
+    }
+  }
+
+  LOG(INFO) << "Finish importing label image";
+
+  STOP_AND_LOG(bt)
 }
 
 void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
@@ -581,9 +668,9 @@ void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
   QTemporaryDir dir;
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
-    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale);
+    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, true);
     auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
-    importLabelImage(fn, FileFormat::Unknown, false, true, 1.0 / scale);
+    importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
     //emit modified();
@@ -625,7 +712,7 @@ ZBBox<glm::ivec4> ZRegionAnnotation::copiedItemBoundBox() const
   return boundBox;
 }
 
-void ZRegionAnnotation::interpolate_Impl(const ZTree<RegionNode>& newOntology)
+void ZRegionAnnotation::updateROI_Impl(const ZTree<RegionNode>& newOntology)
 {
   auto it = m_ontology.begin();
   auto itn = newOntology.begin();
@@ -655,13 +742,19 @@ void ZRegionAnnotation::transformMesh_Impl(const glm::mat4& trans)
   emit allMeshChanged();
 }
 
-ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTreeWithDeepCopyedMesh() const
+ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTree()
 {
   ZTree<RegionNode> res(m_ontology);
   auto it = m_ontology.begin();
   auto itn = res.begin();
   for (; it != m_ontology.end(); ++it, ++itn) {
-    itn->mesh = std::make_shared<ZMesh>(*it->mesh);
+    if (it->mesh) {
+      itn->mesh = std::make_shared<ZMesh>(*it->mesh);
+    }
+    if (it->roi) {
+      itn->roi = createROI();
+      itn->roi->mergeWith_Impl(*it->roi);
+    }
   }
   return res;
 }
@@ -689,7 +782,7 @@ void ZRegionAnnotationInterpolateCommand::redo()
   if (m_firstRun) {
     m_firstRun = false;
   } else {
-    m_regionAnnotation.interpolate_Impl(m_newOntology);
+    m_regionAnnotation.updateROI_Impl(m_newOntology);
   }
 }
 

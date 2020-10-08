@@ -3,6 +3,7 @@
 #include "zobjfilter.h"
 #include "zregionannotationpack.h"
 #include "zroifilter.h"
+#include "zregionannotationviewsettingtreemodel.h"
 
 namespace nim {
 
@@ -70,7 +71,8 @@ private:
   ZBoolParameter m_fixedControlPointsSize;
   ZBoolParameter m_highlightRegionOnMouseHover;
 
-  std::shared_ptr<ZWidgetsGroup> m_viewSettingTreeWidgetGroup;
+  std::unique_ptr<ZRegionAnnotationViewSettingTreeModel> m_viewSettingTreeModel;
+  std::unique_ptr<QWidget> m_viewSettingTreeWidget;
 
   size_t m_numParametersWithoutRegionSepcificParas = 0;
 };
