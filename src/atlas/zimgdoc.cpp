@@ -85,49 +85,7 @@ size_t ZImgDoc::loadFile(const QString& fileName, QString& errorMsg)
 
 size_t ZImgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
 {
-  if (!jValue.isObject()) {
-    errorMsg = QString("No valid image file path");
-    return 0;
-  }
-  QJsonObject obj = jValue.toObject();
-  if (!obj.contains("Path") || !obj["Path"].isArray()) {
-    errorMsg = QString("No valid image file path, no valid sequence or path key");
-    return 0;
-  }
-  QJsonArray pathArray = obj["Path"].toArray();
-  QStringList paths;
-  for (int i = 0; i < pathArray.size(); ++i) {
-    paths.push_back(pathArray.at(i).toString());
-  }
-  Dimension catDim = Dimension::Z;
-  size_t tileIdx = 0;
-  if (obj.contains("CatDimension")) {
-    if (!obj["CatDimension"].isString()) {
-      errorMsg = QString("Invalid CatDimension Key");
-      return 0;
-    }
-    QString txt = obj["CatDimension"].toString();
-    if (txt == enumToString(Dimension::Z)) {
-      catDim = Dimension::Z;
-    } else if (txt == enumToString(Dimension::T)) {
-      catDim = Dimension::T;
-    } else {
-      errorMsg = QString("Wrong CatDimension String %1").arg(txt);
-      return 0;
-    }
-  }
-  if (obj.contains("TileIndex")) {
-    if (!obj["TileIndex"].isDouble()) {
-      errorMsg = QString("Invalid TileIndex Key");
-      return 0;
-    }
-    tileIdx = obj.value("TileIndex").toInt(-1);
-  }
-  if (paths.size() > 1) {
-    return loadImg(paths, catDim, false, tileIdx, FileFormat::Unknown, errorMsg, tileIdx + 1);
-  } else {
-    return loadImg(paths[0], tileIdx, FileFormat::Unknown, errorMsg, tileIdx + 1);
-  }
+  return loadImg(ZImgSource(jValue), errorMsg);
 }
 
 QList<QAction*> ZImgDoc::loadFileActions() const
@@ -196,66 +154,20 @@ QString ZImgDoc::objTooltip(size_t id) const
 
 QJsonValue ZImgDoc::jsonValue(size_t id) const
 {
-  QJsonObject obj;
   auto& pack = m_idToImgPacks.at(id);
-  QJsonArray pathArray;
-  for (int i = 0; i < pack->paths().size(); ++i) {
-    pathArray.append(pack->paths()[i]);
-  }
-  obj.insert("Path", pathArray);
-  if (pack->isSequence()) {
-    obj["CatDimension"] = QJsonValue(enumToString(pack->catDim()));
-  }
-  if (pack->numScenes() > 1) {
-    obj["TileIndex"] = QJsonValue(int(pack->sceneIdx()));
-  }
-  return obj;
+  return pack->imgSource().toJson();
 }
 
 bool ZImgDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
 {
   CHECK(v1.isObject() && v2.isObject());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
-  QJsonObject f1 = v1.toObject();
-  QJsonObject f2 = v2.toObject();
-  if (f1.size() != f2.size())
-    return false;
-  QJsonObject::const_iterator it1 = f1.begin();
-  QJsonObject::const_iterator it2 = f2.begin();
-  while (it1 != f1.end()) {
-    if (it1.key() != it2.key())
-      return false;
-    if (it1.key() == "TileIndex" && it1.value() != it2.value())
-      return false;
-    if (it1.key() == "CatDimension" && it1.value() != it2.value())
-      return false;
-    if (it1.key() == "Path") {
-      if (!it1.value().isArray() || !it2.value().isArray())
-        return false;
-      QJsonArray a1 = it1.value().toArray();
-      QJsonArray a2 = it2.value().toArray();
-      if (a1.size() != a2.size())
-        return false;
-      QJsonArray::const_iterator ait1 = a1.begin();
-      QJsonArray::const_iterator ait2 = a2.begin();
-      while (ait1 != a1.end()) {
-        if (!(*ait1).isString() || !(*ait2).isString())
-          return false;
-        QString fn1 = (*ait1).toString();
-        QString fn2 = (*ait2).toString();
-        if (!QFile::exists(fn1) || !QFile::exists(fn2))
-          return false;
-        if (QFileInfo(fn1).canonicalFilePath() != QFileInfo(fn2).canonicalFilePath())
-          return false;
-        ++ait1;
-        ++ait2;
-      }
-    }
-    ++it1;
-    ++it2;
   }
-  return true;
+  if (ZImgSource(v1) == ZImgSource(v2)) {
+    return true;
+  }
+  return false;
 }
 
 size_t ZImgDoc::makeAlias(size_t id)
@@ -364,7 +276,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, FileFormat format, QString& err
     std::vector<ZImgInfo> infos = ZImg::readImgInfos(fileName, &subBlocks, format);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
-      id = loadImg(fileName, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);
+      id = loadImg(fileName, s, format, errorMsg, &infos[s], &subBlocks[s]);
       if (!id)
         return 0;
     }
@@ -377,7 +289,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, FileFormat format, QString& err
 }
 
 size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format, QString& errorMsg,
-                        size_t numScene, const ZImgInfo* info,
+                        const ZImgInfo* info,
                         const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
 {
   try {
@@ -387,7 +299,7 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
         return idPack.first;
     }
 
-    size_t id = addImgPack(new ZImgPack(ZImgSource(fileName, ZImgRegion(), scene, format), numScene, info, subBlock));
+    size_t id = addImgPack(new ZImgPack(ZImgSource(fileName, ZImgRegion(), scene, format), info, subBlock));
 
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
@@ -406,7 +318,7 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScen
     std::vector<ZImgInfo> infos = ZImg::readImgInfos(files, catDim, catScenes, &subBlocks, format, true);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
-      id = loadImg(files, catDim, catScenes, s, format, errorMsg, infos.size(), &infos[s], &subBlocks[s]);
+      id = loadImg(files, catDim, catScenes, s, format, errorMsg, &infos[s], &subBlocks[s]);
       if (!id)
         return 0;
     }
@@ -420,18 +332,17 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScen
 }
 
 size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg,
-                        size_t numScene, const ZImgInfo* info,
+                        const ZImgInfo* info,
                         const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
 {
   try {
-    ZImgSource imgSource(files, catDim, ZImgRegion(), scene, format);
-    imgSource.catScenes = catScenes;
+    ZImgSource imgSource(files, catDim, catScenes, ZImgRegion(), scene, format);
     for (const auto& idPack : m_idToImgPacks) {
       if (idPack.second->imgSource() == imgSource)
         return idPack.first;
     }
 
-    size_t id = addImgPack(new ZImgPack(imgSource, numScene, info, subBlock));
+    size_t id = addImgPack(new ZImgPack(imgSource, info, subBlock));
 
     ZSystemInfo::instance().addFileToRecentFileList(files[0]);
     setLastOpenedObjPath(files[0]);
@@ -440,6 +351,30 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScen
   catch (const ZException& e) {
     errorMsg = QString("Can not read image sequence start from %1: %2")
       .arg(files[0]).arg(e.what());
+    return 0;
+  }
+}
+
+size_t ZImgDoc::loadImg(const ZImgSource& imgSource, QString& errorMsg)
+{
+  try {
+    for (const auto& idPack : m_idToImgPacks) {
+      if (idPack.second->imgSource() == imgSource)
+        return idPack.first;
+    }
+
+    std::vector<std::shared_ptr<ZImgSubBlock>> subBlock;
+    ZImgInfo info = ZImg::readImgInfo(imgSource, &subBlock);
+
+    size_t id = addImgPack(new ZImgPack(imgSource, &info, &subBlock));
+
+    ZSystemInfo::instance().addFileToRecentFileList(imgSource.filenames[0]);
+    setLastOpenedObjPath(imgSource.filenames[0]);
+    return id;
+  }
+  catch (const ZException& e) {
+    errorMsg = QString("Can not read image source start from %1: %2")
+      .arg((!imgSource.filenames.empty()) ? imgSource.filenames[0] : "").arg(e.what());
     return 0;
   }
 }

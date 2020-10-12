@@ -45,17 +45,12 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
   return m_img->info();
 }
 
-ZImgPack::ZImgPack(ZImgSource imgSource, size_t numScene,
+ZImgPack::ZImgPack(ZImgSource imgSource,
                    const ZImgInfo* info, const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
   : m_imgSource(std::move(imgSource))
-  , m_numScenes(numScene)
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
-  CHECK(m_numScenes > 0);
-  if (m_imgSource.scene >= m_numScenes) {
-    throw ZIOException("invalid scene");
-  }
   const std::vector<std::shared_ptr<ZImgSubBlock>>* sceneSubBlock = nullptr;
   std::vector<std::shared_ptr<ZImgSubBlock>> ssb;
   if (info && subBlock) {
@@ -163,7 +158,6 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
     m_diskCached = true;
   }
   m_imgSource = ZImgSource(fileName);
-  m_numScenes = 1;
   m_hasUnsavedChange = false;
 
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
@@ -174,7 +168,6 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   ZImgIO::instance().readInfos(m_imgSource.filenames[0], infos, &subBlocks, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
-  m_numScenes = infos.size();
   ZImgIO::instance().readMetadata(m_imgSource, m_imgMetaData);
   buildFastReadIndex(subBlocks[0]);
 
@@ -904,14 +897,9 @@ void ZImgPack::updateNameTootip()
       QFileInfo(m_imgSource.filenames[0]).fileName() + QString(" %1 Sequence").arg(enumToString(m_imgSource.catDim));
     m_tooltip = m_imgSource.filenames.join("\n");
   } else {
-    if (m_numScenes == 1) {
-      m_name = QFileInfo(m_imgSource.filenames[0]).fileName();
-      m_tooltip = m_imgSource.filenames[0];
-    } else {
-      m_name = QFileInfo(m_imgSource.filenames[0]).fileName() +
-               QString(" scene %1 of %2").arg(m_imgSource.scene + 1).arg(m_numScenes);
-      m_tooltip = m_imgSource.filenames[0] + QString(" scene %1 of %2").arg(m_imgSource.scene + 1).arg(m_numScenes);
-    }
+    m_name = QFileInfo(m_imgSource.filenames[0]).fileName() +
+               QString(" scene %1").arg(m_imgSource.scene + 1);
+    m_tooltip = m_imgSource.filenames[0] + QString(" scene %1").arg(m_imgSource.scene + 1);
   }
 }
 

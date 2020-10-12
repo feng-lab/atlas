@@ -2,6 +2,7 @@
 
 #include "zimginfo.h"
 #include "zvoxelcoordinate.h"
+#include "zjson.h"
 
 namespace nim {
 
@@ -30,6 +31,8 @@ struct ZImgRegion
     : start(startCoord)
     , end(endCoord)
   {}
+
+  explicit ZImgRegion(const QJsonValue& jValue);
 
   inline bool operator==(const ZImgRegion& other) const
   {
@@ -108,6 +111,8 @@ struct ZImgRegion
     return containsWholeTime(info) &&
            start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
   }
+
+  [[nodiscard]] QJsonValue toJson() const;
 
   QString toQString() const;
 

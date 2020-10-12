@@ -371,9 +371,12 @@ struct ZImgSource
   explicit ZImgSource(const QString& fn, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
                       FileFormat format_ = FileFormat::Unknown);
 
-  ZImgSource(const QStringList& fns, Dimension catDim_, const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
+  ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes_ = true,
+             const ZImgRegion& rgn = ZImgRegion(), size_t scene_ = 0,
              FileFormat format_ = FileFormat::Unknown,
-             bool expandXY_ = true, bool expandWithMaxValue_ = false, bool catScenes_ = true);
+             bool expandXY_ = true, bool expandWithMaxValue_ = false);
+
+  explicit ZImgSource(const QJsonValue& jValue);
 
   inline bool operator==(const ZImgSource& other) const
   {
@@ -381,10 +384,9 @@ struct ZImgSource
       if (filenames.size() == 1) {
         return region == other.region && scene == other.scene;
       }
-      return catDim == other.catDim && region == other.region &&
-             scene == other.scene && expandXY == other.expandXY &&
-             expandWithMaxValue == other.expandWithMaxValue &&
-             catScenes == other.catScenes;
+      return catDim == other.catDim && catScenes == other.catScenes &&
+             region == other.region && scene == other.scene && expandXY == other.expandXY &&
+             expandWithMaxValue == other.expandWithMaxValue;
     }
     return false;
   }
@@ -394,17 +396,20 @@ struct ZImgSource
     return !(*this == other);
   }
 
+  [[nodiscard]] QJsonValue toJson() const;
+
   [[nodiscard]] QString toQString() const;
 
   QStringList filenames;
   Dimension catDim = Dimension::Z;
+  bool catScenes = false;
   ZImgRegion region;
   size_t scene = 0;
   FileFormat format = FileFormat::Unknown;
   bool expandXY = true;
   bool expandWithMaxValue = false;
+
   int64_t totalFileSize = 0;
-  bool catScenes = false;
 };
 
 class ZImgSubBlock
@@ -567,7 +572,8 @@ public:
                                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks = nullptr,
                                             FileFormat format = FileFormat::Unknown, bool expandXY = true);
 
-  static ZImgInfo readImgInfo(const ZImgSource& imgSource);
+  static ZImgInfo readImgInfo(const ZImgSource& imgSource,
+                              std::vector<std::shared_ptr<ZImgSubBlock>>* subBlocks = nullptr);
 
   static ZImg readSubBlock(const QString& filename, size_t scene, size_t blockIndex,
                            FileFormat format = FileFormat::Unknown);

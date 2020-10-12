@@ -325,9 +325,10 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<>())
     .def(py::init<const QString&, const ZImgRegion&, size_t, FileFormat>(),
          "filename"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown)
-    .def(py::init<const QStringList&, Dimension, const ZImgRegion&, size_t, FileFormat, bool, bool, bool>(),
-         "filenames"_a, "catDim"_a, "region"_a = ZImgRegion(), "scene"_a = 0, "format"_a = FileFormat::Unknown,
-         "expandXY"_a = false, "expandWithMaxValue"_a = false, "catScenes"_a = true)
+    .def(py::init<const QStringList&, Dimension, bool, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
+         "filenames"_a, "catDim"_a, "catScenes"_a = true, "region"_a = ZImgRegion(), "scene"_a = 0,
+         "format"_a = FileFormat::Unknown,
+         "expandXY"_a = false, "expandWithMaxValue"_a = false)
     .def_readwrite("filenames", &ZImgSource::filenames)
     .def_readwrite("catDim", &ZImgSource::catDim)
     .def_readwrite("region", &ZImgSource::region)

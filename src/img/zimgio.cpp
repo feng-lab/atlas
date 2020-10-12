@@ -266,8 +266,9 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
           (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
             ZImgSource(fileList,
                        catDim,
+                       catScenes,
                        ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
-                                                    ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
+                                  ZVoxelCoordinate(res[s].width, res[s].height, z + 1, res[s].numChannels, t + 1)),
                        s)));
         }
       }

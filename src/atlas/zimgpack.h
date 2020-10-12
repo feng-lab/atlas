@@ -42,7 +42,7 @@ public:
   };
 
   ZImgPack(ZImgSource  imgSource,
-           size_t numScene, const ZImgInfo* info = nullptr,
+           const ZImgInfo* info = nullptr,
            const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
   virtual ~ZImgPack();
@@ -75,9 +75,6 @@ public:
   inline bool isSequence() const
   { return m_imgSource.filenames.size() > 1; }
 
-  inline bool pathHasMultipleTiles() const
-  { return m_numScenes > 1; }
-
   inline const QString& name() const
   { return m_name; }
 
@@ -97,9 +94,6 @@ public:
 
   size_t sceneIdx() const
   { return m_imgSource.scene; }
-
-  size_t numScenes() const
-  { return m_numScenes; }
 
   Dimension catDim() const
   { return m_imgSource.catDim; }
@@ -196,7 +190,6 @@ protected:
   ZImgInfo m_imgInfo;
   ZImgMetadata m_imgMetaData;
   ZImgSource m_imgSource;
-  size_t m_numScenes;
   bool m_hasUnsavedChange;
 
   // derived data

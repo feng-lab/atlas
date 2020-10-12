@@ -85,15 +85,17 @@ protected:
   //
   size_t loadImg(const QString& fileName, FileFormat format, QString& errorMsg);
 
-  size_t loadImg(const QString& fileName, size_t scene, FileFormat format, QString& errorMsg, size_t numScene,
+  size_t loadImg(const QString& fileName, size_t scene, FileFormat format, QString& errorMsg,
                  const ZImgInfo* info = nullptr,
                  const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
   size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg);
 
   size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg,
-                 size_t numScene, const ZImgInfo* info = nullptr,
+                 const ZImgInfo* info = nullptr,
                  const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
+
+  size_t loadImg(const ZImgSource& imgSource, QString& errorMsg);
 
   void sendChangedSignal(size_t id);
 

@@ -71,7 +71,7 @@ QString ZImgThumbernail::toQString() const
 }
 
 ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, FileFormat format_)
-  : region(rgn), scene(scene_), format(format_), catScenes(false)
+  : region(rgn), scene(scene_), format(format_)
 {
   QFileInfo fi(fn);
   if (fi.exists()) {
@@ -82,11 +82,11 @@ ZImgSource::ZImgSource(const QString& fn, const ZImgRegion& rgn, size_t scene_, 
   }
 }
 
-ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_,
+ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes_,
                        const ZImgRegion& rgn, size_t scene_, FileFormat format_,
-                       bool expandXY_, bool expandWithMaxValue_, bool catScenes_)
-  : catDim(catDim_), region(rgn), scene(scene_), format(format_), expandXY(expandXY_)
-  , expandWithMaxValue(expandWithMaxValue_), catScenes(catScenes_)
+                       bool expandXY_, bool expandWithMaxValue_)
+  : catDim(catDim_), catScenes(catScenes_), region(rgn), scene(scene_), format(format_), expandXY(expandXY_)
+  , expandWithMaxValue(expandWithMaxValue_)
 {
   for (int i = 0; i < fns.size(); ++i) {
     QFileInfo fi(fns[i]);
@@ -97,6 +97,71 @@ ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_,
       throw ZIOException(QString("file %1 does not exist").arg(fns[i]));
     }
   }
+}
+
+ZImgSource::ZImgSource(const QJsonValue& jValue)
+{
+  if (!jValue.isObject()) {
+    throw ZIOException(QString("Invalid json for ZImgSource"));
+  }
+  QJsonObject obj = jValue.toObject();
+  if (obj.contains("Path")) {  // compat to old version
+    filenames = readStringList(obj, "Path");
+  } else {
+    filenames = readStringList(obj, "filenames");
+  }
+  for (int i = 0; i < filenames.size(); ++i) {
+    QFileInfo fi(filenames[i]);
+    if (fi.exists()) {
+      filenames[i] = fi.canonicalFilePath();
+      totalFileSize += fi.size();
+    } else {
+      throw ZIOException(QString("file %1 does not exist").arg(filenames[i]));
+    }
+  }
+
+  catDim = Dimension::Z;
+  if (obj.contains("CatDimension")) {  // compat to old version
+    catDim = stringToDimension(readString(obj, "catDimension"));
+  } else if (obj.contains("CatDim")) {
+    catDim = stringToDimension(readString(obj, "catDim"));
+  }
+  scene = 0;
+  if (obj.contains("TileIndex")) {  // compat to old version
+    scene = readNumber(obj, "TileIndex");
+  } else if (obj.contains("scene")) {
+    scene = readNumber(obj, "scene");
+  }
+
+  if (obj.contains("catScenes")) {
+    catScenes = readBool(obj, "catScenes");
+  }
+  if (obj.contains("region")) {
+    region = ZImgRegion(obj["region"]);
+  }
+  if (obj.contains("format")) {
+    format = stringToFileFormat(readString(obj, "format"));
+  }
+  if (obj.contains("expandXY")) {
+    expandXY = readBool(obj, "expandXY");
+  }
+  if (obj.contains("expandWithMaxValue")) {
+    expandWithMaxValue = readBool(obj, "expandWithMaxValue");
+  }
+}
+
+QJsonValue ZImgSource::toJson() const
+{
+  QJsonObject obj;
+  obj["filenames"] = QJsonArray::fromStringList(filenames);
+  obj["catDim"] = enumToString(catDim);
+  obj["catScenes"] = catScenes;
+  obj["region"] = region.toJson();
+  obj["scene"] = int(scene);
+  obj["format"] = enumToString(format);
+  obj["expandXY"] = expandXY;
+  obj["expandWithMaxValue"] = expandWithMaxValue;
+  return obj;
 }
 
 QString ZImgSource::toQString() const
@@ -327,10 +392,11 @@ std::vector<ZImgInfo> ZImg::readImgInfos(const QStringList& fileList, Dimension 
   return res;
 }
 
-ZImgInfo ZImg::readImgInfo(const ZImgSource& imgSource)
+ZImgInfo ZImg::readImgInfo(const ZImgSource& imgSource,
+                           std::vector<std::shared_ptr<ZImgSubBlock>>* subBlocks)
 {
   ZImgInfo res;
-  ZImgIO().readInfo(imgSource, res);
+  ZImgIO().readInfo(imgSource, res, subBlocks);
   return res;
 }
 

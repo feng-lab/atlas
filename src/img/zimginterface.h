@@ -163,17 +163,17 @@ struct col4
   bool operator==(const col4& c) const
   { return (r == c.r && g == c.g && b == c.b && a == c.a); }
 
-  float redF() const
-  { return r / 255.f; }
+  [[nodiscard]] float redF() const
+  { return float(r) / 255.f; }
 
-  float greenF() const
-  { return g / 255.f; }
+  [[nodiscard]] float greenF() const
+  { return float(g) / 255.f; }
 
-  float blueF() const
-  { return b / 255.f; }
+  [[nodiscard]] float blueF() const
+  { return float(b) / 255.f; }
 
-  float alphaF() const
-  { return a / 255.f; }
+  [[nodiscard]] float alphaF() const
+  { return float(a) / 255.f; }
 
   col4& max(const col4& c)
   {
@@ -247,6 +247,77 @@ enum class FileFormat
   ITKImage,
   Leica,
 };
+
+inline QString enumToString(FileFormat f)
+{
+  switch (f) {
+    case FileFormat::Unknown:
+      return "Unknown";
+    case FileFormat::HDF5Img:
+      return "HDF5Img";
+    case FileFormat::OmeTiff:
+      return "OmeTiff";
+    case FileFormat::Tiff:
+      return "Tiff";
+    case FileFormat::Vaa3DRaw:
+      return "Vaa3DRaw";
+    case FileFormat::ZeissLsm:
+      return "ZeissLsm";
+    case FileFormat::Jpeg:
+      return "Jpeg";
+    case FileFormat::JpegXR:
+      return "JpegXR";
+    case FileFormat::Png:
+      return "Png";
+    case FileFormat::FreeImage:
+      return "FreeImage";
+    case FileFormat::MetaImage:
+      return "MetaImage";
+    case FileFormat::ZeissCZI:
+      return "ZeissCZI";
+    case FileFormat::ITKImage:
+      return "ITKImage";
+    case FileFormat::Leica:
+      return "Leica";
+    default:
+      throw ZIOException("invalid FileFormat");
+  }
+}
+
+inline FileFormat stringToFileFormat(const QString& str)
+{
+  if (str == "Unknown") {
+    return FileFormat::Unknown;
+  } else if (str == "HDF5Img") {
+    return FileFormat::HDF5Img;
+  } else if (str == "OmeTiff") {
+    return FileFormat::OmeTiff;
+  } else if (str == "Tiff") {
+    return FileFormat::Tiff;
+  } else if (str == "Vaa3DRaw") {
+    return FileFormat::Vaa3DRaw;
+  } else if (str == "ZeissLsm") {
+    return FileFormat::ZeissLsm;
+  } else if (str == "Jpeg") {
+    return FileFormat::Jpeg;
+  } else if (str == "JpegXR") {
+    return FileFormat::JpegXR;
+  } else if (str == "Png") {
+    return FileFormat::Png;
+  } else if (str == "FreeImage") {
+    return FileFormat::FreeImage;
+  } else if (str == "MetaImage") {
+    return FileFormat::MetaImage;
+  } else if (str == "ZeissCZI") {
+    return FileFormat::ZeissCZI;
+  } else if (str == "ITKImage") {
+    return FileFormat::ITKImage;
+  } else if (str == "Leica") {
+    return FileFormat::Leica;
+  } else {
+    throw ZIOException("invalid FileFormat " + str);
+  }
+}
 
 enum class Compression : std::uint16_t
 {
@@ -355,6 +426,23 @@ inline QString enumToString(Dimension d)
       return "T";
     default:
       throw ZIOException("invalid Dimension");
+  }
+}
+
+inline Dimension stringToDimension(const QString& str)
+{
+  if (str == "X") {
+    return Dimension::X;
+  } else if (str == "Y") {
+    return Dimension::Y;
+  } else if (str == "Z") {
+    return Dimension::Z;
+  } else if (str == "C") {
+    return Dimension::C;
+  } else if (str == "T") {
+    return Dimension::T;
+  } else {
+    throw ZIOException("invalid Dimension " + str);
   }
 }
 
