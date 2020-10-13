@@ -257,17 +257,41 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 {
   LOG(INFO) << "Exporting Label Image...";
 
+  int64_t minID = std::numeric_limits<int64_t>::max();
+  int64_t maxID = std::numeric_limits<int64_t>::lowest();
+  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+    minID = std::min(minID, it->id);
+    maxID = std::max(maxID, it->id);
+  }
+  size_t bytePerVoxel = 1;
+  VoxelFormat vf = VoxelFormat::Unsigned;
+  if (minID < 0) {
+    vf = VoxelFormat::Signed;
+    maxID = std::max(maxID, -minID);
+    if (maxID > std::numeric_limits<int8_t>::max()) {
+      bytePerVoxel = 2;
+    } else if (maxID > std::numeric_limits<int16_t>::max()) {
+      bytePerVoxel = 4;
+    } else if (maxID > std::numeric_limits<int32_t>::max()) {
+      bytePerVoxel = 8;
+    }
+  } else {
+    if (maxID > std::numeric_limits<uint8_t>::max()) {
+      bytePerVoxel = 2;
+    } else if (maxID > std::numeric_limits<uint16_t>::max()) {
+      bytePerVoxel = 4;
+    } else if (maxID > std::numeric_limits<uint32_t>::max()) {
+      bytePerVoxel = 8;
+    }
+  }
   ZImgInfo info(m_boundBox.maxCorner().x * scale + 2, m_boundBox.maxCorner().y * scale + 2, m_boundBox.maxCorner().z + 2,
-                1, 1, 2);
+                1, 1, bytePerVoxel, vf);
   info.voxelSizeUnit = VoxelSizeUnit::um;
   info.voxelSizeX = std::ceil(m_voxelSizeX / scale);
   info.voxelSizeY = std::ceil(m_voxelSizeY / scale);
   info.voxelSizeZ = m_voxelSizeZ;
   ZImg res(info);
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    if (it->id < 0) {
-      continue;
-    }
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
       ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale,
