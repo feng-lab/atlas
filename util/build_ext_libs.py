@@ -145,6 +145,8 @@ def get_tbb_env():
         else:
             env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                                 'tbbvars.sh'))
+    if 'TBB_ROOT' not in env:
+        env['TBB_ROOT'] = env['TBBROOT']
     return env
 
 
@@ -1502,7 +1504,8 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
-                         '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO'])
+                         '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
+                         '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB'])
 
         # if is_windows():
         #     cmakecmd.extend([
@@ -1512,7 +1515,7 @@ def build_vtk(src_dir: str, install_dir: str):
         #     ])
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
+        build_and_install_cmakecmd(cmakecmd, build_dir, env=get_tbb_env())
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -2066,7 +2069,7 @@ def parse_inputs(argv: list):
                             'glog': ['ceres-solver', 'folly'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
-                            'tbb': ['itk', 'opencv'],
+                            'tbb': ['itk', 'opencv', 'vtk'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
                             # 'ceres-solver': ['opencv'],   # only if we need opencv sfm
