@@ -71,9 +71,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DRegionAnnotationFilter::widgetsGroup()
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
                                                               m_idToMeshFilters, this);
     m_viewSettingTreeWidget =
-      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
-                                                             m_regionAnnotationPack->regionAnnotation(),
-                                                             m_idToMeshFilters);
+      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                               m_regionAnnotationPack->regionAnnotation(),
+                                               m_idToMeshFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 9);
   }
   return m_widgetsGroup;
@@ -147,7 +147,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
     if (m_viewSettingTreeWidget) {
       m_widgetsGroup->removeChild(*m_viewSettingTreeWidget);
       m_viewSettingTreeWidget->setParent(nullptr);
-      m_viewSettingTreeWidget.reset();
+      m_viewSettingTreeWidget = nullptr;
       m_viewSettingTreeModel.reset();
     }
   }
@@ -203,9 +203,9 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
                                                               m_idToMeshFilters, this);
     m_viewSettingTreeWidget =
-      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
-                                                             m_regionAnnotationPack->regionAnnotation(),
-                                                             m_idToMeshFilters);
+      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                               m_regionAnnotationPack->regionAnnotation(),
+                                               m_idToMeshFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 9);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

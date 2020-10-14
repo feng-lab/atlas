@@ -294,6 +294,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
     if (it->roi) {
+      LOG(INFO) << "has roi";
       ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true, scale,
                                                 keepOnlyInterpolatedSlices);
       res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
@@ -670,12 +671,12 @@ void ZRegionAnnotation::save(const QString& filename) const
       H5::Attribute abbreviation = regionGrp.createAttribute("Abbreviation", strType, attrDataSpace);
       abbreviation.write(strType, p.abbreviation.toStdString());
 
-      if (p.roi) {
+      if (p.roi && !p.roi->isEmpty()) {
         H5::Group roiGrp = regionGrp.createGroup("ROI");
         p.roi->save(roiGrp);
       }
 
-      if (p.mesh) {
+      if (p.mesh && !p.mesh->empty()) {
         H5::Group meshGrp = regionGrp.createGroup("Mesh");
         p.mesh->save(meshGrp);
       }

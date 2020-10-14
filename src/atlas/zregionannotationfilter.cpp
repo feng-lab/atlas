@@ -104,9 +104,9 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
                                                               m_idToROIFilters, this);
     m_viewSettingTreeWidget =
-      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
-                                                             m_regionAnnotationPack->regionAnnotation(),
-                                                             m_idToROIFilters);
+      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                               m_regionAnnotationPack->regionAnnotation(),
+                                               m_idToROIFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
   }
   return m_widgetsGroup;
@@ -205,7 +205,7 @@ void ZRegionAnnotationFilter::allROIChanged()
     if (m_viewSettingTreeWidget) {
       m_widgetsGroup->removeChild(*m_viewSettingTreeWidget);
       m_viewSettingTreeWidget->setParent(nullptr);
-      m_viewSettingTreeWidget.reset();
+      m_viewSettingTreeWidget = nullptr;
       m_viewSettingTreeModel.reset();
     }
   }
@@ -266,9 +266,9 @@ void ZRegionAnnotationFilter::allROIChanged()
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
                                                               m_idToROIFilters, this);
     m_viewSettingTreeWidget =
-      std::make_unique<ZRegionAnnotationViewSettingTreeView>(*m_viewSettingTreeModel,
-                                                             m_regionAnnotationPack->regionAnnotation(),
-                                                             m_idToROIFilters);
+      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                               m_regionAnnotationPack->regionAnnotation(),
+                                               m_idToROIFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();

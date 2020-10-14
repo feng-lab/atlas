@@ -72,7 +72,7 @@ private:
   ZBoolParameter m_highlightRegionOnMouseHover;
 
   std::unique_ptr<ZRegionAnnotationViewSettingTreeModel> m_viewSettingTreeModel;
-  std::unique_ptr<QWidget> m_viewSettingTreeWidget;
+  QWidget* m_viewSettingTreeWidget = nullptr;
 
   size_t m_numParametersWithoutRegionSepcificParas = 0;
 };

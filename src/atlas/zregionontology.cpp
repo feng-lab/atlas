@@ -386,11 +386,11 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   vtkSmartPointer<vtkImageData> vimg = vtkSmartPointer<vtkImageData>::New();
-  vimg->SetExtent(0, img.width(), 0, img.height(), 0, img.depth());
+  vimg->SetExtent(-1, img.width(), -1, img.height(), -1, img.depth());
   vimg->SetSpacing(1, 1, 1);
   vimg->SetOrigin(0, 0, 0);
   vimg->AllocateScalars(VTK_UNSIGNED_CHAR, 1);
-  std::memset(vimg->GetScalarPointer(), 0, (img.width() + 1) * (img.height() + 1) * (img.depth() + 1));
+  std::memset(vimg->GetScalarPointer(), 0, (img.width() + 2) * (img.height() + 2) * (img.depth() + 2));
 
   for (size_t z = 0; z < img.depth(); ++z) {
     for (size_t y = 0; y < img.height(); ++y) {
