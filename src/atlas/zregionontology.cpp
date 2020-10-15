@@ -14,6 +14,7 @@
 //#include <CGAL/exceptions.h>
 #include <opencv2/imgproc.hpp>
 #include <vtkDiscreteMarchingCubes.h>
+#include <vtkDiscreteFlyingEdges3D.h>
 #include <vtkWindowedSincPolyDataFilter.h>
 #include <vtkMaskFields.h>
 #include <vtkThreshold.h>
@@ -398,16 +399,20 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
     }
   }
 
-  vtkSmartPointer<vtkDiscreteMarchingCubes> discreteCubes = vtkSmartPointer<vtkDiscreteMarchingCubes>::New();
+#if 0
+  auto discreteCubes = vtkSmartPointer<vtkDiscreteFlyingEdges3D>::New();
+#else
+  auto discreteCubes = vtkSmartPointer<vtkDiscreteMarchingCubes>::New();
+#endif
   discreteCubes->SetInputData(vimg);
   discreteCubes->GenerateValues(1, 1, 1);
 
   vtkSmartPointer<vtkWindowedSincPolyDataFilter> smoother = vtkSmartPointer<vtkWindowedSincPolyDataFilter>::New();
   smoother->SetInputConnection(discreteCubes->GetOutputPort());
-  smoother->SetNumberOfIterations(15);
-  smoother->BoundarySmoothingOff();
-  smoother->FeatureEdgeSmoothingOff();
-  smoother->SetFeatureAngle(120);
+  smoother->SetNumberOfIterations(100);
+  smoother->BoundarySmoothingOn();
+  smoother->FeatureEdgeSmoothingOn();
+  smoother->SetFeatureAngle(180);
   smoother->SetPassBand(0.001);
   smoother->NonManifoldSmoothingOn();
   // smoother->NormalizeCoordinatesOn();   // todo: VTK bug
@@ -433,6 +438,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
   geometry->Update();
 
   vtkPolyData* outputPolydata = geometry->GetOutput();
+#if 1
   size_t numTriangles = outputPolydata->GetNumberOfPolys();
   double baseRate = 0.05;
   if (numTriangles * baseRate > 250000) {
@@ -449,6 +455,8 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
   decimate->Update();
 
   outputPolydata = decimate->GetOutput();
+#endif
+
   vtkPoints* points = outputPolydata->GetPoints();
   vtkCellArray* polys = outputPolydata->GetPolys();
   //  vtkDataArray* pointsNormals = outputPolydata->GetPointData()->GetNormals();
