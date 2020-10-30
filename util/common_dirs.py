@@ -386,14 +386,19 @@ def install_ffmpeg():
     elif is_linux():
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*amd64*')
     else:
-        folder = unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*macos*')
+        folder = unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*macOS*')
         if 'feng' in os.path.expanduser("~"):
-            os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-            os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-            os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-            if os.path.exists('/usr/local/bin/ffmpeg'):
-                os.unlink('/usr/local/bin/ffmpeg')
-            os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
+            if True:  # from https://evermeet.cx/ffmpeg/
+                if os.path.lexists('/usr/local/bin/ffmpeg'):
+                    os.unlink('/usr/local/bin/ffmpeg')
+                os.symlink(folder, '/usr/local/bin/ffmpeg')
+            else:
+                os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+                if os.path.lexists('/usr/local/bin/ffmpeg'):
+                    os.unlink('/usr/local/bin/ffmpeg')
+                os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
 
 
 def get_cmake_binary() -> str:

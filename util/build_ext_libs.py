@@ -2078,6 +2078,13 @@ def build_libs(libs: dict, update_src: bool):
             remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jdk*'))
             unpack_file_to_folder(package_name, ext_build_dir())
             assert os.path.exists(jdk_dir)
+            if os.path.lexists(os.path.join(ext_build_dir(), 'jdk')):
+                os.unlink(os.path.join(ext_build_dir(), 'jdk'))
+                print('link jdk')
+                os.symlink(jdk_dir, os.path.join(ext_build_dir(), 'jdk'))
+        if not os.path.lexists(os.path.join(ext_build_dir(), 'jdk')):
+            print('link jdk')
+            os.symlink(jdk_dir, os.path.join(ext_build_dir(), 'jdk'))
 
     if libs['ants']:
         src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
