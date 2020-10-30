@@ -42,7 +42,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(filters);
     for (int i = 0; i < formats.size(); ++i) {
-      if (formats[i] == FileFormat::MetaImage) {
+      if (formats[i] == FileFormat::HDF5Img) {
         dialog.selectNameFilter(filters[i]);
       }
     }
@@ -55,12 +55,15 @@ void ZRegionAnnotationWidget::exportLabelImage()
     dialog.close();
   }
   QApplication::processEvents();
+  if (fn.isEmpty()) {
+    return;
+  }
   bool ok;
   auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
   double d = QInputDialog::getDouble(this, tr("Scale Output Label Image"),
                                      tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
                                      Qt::WindowFlags(), 1);
-  if (fmtIdx >= 0 && !fn.isEmpty() && ok) {
+  if (fmtIdx >= 0 && ok) {
     try {
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];

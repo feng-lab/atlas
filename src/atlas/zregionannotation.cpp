@@ -143,9 +143,11 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 //  m_height = origLabelImg.height();
 //  m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
-  m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scale;
-  m_voxelSizeY = origLabelImg.info().voxelSizeYInUm() * scale;
-  m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
+  if (origLabelImg.info().voxelSizeUnit != VoxelSizeUnit::none) {
+    m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scale;
+    m_voxelSizeY = origLabelImg.info().voxelSizeYInUm() * scale;
+    m_voxelSizeZ = origLabelImg.info().voxelSizeZInUm();
+  }
 
   for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
     if (createMesh) {
@@ -263,6 +265,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
     minID = std::min(minID, it->id);
     maxID = std::max(maxID, it->id);
   }
+  LOG(INFO) << minID << " " << maxID;
   size_t bytePerVoxel = 1;
   VoxelFormat vf = VoxelFormat::Unsigned;
   if (minID < 0) {

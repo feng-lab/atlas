@@ -18,7 +18,7 @@
 
 ### Linux:
 * install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja
-* `sudo apt install unrar p7zip-full git nasm golang patchelf`
+* `sudo apt install unrar p7zip-full git nasm golang patchelf libxcursor-dev`
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
 
 ### All:

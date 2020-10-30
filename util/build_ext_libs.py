@@ -251,19 +251,19 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
         return res
 
 
-def build_cmakecmd(cmakecmd, build_dir: str, *, env=None):
+def build_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja()):
     if is_windows():
         if env is None:
             env = get_vcvars_environment()
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-        if use_ninja():
+        if use_ninja:
             subprocess.run([get_ninja_binary()],
                            cwd=build_dir, shell=False, check=True, env=env)
         else:
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
     else:
-        if use_ninja():
+        if use_ninja:
             if env is None:
                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
                 subprocess.run([get_ninja_binary()],
@@ -1186,8 +1186,8 @@ def build_assimp(src_dir: str, install_dir: str):
     orig_file = bak_file = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
-    orig_file_3 = bak_file_3 = None
-    orig_file_4 = bak_file_4 = None
+    # orig_file_3 = bak_file_3 = None
+    # orig_file_4 = bak_file_4 = None
     try:
         orig_file = os.path.join(src_dir, 'include', 'assimp', 'defs.h')
         from_texts = [r'#define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))']
@@ -1214,20 +1214,20 @@ def build_assimp(src_dir: str, install_dir: str):
 
         os.remove(os.path.join(src_dir, 'cmake-modules', 'FindZLIB.cmake'))
 
-        if is_mac():
-            orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
-            from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
-            to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
-            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
-
-            orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
-            from_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.'
-                r'@ASSIMP_VERSION_MAJOR@']
-            to_texts = [
-                r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@'
-                r'@CMAKE_SHARED_LIBRARY_SUFFIX@']
-            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
+        # if is_mac():
+        #     orig_file_3 = os.path.join(src_dir, 'assimpTargets-release.cmake.in')
+        #     from_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_SHARED_LIBRARY_SUFFIX@.@ASSIMP_VERSION_MAJOR@']
+        #     to_texts = [r'libassimp${ASSIMP_LIBRARY_SUFFIX}.@ASSIMP_VERSION_MAJOR@@CMAKE_SHARED_LIBRARY_SUFFIX@']
+        #     bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
+        #
+        #     orig_file_4 = os.path.join(src_dir, 'assimpTargets-debug.cmake.in')
+        #     from_texts = [
+        #         r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@@CMAKE_SHARED_LIBRARY_SUFFIX@.'
+        #         r'@ASSIMP_VERSION_MAJOR@']
+        #     to_texts = [
+        #         r'libassimp${ASSIMP_LIBRARY_SUFFIX}@CMAKE_DEBUG_POSTFIX@.@ASSIMP_VERSION_MAJOR@'
+        #         r'@CMAKE_SHARED_LIBRARY_SUFFIX@']
+        #     bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
@@ -1252,9 +1252,9 @@ def build_assimp(src_dir: str, install_dir: str):
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
-        if is_mac():
-            os.replace(bak_file_3, orig_file_3)
-            os.replace(bak_file_4, orig_file_4)
+        # if is_mac():
+        #     os.replace(bak_file_3, orig_file_3)
+        #     os.replace(bak_file_4, orig_file_4)
         shutil.rmtree(build_dir, ignore_errors=False)
         cleanup_git_submodule(src_dir)
 
@@ -1646,6 +1646,21 @@ def build_ospray(src_dir: str, install_dir: str):
         cmakecmd.extend([os.path.join(src_dir, 'scripts', 'superbuild')])
         build_and_install_cmakecmd(cmakecmd, build_dir, use_ninja=False, use_cmake=True)
     finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
+def build_ants(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
+
+        cmakecmd.extend([src_dir])
+        build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
+        subprocess.run(['make', 'install'],
+                       cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
+    finally:
+        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -2050,6 +2065,14 @@ def build_libs(libs: dict, update_src: bool):
             unpack_file_to_folder(package_name, ext_build_dir())
             assert os.path.exists(jdk_dir)
 
+    if libs['ants']:
+        src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')
+        update_or_clone_git_repository(src_dir, 'git@github.com:ANTsX/ANTs.git')
+        if not os.path.exists(src_dir):
+            print('no ANTs')
+        else:
+            build_ants(src_dir, os.path.join(ext_build_dir(), 'ANTs'))
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
@@ -2057,9 +2080,12 @@ def parse_inputs(argv: list):
                 'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java',
+                'opencv', 'botan', 'ospray', 'java', 'ants'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
+
+    # not used now
+    lib_skip_list = ['botan', 'ospray', 'ants']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
@@ -2107,7 +2133,8 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     for lib in args.libs:
         if lib.lower() == "all":
             for vlib in libs:
-                libs[vlib] = True
+                if vlib not in lib_skip_list:
+                    libs[vlib] = True
         else:
             libs[lib] = True
 
@@ -2139,10 +2166,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         if libs[lib.lower()]:
             for dlib in rev_dep:
                 libs[dlib.lower()] = True
-
-    # not used now
-    libs['botan'] = False
-    libs['ospray'] = False
 
     return libs, args.update_src
 

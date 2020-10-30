@@ -132,9 +132,9 @@ private:
   friend class ZRegionAnnotationUpdateMeshCommand;
   friend class ZRegionAnnotationTransformMeshCommand;
 
-  double m_voxelSizeX = 0.0; //todo : these fields should always be available
-  double m_voxelSizeY = 0.0;
-  double m_voxelSizeZ = 0.0;
+  double m_voxelSizeX = 1.; //todo : these fields should always be available
+  double m_voxelSizeY = 1.;
+  double m_voxelSizeZ = 1.;
   ZTree<RegionNode> m_ontology;
   ZBBox<glm::ivec4> m_boundBox;
 
