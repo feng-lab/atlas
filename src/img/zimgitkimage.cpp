@@ -259,6 +259,9 @@ void ZImgITKImage::checkImgBeforeWriting(const QString& filename, const ZImgInfo
                                          const ZImgWriteParameters& paras)
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
+  if (!filename.endsWith(".nrrd", Qt::CaseInsensitive)) {
+    throw ZIOException("only support nrrd format for now");
+  }
   if (!(paras.compression == Compression::AUTO ||
         paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
@@ -269,102 +272,11 @@ void ZImgITKImage::checkImgBeforeWriting(const QString& filename, const ZImgInfo
   }
 }
 
-void ZImgITKImage::writeImg(const QString& /*filename*/, const ZImg& /*img*/,
-                            const ZImgWriteParameters&)
+void ZImgITKImage::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
-//  checkImgBeforeWriting(filename, img.info(), paras);
+  checkImgBeforeWriting(filename, img.info(), paras);
 
-//  bool multipleChannel = img.numChannels() > 1;
-
-//  ZImg tmpImg;
-//  if (multipleChannel) {
-//    tmpImg = ZImg(img.info());
-//    XYZCtoCXYZ(img, tmpImg);
-//  }
-
-//  int nDims = 3;
-//  if (img.depth() == 1) {
-//    nDims = 2;
-//  }
-//  int dimSize[3];
-//  dimSize[0] = img.width();
-//  dimSize[1] = img.height();
-//  dimSize[2] = img.depth();
-//  MET_DistanceUnitsEnumType distanceUnitType = MET_DISTANCE_UNITS_UNKNOWN;
-//  float elementSpacing[3];
-//  if (img.voxelSizeUnit() == VoxelSizeUnit::Voxel) {
-//    elementSpacing[0] = img.voxelSizeX();
-//    elementSpacing[1] = img.voxelSizeY();
-//    elementSpacing[2] = img.voxelSizeZ();
-//  } else {
-//    distanceUnitType = MET_DISTANCE_UNITS_UM;
-//    elementSpacing[0] = img.voxelSizeXInUm();
-//    elementSpacing[1] = img.voxelSizeYInUm();
-//    elementSpacing[2] = img.voxelSizeZInUm();
-//  }
-//  MET_ValueEnumType elementType = MET_CHAR;
-//  switch (img.voxelFormat()) {
-//  case VoxelFormat::Signed:
-//    switch (img.bytesPerVoxel()) {
-//    case 1:
-//      elementType = multipleChannel ? MET_CHAR_ARRAY : MET_CHAR;
-//      break;
-//    case 2:
-//      elementType = multipleChannel ? MET_SHORT_ARRAY : MET_SHORT;
-//      break;
-//    case 4:
-//      elementType = multipleChannel ? MET_INT_ARRAY : MET_INT;
-//      break;
-//    case 8:
-//      elementType = multipleChannel ? MET_LONG_LONG_ARRAY : MET_LONG_LONG;
-//      break;
-//    default:
-//      CHECK(false);
-//      break;
-//    }
-//    break;
-//  case VoxelFormat::Unsigned:
-//    switch (img.bytesPerVoxel()) {
-//    case 1:
-//      elementType = multipleChannel ? MET_UCHAR_ARRAY : MET_UCHAR;
-//      break;
-//    case 2:
-//      elementType = multipleChannel ? MET_USHORT_ARRAY : MET_USHORT;
-//      break;
-//    case 4:
-//      elementType = multipleChannel ? MET_UINT_ARRAY : MET_UINT;
-//      break;
-//    case 8:
-//      elementType = multipleChannel ? MET_ULONG_LONG_ARRAY : MET_ULONG_LONG;
-//      break;
-//    default:
-//      CHECK(false);
-//      break;
-//    }
-//    break;
-//  case VoxelFormat::Float:
-//    switch (img.bytesPerVoxel()) {
-//    case 4:
-//      elementType = multipleChannel ? MET_FLOAT_ARRAY : MET_FLOAT;
-//      break;
-//    case 8:
-//      elementType = multipleChannel ? MET_DOUBLE_ARRAY : MET_DOUBLE;
-//      break;
-//    default:
-//      CHECK(false);
-//      break;
-//    }
-//  }
-
-//  MetaImage metaImage(nDims, dimSize, elementSpacing, elementType, img.numChannels(),
-//                      multipleChannel ? const_cast<uint8_t*>(tmpImg.channelData(0)) : const_cast<uint8_t*>(img.channelData(0)));
-
-//  metaImage.DistanceUnits(distanceUnitType);
-//  metaImage.CompressedData(comp != Compression::NONE);
-
-//  if (!metaImage.Write(QFile::encodeName(filename).constData())) {
-//    throw ZIOException("Can not write metaimage");
-//  }
+  //
 }
 
 bool ZImgITKImage::supportRead() const

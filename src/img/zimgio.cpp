@@ -733,9 +733,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     } else {
       for (auto writer : writers) {
         try {
-          auto tfn = getTemporaryFilename(filename);
-          writer->writeImg(tfn, img, paras);
-          renameFile(tfn, filename);
+          if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
+            writer->writeImg(filename, img, paras);
+          } else {
+            auto tfn = getTemporaryFilename(filename);
+            writer->writeImg(tfn, img, paras);
+            renameFile(tfn, filename);
+          }
           return;
         }
         catch (const ZIOException& e) {
@@ -748,9 +752,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      auto tfn = getTemporaryFilename(filename);
-      m_ioFormats[format]->writeImg(tfn, img, paras);
-      renameFile(tfn, filename);
+      if (format == FileFormat::MetaImage) {
+        m_ioFormats[format]->writeImg(filename, img, paras);
+      } else {
+        auto tfn = getTemporaryFilename(filename);
+        m_ioFormats[format]->writeImg(tfn, img, paras);
+        renameFile(tfn, filename);
+      }
       return;
     }
     catch (const ZIOException& e) {
@@ -777,9 +785,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          auto tfn = getTemporaryFilename(filename);
-          writer->writeImg(tfn, img, paras);
-          renameFile(tfn, filename);
+          if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
+            writer->writeImg(filename, img, paras);
+          } else {
+            auto tfn = getTemporaryFilename(filename);
+            writer->writeImg(tfn, img, paras);
+            renameFile(tfn, filename);
+          }
           return;
         }
         catch (const ZIOException& e) {
@@ -792,9 +804,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      auto tfn = getTemporaryFilename(filename);
-      m_ioFormats[format]->writeImg(tfn, img, paras);
-      renameFile(tfn, filename);
+      if (format == FileFormat::MetaImage) {
+        m_ioFormats[format]->writeImg(filename, img, paras);
+      } else {
+        auto tfn = getTemporaryFilename(filename);
+        m_ioFormats[format]->writeImg(tfn, img, paras);
+        renameFile(tfn, filename);
+      }
       return;
     }
     catch (const ZIOException& e) {
@@ -821,9 +837,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     } else {
       for (auto writer : writers) {
         try {
-          auto tfn = getTemporaryFilename(filename);
-          writer->writeImg(tfn, img, paras);
-          renameFile(tfn, filename);
+          if (filename.endsWith(".mhd", Qt::CaseInsensitive)) {
+            writer->writeImg(filename, img, paras);
+          } else {
+            auto tfn = getTemporaryFilename(filename);
+            writer->writeImg(tfn, img, paras);
+            renameFile(tfn, filename);
+          }
           return;
         }
         catch (const ZIOException& e) {
@@ -836,9 +856,13 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
-      auto tfn = getTemporaryFilename(filename);
-      m_ioFormats[format]->writeImg(tfn, img, paras);
-      renameFile(tfn, filename);
+      if (format == FileFormat::MetaImage) {
+        m_ioFormats[format]->writeImg(filename, img, paras);
+      } else {
+        auto tfn = getTemporaryFilename(filename);
+        m_ioFormats[format]->writeImg(tfn, img, paras);
+        renameFile(tfn, filename);
+      }
       return;
     }
     catch (const ZIOException& e) {
