@@ -57,9 +57,9 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
     return std::make_tuple(img, 0_i32, 0_i32);
   }
   QRectF pathRect = path.boundingRect();
-  int minX = static_cast<int>(std::floor(pathRect.left()));
+  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left())));
   int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = static_cast<int>(std::floor(pathRect.top()));
+  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top())));
   int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);

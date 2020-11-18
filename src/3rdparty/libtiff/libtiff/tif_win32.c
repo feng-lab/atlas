@@ -288,7 +288,7 @@ TIFFOpen(const char* name, const char* mode)
 		return ((TIFF *)0);
 	}
 
-	tif = TIFFFdOpen((int)fd, name, mode);   /* FIXME: WIN64 cast from pointer to int warning */
+	tif = TIFFFdOpen(thandle_to_int(fd), name, mode);
 	if(!tif)
 		CloseHandle(fd);
 	return tif;
@@ -343,7 +343,7 @@ TIFFOpenW(const wchar_t* name, const char* mode)
 				    NULL, NULL);
 	}
 
-	tif = TIFFFdOpen((int)fd,    /* FIXME: WIN64 cast from pointer to int warning */
+	tif = TIFFFdOpen(thandle_to_int(fd),
 			 (mbname != NULL) ? mbname : "<unknown>", mode);
 	if(!tif)
 		CloseHandle(fd);
