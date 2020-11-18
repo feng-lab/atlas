@@ -850,6 +850,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
         build_dir = create_build_dir(src_dir)
 
         orig_file = bak_file = None
+        orig_file5 = bak_file5 = None
         orig_file2 = bak_file2 = None
         orig_file3 = bak_file3 = None
         orig_file4 = bak_file4 = None
@@ -859,6 +860,14 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                 bak_file = patch_file(orig_file,
                                       from_texts=[r'-std=${CXX_STD}'],
                                       to_texts=[r''])
+            if is_mac() and macos_min_version().startswith('10.'):
+                # preadv and pwritev are only available after macOS 11.0
+                orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
+                bak_file5 = patch_file(orig_file5,
+                                      from_texts=[r'check_symbol_exists(preadv',
+                                                  r'check_symbol_exists(pwritev'],
+                                      to_texts=[r'#check_symbol_exists(preadv',
+                                                r'#check_symbol_exists(pwritev'])
 
             orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
             bak_file2 = patch_file(orig_file2,
@@ -892,6 +901,8 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
             shutil.rmtree(build_dir, ignore_errors=False)
             if is_mac():
                 os.replace(bak_file, orig_file)
+            if is_mac() and macos_min_version().startswith('10.'):
+                os.replace(bak_file5, orig_file5)
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
             os.replace(bak_file4, orig_file4)
@@ -2163,6 +2174,11 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         for lib in args.exclude_libs:
             libs[lib] = False
 
+    for lib, rev_dep in libs_reverse_depends.items():
+        if libs[lib.lower()]:
+            for dlib in rev_dep:
+                libs[dlib.lower()] = True
+
     if args.start_from is not None:
         started = False
         for lib in libs:
@@ -2182,11 +2198,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         libs['curl'] = False
     elif is_mac():
         libs['curl'] = False
-
-    for lib, rev_dep in libs_reverse_depends.items():
-        if libs[lib.lower()]:
-            for dlib in rev_dep:
-                libs[dlib.lower()] = True
 
     return libs, args.update_src
 

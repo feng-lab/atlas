@@ -428,8 +428,8 @@ def get_ffmpeg_binary() -> str:
         folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*amd64*'))
         return os.path.join(folder, 'ffmpeg')
     else:
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*macos*'))
-        return os.path.join(folder, 'bin', 'ffmpeg')
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg'))
+        return folder
 
 
 if __name__ == "__main__":
