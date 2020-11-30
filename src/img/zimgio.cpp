@@ -923,10 +923,14 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& forma
         filters.push_back(flt);
         formats.push_back(fmt.first);
         comps.push_back(Compression::AUTO);
+        filters.push_back(filter);
+        formats.push_back(fmt.first);
+        comps.push_back(Compression::NONE);
+      } else {
+        filters.push_back(filter);
+        formats.push_back(fmt.first);
+        comps.push_back(Compression::AUTO);
       }
-      filters.push_back(filter);
-      formats.push_back(fmt.first);
-      comps.push_back(Compression::AUTO);
     }
   }
 }
