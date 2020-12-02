@@ -1915,7 +1915,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     }
     connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), sb2, &ZSpinBox::setMinimum);
     connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), sb1, &ZSpinBox::setMaximum);
-    lo->setMargin(0);
+    lo->setContentsMargins(0, 0, 0, 0);
     w->setLayout(lo);
     return w;
   } else {
@@ -2034,7 +2034,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
     }
     connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb2, &ZDoubleSpinBox::setMinimum);
     connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), sb1, &ZDoubleSpinBox::setMaximum);
-    lo->setMargin(0);
+    lo->setContentsMargins(0, 0, 0, 0);
     w->setLayout(lo);
     return w;
   } else {

@@ -27,6 +27,8 @@ public:
   QString currentTheme() const
   { return m_currentTheme; }
 
+  bool event(QEvent *event) override;
+
   enum Color
   {
     /* Palette for QPalette */

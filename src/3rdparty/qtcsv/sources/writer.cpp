@@ -40,17 +40,17 @@ public:
     // Append information to the file
     static bool appendToFile(const QString& filePath,
                              ContentIterator& content,
-                             QTextCodec* codec);
+                             QStringConverter::Encoding encoding);
 
     // Overwrite file with new information
     static bool overwriteFile(const QString& filePath,
                               ContentIterator& content,
-                              QTextCodec* codec);
+                              QStringConverter::Encoding encoding);
 
     // Write to IO Device
     static bool writeToIODevice(QIODevice& ioDevice,
                                 ContentIterator& content,
-                                QTextCodec* codec);
+                                QStringConverter::Encoding encoding);
 
     // Create unique name for the temporary file
     static QString getTempFileName();
@@ -65,7 +65,7 @@ public:
 // - bool - True if data was appended to the file, otherwise False
 bool WriterPrivate::appendToFile(const QString& filePath,
                                  ContentIterator& content,
-                                 QTextCodec* codec)
+                                 QStringConverter::Encoding encoding)
 {
     if ( filePath.isEmpty() || content.isEmpty() )
     {
@@ -81,7 +81,7 @@ bool WriterPrivate::appendToFile(const QString& filePath,
         return false;
     }
 
-    bool result = writeToIODevice(csvFile, content, codec);
+    bool result = writeToIODevice(csvFile, content, encoding);
     csvFile.close();
 
     return result;
@@ -96,7 +96,7 @@ bool WriterPrivate::appendToFile(const QString& filePath,
 // - bool - True if file was overwritten with new data, otherwise False
 bool WriterPrivate::overwriteFile(const QString& filePath,
                                   ContentIterator& content,
-                                  QTextCodec* codec)
+                                  QStringConverter::Encoding encoding)
 {
     // Create path to the unique temporary file
     QString tempFileName = getTempFileName();
@@ -110,7 +110,7 @@ bool WriterPrivate::overwriteFile(const QString& filePath,
     TempFileHandler handler(tempFileName);
 
     // Write information to the temporary file
-    if ( false == appendToFile(tempFileName, content, codec) )
+    if ( false == appendToFile(tempFileName, content, encoding) )
     {
         return false;
     }
@@ -143,7 +143,7 @@ bool WriterPrivate::overwriteFile(const QString& filePath,
 // - bool - True if data could be written to the IO Device
 bool WriterPrivate::writeToIODevice(QIODevice& ioDevice,
                                     ContentIterator& content,
-                                    QTextCodec* codec) {
+                                    QStringConverter::Encoding encoding) {
     if ( content.isEmpty() )
     {
         qDebug() << __FUNCTION__ << "Error - invalid arguments";
@@ -159,7 +159,7 @@ bool WriterPrivate::writeToIODevice(QIODevice& ioDevice,
     }
 
     QTextStream stream(&ioDevice);
-    stream.setCodec(codec);
+    stream.setEncoding(encoding);
     while( content.hasNext() )
     {
         stream << content.getNext();
@@ -218,7 +218,7 @@ bool Writer::write(const QString& filePath,
                    const WriteMode& mode,
                    const QStringList& header,
                    const QStringList& footer,
-                   QTextCodec* codec)
+                   QStringConverter::Encoding encoding)
 {
     if ( filePath.isEmpty() )
     {
@@ -244,11 +244,11 @@ bool Writer::write(const QString& filePath,
     switch (mode)
     {
         case APPEND:
-            result = WriterPrivate::appendToFile(filePath, content, codec);
+            result = WriterPrivate::appendToFile(filePath, content, encoding);
             break;
         case REWRITE:
         default:
-            result = WriterPrivate::overwriteFile(filePath, content, codec);
+            result = WriterPrivate::overwriteFile(filePath, content, encoding);
     }
 
     return result;
@@ -274,7 +274,7 @@ bool Writer::write(QIODevice& ioDevice,
                    const QString& textDelimiter,
                    const QStringList& header,
                    const QStringList& footer,
-                   QTextCodec* codec)
+                   QStringConverter::Encoding encoding)
 {
     if ( data.isEmpty() )
     {
@@ -283,5 +283,5 @@ bool Writer::write(QIODevice& ioDevice,
     }
 
     ContentIterator content(data, separator, textDelimiter, header, footer);
-    return WriterPrivate::writeToIODevice(ioDevice, content, codec);
+    return WriterPrivate::writeToIODevice(ioDevice, content, encoding);
 }

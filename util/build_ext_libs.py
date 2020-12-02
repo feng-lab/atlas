@@ -1722,7 +1722,7 @@ def build_libs(libs: dict, update_src: bool):
             file.write('# Set Qt related variables\n')
             file.write(f'set(QT_VERSION {qt_ver()})\n')
             if sys.platform.startswith('win32'):
-                file.write('set(QT_PATHS {0})\n'.format(qt_base_dir().replace("\\", "/")))
+                file.write('set(QT_HOST_PATH {0})\n'.format(qt_base_dir().replace("\\", "/")))
                 # also need to patch Qt
                 orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
                 bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
@@ -1741,7 +1741,7 @@ def build_libs(libs: dict, update_src: bool):
                             to_lines.append(line)
                     print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
             else:
-                file.write(f'set(QT_PATHS {qt_base_dir()})\n')
+                file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
         # patch installer framework
         pattern_bytes = b'Mozilla/5.0'
         replace_bytes = b'Mozilla/590'

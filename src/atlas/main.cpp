@@ -103,10 +103,12 @@ int main(int argc, char* argv[])
 #ifdef Q_OS_MACOS
     QCoreApplication::setAttribute(Qt::AA_DontShowIconsInMenus, true);
 #endif
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps, true);
+    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
+#endif
     QCoreApplication::setAttribute(Qt::AA_UseDesktopOpenGL, true);
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
-    QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling, true);
     QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
     nim::ZApplication app(argc, argv);

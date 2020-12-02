@@ -2,7 +2,6 @@
 
 #include <QFile>
 #include <QStringList>
-#include <QStringRef>
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
@@ -48,7 +47,7 @@ public:
                      Reader::AbstractProcessor& processor,
                      const QString& separator,
                      const QString& textDelimiter,
-                     QTextCodec* codec);
+                     QStringConverter::Encoding encoding);
 
 
 private:
@@ -92,7 +91,7 @@ bool ReaderPrivate::read(QIODevice& ioDevice,
                          Reader::AbstractProcessor& processor,
                          const QString& separator,
                          const QString& textDelimiter,
-                         QTextCodec* codec)
+                         QStringConverter::Encoding encoding)
 {
     if ( false == checkParams(separator) )
     {
@@ -108,7 +107,7 @@ bool ReaderPrivate::read(QIODevice& ioDevice,
     }
 
     QTextStream stream(&ioDevice);
-    stream.setCodec(codec);
+    stream.setEncoding(encoding);
 
     // This list will contain elements of the row if its elements
     // are located on several lines
@@ -389,8 +388,8 @@ int ReaderPrivate::findMiddleElementPositioin(const QString& str,
         int numOfDelimiters = 0;
         for (int pos = elemEndPos; startPos <= pos; --pos, ++numOfDelimiters)
         {
-            QStringRef strRef = str.midRef(pos, txtDelim.size());
-            if (QStringRef::compare(strRef, txtDelim) != 0)
+            QStringView strView(str.data() + pos, txtDelim.size());
+            if (strView.compare(txtDelim) != 0)
             {
                 break;
             }
@@ -451,8 +450,8 @@ bool ReaderPrivate::isElementLast(const QString& str,
     int numOfDelimiters = 0;
     for (int pos = str.size() - 1; startPos <= pos; --pos, ++numOfDelimiters)
     {
-        QStringRef strRef = str.midRef(pos, txtDelim.size());
-        if (QStringRef::compare(strRef, txtDelim) != 0)
+        QStringView strView(str.data() + pos, txtDelim.size());
+        if (strView.compare(txtDelim) != 0)
         {
             break;
         }
@@ -484,8 +483,8 @@ void ReaderPrivate::removeExtraSymbols(QStringList& elements,
     const QString doubleTextDelim = textDelimiter + textDelimiter;
     for (int i = 0; i < elements.size(); ++i)
     {
-        QStringRef str(&elements.at(i));
-        int startPos = 0, endPos = str.size() - 1;
+        QStringView str(elements.at(i));
+        qsizetype startPos = 0, endPos = str.size() - 1;
 
         // Find first non-space char
         for (;
@@ -499,17 +498,17 @@ void ReaderPrivate::removeExtraSymbols(QStringList& elements,
                  str.at(endPos).category() == QChar::Separator_Space;
              --endPos);
 
-        if (false == textDelimiter.isEmpty())
+        if (!textDelimiter.isEmpty())
         {
             // Skip text delimiter symbol if element starts with it
-            QStringRef strStart(&elements.at(i), startPos, textDelimiter.size());
+            QStringView strStart(elements.at(i).data() + startPos, textDelimiter.size());
             if ( strStart == textDelimiter)
             {
                 startPos += textDelimiter.size();
             }
 
             // Skip text delimiter symbol if element ends with it
-            QStringRef strEnd(&elements.at(i), endPos - textDelimiter.size() + 1,
+            QStringView strEnd(elements.at(i).data() + endPos - textDelimiter.size() + 1,
                               textDelimiter.size());
             if (strEnd == textDelimiter)
             {
@@ -552,7 +551,7 @@ public:
 QList<QStringList> Reader::readToList(const QString& filePath,
                                       const QString& separator,
                                       const QString& textDelimiter,
-                                      QTextCodec* codec)
+                                      QStringConverter::Encoding encoding)
 {
     QFile file;
     if (false == openFile(filePath, file))
@@ -560,7 +559,7 @@ QList<QStringList> Reader::readToList(const QString& filePath,
         return QList<QStringList>();
     }
 
-    return readToList(file, separator, textDelimiter, codec);
+    return readToList(file, separator, textDelimiter, encoding);
 }
 
 // Read csv-formatted data from IO Device and save it
@@ -568,10 +567,10 @@ QList<QStringList> Reader::readToList(const QString& filePath,
 QList<QStringList> Reader::readToList(QIODevice &ioDevice,
                                       const QString &separator,
                                       const QString &textDelimiter,
-                                      QTextCodec *codec)
+                                      QStringConverter::Encoding encoding)
 {
     ReadToListProcessor processor;
-    ReaderPrivate::read(ioDevice, processor, separator, textDelimiter, codec);
+    ReaderPrivate::read(ioDevice, processor, separator, textDelimiter, encoding);
     return processor.data;
 }
 
@@ -588,7 +587,7 @@ bool Reader::readToData(const QString& filePath,
                         AbstractData& data,
                         const QString& separator,
                         const QString& textDelimiter,
-                        QTextCodec* codec)
+                        QStringConverter::Encoding encoding)
 {
     QFile file;
     if (false == openFile(filePath, file))
@@ -596,7 +595,7 @@ bool Reader::readToData(const QString& filePath,
         return false;
     }
 
-    return readToData(file, data, separator, textDelimiter, codec);
+    return readToData(file, data, separator, textDelimiter, encoding);
 }
 
 // Read csv-formatted data from IO Device and save it
@@ -605,11 +604,11 @@ bool Reader::readToData(QIODevice& ioDevice,
                         AbstractData& data,
                         const QString& separator,
                         const QString& textDelimiter,
-                        QTextCodec* codec)
+                        QStringConverter::Encoding encoding)
 {
     ReadToListProcessor processor;
     if (false == ReaderPrivate::read(
-                ioDevice, processor, separator, textDelimiter, codec))
+                ioDevice, processor, separator, textDelimiter, encoding))
     {
         return false;
     }
@@ -636,7 +635,7 @@ bool Reader::readToProcessor(const QString& filePath,
                              Reader::AbstractProcessor& processor,
                              const QString& separator,
                              const QString& textDelimiter,
-                             QTextCodec* codec)
+                             QStringConverter::Encoding encoding)
 {
     QFile file;
     if (false == openFile(filePath, file))
@@ -644,7 +643,7 @@ bool Reader::readToProcessor(const QString& filePath,
         return false;
     }
 
-    return readToProcessor(file, processor, separator, textDelimiter, codec);
+    return readToProcessor(file, processor, separator, textDelimiter, encoding);
 }
 
 // Read csv-formatted data from IO Device and process it line-by-line
@@ -652,8 +651,8 @@ bool Reader::readToProcessor(QIODevice& ioDevice,
                              Reader::AbstractProcessor& processor,
                              const QString& separator,
                              const QString& textDelimiter,
-                             QTextCodec* codec)
+                             QStringConverter::Encoding encoding)
 {
     return ReaderPrivate::read(
-                ioDevice, processor, separator, textDelimiter, codec);
+                ioDevice, processor, separator, textDelimiter, encoding);
 }

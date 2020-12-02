@@ -15,7 +15,7 @@ public:
 
   inline QString displayText(const QVariant& value, const QLocale& locale) const
   {
-    if (value.type() == QVariant::Double) return locale.toString(value.toDouble(), 'g', 16);
+    if (value.metaType() == QMetaType(QMetaType::Double)) return locale.toString(value.toDouble(), 'g', 16);
     return QStyledItemDelegate::displayText(value, locale);
   }
 

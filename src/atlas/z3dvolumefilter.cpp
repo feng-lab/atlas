@@ -497,18 +497,18 @@ void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     return;
   // Mouse button pressed
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->x();
-    m_startCoord.y = e->y();
+    m_startCoord.x = e->position().x();
+    m_startCoord.y = e->position().y();
     toggleInteractionMode(true, this);
     return;
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
+    if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
       bool success;
 #ifndef _QT4_
-      glm::vec3 pos3D = getFirstHit3DPosition(e->x() * qApp->devicePixelRatio(),
-                                              e->y() * qApp->devicePixelRatio(),
+      glm::vec3 pos3D = getFirstHit3DPosition(e->position().x() * qApp->devicePixelRatio(),
+                                              e->position().y() * qApp->devicePixelRatio(),
                                               w * qApp->devicePixelRatio(),
                                               h * qApp->devicePixelRatio(),
                                               success);

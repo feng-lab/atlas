@@ -96,12 +96,14 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg Concurrent PATHS ${QT_PATHS})
-print_target_properties(Qt5::Core)
-print_target_properties(Qt5::Widgets)
-print_target_properties(Qt5::Network)
-print_target_properties(Qt5::Svg)
-print_target_properties(Qt5::Concurrent)
+find_package(Qt6 ${QT_VERSION} REQUIRED COMPONENTS Core Widgets Network Svg SvgWidgets Concurrent OpenGLWidgets)
+print_target_properties(Qt6::Core)
+print_target_properties(Qt6::Widgets)
+print_target_properties(Qt6::Network)
+print_target_properties(Qt6::Svg)
+print_target_properties(Qt6::SvgWidgets)
+print_target_properties(Qt6::Concurrent)
+print_target_properties(Qt6::OpenGLWidgets)
 
 print_target_properties(img NO_LOCATION)
 
@@ -716,10 +718,10 @@ else (WIN32)
                               "-Wno-unused-parameter")
 
   if (APPLE)
-    message(STATUS "Qt5Core_INCLUDE_DIRS: ${Qt5Core_INCLUDE_DIRS}")
-    list(GET Qt5Core_INCLUDE_DIRS 0 Qt5Core_INCLUDE_DIRS0)
-    message(STATUS "Qt5Core_INCLUDE_DIRS0: ${Qt5Core_INCLUDE_DIRS0}")
-    set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt5Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
+    message(STATUS "Qt6Core_INCLUDE_DIRS: ${Qt6Core_INCLUDE_DIRS}")
+    list(GET Qt6Core_INCLUDE_DIRS 0 Qt6Core_INCLUDE_DIRS0)
+    message(STATUS "Qt6Core_INCLUDE_DIRS0: ${Qt6Core_INCLUDE_DIRS0}")
+    set_source_files_properties(ztheme.cpp PROPERTIES COMPILE_FLAGS "-isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}/QtCore -isystem ${Qt6Core_INCLUDE_DIRS0}/Headers/${QT_VERSION}")
 
     set(copyright_line "Copyright 2011-2019 Linqing Feng")
     set_target_properties(${APP_NAME} PROPERTIES
@@ -779,7 +781,8 @@ else (WIN32)
 endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
-                      img ${OpenCV_LIBS} Qt5::Core Qt5::Widgets Qt5::Network Qt5::Svg Qt5::Concurrent
+                      img ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+                      Qt6::OpenGLWidgets
                       assimp::assimp gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)

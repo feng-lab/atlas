@@ -294,7 +294,7 @@ int ZImgLeica::parseLIFVersion(const QString& xmlString) const
     }
     // If token is StartElement, we'll see if we can read it.
     if (token == QXmlStreamReader::StartElement) {
-      if (xml.name() != "LMSDataContainerHeader") {
+      if (xml.name() != QString("LMSDataContainerHeader")) {
         continue;
       }
 
@@ -435,7 +435,7 @@ void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std:
     }
     // If token is StartElement, we'll see if we can read it.
     if (token == QXmlStreamReader::StartElement) {
-      if (xml.name() != "LMSDataContainerHeader") {
+      if (xml.name() != QString("LMSDataContainerHeader")) {
         continue;
       }
 
@@ -452,10 +452,10 @@ void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std:
 
 void ZImgLeica::parseMetadata(QXmlStreamReader& xml, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
 {
-  CHECK(xml.isStartElement() && xml.name() == "LMSDataContainerHeader");
+  CHECK(xml.isStartElement() && xml.name() == QString("LMSDataContainerHeader"));
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Element") {
+    if (xml.name() == QString("Element")) {
       parseElement(xml, xmlDir, imageInfos);
     } else {
       xml.skipCurrentElement();
@@ -495,17 +495,17 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
 
   while (xml.readNextStartElement()) {
 
-    if (xml.name() == "Data") {
+    if (xml.name() == QString("Data")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Experiment") {
+        if (xml.name() == QString("Experiment")) {
           xml.skipCurrentElement();
-        } else if (xml.name() == "Image") {
+        } else if (xml.name() == QString("Image")) {
           while (xml.readNextStartElement()) {
-            if (xml.name() == "ImageDescription") {
+            if (xml.name() == QString("ImageDescription")) {
               while (xml.readNextStartElement()) {
-                if (xml.name() == "Channels") {
+                if (xml.name() == QString("Channels")) {
                   while (xml.readNextStartElement()) {
-                    if (xml.name() == "ChannelDescription") {
+                    if (xml.name() == QString("ChannelDescription")) {
                       ChannelDescription cd;
                       attributes = xml.attributes();
                       cd.dataType = attributes.value("DataType").toInt(&ok);
@@ -539,9 +539,9 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                     }
                     xml.skipCurrentElement();
                   }
-                } else if (xml.name() == "Dimensions") {
+                } else if (xml.name() == QString("Dimensions")) {
                   while (xml.readNextStartElement()) {
-                    if (xml.name() == "DimensionDescription") {
+                    if (xml.name() == QString("DimensionDescription")) {
                       DimensionDescription dd;
                       attributes = xml.attributes();
                       dd.dimID = attributes.value("DimID").toInt(&ok);
@@ -571,7 +571,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                   xml.skipCurrentElement();
                 }
               }
-            } else if (xml.name() == "TimeStampList") {
+            } else if (xml.name() == QString("TimeStampList")) {
               std::vector<uint64_t> values;
               attributes = xml.attributes();
               if (attributes.hasAttribute("NumberOfTimeStamps")) {
@@ -593,7 +593,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                 }
               } else {
                 while (xml.readNextStartElement()) {
-                  if (xml.name() == "TimeStamp") {
+                  if (xml.name() == QString("TimeStamp")) {
                     attributes = xml.attributes();
                     uint64_t highInteger = attributes.value("HighInteger").toULongLong(&ok);
                     if (!ok)
@@ -620,20 +620,20 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
               xml.skipCurrentElement();
             }
           }
-        } else if (xml.name() == "Collection") {
+        } else if (xml.name() == QString("Collection")) {
           xml.skipCurrentElement(); //todo: what is ChildTypeTest?
         } else {
           xml.skipCurrentElement();
         }
       }
-    } else if (xml.name() == "Memory") {
+    } else if (xml.name() == QString("Memory")) {
       attributes = xml.attributes();
       imageInfo.imageMemory.size = attributes.value("Size").toULongLong(&ok);
       if (!ok)
         throw ZIOException("Can not parse leica Memory Size");
       imageInfo.imageMemory.memoryBlockID = attributes.value("MemoryBlockID").toString();
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Block" || xml.name() == "Frame") {
+        if (xml.name() == QString("Block") || xml.name() == QString("Frame")) {
           attributes = xml.attributes();
           QString fp = QUrl::fromPercentEncoding(attributes.value("File").toString().toUtf8());
           fp.replace(QChar('\\'), QChar('/'));
@@ -651,11 +651,11 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
         xml.skipCurrentElement();
       }
       //LOG(INFO) << imageInfo.imageMemory.memoryBlockID;
-    } else if (xml.name() == "Children") {
+    } else if (xml.name() == QString("Children")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Element") {
+        if (xml.name() == QString("Element")) {
           parseElement(xml, xmlDir, imageInfos);
-        } else if (xml.name() == "Reference") {
+        } else if (xml.name() == QString("Reference")) {
           attributes = xml.attributes();
           if (attributes.hasAttribute("File")) {
             QString fp = QUrl::fromPercentEncoding(attributes.value("File").toString().toUtf8());

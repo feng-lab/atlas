@@ -6,7 +6,7 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QDir>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QtWidgets/QMessageBox>
 
 namespace nim {

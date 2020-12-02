@@ -249,7 +249,7 @@ void ZAnimationWidget::createWidget()
   m_timelineWidget = new ZTimelineWidget(m_animation, m_currentTime, this);
 
   auto vlo = new QVBoxLayout;
-  vlo->setMargin(0);
+  vlo->setContentsMargins(0, 0, 0, 0);
   vlo->setSpacing(0);
   vlo->addLayout(hlo);
   vlo->addWidget(m_timelineWidget);

@@ -270,17 +270,17 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setStyleSheet("border-style: none;");
 #endif
 
-  m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X), this);
+  m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_X), this);
   connect(m_rotateXShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateX);
-  m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y), this);
+  m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Y), this);
   connect(m_rotateYShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateY);
-  m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z), this);
+  m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Z), this);
   connect(m_rotateZShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZ);
-  m_rotateXMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X + Qt::SHIFT), this);
+  m_rotateXMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_X)), this);
   connect(m_rotateXMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateXM);
-  m_rotateYMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y + Qt::SHIFT), this);
+  m_rotateYMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Y)), this);
   connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
-  m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
+  m_rotateZMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Z)), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
@@ -312,7 +312,7 @@ void Z3DCanvas::contextMenuEvent(QContextMenuEvent* event)
   broadcastEvent(event, width(), height());
 }
 
-void Z3DCanvas::enterEvent(QEvent* e)
+void Z3DCanvas::enterEvent(QEnterEvent* e)
 {
   broadcastEvent(e, width(), height());
 }

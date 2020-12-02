@@ -1,8 +1,5 @@
 #include "sources/contentiterator.h"
 
-#include <QString>
-#include <QStringList>
-
 #include "include/qtcsv/abstractdata.h"
 #include "sources/symbols.h"
 

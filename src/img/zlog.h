@@ -89,8 +89,13 @@ inline std::ostream& operator<<(std::ostream& s, const QByteArray& q)
 inline std::ostream& operator<<(std::ostream& s, const QString& q)
 { return (s << q.toUtf8().constData()); }
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+inline std::ostream& operator<<(std::ostream& s, const QStringView& q)
+{ return (s << q.toUtf8().constData()); }
+#else
 inline std::ostream& operator<<(std::ostream& s, const QStringRef& q)
 { return (s << q.toUtf8().constData()); }
+#endif
 
 template<class T, std::size_t N>
 inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
@@ -101,11 +106,19 @@ inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
 
 inline void logLongString(const QString& q)
 {
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+  for (qsizetype i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
+    int length = std::min(qsizetype(10000), q.size() - i);
+    QStringView qView(q.data() + i, length);
+    LOG(INFO) << qView;
+  }
+#else
   for (int i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
     int length = std::min(10000, q.size() - i);
     QStringRef qRef(&q, i, length);
     LOG(INFO) << qRef;
   }
+#endif
 }
 
 template<typename T>
@@ -143,11 +156,13 @@ inline std::ostream& operator<<(std::ostream& s, const QList<T>& list)
   return (s << qtTypeToQString(list).toUtf8().constData());
 }
 
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
 template<typename T>
 inline std::ostream& operator<<(std::ostream& s, const QVector<T>& vec)
 {
   return (s << qtTypeToQString(vec).toUtf8().constData());
 }
+#endif
 
 template<typename T, typename Alloc>
 inline std::ostream& operator<<(std::ostream& s, const std::vector<T, Alloc>& vec)
@@ -185,11 +200,13 @@ inline std::ostream& operator<<(std::ostream& s, const QHash<Key, T>& hash)
   return (s << qtTypeToQString(hash).toUtf8().constData());
 }
 
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
 template<class T1, class T2>
 inline std::ostream& operator<<(std::ostream& s, const QPair<T1, T2>& pair)
 {
   return (s << qtTypeToQString(pair).toUtf8().constData());
 }
+#endif
 
 template<class T1, class T2>
 inline std::ostream& operator<<(std::ostream& s, const std::pair<T1, T2>& pair)

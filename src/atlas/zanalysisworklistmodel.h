@@ -9,7 +9,7 @@
 #include <QStringList>
 #include <QModelIndex>
 #include <QMimeData>
-#include <QTextCodec>
+#include <QStringConverter>
 #include <map>
 
 namespace nim {
@@ -22,10 +22,10 @@ public:
 
   explicit ZAnalysisWorklistModel(const QString& filename, QObject* parent = nullptr);
 
-  QString setSource(const QString& filename, QTextCodec* codec = QTextCodec::codecForName("UTF-8"));
+  QString setSource(const QString& filename, QStringConverter::Encoding encoding = QStringConverter::Utf8);
 
   QString toCSV(const QString& filename, bool withHeader = true, QChar separator = ',',
-                QTextCodec* codec = QTextCodec::codecForName("UTF-8")) const;
+                QStringConverter::Encoding encoding = QStringConverter::Utf8) const;
 
   int rowCount(const QModelIndex& parent = QModelIndex()) const;
 

@@ -319,7 +319,7 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
   e->ignore();
   // Mouse button pressend
   if (e->type() == QEvent::MouseButtonPress) {
-    m_lastMousePosition = glm::ivec2(e->x(), e->y());
+    m_lastMousePosition = glm::ivec2(e->position().x(), e->position().y());
     const void* obj = pickingManager().objectAtWidgetPos(m_lastMousePosition);
     int handleIdx = selectedHandle(obj);
     if (handleIdx == 0)
@@ -329,15 +329,15 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
     m_startTrans = m_rendererBase.coordTransformPara().translation();
     if (handleIdx == 1) {
       m_startDepth = camera().worldToScreen(m_center, viewport).z;
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->x(), h - e->y(), m_startDepth), viewport);
+      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth), viewport);
     } else {
       GLfloat WindowPosZ;
       pickingManager().bindTarget();
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
-      glReadPixels(e->x(), h - e->y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
+      glReadPixels(e->x(), h - e->position().y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
       pickingManager().releaseTarget();
       CHECK_GL_ERROR
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->x(), h - e->y(), WindowPosZ), viewport);
+      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ), viewport);
     }
     e->accept();
     return;
@@ -347,12 +347,12 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
     if (m_selectedHandle == 0)
       return;
     if (m_selectedHandle == 1) {
-      glm::vec3 endInWorld = camera().screenToWorld(glm::vec3(glm::vec2(e->x(), h - e->y()), m_startDepth),
+      glm::vec3 endInWorld = camera().screenToWorld(glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
                                                     glm::ivec4(0, 0, w, h));
       m_rendererBase.coordTransformPara().setTranslation(m_startTrans + endInWorld - m_startMouseWorldPos);
     } else {
       glm::vec3 v1, v2;
-      rayUnderScreenPoint(v1, v2, e->x(), e->y(), w, h);
+      rayUnderScreenPoint(v1, v2, e->position().x(), e->position().y(), w, h);
       v2 -= v1;
       gte::Ray<3, float> ray(gte::Vector<3, float>
       { v1.x, v1.y, v1.z }, gte::Vector<3, float>{v2.x, v2.y, v2.z});
@@ -374,7 +374,7 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
       }
     }
-    m_lastMousePosition = glm::ivec2(e->x(), e->y());
+    m_lastMousePosition = glm::ivec2(e->position().x(), e->position().y());
     return;
   }
 

@@ -27,8 +27,6 @@ ZTheme::ZTheme()
   m_iconFiles.resize(m_icons.size());
 
   updateTheme();
-
-  connect(qApp, &QApplication::paletteChanged, this, &ZTheme::updateTheme);
 }
 
 void ZTheme::updateTheme()
@@ -40,6 +38,14 @@ void ZTheme::updateTheme()
 #endif
   LOG(INFO) << "Current Theme: " << m_currentTheme;
   loadTheme(QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme));
+}
+
+bool ZTheme::event(QEvent* event)
+{
+  if (event->type() == QEvent::ApplicationPaletteChange) {
+    updateTheme();
+  }
+  return QObject::event(event);
 }
 
 void ZTheme::loadTheme(const QString& fn)

@@ -78,7 +78,7 @@ ZTimelineWidget::ZTimelineWidget(ZAnimation& ani, ZDoubleParameter* currentTimeP
 
   auto lo = new QGridLayout;
   lo->setSpacing(0);
-  lo->setMargin(0);
+  lo->setContentsMargins(0, 0, 0, 0);
   lo->addLayout(hlo, 0, 0);
   lo->addWidget(m_axis, 0, 1);
   lo->addWidget(m_objView, 1, 0);

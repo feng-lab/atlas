@@ -22,14 +22,14 @@ ZAnalysisWorklistModel::ZAnalysisWorklistModel(const QString& filename, QObject*
   setSource(filename);
 }
 
-QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* codec)
+QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConverter::Encoding encoding)
 {
   QStringList res;
   beginResetModel();
 
   reset();
 
-  QList<QStringList> allLines = QtCSV::Reader::readToList(filename, QString(","), QString("\""), codec);
+  QList<QStringList> allLines = QtCSV::Reader::readToList(filename, QString(","), QString("\""), encoding);
   if (!allLines.empty()) {
     for (const auto& list: allLines) {
       if (list.empty() || list.at(0).startsWith("#")) {
@@ -122,7 +122,7 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QTextCodec* c
   return res.join("\n");
 }
 
-QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, QChar separator, QTextCodec* codec) const
+QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, QChar separator, QStringConverter::Encoding encoding) const
 {
   QtCSV::VariantData vd;
   if (withHeader) {
@@ -151,7 +151,7 @@ QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, 
     }
   }
   if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(),
-                            codec)) {
+                            encoding)) {
     return QString("Can not write csv to file (%1).").arg(filename);
   }
   return QString();

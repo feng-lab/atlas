@@ -6,7 +6,7 @@ namespace nim {
 
 QWidget* ZItemEditorFactory::createEditor(int type, QWidget* parent) const
 {
-  if (type == QVariant::Double) {
+  if (type == QMetaType::Double) {
     auto sb = new QDoubleSpinBox(parent);
     sb->setFrame(false);
     sb->setDecimals(10);

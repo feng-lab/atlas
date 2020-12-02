@@ -1,7 +1,7 @@
-#include <CGLRenderers.h>
-#include <CGLTypes.h>
-#include <CGLCurrent.h>
-#include <OpenGL.h>
+#include <OpenGL/CGLRenderers.h>
+#include <OpenGL/CGLTypes.h>
+#include <OpenGL/CGLCurrent.h>
+#include <OpenGL/OpenGL.h>
 #include <iostream>
 #include "zlog.h"
 

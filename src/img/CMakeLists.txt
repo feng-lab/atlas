@@ -363,7 +363,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen Boost::headers
                       GeometricTools glm::glm range-v3::range-v3
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
-                      glog::glog Qt5::Core Qt5::Gui)
+                      glog::glog ${_QT_LIBS_})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)

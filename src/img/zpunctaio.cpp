@@ -309,7 +309,9 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
     throw ZIOException("Can not read file.");
 
   QTextStream stream(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   stream.setCodec("UTF-8");
+#endif
   while (!stream.atEnd()) {
     QString line = stream.readLine().trimmed();
     if (stream.status() != QTextStream::Ok) {
@@ -399,7 +401,9 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) cons
     throw ZIOException("Can not open file.");
 
   QTextStream out(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   out.setCodec("UTF-8");
+#endif
   size_t idx = 0;
   out
     << "#id, , name, comment, z, x, y, maxIntensity, meanIntensity, sDevOfIntensity, volSize, mass, property1, property2, property3, red, green, blue\n";
@@ -427,7 +431,9 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
     throw ZIOException("Can not read file.");
 
   QTextStream stream(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   stream.setCodec("UTF-8");
+#endif
   while (!stream.atEnd()) {
     QString line = stream.readLine().trimmed();
     if (stream.status() != QTextStream::Ok) {
@@ -513,7 +519,9 @@ void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file) const
     throw ZIOException("Can not open file.");
 
   QTextStream out(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   out.setCodec("UTF-8");
+#endif
   out << "# x y z radius\n";
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");

@@ -148,10 +148,10 @@ QVariant QxtCsvModel::headerData(int section, Qt::Orientation orientation, int r
 
   Reads in a CSV file from the provided \a file using \a codec.
   */
-void QxtCsvModel::setSource(const QString filename, bool withHeader, QChar separator, QTextCodec* codec)
+void QxtCsvModel::setSource(const QString filename, bool withHeader, QChar separator, QStringConverter::Encoding encoding)
 {
     QFile src(filename);
-    setSource(&src, withHeader, separator, codec);
+    setSource(&src, withHeader, separator, encoding);
 }
 
 /*!
@@ -163,7 +163,7 @@ void QxtCsvModel::setSource(const QString filename, bool withHeader, QChar separ
 
   \sa quoteMode
   */
-void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, QTextCodec* codec)
+void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, QStringConverter::Encoding encoding)
 {
     QxtCsvModelPrivate* d_ptr = &qxt_d();
     bool headerSet = !withHeader;
@@ -180,8 +180,8 @@ void QxtCsvModel::setSource(QIODevice *file, bool withHeader, QChar separator, Q
     QChar ch, buffer(0);
     bool readCR = false;
     QTextStream stream(file);
-    if(codec) {
-        stream.setCodec(codec);
+    if(encoding != QStringConverter::Utf8) {
+        stream.setEncoding(encoding);
     } else {
         stream.setAutoDetectUnicode(true);
     }
@@ -434,7 +434,7 @@ static QString qxt_addCsvQuotes(QxtCsvModel::QuoteMode mode, QString field)
   Fields in the output file will be separated by \a separator. Set \a withHeader to true
   to output a row of headers at the top of the file.
  */
-void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QTextCodec* codec) const
+void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QStringConverter::Encoding encoding) const
 {
     const QxtCsvModelPrivate& d_ptr = qxt_d();
     int row, col, rows, cols;
@@ -443,7 +443,7 @@ void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QText
     QString data;
     if(!dest->isOpen()) dest->open(QIODevice::WriteOnly | QIODevice::Truncate);
     QTextStream stream(dest);
-    if(codec) stream.setCodec(codec);
+    if(encoding != QStringConverter::Utf8) stream.setEncoding(encoding);
     if(withHeader) {
         data = "";
         for(col = 0; col < cols; ++col) {
@@ -477,10 +477,10 @@ void QxtCsvModel::toCSV(QIODevice* dest, bool withHeader, QChar separator, QText
   Fields in the output file will be separated by \a separator. Set \a withHeader to true
   to output a row of headers at the top of the file.
  */
-void QxtCsvModel::toCSV(const QString filename, bool withHeader, QChar separator, QTextCodec* codec) const
+void QxtCsvModel::toCSV(const QString filename, bool withHeader, QChar separator, QStringConverter::Encoding encoding) const
 {
     QFile dest(filename);
-    toCSV(&dest, withHeader, separator, codec);
+    toCSV(&dest, withHeader, separator, encoding);
 }
 
 /*!

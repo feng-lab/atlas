@@ -39,7 +39,6 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
         QString("Can not open vertex shader file: %1.  Error String: %2").arg(filename).arg(file.errorString()));
     }
     QTextStream fileStream(&file);
-    fileStream.setCodec("UTF-8");
     QString src = header + fileStream.readAll();
 
     CHECK(context == Z3DContextGroup());

@@ -57,7 +57,6 @@ void Z3DSDFont::parseFontFile()
     return;
 
   QTextStream stream(&qFile);
-  stream.setCodec("UTF-8");
   int numCharFromFile = 0;
   while (!stream.atEnd()) {
     QString line = stream.readLine();

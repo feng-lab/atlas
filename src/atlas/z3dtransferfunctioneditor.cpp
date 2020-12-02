@@ -74,7 +74,7 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
 
 void Z3DTransferFunctionWidget::showNoKeyContextMenu(QMouseEvent* event)
 {
-  m_noKeyContextMenu.popup(event->globalPos());
+  m_noKeyContextMenu.popup(event->globalPosition().toPoint());
 }
 
 void Z3DTransferFunctionWidget::showKeyContextMenu(QMouseEvent* event, size_t selectedKeyIndex)
@@ -91,7 +91,7 @@ void Z3DTransferFunctionWidget::showKeyContextMenu(QMouseEvent* event, size_t se
     m_changeIntensityAction->setEnabled(true);
   }
 
-  m_keyContextMenu.popup(event->globalPos());
+  m_keyContextMenu.popup(event->globalPosition().toPoint());
 }
 
 void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
@@ -286,7 +286,7 @@ void Z3DTransferFunctionWidget::mousePressEvent(QMouseEvent* event)
   if (selectedKey)
     m_transferFunction->get().setKeySelected(selectedKeyIndex, true);
 
-  glm::dvec2 sHit = glm::dvec2(event->x(), event->y());
+  glm::dvec2 sHit = glm::dvec2(event->position().x(), event->position().y());
   glm::dvec2 hit = pixelToRelativeCoordinates(sHit);
 
   if (event->button() == Qt::RightButton) {
@@ -320,7 +320,7 @@ void Z3DTransferFunctionWidget::mouseMoveEvent(QMouseEvent* event)
 {
   event->accept();
 
-  glm::dvec2 sHit = glm::dvec2(event->x(), event->y());
+  glm::dvec2 sHit = glm::dvec2(event->position().x(), event->position().y());
   glm::dvec2 hit = pixelToRelativeCoordinates(sHit);
 
   // return when no key was inserted or selected
@@ -839,7 +839,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
 
   // put widgets in layout
   auto vBox = new QVBoxLayout();
-  vBox->setMargin(0);
+  vBox->setContentsMargins(0, 0, 0, 0);
   vBox->setSpacing(1);
   vBox->addStretch();
   vBox->addWidget(m_transferFunctionWidget, 1);
@@ -859,7 +859,7 @@ void Z3DTransferFunctionEditor::createWidgets()
 {
   QLayout* mappingLayout = createMappingLayout();
 
-  mappingLayout->setMargin(5);
+  mappingLayout->setContentsMargins(5, 5, 5, 5);
   setLayout(mappingLayout);
 }
 

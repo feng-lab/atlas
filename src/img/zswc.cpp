@@ -106,7 +106,9 @@ void ZSwc::load(const QString& filename)
     std::map<int, SwcNode> nodeMap;
 
     QTextStream stream(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     stream.setCodec("UTF-8");
+#endif
     while (!stream.atEnd()) {
       QString line = stream.readLine().trimmed();
       if (stream.status() != QTextStream::Ok) {
@@ -186,7 +188,9 @@ void ZSwc::save(const QString& filename) const
       throw ZIOException("Can not open file.");
 
     QTextStream out(&qFile);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     out.setCodec("UTF-8");
+#endif
     out << "#id type x y z radius parentID\n";
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");

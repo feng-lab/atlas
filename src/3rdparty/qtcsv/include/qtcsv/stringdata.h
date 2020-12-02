@@ -4,8 +4,8 @@
 #include "qtcsv/qtcsv_global.h"
 #include "qtcsv/abstractdata.h"
 
-class QString;
-class QStringList;
+#include <QString>
+#include <QStringList>
 
 namespace QtCSV
 {

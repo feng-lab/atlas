@@ -17,7 +17,7 @@ inline void toVal(const QString& str, QColor& v)
 {
   QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
-  for (int i = 0; i < std::min(4, numList.size()); ++i) {
+  for (qsizetype i = 0; i < std::min(qsizetype(4), numList.size()); ++i) {
     int c;
     toVal(numList[i], c);
     if (i == 0) {

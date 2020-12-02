@@ -484,7 +484,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
     const void* obj = pickingManager().objectAtWidgetPos(
-      glm::ivec2(e->x(), e->y()));
+      glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       emit objDeselected();
@@ -510,9 +510,9 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
   // Mouse button pressend
   // can not accept the event in button press, because we don't know if it is a selection or interaction
   if (e->type() == QEvent::MouseButtonPress) {
-    m_startCoord.x = e->x();
-    m_startCoord.y = e->y();
-    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->x(), e->y()));
+    m_startCoord.x = e->position().x();
+    m_startCoord.y = e->position().y();
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
     if (!obj) {
       return;
     }
@@ -528,7 +528,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
-    if (std::abs(e->x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->y()) < 2) {
+    if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
       emit punctumSelected(m_pressedPunctum, e->modifiers() == Qt::ControlModifier);
       if (m_pressedPunctum) {
         e->accept();

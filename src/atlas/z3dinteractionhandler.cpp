@@ -294,7 +294,7 @@ void Z3DTrackballInteractionHandler::keyRollEvent(QKeyEvent* e, int /*unused*/, 
 
 void Z3DTrackballInteractionHandler::mousePressEvent(QMouseEvent* e, int /*unused*/, int h)
 {
-  m_lastMousePosition = glm::ivec2(e->x(), h - e->y());
+  m_lastMousePosition = glm::ivec2(e->position().x(), h - e->position().y());
   m_lastCenterDistance = m_camera->get().centerDist();
   e->ignore();
 }
@@ -309,7 +309,7 @@ void Z3DTrackballInteractionHandler::mouseMoveEvent(QMouseEvent* e, int w, int h
 {
   e->ignore();
 
-  glm::ivec2 newMouse(e->x(), h - e->y());
+  glm::ivec2 newMouse(e->position().x(), h - e->position().y());
 
   if (m_state == State::Rotate) {
     rotate(m_lastMousePosition, newMouse, w, h);

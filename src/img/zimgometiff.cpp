@@ -166,7 +166,7 @@ void ZImgOmeTiff::readOmeInfo(ZTiff& tiff)
     }
     // If token is StartElement, we'll see if we can read it.
     if (token == QXmlStreamReader::StartElement) {
-      if (xml.name() != "OME") {
+      if (xml.name() != QString("OME")) {
         continue;
       }
       parseOME(xml, tiff);
@@ -193,12 +193,12 @@ void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& d
 
 void ZImgOmeTiff::parseOME(QXmlStreamReader& xml, ZTiff& tiff)
 {
-  CHECK(xml.isStartElement() && xml.name() == "OME");
+  CHECK(xml.isStartElement() && xml.name() == QString("OME"));
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Image") {
+    if (xml.name() == QString("Image")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Pixels") {
+        if (xml.name() == QString("Pixels")) {
           parsePixels(xml, tiff);
         } else {
           xml.skipCurrentElement();
@@ -327,9 +327,9 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
   }
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "TiffData") {
+    if (xml.name() == QString("TiffData")) {
       parseTiffData(xml, tiff);
-    } else if (xml.name() == "Channel") {
+    } else if (xml.name() == QString("Channel")) {
       parseChannel(xml);
     } else {
       xml.skipCurrentElement();
@@ -422,7 +422,9 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
 {
   QByteArray res;  // no " encoding="UTF-8" " if use QString
   QXmlStreamWriter xml(&res);
+#if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   xml.setCodec("UTF-8");
+#endif
   xml.writeStartDocument();
 
   xml.writeStartElement("OME");

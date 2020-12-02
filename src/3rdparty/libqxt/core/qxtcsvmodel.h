@@ -39,7 +39,7 @@
 #include <QStringList>
 #include <QModelIndex>
 #include <qxtglobal.h>
-class QTextCodec;
+#include <QStringConverter>
 
 class QxtCsvModelPrivate;
 class QXT_CORE_EXPORT QxtCsvModel : public QAbstractTableModel
@@ -73,14 +73,14 @@ public:
     bool removeColumn(int col, const QModelIndex& parent = QModelIndex());
     bool removeColumns(int col, int count, const QModelIndex& parent = QModelIndex());
 
-    void setSource(QIODevice *file, bool withHeader = false, QChar separator = ',', QTextCodec* codec = 0);
-    void setSource(const QString filename, bool withHeader = false, QChar separator = ',', QTextCodec* codec = 0);
+    void setSource(QIODevice *file, bool withHeader = false, QChar separator = ',', QStringConverter::Encoding encoding = QStringConverter::Utf8);
+    void setSource(const QString filename, bool withHeader = false, QChar separator = ',', QStringConverter::Encoding encoding = QStringConverter::Utf8);
 
-    void toCSV(QIODevice *file, bool withHeader = false, QChar separator = ',', QTextCodec* codec = 0) const;
-    void toCSV(const QString filename, bool withHeader = false, QChar separator = ',', QTextCodec* codec = 0) const;
+    void toCSV(QIODevice *file, bool withHeader = false, QChar separator = ',', QStringConverter::Encoding encoding = QStringConverter::Utf8) const;
+    void toCSV(const QString filename, bool withHeader = false, QChar separator = ',', QStringConverter::Encoding encoding = QStringConverter::Utf8) const;
 
     enum QuoteOption { NoQuotes = 0, SingleQuote = 1, DoubleQuote = 2, BothQuotes = 3,
-                       NoEscape = 0, TwoQuoteEscape = 4, BackslashEscape = 8, 
+                       NoEscape = 0, TwoQuoteEscape = 4, BackslashEscape = 8,
                        AlwaysQuoteOutput = 16, DefaultQuoteMode = BothQuotes | BackslashEscape | AlwaysQuoteOutput };
     Q_DECLARE_FLAGS(QuoteMode, QuoteOption)
     QuoteMode quoteMode() const;

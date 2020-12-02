@@ -993,7 +993,7 @@ void ZImgZeissCZI::readCZIInfo(const QString& xmlString)
     }
     // If token is StartElement, we'll see if we can read it.
     if (token == QXmlStreamReader::StartElement) {
-      if (xml.name() != "Metadata") {
+      if (xml.name() != QString("Metadata")) {
         continue;
       }
       parseMetadata(xml);
@@ -1009,28 +1009,28 @@ void ZImgZeissCZI::readCZIInfo(const QString& xmlString)
 
 void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
 {
-  CHECK(xml.isStartElement() && xml.name() == "Metadata");
+  CHECK(xml.isStartElement() && xml.name() == QString("Metadata"));
 
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Information") {
+    if (xml.name() == QString("Information")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Image") {
+        if (xml.name() == QString("Image")) {
           while (xml.readNextStartElement()) {
-            if (xml.name() == "Dimensions") {
+            if (xml.name() == QString("Dimensions")) {
               while (xml.readNextStartElement()) {
-                if (xml.name() == "Channels") {
+                if (xml.name() == QString("Channels")) {
                   while (xml.readNextStartElement()) {
-                    if (xml.name() == "Channel") {
+                    if (xml.name() == QString("Channel")) {
                       parseChannel(xml);
                     } else {
                       xml.skipCurrentElement();
                     }
                   }
-                } else if (xml.name() == "S") {
+                } else if (xml.name() == QString("S")) {
                   while (xml.readNextStartElement()) {
-                    if (xml.name() == "Scenes") {
+                    if (xml.name() == QString("Scenes")) {
                       while (xml.readNextStartElement()) {
-                        if (xml.name() == "Scene") {
+                        if (xml.name() == QString("Scene")) {
                           parseScene(xml);
                         } else {
                           xml.skipCurrentElement();
@@ -1052,11 +1052,11 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
           xml.skipCurrentElement();
         }
       }
-    } else if (xml.name() == "Scaling") {
+    } else if (xml.name() == QString("Scaling")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Items") {
+        if (xml.name() == QString("Items")) {
           while (xml.readNextStartElement()) {
-            if (xml.name() == "Distance") {
+            if (xml.name() == QString("Distance")) {
               parseDistance(xml);
             } else {
               xml.skipCurrentElement();
@@ -1066,11 +1066,11 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
           xml.skipCurrentElement();
         }
       }
-    } else if (xml.name() == "DisplaySetting") {
+    } else if (xml.name() == QString("DisplaySetting")) {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Channels") {
+        if (xml.name() == QString("Channels")) {
           while (xml.readNextStartElement()) {
-            if (xml.name() == "Channel") {
+            if (xml.name() == QString("Channel")) {
               parseDisplaySettingChannel(xml);
             } else {
               xml.skipCurrentElement();
@@ -1155,7 +1155,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
 
   bool ok;
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Color") {
+    if (xml.name() == QString("Color")) {
       QString colorStr = xml.readElementText();
       if (colorStr.startsWith("#")) {
         colorStr = colorStr.mid(1);
@@ -1174,7 +1174,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
           LOG(WARNING) << "can not parse czi channel color " << colorStr;
         }
       }
-    } else if (xml.name() == "PixelType") {
+    } else if (xml.name() == QString("PixelType")) {
       QString pixelTypeStr = xml.readElementText();
       if (pixelTypeStr.isEmpty()) {
         throw ZIOException("Can not parse czi channel pixel type");
@@ -1204,7 +1204,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
         throw ZIOException(QString("Not supported czi pixel type: %1").arg(pixelTypeStr));
       }
       hasPixelType = true;
-    } else if (xml.name() == "ComponentBitCount") {
+    } else if (xml.name() == QString("ComponentBitCount")) {
       bc = xml.readElementText().toInt(&ok);
       if (!ok)
         throw ZIOException("Can not parse czi bit count");
@@ -1231,7 +1231,7 @@ void ZImgZeissCZI::parseScene(QXmlStreamReader& xml)
 
   bool ok;
   while (xml.readNextStartElement()) {
-    if (xml.name() == "CenterPosition") {
+    if (xml.name() == QString("CenterPosition")) {
       QString centerPositionStr = xml.readElementText();
       QStringList nums = centerPositionStr.split(",");
       if (nums.size() != 2)
@@ -1257,7 +1257,7 @@ void ZImgZeissCZI::parseDistance(QXmlStreamReader& xml)
     bool ok;
     if (attributes.value("Id").toString() == "X") {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
+        if (xml.name() == QString("Value")) {
           m_voxelSizeX = xml.readElementText().toDouble(&ok);
           if (!ok)
             throw ZIOException("Can not parse Distance X");
@@ -1267,7 +1267,7 @@ void ZImgZeissCZI::parseDistance(QXmlStreamReader& xml)
       }
     } else if (attributes.value("Id").toString() == "Y") {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
+        if (xml.name() == QString("Value")) {
           m_voxelSizeY = xml.readElementText().toDouble(&ok);
           if (!ok)
             throw ZIOException("Can not parse Distance Y");
@@ -1277,7 +1277,7 @@ void ZImgZeissCZI::parseDistance(QXmlStreamReader& xml)
       }
     } else if (attributes.value("Id").toString() == "Z") {
       while (xml.readNextStartElement()) {
-        if (xml.name() == "Value") {
+        if (xml.name() == QString("Value")) {
           m_voxelSizeZ = xml.readElementText().toDouble(&ok);
           if (!ok)
             throw ZIOException("Can not parse Distance Z");
@@ -1306,7 +1306,7 @@ void ZImgZeissCZI::parseDisplaySettingChannel(QXmlStreamReader& xml)
 
   bool ok;
   while (xml.readNextStartElement()) {
-    if (xml.name() == "Color") {
+    if (xml.name() == QString("Color")) {
       QString colorStr = xml.readElementText();
       if (colorStr.startsWith("#")) {
         colorStr = colorStr.mid(1);
