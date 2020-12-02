@@ -12,10 +12,10 @@ uint64_t getDedicatedVideoMemoryMB()
 
   if (cmd.waitForFinished(-1)) {
     QString output(cmd.readAllStandardOutput());
-    QStringList gpuInfos = output.split(QChar('\n'), QString::SkipEmptyParts);
+    QStringList gpuInfos = output.split(QChar('\n'), Qt::SkipEmptyParts);
     for (const auto& gpuInfo : gpuInfos) {
       LOG(INFO) << gpuInfo;
-      QStringList gInfo = gpuInfo.split(QChar(' '), QString::SkipEmptyParts);
+      QStringList gInfo = gpuInfo.split(QChar(' '), Qt::SkipEmptyParts);
       for (int i = 0; i < gInfo.size(); ++i) {
         if (QString::compare(gInfo[i], "kBytes", Qt::CaseInsensitive) == 0 ||
             QString::compare(gInfo[i], "kByte", Qt::CaseInsensitive) == 0) {

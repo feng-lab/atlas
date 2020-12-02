@@ -73,7 +73,7 @@ print_target_properties(benchmark::benchmark)
 #             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 #message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
 
-find_package(ASSIMP REQUIRED
+find_package(assimp REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(assimp::assimp)
 

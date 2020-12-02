@@ -2190,7 +2190,8 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
 
     build_all = True
     for lib in libs:
-        build_all = build_all and libs[lib]
+        if lib not in lib_skip_list:
+            build_all = build_all and libs[lib]
     if build_all:
         shutil.rmtree(ext_build_dir(), ignore_errors=True)
 

@@ -409,7 +409,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
     if (!ok)
       throw ZIOException("Can not parse ome channel Color");
     col4 col;
-    std::memcpy(&col, &color, 3);
+    std::memcpy(static_cast<void*>(&col), &color, 3);
     std::swap(col.r, col.b);
     col.a = 255;
     m_omeImgInfo.channelColors.push_back(col);

@@ -50,8 +50,8 @@ aiMesh* createAIMesh(const ZMesh& mesh)
   const std::vector<glm::vec3>& vertices = mesh.vertices();
   const std::vector<glm::vec3>& normals = mesh.normals();
   CHECK(normals.size() >= vertices.size());
-  std::memcpy(pMesh->mVertices, vertices.data(), sizeof(float) * 3 * vertices.size());
-  std::memcpy(pMesh->mNormals, normals.data(), sizeof(float) * 3 * vertices.size());
+  std::memcpy(static_cast<void*>(pMesh->mVertices), vertices.data(), sizeof(float) * 3 * vertices.size());
+  std::memcpy(static_cast<void*>(pMesh->mNormals), normals.data(), sizeof(float) * 3 * vertices.size());
 
   return pMesh;
 }

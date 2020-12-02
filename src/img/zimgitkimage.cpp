@@ -417,7 +417,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
             if (!ok)
               throw ZIOException("Can not parse nd2 channel Color");
             col4 col;
-            std::memcpy(&col, &color, 3);
+            std::memcpy(static_cast<void*>(&col), &color, 3);
             col.a = 255;
             info.channelColors[ch] = col;
             break;
