@@ -86,7 +86,7 @@ void readOntology(const QJsonObject& obj, ZTree<RegionNode>::Iterator& parentIt,
       children = it.value().toArray();
     }
   }
-  if (!ontology.isNull(parentIt)) {
+  if (!ZTree<RegionNode>::isNull(parentIt)) {
     if (node.parentID != parentIt->id) {
       throw ZIOException(
         QString("node %1 has wrong parent id %2 (should be %3)").arg(node.id).arg(node.parentID).arg(parentIt->id));
@@ -172,7 +172,6 @@ int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNo
     }
   }
   throw ZException(QString("can not find region %1").arg(abbreviation));
-  return 0;
 }
 
 std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology)

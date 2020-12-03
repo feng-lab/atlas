@@ -82,14 +82,14 @@ public:
 
   void save(H5::Group& allGrp) const;
 
-  ZBBox<glm::dvec3> boundBox() const;
+  [[nodiscard]] ZBBox<glm::dvec3> boundBox() const;
 
-  ZBBox<glm::dvec3> boundBox(const glm::mat4& transform) const;
+  [[nodiscard]] ZBBox<glm::dvec3> boundBox(const glm::mat4& transform) const;
 
-  GLenum type() const
+  [[nodiscard]] GLenum type() const
   { return m_type; }
 
-  QString typeAsString() const;
+  [[nodiscard]] QString typeAsString() const;
 
   void setType(GLenum type)
   {
@@ -97,35 +97,35 @@ public:
     CHECK(m_type == GL_TRIANGLES || m_type == GL_TRIANGLE_FAN || m_type == GL_TRIANGLE_STRIP);
   }
 
-  const std::vector<glm::vec3>& vertices() const
+  [[nodiscard]] const std::vector<glm::vec3>& vertices() const
   { return m_vertices; }
 
   void setVertices(const std::vector<glm::vec3>& vertices)
   { m_vertices = vertices; }
 
-  std::vector<glm::dvec3> doubleVertices() const;
+  [[nodiscard]] std::vector<glm::dvec3> doubleVertices() const;
 
   void setVertices(const std::vector<glm::dvec3>& vertices);
 
-  const std::vector<float>& textureCoordinates1D() const
+  [[nodiscard]] const std::vector<float>& textureCoordinates1D() const
   { return m_1DTextureCoordinates; }
 
   void setTextureCoordinates(const std::vector<float>& textureCoordinates)
   { m_1DTextureCoordinates = textureCoordinates; }
 
-  const std::vector<glm::vec2>& textureCoordinates2D() const
+  [[nodiscard]] const std::vector<glm::vec2>& textureCoordinates2D() const
   { return m_2DTextureCoordinates; }
 
   void setTextureCoordinates(const std::vector<glm::vec2>& textureCoordinates)
   { m_2DTextureCoordinates = textureCoordinates; }
 
-  const std::vector<glm::vec3>& textureCoordinates3D() const
+  [[nodiscard]] const std::vector<glm::vec3>& textureCoordinates3D() const
   { return m_3DTextureCoordinates; }
 
   void setTextureCoordinates(const std::vector<glm::vec3>& textureCoordinates)
   { m_3DTextureCoordinates = textureCoordinates; }
 
-  const std::vector<glm::vec3>& normals() const
+  [[nodiscard]] const std::vector<glm::vec3>& normals() const
   { return m_normals; }
 
   void setNormals(const std::vector<glm::vec3>& normals)
@@ -133,66 +133,66 @@ public:
 
   void setNormals(const std::vector<glm::dvec3>& normals);
 
-  const std::vector<glm::vec4>& colors() const
+  [[nodiscard]] const std::vector<glm::vec4>& colors() const
   { return m_colors; }
 
   void setColors(const std::vector<glm::vec4>& colors)
   { m_colors = colors; }
 
-  const std::vector<GLuint>& indices() const
+  [[nodiscard]] const std::vector<GLuint>& indices() const
   { return m_indices; }
 
   void setIndices(const std::vector<GLuint>& indices)
   { m_indices = indices; }
 
-  bool hasIndices() const
+  [[nodiscard]] bool hasIndices() const
   { return !m_indices.empty(); }
 
   // use ref to interpolate texture coordinate and colors. all vertices should be on ref surface
   void interpolate(const ZMesh& ref);
 
   // return true if no vertex
-  bool empty() const
+  [[nodiscard]] bool empty() const
   { return m_vertices.empty(); }
 
   void clear();
 
-  size_t numVertices() const
+  [[nodiscard]] size_t numVertices() const
   { return m_vertices.size(); }
 
-  size_t numTriangles() const;
+  [[nodiscard]] size_t numTriangles() const;
 
-  size_t numColors() const
+  [[nodiscard]] size_t numColors() const
   { return m_colors.size(); }
 
-  size_t numNormals() const
+  [[nodiscard]] size_t numNormals() const
   { return m_normals.size(); }
 
-  size_t num1DTextureCoordinates() const
+  [[nodiscard]] size_t num1DTextureCoordinates() const
   { return m_1DTextureCoordinates.size(); }
 
-  size_t num2DTextureCoordinates() const
+  [[nodiscard]] size_t num2DTextureCoordinates() const
   { return m_2DTextureCoordinates.size(); }
 
-  size_t num3DTextureCoordinates() const
+  [[nodiscard]] size_t num3DTextureCoordinates() const
   { return m_3DTextureCoordinates.size(); }
 
-  std::vector<glm::vec3> triangleVertices(size_t index) const;
+  [[nodiscard]] std::vector<glm::vec3> triangleVertices(size_t index) const;
 
-  std::vector<glm::uvec3> triangleIndices() const;
+  [[nodiscard]] std::vector<glm::uvec3> triangleIndices() const;
 
-  glm::uvec3 triangleIndices(size_t index) const;
+  [[nodiscard]] glm::uvec3 triangleIndices(size_t index) const;
 
-  glm::vec3 triangleVertex(size_t triangleIndex, size_t vertexIndex) const;
+  [[nodiscard]] glm::vec3 triangleVertex(size_t triangleIndex, size_t vertexIndex) const;
 
   void transformVerticesByMatrix(const glm::mat4& tfmat);
 
-  std::vector<ZMesh> split(size_t numTriangle = 100000) const;
+  [[nodiscard]] std::vector<ZMesh> split(size_t numTriangle = 100000) const;
 
   void generateNormals(bool useAreaWeight = true);
 
   //double volume() const;
-  ZMeshProperties properties() const;
+  [[nodiscard]] ZMeshProperties properties() const;
 
   void logProperties(const QString& str = "") const
   { logProperties(properties(), str); }
@@ -293,9 +293,9 @@ private:
 
   void appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle);
 
-  double signedVolumeOfTriangle(const glm::vec3& v1,
-                                const glm::vec3& v2,
-                                const glm::vec3& v3) const;
+  [[nodiscard]] double signedVolumeOfTriangle(const glm::vec3& v1,
+                                              const glm::vec3& v2,
+                                              const glm::vec3& v3) const;
 
   size_t numCoverCubes(double cubeEdgeLength);
 

@@ -130,12 +130,12 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_handleEvent.setEnabled(m_isSelected);
 
   const std::vector<ZParameter*>& globalParas = m_rendererBase.globalParameters();
-  for (size_t i = 0; i < globalParas.size(); ++i) {
-    connect(globalParas[i], &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
+  for (auto para : globalParas) {
+    connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
   }
   const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-  for (size_t i = 0; i < paras.size(); ++i) {
-    addParameter(*paras[i]);
+  for (auto para : paras) {
+    addParameter(*para);
   }
 }
 
@@ -151,8 +151,9 @@ void Z3DBoundedFilter::setSelected(bool v)
 void Z3DBoundedFilter::renderHandle(Z3DEye eye)
 {
   if (m_isSelected && m_transformEnabled) {
-    if (!m_handleValid)
+    if (!m_handleValid) {
       updateHandle();
+    }
     m_rendererBase.setClipEnabled(false);
     m_rendererBase.render(eye, m_handleArrowRenderer, m_handleCenterRenderer);
     m_rendererBase.setClipEnabled(true);
@@ -209,43 +210,49 @@ void Z3DBoundedFilter::renderEditingSelectionBox(Z3DEye eye)
 
 void Z3DBoundedFilter::rotateX()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateY()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZ()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateXM()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(1, 0, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateYM()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 1, 0), -boost::math::float_constants::degree, m_center);
 }
 
 void Z3DBoundedFilter::rotateZM()
 {
-  if (!m_isSelected || !m_transformEnabled)
+  if (!m_isSelected || !m_transformEnabled) {
     return;
+  }
   m_rendererBase.coordTransformPara().rotate(glm::vec3(0, 0, 1), -boost::math::float_constants::degree, m_center);
 }
 
@@ -282,15 +289,17 @@ void Z3DBoundedFilter::updateBoundBox()
   updateNotTransformedBoundBox();
   m_normalBoundBoxLines.clear();
   appendBoundboxLines(m_notTransformedBoundBox, m_normalBoundBoxLines);
-  if (m_boundBoxMode.isSelected("Bound Box"))
+  if (m_boundBoxMode.isSelected("Bound Box")) {
     m_baseBoundBoxRenderer.setData(&m_normalBoundBoxLines);
+  }
   updateAxisAlignedBoundBox();
 }
 
 void Z3DBoundedFilter::setClipPlanes()
 {
-  if (!m_canUpdateClipPlane)
+  if (!m_canUpdateClipPlane) {
     return;
+  }
 
   std::vector<glm::vec4> clipPlanes;
   if (m_xCut.lowerValue() != m_xCut.minimum()) {
@@ -322,54 +331,62 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
     m_lastMousePosition = glm::ivec2(e->position().x(), e->position().y());
     const void* obj = pickingManager().objectAtWidgetPos(m_lastMousePosition);
     int handleIdx = selectedHandle(obj);
-    if (handleIdx == 0)
+    if (handleIdx == 0) {
       return;
+    }
     updateSelectedHandle(handleIdx);
     glm::ivec4 viewport(0, 0, w, h);
     m_startTrans = m_rendererBase.coordTransformPara().translation();
     if (handleIdx == 1) {
       m_startDepth = camera().worldToScreen(m_center, viewport).z;
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth), viewport);
+      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth),
+                                                    viewport);
     } else {
       GLfloat WindowPosZ;
       pickingManager().bindTarget();
       glPixelStorei(GL_PACK_ALIGNMENT, 1);
-      glReadPixels(e->x(), h - e->position().y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
+      glReadPixels(e->position().x(), h - e->position().y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
       pickingManager().releaseTarget();
       CHECK_GL_ERROR
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ), viewport);
+      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ),
+                                                    viewport);
     }
     e->accept();
     return;
   }
 
   if (e->type() == QEvent::MouseMove) {
-    if (m_selectedHandle == 0)
+    if (m_selectedHandle == 0) {
       return;
+    }
     if (m_selectedHandle == 1) {
-      glm::vec3 endInWorld = camera().screenToWorld(glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
-                                                    glm::ivec4(0, 0, w, h));
+      glm::vec3 endInWorld = camera().screenToWorld(
+        glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
+        glm::ivec4(0, 0, w, h));
       m_rendererBase.coordTransformPara().setTranslation(m_startTrans + endInWorld - m_startMouseWorldPos);
     } else {
       glm::vec3 v1, v2;
       rayUnderScreenPoint(v1, v2, e->position().x(), e->position().y(), w, h);
       v2 -= v1;
       gte::Ray<3, float> ray(gte::Vector<3, float>
-      { v1.x, v1.y, v1.z }, gte::Vector<3, float>{v2.x, v2.y, v2.z});
+                               {v1.x, v1.y, v1.z}, gte::Vector<3, float>{v2.x, v2.y, v2.z});
       gte::DCPLineRay<3, float> dist;
       if (m_selectedHandle == 2) {
         gte::Line<3, float> xLine(gte::Vector<3, float>
-        { m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z }, gte::Vector<3, float>{1, 0, 0});
+                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+                                  gte::Vector<3, float>{1, 0, 0});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
       } else if (m_selectedHandle == 3) {
         gte::Line<3, float> xLine(gte::Vector<3, float>
-        { m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z }, gte::Vector<3, float>{0, 1, 0});
+                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+                                  gte::Vector<3, float>{0, 1, 0});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
       } else if (m_selectedHandle == 4) {
         gte::Line<3, float> xLine(gte::Vector<3, float>
-        { m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z }, gte::Vector<3, float>{0, 0, 1});
+                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+                                  gte::Vector<3, float>{0, 0, 1});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
       }
@@ -677,24 +694,30 @@ void Z3DBoundedFilter::registerHandlePickingColors()
 
 int Z3DBoundedFilter::selectedHandle(const void* obj)
 {
-  if (!obj)
+  if (!obj) {
     return 0;
-  if (obj == &m_handleCenterRenderer)
+  }
+  if (obj == &m_handleCenterRenderer) {
     return 1;
-  if (obj == &m_handleArrowRenderer)
+  }
+  if (obj == &m_handleArrowRenderer) {
     return 2;
-  if (obj == &m_handleArrowTailPosAndTailRadius)
+  }
+  if (obj == &m_handleArrowTailPosAndTailRadius) {
     return 3;
-  if (obj == &m_handleArrowheadPosAndHeadRadius)
+  }
+  if (obj == &m_handleArrowheadPosAndHeadRadius) {
     return 4;
+  }
 
   return 0;
 }
 
 void Z3DBoundedFilter::updateSelectedHandle(int handleIdx)
 {
-  if (handleIdx == m_selectedHandle)
+  if (handleIdx == m_selectedHandle) {
     return;
+  }
 
   if (handleIdx == 0) {
     switch (m_selectedHandle) {

@@ -1,6 +1,5 @@
-#include <OpenGL/CGLRenderers.h>
+#define GL_SILENCE_DEPRECATION
 #include <OpenGL/CGLTypes.h>
-#include <OpenGL/CGLCurrent.h>
 #include <OpenGL/OpenGL.h>
 #include <iostream>
 #include "zlog.h"

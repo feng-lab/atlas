@@ -189,7 +189,7 @@ protected:
 
   void renderBoundBox(Z3DEye eye);
 
-  void appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines);
+  static void appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines);
 
   // output v1 is start point of ray, v2 is a point on the ray, v2-v1 is normalized
   // x and y are input screen point, width and height are input screen dimension
@@ -265,7 +265,7 @@ protected:
   ZEventListenerParameter m_handleEvent;
 
   ZBBox<glm::dvec3> m_axisAlignedBoundBox;
-  glm::vec3 m_center;
+  glm::vec3 m_center{};
   ZBBox<glm::dvec3> m_notTransformedBoundBox;
 
   std::vector<glm::vec3> m_normalBoundBoxLines;
@@ -293,10 +293,10 @@ protected:
 private:
   ZBBox<glm::dvec3> m_selectionBoundBox;
 
-  glm::ivec2 m_lastMousePosition;
-  glm::vec3 m_startMouseWorldPos;
-  glm::vec3 m_startTrans;
-  float m_startDepth;
+  glm::ivec2 m_lastMousePosition{};
+  glm::vec3 m_startMouseWorldPos{};
+  glm::vec3 m_startTrans{};
+  float m_startDepth{};
   int m_selectedHandle;
 
   bool m_transformEnabled;

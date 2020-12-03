@@ -7,17 +7,17 @@
     # if xcode command line tools are already installed, disable it:
     sudo xcode-select -switch /Applications/Xcode.app`
     ```
-* install qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb) and python3 (recommend miniconda)
+* install qt5 (>= 6.0), intel c composer (for mkl, ipp, tbb) and python3 (recommend miniconda)
 * `brew install unrar p7zip git golang autoconf`
 
 ### Windows:
-* install visual studio, qt5 (>= 5.9), intel c composer (for mkl, ipp, tbb), python3, git
+* install visual studio, qt5 (>= 6.0), intel c composer (for mkl, ipp, tbb), python3, git
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
 * install perl: https://www.activestate.com/products/perl/downloads/, add to path
 
 ### Linux:
-* install qt5 (>= 5.9), mkl, ipp, tbb, python3 and ninja
+* install qt5 (>= 6.0), mkl, ipp, tbb, python3 and ninja
 * `sudo apt install unrar p7zip-full git nasm golang patchelf libxcursor-dev`
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
 
@@ -40,12 +40,12 @@
 * $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)
 
 ## Minimum macOS Defines
-* $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
+* $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
 * $Repository_DIR/util/build_ext_libs.py: def macos_min_version() ...
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.13
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.13
-* $Repository_DIR/src/3rdparty/makeengine.macos.gte: -mmacosx-version-min=10.13
-* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.13)
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -mmacosx-version-min=10.14
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -mmacosx-version-min=10.14
+* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
+* $SuiteSparse_Repo/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
 
 ## Visual Studio Update
 * $Repository_DIR/util/common_dirs.py: 178: def vs_install_dir() -> str ...

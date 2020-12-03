@@ -290,16 +290,16 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
 
 bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes)
 {
-  int shapeID = -1;
-  int shapeIndex = -1;
-  int pos = -1;
+  int64_t shapeID = -1;
+  int64_t shapeIndex = -1;
+  int64_t pos = -1;
   double minDist = std::numeric_limits<double>::max();
   for (const auto&[id, shapes] : m_idToShapeOperations) {
     for (size_t i = 0; i < shapes.size(); ++i) {
       const auto& shape = shapes[i];
       if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
         const QPolygonF& poly = shape.poly;
-        for (int j = 0; j < poly.size() - 1; ++j) {
+        for (int64_t j = 0; j < poly.size() - 1; ++j) {
           double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
           if (dist < minDist) {
             minDist = dist;
