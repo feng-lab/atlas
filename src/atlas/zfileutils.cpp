@@ -59,7 +59,7 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
     dialog.selectNameFilter(*selectedFilter);
   }
   dialog.setOptions(options);
-  QRegExp filter_regex(QLatin1String(R"((?:^\*\.(?!.*\()|\(\*\.)(\w+))"));
+  QRegularExpression filter_regex(QLatin1String(R"((?:^\*\.(?!.*\()|\(\*\.)(\w+))"));
   QStringList filters = filter.split(QLatin1String(";;"));
 //  if (!filters.isEmpty()) {
 //    dialog.setNameFilter(filters.first());
@@ -79,8 +79,9 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
       QFileInfo info(res);
       //LOG(INFO) << file_name << " " << dialog.selectedNameFilter();
       if (info.suffix().isEmpty() && !dialog.selectedNameFilter().isEmpty()) {
-        if (filter_regex.indexIn(dialog.selectedNameFilter()) != -1) {
-          QString extension = filter_regex.cap(1);
+        auto match = filter_regex.match(dialog.selectedNameFilter());
+        if (match.hasMatch()) {
+          QString extension = filter_regex.captured(1);
           //LOG(INFO) << extension;
           res += QLatin1String(".") + extension;
 
