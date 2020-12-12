@@ -752,7 +752,15 @@ def build_lz4(src_dir: str, install_dir: str):
 def build_snappy(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'NOT CMAKE_CXX_FLAGS MATCHES "-Werror"',
+                                          ],
+                              to_texts=[r'OFF',
+                                        ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
@@ -762,6 +770,7 @@ def build_snappy(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_xz(src_dir: str, install_dir: str):
@@ -960,19 +969,19 @@ def build_eigen(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        if is_linux():
-            orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
-                                       'PacketMath.h')
-            patch_file(orig_file_1,
-                       from_texts=[r'#define EIGEN_PACKET_MATH_AVX_H',
-                                   ],
-                       to_texts=['#define EIGEN_PACKET_MATH_AVX_H\n'
-                                 '#if __GNUC__ < 8\n'
-                                 'extern __inline __m256d __attribute__((__gnu_inline__, __always_inline__, __artificial__))\n'
-                                 '_mm256_set_m128d (__m128d __H, __m128d __L)\n'
-                                 '{ return _mm256_insertf128_pd (_mm256_castpd128_pd256 (__L), __H, 1); }\n'
-                                 '#endif\n',
-                                 ])
+        # if is_linux():
+        #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
+        #                                'PacketMath.h')
+        #     patch_file(orig_file_1,
+        #                from_texts=[r'#define EIGEN_PACKET_MATH_AVX_H',
+        #                            ],
+        #                to_texts=['#define EIGEN_PACKET_MATH_AVX_H\n'
+        #                          '#if __GNUC__ < 8\n'
+        #                          'extern __inline __m256d __attribute__((__gnu_inline__, __always_inline__, __artificial__))\n'
+        #                          '_mm256_set_m128d (__m128d __H, __m128d __L)\n'
+        #                          '{ return _mm256_insertf128_pd (_mm256_castpd128_pd256 (__L), __H, 1); }\n'
+        #                          '#endif\n',
+        #                          ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
