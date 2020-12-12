@@ -81,7 +81,7 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
       if (info.suffix().isEmpty() && !dialog.selectedNameFilter().isEmpty()) {
         auto match = filter_regex.match(dialog.selectedNameFilter());
         if (match.hasMatch()) {
-          QString extension = filter_regex.captured(1);
+          QString extension = match.captured(1);
           //LOG(INFO) << extension;
           res += QLatin1String(".") + extension;
 
