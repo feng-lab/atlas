@@ -571,8 +571,8 @@ set(SOURCES
     z3dvolumefilter.h
     z3dvolumeraycasterrenderer.cpp
     z3dvolumeraycasterrenderer.h
-    zopenglwidget.cpp
-    zopenglwidget.h
+    z3dopenglwidget.cpp
+    z3dopenglwidget.h
     zchromaticshiftcorrectiondialog.cpp
     zchromaticshiftcorrectiondialog.h
     zlogwidget.cpp

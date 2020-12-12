@@ -1,14 +1,19 @@
 #pragma once
 
+//#define ATLAS_USE_OPENGLWINDOW
+//#define ATLAS_USE_OPENGLWIDGET
+
 #include "zglmutils.h"
 #include <QGraphicsView>
 #include <QSurfaceFormat>
 #include <QInputEvent>
 #include <QShortcut>
+#ifdef ATLAS_USE_OPENGLWIDGET
+#include <QOpenGLWidget>
+#endif
+
 #include <deque>
 #include <memory>
-
-class ZOpenGLWidget;
 
 namespace nim {
 
@@ -18,88 +23,129 @@ class Z3DNetworkEvaluator;
 
 class Z3DCanvasEventListener;
 
-#ifdef nothing
+class ZOpenGLWidget;
+
+class ZOpenGLWindow;
+
+#ifdef ATLAS_USE_OPENGLWIDGET
 
 class Z3DCanvas : public QOpenGLWidget
 {
-  Q_OBJECT
+Q_OBJECT
 public:
-  Z3DCanvas(const QString &title, QWidget* parent = nullptr, Qt::WindowFlags f = 0);
-  virtual ~Z3DCanvas();
+  Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr,
+            Qt::WindowFlags f = Qt::WindowFlags());
 
-  void setNetworkEvaluator(Z3DNetworkEvaluator *n);
+  void setNetworkEvaluator(Z3DNetworkEvaluator* n);
+
   void setFakeStereoOnce();
 
   void addEventListenerToBack(Z3DCanvasEventListener* e);
+
   void addEventListenerToFront(Z3DCanvasEventListener* e);
-  void removeEventListener(Z3DCanvasEventListener *e);
+
+  void removeEventListener(Z3DCanvasEventListener* e);
+
   void clearEventListeners();
+
   void broadcastEvent(QEvent* e, int w, int h);
 
   // Set the opengl context of this canvas as the current one.
-  inline void getGLFocus() { makeCurrent(); }
+  inline void getGLFocus()
+  { makeCurrent(); }
+
   void toggleFullScreen();
-  void forceUpdate() { auto pe = std::make_unique<QPaintEvent>(rect()); paintEvent(pe.get()); }
-  void updateAll() { update(); }
+
+  void forceUpdate()
+  {
+    auto pe = std::make_unique<QPaintEvent>(rect());
+    paintEvent(pe.get());
+  }
+
+  void updateAll()
+  { update(); }
 
   // for high dpi support like retina
-  glm::ivec2 physicalSize() { return glm::ivec2(width() * devicePixelRatio(),
-                                                height() * devicePixelRatio()); }
-  glm::ivec2 logicalSize() { return glm::ivec2(width(), height()); }
+  glm::ivec2 physicalSize()
+  {
+    return glm::ivec2(width() * devicePixelRatioF(),
+                      height() * devicePixelRatioF());
+  }
+
+  glm::ivec2 logicalSize()
+  { return glm::ivec2(width(), height()); }
 
 signals:
+
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(int w, int h);
 
+  void openGLContextInitialized();
+
 protected:
-  virtual void enterEvent(QEvent* e);
-  virtual void leaveEvent(QEvent* e);
-  virtual void mousePressEvent(QMouseEvent* e);
-  virtual void mouseReleaseEvent (QMouseEvent* e);
-  virtual void mouseMoveEvent(QMouseEvent*  e);
-  virtual void mouseDoubleClickEvent(QMouseEvent* e);
-  virtual void wheelEvent(QWheelEvent* e);
-  virtual void timerEvent(QTimerEvent* e);
+  void enterEvent(QEnterEvent* e) override;
 
-  virtual void keyPressEvent(QKeyEvent* event);
-  virtual void keyReleaseEvent(QKeyEvent* event);
+  void leaveEvent(QEvent* e) override;
 
-  virtual void resizeEvent(QResizeEvent *event);
-  virtual void paintEvent(QPaintEvent *event);
-  virtual void dragEnterEvent(QDragEnterEvent *event);
-  virtual void dropEvent(QDropEvent *event);
+  void mousePressEvent(QMouseEvent* e) override;
+
+  void mouseReleaseEvent(QMouseEvent* e) override;
+
+  void mouseMoveEvent(QMouseEvent* e) override;
+
+  void mouseDoubleClickEvent(QMouseEvent* e) override;
+
+  void wheelEvent(QWheelEvent* e) override;
+
+  void timerEvent(QTimerEvent* e) override;
+
+  void keyPressEvent(QKeyEvent* event) override;
+
+  void keyReleaseEvent(QKeyEvent* event) override;
+
+  void resizeEvent(QResizeEvent* event) override;
+
+  void paintEvent(QPaintEvent* event) override;
+
+  void dragEnterEvent(QDragEnterEvent* event) override;
+
+  void dropEvent(QDropEvent* event) override;
 
   void rotateX();
+
   void rotateY();
+
   void rotateZ();
+
   void rotateXM();
+
   void rotateYM();
+
   void rotateZM();
 
   // QOpenGLWidget interface
 protected:
-  virtual void initializeGL();
-  virtual void resizeGL(int w, int h);
-  virtual void paintGL();
+  void initializeGL() override;
+
+  void resizeGL(int w, int h) override;
+
+  void paintGL() override;
 
 private:
-  double devicePixelRatio();
-
-private:
-  bool m_fullscreen;
+  bool m_fullscreen = false;
 
   std::deque<Z3DCanvasEventListener*> m_listeners;
 
-  QShortcut* m_rotateXShortCut;
-  QShortcut* m_rotateYShortCut;
-  QShortcut* m_rotateZShortCut;
-  QShortcut* m_rotateXMShortCut;
-  QShortcut* m_rotateYMShortCut;
-  QShortcut* m_rotateZMShortCut;
+  QShortcut* m_rotateXShortCut = nullptr;
+  QShortcut* m_rotateYShortCut = nullptr;
+  QShortcut* m_rotateZShortCut = nullptr;
+  QShortcut* m_rotateXMShortCut = nullptr;
+  QShortcut* m_rotateYMShortCut = nullptr;
+  QShortcut* m_rotateZMShortCut = nullptr;
 
-  Z3DNetworkEvaluator* m_networkEvaluator;
-  bool m_isStereoScene;
-  bool m_fakeStereoOnce;
+  Z3DNetworkEvaluator* m_networkEvaluator = nullptr;
+  bool m_isStereoScene = false;
+  bool m_fakeStereoOnce = false;
 };
 
 #else
@@ -190,8 +236,8 @@ protected:
 
   void dropEvent(QDropEvent* event) override;
 
-  void setCursor(const QCursor& c)
-  { viewport()->setCursor(c); }
+//  void setCursor(const QCursor& c)
+//  { viewport()->setCursor(c); }
 
   void rotateX();
 
@@ -209,18 +255,19 @@ private:
   //double devicePixelRatio();
 
 private:
-  bool m_fullscreen;
+  bool m_fullscreen = false;
 
-  ZOpenGLWidget* m_glWidget;
-  Z3DScene* m_3dScene;
+  ZOpenGLWidget* m_glWidget = nullptr;
+  ZOpenGLWindow* m_glWindow = nullptr;
+  Z3DScene* m_3dScene = nullptr;
   std::deque<Z3DCanvasEventListener*> m_listeners;
 
-  QShortcut* m_rotateXShortCut;
-  QShortcut* m_rotateYShortCut;
-  QShortcut* m_rotateZShortCut;
-  QShortcut* m_rotateXMShortCut;
-  QShortcut* m_rotateYMShortCut;
-  QShortcut* m_rotateZMShortCut;
+  QShortcut* m_rotateXShortCut = nullptr;
+  QShortcut* m_rotateYShortCut = nullptr;
+  QShortcut* m_rotateZShortCut = nullptr;
+  QShortcut* m_rotateXMShortCut = nullptr;
+  QShortcut* m_rotateYMShortCut = nullptr;
+  QShortcut* m_rotateZMShortCut = nullptr;
 };
 
 #endif

@@ -4,42 +4,35 @@
 #include "z3dcanvaseventlistener.h"
 #include "z3dscene.h"
 #include "zlog.h"
-#include "zopenglwidget.h"
-#include <QWindow>
+#include "z3dopenglwidget.h"
 
 #include <algorithm>
 
 namespace nim {
 
-#ifdef nothing
+#ifdef ATLAS_USE_OPENGLWIDGET
 
-Z3DCanvas::Z3DCanvas(const QString &title, QWidget* parent, Qt::WindowFlags f)
+Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QOpenGLWidget(parent, f)
-  , m_fullscreen(false)
-  , m_networkEvaluator(nullptr)
-  , m_isStereoScene(false)
-  , m_fakeStereoOnce(false)
 {
   setWindowTitle(title);
 
   setAcceptDrops(true);
   setFocusPolicy(Qt::StrongFocus);
 
-  m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X), this);
+  m_rotateXShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_X), this);
   connect(m_rotateXShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateX);
-  m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y), this);
+  m_rotateYShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Y), this);
   connect(m_rotateYShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateY);
-  m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z), this);
+  m_rotateZShortCut = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Z), this);
   connect(m_rotateZShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZ);
-  m_rotateXMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_X + Qt::SHIFT), this);
+  m_rotateXMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_X)), this);
   connect(m_rotateXMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateXM);
-  m_rotateYMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Y + Qt::SHIFT), this);
+  m_rotateYMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Y)), this);
   connect(m_rotateYMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateYM);
-  m_rotateZMShortCut = new QShortcut(QKeySequence(Qt::ALT + Qt::Key_Z + Qt::SHIFT), this);
+  m_rotateZMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Z)), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 }
-
-Z3DCanvas::~Z3DCanvas() {}
 
 void Z3DCanvas::toggleFullScreen()
 {
@@ -52,7 +45,7 @@ void Z3DCanvas::toggleFullScreen()
   }
 }
 
-void Z3DCanvas::enterEvent(QEvent* e)
+void Z3DCanvas::enterEvent(QEnterEvent* e)
 {
   broadcastEvent(e, width(), height());
 }
@@ -101,8 +94,8 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* event)
 void Z3DCanvas::resizeEvent(QResizeEvent *event)
 {
   QOpenGLWidget::resizeEvent(event);
-  emit canvasSizeChanged(event->size().width() * devicePixelRatio(),
-                         event->size().height() * devicePixelRatio());
+  emit canvasSizeChanged(event->size().width() * devicePixelRatioF(),
+                         event->size().height() * devicePixelRatioF());
 }
 
 void Z3DCanvas::paintEvent(QPaintEvent *event)
@@ -118,6 +111,17 @@ void Z3DCanvas::dragEnterEvent(QDragEnterEvent *event)
 void Z3DCanvas::dropEvent(QDropEvent *event)
 {
   event->ignore();
+}
+
+void Z3DCanvas::initializeGL()
+{
+  emit openGLContextInitialized();
+}
+
+void Z3DCanvas::resizeGL(int w, int h)
+{
+  Q_UNUSED(w)
+  Q_UNUSED(h)
 }
 
 void Z3DCanvas::paintGL()
@@ -136,48 +140,48 @@ void Z3DCanvas::paintGL()
 void Z3DCanvas::rotateX()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateX();
+  for (auto listener : m_listeners) {
+    listener->rotateX();
   }
 }
 
 void Z3DCanvas::rotateY()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateY();
+  for (auto listener : m_listeners) {
+    listener->rotateY();
   }
 }
 
 void Z3DCanvas::rotateZ()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateZ();
+  for (auto listener : m_listeners) {
+    listener->rotateZ();
   }
 }
 
 void Z3DCanvas::rotateXM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateXM();
+  for (auto listener : m_listeners) {
+    listener->rotateXM();
   }
 }
 
 void Z3DCanvas::rotateYM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateYM();
+  for (auto listener : m_listeners) {
+    listener->rotateYM();
   }
 }
 
 void Z3DCanvas::rotateZM()
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->rotateZM();
+  for (auto listener : m_listeners) {
+    listener->rotateZM();
   }
 }
 
@@ -189,8 +193,6 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
 void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator *n)
 {
   m_networkEvaluator = n;
-  if (n)
-    n->setOpenGLContext(this);
 }
 
 void Z3DCanvas::setFakeStereoOnce()
@@ -215,8 +217,9 @@ void Z3DCanvas::removeEventListener(Z3DCanvasEventListener *e)
   std::deque<Z3DCanvasEventListener*>::iterator pos;
   pos = std::find(m_listeners.begin(), m_listeners.end(), e);
 
-  if (pos != m_listeners.end())
+  if (pos != m_listeners.end()) {
     m_listeners.erase(pos);
+  }
 }
 
 void Z3DCanvas::clearEventListeners()
@@ -227,17 +230,11 @@ void Z3DCanvas::clearEventListeners()
 void Z3DCanvas::broadcastEvent(QEvent *e, int w, int h)
 {
   getGLFocus();
-  for (size_t i = 0 ; i < m_listeners.size() ; ++i) {
-    m_listeners[i]->onEvent(e, w, h);
+  for (auto listener : m_listeners) {
+    listener->onEvent(e, w, h);
     if (e->isAccepted())
       break;
   }
-}
-
-double Z3DCanvas::devicePixelRatio()
-{
-  return (window() && window()->windowHandle()) ?
-        window()->windowHandle()->devicePixelRatio() : 1.0;
 }
 
 #else
@@ -245,17 +242,21 @@ double Z3DCanvas::devicePixelRatio()
 
 Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QGraphicsView(parent)
-  , m_fullscreen(false)
-  , m_glWidget(nullptr)
-  , m_3dScene(nullptr)
 {
   setAlignment(Qt::AlignLeft | Qt::AlignTop);
   resize(width, height);
 
+#ifdef ATLAS_USE_OPENGLWINDOW
+  m_glWindow = new ZOpenGLWindow();
+  m_glWindow->setFlags(Qt::WindowDoesNotAcceptFocus);
+  m_3dScene = new Z3DScene(width, height, m_glWindow->format().stereo(), this);
+  setViewport(QWidget::createWindowContainer(m_glWindow, nullptr, f));
+#else
   m_glWidget = new ZOpenGLWidget(nullptr, f);
   m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), this);
-
   setViewport(m_glWidget);
+#endif
+
   setViewportUpdateMode(FullViewportUpdate);
   setScene(m_3dScene);
 
@@ -283,12 +284,20 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   m_rotateZMShortCut = new QShortcut(QKeySequence(QKeyCombination(Qt::ALT | Qt::SHIFT, Qt::Key_Z)), this);
   connect(m_rotateZMShortCut, &QShortcut::activated, this, &Z3DCanvas::rotateZM);
 
+#ifdef ATLAS_USE_OPENGLWINDOW
+  connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
+#else
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
+#endif
 }
 
 QSurfaceFormat Z3DCanvas::format() const
 {
+#ifdef ATLAS_USE_OPENGLWINDOW
+  return m_glWindow->format();
+#else
   return m_glWidget->format();
+#endif
 }
 
 void Z3DCanvas::toggleFullScreen()
@@ -304,7 +313,11 @@ void Z3DCanvas::toggleFullScreen()
 
 void Z3DCanvas::updateAll()
 {
+#ifdef ATLAS_USE_OPENGLWINDOW
+  m_glWindow->update();
+#else
   m_glWidget->update();
+#endif
 }
 
 void Z3DCanvas::contextMenuEvent(QContextMenuEvent* event)
@@ -388,48 +401,48 @@ void Z3DCanvas::dropEvent(QDropEvent* event)
 void Z3DCanvas::rotateX()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateX();
+  for (auto listener : m_listeners) {
+    listener->rotateX();
   }
 }
 
 void Z3DCanvas::rotateY()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateY();
+  for (auto listener : m_listeners) {
+    listener->rotateY();
   }
 }
 
 void Z3DCanvas::rotateZ()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateZ();
+  for (auto listener : m_listeners) {
+    listener->rotateZ();
   }
 }
 
 void Z3DCanvas::rotateXM()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateXM();
+  for (auto listener : m_listeners) {
+    listener->rotateXM();
   }
 }
 
 void Z3DCanvas::rotateYM()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateYM();
+  for (auto listener : m_listeners) {
+    listener->rotateYM();
   }
 }
 
 void Z3DCanvas::rotateZM()
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->rotateZM();
+  for (auto listener : m_listeners) {
+    listener->rotateZM();
   }
 }
 
@@ -465,8 +478,8 @@ void Z3DCanvas::clearEventListeners()
 void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
 {
   getGLFocus();
-  for (size_t i = 0; i < m_listeners.size(); ++i) {
-    m_listeners[i]->onEvent(e, w, h);
+  for (auto listener : m_listeners) {
+    listener->onEvent(e, w, h);
     if (e->isAccepted())
       break;
   }
@@ -474,7 +487,11 @@ void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
 
 void Z3DCanvas::getGLFocus()
 {
+#ifdef ATLAS_USE_OPENGLWINDOW
+  m_glWindow->makeCurrent();
+#else
   m_glWidget->makeCurrent();
+#endif
 }
 
 #endif
