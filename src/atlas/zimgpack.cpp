@@ -9,7 +9,7 @@
 #include <QPoint>
 #include <QDir>
 #include <tbb/parallel_for.h>
-#include <boost/function_output_iterator.hpp>
+#include <boost/iterator/function_output_iterator.hpp>
 #include <cmath>
 #include <zbenchtimer.h>
 
