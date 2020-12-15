@@ -7,19 +7,20 @@
     # if xcode command line tools are already installed, disable it:
     sudo xcode-select -switch /Applications/Xcode.app`
     ```
-* install qt5 (>= 6.0), intel c composer (for mkl, ipp, tbb) and python3 (recommend miniconda)
+* install qt (>= 6.0), intel oneapi basekit and python3 (recommend miniconda)
 * `brew install unrar p7zip git golang autoconf`
 
 ### Windows:
-* install visual studio, qt5 (>= 6.0), intel c composer (for mkl, ipp, tbb), python3, git
+* install visual studio, qt (>= 6.0), intel oneapi basekit, python3, git
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
 * install perl: https://www.activestate.com/products/perl/downloads/, add to path
 
 ### Linux:
-* install qt5 (>= 6.0), mkl, ipp, tbb, python3 and ninja
+* install qt (>= 6.0), python3
 * `sudo apt install unrar p7zip-full git nasm golang patchelf libxcursor-dev`
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
+* install intel oneapi basekit with apt
 
 ### All:
 * `atlas_others` folder and repository folder should be in same directory
