@@ -9,6 +9,7 @@ else ()
   # tbb
   # set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR})
 endif ()
+set(QT_HOST_PATH_CMAKE_DIR ${QT_HOST_PATH}/lib/cmake)
 
 find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)

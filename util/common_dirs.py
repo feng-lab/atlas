@@ -135,7 +135,7 @@ def qt_install_dir() -> str:
 
 def qt_compiler_name() -> str:
     if sys.platform.startswith('win32'):
-        return 'msvc2017_64'
+        return 'msvc2019_64'
     elif sys.platform.startswith('darwin'):
         return 'clang_64'
     else:
@@ -422,7 +422,7 @@ def get_ninja_binary() -> str:
 
 def get_ffmpeg_binary() -> str:
     if is_windows():
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*win*'))
+        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*build*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
         folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*amd64*'))
