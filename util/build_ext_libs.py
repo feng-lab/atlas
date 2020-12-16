@@ -469,12 +469,14 @@ def build_glog(src_dir: str, install_dir: str):
         #                cwd=src_dir, shell=False, check=True)
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         ])
 
-        if is_windows():
-            patch_file(os.path.join(src_dir, 'src', 'logging_unittest.cc'),
-                       from_texts=[r'google::ERROR'],
-                       to_texts=[r'GLOG_ERROR'],
-                       keep_bak_file=False)
+        # if is_windows():
+        #     patch_file(os.path.join(src_dir, 'src', 'logging_unittest.cc'),
+        #                from_texts=[r'google::ERROR'],
+        #                to_texts=[r'GLOG_ERROR'],
+        #                keep_bak_file=False)
         #
         #     cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/CMake'])
         # else:
@@ -1426,20 +1428,20 @@ def build_botan(src_dir: str, install_dir: str):
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
-    orig_file_1 = bak_file_1 = None
+    # orig_file = bak_file = None
+    # orig_file_1 = bak_file_1 = None
     # orig_file4 = bak_file4 = None
     try:
-        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
-        bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
-                              to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
-                                        'set(headers ${headers} ${__files})\n'
-                                        'install(FILES ${headers}'])
+        # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
+        # bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
+        #                       to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
+        #                                 'set(headers ${headers} ${__files})\n'
+        #                                 'install(FILES ${headers}'])
 
-        orig_file_1 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
-        if is_windows():
-            bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h'],
-                                    to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
+        # orig_file_1 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'VNL', 'src', 'vxl', 'vcl', 'CMakeLists.txt')
+        # if is_windows():
+        #     bak_file_1 = patch_file(orig_file_1, from_texts=[r'vcl_legacy_aliases.h'],
+        #                             to_texts=[r'vcl_legacy_aliases.h vcl_msvc_warnings.h'])
 
         # orig_file4 = os.path.join(src_dir, 'Modules', 'ThirdParty', 'GDCM', 'src', 'gdcm', 'CMakeLists.txt')
         # bak_file4 = patch_file(orig_file4, from_texts=[r'find_package(OpenJPEG 2.0.0 REQUIRED)'],
@@ -1497,18 +1499,18 @@ def build_itk(src_dir: str, install_dir: str):
         # ITKZLIB_INCLUDE_DIRS includes
         # /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
         # which cause conda compilation errors
-        orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKZLIB.cmake')
-        patch_file(orig_file_3,
-                   from_texts=[r'set(ITKZLIB_INCLUDE_DIRS',
-                               ],
-                   to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
-                             ])
+        # orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKZLIB.cmake')
+        # patch_file(orig_file_3,
+        #            from_texts=[r'set(ITKZLIB_INCLUDE_DIRS',
+        #                        ],
+        #            to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
+        #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
-        # os.replace(bak_file4, orig_file4)
-        if is_windows():
-            os.replace(bak_file_1, orig_file_1)
+        # os.replace(bak_file, orig_file)
+        # # os.replace(bak_file4, orig_file4)
+        # if is_windows():
+        #     os.replace(bak_file_1, orig_file_1)
 
 
 def build_vtk(src_dir: str, install_dir: str):
