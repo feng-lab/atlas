@@ -53,6 +53,14 @@ def ext_build_dir() -> str:
     return res
 
 
+def ext_conda_build_dir() -> str:
+    res = os.path.join(atlas_src_dir(), '3rdparty', 'conda_build')
+    if not os.path.exists(res):
+        os.mkdir(res)
+    assert os.path.exists(res)
+    return res
+
+
 def atlas_dir() -> str:
     res = os.path.join(atlas_src_dir(), 'atlas')
     assert os.path.exists(res)

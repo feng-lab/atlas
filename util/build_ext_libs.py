@@ -132,8 +132,11 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     return env
 
 
-def get_tbb_env():
-    if is_windows():
+def get_tbb_env(conda_build: bool=False):
+    if conda_build:
+        env = os.environ.copy()
+        env['TBBROOT'] = env['CONDA_PREFIX']
+    elif is_windows():
         env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                             'tbbvars.bat'),
                                                para='intel64 vs2017',
@@ -1556,9 +1559,12 @@ def build_vtk(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool=False):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
+    bak_file2 = orig_file2 = None
+    bak_file3 = orig_file3 = None
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -1566,6 +1572,40 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             for idx, cmd in enumerate(cmakecmd):
                 if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
                     cmakecmd[idx] = cmd + ' /DWIN32_LEAN_AND_MEAN'
+
+        if conda_build:
+            print('CONDA_PREFIX', os.environ['CONDA_PREFIX'])
+            cmakecmd.extend([
+                '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'],
+                '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/lib/cmake/tbb',
+            ])
+            orig_file = os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'ocv_add_perf_tests()',
+                                              ],
+                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir() + '/include)\n'
+                                            'ocv_add_perf_tests()\n',
+                                            ])
+        else:
+            orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'macro(mkl_fail)',
+                                              r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib)',
+                                              ],
+                                  to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
+                                            'macro(mkl_fail)\n',
+                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib)',
+                                            ])
+
+            orig_file2 = os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt')
+            bak_file2 = patch_file(orig_file2,
+                                   from_texts=[r'${LAPACK_LIBRARIES}'],
+                                   to_texts=[r''])
+
+            orig_file3 = os.path.join(src_dir, 'modules', 'core', 'CMakeLists.txt')
+            bak_file3 = patch_file(orig_file3,
+                                   from_texts=[r'${LAPACK_LIBRARIES}'],
+                                   to_texts=[r''])
 
         cmakecmd.extend([
             '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
@@ -1599,10 +1639,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             '-DWITH_OPENCL_SVM:BOOL=OFF',
             '-DWITH_OPENCLAMDFFT:BOOL=OFF',
             '-DWITH_OPENCLAMDBLAS:BOOL=OFF',
-            '-DWITH_LAPACK:BOOL=OFF',
-            # '-DWITH_MKL:BOOL=ON',
-            # '-DMKL_USE_MULTITHREAD:BOOL=ON',
-            # '-DMKL_WITH_TBB:BOOL=ON',
+            '-DWITH_LAPACK:BOOL=ON',
+            '-DWITH_MKL:BOOL=ON',
+            '-DMKL_WITH_TBB:BOOL=ON',
+            '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + 'OFF' if conda_build else 'ON',
             '-DWITH_PROTOBUF:BOOL=ON',
 
             '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1626,7 +1666,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
             '-DBUILD_opencv_dnn:BOOL=OFF',
             '-DBUILD_opencv_world:BOOL=OFF',
             '-DBUILD_opencv_python2:BOOL=OFF',
-            '-DBUILD_opencv_python3:BOOL=OFF',
+            '-DBUILD_opencv_python3:BOOL=' + 'ON' if conda_build else 'OFF',
             '-DPYTHON3_EXECUTABLE=' + sys.executable,
             '-DBUILD_opencv_java:BOOL=OFF',
 
@@ -1656,15 +1696,20 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        if is_windows():
-            orig_file_2 = os.path.join(install_dir, 'x64', 'vc16', 'staticlib', 'OpenCVModules.cmake')
-        else:
-            orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
-        patch_file(orig_file_2,
-                   from_texts=[r';\$<LINK_ONLY:tbb>', r'\$<LINK_ONLY:tbb>;'],
-                   to_texts=[r'', r''])
+        if not conda_build:
+            if is_windows():
+                orig_file_2 = os.path.join(install_dir, 'x64', 'vc16', 'staticlib', 'OpenCVModules.cmake')
+            else:
+                orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
+            patch_file(orig_file_2,
+                       from_texts=[r';\$<LINK_ONLY:tbb>', r'\$<LINK_ONLY:tbb>;'],
+                       to_texts=[r'', r''])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        if not conda_build:
+            os.replace(bak_file2, orig_file2)
+            os.replace(bak_file3, orig_file3)
 
 
 def build_ospray(src_dir: str, install_dir: str):
@@ -2050,6 +2095,11 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_contrib_dir)
         build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
+    if libs['conda_opencv']:
+        src_dir = os.path.join(ext_dir(), 'opencv')
+        src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
+        build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
+
     # if libs['botan']:
     #     src_dir = os.path.join(ext_dir(), 'botan')
     #     if update_src:
@@ -2123,7 +2173,7 @@ def parse_inputs(argv: list):
                 'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants'
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda_opencv'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
@@ -2150,6 +2200,7 @@ def parse_inputs(argv: list):
                             'zstd': ['folly'],
                             'openjpeg': ['opencv'],
                             'libwebp': ['opencv'],
+                            'opencv': ['conda_opencv'],
                             }
 
     print('current interpreter: ' + sys.executable)

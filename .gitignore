@@ -34,6 +34,7 @@
 /src/3rdparty/boost*
 /src/3rdparty/openssl*
 /src/3rdparty/build
+/src/3rdparty/conda_build
 /src/3rdparty/libsodium*
 /src/3rdparty/openjpeg*
 /src/3rdparty/libwebp*
