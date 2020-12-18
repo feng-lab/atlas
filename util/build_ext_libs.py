@@ -1596,7 +1596,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                               ],
                                   to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
                                             'macro(mkl_fail)\n',
-                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64)',
+                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8)',
                                             ])
 
             orig_file2 = os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt')
