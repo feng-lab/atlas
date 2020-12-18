@@ -160,18 +160,18 @@ def get_common_build_flags():
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
         res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC -fvisibility=hidden'
+                        f'-fPIC -fvisibility=hidden -mavx'
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
+                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_linux():
-        res['CFLAGS'] = f'-fPIC -fvisibility=hidden'
-        res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden'
+        res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
+        res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
-        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX'
+        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
 
 

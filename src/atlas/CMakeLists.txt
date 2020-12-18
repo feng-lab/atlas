@@ -666,6 +666,7 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${APP_NAME} PUBLIC /permissive-)
   target_compile_options(${APP_NAME} PUBLIC /Zc:preprocessor)
+  target_compile_options(${APP_NAME} PUBLIC /arch:AVX)
 
   set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
@@ -700,6 +701,7 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
+  target_compile_options(${APP_NAME} PUBLIC -mavx)
 
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)

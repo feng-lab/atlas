@@ -299,6 +299,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:inline) #
   target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor)
+  target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
 
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
@@ -326,6 +327,7 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress -Wdeprecated)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -mavx)
 
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)

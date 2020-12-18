@@ -120,9 +120,9 @@ int main(int argc, char* argv[])
 #endif
     QCoreApplication::setApplicationName("Atlas");
 
-    if (!nim::ZCpuInfo::instance().bSSE3) {
+    if (!nim::ZCpuInfo::instance().bAVX) {
       QMessageBox::critical(nullptr, app.applicationName(),
-                            "CPU not supported.\nThis program requires CPU with SSE3 support. Click OK to exit.");
+                            "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
       LOG(ERROR) << "CPU not supported";
       return 1;
     }
