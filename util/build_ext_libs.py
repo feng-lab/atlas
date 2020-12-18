@@ -134,7 +134,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 
 def get_tbb_env(conda_build: bool=False):
     if conda_build:
-        env = os.environ.copy()
+        env = get_vcvars_environment() if is_windows() else os.environ.copy()
         env['TBBROOT'] = env['CONDA_PREFIX']
     elif is_windows():
         env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
@@ -1060,11 +1060,10 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                          ])
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        # env = get_vcvars_environment() if is_windows() else os.environ.copy()
-        # env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl')
-        # build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+        env = get_vcvars_environment() if is_windows() else os.environ.copy()
+        env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl')
+        build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -1723,7 +1722,7 @@ def build_conda_zimg(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        env = os.environ.copy()
+        env = get_vcvars_environment() if is_windows() else os.environ.copy()
         env['PREFIX'] = env['CONDA_PREFIX']
 
         cmakecmd.extend([src_dir])
