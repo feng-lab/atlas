@@ -1204,10 +1204,10 @@ def build_jxrlib(src_dir: str, install_dir: str):
                           r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O']
             if is_linux():
                 to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC']
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx']
             else:
                 to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 '
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx '
                             r'-mmacosx-version-min={0}'.format(macos_min_version())]
 
             bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
@@ -1596,7 +1596,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                               ],
                                   to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
                                             'macro(mkl_fail)\n',
-                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib)',
+                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64)',
                                             ])
 
             orig_file2 = os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt')
