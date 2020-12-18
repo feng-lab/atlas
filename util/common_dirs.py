@@ -370,7 +370,7 @@ def install_cmake():
     elif is_linux():
         unpack_tool_to_target_dir(src_package_dir(), 'cmake*Linux*')
     else:
-        unpack_tool_to_target_dir(src_package_dir(), 'cmake*Darwin*')
+        unpack_tool_to_target_dir(src_package_dir(), 'cmake*macos*')
 
 
 # to install new version of ninja, delete existing binary in atlas/src/3rdparty/build/ninja
@@ -417,7 +417,7 @@ def get_cmake_binary() -> str:
         cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*Linux*_64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     else:
-        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*Darwin*_64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*macos*'))
         return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
 
 

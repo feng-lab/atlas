@@ -29,7 +29,8 @@
     git submodule update --init --recursive --depth 1
     # or git submodule update --init --recursive
     ```
-* run `python3 util/build_ext_libs.py all` to build external libraries
+* activate a conda env with tbb-devel mkl-devel qt numpy python   
+* run `python3 util/build_ext_libs.py all` to build external libraries and python packages
 * run `python3 util/build_and_deploy_atlas.py` or build CMakeLists.txt
 
 ## C++ Version Defines
@@ -57,9 +58,10 @@
 
 ## Python Package Build
 ```bash
-conda install conda-build cmake ninja qt numpy
+conda install conda-build conda-verify
 conda build purge-all
-conda build conda
-conda remove zimg -y
-conda install zimg -c fenglab -y
+conda build zimg-recipe
+conda build conda-opencv-recipe
+conda remove zimg conda-opencv -y
+conda install zimg conda-opencv -c fenglab -y
 ```

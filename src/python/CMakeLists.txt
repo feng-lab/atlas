@@ -70,7 +70,7 @@ include(LibsForImg)
 add_subdirectory(../img condaimg)
 
 # pybind11
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/pybind11 pybind11)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/pybind11 pybind11)
 message(STATUS "PYTHON_VERSION_MAJOR: " ${PYTHON_VERSION_MAJOR})
 message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
 
@@ -104,17 +104,19 @@ if (PYTHON_VERSION_MAJOR)
   endif ()
 endif ()
 
+# target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
+
 # install
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/" # source directory
-        DESTINATION $ENV{SP_DIR}/zimg # target directory
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/" # source directory
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
         FILES_MATCHING PATTERN "*.py"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE
         )
-install(TARGETS ${module_name} DESTINATION $ENV{SP_DIR}/zimg)
-install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION $ENV{SP_DIR}/zimg)
-install(DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/jars" # source directory
-        DESTINATION $ENV{SP_DIR}/zimg # target directory
+install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
+        DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
         FILES_MATCHING PATTERN "*.jar"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE

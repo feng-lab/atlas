@@ -458,6 +458,9 @@ def build_gflags(src_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd.extend(['-DGFLAGS_NAMESPACE=gflags',
+                         ])
+
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -634,7 +637,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_CARES_PROVIDER=module',
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
-                         '-DgRPC_GFLAGS_PROVIDER:STRING=package',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
                          '-DgRPC_ABSL_PROVIDER:STRING=module',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
@@ -769,6 +771,7 @@ def build_snappy(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
+                         '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
                          '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
                          '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
                          src_dir])
@@ -1535,10 +1538,10 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_doubleconversion:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_eigen:BOOL=ON',
-                         '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=' + 'OFF' if is_windows() else 'ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_hdf5:BOOL=' + ('OFF' if is_windows() else 'ON'),
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_jpeg:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_lz4:BOOL=ON',
-                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=' + 'OFF' if is_windows() else 'ON',
+                         '-DVTK_MODULE_USE_EXTERNAL_VTK_lzma:BOOL=' + ('OFF' if is_windows() else 'ON'),
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_png:BOOL=ON',
                          '-DVTK_MODULE_USE_EXTERNAL_VTK_zlib:BOOL=ON',
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
@@ -1642,7 +1645,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DWITH_LAPACK:BOOL=ON',
             '-DWITH_MKL:BOOL=ON',
             '-DMKL_WITH_TBB:BOOL=ON',
-            '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + 'OFF' if conda_build else 'ON',
+            '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),
             '-DWITH_PROTOBUF:BOOL=ON',
 
             '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1666,7 +1669,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_opencv_dnn:BOOL=OFF',
             '-DBUILD_opencv_world:BOOL=OFF',
             '-DBUILD_opencv_python2:BOOL=OFF',
-            '-DBUILD_opencv_python3:BOOL=' + 'ON' if conda_build else 'OFF',
+            '-DBUILD_opencv_python3:BOOL=' + ('ON' if conda_build else 'OFF'),
             '-DPYTHON3_EXECUTABLE=' + sys.executable,
             '-DBUILD_opencv_java:BOOL=OFF',
 
@@ -1693,6 +1696,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
                              ])
 
+        print(cmakecmd)
+
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -1710,6 +1715,21 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
         if not conda_build:
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
+
+
+def build_conda_zimg(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        env = os.environ.copy()
+        env['PREFIX'] = env['CONDA_PREFIX']
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
 
 
 def build_ospray(src_dir: str, install_dir: str):
@@ -2095,10 +2115,14 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_contrib_dir)
         build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
-    if libs['conda_opencv']:
+    if libs['conda-opencv']:
         src_dir = os.path.join(ext_dir(), 'opencv')
         src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
         build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
+
+    if libs['conda-zimg']:
+        src_dir = os.path.join(atlas_src_dir(), 'python')
+        build_conda_zimg(src_dir, ext_conda_build_dir())
 
     # if libs['botan']:
     #     src_dir = os.path.join(ext_dir(), 'botan')
@@ -2173,7 +2197,7 @@ def parse_inputs(argv: list):
                 'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda_opencv'
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
@@ -2184,7 +2208,7 @@ def parse_inputs(argv: list):
                             'libpng': ['opencv', 'itk', 'vtk'],
                             'libjpeg': ['opencv', 'itk', 'vtk'],
                             'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly'],
-                            'gflags': ['glog', 'grpc'],
+                            'gflags': ['glog'],
                             'glog': ['ceres-solver', 'folly'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
@@ -2200,7 +2224,7 @@ def parse_inputs(argv: list):
                             'zstd': ['folly'],
                             'openjpeg': ['opencv'],
                             'libwebp': ['opencv'],
-                            'opencv': ['conda_opencv'],
+                            'opencv': ['conda-opencv'],
                             }
 
     print('current interpreter: ' + sys.executable)

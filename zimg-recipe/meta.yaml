@@ -1,0 +1,38 @@
+package:
+  name: zimg
+  version: {{ datetime.datetime.today().strftime('%Y.%m.%d.%H') }}
+
+source:
+  path: ../src/3rdparty/conda_build
+
+build:
+  number: 0
+
+requirements:
+  build:
+#    - git
+#    - cmake
+#    - ninja
+
+  host:
+    - qt
+    - mkl-devel
+    - tbb-devel
+    - python x.x
+    - numpy
+
+  run:
+    - python
+    - numpy >=1.18
+    - qt >=5.9
+    - mkl
+    - tbb
+
+test:
+
+outputs:
+
+about:
+  home: https://feng-lab.github.io
+  license: proprietary - fenglab
+  license_family: PROPRIETARY

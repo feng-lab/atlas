@@ -370,3 +370,5 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 else ()
   target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 endif ()
+
+# target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)

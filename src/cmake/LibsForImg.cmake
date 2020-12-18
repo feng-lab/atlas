@@ -210,6 +210,7 @@ print_target_properties(ITKBinaryMathematicalMorphology)
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(gflags)
+print_target_properties(gflags_static)
 find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build
              NO_DEFAULT_PATH)

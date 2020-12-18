@@ -1,0 +1,36 @@
+package:
+  name: conda-opencv
+  version: {{ datetime.datetime.today().strftime('%Y.%m.%d.%H') }}
+
+source:
+  path: ../src/3rdparty/conda_build
+
+build:
+  number: 0
+
+requirements:
+  build:
+
+  host:
+    - python x.x
+    - numpy
+    - mkl
+    - tbb
+
+  run:
+    - python x.x
+    - numpy >=1.18
+    - mkl
+    - tbb
+    - libstdcxx-ng # [linux]
+    - libgcc-ng # [linux]
+
+test:
+
+outputs:
+
+about:
+  home: http://opencv.org/
+  license: Apache
+  license_family: Apache
+  summary: Computer vision and machine learning software library.
