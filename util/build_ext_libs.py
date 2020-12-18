@@ -1644,7 +1644,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DWITH_LAPACK:BOOL=ON',
             '-DWITH_MKL:BOOL=ON',
             '-DMKL_WITH_TBB:BOOL=ON',
-            '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),
+            # '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),  # if on lapack check fails
             '-DWITH_PROTOBUF:BOOL=ON',
 
             '-DBUILD_SHARED_LIBS:BOOL=OFF',
