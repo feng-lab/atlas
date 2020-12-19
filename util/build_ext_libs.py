@@ -456,7 +456,14 @@ def build_cpuinfo(src_dir: str, install_dir: str):
 def build_gflags(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        if is_mac():
+            orig_file = os.path.join(src_dir, 'src', 'gflags.cc')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'ReportError(DIE, "ERROR: something wrong with'],
+                                  to_texts=[r'ReportError(DO_NOT_DIE, "ERROR: something wrong with'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DGFLAGS_NAMESPACE=gflags',
                          ])
@@ -465,6 +472,8 @@ def build_gflags(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac:
+            os.replace(bak_file, orig_file)
 
 
 def build_glog(src_dir: str, install_dir: str):
@@ -2208,7 +2217,7 @@ def parse_inputs(argv: list):
                             'libjpeg': ['opencv', 'itk', 'vtk'],
                             'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly'],
                             'gflags': ['glog'],
-                            'glog': ['ceres-solver', 'folly'],
+                            'glog': ['ceres-solver', 'folly', 'opencv'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
                             'tbb': ['itk', 'opencv', 'vtk'],
