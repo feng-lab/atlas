@@ -472,7 +472,7 @@ def build_gflags(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac:
+        if is_mac():
             os.replace(bak_file, orig_file)
 
 

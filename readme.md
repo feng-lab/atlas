@@ -26,8 +26,7 @@
 * `atlas_others` folder and repository folder should be in same directory
 * get submodules
     ```bash
-    git submodule update --init --recursive --depth 1
-    # or git submodule update --init --recursive
+    git submodule update --init --recursive
     ```
 * activate a conda env with tbb-devel mkl-devel qt numpy python   
 * run `python3 util/build_ext_libs.py all` to build external libraries and python packages
