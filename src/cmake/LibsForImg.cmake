@@ -164,6 +164,9 @@ if (WIN32)
   set(FREEIMAGE_LIBRARIES ${FREEIMAGE_LIBRARIES}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.lib
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.lib)
+  set(FREEIMAGE_DLLS ${FREEIMAGE_DLLS}
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImagePlus.dll
+      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/freeimage/FreeImage.dll)
 elseif (APPLE)
   set(FREEIMAGE_INCLUDE_DIRS ${FREEIMAGE_INCLUDE_DIRS}
       ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)

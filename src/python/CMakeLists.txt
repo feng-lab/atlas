@@ -102,6 +102,13 @@ if (PYTHON_VERSION_MAJOR)
                        $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
                        )
   endif ()
+  if (WIN32)
+    add_custom_command(TARGET ${module_name}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_DLLS}
+                       $<TARGET_FILE_DIR:${module_name}>
+                       )
+  endif ()
 endif ()
 
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
