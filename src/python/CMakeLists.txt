@@ -102,13 +102,6 @@ if (PYTHON_VERSION_MAJOR)
                        $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
                        )
   endif ()
-  if (WIN32)
-    add_custom_command(TARGET ${module_name}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_DLLS}
-                       $<TARGET_FILE_DIR:${module_name}>
-                       )
-  endif ()
 endif ()
 
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
@@ -121,7 +114,11 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/" # source directory
         PATTERN "*cmake*" EXCLUDE
         )
 install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
-install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+if (WIN32)
+  install(FILES ${FREEIMAGE_DLLS} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+else (WIN32)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+endif (WIN32)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
         DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
         FILES_MATCHING PATTERN "*.jar"

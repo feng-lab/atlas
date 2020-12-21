@@ -656,8 +656,10 @@ if (WIN32)
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${APP_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
     # target_compile_options(${APP_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead.
-    # target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
+    target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
     # target_compile_options(${APP_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
+    target_compile_options(${APP_NAME} PUBLIC /wd6386) # Buffer overrun while writing to 'data'.
+    target_compile_options(${APP_NAME} PUBLIC /wd28020)
     target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
     target_compile_options(${APP_NAME} PUBLIC /GL) # Enables whole program optimization.
   else()
@@ -668,8 +670,8 @@ if (WIN32)
   target_compile_options(${APP_NAME} PUBLIC /Zc:preprocessor)
   target_compile_options(${APP_NAME} PUBLIC /arch:AVX)
 
-  set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
-  set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  #set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  #set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.

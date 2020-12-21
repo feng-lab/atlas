@@ -14,6 +14,10 @@ def macos_min_version():
     return '10.14'
 
 
+def cpp_standard():
+    return '17'
+
+
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
@@ -132,11 +136,8 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     return env
 
 
-def get_tbb_env(conda_build: bool=False):
-    if conda_build:
-        env = get_vcvars_environment() if is_windows() else os.environ.copy()
-        env['TBBROOT'] = env['CONDA_PREFIX']
-    elif is_windows():
+def get_tbb_env():
+    if is_windows():
         env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
                                                             'tbbvars.bat'),
                                                para='intel64 vs2017',
@@ -153,7 +154,7 @@ def get_tbb_env(conda_build: bool=False):
     return env
 
 
-def get_common_build_flags():
+def get_common_build_flags(cpp_standard: str = cpp_standard()):
     res = {}
     if is_mac():
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
@@ -163,21 +164,21 @@ def get_common_build_flags():
                         f'-fPIC -fvisibility=hidden -mavx'
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
-        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++17 ' \
+        res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_linux():
         res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
-        res['CXXFLAGS'] = f'-std=c++17 -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+        res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
-        res['CXXFLAGS'] = f'/utf-8 /std:c++17 /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
+        res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
 
 
-def get_env_for_config_make():
+def get_env_for_config_make(cpp_standard: str = cpp_standard()):
     env = get_vcvars_environment() if is_windows() else os.environ.copy()
-    cbf = get_common_build_flags()
+    cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_mac():
         env['CC'] = cbf['CC']
         env['CFLAGS'] = cbf['CFLAGS']
@@ -193,8 +194,8 @@ def get_env_for_config_make():
     return env
 
 
-def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
-    cbf = get_common_build_flags()
+def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: str = cpp_standard()):
+    cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_windows():
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
@@ -205,6 +206,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
                '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
                '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
                '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               f'-DCMAKE_CXX_STANDARD={cpp_standard}',
+               '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
+               '-DCMAKE_CXX_EXTENSIONS=OFF',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -226,6 +230,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
                '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
                '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
                '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               f'-DCMAKE_CXX_STANDARD={cpp_standard}',
+               '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
+               '-DCMAKE_CXX_EXTENSIONS=OFF',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -244,6 +251,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja = use_ninja()):
                '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
                '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
                '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               f'-DCMAKE_CXX_STANDARD={cpp_standard}',
+               '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
+               '-DCMAKE_CXX_EXTENSIONS=OFF',
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
@@ -500,7 +510,6 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
-        cleanup_git_submodule(src_dir)
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
@@ -1133,7 +1142,16 @@ def build_libpng(src_dir: str, install_dir: str):
 def build_openjpeg(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        orig_file = os.path.join(src_dir, 'src', 'lib', 'openjp2', 'openjpeg.h')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'#define OPENJPEG_H'],
+                              to_texts=['#define OPENJPEG_H\n'
+                                        '#ifndef OPJ_STATIC\n'
+                                        '#define OPJ_STATIC\n'
+                                        '#endif\n'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_STATIC_LIBS:BOOL=ON',
@@ -1146,6 +1164,7 @@ def build_openjpeg(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_libwebp(src_dir: str, install_dir: str):
@@ -1531,12 +1550,7 @@ def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        if is_windows():
-            for idx, cmd in enumerate(cmakecmd):
-                if cmd.startswith('-DCMAKE_CXX_FLAGS:'):
-                    cmakecmd[idx] = cmd.replace('/std:c++17', '/std:c++14')
+        cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard='14')
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -1586,17 +1600,29 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
 
         if conda_build:
             print('CONDA_PREFIX', os.environ['CONDA_PREFIX'])
-            cmakecmd.extend([
-                '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'],
-                '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/lib/cmake/tbb',
-            ])
+            if is_windows():
+                cmakecmd.extend([
+                    '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'] + '/Library',
+                    '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/Library/lib/cmake/tbb',
+                ])
+            else:
+                cmakecmd.extend([
+                    '-DMKL_ROOT_DIR=' + os.environ['CONDA_PREFIX'],
+                    '-DTBB_DIR=' + os.environ['CONDA_PREFIX'] + '/lib/cmake/tbb',
+                ])
             orig_file = os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt')
             bak_file = patch_file(orig_file,
                                   from_texts=[r'ocv_add_perf_tests()',
                                               ],
-                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir() + '/include)\n'
+                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode('unicode_escape').decode() + '/include)\n'
                                             'ocv_add_perf_tests()\n',
                                             ])
+
+            if is_windows():
+                orig_file2 = os.path.join(src_dir, 'cmake', 'OpenCVDetectPython.cmake')
+                bak_file2 = patch_file(orig_file2,
+                                       from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
+                                       to_texts=[r'set(_packages_path "Lib/site-packages")'])
         else:
             orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
             bak_file = patch_file(orig_file,
@@ -1605,7 +1631,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                               ],
                                   to_texts=['set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n'
                                             'macro(mkl_fail)\n',
-                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8)',
+                                            r'set(mkl_lib_find_paths ${MKL_LIB_FIND_PATHS} ${MKL_ROOT_DIR}/lib ${MKL_ROOT_DIR}/../tbb/lib ${MKL_ROOT_DIR}/../tbb/lib/intel64/gcc4.8 ${MKL_ROOT_DIR}/../tbb/lib/intel64/vc14)',
                                             ])
 
             orig_file2 = os.path.join(src_dir, 'modules', 'calib3d', 'CMakeLists.txt')
@@ -1619,6 +1645,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                    to_texts=[r''])
 
         cmakecmd.extend([
+            '-DOPENCV_SKIP_CMAKE_CXX_STANDARD:BOOL=ON',
+            '-DHAVE_CXX11:BOOL=ON',
             '-DOPENCV_ENABLE_NONFREE:BOOL=ON',
             '-DOPENCV_FORCE_3RDPARTY_BUILD:BOOL=OFF',
             '-DBUILD_ZLIB:BOOL=OFF',
@@ -1628,6 +1656,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_PNG:BOOL=OFF',
             '-DBUILD_OPENEXR:BOOL=ON',
             '-DBUILD_WEBP:BOOL=OFF',
+            '-DBUILD_OPENJPEG:BOOL=OFF',
 
             '-DBUILD_PROTOBUF:BOOL=OFF',
 
@@ -1652,7 +1681,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DWITH_OPENCLAMDBLAS:BOOL=OFF',
             '-DWITH_LAPACK:BOOL=ON',
             '-DWITH_MKL:BOOL=ON',
-            '-DMKL_WITH_TBB:BOOL=ON',
+            '-DMKL_WITH_TBB:BOOL=' + ('OFF' if is_windows() else 'ON'),   # mkl_tbb link with static run lib (/MT)
+            '-DMKL_WITH_OPENMP:BOOL=OFF',
             # '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),  # if on lapack check fails
             '-DWITH_PROTOBUF:BOOL=ON',
 
@@ -1692,6 +1722,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
         if is_windows():
             cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DWITH_WIN32UI:BOOL=OFF',
+                             '-DOpenJPEG_DIR=' + ext_build_dir() + '\\lib\\openjpeg-2.3',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
                              ])
         elif is_linux():
@@ -1704,10 +1735,19 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '/modules',
                              ])
 
-        print(cmakecmd)
+        # print(cmakecmd)
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if conda_build and is_windows():
+            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
+                                                                'conda.bat'),
+                                                   para='activate',
+                                                   start_env=get_vcvars_environment(),
+                                                   remove_conda_from_path=False)
+            build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+        else:
+            build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if not conda_build:
             if is_windows():
@@ -1720,6 +1760,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        if conda_build and is_windows():
+            os.replace(bak_file2, orig_file2)
         if not conda_build:
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
@@ -1731,7 +1773,14 @@ def build_conda_zimg(src_dir: str, install_dir: str):
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        env = get_vcvars_environment() if is_windows() else os.environ.copy()
+        if is_windows():
+            env = get_enviroment_from_shell_script(os.path.join(os.environ['CONDA_PREFIX'], 'condabin',
+                                                                'conda.bat'),
+                                                   para='activate',
+                                                   start_env=get_vcvars_environment(),
+                                                   remove_conda_from_path=False)
+        else:
+            env = os.environ.copy()
         env['PREFIX'] = env['CONDA_PREFIX']
 
         cmakecmd.extend([src_dir])
@@ -2223,7 +2272,7 @@ def parse_inputs(argv: list):
                             'tbb': ['itk', 'opencv', 'vtk'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
-                            # 'ceres-solver': ['opencv'],   # only if we need opencv sfm
+                            'ceres-solver': ['opencv'],   # only if we need opencv sfm
                             'boost': ['folly'],
                             'folly-deps': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],

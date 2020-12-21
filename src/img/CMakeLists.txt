@@ -289,8 +289,10 @@ if (WIN32)
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
     # target_compile_options(${LIBRARY_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead.
-    # target_compile_options(${LIBRARY_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
     # target_compile_options(${LIBRARY_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6386) # Buffer overrun while writing to 'data'.
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd28020)
     target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
     target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
   else()
@@ -319,9 +321,9 @@ if (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_FLAGS ${JXRINC})
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
-  set_source_files_properties(zimggraph.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
-  set_source_files_properties(zimagetransformresolve.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
-  set_source_files_properties(zminimumspanningtree.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  #set_source_files_properties(zimggraph.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  #set_source_files_properties(zimagetransformresolve.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  #set_source_files_properties(zminimumspanningtree.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
   target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)

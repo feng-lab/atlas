@@ -1,8 +1,13 @@
 if (BUILD_WITH_CONDA)
+  if (WIN32)
+    set(CONDA_LIB_DIR $ENV{PREFIX}/Library)
+  else (WIN32)
+    set(CONDA_LIB_DIR $ENV{PREFIX})
+  endif ()
   # qt
-  set(QT_HOST_PATH $ENV{PREFIX})
+  set(QT_HOST_PATH ${CONDA_LIB_DIR})
   # tbb
-  set(TBB_DIR $ENV{PREFIX}/lib/cmake/tbb)
+  set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/tbb)
 else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/QtInfo.cmake)
@@ -15,13 +20,13 @@ find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)
 
 if (BUILD_WITH_CONDA)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} $ENV{PREFIX}/include $ENV{PREFIX}/include/fftw)
-  find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64
-               PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
-  find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread
-               PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
-  find_library(MKL_CORE NAMES mkl_core
-               PATHS $ENV{PREFIX}/lib NO_DEFAULT_PATH)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include ${CONDA_LIB_DIR}/include/fftw)
+  find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
+               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
+  find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread mkl_sequential_dll
+               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
+  find_library(MKL_CORE NAMES mkl_core mkl_core_dll
+               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
   set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
 else ()
   if (WIN32)
