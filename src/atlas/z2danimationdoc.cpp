@@ -9,8 +9,8 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
+#include <utility>
 
 namespace nim {
 
@@ -31,7 +31,7 @@ void Z2DAnimationDoc::bindView(ZView* v)
 
 void Z2DAnimationDoc::createNewAnimation(const QString& name)
 {
-  Z2DAnimation* animation = new Z2DAnimation(m_doc, this);
+  auto animation = new Z2DAnimation(m_doc, this);
   addAnimation(animation, "", name);
   animation->addKeyFrame(0);
 }
@@ -129,9 +129,9 @@ size_t Z2DAnimationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> Z2DAnimationDoc::loadFileActions() const
+std::vector<QAction*> Z2DAnimationDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadAnimationsAction);
   return res;
 }
@@ -237,7 +237,7 @@ void Z2DAnimationDoc::loadAnimation()
 
 void Z2DAnimationDoc::setModified()
 {
-  if (Z2DAnimation* animation = qobject_cast<Z2DAnimation*>(sender())) {
+  if (auto animation = qobject_cast<Z2DAnimation*>(sender())) {
     for (const auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
         if (!idPack.second->hasUnsavedChange) {
@@ -276,8 +276,8 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& pat
   return id;
 }
 
-Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animation_, const QString& path_, const QString& name)
-  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(name)
+Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animation_, const QString& path_, QString name)
+  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(std::move(name))
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;

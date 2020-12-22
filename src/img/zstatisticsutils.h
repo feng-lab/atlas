@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zlog.h"
-#include <QList>
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 #include <vector>
@@ -168,7 +167,7 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
   if (bias || size <= 1) {
     stdV = std::sqrt(sq_sum / size);
   } else {
-    stdV = std::sqrt(sq_sum / (size - 1));
+    stdV = std::sqrt(sq_sum / (size - 1.));
   }
 }
 

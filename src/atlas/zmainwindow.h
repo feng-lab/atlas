@@ -31,7 +31,7 @@ public:
 
   void initOpenglContext();
 
-  [[nodiscard]] const QList<QAction*>& recentFileActions() const
+  [[nodiscard]] const std::vector<QAction*>& recentFileActions() const
   { return m_recentFileActions; }
 
   void updateRecentFileActions();
@@ -158,68 +158,68 @@ private:
   static void checkForUpdates();
 
 private:
-  QMenu* m_fileMenu;
-  QMenu* m_editMenu;
-  QMenu* m_viewMenu;
-  QMenu* m_animationMenu;
-  QMenu* m_windowMenu;
-  QMenu* m_helpMenu;
-  QMenu* m_dockMenu;
-  QToolBar* m_fileToolBar;
-  QToolBar* m_editToolBar;
-  QToolBar* m_viewToolBar;
-  QToolBar* m_dragModeToolBar;
-  QToolBar* m_roiToolBar;
-  QToolBar* m_helpToolBar;
+  QMenu* m_fileMenu = nullptr;
+  QMenu* m_editMenu = nullptr;
+  QMenu* m_viewMenu = nullptr;
+  QMenu* m_animationMenu = nullptr;
+  QMenu* m_windowMenu = nullptr;
+  QMenu* m_helpMenu = nullptr;
+  QMenu* m_dockMenu = nullptr;
+  QToolBar* m_fileToolBar = nullptr;
+  QToolBar* m_editToolBar = nullptr;
+  QToolBar* m_viewToolBar = nullptr;
+  QToolBar* m_dragModeToolBar = nullptr;
+  QToolBar* m_roiToolBar = nullptr;
+  QToolBar* m_helpToolBar = nullptr;
 
-  //QAction *m_newAction;
-  QAction* m_openAction;
-  QAction* m_saveAction;
-  QAction* m_saveAsAction;
-  QAction* m_loadSceneAction;
-  QAction* m_saveSceneAction;
-  QAction* m_closeAction;
+  //QAction *m_newAction = nullptr;
+  QAction* m_openAction = nullptr;
+  QAction* m_saveAction = nullptr;
+  QAction* m_saveAsAction = nullptr;
+  QAction* m_loadSceneAction = nullptr;
+  QAction* m_saveSceneAction = nullptr;
+  QAction* m_closeAction = nullptr;
 
-  QAction* m_exitAction;
-  QAction* m_aboutAction;
-  QAction* m_aboutQtAction;
-  QAction* m_checkForUpdatesAction;
+  QAction* m_exitAction = nullptr;
+  QAction* m_aboutAction = nullptr;
+  QAction* m_aboutQtAction = nullptr;
+  QAction* m_checkForUpdatesAction = nullptr;
 #ifdef Q_OS_LINUX
-  QAction* m_createDesktopEntryAction;
+  QAction* m_createDesktopEntryAction = nullptr;
 #endif
 
-  QAction* m_viewLogAction;
-  QAction* m_openLogFolderAction;
+  QAction* m_viewLogAction = nullptr;
+  QAction* m_openLogFolderAction = nullptr;
 #ifdef ATLAS_WITH_TESTS
-  QAction* m_runBenchmarkAction;
+  QAction* m_runBenchmarkAction = nullptr;
   QAction* m_testAction;
 #endif
-  QAction* m_runCustomCommandAction;
+  QAction* m_runCustomCommandAction = nullptr;
 
-  QAction* m_separatorAction;
-  QList<QAction*> m_recentFileActions;
+  QAction* m_separatorAction = nullptr;
+  std::vector<QAction*> m_recentFileActions;
 
-  QAction* m_open3DViewAction;
-  QAction* m_screenShotAction;
-  QAction* m_helpAction;
+  QAction* m_open3DViewAction = nullptr;
+  QAction* m_screenShotAction = nullptr;
+  QAction* m_helpAction = nullptr;
 
-  QAction* m_openNewInstanceAction;
+  QAction* m_openNewInstanceAction = nullptr;
 
-  QDockWidget* m_objectsDockWidget;
-  QDockWidget* m_viewSettingDockWidget;
-  QDockWidget* m_objectDetailedInfoDockWidget;
-  QDockWidget* m_globalSettingDockWidget;
-  QDockWidget* m_captureDockWidget;
-  QDockWidget* m_helpDockWidget;
-  QDockWidget* m_editObjDockWidget;
-  ZObjEditWidget* m_objEditWidget;
+  QDockWidget* m_objectsDockWidget = nullptr;
+  QDockWidget* m_viewSettingDockWidget = nullptr;
+  QDockWidget* m_objectDetailedInfoDockWidget = nullptr;
+  QDockWidget* m_globalSettingDockWidget = nullptr;
+  QDockWidget* m_captureDockWidget = nullptr;
+  QDockWidget* m_helpDockWidget = nullptr;
+  QDockWidget* m_editObjDockWidget = nullptr;
+  ZObjEditWidget* m_objEditWidget = nullptr;
 
   //
   std::unique_ptr<ZDoc> m_doc;
   std::unique_ptr<ZView> m_view;
 
   //
-  Z3DCanvas* m_sharedContext;
+  Z3DCanvas* m_sharedContext = nullptr;
 
   QPointer<Z3DMainWindow> m_3dWindow;
 

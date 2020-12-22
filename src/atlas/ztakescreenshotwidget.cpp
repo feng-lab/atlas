@@ -12,7 +12,6 @@
 #include <QMessageBox>
 #include <QLabel>
 #include <QGroupBox>
-#include <QSettings>
 #include <QApplication>
 
 namespace nim {
@@ -36,9 +35,7 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget* par
   , m_is2D(is2D)
 {
   m_customSize.setStyle("SPINBOX");
-  QList<QString> names;
-  names.push_back("Width:");
-  names.push_back("Height:");
+  std::vector<QString> names{"Width:", "Height:"};
   m_customSize.setNameForEachValue(names);
   m_mode.addOptions("Capture Single Image", "Capture Rotating Image sequence");
   m_mode.select("Capture Single Image");
@@ -193,9 +190,9 @@ void ZTakeScreenShotWidget::createWidget()
 {
   auto lo = new QVBoxLayout;
 
-  QHBoxLayout* hlo = nullptr;
-  QWidget* wg = nullptr;
-  QLabel* label = nullptr;
+  QHBoxLayout* hlo;
+  QWidget* wg;
+  QLabel* label;
 
   if (!m_is2D) {
     hlo = new QHBoxLayout;

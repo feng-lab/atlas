@@ -21,8 +21,8 @@ ZLoadImageSequenceDialog::ZLoadImageSequenceDialog(const QString& title, QWidget
   , m_catScenes("Cat Scenes", true)
 {
   QStringList filters;
-  QList<nim::FileFormat> formats;
-  nim::ZImg::getQtReadNameFilter(filters, formats);
+  std::vector<FileFormat> formats;
+  ZImg::getQtReadNameFilter(filters, formats);
   m_inputImagesFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFilesWithFilter,
                                                   "Input Sequence:",
                                                   filters.join(";;"),

@@ -1,5 +1,7 @@
 #include "zcameraparameteranimation.h"
 
+#include <memory>
+
 namespace nim {
 
 // Legendre polynomial information for Gaussian quadrature of speed on domain
@@ -66,8 +68,8 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
   for (size_t i = 1; i < m_keys.size(); ++i) {
     if (secs < m_keys[i]->time()) {
       double progress = m_keys[i]->timeToProgress(*m_keys[i - 1], secs);
-      ZCameraParameterKey* key1 = static_cast<ZCameraParameterKey*>(m_keys[i - 1].get());
-      ZCameraParameterKey* key2 = static_cast<ZCameraParameterKey*>(m_keys[i].get());
+      auto key1 = static_cast<ZCameraParameterKey*>(m_keys[i - 1].get());
+      auto key2 = static_cast<ZCameraParameterKey*>(m_keys[i].get());
       centerDist = glm::mix(key1->para()->get().centerDist(), key2->para()->get().centerDist(), progress);
       center = glm::mix(key1->para()->get().center(), key2->para()->get().center(), progress);
       Z3DCamera::ProjectionType pt = key1->para()->get().projectionType();
@@ -141,14 +143,14 @@ void ZCameraParameterAnimation::buildSpline()
   for (size_t i = 1; i < m_keys.size(); ++i) {
     if (m_keys[i]->type() == "Switch") {
       // end of one segment, build spline with range
-      QList<ZCameraParameterKey*> res;
+      std::vector<ZCameraParameterKey*> res;
       for (size_t j = start; j < i; ++j) {
         // make sure no overlap key
         if (j > start && m_keys[j]->time() - m_keys[j - 1]->time() < 0.0001)
           m_keys[j]->setTime(m_keys[j - 1]->time() + 0.0001);
         res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
       }
-      m_pathSegments.push_back(SplineRange());
+      m_pathSegments.emplace_back();
       SplineRange sr(res);
       m_pathSegments[m_pathSegments.size() - 1].swap(sr);
 
@@ -156,14 +158,14 @@ void ZCameraParameterAnimation::buildSpline()
     }
   }
   // last segment
-  QList<ZCameraParameterKey*> res;
+  std::vector<ZCameraParameterKey*> res;
   for (size_t j = start; j < m_keys.size(); ++j) {
     // make sure no overlap key
     if (j > start && m_keys[j]->time() - m_keys[j - 1]->time() < 0.0001)
       m_keys[j]->setTime(m_keys[j - 1]->time() + 0.0001);
     res.push_back(static_cast<ZCameraParameterKey*>(m_keys[j].get()));
   }
-  m_pathSegments.push_back(SplineRange());
+  m_pathSegments.emplace_back();
   SplineRange sr(res);
   m_pathSegments[m_pathSegments.size() - 1].swap(sr);
 }
@@ -204,14 +206,14 @@ glm::quat ZCameraParameterAnimation::SquadPoly::Q(float fU) const
   return glm::squad(m_kP, m_kQ, m_kA, m_kB, fU);
 }
 
-ZCameraParameterAnimation::SplineRange::SplineRange(QList<ZCameraParameterKey*>& kys)
+ZCameraParameterAnimation::SplineRange::SplineRange(std::vector<ZCameraParameterKey*>& kys)
   : m_hasSpline(kys.size() >= 2)
 {
   keys.swap(kys);
   if (m_hasSpline) {
-    firstKey.reset(new ZCameraParameterKey(*keys[0]));
-    lastKey.reset(new ZCameraParameterKey(*keys[keys.size() - 1]));
-    keys.push_front(firstKey.get());
+    firstKey = std::make_unique<ZCameraParameterKey>(*keys[0]);
+    lastKey = std::make_unique<ZCameraParameterKey>(*keys[keys.size() - 1]);
+    keys.insert(keys.begin(), firstKey.get());
     keys.push_back(lastKey.get());
     buildPosSpline();
     buildRotSpline();
@@ -224,7 +226,7 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
     return keys[0]->rot();
 
   // find the interpolating polynomial (clamping used, modify for looping)
-  int i;
+  size_t i;
   float fU;
   if (startTime() < fTime) {
     if (fTime < endTime()) {
@@ -234,7 +236,7 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
       }
       fU = (fTime - rotSpline[i].m_fTMin) * rotSpline[i].m_fTInvRange;
     } else {
-      i = rotSpline.size() - 1;
+      i = rotSpline.size() - 1_usize;
       fU = 1.0f;
     }
   } else {
@@ -244,83 +246,83 @@ glm::quat ZCameraParameterAnimation::SplineRange::rotation(float fTime) const
   return rotSpline[i].Q(fU);
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::position(double fTime) const
+glm::vec3 ZCameraParameterAnimation::SplineRange::position(float fTime) const
 {
   if (!m_hasSpline)
     return keys[0]->eye();
 
-  int i;
+  size_t i;
   float fU;
   doPolyLookup(fTime, i, fU);
   return posSpline[i].Position(fU);
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::velocity(double fTime)
+glm::vec3 ZCameraParameterAnimation::SplineRange::velocity(float fTime)
 {
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i;
+  size_t i;
   float fU;
   doPolyLookup(fTime, i, fU);
   return posSpline[i].Velocity(fU);
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::acceleration(double fTime)
+glm::vec3 ZCameraParameterAnimation::SplineRange::acceleration(float fTime)
 {
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i;
+  size_t i;
   float fU;
   doPolyLookup(fTime, i, fU);
   return posSpline[i].Acceleration(fU);
 }
 
-double ZCameraParameterAnimation::SplineRange::length(double fTime)
+float ZCameraParameterAnimation::SplineRange::length(float fTime)
 {
   if (!m_hasSpline)
     return 0;
 
-  int i;
+  size_t i;
   float fU;
   doPolyLookup(fTime, i, fU);
   return posSpline[i].Length(fU);
 }
 
-double ZCameraParameterAnimation::SplineRange::totalLength()
+float ZCameraParameterAnimation::SplineRange::totalLength() const
 {
   return posSplineTotalLength;
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(double fS)
+glm::vec3 ZCameraParameterAnimation::SplineRange::positionAL(float fS)
 {
   if (!m_hasSpline)
     return keys[0]->eye();
 
-  int i = 0;
+  size_t i = 0;
   float fU = 0;
   invertIntegral(fS, i, fU);
   return posSpline[i].Position(fU);
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::velocityAL(double fS)
+glm::vec3 ZCameraParameterAnimation::SplineRange::velocityAL(float fS)
 {
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i = 0;
+  size_t i = 0;
   float fU = 0;
   invertIntegral(fS, i, fU);
   return posSpline[i].Velocity(fU);
 }
 
-glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(double fS)
+glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(float fS)
 {
   if (!m_hasSpline)
     return glm::vec3(0.f);
 
-  int i = 0;
+  size_t i = 0;
   float fU = 0;
   invertIntegral(fS, i, fU);
   return posSpline[i].Acceleration(fU);
@@ -328,11 +330,11 @@ glm::vec3 ZCameraParameterAnimation::SplineRange::accelerationAL(double fS)
 
 void ZCameraParameterAnimation::SplineRange::buildPosSpline()
 {
-  for (int i = 0; i < keys.size() - 3; ++i) {
-    posSpline.push_back(Poly());
+  for (size_t i = 0; i < keys.size() - 3; ++i) {
+    posSpline.emplace_back();
   }
 
-  for (int i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < posSpline.size(); i0++, i1++, i2++, i3++) {
+  for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < posSpline.size(); i0++, i1++, i2++, i3++) {
     glm::vec3 kDiff10 = keys[i1]->eye() - keys[i0]->eye();
     glm::vec3 kDiff21 = keys[i2]->eye() - keys[i1]->eye();
     glm::vec3 kDiff32 = keys[i3]->eye() - keys[i2]->eye();
@@ -370,7 +372,7 @@ void ZCameraParameterAnimation::SplineRange::buildPosSpline()
   }
   // compute arc lengths of polynomials and total length of spline
   posSplineLengths.resize(posSpline.size() + 1, 0.f);
-  for (int i = 0; i < posSpline.size(); ++i) {
+  for (size_t i = 0; i < posSpline.size(); ++i) {
     // length of current polynomial
     float fPolyLength = posSpline[i].Length(1.0f);
     // total length of curve between poly[0] and poly[i+1]
@@ -381,18 +383,18 @@ void ZCameraParameterAnimation::SplineRange::buildPosSpline()
 
 void ZCameraParameterAnimation::SplineRange::buildRotSpline()
 {
-  for (int i = 0; i < keys.size() - 3; ++i) {
-    rotSpline.push_back(SquadPoly());
+  for (size_t i = 0; i < keys.size() - 3; ++i) {
+    rotSpline.emplace_back();
   }
 
   // Consecutive quaterions should form an acute angle. Changing sign on
   // a quaternion does not change the rotation it represents.
-  int i;
+  size_t i;
   for (i = 1; i < keys.size(); ++i) {
     if (glm::dot(keys[i]->rot(), keys[i - 1]->rot()) < 0.0f)
       keys[i]->rot() = -keys[i]->rot();
   }
-  for (int i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < rotSpline.size(); i0++, i1++, i2++, i3++) {
+  for (size_t i0 = 0, i1 = 1, i2 = 2, i3 = 3; i0 < rotSpline.size(); i0++, i1++, i2++, i3++) {
     glm::quat kQ0 = keys[i0]->rot();
     glm::quat kQ1 = keys[i1]->rot();
     glm::quat kQ2 = keys[i2]->rot();
@@ -434,7 +436,7 @@ void ZCameraParameterAnimation::SplineRange::buildRotSpline()
   }
 }
 
-void ZCameraParameterAnimation::SplineRange::doPolyLookup(float fTime, int& riI, float& rfU) const
+void ZCameraParameterAnimation::SplineRange::doPolyLookup(float fTime, size_t& riI, float& rfU) const
 {
   // Lookup the polynomial that contains the input time in its domain of
   // evaluation. Clamp to [tmin,tmax].
@@ -446,7 +448,7 @@ void ZCameraParameterAnimation::SplineRange::doPolyLookup(float fTime, int& riI,
       }
       rfU = (fTime - posSpline[riI].m_fTMin) * posSpline[riI].m_fTInvRange;
     } else {
-      riI = posSpline.size() - 1;
+      riI = posSpline.size() - 1_usize;
       rfU = 1.0f;
     }
   } else {
@@ -455,7 +457,7 @@ void ZCameraParameterAnimation::SplineRange::doPolyLookup(float fTime, int& riI,
   }
 }
 
-void ZCameraParameterAnimation::SplineRange::invertIntegral(float fS, int& riI, float& rfU)
+void ZCameraParameterAnimation::SplineRange::invertIntegral(float fS, size_t& riI, float& rfU)
 {
   // clamp s to [0,L] so that t in [tmin,tmax]
   if (fS <= 0.0f) {
@@ -464,7 +466,7 @@ void ZCameraParameterAnimation::SplineRange::invertIntegral(float fS, int& riI, 
     return;
   }
   if (fS >= posSplineTotalLength) {
-    riI = posSpline.size() - 1;
+    riI = posSpline.size() - 1_usize;
     rfU = 1.0f;
     return;
   }

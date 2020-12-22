@@ -122,8 +122,8 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
       //m_transferFuncParas[i]->setVolume(m_img->volumes()[i].get());
       m_texFilterModeParas.emplace_back(
         std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
-      m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
-                                                  qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
+      m_texFilterModeParas[i]->addOptionsWithData(std::make_pair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
+                                                  std::make_pair(QString("Linear"), static_cast<int>(GL_LINEAR)));
       m_texFilterModeParas[i]->select("Linear");
     }
   }

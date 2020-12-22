@@ -13,7 +13,7 @@ public:
   Z3DImgView(ZImgDoc& doc, Z3DView& view);
 
 private:
-  void docImgsAdded(const QList<size_t>& objs);
+  void docImgsAdded(const std::vector<size_t>& objs);
 
   void docImgAdded(size_t id);
 };

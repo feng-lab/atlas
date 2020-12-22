@@ -8,7 +8,6 @@
 #include "zgraphicsitemtype.h"
 #include <QGraphicsRectItem>
 #include <QGraphicsPathItem>
-#include <QList>
 #include <QPointF>
 #include <map>
 #include <vector>
@@ -111,7 +110,7 @@ public:
   int type() const override
   { return Type; }
 
-  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, QTransform  tfm, ZView& view,
+  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm, ZView& view,
                         double viewScale = 1., const RegionNode* regionNode = nullptr,
                         QGraphicsItem* parent = nullptr);
 
@@ -174,7 +173,7 @@ public:
 
   void setData(ZROI& roi, ZRegionAnnotationPack& raPack);
 
-  bool isLocked() const;
+  [[nodiscard]] bool isLocked() const;
 
   void releaseItemsOwnership();
 
@@ -190,18 +189,18 @@ public:
   void setRegionColor(const glm::vec3& col)
   { m_regionColor.set(col); }
 
-  glm::vec3 outlineColor() const
+  [[nodiscard]] glm::vec3 outlineColor() const
   { return m_outlineColor.get(); }
 
-  glm::vec3 regionColor() const
+  [[nodiscard]] glm::vec3 regionColor() const
   { return m_regionColor.get(); }
 
-  double opacity() const
+  [[nodiscard]] double opacity() const
   { return m_opacity.get(); }
 
-  QString regionName() const;
+  [[nodiscard]] QString regionName() const;
 
-  ZBBox<glm::ivec4> boundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

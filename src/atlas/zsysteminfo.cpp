@@ -161,7 +161,7 @@ QString ZSystemInfo::fontPath(const QString& filename) const
   return m_fontPath + (filename.isEmpty() ? QString("") : QString("/") + filename);
 }
 
-QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
+QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 {
   QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
   QDir dir(folder);
@@ -187,12 +187,12 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes) const
 
   // try other volumes
   if (folder.isEmpty()) {
-    QList<QStorageInfo> vols = QStorageInfo::mountedVolumes();
-    for (int i = 0; i < vols.size(); ++i) {
+    auto vols = QStorageInfo::mountedVolumes();
+    for (auto& vol : vols) {
       //LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
-      if (!vols[i].isRoot() && vols[i].isValid() && vols[i].isReady() && !vols[i].isReadOnly() &&
-          static_cast<size_t>(vols[i].bytesAvailable()) >= requiredSpaceInBytes) {
-        folder = vols[i].rootPath();
+      if (!vol.isRoot() && vol.isValid() && vol.isReady() && !vol.isReadOnly() &&
+          static_cast<size_t>(vol.bytesAvailable()) >= requiredSpaceInBytes) {
+        folder = vol.rootPath();
         break;
       }
     }
@@ -250,10 +250,10 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
   updateRecentFiles();
 }
 
-void ZSystemInfo::updateRecentFiles() const
+void ZSystemInfo::updateRecentFiles()
 {
   for (auto widget : QApplication::topLevelWidgets()) {
-    if (ZMainWindow* mainWin = qobject_cast<ZMainWindow*>(widget))
+    if (auto mainWin = qobject_cast<ZMainWindow*>(widget))
       mainWin->updateRecentFileActions();
   }
 }
@@ -274,7 +274,7 @@ void ZSystemInfo::detectOS()
 #endif // Q_OS_WIN
 }
 
-QDir ZSystemInfo::createLogDir() const
+QDir ZSystemInfo::createLogDir()
 {
   QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
   if (!dir.exists())

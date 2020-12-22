@@ -11,7 +11,7 @@
 
 namespace nim {
 
-ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const QList<size_t>& objs, QWidget* parent)
+ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const std::vector<size_t>& objs, QWidget* parent)
   : QDialog(parent), m_doc(doc)
 {
   createWidget();
@@ -70,7 +70,7 @@ void ZSaveObjsDialog::collectObjsToSave()
 {
   m_objsToSave.clear();
   for (auto item : m_treeWidget->selectedItems()) {
-    m_objsToSave.append(item->data(0, Qt::UserRole).value<size_t>());
+    m_objsToSave.push_back(item->data(0, Qt::UserRole).value<size_t>());
   }
   accept();
 }

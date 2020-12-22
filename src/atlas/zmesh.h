@@ -67,7 +67,7 @@ public:
 
   static const QString& getQtReadNameFilter();
 
-  static void getQtWriteNameFilter(QStringList& filters, QList<std::string>& formats);
+  static void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
   // might throw ZIOException
   void load(const QString& filename);
@@ -304,7 +304,7 @@ private:
 private:
   friend class ZMeshIO;
 
-  GLenum m_type;
+  GLenum m_type = GL_TRIANGLES;
 
   std::vector<glm::vec3> m_vertices;
   std::vector<float> m_1DTextureCoordinates;

@@ -4,7 +4,6 @@
 #include "z2dtransformparameter.h"
 #include "zview.h"
 #include <QObject>
-#include <QList>
 #include <QTransform>
 
 namespace nim {
@@ -22,7 +21,7 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  virtual bool isVisible() const
+  [[nodiscard]] virtual bool isVisible() const
   { return m_visible.get(); }
 
   ZBoolParameter& visiblePara()
@@ -61,13 +60,13 @@ public:
   virtual void rotateCounterclockwise(double, double)
   {}
 
-  QList<ZParameter*> parameters()
+  std::vector<ZParameter*> parameters()
   { return m_parameters; }
 
-  int viewPrecedence() const
+  [[nodiscard]] int viewPrecedence() const
   { return m_viewPrecedencePara.get(); }
 
-  QPointF mapFromScene(QPointF p) const;
+  [[nodiscard]] QPointF mapFromScene(QPointF p) const;
 
 signals:
 
@@ -88,23 +87,23 @@ protected:
 
   QTransform getQTransform() const;
 
-  glm::dvec2 getTransformScale() const
+  [[nodiscard]] glm::dvec2 getTransformScale() const
   { return m_transform.scale(); }
 
-  QRectF mapToSceneRect(const QRectF& rect) const;
+  [[nodiscard]] QRectF mapToSceneRect(const QRectF& rect) const;
 
-  QRectF mapFromSceneRect(const QRectF& rect) const;
+  [[nodiscard]] QRectF mapFromSceneRect(const QRectF& rect) const;
 
-  int realZ() const
+  [[nodiscard]] int realZ() const
   { return m_view.currentSlice() - int(m_offsetPara.get().x); }
 
-  int realZ(int z) const
+  [[nodiscard]] int realZ(int z) const
   { return z - int(m_offsetPara.get().x); }
 
-  int realT() const
+  [[nodiscard]] int realT() const
   { return m_view.currentTime() - int(m_offsetPara.get().y); }
 
-  int realT(int t) const
+  [[nodiscard]] int realT(int t) const
   { return t - int(m_offsetPara.get().y); }
 
   virtual void viewPrecedenceChanged();
@@ -120,7 +119,7 @@ protected:
   void sendToBack();
 
 protected:
-  QList<ZParameter*> m_parameters;
+  std::vector<ZParameter*> m_parameters;
 
   ZView& m_view;
 

@@ -68,7 +68,7 @@ private:
 private:
   bool m_group;
 
-  QGroupBox* m_groupBox;
+  QGroupBox* m_groupBox = nullptr;
 
   ZStringIntOptionParameter m_mode;
   ZBoolParameter m_captureStereoImage;
@@ -76,12 +76,12 @@ private:
   ZBoolParameter m_useWindowSize;
   ZIVec2Parameter m_customSize;
 
-  QRadioButton* m_useManualName;
-  QRadioButton* m_useAutoName;
+  QRadioButton* m_useManualName = nullptr;
+  QRadioButton* m_useAutoName = nullptr;
 
-  ZSelectFileWidget* m_folderWidget;
+  ZSelectFileWidget* m_folderWidget = nullptr;
   ZStringParameter m_namePrefix;
-  QPushButton* m_captureButton;
+  QPushButton* m_captureButton = nullptr;
 
   QString m_lastFName;
   int m_nextNumber;
@@ -90,7 +90,7 @@ private:
   ZBoolParameter m_clockwise;
   ZIntParameter m_timeInSecond;
   ZIntParameter m_framePerSecond;
-  QPushButton* m_captureSequenceButton;
+  QPushButton* m_captureSequenceButton = nullptr;
 
   bool m_is2D;
 };

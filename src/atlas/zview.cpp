@@ -4,7 +4,6 @@
 #include "zgraphicsscene.h"
 #include "zgraphicsview.h"
 #include "zobjview.h"
-#include "zactiongroup.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "zroidoc.h"
@@ -203,7 +202,7 @@ ZView::State ZView::state() const
   return State::Normal;
 }
 
-QWidget* ZView::captureWidget()
+QWidget* ZView::captureWidget() const
 {
   //auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
@@ -572,7 +571,7 @@ void ZView::changeViewport()
   }
 }
 
-void ZView::takeFixedSizeScreenShot(QString filename, int width, int height)
+void ZView::takeFixedSizeScreenShot(const QString& filename, int width, int height)
 {
   QString err;
   if (!m_view->renderToImage(filename, width, height, &err)) {
@@ -580,7 +579,7 @@ void ZView::takeFixedSizeScreenShot(QString filename, int width, int height)
   }
 }
 
-void ZView::takeScreenShot(QString filename)
+void ZView::takeScreenShot(const QString& filename)
 {
   QString err;
   if (!m_view->renderToImage(filename, &err)) {
@@ -774,7 +773,6 @@ void ZView::createActions()
   m_roiCutLineAction->setCheckable(true);
   m_roiCutLineAction->setStatusTip(tr("Draw Line to Cut ROI"));
 
-  // m_roiStyleActionGroup = new ZActionGroup(this);
   m_dragModeActionGroup->addAction(m_roiSplineAction);
   m_dragModeActionGroup->addAction(m_roiPolygonAction);
   m_dragModeActionGroup->addAction(m_roiRectangleAction);

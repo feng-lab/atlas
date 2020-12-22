@@ -44,8 +44,7 @@ void zoomPVRawImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     QString outname = outFolder + fileInfo.completeBaseName() + "_ds.tif";
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 2, 3));
     img.zoom(0.248113255269998, 0.248113255269998, 0.414373111494544);
@@ -60,8 +59,7 @@ void zoomRefBrainSlices()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
     img.zoom(0.25, 0.25, 1);
@@ -76,8 +74,7 @@ void zoomRefBrainSlices2()
   QStringList filters;
   filters << "*.ome.tiff";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     QString outname = outFolder + fileInfo.fileName();
     ZImg img(fileInfo.absoluteFilePath());
     img.zoom(0.25, 0.25, 1);
@@ -166,8 +163,7 @@ void convertImages()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     QString outname = outFolder + fileInfo.baseName() + ".v3draw";
     ZImg img(fileInfo.absoluteFilePath());
     //img.save(outname);
@@ -302,13 +298,12 @@ void transfromMesh()
   glm::mat4 mat;
   nim::toVal(QString("[1.03, 0, 0, 0; 0, 6.13928e-08, 1.03, 0; 0, -1.03, 6.13928e-08, 0; 0, 0, 0, 1]"), mat);
 
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t j = 0; j < vertices.size(); ++j) {
-      vertices[j] = glm::applyMatrix(mat, vertices[j]);
+    for (auto& vertice : vertices) {
+      vertice = glm::applyMatrix(mat, vertice);
     }
     msh.setVertices(vertices);
     msh.generateNormals();
@@ -328,13 +323,12 @@ void transfromMesh2()
   glm::mat4 mat;
   nim::toVal(QString("[5.96047e-09, 0, -0.1, 490.6; 0, 0.1, 0, -355.6; 0.1, 0, 5.96047e-09, -513.4; 0, 0, 0, 1]"), mat);
 
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     ZMesh msh(fileInfo.absoluteFilePath());
 
     std::vector<glm::vec3> vertices = msh.vertices();
-    for (size_t j = 0; j < vertices.size(); ++j) {
-      vertices[j] = glm::applyMatrix(mat, vertices[j]);
+    for (auto& vertice : vertices) {
+      vertice = glm::applyMatrix(mat, vertice);
     }
     msh.setVertices(vertices);
     msh.generateNormals();
@@ -368,8 +362,7 @@ void stnTrajectory()
     }
   }
 
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     QStringList tokens = fileInfo.fileName().split("_");
     for (auto it = tokens.begin(); it != tokens.end(); ++it) {
       if (it->contains("um")) {
@@ -442,7 +435,7 @@ void stnTrajectory()
         ZImgAutoThreshold<> imgAutoThre;
         double cent1 = 0;
         double cent2 = 0;
-        double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
+        auto thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, projection);
 #if 0
         double scale = cent2 - cent1;
         if (scale < 1.0)
@@ -477,7 +470,7 @@ void stnTrajectory()
           std::vector<glm::dvec3> line;
           while (true) {
             ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
-            line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
+            line.emplace_back(coord.x, coord.y, coord.z);
             if (curIdx == idx) {
               break;
             }
@@ -555,7 +548,7 @@ void mergeTraces()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   QDir outFolder("/Users/feng/Downloads/allen_stn_grid_traj_clean");
 
-  for (QFileInfo fileInfo : list) {
+  for (const auto& fileInfo : list) {
     QString fileName = fileInfo.fileName();
     ZSwc origSwc(fileInfo.absoluteFilePath());
     ZSwc swc;
@@ -622,8 +615,7 @@ void calcSwcVolume()
   ZMesh branchMesh;
   filters << "*c.swc";
   LOG(INFO) << "NameOfCell, SomaSurfaceArea, SomaVolume, NeuriteSurfaceArea, NeuriteVolume";
-  for (int i = 0; i < dirlist.size(); ++i) {
-    QFileInfo dirInfo = dirlist.at(i);
+  for (auto& dirInfo : dirlist) {
     QDir subDir(dirInfo.absoluteFilePath());
     QFileInfoList list = subDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     CHECK(list.size() == 1);
@@ -798,18 +790,18 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
   double swcPixelPerUmz = 2.0;
   glm::dvec3 refSwcLocInBrain = glm::dvec3(-2.25, 1.27, 2.5);   //in mm
   glm::dvec3 refSwcRootImageLoc = glm::dvec3(373, 291, 202);   //roughly get from image
-  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
-    QString cellName = metaData[metaIdx][0];
-    double Anterior_Posterior = metaData[metaIdx][1].toDouble();
-    double Medial_Lateral = metaData[metaIdx][2].toDouble();
-    double Deep_Superficial = metaData[metaIdx][3].toDouble();
+  for (auto& metaIdx : metaData) {
+    QString cellName = metaIdx[0];
+    double Anterior_Posterior = metaIdx[1].toDouble();
+    double Medial_Lateral = metaIdx[2].toDouble();
+    double Deep_Superficial = metaIdx[3].toDouble();
 
     glm::dvec3 swcLoc(-Medial_Lateral, Deep_Superficial, -Anterior_Posterior);
     glm::dvec3 swcRootImageLoc = (swcLoc - refSwcLocInBrain) * imagePixelPerUm * 1000. + refSwcRootImageLoc;
     QString swcFolder;
-    for (int i = 0; i < swcFolders.size(); ++i) {
-      if (QFile::exists(QString("%1/%2.swc").arg(swcFolders[i]).arg(cellName))) {
-        swcFolder = swcFolders[i];
+    for (const auto& i : swcFolders) {
+      if (QFile::exists(QString("%1/%2.swc").arg(i).arg(cellName))) {
+        swcFolder = i;
         break;
       }
     }
@@ -920,13 +912,13 @@ void createCellTable()
 
   std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
 
-  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
-    QString cellType = metaData[metaIdx][1];
-    QString cellName = metaData[metaIdx][2];
-    QString somaLocation = metaData[metaIdx][3];
-    double AP = metaData[metaIdx][4].toDouble();
-    double ML = metaData[metaIdx][5].toDouble();
-    double r2 = metaData[metaIdx][27].toDouble();
+  for (auto& metaIdx : metaData) {
+    QString cellType = metaIdx[1];
+    QString cellName = metaIdx[2];
+    QString somaLocation = metaIdx[3];
+    double AP = metaIdx[4].toDouble();
+    double ML = metaIdx[5].toDouble();
+    double r2 = metaIdx[27].toDouble();
     int somaLocationOrder = somaLocationMap[somaLocation];
     assert(somaLocationOrder > 0 && somaLocationOrder < 5);
 
@@ -1026,8 +1018,8 @@ void testLogSpeed()
   for (int i = 0; i < 500000; ++i)
     logList << randomString(10, 100);
   bt.start();
-  for (int i = 0; i < logList.size(); ++i)
-    LOG(INFO) << logList.at(i);
+  for (const auto& i : logList)
+    LOG(INFO) << i;
   STOP_AND_LOG(bt);
 }
 
@@ -1170,19 +1162,19 @@ void detectPuncta()
 
   filters.clear();
   filters << "*.nim";
-  for (int i = 0; i < fdlist.size(); ++i) {
-    QDir fdir(fdlist.at(i).absoluteFilePath());
+  for (const auto& i : fdlist) {
+    QDir fdir(i.absoluteFilePath());
     QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     if (list.size() == 1) {
       LOG(INFO) << list.at(0).absoluteFilePath();
 
       for (size_t ch = 1; ch < 4; ++ch) {
-        QString pfn = QString("%1/%2_ch%3.nimp").arg(fdlist.at(i).absoluteFilePath()).arg(
+        QString pfn = QString("%1/%2_ch%3.nimp").arg(i.absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
         if (QFile::exists(pfn)) {
           continue;
         }
-        QString lfn = QString("%1/%2_ch%3_log.txt").arg(fdlist.at(i).absoluteFilePath()).arg(
+        QString lfn = QString("%1/%2_ch%3_log.txt").arg(i.absoluteFilePath()).arg(
           list.at(0).completeBaseName()).arg(ch + 1);
         LOG(INFO) << pfn;
         ZPunctaDetection pd(list.at(0).absoluteFilePath(), ch);
@@ -1203,8 +1195,8 @@ void changeDapifileType()
   QFileInfoList fdlist = dir.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks);
   filters.clear();
   filters << "*.nim";
-  for (int i = 0; i < fdlist.size(); ++i) {
-    QDir fdir(fdlist.at(i).absoluteFilePath());
+  for (const auto& i : fdlist) {
+    QDir fdir(i.absoluteFilePath());
     QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
     if (list.size() == 1) {
       LOG(INFO) << list.at(0).absoluteFilePath();
@@ -1348,14 +1340,14 @@ void createGlanceThumbnails()
   }
 
   std::vector<QString> templateName;
-  templateName.push_back("pc_thumbnail_template.scene");
-  templateName.push_back("pv_thumbnail_template.scene");
+  templateName.emplace_back("pc_thumbnail_template.scene");
+  templateName.emplace_back("pv_thumbnail_template.scene");
   std::vector<QString> swcDirs;
-  swcDirs.push_back("/Users/feng/Documents/PY/PySWC");
-  swcDirs.push_back("/Users/feng/Documents/PV/PVSWC");
+  swcDirs.emplace_back("/Users/feng/Documents/PY/PySWC");
+  swcDirs.emplace_back("/Users/feng/Documents/PV/PVSWC");
   std::vector<QString> punctaSuffix;
-  punctaSuffix.push_back("_puncta.apo");
-  punctaSuffix.push_back("_neurite.nimp");
+  punctaSuffix.emplace_back("_puncta.apo");
+  punctaSuffix.emplace_back("_neurite.nimp");
 
   for (size_t ti = 0; ti < templateName.size(); ++ti) {
     QFile file(QString("/Users/feng/Google Drive/eeum/raw/%1").arg(templateName[ti]));
@@ -1448,7 +1440,7 @@ void exportSceneForGlance()
 
   Z3DView* view3d = mainWin->get3DWindow()->view();
   for (auto ojbview : view3d->objViews()) {
-    if (Z3DMeshView* meshView = qobject_cast<Z3DMeshView*>(ojbview)) {
+    if (auto meshView = qobject_cast<Z3DMeshView*>(ojbview)) {
       auto doc = const_cast<ZMeshDoc*>(qobject_cast<const ZMeshDoc*>(&meshView->doc()));
       CHECK(doc);
       for (auto& kv : meshView->idToFilter()) {
@@ -1463,7 +1455,7 @@ void exportSceneForGlance()
         mesh.generateNormals();
         mesh.save(name);
       }
-    } else if (Z3DSwcView* swcView = qobject_cast<Z3DSwcView*>(ojbview)) {
+    } else if (auto swcView = qobject_cast<Z3DSwcView*>(ojbview)) {
       auto doc = const_cast<ZSwcDoc*>(qobject_cast<const ZSwcDoc*>(&swcView->doc()));
       CHECK(doc);
       for (auto& kv : swcView->idToFilter()) {
@@ -1487,7 +1479,7 @@ void exportSceneForGlance()
         QString cellname = doc->objName(id);
         cellnames.push_back(cellname);
       }
-    } else if (Z3DPunctaView* punctaView = qobject_cast<Z3DPunctaView*>(ojbview)) {
+    } else if (auto punctaView = qobject_cast<Z3DPunctaView*>(ojbview)) {
       auto doc = const_cast<ZPunctaDoc*>(qobject_cast<const ZPunctaDoc*>(&punctaView->doc()));
       CHECK(doc);
       for (auto& kv : punctaView->idToFilter()) {
@@ -1631,21 +1623,21 @@ void stitchAndDetectPuncta()
 
   filters.clear();
   filters << "*_Sum.lsm";
-  for (int i = 0; i < fdlist.size(); ++i) {
-    QDir fdir(fdlist.at(i).absoluteFilePath());
+  for (const auto& i : fdlist) {
+    QDir fdir(i.absoluteFilePath());
     QString tsfn = fdir.filePath("TileSelection.lsm");
     if (!QFile::exists(tsfn)) {
       LOG(WARNING) << fdir.absolutePath() << " no tile selection file";
       continue;
     }
     QFileInfoList list = fdir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-    if (list.size() < 1) {
+    if (list.empty()) {
       LOG(WARNING) << fdir.absolutePath() << " not enough lsm file for stitching";
       continue;
     }
 
     QStringList inputFiles;
-    for (auto fi : list) {
+    for (const auto& fi : list) {
       inputFiles.push_back(fi.absoluteFilePath());
     }
 
@@ -1720,7 +1712,7 @@ using helloworld::Greeter;
 class GreeterClient
 {
 public:
-  GreeterClient(std::shared_ptr<Channel> channel)
+  explicit GreeterClient(std::shared_ptr<Channel> channel)
     : m_stub(Greeter::NewStub(channel))
   {}
 
@@ -1799,8 +1791,7 @@ void swapMeshXY()
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   QString outFolder = "/Volumes/fs3017/eeum/AllenMouseBrainCommonCoordinateFrameworkSpacesP56MeshesSwapXY";
 
-  for (int i = 0; i < list.size(); ++i) {
-    QFileInfo fileInfo = list.at(i);
+  for (auto& fileInfo : list) {
     ZMesh msh(fileInfo.absoluteFilePath());
     msh.swapXY();
 
@@ -1847,13 +1838,13 @@ void createPCCellTable()
 
   std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
 
-  for (int metaIdx = 0; metaIdx < metaData.size(); ++metaIdx) {
-    QString cellType = metaData[metaIdx][1];
-    QString cellName = metaData[metaIdx][2];
-    QString somaLocation = metaData[metaIdx][3];
-    double AP = metaData[metaIdx][4].toDouble();
-    double ML = metaData[metaIdx][5].toDouble();
-    double r2 = metaData[metaIdx][27].toDouble();
+  for (auto& metaIdx : metaData) {
+    QString cellType = metaIdx[1];
+    QString cellName = metaIdx[2];
+    QString somaLocation = metaIdx[3];
+    double AP = metaIdx[4].toDouble();
+    double ML = metaIdx[5].toDouble();
+    double r2 = metaIdx[27].toDouble();
     int somaLocationOrder = somaLocationMap[somaLocation];
     assert(somaLocationOrder > 0 && somaLocationOrder < 5);
 
@@ -1865,7 +1856,7 @@ void createPCCellTable()
     QString swcName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_layer.swc").arg(cellName);
     QString punctaName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_puncta_small.apo").arg(cellName);
 
-    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
+    for (auto it = docObject.begin(); it != docObject.end(); ++it) {
       QStringList typeAndID = it.key().split(" ");
       QString IDString = typeAndID[1].trimmed();
       QFileInfo docPath(it.value().toString());

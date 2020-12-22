@@ -13,7 +13,7 @@ public:
   Z3DMeshView(ZMeshDoc& doc, Z3DView& view);
 
 private:
-  void docMeshesAdded(const QList<size_t>& objs);
+  void docMeshesAdded(const std::vector<size_t>& objs);
 
   void docMeshAdded(size_t id);
 };

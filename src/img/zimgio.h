@@ -82,20 +82,20 @@ public:
                 const ZImgWriteParameters& paras = ZImgWriteParameters());
 
   // qt style name filter for image open dialog
-  void getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats) const;
+  void getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats) const;
 
   // write filter
-  void getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps) const;
+  void getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps) const;
 
   //
-  bool fileExtensionReadSupported(const QString& filename) const;
+  [[nodiscard]] bool fileExtensionReadSupported(const QString& filename) const;
 
-  bool fileExtensionWriteSupported(const QString& filename) const;
+  [[nodiscard]] bool fileExtensionWriteSupported(const QString& filename) const;
 
 protected:
-  std::vector<ZImgFormat*> getSupportedReader(const QString& filename) const;
+  [[nodiscard]] std::vector<ZImgFormat*> getSupportedReader(const QString& filename) const;
 
-  std::vector<ZImgFormat*> getSupportedWriter(const QString& filename) const;
+  [[nodiscard]] std::vector<ZImgFormat*> getSupportedWriter(const QString& filename) const;
 
 private:
   std::map<FileFormat, std::unique_ptr<ZImgFormat>> m_ioFormats;

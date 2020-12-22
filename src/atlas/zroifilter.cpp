@@ -236,14 +236,14 @@ void ROIGraphicsItem::hoverLeaveEvent(QGraphicsSceneHoverEvent*)
   setPen(p);
 }
 
-ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, QTransform  tfm,
+ROICtrlPtGraphicsItem::ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm,
                                              ZView& view, double viewScale, const RegionNode* regionNode,
                                              QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_roi(roi)
   , m_controlPoint(controlPoint)
   , m_viewScale(viewScale)
-  , m_transform(std::move(tfm))
+  , m_transform(tfm)
   , m_view(view)
   , m_regionNode(regionNode)
 {

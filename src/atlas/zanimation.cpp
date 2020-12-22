@@ -10,7 +10,6 @@
 #include "z3dcanvas.h"
 #include "z3dcanvaspainter.h"
 #include "zgraphicsview.h"
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QFile>
 #include <QFileInfo>
@@ -27,7 +26,7 @@ template<class T>
 int numDigits(T number)
 {
   int digits = 0;
-  if (number < 0) digits = 1; // remove this line if '-' counts as a digit
+  if (number < 0) { digits = 1; } // remove this line if '-' counts as a digit
   while (number) {
     number /= 10;
     digits++;
@@ -39,32 +38,36 @@ int numDigits(T number)
 template<>
 int numDigits(int32_t x)
 {
-  if (x == std::numeric_limits<int>::min()) return 10 + 1;
-  if (x < 0) return numDigits(-x) + 1;
+  if (x == std::numeric_limits<int>::min()) { return 10 + 1; }
+  if (x < 0) { return numDigits(-x) + 1; }
 
   if (x >= 10000) {
     if (x >= 10000000) {
       if (x >= 100000000) {
-        if (x >= 1000000000)
+        if (x >= 1000000000) {
           return 10;
+        }
         return 9;
       }
       return 8;
     }
     if (x >= 100000) {
-      if (x >= 1000000)
+      if (x >= 1000000) {
         return 7;
+      }
       return 6;
     }
     return 5;
   }
   if (x >= 100) {
-    if (x >= 1000)
+    if (x >= 1000) {
       return 4;
+    }
     return 3;
   }
-  if (x >= 10)
+  if (x >= 10) {
     return 2;
+  }
   return 1;
 }
 
@@ -113,7 +116,7 @@ void ZAnimation::addKeyFrame(double time)
 
   addGlobalKey(time);
 
-  QList<size_t> objs = m_doc.objs();
+  auto objs = m_doc.objs();
   if (!is2DAnimation()) {
     objs.push_back(1);  //background
     objs.push_back(2);  //axis
@@ -219,8 +222,9 @@ void ZAnimation::toogleShowAll(size_t id)
 void ZAnimation::setDuration(double duration)
 {
   duration = std::max(1.0, duration);
-  if (m_duration != duration)
+  if (m_duration != duration) {
     m_undoStack.push(new ZAnimationChangeDurationCommand(this, m_duration, duration));
+  }
 }
 
 void ZAnimation::setCurrentTime(double time)
@@ -228,8 +232,9 @@ void ZAnimation::setCurrentTime(double time)
   time = std::max(0.0, time);
 
   for (const auto& obj : m_objList) {
-    if (obj->boundId == 0)
+    if (obj->boundId == 0) {
       continue;
+    }
     for (const auto& pa : obj->objParaAnimations) {
       pa->setCurrentTime(time);
     }
@@ -268,8 +273,9 @@ void ZAnimation::removeRedundantKeys()
 void ZAnimation::rebindView()
 {
   releaseParameters();
-  if (!m_view)
+  if (!m_view) {
     return;
+  }
 
   bindGlobalParameters();
 
@@ -277,8 +283,9 @@ void ZAnimation::rebindView()
 
   for (const auto& obj : m_objList) {
     size_t id = obj->boundId;
-    if (id == 0)
+    if (id == 0) {
       continue;
+    }
     std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
     CHECK(wg);
     connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
@@ -343,7 +350,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
   }
-  QProgressDialog* progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
@@ -356,8 +363,9 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   QDir tmpdir(tempdir->path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
-    if (progress->wasCanceled())
+    if (progress->wasCanceled()) {
       break;
+    }
 
     setCurrentTime(time);
     time += timeIncrement;
@@ -466,7 +474,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
     title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
   }
-  QProgressDialog* progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->show();
   int fieldWidth = numDigits(numFrame);
@@ -478,8 +486,9 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
   QDir tmpdir(tempdir->path());
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
-    if (progress->wasCanceled())
+    if (progress->wasCanceled()) {
       break;
+    }
 
     setCurrentTime(time);
     time += timeIncrement;
@@ -576,7 +585,7 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
   int numFrame = std::ceil(m_duration * framePerSecond);
   QString title = "Exporting 2D Animation As Images...";
-  QProgressDialog* progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
@@ -590,8 +599,9 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
   QString err;
   for (int i = 0; i < numFrame; ++i) {
     progress->setValue(i);
-    if (progress->wasCanceled())
+    if (progress->wasCanceled()) {
       break;
+    }
 
     setCurrentTime(time);
     time += timeIncrement;
@@ -761,10 +771,11 @@ void ZAnimation::buildDisplayPacks()
 
   for (const auto& obj : m_objList) {
     ZAnimationDisplayPack pack;
-    if (obj->boundId == 0)
+    if (obj->boundId == 0) {
       pack.name = QString("%1 not loaded").arg(obj->objType);
-    else
+    } else {
       pack.name = m_doc.objName(obj->boundId);
+    }
     pack.id = obj->uniqueId;
     pack.boundId = obj->boundId;
     pack.row = row++;
@@ -773,9 +784,9 @@ void ZAnimation::buildDisplayPacks()
     pack.showAll = obj->isShowAll;
     pack.paraAnimation = nullptr;
     QString objInfo;
-    if (obj->objJsonValue.isString())
+    if (obj->objJsonValue.isString()) {
       objInfo = obj->objJsonValue.toString();
-    else if (obj->objJsonValue.isObject()) {
+    } else if (obj->objJsonValue.isObject()) {
       QJsonDocument jd(obj->objJsonValue.toObject());
       objInfo = jd.toJson();
       QStringList infoList = objInfo.split("\n");
@@ -826,11 +837,12 @@ void ZAnimation::releaseParameters()
 {
   if (m_view) {
     for (const auto& pa : m_globalParaAnimations) {
-     pa->releaseParameter();
+      pa->releaseParameter();
     }
     for (const auto& obj : m_objList) {
-      if (obj->boundId == 0)
+      if (obj->boundId == 0) {
         continue;
+      }
       for (const auto& pa : obj->objParaAnimations) {
         pa->releaseParameter();
       }
@@ -843,11 +855,11 @@ bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAni
 {
   bool sorted = false;
   size_t foundNum = 0;
-  for (size_t i = 0; i < paraList.size(); ++i) {
+  for (auto para : paraList) {
     for (size_t j = 0; j < paraAnimationList.size(); ++j) {
-      if (paraList[i]->name() == paraAnimationList[j]->name() &&
-          paraList[i]->type() == paraAnimationList[j]->type()) {
-        paraAnimationList[j]->bindParameter(*paraList[i]);
+      if (para->name() == paraAnimationList[j]->name() &&
+          para->type() == paraAnimationList[j]->type()) {
+        paraAnimationList[j]->bindParameter(*para);
         if (j != foundNum) {
           std::swap(paraAnimationList[j], paraAnimationList[foundNum]);
           sorted = true;
@@ -920,12 +932,13 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
       } else if (it.key() == "Background" || it.key() == "Axis" || it.key() == "Lighting") {
         auto aniObj = std::make_unique<AnimationObj>(it.key(), QJsonValue());
         aniObj->uniqueId = m_nextUniqueId++;
-        if (it.key() == "Background")
+        if (it.key() == "Background") {
           aniObj->boundId = 1;
-        else if (it.key() == "Axis")
+        } else if (it.key() == "Axis") {
           aniObj->boundId = 2;
-        else if (it.key() == "Lighting")
+        } else if (it.key() == "Lighting") {
           aniObj->boundId = 3;
+        }
         QJsonObject jObj = it.value().toObject();
         for (QJsonObject::const_iterator it1 = jObj.begin(); it1 != jObj.end(); ++it1) {
           std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(it1.key(), it1.value()));
@@ -965,11 +978,11 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     }
 
     // match global parameters
-    for (size_t i = 0; i < globalParaAnimations.size(); ++i) {
-      for (size_t j = 0; j < m_globalParaAnimations.size(); ++j) {
-        if (globalParaAnimations[i]->name() == m_globalParaAnimations[j]->name() &&
-            globalParaAnimations[i]->type() == m_globalParaAnimations[j]->type()) {
-          m_globalParaAnimations[j] = std::move(globalParaAnimations[i]);
+    for (auto& gp : globalParaAnimations) {
+      for (auto& globalParaAnimation : m_globalParaAnimations) {
+        if (gp->name() == globalParaAnimation->name() &&
+            gp->type() == globalParaAnimation->type()) {
+          globalParaAnimation = std::move(gp);
           break;
         }
       }
@@ -980,11 +993,11 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     if (idmap.empty()) {
       err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey).arg(fn);
     } else {
-      for (size_t i = 0; i < m_objList.size(); ++i) {
-        if (idmap.find(m_objList[i]->uniqueId) != idmap.end()) {
-          m_objList[i]->boundId = idmap.at(m_objList[i]->uniqueId);
+      for (auto& i : m_objList) {
+        if (idmap.find(i->uniqueId) != idmap.end()) {
+          i->boundId = idmap.at(i->uniqueId);
           // original jsonvalue might be relative path, we need to convert them to absolute path (if file exist)
-          m_objList[i]->objJsonValue = m_doc.idToDoc(m_objList[i]->boundId)->jsonValue(m_objList[i]->boundId);
+          i->objJsonValue = m_doc.idToDoc(i->boundId)->jsonValue(i->boundId);
         }
       }
     }
@@ -1006,8 +1019,9 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
 {
   try {
     QSettings settings;
-    if (settings.value(QString("Animation/removeRedundantKeysWhenSaving"), QVariant(true)).toBool())
+    if (settings.value(QString("Animation/removeRedundantKeysWhenSaving"), QVariant(true)).toBool()) {
       removeRedundantKeys();
+    }
 
     QFileInfo fi(fn);
     QString nName;
@@ -1032,34 +1046,35 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     animationObj.insert("Version", QJsonValue(1.0));
 
     QJsonObject docObj;
-    for (size_t i = 0; i < m_objList.size(); ++i) {
-      if (m_objList[i]->objType == "Axis" || m_objList[i]->objType == "Background" ||
-          m_objList[i]->objType == "Lighting")
+    for (auto& i : m_objList) {
+      if (i->objType == "Axis" || i->objType == "Background" ||
+          i->objType == "Lighting") {
         continue;
-      docObj.insert(QString("%1 %2").arg(m_objList[i]->objType).arg(m_objList[i]->uniqueId),
-                    m_objList[i]->objJsonValue);
+      }
+      docObj.insert(QString("%1 %2").arg(i->objType).arg(i->uniqueId),
+                    i->objJsonValue);
     }
     animationObj.insert("Doc", docObj);
 
     animationObj.insert("Duration", m_duration);
-    for (size_t i = 0; i < m_globalParaAnimations.size(); ++i) {
-      m_globalParaAnimations[i]->write(animationObj);
+    for (auto& globalParaAnimation : m_globalParaAnimations) {
+      globalParaAnimation->write(animationObj);
     }
-    for (size_t i = 0; i < m_objList.size(); ++i) {
-      size_t id = m_objList[i]->uniqueId;
-      const auto& pas = m_objList[i]->objParaAnimations;
+    for (auto& i : m_objList) {
+      size_t id = i->uniqueId;
+      const auto& pas = i->objParaAnimations;
       if (!pas.empty()) {
         QJsonObject jObj;
-        for (size_t j = 0; j < pas.size(); ++j) {
-          pas[j]->write(jObj);
+        for (const auto& pa : pas) {
+          pa->write(jObj);
         }
         QString name;
-        if (m_objList[i]->objType == "Background") {
-          name = m_objList[i]->objType;
-        } else if (m_objList[i]->objType == "Axis") {
-          name = m_objList[i]->objType;
-        } else if (m_objList[i]->objType == "Lighting") {
-          name = m_objList[i]->objType;
+        if (i->objType == "Background") {
+          name = i->objType;
+        } else if (i->objType == "Axis") {
+          name = i->objType;
+        } else if (i->objType == "Lighting") {
+          name = i->objType;
         } else {
           name = QString("%1").arg(id);
         }
@@ -1097,7 +1112,7 @@ ZAnimation::AnimationObj* ZAnimation::findBoundId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->boundId == id) {
-      if (idx) *idx = i;
+      if (idx) { *idx = i; }
       return m_objList[i].get();
     }
   }
@@ -1108,7 +1123,7 @@ ZAnimation::AnimationObj* ZAnimation::findUniqueId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->uniqueId == id) {
-      if (idx) *idx = i;
+      if (idx) { *idx = i; }
       return m_objList[i].get();
     }
   }
@@ -1119,7 +1134,7 @@ const ZAnimation::AnimationObj* ZAnimation::findBoundId(size_t id, size_t* idx) 
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->boundId == id) {
-      if (idx) *idx = i;
+      if (idx) { *idx = i; }
       return m_objList[i].get();
     }
   }
@@ -1130,7 +1145,7 @@ const ZAnimation::AnimationObj* ZAnimation::findUniqueId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->uniqueId == id) {
-      if (idx) *idx = i;
+      if (idx) { *idx = i; }
       return m_objList[i].get();
     }
   }

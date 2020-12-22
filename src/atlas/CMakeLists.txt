@@ -309,7 +309,6 @@ set(SOURCES
     zfilterview.h
     zroiview.h
     zroifilter.h
-    zactiongroup.h
     zboostgeometryadaptor.h
     zquatparameter.h
     z3dshadermanager.h
@@ -487,7 +486,6 @@ set(SOURCES
     zroidoc.cpp
     zroiview.cpp
     zroifilter.cpp
-    zactiongroup.cpp
     zquatparameter.cpp
     z3dshadermanager.cpp
     zanimationexportwidget.cpp

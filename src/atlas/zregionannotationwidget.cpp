@@ -30,8 +30,8 @@ ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotationPack& rap, ZDo
 void ZRegionAnnotationWidget::exportLabelImage()
 {
   QStringList filters;
-  QList<FileFormat> formats;
-  QList<Compression> comps;
+  std::vector<FileFormat> formats;
+  std::vector<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
   int fmtIdx = -1;
@@ -41,7 +41,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(filters);
-    for (int i = 0; i < formats.size(); ++i) {
+    for (size_t i = 0; i < formats.size(); ++i) {
       if (formats[i] == FileFormat::HDF5Img) {
         dialog.selectNameFilter(filters[i]);
       }

@@ -9,9 +9,9 @@ ZRegionAnnotationView::ZRegionAnnotationView(ZRegionAnnotationDoc& doc, ZView& v
   connect(&m_doc, &ZRegionAnnotationDoc::objAdded, this, &ZRegionAnnotationView::docRegionAnnotationAdded);
 }
 
-void ZRegionAnnotationView::docRegionAnnotationsAdded(const QList<size_t>& objs)
+void ZRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t>& objs)
 {
-  for (unsigned long obj : objs) {
+  for (auto obj : objs) {
     auto viewControl = new ZRegionAnnotationFilter(m_view);
     viewControl->setData(m_doc.regionAnnotationPack(obj));
     expandBoundBox(viewControl->boundBox());

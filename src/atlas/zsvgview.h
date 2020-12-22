@@ -3,7 +3,6 @@
 #include "zfilterview.h"
 #include "zsvgdoc.h"
 #include "zsvgfilter.h"
-#include <map>
 
 namespace nim {
 
@@ -14,7 +13,7 @@ public:
   ZSvgView(ZSvgDoc& doc, ZView& view);
 
 private:
-  void docSvgsAdded(const QList<size_t>& objs);
+  void docSvgsAdded(const std::vector<size_t>& objs);
 
   void docSvgAdded(size_t id);
 };

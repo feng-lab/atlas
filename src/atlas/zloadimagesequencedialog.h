@@ -24,10 +24,10 @@ public:
   { return m_catScenes.get(); }
 
 private:
-  QPushButton* m_runButton;
-  QPushButton* m_exitButton;
-  QDialogButtonBox* m_buttonBox;
-  ZSelectFileWidget* m_inputImagesFileWidget;
+  QPushButton* m_runButton = nullptr;
+  QPushButton* m_exitButton = nullptr;
+  QDialogButtonBox* m_buttonBox = nullptr;
+  ZSelectFileWidget* m_inputImagesFileWidget = nullptr;
   ZStringIntOptionParameter m_catDimension;
   ZBoolParameter m_catScenes;
 };

@@ -13,7 +13,7 @@ public:
   Z3DSwcView(ZSwcDoc& doc, Z3DView& view);
 
 private:
-  void docSwcsAdded(const QList<size_t>& objs);
+  void docSwcsAdded(const std::vector<size_t>& objs);
 
   void docSwcAdded(size_t id);
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPlainTextEdit>
+#include <deque>
 
 namespace nim {
 
@@ -12,7 +13,7 @@ public:
   explicit ZLogWidget(bool receiveOldMessages = false, QWidget *parent = nullptr);
 
 private:
-  void writeLogData(const QList<LogData>* messages, int start, int end);
+  void writeLogData(const std::deque<LogData>* messages, size_t start, size_t end);
 
 private:
   QTextCharFormat m_normalFormat;

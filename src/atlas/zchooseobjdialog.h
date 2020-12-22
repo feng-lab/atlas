@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include <QDialog>
-#include <QList>
 
 class QLabel;
 

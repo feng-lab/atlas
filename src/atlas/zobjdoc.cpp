@@ -1,16 +1,13 @@
 #include "zobjdoc.h"
 
 #include "zdoc.h"
-#include "zmainwindow.h"
 #include "zlog.h"
 #include "zfileutils.h"
 #include "zchooseobjdialog.h"
 #include "zsysteminfo.h"
-#include <QSettings>
 #include <QMessageBox>
 #include <QApplication>
 #include <QFileInfo>
-#include <QDir>
 #include <set>
 
 namespace nim {
@@ -56,34 +53,34 @@ QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
   return QString("%1 (id: %2)").arg(objName(id)).arg(id);
 }
 
-std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& docKeyValueList, QString& err)
+std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, QJsonValue>>& docKeyValueList, QString& err)
 {
   std::map<size_t, size_t> idmap;
-  QList<size_t> allObjs = objs();
+  auto allObjs = objs();
 
   std::map<size_t, QJsonValue> idToJsonValue;
-  for (int i = 0; i < docKeyValueList.size(); ++i) {
-    QString keyString = docKeyValueList[i].first;
+  for (const auto& keyValue : docKeyValueList) {
+    QString keyString = keyValue.first;
     CHECK(keyString.startsWith(typeName()));
     bool ok = false;
     size_t id = 0;
     if (keyString.length() > typeName().length() + 1) {
       keyString.remove(0, typeName().length() + 1);
       if (keyString.trimmed().isEmpty()) {
-        LOG(WARNING) << "Invalid object key " << docKeyValueList[i].first;
+        LOG(WARNING) << "Invalid object key " << keyValue.first;
         continue;
       }
       id = keyString.toLongLong(&ok);
     }
     if (ok && id > 0) {
-      idToJsonValue[id] = docKeyValueList[i].second;
+      idToJsonValue[id] = keyValue.second;
     } else {
-      LOG(WARNING) << "Invalid object key " << docKeyValueList[i].first;
+      LOG(WARNING) << "Invalid object key " << keyValue.first;
     }
   }
 
   while (!idToJsonValue.empty()) {
-    std::map<size_t, QJsonValue>::iterator it = idToJsonValue.begin();
+    auto it = idToJsonValue.begin();
     QJsonValue jv = it->second;
     std::set<size_t> ids; // collect all ids that are pointing to jv
     ids.insert(it->first);
@@ -99,9 +96,9 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& 
 
     // check existing objects that are pointing to jv
     std::set<size_t> existingIds;
-    for (int i = 0; i < allObjs.size(); ++i) {
-      if (isSameObj(jv, jsonValue(allObjs[i]))) {
-        existingIds.insert(allObjs[i]);
+    for (auto obj : allObjs) {
+      if (isSameObj(jv, jsonValue(obj))) {
+        existingIds.insert(obj);
       }
     }
 
@@ -121,8 +118,8 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& 
       for (size_t i = 0; i < num; ++i)
         existingIds.insert(makeAlias(firstId));
     }
-    std::set<size_t>::iterator it1 = ids.begin();
-    std::set<size_t>::iterator it2 = existingIds.begin();
+    auto it1 = ids.begin();
+    auto it2 = existingIds.begin();
     while (it2 != existingIds.end()) {
       idmap[*it1] = *it2;
       ++it1;
@@ -136,18 +133,17 @@ std::map<size_t, size_t> ZObjDoc::read(const QList<QPair<QString, QJsonValue>>& 
 
 void ZObjDoc::write(QJsonObject& json) const
 {
-  QList<size_t> allObjs = objs();
-  for (int i = 0; i < allObjs.size(); ++i) {
-    json.insert(QString("%1 %2").arg(typeName()).arg(allObjs[i]), jsonValue(allObjs[i]));
+  for (auto id : objs()) {
+    json.insert(QString("%1 %2").arg(typeName()).arg(id), jsonValue(id));
   }
 }
 
-QString ZObjDoc::lastOpenedObjPath()
+QString ZObjDoc::lastOpenedObjPath() const
 {
   return ZSystemInfo::instance().lastOpenedObjPath(typeName());
 }
 
-void ZObjDoc::setLastOpenedObjPath(const QString& path)
+void ZObjDoc::setLastOpenedObjPath(const QString& path) const
 {
   ZSystemInfo::instance().setLastOpenedObjPath(typeName(), path);
 }

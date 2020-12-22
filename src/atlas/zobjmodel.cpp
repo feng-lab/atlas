@@ -129,28 +129,20 @@ QVariant ZObjModel::headerData(int section, Qt::Orientation orientation,
     switch (section) {
       case ShowHideNameColumn:
         return QString("Name");
-        break;
       case LockColumn:
         return QString();
-        break;
       case TypeColumn:
         return QString("Type");
-        break;
       case InfoColumn:
         return QString("Info");
-        break;
       case IDColumn:
         return QString("ID");
-        break;
       case ShowHideColumn:
         return QString();
-        break;
       case NameColumn:
         return QString("Name");
-        break;
       case ViewSettingColumn:
         return QString("View Settings");
-        break;
       default:
         break;
     }
@@ -166,10 +158,8 @@ QVariant ZObjModel::headerData(int section, Qt::Orientation orientation,
       case InfoColumn:
       case IDColumn:
         return 0;
-        break;
       case ViewSettingColumn:
         return 1;
-        break;
       default:
         break;
     }
@@ -183,7 +173,7 @@ QModelIndex ZObjModel::index(int row, int column, const QModelIndex& parent) con
   if (!hasIndex(row, column, parent))
     return QModelIndex();
 
-  ZObjPack* parentItem = nullptr;
+  ZObjPack* parentItem;
   if (!parent.isValid()) {
     parentItem = m_rootItem.get();
   } else {
@@ -243,9 +233,9 @@ size_t ZObjModel::numObjs() const
   return num;
 }
 
-QList<size_t> ZObjModel::objs() const
+std::vector<size_t> ZObjModel::objs() const
 {
-  QList<size_t> res;
+  std::vector<size_t> res;
   for (const auto& c : m_rootItem->children) {
     if (c->children.empty()) {
       res.push_back(c->m_id);
@@ -258,9 +248,9 @@ QList<size_t> ZObjModel::objs() const
   return res;
 }
 
-QList<size_t> ZObjModel::objsOfDoc(const ZObjDoc* doc) const
+std::vector<size_t> ZObjModel::objsOfDoc(const ZObjDoc* doc) const
 {
-  QList<size_t> res;
+  std::vector<size_t> res;
   for (const auto& c : m_rootItem->children) {
     if (c->m_objDoc != doc)
       continue;

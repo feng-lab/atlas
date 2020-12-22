@@ -214,7 +214,7 @@ void ZRegionAnnotationFilter::allROIChanged()
   m_idToRegionNames.clear();
   m_nameToID.clear();
 
-  while (m_parameters.size() > static_cast<int>(m_numParametersWithoutRegionSepcificParas)) {
+  while (m_parameters.size() > m_numParametersWithoutRegionSepcificParas) {
     m_parameters.pop_back();
   }
 

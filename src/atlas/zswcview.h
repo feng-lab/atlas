@@ -3,7 +3,6 @@
 #include "zfilterview.h"
 #include "zswcdoc.h"
 #include "zswcfilter.h"
-#include <map>
 
 namespace nim {
 
@@ -14,7 +13,7 @@ public:
   ZSwcView(ZSwcDoc& doc, ZView& view);
 
 private:
-  void docSwcsAdded(const QList<size_t>& objs);
+  void docSwcsAdded(const std::vector<size_t>& objs);
 
   void docSwcAdded(size_t id);
 };

@@ -5,7 +5,6 @@
 #include "zmesh.h"
 #include "zrandom.h"
 #include <QFileInfo>
-#include <QPushButton>
 
 namespace nim {
 
@@ -127,21 +126,6 @@ void Z3DMeshFilter::setData(std::vector<ZMesh*>* meshList)
   m_origMeshList.clear();
   if (meshList) {
     m_origMeshList = *meshList;
-    LOG(INFO) << className() << " read " << m_origMeshList.size() << " meshes.";
-  }
-  getVisibleData();
-  m_dataIsInvalid = true;
-  invalidateResult();
-
-  updateBoundBox();
-}
-
-void Z3DMeshFilter::setData(QList<ZMesh*>* meshList)
-{
-  m_origMeshList.clear();
-  if (meshList) {
-    for (auto mesh : *meshList)
-      m_origMeshList.push_back(mesh);
     LOG(INFO) << className() << " read " << m_origMeshList.size() << " meshes.";
   }
   getVisibleData();

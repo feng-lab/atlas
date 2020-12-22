@@ -6,7 +6,6 @@
 #include <QTabBar>
 #include <QApplication>
 #include <QScrollBar>
-#include <iostream>
 
 namespace nim {
 
@@ -30,15 +29,15 @@ ZObjEditWidget::ZObjEditWidget(ZDoc& doc, QWidget* mw)
 
 bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
 {
-  for (int i = 0; i < m_subWidgets.size(); ++i) {
-    if (m_subWidgets[i].id == id) {
-      setCurrentWidget(m_subWidgets[i].widget);
+  for (auto& subWidget : m_subWidgets) {
+    if (subWidget.id == id) {
+      setCurrentWidget(subWidget.widget);
       return true;
     }
   }
   QWidget* wg = m_doc.createObjEditWidget(id);
   if (wg) {
-    SubWidget sw;
+    SubWidget sw{};
     sw.id = id;
     sw.widget = wg;
     m_subWidgets.push_back(sw);
@@ -51,9 +50,9 @@ bool ZObjEditWidget::showObjEditWidgetOfObj(size_t id)
 
 void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 {
-  for (int i = 0; i < m_subWidgets.size(); ++i) {
-    if (m_subWidgets[i].id == id) {
-      setTabText(indexOf(m_subWidgets[i].widget), QString("Edit %1").arg(m_doc.objNameWithModifiedMarkerAndID(id)));
+  for (auto& subWidget : m_subWidgets) {
+    if (subWidget.id == id) {
+      setTabText(indexOf(subWidget.widget), QString("Edit %1").arg(m_doc.objNameWithModifiedMarkerAndID(id)));
       return;
     }
   }
@@ -61,11 +60,11 @@ void ZObjEditWidget::updateEditWidgetTitleOfObj(size_t id)
 
 void ZObjEditWidget::removeObjEditWidgetOfObj(size_t id)
 {
-  for (int i = 0; i < m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       removeTab(indexOf(m_subWidgets[i].widget));
       delete m_subWidgets[i].widget;
-      m_subWidgets.removeAt(i);
+      m_subWidgets.erase(m_subWidgets.begin() + i);
       return;
     }
   }
@@ -77,10 +76,10 @@ void ZObjEditWidget::closeTab(int index)
     return;
   QWidget* wgt = widget(index);
   removeTab(index);
-  for (int i = 0; i < m_subWidgets.size(); ++i) {
+  for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].widget == wgt) {
       delete m_subWidgets[i].widget;
-      m_subWidgets.removeAt(i);
+      m_subWidgets.erase(m_subWidgets.begin() + i);
       return;
     }
   }

@@ -108,9 +108,9 @@ size_t ZPunctaDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> ZPunctaDoc::loadFileActions() const
+std::vector<QAction*> ZPunctaDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadPunctaAction);
   return res;
 }

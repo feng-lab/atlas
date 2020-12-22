@@ -8,7 +8,6 @@
 #include "zswccolorparameters.h"
 #include <QGraphicsEllipseItem>
 #include <QGraphicsLineItem>
-#include <QList>
 #include <map>
 #include <vector>
 
@@ -83,7 +82,7 @@ protected:
   bool m_mip = false;
   int m_z = 0;
   int m_t = 0;
-  QVector<QLineF> m_lines;
+  QList<QLineF> m_lines;
 };
 #endif
 
@@ -162,7 +161,7 @@ protected:
   int m_z = 0;
   int m_t = 0;
   double m_sizeScale = 1.;
-  QVector<QLineF> m_lines;
+  QList<QLineF> m_lines;
   bool m_selected = false;
 };
 
@@ -177,7 +176,7 @@ public:
   int type() const override
   { return Type; }
 
-  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, QTransform  tfm,
+  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, const QTransform& tfm,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -234,7 +233,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  ZBBox<glm::ivec4> boundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

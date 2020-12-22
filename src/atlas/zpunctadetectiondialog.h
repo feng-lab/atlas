@@ -40,18 +40,18 @@ private:
   void createParaGroupBox();
 
 private:
-  QGroupBox* m_ioGroupBox;
-  QGroupBox* m_paraGroupBox;
+  QGroupBox* m_ioGroupBox = nullptr;
+  QGroupBox* m_paraGroupBox = nullptr;
 
   ZBoolParameter m_useCurrentActiveImage;
-  ZSelectFileWidget* m_inputImageFileWidget;
-  ZSelectFileWidget* m_inputSwcFilesWidget;
-  ZSelectFileWidget* m_outputPunctaFileWidget;
-  ZSelectFileWidget* m_outputSomaPunctaFileWidget;
-  ZSelectFileWidget* m_outputLogFileWidget;
+  ZSelectFileWidget* m_inputImageFileWidget = nullptr;
+  ZSelectFileWidget* m_inputSwcFilesWidget = nullptr;
+  ZSelectFileWidget* m_outputPunctaFileWidget = nullptr;
+  ZSelectFileWidget* m_outputSomaPunctaFileWidget = nullptr;
+  ZSelectFileWidget* m_outputLogFileWidget = nullptr;
 
   ZDVec3Parameter m_voxelSize;
-  QPushButton* m_detectResolutionButton;
+  QPushButton* m_detectResolutionButton = nullptr;
   ZIntIntOptionParameter m_punctaChannel;
   ZIntParameter m_punctaThreshold;
   ZIntParameter m_somaPunctaThreshold;

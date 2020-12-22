@@ -6,8 +6,6 @@
 #include "zimgregion.h"
 #include "zimgmerge.h"
 #include "zstringutils.h"
-#include <QList>
-#include <QRect>
 
 namespace nim {
 

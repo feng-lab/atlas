@@ -9,13 +9,13 @@ Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, 
   , m_blendMode("Blend Mode")
   , m_VAO(1)
 {
-  m_blendMode.addOptionsWithData(qMakePair<QString, QString>("DepthTest", "DEPTH_TEST"),
-                                 qMakePair<QString, QString>("FirstOnTop", "FIRST_ON_TOP"),
-                                 qMakePair<QString, QString>("SecondOnTop", "SECOND_ON_TOP"),
-                                 qMakePair<QString, QString>("DepthTestBlending", "DEPTH_TEST_BLENDING"),
-                                 qMakePair<QString, QString>("FirstOnTopBlending", "FIRST_ON_TOP_BLENDING"),
-                                 qMakePair<QString, QString>("SecondOnTopBlending", "SECOND_ON_TOP_BLENDING"),
-                                 qMakePair<QString, QString>("MIPImageDepthTestBlending", "MIP_IMAGE_DEPTH_TEST_BLENDING")
+  m_blendMode.addOptionsWithData(std::make_pair<QString, QString>("DepthTest", "DEPTH_TEST"),
+                                 std::make_pair<QString, QString>("FirstOnTop", "FIRST_ON_TOP"),
+                                 std::make_pair<QString, QString>("SecondOnTop", "SECOND_ON_TOP"),
+                                 std::make_pair<QString, QString>("DepthTestBlending", "DEPTH_TEST_BLENDING"),
+                                 std::make_pair<QString, QString>("FirstOnTopBlending", "FIRST_ON_TOP_BLENDING"),
+                                 std::make_pair<QString, QString>("SecondOnTopBlending", "SECOND_ON_TOP_BLENDING"),
+                                 std::make_pair<QString, QString>("MIPImageDepthTestBlending", "MIP_IMAGE_DEPTH_TEST_BLENDING")
   );
   m_blendMode.select(mode);
   connect(&m_blendMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureBlendRenderer::compile);

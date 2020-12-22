@@ -1,5 +1,6 @@
 #include "zlogwidget.h"
 #include "zlogcache.h"
+#include <vector>
 
 namespace nim {
 
@@ -13,28 +14,31 @@ ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   ZLogCache::instance().receiveLogMessages(this, &ZLogWidget::writeLogData, receiveOldMessages);
 }
 
-void ZLogWidget::writeLogData(const QList<LogData>* messages, int start, int end)
+void ZLogWidget::writeLogData(const std::deque<LogData>* messages, size_t start, size_t end)
 {
   if (end - start == 1) {
-    if (messages->at(start).level <= InfoLevel) {
-      appendPlainText(messages->at(start).formatted);
+    const auto& logData = (*messages)[start];
+    if (logData.level <= InfoLevel) {
+      appendPlainText(logData.formatted);
     } else {
       setCurrentCharFormat(m_errorFormat);
-      appendPlainText(messages->at(start).formatted);
+      appendPlainText(logData.formatted);
       setCurrentCharFormat(m_normalFormat);
     }
   } else {
-    bool firstFormat = messages->at(start).level <= InfoLevel;
+    const auto& logData = (*messages)[start];
+    bool firstFormat = logData.level <= InfoLevel;
     bool lastFormat = firstFormat;
-    QList<QStringList> textList;
-    textList.push_back(QStringList());
-    textList.back().push_back(messages->at(start).formatted);
-    for (int i = start + 1; i < end; ++i) {
-      if ((messages->at(i).level <= InfoLevel) != lastFormat) {
+    std::vector<QStringList> textList;
+    textList.emplace_back();
+    textList.back().push_back(logData.formatted);
+    for (auto i = start + 1; i < end; ++i) {
+      const auto& logD = (*messages)[i];
+      if ((logD.level <= InfoLevel) != lastFormat) {
         lastFormat = !lastFormat;
-        textList.push_back(QStringList());
+        textList.emplace_back();
       }
-      textList.back().push_back(messages->at(i).formatted);
+      textList.back().push_back(logD.formatted);
     }
     for (const auto& si : textList) {
       setCurrentCharFormat(firstFormat ? m_normalFormat : m_errorFormat);

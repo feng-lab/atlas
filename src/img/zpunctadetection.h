@@ -5,7 +5,6 @@
 #include "zpuncta.h"
 #include "zimginfo.h"
 #include "zimgregion.h"
-#include <QList>
 
 namespace nim {
 

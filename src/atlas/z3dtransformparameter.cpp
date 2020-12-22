@@ -134,8 +134,7 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* paren
 {
   updateWidget(m_value);
 
-  QStringList names;
-  names << "x:" << "y:" << "z:";
+  std::vector<QString> names{"x:", "y:", "z:"};
   m_scale.setNameForEachValue(names);
   m_translation.setNameForEachValue(names);
   m_center.setNameForEachValue(names);
@@ -150,8 +149,7 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* paren
   m_translation.setStyle("SPINBOX");
   connect(&m_translation, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
-  names.clear();
-  names << "angle:" << "x:" << "y:" << "z:";
+  names = std::vector<QString>{"angle:", "x:", "y:", "z:"};
   m_rotation.setNameForEachValue(names);
   m_rotation.setSingleStep(1);
   m_rotation.setDecimal(6);
@@ -178,8 +176,7 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat
 {
   updateWidget(m_value);
 
-  QStringList names;
-  names << "x:" << "y:" << "z:";
+  std::vector<QString> names{"x:", "y:", "z:"};
   m_scale.setNameForEachValue(names);
   m_translation.setNameForEachValue(names);
   m_center.setNameForEachValue(names);
@@ -194,8 +191,7 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat
   m_translation.setStyle("SPINBOX");
   connect(&m_translation, &ZVec3Parameter::valueChanged, this, &Z3DTransformParameter::updateMatrix);
 
-  names.clear();
-  names << "angle:" << "x:" << "y:" << "z:";
+  names = std::vector<QString>{"angle:", "x:", "y:", "z:"};
   m_rotation.setNameForEachValue(names);
   m_rotation.setSingleStep(1);
   m_rotation.setDecimal(6);
@@ -320,14 +316,14 @@ QWidget* Z3DTransformParameter::actualCreateWidget(QWidget* parent)
   transform.addChild(m_translation, 1);
   transform.addChild(m_center, 1);
 
-  QPushButton* pb = new QPushButton("Show Transform Matrix");
+  auto pb = new QPushButton("Show Transform Matrix");
   connect(pb, &QPushButton::clicked, this, &Z3DTransformParameter::showTransformMatrix);
   transform.addChild(*pb, 2);
 
   QLayout* lw = transform.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
-  QGroupBox* groupBox = new QGroupBox("Transform Parameters", parent);
+  auto groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);

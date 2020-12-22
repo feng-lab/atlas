@@ -25,41 +25,41 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "Animation3D"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "Animation3Ds"; }
 
-  bool canReadFile(const QString& fileName) const override;
+  [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  const QUndoStack* objUndoStack(size_t id) const override;
+  [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
   QWidget* createObjEditWidget(size_t id) override;
 
@@ -76,7 +76,7 @@ protected:
 private:
   struct AnimationPack
   { // animation and its associated data
-    AnimationPack(Z3DAnimation* animation_, const QString& path_, const QString& name = "");
+    AnimationPack(Z3DAnimation* animation_, const QString& path_, QString  name = "");
 
     void updateDerivedData();
 
@@ -109,7 +109,7 @@ private:
 private:
   std::map<size_t, std::shared_ptr<AnimationPack>> m_idToAnimationPacks;
 
-  QAction* m_loadAnimationsAction;
+  QAction* m_loadAnimationsAction = nullptr;
 
   Z3DView* m_view = nullptr;
 };

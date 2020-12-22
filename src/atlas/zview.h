@@ -27,8 +27,6 @@ class ZGraphicsView;
 
 class ZObjView;
 
-class ZActionGroup;
-
 class ZROIPack;
 
 class ZRegionAnnotationPack;
@@ -147,7 +145,7 @@ public:
 
   State state() const;
 
-  QWidget* captureWidget();
+  QWidget* captureWidget() const;
 
   void updateViewSize();
 
@@ -220,9 +218,9 @@ private:
 
   void changeViewport();
 
-  void takeFixedSizeScreenShot(QString filename, int width, int height);
+  void takeFixedSizeScreenShot(const QString& filename, int width, int height);
 
-  void takeScreenShot(QString filename);
+  void takeScreenShot(const QString& filename);
 
   void mousePressed(QPointF scenePos);
 
@@ -246,52 +244,52 @@ private:
 
 private:
   ZDoc& m_doc;
-  ZGraphicsScene* m_scene;
-  QGraphicsScene* m_montageScene;
+  ZGraphicsScene* m_scene = nullptr;
+  QGraphicsScene* m_montageScene = nullptr;
 
-  QVBoxLayout* m_layout;
-  QLabel* m_label;
-  ZGraphicsView* m_view;
-  ZIntParameter* m_imgSlice;
-  ZIntParameter* m_imgTime;
-  QWidget* m_imgSliceWidget;
-  QWidget* m_imgTimeWidget;
-  ZStringIntOptionParameter* m_viewStyle;
-  ZIntParameter* m_montageColumns;
-  mutable ZDVec4Parameter* m_viewport;
+  QVBoxLayout* m_layout = nullptr;
+  QLabel* m_label = nullptr;
+  ZGraphicsView* m_view = nullptr;
+  ZIntParameter* m_imgSlice = nullptr;
+  ZIntParameter* m_imgTime = nullptr;
+  QWidget* m_imgSliceWidget = nullptr;
+  QWidget* m_imgTimeWidget = nullptr;
+  ZStringIntOptionParameter* m_viewStyle = nullptr;
+  ZIntParameter* m_montageColumns = nullptr;
+  mutable ZDVec4Parameter* m_viewport = nullptr;
 
   //
-  QAction* m_copyAction;
-  QAction* m_pasteAction;
-  // QAction* m_deleteAction;
+  QAction* m_copyAction = nullptr;
+  QAction* m_pasteAction = nullptr;
+  // QAction* m_deleteAction = nullptr;
 
-  QAction* m_zoomInAction;
-  QAction* m_zoomOutAction;
-  QActionGroup* m_imgViewStyleActionGroup;
-  QAction* m_normalViewAction;
-  QAction* m_maxZProjViewAction;
-  QAction* m_montageViewAction;
-  QAction* m_fitIntoWindowAction;
+  QAction* m_zoomInAction = nullptr;
+  QAction* m_zoomOutAction = nullptr;
+  QActionGroup* m_imgViewStyleActionGroup = nullptr;
+  QAction* m_normalViewAction = nullptr;
+  QAction* m_maxZProjViewAction = nullptr;
+  QAction* m_montageViewAction = nullptr;
+  QAction* m_fitIntoWindowAction = nullptr;
   //
-  QActionGroup* m_dragModeActionGroup;
-  QAction* m_rubberBandDragAction;
-  QAction* m_scrollHandDragAction;
+  QActionGroup* m_dragModeActionGroup = nullptr;
+  QAction* m_rubberBandDragAction = nullptr;
+  QAction* m_scrollHandDragAction = nullptr;
   //
-  ZActionGroup* m_roiStyleActionGroup;
-  QAction* m_roiRectangleAction;
-  QAction* m_roiEllipseAction;
-  QAction* m_roiPolygonAction;
-  QAction* m_roiSplineAction;
-  QAction* m_roiCutLineAction;
+  QActionGroup* m_roiStyleActionGroup = nullptr;
+  QAction* m_roiRectangleAction = nullptr;
+  QAction* m_roiEllipseAction = nullptr;
+  QAction* m_roiPolygonAction = nullptr;
+  QAction* m_roiSplineAction = nullptr;
+  QAction* m_roiCutLineAction = nullptr;
 
-  ZStringIntOptionParameter* m_roiMode;
+  ZStringIntOptionParameter* m_roiMode = nullptr;
 
-  bool m_doNotReceiveSliceSignal;
+  bool m_doNotReceiveSliceSignal = false;
   ZBBox<glm::ivec4> m_boundBox;
 
   std::vector<std::unique_ptr<ZObjView>> m_objViews;
 
-  size_t m_numObjsBefore;
+  size_t m_numObjsBefore = 0;
 
   int m_montageZ = 0;
 };

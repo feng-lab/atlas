@@ -14,13 +14,13 @@ Q_OBJECT
 public:
   explicit ZItemSelectionModel(ZObjModel* model, QObject* parent = nullptr);
 
-  size_t numSelectedObjs() const;
+  [[nodiscard]] size_t numSelectedObjs() const;
 
-  QList<size_t> selectedObjs() const;
+  [[nodiscard]] std::vector<size_t> selectedObjs() const;
 
-  QList<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
+  std::vector<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
 
-  bool isObjSelected(size_t id) const;
+  [[nodiscard]] bool isObjSelected(size_t id) const;
 
   void setObjSelected(size_t id, bool v);
 

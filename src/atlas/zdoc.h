@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QObject>
-#include <QList>
 #include <QUndoGroup>
 #include <memory>
 
@@ -43,29 +42,27 @@ class ZDoc : public QObject
 {
 Q_OBJECT
 public:
-  using ConstObjIdIterator = QList<size_t>::const_iterator;
-
   explicit ZDoc(QObject* parent = nullptr);
 
   std::vector<size_t> chooseObjsWithWidget(const QString& title, QWidget* parent) const;
 
-  bool hasObj() const;
+  [[nodiscard]] bool hasObj() const;
 
-  size_t numObjs() const;
+  [[nodiscard]] size_t numObjs() const;
 
-  QList<size_t> objs() const;
+  [[nodiscard]] std::vector<size_t> objs() const;
 
-  size_t numSelectedObjs() const;
+  [[nodiscard]] size_t numSelectedObjs() const;
 
-  QList<size_t> selectedObjs() const;
+  [[nodiscard]] std::vector<size_t> selectedObjs() const;
 
-  QList<ZObjDoc*> objDocs();
+  std::vector<ZObjDoc*> objDocs();
 
-  ZObjDoc* idToDoc(size_t id) const;
+  [[nodiscard]] ZObjDoc* idToDoc(size_t id) const;
 
-  bool isObjVisible(size_t id) const;
+  [[nodiscard]] bool isObjVisible(size_t id) const;
 
-  bool isObjSelected(size_t id) const;
+  [[nodiscard]] bool isObjSelected(size_t id) const;
 
   void setObjVisible(size_t id, bool v);
 
@@ -81,17 +78,17 @@ public:
 
   size_t indexToId(const QModelIndex& index);
 
-  QString objName(size_t id) const;
+  [[nodiscard]] QString objName(size_t id) const;
 
-  QString objNameWithModifiedMarker(size_t id) const;
+  [[nodiscard]] QString objNameWithModifiedMarker(size_t id) const;
 
-  QString objNameWithModifiedMarkerAndID(size_t id) const;
+  [[nodiscard]] QString objNameWithModifiedMarkerAndID(size_t id) const;
 
-  QString objDetailedInfo(size_t id) const;
+  [[nodiscard]] QString objDetailedInfo(size_t id) const;
 
-  QList<size_t> objsOfDoc(const ZObjDoc* objD) const;
+  std::vector<size_t> objsOfDoc(const ZObjDoc* objD) const;
 
-  QList<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
+  std::vector<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
 
   inline QUndoGroup* undoGroup()
   { return m_undoGroup; }
@@ -113,15 +110,15 @@ public:
   inline QAction* changeAnimationSettingAction()
   { return m_changeAnimationSettingAction; }
 
-  QList<QAction*> fileActions() const;
+  [[nodiscard]] std::vector<QAction*> fileActions() const;
 
-  QList<QAction*> loadFileActions() const;
+  [[nodiscard]] std::vector<QAction*> loadFileActions() const;
 
-  QList<QMenu*> processObjMenu() const;
+  [[nodiscard]] std::vector<QMenu*> processObjMenu() const;
 
   ZObjWidget* createObjWidget(QWidget* parent);
 
-  QWidget* createObjEditWidget(size_t id);
+  QWidget* createObjEditWidget(size_t id) const;
 
   // notify model to update some info of obj id
   void updateObjInfo(size_t id);
@@ -147,7 +144,7 @@ public:
   // otherwise return false
   bool saveOrDiscard(size_t id);
 
-  bool saveOrDiscard(const QList<size_t>& objs);
+  bool saveOrDiscard(const std::vector<size_t>& objs);
 
   void loadFile(const QString& fileName);
 
@@ -159,7 +156,7 @@ public:
 
   void write(QJsonObject& json, bool includeAnimation) const;
 
-  QString lastOpenedFilePath();
+  static QString lastOpenedFilePath();
 
   void setLastOpenedFilePath(const QString& path);
 
@@ -275,7 +272,7 @@ private:
 
   ZObjModel* m_objModel = nullptr;
   ZItemSelectionModel* m_objSelectionModel = nullptr;
-  QList<DocPack> m_docPacks;
+  std::vector<DocPack> m_docPacks;
   size_t m_nextObjId;
 
   size_t m_viewSettingId;

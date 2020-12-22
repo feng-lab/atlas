@@ -34,7 +34,7 @@ public:
   QString fontPath(const QString& filename = "") const;
 
   // return empty if can not find enough space
-  QString imgCachePath(size_t requiredSpaceInBytes) const;
+  static QString imgCachePath(size_t requiredSpaceInBytes) ;
 
   QDir logDir() const;
 
@@ -57,12 +57,12 @@ public:
   { setLastOpenedObjPath("Image", path); }
 
 protected:
-  void updateRecentFiles() const;
+  static void updateRecentFiles() ;
 
 private:
   void detectOS();
 
-  QDir createLogDir() const;
+  static QDir createLogDir() ;
 
 protected:
   QString m_osString;

@@ -19,13 +19,13 @@ public:
 
   // Z3DObjView interface
 public:
-  const ZObjDoc& doc() const override
+  [[nodiscard]] const ZObjDoc& doc() const override
   { return m_doc; }
 
-  bool hasObj(size_t id) const override
+  [[nodiscard]] bool hasObj(size_t id) const override
   { return m_idToFilter.find(id) != m_idToFilter.end(); }
 
-  ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const override
+  [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObj(size_t id) const override
   {
     ZBBox<glm::dvec3> res;
     if (hasObj(id)) {
@@ -34,7 +34,7 @@ public:
     return res;
   }
 
-  ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const override
+  [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const override
   {
     ZBBox<glm::dvec3> res;
     if (hasObj(id)) {
@@ -101,7 +101,7 @@ protected:
     updateBoundBox();
   }
 
-  void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
+  void onSelectionChanged(const std::vector<size_t>& selected, const std::vector<size_t>& deselected) override
   {
     for (auto id : selected) {
       auto it = m_idToFilter.find(id);

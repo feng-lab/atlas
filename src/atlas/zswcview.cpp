@@ -9,7 +9,7 @@ ZSwcView::ZSwcView(ZSwcDoc& doc, ZView& view)
   connect(&m_doc, &ZSwcDoc::objAdded, this, &ZSwcView::docSwcAdded);
 }
 
-void ZSwcView::docSwcsAdded(const QList<size_t>& objs)
+void ZSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 {
   for (auto obj : objs) {
     auto viewControl = new ZSwcFilter(m_view);

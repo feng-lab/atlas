@@ -64,7 +64,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
     auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(),
                                               txtFileInfo.absoluteFilePath());
     if (!sdFont->isEmpty()) {
-      m_allFontNames.addOptionWithData(qMakePair(sdFont->fontName(), static_cast<int>(m_allFonts.size())));
+      m_allFontNames.addOptionWithData(std::make_pair(sdFont->fontName(), static_cast<int>(m_allFonts.size())));
       m_allFonts.emplace_back(std::move(sdFont));
     }
   }

@@ -106,9 +106,9 @@ size_t ZSwcDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> ZSwcDoc::loadFileActions() const
+std::vector<QAction*> ZSwcDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadSwcAction);
   return res;
 }

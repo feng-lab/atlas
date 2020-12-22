@@ -28,8 +28,8 @@
 #include "zlog.h"
 #include <QAbstractTableModel>
 #include <QReadWriteLock>
-#include <QList>
 #include <limits>
+#include <deque>
 
 namespace nim {
 
@@ -47,7 +47,7 @@ public:
     FormattedMessageColumn = 100
   };
 
-  explicit ZLogModelSink(int max_items = std::numeric_limits<int>::max());
+  explicit ZLogModelSink(size_t max_items = size_t(std::numeric_limits<int>::max()));
 
   void addEntry(const LogData& message);
 
@@ -57,18 +57,18 @@ public:
 
 public:
   // QAbstractTableModel overrides
-  int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+  [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
-  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+  [[nodiscard]] int rowCount(const QModelIndex& parent) const override;
 
-  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+  [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
-  QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
 private:
-  QList<LogData> m_logDatas;
+  std::deque<LogData> m_logDatas;
   mutable QReadWriteLock m_messagesLock;
-  int m_maxItems;
+  size_t m_maxItems;
 };
 
 } // namespace nim

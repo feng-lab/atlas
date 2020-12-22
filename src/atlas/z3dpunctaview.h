@@ -13,7 +13,7 @@ public:
   Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view);
 
 private:
-  void docPunctasAdded(const QList<size_t>& objs);
+  void docPunctasAdded(const std::vector<size_t>& objs);
 
   void docPunctaAdded(size_t id);
 };

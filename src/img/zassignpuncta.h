@@ -4,7 +4,6 @@
 #include "zpuncta.h"
 #include "zswc.h"
 #include "zimginfo.h"
-#include <QList>
 #include <map>
 
 namespace nim {

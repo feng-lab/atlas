@@ -2,15 +2,12 @@
 
 #include "zselectfilewidget.h"
 #include "zsectionsregistration.h"
-#include "zimgstackinterface.h"
 #include "zstringutils.h"
-#include "zlog.h"
 #include "zsysteminfo.h"
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
-#include <QFileDialog>
 #include <QMessageBox>
 #include <QThread>
 
@@ -34,7 +31,7 @@ ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget* parent)
   , m_optimizer("Optimizer")
 {
   m_referenceChannel.clearOptions();
-  m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
+  m_referenceChannel.addOptionWithData(std::make_pair<QString, int>("Auto", 0));
   m_referenceChannel.select("Auto");
   init();
 }
@@ -97,8 +94,8 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   QString stackFn = fi.path() + "/" + replaceLastInteger(fi.baseName(), "_all") + "_aligned_stack.nim";
   m_outputStackWidget->setFile(stackFn);
 
-  size_t channelNumber = 0;
-  size_t numFrames = 0;
+  size_t channelNumber;
+  size_t numFrames;
   try {
     std::vector<ZImgInfo> info = ZImg::readImgInfos(fns, Dimension::Z, true, nullptr, FileFormat::Unknown, true);
     if (info.size() != 1 || info[0].isEmpty()) {
@@ -113,9 +110,9 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
   }
 
   m_referenceChannel.clearOptions();
-  m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
+  m_referenceChannel.addOptionWithData(std::make_pair<QString, int>("Auto", 0));
   for (size_t i = 0; i < channelNumber; ++i) {
-    m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
+    m_referenceChannel.addOptionWithData(std::make_pair(QString("Ch%1").arg(i + 1), i + 1));
   }
   m_referenceChannel.select("Auto");
 

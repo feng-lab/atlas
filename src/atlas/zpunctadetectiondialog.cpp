@@ -3,11 +3,9 @@
 #include "zpunctadetection.h"
 #include "zimg.h"
 #include "zselectfilewidget.h"
-#include "zimgstackinterface.h"
 #include "zswc.h"
 #include "zsysteminfo.h"
 #include <QVBoxLayout>
-#include <QGridLayout>
 #include <QFileInfo>
 #include <QKeyEvent>
 #include <QFileDialog>
@@ -166,10 +164,10 @@ void ZPunctaDetectionDialog::updateInterface(const QString& fn, size_t numChanne
 
   m_punctaChannel.clearOptions();
   m_dendriteChannel.clearOptions();
-  m_dendriteChannel.addOptionWithData(qMakePair<QString, int>("None", 0));
+  m_dendriteChannel.addOptionWithData(std::make_pair<QString, int>("None", 0));
   for (int i = 0; i < static_cast<int>(numChannel); ++i) {
     m_punctaChannel.addOption(i + 1);
-    m_dendriteChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
+    m_dendriteChannel.addOptionWithData(std::make_pair(QString("Ch%1").arg(i + 1), i + 1));
   }
 
   m_dendriteChannel.select("None");
@@ -207,7 +205,7 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   auto alllayout = new QVBoxLayout;
 
   QStringList filters;
-  QList<FileFormat> formats;
+  std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
   m_inputImageFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile, "Input Image:",
                                                  filters[0],
@@ -250,10 +248,7 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   m_voxelSize.setDecimal(6);
   m_voxelSize.setWidgetOrientation(Qt::Horizontal);
   m_voxelSize.setStyle("SPINBOX");
-  QStringList name;
-  name.push_back("x");
-  name.push_back("y");
-  name.push_back("z");
+  std::vector<QString> name{"x", "y", "z"};
   m_voxelSize.setNameForEachValue(name);
 
   auto hlayout = new QHBoxLayout;

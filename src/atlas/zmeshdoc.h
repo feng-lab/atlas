@@ -12,7 +12,7 @@ public:
   explicit ZMeshDoc(ZDoc& doc);
 
   // return info of mesh with id, assume mesh exist, otherwise crash
-  QList<ZMesh*>* meshList(size_t id)
+  std::vector<ZMesh*>* meshList(size_t id)
   { return &(m_idToMeshPacks.at(id)->meshList); }
 
   void askToSave(const ZMesh& msh, const QString& title = "");
@@ -23,41 +23,41 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "Mesh"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "Mesh"; }
 
-  bool canReadFile(const QString& fileName) const override;
+  [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objDetailedInfo(size_t id) const override;
+  [[nodiscard]] QString objDetailedInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
 protected:
   void loadMesh();
@@ -85,7 +85,7 @@ private:
     { return m_tooltip; }
 
     ZMesh mesh;
-    QList<ZMesh*> meshList;
+    std::vector<ZMesh*> meshList;
     QString path;
     bool hasUnsavedChange = false;
 
@@ -107,7 +107,7 @@ private:
 private:
   std::map<size_t, std::shared_ptr<MeshPack>> m_idToMeshPacks;
 
-  QAction* m_loadMeshAction;
+  QAction* m_loadMeshAction = nullptr;
 };
 
 } // namespace nim

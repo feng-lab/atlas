@@ -25,11 +25,11 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   setUseDisplayList(true);
 #endif
 
-  m_coneCapStyle.addOptionsWithData(qMakePair<QString, QString>("Flat Caps", "FLAT_CAPS"),
-    //qMakePair<QString,QString>("Round Caps", "ROUND_CAPS"),
-                                    qMakePair<QString, QString>("No Caps", "NO_CAPS"),
-    //qMakePair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
-                                    qMakePair<QString, QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
+  m_coneCapStyle.addOptionsWithData(std::make_pair<QString, QString>("Flat Caps", "FLAT_CAPS"),
+    //std::make_pair<QString,QString>("Round Caps", "ROUND_CAPS"),
+                                    std::make_pair<QString, QString>("No Caps", "NO_CAPS"),
+    //std::make_pair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
+                                    std::make_pair<QString, QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
   m_coneCapStyle.select("Flat Caps");
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)

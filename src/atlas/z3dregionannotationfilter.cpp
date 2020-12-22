@@ -163,7 +163,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
     int id = node.id;
     auto flt = new Z3DMeshFilter(m_rendererBase.globalParas(), &node);
     if (node.mesh) {
-      QList<ZMesh*> meshList;
+      std::vector<ZMesh*> meshList;
       meshList.push_back(node.mesh.get());
       flt->setData(&meshList);
     }

@@ -2,7 +2,6 @@
 
 #include "zstitchimage.h"
 #include "zimgprocessdialog.h"
-#include <QList>
 #include <QPoint>
 #include <QRect>
 #include <vector>
@@ -57,14 +56,14 @@ class ZLogWidget;
 class ZTile
 {
 public:
-  ZTile(int index_, QPoint topleft, QPoint bottomright)
+  ZTile(size_t index_, QPoint topleft, QPoint bottomright)
     : index(index_)
   {
     region = QRect(topleft, bottomright);
   }
 
   bool bIsSelected = true;
-  int index;
+  size_t index;
   QRect region;
 };
 
@@ -73,8 +72,8 @@ class ZTileImageWidget : public QWidget
 Q_OBJECT
 public:
   explicit ZTileImageWidget(QWidget* parent, QImage* image,
-                            const std::vector<std::vector<int>>& tileMatrix,
-                            QList<ZTile>* pTiles = nullptr,
+                            const std::vector<std::vector<size_t>>& tileMatrix,
+                            std::vector<ZTile>* pTiles = nullptr,
                             const QStringList& filenames = QStringList());
 
   void paintEvent(QPaintEvent* event) override;
@@ -89,9 +88,9 @@ public:
 
   void saveAsImage(const QString& fn);
 
-  QSize minimumSizeHint() const override;
+  [[nodiscard]] QSize minimumSizeHint() const override;
 
-  QSize sizeHint() const override;
+  [[nodiscard]] QSize sizeHint() const override;
 
   void mouseReleaseEvent(QMouseEvent* event) override;
 
@@ -102,13 +101,13 @@ public:
 private:
   QPixmap* m_pixmap;
   QImage* m_image;
-  const std::vector<std::vector<int>>& m_tileMatrix;
-  QList<ZTile>* m_pTiles;
+  const std::vector<std::vector<size_t>>& m_tileMatrix;
+  std::vector<ZTile>* m_pTiles;
   double m_scaleFactor;
   QRubberBand* m_rubberBand;
   QPoint m_origin;
   QStringList m_filenames;
-  QList<QImage> m_tileimages;
+  std::vector<QImage> m_tileimages;
 };
 
 class ZStitchImageDialog : public ZImgProcessDialog
@@ -176,7 +175,7 @@ private:
 
   QWidget* createCommandOutputWidget();
 
-  static bool getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList);
+  static bool getTileMatrix(ZImg& img, std::vector<std::vector<size_t>>& tileMatrix, std::vector<ZTile>& tileList);
 
   void initScene1ComboBox(int scene);
 
@@ -191,78 +190,78 @@ private:
   void initBgsub2ComboBox(int nchannel);
 
 private:
-  std::vector<std::vector<int>> m_tileMatrix;
-  QList<ZTile> m_tileList;
+  std::vector<std::vector<size_t>> m_tileMatrix;
+  std::vector<ZTile> m_tileList;
   int m_nSel;
 
-  QGroupBox* m_ioGroupBox;
-  QGroupBox* m_connGroupBox;
-  QGroupBox* m_commandOutputGroupBox;
+  QGroupBox* m_ioGroupBox = nullptr;
+  QGroupBox* m_connGroupBox = nullptr;
+  QGroupBox* m_commandOutputGroupBox = nullptr;
 
   QStringList m_inputStack1Filenames;
   QStringList m_inputStack2Filenames;
   QString m_tileSelectionImageFilename;
   QImage m_tileImage;
 
-  QCheckBox* m_dsCheckBox;
-  //QCheckBox *m_useLayoutRadioButton;
-  QCheckBox* m_concatOnlyCheckBox;
-  QCheckBox* m_hasTwoInputStackSetCheckBox;
+  QCheckBox* m_dsCheckBox = nullptr;
+  //QCheckBox *m_useLayoutRadioButton = nullptr;
+  QCheckBox* m_concatOnlyCheckBox = nullptr;
+  QCheckBox* m_hasTwoInputStackSetCheckBox = nullptr;
 
-  QLineEdit* m_outputFileEdit;
-  QLineEdit* m_connFileEdit;
-  QTextEdit* m_inputStack1FileEdit;
-  QTextEdit* m_inputStack2FileEdit;
-  QTextEdit* m_connEdit;
-  ZLogWidget* m_commandOutputEdit;
+  QLineEdit* m_outputFileEdit = nullptr;
+  QLineEdit* m_connFileEdit = nullptr;
+  QTextEdit* m_inputStack1FileEdit = nullptr;
+  QTextEdit* m_inputStack2FileEdit = nullptr;
+  QTextEdit* m_connEdit = nullptr;
+  ZLogWidget* m_commandOutputEdit = nullptr;
 
-  QSpinBox* m_overlapRateSpinBox;
-  QRadioButton* m_useConfigRadioButton;
-  QRadioButton* m_useTileImageRadioButton;
-  QRadioButton* m_useConnFileRadioButton;
-  QRadioButton* m_useFullConnectionRadioButton;
-  QRadioButton* m_useLayoutRadioButton;
-  QRadioButton* m_restitchCZIRadioButton;
+  QSpinBox* m_overlapRateSpinBox = nullptr;
+  QRadioButton* m_useConfigRadioButton = nullptr;
+  QRadioButton* m_useTileImageRadioButton = nullptr;
+  QRadioButton* m_useConnFileRadioButton = nullptr;
+  QRadioButton* m_useFullConnectionRadioButton = nullptr;
+  QRadioButton* m_useLayoutRadioButton = nullptr;
+  QRadioButton* m_restitchCZIRadioButton = nullptr;
 
-  QPushButton* m_selectInputStacks1Button;
-  QPushButton* m_selectInputStacks2Button;
-  QPushButton* m_openTileImageButton;
-  QPushButton* m_editTileImageButton;
-  QToolButton* m_selectConnFileButton;
-  QToolButton* m_selectOutputButton;
-  QComboBox* m_mergeModeComboBox;
-  QComboBox* m_scene1ComboBox;
-  QComboBox* m_bgsub1ComboBox;
-  QComboBox* m_channel1ComboBox;
-  QComboBox* m_scene2ComboBox;
-  QComboBox* m_bgsub2ComboBox;
-  QComboBox* m_channel2ComboBox;
-  QSpinBox* m_commonChannel1SpinBox;
-  QSpinBox* m_commonChannel2SpinBox;
-  //  QSpinBox *m_outputCh1ImageChannelSpinBox;
-  //  QSpinBox *m_outputCh2ImageChannelSpinBox;
-  //  QSpinBox *m_outputCh3ImageChannelSpinBox;
-  //  QComboBox *m_outputCh1ImageComboBox;
-  //  QComboBox *m_outputCh2ImageComboBox;
-  //  QComboBox *m_outputCh3ImageComboBox;
-  QSpinBox* m_layout1SpinBox;
-  QSpinBox* m_layout2SpinBox;
-  QComboBox* m_configDim1ComboBox;
-  QComboBox* m_configDim2ComboBox;
-  QComboBox* m_configDim3ComboBox;
-  QSpinBox* m_intvXSpinBox;
-  QSpinBox* m_intvYSpinBox;
-  QSpinBox* m_intvZSpinBox;
-  QSpinBox* m_dsXSpinBox;
-  QSpinBox* m_dsYSpinBox;
-  QSpinBox* m_dsZSpinBox;
+  QPushButton* m_selectInputStacks1Button = nullptr;
+  QPushButton* m_selectInputStacks2Button = nullptr;
+  QPushButton* m_openTileImageButton = nullptr;
+  QPushButton* m_editTileImageButton = nullptr;
+  QToolButton* m_selectConnFileButton = nullptr;
+  QToolButton* m_selectOutputButton = nullptr;
+  QComboBox* m_mergeModeComboBox = nullptr;
+  QComboBox* m_scene1ComboBox = nullptr;
+  QComboBox* m_bgsub1ComboBox = nullptr;
+  QComboBox* m_channel1ComboBox = nullptr;
+  QComboBox* m_scene2ComboBox = nullptr;
+  QComboBox* m_bgsub2ComboBox = nullptr;
+  QComboBox* m_channel2ComboBox = nullptr;
+  QSpinBox* m_commonChannel1SpinBox = nullptr;
+  QSpinBox* m_commonChannel2SpinBox = nullptr;
+  //  QSpinBox *m_outputCh1ImageChannelSpinBox = nullptr;
+  //  QSpinBox *m_outputCh2ImageChannelSpinBox = nullptr;
+  //  QSpinBox *m_outputCh3ImageChannelSpinBox = nullptr;
+  //  QComboBox *m_outputCh1ImageComboBox = nullptr;
+  //  QComboBox *m_outputCh2ImageComboBox = nullptr;
+  //  QComboBox *m_outputCh3ImageComboBox = nullptr;
+  QSpinBox* m_layout1SpinBox = nullptr;
+  QSpinBox* m_layout2SpinBox = nullptr;
+  QComboBox* m_configDim1ComboBox = nullptr;
+  QComboBox* m_configDim2ComboBox = nullptr;
+  QComboBox* m_configDim3ComboBox = nullptr;
+  QSpinBox* m_intvXSpinBox = nullptr;
+  QSpinBox* m_intvYSpinBox = nullptr;
+  QSpinBox* m_intvZSpinBox = nullptr;
+  QSpinBox* m_dsXSpinBox = nullptr;
+  QSpinBox* m_dsYSpinBox = nullptr;
+  QSpinBox* m_dsZSpinBox = nullptr;
 
-  QList<QLabel*> m_labelsForTwoInputs;
+  std::vector<QLabel*> m_labelsForTwoInputs;
 
-  ZTileImageWidget* m_tileImageWidget;
-  QScrollArea* m_scrollArea;
+  ZTileImageWidget* m_tileImageWidget = nullptr;
+  QScrollArea* m_scrollArea = nullptr;
 
-  QTabWidget* m_tabWidget;
+  QTabWidget* m_tabWidget = nullptr;
 };
 
 } // namespace nim

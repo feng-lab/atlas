@@ -15,12 +15,12 @@ Q_OBJECT
 public:
   explicit ZObjView(ZView& view);
 
-  const ZBBox<glm::ivec4>& boundBox() const
+  [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }
 
-  virtual const ZObjDoc& doc() const = 0;
+  [[nodiscard]] virtual const ZObjDoc& doc() const = 0;
 
-  virtual bool hasObj(size_t id) const = 0;
+  [[nodiscard]] virtual bool hasObj(size_t id) const = 0;
 
   virtual void read(size_t id, const QJsonObject& json) = 0;
 
@@ -61,9 +61,9 @@ public:
   virtual void rotateCounterclockwise(double x, double y) = 0;
 
   //
-  virtual int minViewPrecedence() const = 0;
+  [[nodiscard]] virtual int minViewPrecedence() const = 0;
 
-  virtual int maxViewPrecedence() const = 0;
+  [[nodiscard]] virtual int maxViewPrecedence() const = 0;
 
 signals:
 
@@ -76,7 +76,7 @@ protected:
 
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
 
-  virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) = 0;
+  virtual void onSelectionChanged(const std::vector<size_t>& selected, const std::vector<size_t>& deselected) = 0;
 
   virtual void onObjSelectedFromView(bool append) = 0;
 

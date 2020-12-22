@@ -9,12 +9,11 @@ Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DView& view)
   connect(&m_doc, &ZMeshDoc::objAdded, this, &Z3DMeshView::docMeshAdded);
 }
 
-void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
+void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
 {
   try {
-    for (int i = 0; i < objs.size(); ++i) {
-      size_t id = objs[i];
-      Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
+    for (auto id : objs) {
+      auto viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
       viewControl->setData(m_doc.meshList(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -31,8 +30,8 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (int i = 0; i < objs.size(); ++i) {
-        emit objViewReady(objs[i]);
+      for (auto id : objs) {
+        emit objViewReady(id);
       }
     }
   }
@@ -46,7 +45,7 @@ void Z3DMeshView::docMeshesAdded(const QList<size_t>& objs)
 void Z3DMeshView::docMeshAdded(size_t id)
 {
   try {
-    Z3DMeshFilter* viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
+    auto viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
     viewControl->setData(m_doc.meshList(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

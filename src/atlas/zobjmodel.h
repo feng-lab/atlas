@@ -61,9 +61,9 @@ public:
 
   [[nodiscard]] size_t numObjs() const;
 
-  [[nodiscard]] QList<size_t> objs() const;
+  [[nodiscard]] std::vector<size_t> objs() const;
 
-  QList<size_t> objsOfDoc(const ZObjDoc* doc) const;
+  std::vector<size_t> objsOfDoc(const ZObjDoc* doc) const;
 
   [[nodiscard]] bool isObjVisible(size_t id) const;
 
@@ -87,7 +87,7 @@ public:
 
   void removeAllObjs();
 
-  size_t indexToId(const QModelIndex& index);
+  static size_t indexToId(const QModelIndex& index);
 
   QModelIndex idToIndex(size_t id, int col = 0);
 

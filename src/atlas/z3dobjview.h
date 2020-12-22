@@ -65,7 +65,7 @@ protected:
 
   virtual void onObjVisibleChanged(size_t id, bool v) = 0;
 
-  virtual void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) = 0;
+  virtual void onSelectionChanged(const std::vector<size_t>& selected, const std::vector<size_t>& deselected) = 0;
 
   virtual void onObjSelectedFromView(bool append) = 0;
 

@@ -26,13 +26,13 @@ private:
 
   void thisCurrentChanged(const QModelIndex& current, const QModelIndex& previous);
 
-  QModelIndex mapIndexToSrc(const QModelIndex& index) const;
+  [[nodiscard]] QModelIndex mapIndexToSrc(const QModelIndex& index) const;
 
-  QModelIndex mapIndexFromSrc(const QModelIndex& index) const;
+  [[nodiscard]] QModelIndex mapIndexFromSrc(const QModelIndex& index) const;
 
-  QItemSelection mapSelectionToSrc(const QItemSelection& selection) const;
+  [[nodiscard]] QItemSelection mapSelectionToSrc(const QItemSelection& selection) const;
 
-  QItemSelection mapSelectionFromSrc(const QItemSelection& selection) const;
+  [[nodiscard]] QItemSelection mapSelectionFromSrc(const QItemSelection& selection) const;
 
 private:
   QItemSelectionModel* m_srcSelectionModel;

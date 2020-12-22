@@ -3,7 +3,6 @@
 #include "zcombobox.h"
 #include "zglmutils.h"
 #include "zparameter.h"
-#include <QList>
 #include <QString>
 
 namespace nim {
@@ -16,33 +15,32 @@ template<class T, class T2 = int>
 class ZOptionParameter : public ZSingleValueParameter<T>
 {
 public:
-  explicit ZOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
-                            const QString& suffix = "");
+  explicit ZOptionParameter(const QString& name, QObject* parent = nullptr, QString prefix = "", QString suffix = "");
 
-  inline QString prefix() const
+  [[nodiscard]] inline QString prefix() const
   { return m_prefix; }
 
-  inline QString suffix() const
+  [[nodiscard]] inline QString suffix() const
   { return m_suffix; }
 
   void select(const T& value);
 
   void selectNext();
 
-  bool isSelected(const T& value) const;
+  [[nodiscard]] bool isSelected(const T& value) const;
 
-  bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   { return m_options.empty(); }
 
-  bool hasOption(const T& value) const
-  { return m_options.contains(value); }
+  [[nodiscard]] bool hasOption(const T& value) const
+  { return std::find(m_options.begin(), m_options.end(), value) != m_options.end(); }
 
-  inline T2 associatedData() const
+  [[nodiscard]] inline T2 associatedData() const
   { return m_associatedData; }
 
   void addOption(const T& value)
   {
-    if (m_options.indexOf(value) != -1) {
+    if (std::find(m_options.begin(), m_options.end(), value) != m_options.end()) {
       return;
     }
     m_options.push_back(value);
@@ -64,15 +62,16 @@ public:
 
   void removeOption(const T& value)
   {
-    int idx = m_options.indexOf(value);
-    if (idx == -1)
+    auto iter = std::find(m_options.begin(), m_options.end(), value);
+    if (iter == m_options.end()) {
       return;
-    m_options.removeAt(idx);
-    m_associatedDatas.removeAt(idx);
+    }
+    m_options.erase(iter);
+    m_associatedDatas.erase(m_associatedDatas.begin() + (iter - m_options.begin()));
     emit this->reservedStringSignal2(comboBoxItemString(value));
-    int index = m_options.indexOf(this->m_value);
-    if (index != -1) {
-      emit this->reservedIntSignal1(index);
+    iter = std::find(m_options.begin(), m_options.end(), this->m_value);
+    if (iter != m_options.end()) {
+      emit this->reservedIntSignal1(iter - m_options.begin());
     } else {
       emit this->reservedIntSignal1(0);
       this->set(m_options[0]);
@@ -124,9 +123,9 @@ public:
     addOptions(op2, op3, op4, op5, op6, op7, op8);
   }
 
-  inline void addOptionWithData(const QPair<T, T2>& value)
+  inline void addOptionWithData(const std::pair<T, T2>& value)
   {
-    if (m_options.indexOf(value.first) != -1)
+    if (std::find(m_options.begin(), m_options.end(), value.first) != m_options.end())
       return;
     m_options.push_back(value.first);
     m_associatedDatas.push_back(value.second);
@@ -137,52 +136,52 @@ public:
     }
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2)
   {
     addOptionWithData(op1);
     addOptionWithData(op2);
   }
 
-  inline void addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3);
   }
 
   inline void
-  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4);
   }
 
   inline void
-  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                     const QPair<T, T2>& op5)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+                     const std::pair<T, T2>& op5)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5);
   }
 
   inline void
-  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                     const QPair<T, T2>& op5, const QPair<T, T2>& op6)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6);
   }
 
   inline void
-  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                     const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7);
   }
 
   inline void
-  addOptionsWithData(const QPair<T, T2>& op1, const QPair<T, T2>& op2, const QPair<T, T2>& op3, const QPair<T, T2>& op4,
-                     const QPair<T, T2>& op5, const QPair<T, T2>& op6, const QPair<T, T2>& op7, const QPair<T, T2>& op8)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7, const std::pair<T, T2>& op8)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7, op8);
@@ -190,10 +189,10 @@ public:
 
   void setSameAs(const ZParameter& rhs) override;
 
-  bool supportInterpolation() const override
+  [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  QJsonValue jsonValue() const override;
+  [[nodiscard]] QJsonValue jsonValue() const override;
 
   void readValue(const QJsonValue& jsonValue) override;
 
@@ -208,12 +207,12 @@ protected:
 
   void makeValid(T& value) const override;
 
-  QString comboBoxItemString(const T& value) const;
+  [[nodiscard]] QString comboBoxItemString(const T& value) const;
 
 private:
-  QList<T> m_options;
+  std::vector<T> m_options;
   T2 m_associatedData;
-  QList<T2> m_associatedDatas;
+  std::vector<T2> m_associatedDatas;
 
   bool m_dataIsValid = false;
   QString m_prefix;

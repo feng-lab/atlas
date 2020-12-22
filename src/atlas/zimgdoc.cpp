@@ -48,8 +48,8 @@ bool ZImgDoc::save(size_t id)
 bool ZImgDoc::saveAs(size_t id)
 {
   QStringList filters;
-  QList<FileFormat> formats;
-  QList<Compression> comps;
+  std::vector<FileFormat> formats;
+  std::vector<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
   QFileDialog dialog(QApplication::activeWindow());
@@ -88,9 +88,9 @@ size_t ZImgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   return loadImg(ZImgSource(jValue), errorMsg);
 }
 
-QList<QAction*> ZImgDoc::loadFileActions() const
+std::vector<QAction*> ZImgDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadImgAction);
   res.push_back(m_importImgSequenceAction);
   return res;
@@ -197,7 +197,7 @@ bool ZImgDoc::isAlias(size_t id) const
 void ZImgDoc::loadImg()
 {
   QStringList filters;
-  QList<FileFormat> formats;
+  std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
 
   QFileDialog dialog(QApplication::activeWindow());

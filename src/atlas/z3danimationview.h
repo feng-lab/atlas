@@ -13,7 +13,7 @@ public:
   Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view);
 
 private:
-  void docAnimationsAdded(const QList<size_t>& objs);
+  void docAnimationsAdded(const std::vector<size_t>& objs);
 
   void docAnimationAdded(size_t id);
 };

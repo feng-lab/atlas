@@ -3,7 +3,6 @@
 #include "zfilterview.h"
 #include "zimgdoc.h"
 #include "zimgfilter.h"
-#include <map>
 
 namespace nim {
 
@@ -18,7 +17,7 @@ public:
   QString infoOfPos(double x, double y) override;
 
 private:
-  void docImgsAdded(const QList<size_t>& objs);
+  void docImgsAdded(const std::vector<size_t>& objs);
 
   void docImgAdded(size_t id);
 

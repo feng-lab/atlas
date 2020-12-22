@@ -3,13 +3,14 @@
 #include "zlog.h"
 #include <QFile>
 #include <QTextStream>
-#include <QStringList>
+#include <memory>
+#include <utility>
 
 namespace nim {
 
-Z3DSDFont::Z3DSDFont(const QString& imageFileName, const QString& txtFileName)
-  : m_imageFileName(imageFileName)
-  , m_txtFileName(txtFileName)
+Z3DSDFont::Z3DSDFont(QString imageFileName, QString txtFileName)
+  : m_imageFileName(std::move(imageFileName))
+  , m_txtFileName(std::move(txtFileName))
   , m_isEmpty(false)
   , m_maxFontHeight(0)
 {
@@ -21,20 +22,23 @@ Z3DSDFont::CharInfo Z3DSDFont::charInfo(int id) const
 {
   CharInfo space;
   for (const auto& info : m_charInfos) {
-    if (info.id == id)
+    if (info.id == id) {
       return info;
-    else if (info.id == 32)
+    } else if (info.id == 32) {
       space = info;
+    }
   }
   return space;
 }
 
 Z3DTexture* Z3DSDFont::texture()
 {
-  if (m_isEmpty)
+  if (m_isEmpty) {
     return nullptr;
-  if (!m_texture)
+  }
+  if (!m_texture) {
     createTexture();
+  }
   return m_texture.get();
 }
 
@@ -49,15 +53,17 @@ void Z3DSDFont::loadImage()
 
 void Z3DSDFont::parseFontFile()
 {
-  if (m_isEmpty)
+  if (m_isEmpty) {
     return;
+  }
   m_charInfos.clear();
   QFile qFile(m_txtFileName);
-  if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
+  if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
     return;
+  }
 
   QTextStream stream(&qFile);
-  int numCharFromFile = 0;
+  size_t numCharFromFile = 0;
   while (!stream.atEnd()) {
     QString line = stream.readLine();
     line = line.trimmed();
@@ -67,10 +73,10 @@ void Z3DSDFont::parseFontFile()
     }
     if (line.startsWith("chars count=")) {
       bool ok;
-      numCharFromFile = line.section('=', 1, 1).toInt(&ok);
-      if (ok)
+      numCharFromFile = line.section('=', 1, 1).toUInt(&ok);
+      if (ok) {
         continue;
-      else {
+      } else {
         LOG(ERROR) << "char count can not be converted to int, wrong file maybe, abort";
         m_isEmpty = true;
         return;
@@ -103,8 +109,7 @@ void Z3DSDFont::parseFontFile()
             if (line.indexOf(' ') == -1) {
               value = line.mid(tokens[i].size());
               line.clear();
-            }
-            else {
+            } else {
               value = line.mid(tokens[i].size(), line.indexOf(' ') - tokens[i].size());
               line = line.mid(line.indexOf(' '));
             }
@@ -115,26 +120,27 @@ void Z3DSDFont::parseFontFile()
         if (tokenIndex != -1) {
           numTokenFound++;
           bool ok = false;
-          if (tokenIndex == 0)
+          if (tokenIndex == 0) {
             id = value.toInt(&ok);
-          else if (tokenIndex == 1)
+          } else if (tokenIndex == 1) {
             x = value.toInt(&ok);
-          else if (tokenIndex == 2)
+          } else if (tokenIndex == 2) {
             y = value.toInt(&ok);
-          else if (tokenIndex == 3)
+          } else if (tokenIndex == 3) {
             width = value.toInt(&ok);
-          else if (tokenIndex == 4)
+          } else if (tokenIndex == 4) {
             height = value.toInt(&ok);
-          else if (tokenIndex == 5)
+          } else if (tokenIndex == 5) {
             xoffset = value.toFloat(&ok);
-          else if (tokenIndex == 6)
+          } else if (tokenIndex == 6) {
             yoffset = value.toFloat(&ok);
-          else if (tokenIndex == 7)
+          } else if (tokenIndex == 7) {
             xadvance = value.toFloat(&ok);
-          else if (tokenIndex == 8)
+          } else if (tokenIndex == 8) {
             page = value.toInt(&ok);
-          else if (tokenIndex == 9)
+          } else if (tokenIndex == 9) {
             chnl = value.toInt(&ok);
+          }
           if (!ok) {
             LOG(ERROR) << "some number convertion error, abort";
             m_charInfos.clear();
@@ -150,11 +156,11 @@ void Z3DSDFont::parseFontFile()
         }
       }
       if (numTokenFound == tokens.size()) {
-        m_charInfos.push_back(CharInfo(id, x, y, width, height,
-                                       xoffset, yoffset, xadvance,
-                                       page, chnl,
-                                       m_GLFormattedImage.width(),
-                                       m_GLFormattedImage.height()));
+        m_charInfos.emplace_back(id, x, y, width, height,
+                                 xoffset, yoffset, xadvance,
+                                 page, chnl,
+                                 m_GLFormattedImage.width(),
+                                 m_GLFormattedImage.height());
         m_maxFontHeight = std::max(m_maxFontHeight, height);
       } else {
         LOG(ERROR) << "some tokens are missing, abort";
@@ -175,11 +181,12 @@ void Z3DSDFont::parseFontFile()
 
 void Z3DSDFont::createTexture()
 {
-  if (m_isEmpty || m_texture)
+  if (m_isEmpty || m_texture) {
     return;
-  m_texture.reset(
-    new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
-                   GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
+  }
+  m_texture = std::make_unique<Z3DTexture>(
+    GLint(GL_RGBA8), glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
+    GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
   m_texture->setWrap(GLint(GL_REPEAT));
   m_texture->uploadImage(m_GLFormattedImage.bits());
 }

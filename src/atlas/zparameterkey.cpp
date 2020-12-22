@@ -2,7 +2,6 @@
 
 #include "zparameterfactory.h"
 #include "zparameter.h"
-#include "zparameteranimation.h"
 #include "zoptionparameter.h"
 
 namespace {
@@ -145,7 +144,7 @@ void ZParameterKey::setDefaultType()
 {
   m_type = std::make_unique<ZStringIntOptionParameter>("Type");
   if (!m_value->supportInterpolation()) {
-    m_type->addOptionWithData(qMakePair<QString, int>("Switch", QEasingCurve::Custom));
+    m_type->addOptionWithData(std::make_pair<QString, int>("Switch", QEasingCurve::Custom));
     setType("Switch");
   } else {
     enum Type
@@ -164,45 +163,45 @@ void ZParameterKey::setDefaultType()
       InCurve, OutCurve, SineCurve, CosineCurve,
       Switch
     };
-    m_type->addOptionWithData(qMakePair<QString, int>("Linear", QEasingCurve::Linear));
-    m_type->addOptionWithData(qMakePair<QString, int>("Switch", QEasingCurve::Custom));
-    m_type->addOptionWithData(qMakePair<QString, int>("InQuad", QEasingCurve::InQuad));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutQuad", QEasingCurve::OutQuad));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuad", QEasingCurve::InOutQuad));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuad", QEasingCurve::OutInQuad));
-    m_type->addOptionWithData(qMakePair<QString, int>("InCubic", QEasingCurve::InCubic));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutCubic", QEasingCurve::OutCubic));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutCubic", QEasingCurve::InOutCubic));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInCubic", QEasingCurve::OutInCubic));
-    m_type->addOptionWithData(qMakePair<QString, int>("InElastic", QEasingCurve::InElastic));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutElastic", QEasingCurve::OutElastic));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutElastic", QEasingCurve::InOutElastic));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInElastic", QEasingCurve::OutInElastic));
-    m_type->addOptionWithData(qMakePair<QString, int>("InBounce", QEasingCurve::InBounce));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutBounce", QEasingCurve::OutBounce));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutBounce", QEasingCurve::InOutBounce));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInBounce", QEasingCurve::OutInBounce));
-    m_type->addOptionWithData(qMakePair<QString, int>("InBack", QEasingCurve::InBack));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutBack", QEasingCurve::OutBack));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutBack", QEasingCurve::InOutBack));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInBack", QEasingCurve::OutInBack));
+    m_type->addOptionWithData(std::make_pair<QString, int>("Linear", QEasingCurve::Linear));
+    m_type->addOptionWithData(std::make_pair<QString, int>("Switch", QEasingCurve::Custom));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InQuad", QEasingCurve::InQuad));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutQuad", QEasingCurve::OutQuad));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutQuad", QEasingCurve::InOutQuad));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInQuad", QEasingCurve::OutInQuad));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InCubic", QEasingCurve::InCubic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutCubic", QEasingCurve::OutCubic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutCubic", QEasingCurve::InOutCubic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInCubic", QEasingCurve::OutInCubic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InElastic", QEasingCurve::InElastic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutElastic", QEasingCurve::OutElastic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutElastic", QEasingCurve::InOutElastic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInElastic", QEasingCurve::OutInElastic));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InBounce", QEasingCurve::InBounce));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutBounce", QEasingCurve::OutBounce));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutBounce", QEasingCurve::InOutBounce));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInBounce", QEasingCurve::OutInBounce));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InBack", QEasingCurve::InBack));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutBack", QEasingCurve::OutBack));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutBack", QEasingCurve::InOutBack));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInBack", QEasingCurve::OutInBack));
 
-    m_type->addOptionWithData(qMakePair<QString, int>("InQuart", QEasingCurve::InQuart));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutQuart", QEasingCurve::OutQuart));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuart", QEasingCurve::InOutQuart));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuart", QEasingCurve::OutInQuart));
-    m_type->addOptionWithData(qMakePair<QString, int>("InQuint", QEasingCurve::InQuint));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutQuint", QEasingCurve::OutQuint));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutQuint", QEasingCurve::InOutQuint));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInQuint", QEasingCurve::OutInQuint));
-    m_type->addOptionWithData(qMakePair<QString, int>("InSine", QEasingCurve::InSine));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutSine", QEasingCurve::OutSine));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutSine", QEasingCurve::InOutSine));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInSine", QEasingCurve::OutInSine));
-    m_type->addOptionWithData(qMakePair<QString, int>("InExpo", QEasingCurve::InExpo));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutExpo", QEasingCurve::OutExpo));
-    m_type->addOptionWithData(qMakePair<QString, int>("InOutExpo", QEasingCurve::InOutExpo));
-    m_type->addOptionWithData(qMakePair<QString, int>("OutInExpo", QEasingCurve::OutInExpo));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InQuart", QEasingCurve::InQuart));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutQuart", QEasingCurve::OutQuart));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutQuart", QEasingCurve::InOutQuart));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInQuart", QEasingCurve::OutInQuart));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InQuint", QEasingCurve::InQuint));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutQuint", QEasingCurve::OutQuint));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutQuint", QEasingCurve::InOutQuint));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInQuint", QEasingCurve::OutInQuint));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InSine", QEasingCurve::InSine));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutSine", QEasingCurve::OutSine));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutSine", QEasingCurve::InOutSine));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInSine", QEasingCurve::OutInSine));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InExpo", QEasingCurve::InExpo));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutExpo", QEasingCurve::OutExpo));
+    m_type->addOptionWithData(std::make_pair<QString, int>("InOutExpo", QEasingCurve::InOutExpo));
+    m_type->addOptionWithData(std::make_pair<QString, int>("OutInExpo", QEasingCurve::OutInExpo));
     setType("Linear");
   }
 }

@@ -20,7 +20,7 @@ public:
     connect(&m_doc, &DocType::selectionChangedFromDoc, this, &ZFilterView::onSelectionChanged);
   }
 
-  ~ZFilterView()
+  ~ZFilterView() override
   {
     for (const auto& idFilter : m_idToFilter) {
       idFilter.second->releaseItemsOwnership();  // destroy view means mainwindow is closing, this will speed up the closing process
@@ -29,10 +29,10 @@ public:
 
   // ZObjView interface
 public:
-  const ZObjDoc& doc() const override
+  [[nodiscard]] const ZObjDoc& doc() const override
   { return m_doc; }
 
-  bool hasObj(size_t id) const override
+  [[nodiscard]] bool hasObj(size_t id) const override
   { return m_idToFilter.find(id) != m_idToFilter.end(); }
 
   void read(size_t id, const QJsonObject& json) override
@@ -183,7 +183,7 @@ public:
     }
   }
 
-  int minViewPrecedence() const override
+  [[nodiscard]] int minViewPrecedence() const override
   {
     int res = std::numeric_limits<int>::max();
     for (const auto& idFilter : m_idToFilter) {
@@ -192,7 +192,7 @@ public:
     return res;
   }
 
-  int maxViewPrecedence() const override
+  [[nodiscard]] int maxViewPrecedence() const override
   {
     int res = std::numeric_limits<int>::min();
     for (const auto& idFilter : m_idToFilter) {
@@ -228,7 +228,7 @@ protected:
     it->second->setVisible(v);
   }
 
-  void onSelectionChanged(const QList<size_t>& selected, const QList<size_t>& deselected) override
+  void onSelectionChanged(const std::vector<size_t>& selected, const std::vector<size_t>& deselected) override
   {
     for (auto id : selected) {
       auto it = m_idToFilter.find(id);

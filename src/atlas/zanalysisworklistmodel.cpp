@@ -1,6 +1,5 @@
 #include "zanalysisworklistmodel.h"
 
-#include "zlog.h"
 #include <qtcsv/reader.h>
 #include <qtcsv/variantdata.h>
 #include <qtcsv/writer.h>
@@ -182,46 +181,32 @@ QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
     switch (index.column()) {
       case 0:
         return input->imgFilename;
-        break;
       case 1:
         return input->swcFilename;
-        break;
       case 2:
         return input->punctaFilename;
-        break;
       case 3:
         return input->voxelSizeX;
-        break;
       case 4:
         return input->voxelSizeY;
-        break;
       case 5:
         return input->voxelSizeZ;
-        break;
       case 6:
         return input->dendriteChannel;
-        break;
       case 7:
         return input->axonChannel;
-        break;
       case 8:
         return input->maxDistToBranch;
-        break;
       case 9:
         return input->bluenessExtend;
-        break;
       case 10:
         return input->outputFolder;
-        break;
       case 11:
         return input->doPyramidalFunctionalSeparation ? "yes" : "no";
-        break;
       case 12:
         return input->doPyramidalSubclassSeparation ? "yes" : "no";
-        break;
       case 13:
         return input->somaPunctaFilename;
-        break;
       default:
         break;
     }
@@ -236,7 +221,7 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& d
   if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
     if (index.row() >= rowCount() || index.column() >= columnCount() || index.row() < 0 || index.column() < 0)
       return false;
-    ZAnalysisTextFileInput* input = nullptr;
+    ZAnalysisTextFileInput* input;
     if (m_rowToInput.find(index.row()) == m_rowToInput.end()) {
       m_inputs.push_back(ZAnalysisTextFileInput());
       input = &(m_inputs[m_inputs.size() - 1]);

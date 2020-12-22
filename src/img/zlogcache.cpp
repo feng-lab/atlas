@@ -11,18 +11,21 @@ ZLogCache& ZLogCache::instance()
 }
 
 void ZLogCache::send(LogSeverity severity, const char* full_filename, const char* base_filename,
-                     int line, const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len)
+                     int line, const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/,
+                     size_t prefix_len)
 {
   QMutexLocker lock(&m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
     m_logDatas.pop_front();
-    --m_unsendLogDataStart;
+    if (m_unsendLogDataStart > 0) {
+      --m_unsendLogDataStart;
+    }
   }
-  m_logDatas.push_back(LogData(severity, full_filename, base_filename, line,
-                               tm_time, message, message_len, prefix_len));
+  m_logDatas.emplace_back(severity, full_filename, base_filename, line,
+                          tm_time, message, message_len, prefix_len);
 }
 
-ZLogCache::ZLogCache(int maxNumItems)
+ZLogCache::ZLogCache(size_t maxNumItems)
   : m_maxNumItems(maxNumItems)
   , m_timer(new QTimer(this))
 {
@@ -34,7 +37,7 @@ ZLogCache::ZLogCache(int maxNumItems)
 void ZLogCache::sendLogData()
 {
   QMutexLocker lock(&m_mutex);
-  int start = m_unsendLogDataStart;
+  auto start = m_unsendLogDataStart;
   m_unsendLogDataStart = m_logDatas.size();
   if (m_unsendLogDataStart > start) {
     emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);

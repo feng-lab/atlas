@@ -15,7 +15,7 @@ public:
   inline ZImgPack& imgPack(size_t id)
   { return *m_idToImgPacks.at(id); }
 
-  inline const ZImgPack& imgPack(size_t id) const
+  [[nodiscard]] inline const ZImgPack& imgPack(size_t id) const
   { return *m_idToImgPacks.at(id); }
 
   void setImgChannelColor(size_t id, size_t c, col4 col);
@@ -26,43 +26,43 @@ public:
 
   bool saveAs(size_t id) override;
 
-  QString typeName() const override
+  [[nodiscard]] QString typeName() const override
   { return "Image"; }
 
-  QString typePluralName() const override
+  [[nodiscard]] QString typePluralName() const override
   { return "Images"; }
 
-  bool canReadFile(const QString& fileName) const override;
+  [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
-  QMenu* processObjMenu() const override;
+  [[nodiscard]] QMenu* processObjMenu() const override;
 
   void removeObj(size_t id) override;
 
-  QString objName(size_t id) const override;
+  [[nodiscard]] QString objName(size_t id) const override;
 
-  QString objPath(size_t id) const override;
+  [[nodiscard]] QString objPath(size_t id) const override;
 
-  bool objHasUnsavedChange(size_t id) const override;
+  [[nodiscard]] bool objHasUnsavedChange(size_t id) const override;
 
-  QString objInfo(size_t id) const override;
+  [[nodiscard]] QString objInfo(size_t id) const override;
 
-  QString objDetailedInfo(size_t id) const override;
+  [[nodiscard]] QString objDetailedInfo(size_t id) const override;
 
-  QString objTooltip(size_t id) const override;
+  [[nodiscard]] QString objTooltip(size_t id) const override;
 
-  QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
 
-  bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
 
   size_t makeAlias(size_t id) override;
 
-  bool isAlias(size_t id) const override;
+  [[nodiscard]] bool isAlias(size_t id) const override;
 
 signals:
 
@@ -111,12 +111,12 @@ private:
 private:
   std::map<size_t, std::shared_ptr<ZImgPack>> m_idToImgPacks;
 
-  QAction* m_loadImgAction;
-  QAction* m_importImgSequenceAction;
+  QAction* m_loadImgAction = nullptr;
+  QAction* m_importImgSequenceAction = nullptr;
 
-  QAction* m_stitchImageAction;
-  QAction* m_alignSectionsAction;
-  QAction* m_correctChromaticShiftAction;
+  QAction* m_stitchImageAction = nullptr;
+  QAction* m_alignSectionsAction = nullptr;
+  QAction* m_correctChromaticShiftAction = nullptr;
 };
 
 } // namespace nim

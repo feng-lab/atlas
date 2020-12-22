@@ -524,9 +524,9 @@ public:
   }
 
   // qt style read write name filter for filedialog
-  static void getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats);
+  static void getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats);
 
-  static void getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps);
+  static void getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps);
 
   // return true if file extension is supported for read
   static bool fileExtensionReadSupported(const QString& filename);
@@ -895,12 +895,12 @@ public:
   // use img view to work with part of img
   [[nodiscard]] ZImg createView(int c = -1, int t = -1);
 
-  [[nodiscard]] const ZImg createView(int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg createView(int c = -1, int t = -1) const;
 
   // view of one single channel slice
   [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t);
 
-  [[nodiscard]] const ZImg createView(size_t z, size_t c, size_t t) const;
+  [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t) const;
 
   [[nodiscard]] inline bool isImgView() const
   { return !m_ownData; }

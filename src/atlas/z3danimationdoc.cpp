@@ -11,6 +11,7 @@
 #include <QApplication>
 #include <QIcon>
 #include <set>
+#include <utility>
 
 namespace nim {
 
@@ -31,7 +32,7 @@ void Z3DAnimationDoc::bindView(Z3DView* v)
 
 void Z3DAnimationDoc::createNewAnimation(const QString& name)
 {
-  Z3DAnimation* animation = new Z3DAnimation(m_doc, this);
+  auto animation = new Z3DAnimation(m_doc, this);
   addAnimation(animation, "", name);
   animation->addKeyFrame(0);
 }
@@ -129,9 +130,9 @@ size_t Z3DAnimationDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> Z3DAnimationDoc::loadFileActions() const
+std::vector<QAction*> Z3DAnimationDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadAnimationsAction);
   return res;
 }
@@ -237,7 +238,7 @@ void Z3DAnimationDoc::loadAnimation()
 
 void Z3DAnimationDoc::setModified()
 {
-  if (Z3DAnimation* animation = qobject_cast<Z3DAnimation*>(sender())) {
+  if (auto animation = qobject_cast<Z3DAnimation*>(sender())) {
     for (const auto& idPack : m_idToAnimationPacks) {
       if (idPack.second->animation.get() == animation) {
         if (!idPack.second->hasUnsavedChange) {
@@ -276,8 +277,8 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
   return id;
 }
 
-Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QString& path_, const QString& name)
-  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(name)
+Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QString& path_, QString  name)
+  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(std::move(name))
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;

@@ -524,10 +524,10 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
   for (size_t i = 0; i < imgs.size(); ++i) {
     readImg(imgSources[i], imgs[i]);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
-      int widthPadBefore = (info.width - imgs[i].width()) / 2;
-      int widthPadAfter = info.width - imgs[i].width() - widthPadBefore;
-      int heightPadBefore = (info.height - imgs[i].height()) / 2;
-      int heightPadAfter = info.height - imgs[i].height() - heightPadBefore;
+      int widthPadBefore = int(info.width - imgs[i].width()) / 2;
+      int widthPadAfter = int(info.width - imgs[i].width()) - widthPadBefore;
+      int heightPadBefore = int(info.height - imgs[i].height()) / 2;
+      int heightPadAfter = int(info.height - imgs[i].height()) - heightPadBefore;
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -641,8 +641,8 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
     }
 
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {
-      int widthPadBefore = (info.width - sliceInfo.width) / 2;
-      int heightPadBefore = (info.height - sliceInfo.height) / 2;
+      int widthPadBefore = int(info.width - sliceInfo.width) / 2;
+      int heightPadBefore = int(info.height - sliceInfo.height) / 2;
       ZImgRegion sliceRegionFullXY = sliceRegion;
       sliceRegionFullXY.start.x = 0;
       sliceRegionFullXY.end.x = -1;
@@ -874,10 +874,11 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
   throw ZIOException(error);
 }
 
-void ZImgIO::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats) const
+void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats) const
 {
   filters.clear();
   formats.clear();
+  formats.push_back(FileFormat::Unknown);  // for filter 'all'
 
   QString all = "Images";
   QStringList lst;
@@ -896,10 +897,9 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& format
   all += lst.join(" ");
   all += ")";
   filters.prepend(all);
-  formats.prepend(FileFormat::Unknown);
 }
 
-void ZImgIO::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps) const
+void ZImgIO::getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps) const
 {
   filters.clear();
   formats.clear();

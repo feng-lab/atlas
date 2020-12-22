@@ -32,10 +32,10 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   , m_optimizer("Optimizer")
 {
   m_referenceChannel.clearOptions();
-  m_referenceChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
+  m_referenceChannel.addOptionWithData(std::make_pair<QString, int>("Auto", 0));
   m_referenceChannel.select("Auto");
   m_targetChannel.clearOptions();
-  m_targetChannel.addOptionWithData(qMakePair<QString, int>("Auto", 0));
+  m_targetChannel.addOptionWithData(std::make_pair<QString, int>("Auto", 0));
   m_targetChannel.select("Auto");
   init();
 
@@ -122,8 +122,8 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
   m_referenceChannel.clearOptions();
   m_targetChannel.clearOptions();
   for (size_t i = 0; i < channelNumber; ++i) {
-    m_referenceChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
-    m_targetChannel.addOptionWithData(qMakePair(QString("Ch%1").arg(i + 1), i + 1));
+    m_referenceChannel.addOptionWithData(std::make_pair(QString("Ch%1").arg(i + 1), i + 1));
+    m_targetChannel.addOptionWithData(std::make_pair(QString("Ch%1").arg(i + 1), i + 1));
   }
   m_referenceChannel.select("Ch1");
   m_targetChannel.select(QString("Ch%1").arg(channelNumber));
@@ -131,13 +131,13 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
 
 void ZChromaticShiftCorrectionDialog::init()
 {
-  m_method.addOptionsWithData(qMakePair<QString, QString>("Signal Matching", "Registration"),
-                              qMakePair<QString, QString>("Use 40x_1z Preset", "40x_1z"),
-                              qMakePair<QString, QString>("Use 40x_2z Preset", "40x_2z"),
-                              qMakePair<QString, QString>("Use 40x_4z Preset", "40x_4z"),
-                              qMakePair<QString, QString>("Use 63x_1z Preset", "63x_1z"),
-                              qMakePair<QString, QString>("Use 63x_2z Preset", "63x_2z"),
-                              qMakePair<QString, QString>("Use 63x_4z Preset", "63x_4z"));
+  m_method.addOptionsWithData(std::make_pair<QString, QString>("Signal Matching", "Registration"),
+                              std::make_pair<QString, QString>("Use 40x_1z Preset", "40x_1z"),
+                              std::make_pair<QString, QString>("Use 40x_2z Preset", "40x_2z"),
+                              std::make_pair<QString, QString>("Use 40x_4z Preset", "40x_4z"),
+                              std::make_pair<QString, QString>("Use 63x_1z Preset", "63x_1z"),
+                              std::make_pair<QString, QString>("Use 63x_2z Preset", "63x_2z"),
+                              std::make_pair<QString, QString>("Use 63x_4z Preset", "63x_4z"));
   m_method.select("Signal Matching");
 
   m_metric.addOptions("Normalized Cross-Correlation",

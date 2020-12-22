@@ -20,8 +20,7 @@ ZObjFilter::ZObjFilter(ZView& view)
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &ZObjFilter::objVisibleChanged);
   connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged, this, &ZObjFilter::viewPrecedenceChanged);
   connect(&m_transform, &Z2DTransformParameter::valueChanged, this, &ZObjFilter::transformChanged);
-  QList<QString> names;
-  names << "z" << "t";
+  std::vector<QString> names{"z", "t"};
   m_offsetPara.setNameForEachValue(names);
   m_offsetPara.setDecimal(0);
   m_offsetPara.setSingleStep(1);
@@ -66,7 +65,7 @@ void ZObjFilter::addParameter(ZParameter* para)
 
 void ZObjFilter::removeParameter(ZParameter* para)
 {
-  m_parameters.removeAll(para);
+  m_parameters.erase(std::remove(m_parameters.begin(), m_parameters.end(), para), m_parameters.end());
 }
 
 void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const

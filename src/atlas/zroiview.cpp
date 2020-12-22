@@ -9,7 +9,7 @@ ZROIView::ZROIView(ZROIDoc& doc, ZView& view)
   connect(&m_doc, &ZROIDoc::objAdded, this, &ZROIView::docROIAdded);
 }
 
-void ZROIView::docROIsAdded(const QList<size_t>& objs)
+void ZROIView::docROIsAdded(const std::vector<size_t>& objs)
 {
   for (auto obj : objs) {
     auto viewControl = new ZROIFilter(m_view);

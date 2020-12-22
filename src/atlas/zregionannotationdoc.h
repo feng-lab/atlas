@@ -35,7 +35,7 @@ public:
 
   size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
 
-  [[nodiscard]] QList<QAction*> loadFileActions() const override;
+  [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
   [[nodiscard]] QMenu* processObjMenu() const override;
 

@@ -14,23 +14,23 @@
 
 namespace nim {
 
-ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::vector<std::vector<int>>& tileMatrix,
-                                   QList<ZTile>* pTiles, const QStringList& filenames) :
+ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::vector<std::vector<size_t>>& tileMatrix,
+                                   std::vector<ZTile>* pTiles, const QStringList& filenames) :
   QWidget(parent), m_image(image), m_tileMatrix(tileMatrix), m_pTiles(pTiles)
 {
   m_scaleFactor = 0.6;
   m_rubberBand = nullptr;
   m_filenames = filenames;
-  if (filenames.size() == pTiles->size()) {
-    for (int i = 0; i < m_filenames.size(); ++i) {
+  if (static_cast<size_t>(filenames.size()) == pTiles->size()) {
+    for (auto& filename : m_filenames) {
       std::vector<ZImgInfo> infos;
-      ZImgIO().readInfos(m_filenames[i], infos);
+      ZImgIO().readInfos(filename, infos);
       if (infos.size() != 1) {
         m_tileimages.clear();
         break;
       }
       ZImgThumbernail tn;
-      ZImgIO().readThumbnail(m_filenames[i], tn);
+      ZImgIO().readThumbnail(filename, tn);
       bool sbreak = false;
       std::vector<ZImg> imgs;
       for (size_t z = 0; z < infos[0].depth; ++z) {
@@ -64,8 +64,8 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
   if (m_tileimages.size() == m_pTiles->size()) {
     int margin = 15;
     int tileSize = 128;
-    int width = margin + (margin + tileSize) * m_tileMatrix[0].size();
-    int height = margin + (margin + tileSize) * m_tileMatrix.size();
+    int width = margin + (margin + tileSize) * int(m_tileMatrix[0].size());
+    int height = margin + (margin + tileSize) * int(m_tileMatrix.size());
     *m_image = QImage(width, height, QImage::Format_ARGB32_Premultiplied);
     m_image->fill(0);
     for (size_t c = 0; c < m_tileMatrix[0].size(); ++c) {
@@ -74,13 +74,13 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent, QImage* image, const std::ve
           continue;
         }
         CHECK(m_pTiles->at(m_tileMatrix[r][c] - 1).index == m_tileMatrix[r][c]);
-        (*m_pTiles)[m_tileMatrix[r][c] - 1].region = QRect(margin + (margin + tileSize) * c,
-                                                           margin + (margin + tileSize) * r,
+        (*m_pTiles)[m_tileMatrix[r][c] - 1].region = QRect(margin + (margin + tileSize) * int(c),
+                                                           margin + (margin + tileSize) * int(r),
                                                            tileSize, tileSize);
       }
     }
     QPainter painter(m_image);
-    for (int i = 0; i < m_pTiles->size(); ++i) {
+    for (size_t i = 0; i < m_pTiles->size(); ++i) {
       QPoint tl = m_pTiles->at(i).region.topLeft();
       QPoint br = m_pTiles->at(i).region.bottomRight();
       painter.drawImage(QRectF(tl.x(), tl.y(), br.x() - tl.x() + 1, br.y() - tl.y() + 1),
@@ -120,7 +120,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
 
     if (m_tileimages.size() == m_pTiles->size()) {
       painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
-      for (int i = 0; i < m_pTiles->size(); ++i) {
+      for (size_t i = 0; i < m_pTiles->size(); ++i) {
         QPoint tl = m_pTiles->at(i).region.topLeft() * m_scaleFactor;
         QPoint br = m_pTiles->at(i).region.bottomRight() * m_scaleFactor;
         if (m_pTiles->at(i).bIsSelected) {
@@ -132,7 +132,7 @@ void ZTileImageWidget::paintEvent(QPaintEvent* /*event*/)
       }
     } else {
       painter.setPen(QPen(QBrush(QColor(255, 255, 0, 255)), 4));
-      for (int i = 0; i < m_pTiles->size(); ++i) {
+      for (size_t i = 0; i < m_pTiles->size(); ++i) {
         QRect rect = QRect(m_pTiles->at(i).region.topLeft() * m_scaleFactor,
                            m_pTiles->at(i).region.bottomRight() * m_scaleFactor);
         if (m_pTiles->at(i).bIsSelected) {
@@ -371,7 +371,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
       workertmp->setTileGrid(tileGrid);
     }
   } else if (m_useTileImageRadioButton->isChecked()) {
-    if (m_tileMatrix.empty() || m_tileList.isEmpty()) {
+    if (m_tileMatrix.empty() || m_tileList.empty()) {
       throw ZImgException("no tile selection image");
     }
     size_t numCols = m_tileMatrix[0].size();
@@ -414,7 +414,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     QImage image(m_tileImage);
 
     QPainter painter(&image);
-    for (int i = 0; i < m_tileList.size(); ++i) {
+    for (size_t i = 0; i < m_tileList.size(); ++i) {
       QRect rect = QRect(m_tileList.at(i).region.topLeft(),
                          m_tileList.at(i).region.bottomRight());
       if (m_tileList.at(i).bIsSelected) {
@@ -451,7 +451,7 @@ QLayout* ZStitchImageDialog::createIOLayout()
   input1vlayout->addWidget(m_selectInputStacks1Button);
   input1vlayout->addWidget(m_inputStack1FileEdit);
   auto tmphlayout = new QHBoxLayout;
-  QLabel* pl = new QLabel(tr("Use scene: "), this);
+  auto pl = new QLabel(tr("Use scene: "), this);
   pl->setToolTip(tr("scene used for stitching"));
   m_scene1ComboBox = new QComboBox(this);
   m_scene1ComboBox->addItem(tr("scene 1"));
@@ -730,7 +730,7 @@ QLayout* ZStitchImageDialog::createConnLayout()
   m_layout1SpinBox->setRange(0, 99);
   m_layout2SpinBox = new QSpinBox(this);
   m_layout2SpinBox->setRange(0, 99);
-  QLabel* pl = new QLabel(tr("rows:"), this);
+  auto pl = new QLabel(tr("rows:"), this);
   pl->setAlignment(Qt::Alignment(Qt::AlignVCenter | Qt::AlignRight));
   hlayout->addWidget(pl);
   hlayout->addWidget(m_layout1SpinBox);
@@ -888,7 +888,7 @@ void ZStitchImageDialog::selectInputStacks2()
   m_restitchCZIRadioButton->setEnabled(m_inputStack1Filenames.size() == 1);
 }
 
-bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>& tileMatrix, QList<ZTile>& tileList)
+bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<size_t>>& tileMatrix, std::vector<ZTile>& tileList)
 {
   double minvalue;
   double maxvalue;
@@ -925,9 +925,9 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>&
   if (numTilePerRow == 0 || numTilePerCol == 0) {
     return false;
   }
-  tileMatrix = std::vector<std::vector<int>>(numTilePerCol, std::vector<int>(numTilePerRow, 0));
-  int tileindex = 1;
-  int tileindex2 = 1;
+  tileMatrix = std::vector<std::vector<size_t>>(numTilePerCol, std::vector<size_t>(numTilePerRow, 0));
+  size_t tileindex = 1;
+  size_t tileindex2 = 1;
   size_t currentrow = 0;
   size_t currentcol = 0;
   for (size_t h = 1; h < img.height() - 1; h++) {
@@ -968,7 +968,7 @@ bool ZStitchImageDialog::getTileMatrix(ZImg& img, std::vector<std::vector<int>>&
 void ZStitchImageDialog::editConnFromTileImage()
 {
   if (!m_tileImage.isNull()) {
-    QList<ZTile> tmpList(m_tileList);
+    std::vector<ZTile> tmpList(m_tileList);
     QDialog dia;
     m_scrollArea = new QScrollArea(this);
     m_tileImageWidget = new ZTileImageWidget(this, &m_tileImage, m_tileMatrix, &tmpList, m_inputStack1Filenames);
@@ -999,13 +999,13 @@ void ZStitchImageDialog::editConnFromTileImage()
     zoomOutButton->setDefaultAction(m_zoomOutAction);
     hlayout->addWidget(zoomOutButton);
 
-    QPushButton* clearAllButton = new QPushButton(tr("Clear All Selected"), this);
+    auto clearAllButton = new QPushButton(tr("Clear All Selected"), this);
     connect(clearAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::clearAllSelectedInTileImageWidget);
     hlayout->addWidget(clearAllButton);
-    QPushButton* selectAllButton = new QPushButton(tr("Select All"), this);
+    auto selectAllButton = new QPushButton(tr("Select All"), this);
     connect(selectAllButton, &QPushButton::clicked, this, &ZStitchImageDialog::selectAllInTileImageWidget);
     hlayout->addWidget(selectAllButton);
-    QPushButton* saveButton = new QPushButton(tr("Save"), this);
+    auto saveButton = new QPushButton(tr("Save"), this);
     connect(saveButton, &QPushButton::clicked, this, &ZStitchImageDialog::saveTileImageWidgetAsImage);
     hlayout->addWidget(saveButton);
 

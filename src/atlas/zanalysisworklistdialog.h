@@ -34,9 +34,9 @@ protected:
   void createWidget();
 
 private:
-  QTableView* m_view;
-  ZAnalysisWorklistModel* m_model;
-  QPushButton* m_saveButton;
+  QTableView* m_view = nullptr;
+  ZAnalysisWorklistModel* m_model = nullptr;
+  QPushButton* m_saveButton = nullptr;
   QString m_filename;
 };
 

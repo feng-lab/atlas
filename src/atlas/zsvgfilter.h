@@ -5,7 +5,6 @@
 #include "znumericparameter.h"
 #include "zsvgdoc.h"
 #include <QGraphicsSvgItem>
-#include <QList>
 #include <map>
 #include <vector>
 

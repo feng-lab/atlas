@@ -93,8 +93,8 @@ void Z3DVolumeRaycasterRenderer::setChannels(const std::vector<std::unique_ptr<Z
               std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
         m_texFilterModeParas.emplace_back(
               std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
-        m_texFilterModeParas[i]->addOptionsWithData(qMakePair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
-                                                    qMakePair(QString("Linear"), static_cast<int>(GL_LINEAR)));
+        m_texFilterModeParas[i]->addOptionsWithData(std::make_pair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
+                                                    std::make_pair(QString("Linear"), static_cast<int>(GL_LINEAR)));
         m_texFilterModeParas[i]->select("Linear");
       }
     }

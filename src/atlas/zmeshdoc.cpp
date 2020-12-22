@@ -21,7 +21,7 @@ ZMeshDoc::ZMeshDoc(ZDoc& doc)
 void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
 {
   QStringList filters;
-  QList<std::string> formats;
+  std::vector<std::string> formats;
   ZMesh::getQtWriteNameFilter(filters, formats);
 
   QFileDialog dialog(QApplication::activeWindow());
@@ -71,7 +71,7 @@ bool ZMeshDoc::save(size_t id)
 bool ZMeshDoc::saveAs(size_t id)
 {
   QStringList filters;
-  QList<std::string> formats;
+  std::vector<std::string> formats;
   ZMesh::getQtWriteNameFilter(filters, formats);
 
   QFileDialog dialog(QApplication::activeWindow());
@@ -141,9 +141,9 @@ size_t ZMeshDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> ZMeshDoc::loadFileActions() const
+std::vector<QAction*> ZMeshDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadMeshAction);
   return res;
 }

@@ -22,43 +22,43 @@ public:
   inline Z3DCameraParameter* para()
   { return static_cast<Z3DCameraParameter*>(m_value.get()); }
 
-  inline glm::vec3 eye() const
+  [[nodiscard]] inline glm::vec3 eye() const
   { return static_cast<Z3DCameraParameter*>(m_value.get())->get().eye(); }
 
-  inline glm::quat rot() const
+  [[nodiscard]] inline glm::quat rot() const
   { return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono)); }
 
-  float posTension() const
+  [[nodiscard]] float posTension() const
   { return m_posTension; }
 
   void setPosTension(float v)
   { m_posTension = std::min(std::max(v, -1.f), 1.f); }
 
-  float posContinuity() const
+  [[nodiscard]] float posContinuity() const
   { return m_posContinuity; }
 
   void setPosContinuity(float v)
   { m_posContinuity = std::min(std::max(v, -1.f), 1.f); }
 
-  float posBias() const
+  [[nodiscard]] float posBias() const
   { return m_posBias; }
 
   void setPosBias(float v)
   { m_posBias = std::min(std::max(v, -1.f), 1.f); }
 
-  float rotTension() const
+  [[nodiscard]] float rotTension() const
   { return m_rotTension; }
 
   void setRotTension(float v)
   { m_rotTension = std::min(std::max(v, -1.f), 1.f); }
 
-  float rotContinuity() const
+  [[nodiscard]] float rotContinuity() const
   { return m_rotContinuity; }
 
   void setRotContinuity(float v)
   { m_rotContinuity = std::min(std::max(v, -1.f), 1.f); }
 
-  float rotBias() const
+  [[nodiscard]] float rotBias() const
   { return m_rotBias; }
 
   void setRotBias(float v)
@@ -66,7 +66,7 @@ public:
 
   bool readValue(const QJsonValue& value) override;
 
-  QJsonValue jsonValue() const override;
+  [[nodiscard]] QJsonValue jsonValue() const override;
 
 protected:
   float m_posTension = 0;

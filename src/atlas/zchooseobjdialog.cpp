@@ -15,15 +15,16 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection
 {
   setWindowTitle(QString("Choose %1").arg(m_objDoc->typeName()));
   createWidget();
-  QList<size_t> objs = m_objDoc->objs();
+  auto objs = m_objDoc->objs();
 
-  for (int i = 0; i < objs.size(); ++i) {
-    size_t id = objs[i];
+  bool firstObj = true;
+  for (auto id : objs) {
     auto item = new QTreeWidgetItem(m_treeWidget,
                                     QStringList() << m_objDoc->objName(id)
                                                   << QDir::toNativeSeparators(m_objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
-    item->setSelected(i == 0 && !m_multipleSelection);
+    item->setSelected(firstObj && !m_multipleSelection);
+    firstObj = false;
   }
 
   m_treeWidget->resizeColumnToContents(0);
@@ -37,16 +38,17 @@ ZChooseObjDialog::ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWid
 {
   setWindowTitle(QString("Choose object"));
   createWidget();
-  QList<size_t> objs = m_doc->objs();
+  auto objs = m_doc->objs();
 
-  for (int i = 0; i < objs.size(); ++i) {
-    size_t id = objs[i];
+  bool firstObj = true;
+  for (auto id : objs) {
     auto objDoc = m_doc->idToDoc(id);
     auto item = new QTreeWidgetItem(m_treeWidget,
                                     QStringList() << objDoc->objName(id)
                                                   << QDir::toNativeSeparators(objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
-    item->setSelected(i == 0 && !m_multipleSelection);
+    item->setSelected(firstObj && !m_multipleSelection);
+    firstObj = false;
   }
 
   m_treeWidget->resizeColumnToContents(0);
@@ -97,7 +99,6 @@ void ZChooseObjDialog::createWidget()
 void ZChooseObjDialog::updateSelectedIDs()
 {
   m_selectedIDs.clear();
-  QList<QTreeWidgetItem*> sis = m_treeWidget->selectedItems();
   for (auto item : m_treeWidget->selectedItems()) {
     m_selectedIDs.push_back(item->data(0, Qt::UserRole).value<size_t>());
   }

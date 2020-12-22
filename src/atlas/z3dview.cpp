@@ -26,8 +26,6 @@
 #include "ztheme.h"
 #include <QMessageBox>
 #include <QProgressDialog>
-#include <QMainWindow>
-#include <QScrollArea>
 #include <QPlainTextEdit>
 #include <memory>
 

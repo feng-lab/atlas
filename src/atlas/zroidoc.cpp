@@ -3,7 +3,6 @@
 #include "zexception.h"
 #include "zimg.h"
 #include "zimgdoc.h"
-#include "zimgsigneddistancemap.h"
 #include "zlog.h"
 #include "ztheme.h"
 #include "zroiwidget.h"
@@ -11,7 +10,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
 
 namespace nim {
@@ -156,9 +154,9 @@ size_t ZROIDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   }
 }
 
-QList<QAction*> ZROIDoc::loadFileActions() const
+std::vector<QAction*> ZROIDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadROIAction);
   return res;
 }
@@ -300,7 +298,7 @@ void ZROIDoc::setModified()
 void ZROIDoc::importMaskImage()
 {
   QStringList filters;
-  QList<FileFormat> formats;
+  std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
 
   int fmtIdx = -1;
@@ -350,8 +348,8 @@ void ZROIDoc::createMaskImage()
   }
 
   QStringList filters;
-  QList<FileFormat> formats;
-  QList<Compression> comps;
+  std::vector<FileFormat> formats;
+  std::vector<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
   QFileDialog dialog(QApplication::activeWindow());

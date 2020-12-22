@@ -33,13 +33,13 @@ public:
   inline void setCenter(const glm::vec3& v)
   { return m_center.set(v); }
 
-  inline glm::vec3 scale() const
+  [[nodiscard]] inline glm::vec3 scale() const
   { return m_scale.get(); }
 
-  inline glm::vec3 translation() const
+  [[nodiscard]] inline glm::vec3 translation() const
   { return m_translation.get(); }
 
-  glm::quat rotation() const;
+  [[nodiscard]] glm::quat rotation() const;
 
   inline void setXScale(float s)
   { m_scale.set(glm::vec3(s, m_scale.get().y, m_scale.get().z)); }
@@ -68,7 +68,7 @@ public:
 public:
   void setSameAs(const ZParameter& rhs) override;
 
-  QJsonValue jsonValue() const override;
+  [[nodiscard]] QJsonValue jsonValue() const override;
 
   void readValue(const QJsonValue& jsonValue) override;
 

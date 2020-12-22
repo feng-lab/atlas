@@ -3,7 +3,6 @@
 #include "zfilterview.h"
 #include "zroidoc.h"
 #include "zroifilter.h"
-#include <map>
 
 namespace nim {
 
@@ -14,7 +13,7 @@ public:
   ZROIView(ZROIDoc& doc, ZView& view);
 
 private:
-  void docROIsAdded(const QList<size_t>& objs);
+  void docROIsAdded(const std::vector<size_t>& objs);
 
   void docROIAdded(size_t id);
 };

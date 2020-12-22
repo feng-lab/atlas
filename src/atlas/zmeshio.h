@@ -15,29 +15,29 @@ public:
 
   ZMeshIO();
 
-  bool canReadFile(const QString& filename) const;
+  [[nodiscard]] bool canReadFile(const QString& filename) const;
 
-  bool canWriteFile(const QString& filename) const;
+  [[nodiscard]] bool canWriteFile(const QString& filename) const;
 
-  const QString& getQtReadNameFilter() const
+  [[nodiscard]] const QString& getQtReadNameFilter() const
   { return m_readFilter; }
 
-  void getQtWriteNameFilter(QStringList& filters, QList<std::string>& formats);
+  void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
   void load(const QString& filename, ZMesh& mesh) const;
 
   void save(const ZMesh& mesh, const QString& filename, std::string format) const;
 
 private:
-  void readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                          std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices) const;
+  static void readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
+                                 std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices);
 
 private:
   QStringList m_readExts;
   QStringList m_writeExts;
   QString m_readFilter;
   QStringList m_writeFilters;
-  QList<std::string> m_writeFormats;
+  std::vector<std::string> m_writeFormats;
 };
 
 } // namespace nim

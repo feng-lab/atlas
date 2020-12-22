@@ -5,7 +5,6 @@
 #include "zimagesse3.h"
 #include "zimageavx.h"
 #include "zimage2dutils.h"
-#include <QList>
 #include <tbb/parallel_for.h>
 #include <boost/align/aligned_allocator.hpp>
 #include <algorithm>

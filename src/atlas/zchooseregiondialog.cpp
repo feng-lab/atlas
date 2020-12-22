@@ -80,7 +80,7 @@ void ZChooseRegionDialog::createWidget()
 
 void ZChooseRegionDialog::updateSelectedID()
 {
-  QList<QTreeWidgetItem*> sis = m_treeWidget->selectedItems();
+  auto sis = m_treeWidget->selectedItems();
   if (sis.empty()) {
     m_selectedID = 0;
   } else {

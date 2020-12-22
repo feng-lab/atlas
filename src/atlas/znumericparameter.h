@@ -2,7 +2,6 @@
 
 #include "zparameter.h"
 #include "zglmutils.h"
-#include <QList>
 #include <QString>
 #include <limits>
 
@@ -53,10 +52,10 @@ public:
   void setSuffix(const QString& suf)
   { m_suffix = suf; }
 
-  T rangeMin() const
+  [[nodiscard]] T rangeMin() const
   { return m_min; }
 
-  T rangeMax() const
+  [[nodiscard]] T rangeMax() const
   { return m_max; }
 
   // ZParameter interface
@@ -64,7 +63,7 @@ public:
   void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
-    const ZNumericParameter<T>* src = static_cast<const ZNumericParameter<T>*>(&rhs);
+    const auto* src = static_cast<const ZNumericParameter<T>*>(&rhs);
     setSingleStep(src->m_step);
     setDecimal(src->m_decimal);
     setTracking(src->m_tracking);
@@ -76,12 +75,12 @@ public:
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
-    const ZNumericParameter<T>& prevPara = static_cast<const ZNumericParameter<T>&>(prev);
-    ZNumericParameter<T>& desPara = static_cast<ZNumericParameter<T>&>(dest);
+    const auto& prevPara = static_cast<const ZNumericParameter<T>&>(prev);
+    auto& desPara = static_cast<ZNumericParameter<T>&>(dest);
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  QJsonValue jsonValue() const override
+  [[nodiscard]] QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
@@ -223,7 +222,7 @@ public:
         this->m_value[i] = m_min[i];
       if (this->m_value[i] > m_max[i])
         this->m_value[i] = m_max[i];
-      m_nameOfEachValue.push_back("");
+      m_nameOfEachValue.emplace_back("");
     }
   }
 
@@ -240,9 +239,9 @@ public:
   inline void setWidgetOrientation(Qt::Orientation o)
   { m_widgetOrientation = o; }
 
-  void setNameForEachValue(const QList<QString>& other)
+  void setNameForEachValue(const std::vector<QString>& other)
   {
-    CHECK(static_cast<size_t>(other.size()) >= this->m_value.length());
+    CHECK(other.size() >= this->m_value.length());
     m_nameOfEachValue = other;
   }
 
@@ -251,10 +250,10 @@ public:
   inline void setGroupBoxName(const QString& name)
   { m_groupBoxName = name; }
 
-  T rangeMin() const
+  [[nodiscard]] T rangeMin() const
   { return m_min; }
 
-  T rangeMax() const
+  [[nodiscard]] T rangeMax() const
   { return m_max; }
 
   void setPrefix(const QString& pre)
@@ -268,7 +267,7 @@ public:
   void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
-    const ZNumericVectorParameter<T>* src = static_cast<const ZNumericVectorParameter<T>*>(&rhs);
+    const auto* src = static_cast<const ZNumericVectorParameter<T>*>(&rhs);
     setSingleStep(src->m_step);
     setDecimal(src->m_decimal);
     setTracking(src->m_tracking);
@@ -284,12 +283,12 @@ public:
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
-    const ZNumericVectorParameter<T>& prevPara = static_cast<const ZNumericVectorParameter<T>&>(prev);
-    ZNumericVectorParameter<T>& desPara = static_cast<ZNumericVectorParameter<T>&>(dest);
+    const auto& prevPara = static_cast<const ZNumericVectorParameter<T>&>(prev);
+    auto& desPara = static_cast<ZNumericVectorParameter<T>&>(dest);
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  QJsonValue jsonValue() const override
+  [[nodiscard]] QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
@@ -319,7 +318,7 @@ protected:
   bool m_tracking;
   int m_decimal;
   Qt::Orientation m_widgetOrientation;
-  QList<QString> m_nameOfEachValue;   // default is empty string for each value
+  std::vector<QString> m_nameOfEachValue;   // default is empty string for each value
   QString m_groupBoxName;
 
   QString m_prefix;
@@ -577,7 +576,7 @@ public:
         this->m_value[i] = m_min;
       if (this->m_value[i] > m_max)
         this->m_value[i] = m_max;
-      m_nameOfEachValue.push_back(i == 0 ? "low" : "high");
+      m_nameOfEachValue.emplace_back(i == 0 ? "low" : "high");
     }
     m_groupBoxName = "Range";
   }
@@ -595,7 +594,7 @@ public:
   inline void setWidgetOrientation(Qt::Orientation o)
   { m_widgetOrientation = o; }
 
-  void setNameForEachValue(const QList<QString>& other)
+  void setNameForEachValue(const std::vector<QString>& other)
   {
     CHECK(other.size() >= 2);
     m_nameOfEachValue = other;
@@ -626,25 +625,25 @@ public:
     }
   }
 
-  T range() const
+  [[nodiscard]] T range() const
   { return T(m_min, m_max); }
 
-  typename T::value_type lowerValue() const
+  [[nodiscard]] typename T::value_type lowerValue() const
   {
     return this->m_value[0];
   }
 
-  typename T::value_type upperValue() const
+  [[nodiscard]] typename T::value_type upperValue() const
   {
     return this->m_value[1];
   }
 
-  typename T::value_type minimum() const
+  [[nodiscard]] typename T::value_type minimum() const
   {
     return m_min;
   }
 
-  typename T::value_type maximum() const
+  [[nodiscard]] typename T::value_type maximum() const
   {
     return m_max;
   }
@@ -665,7 +664,7 @@ public:
   void setSameAs(const ZParameter& rhs) override
   {
     CHECK(this->isSameType(rhs));
-    const ZNumericSpanParameter<T>* src = static_cast<const ZNumericSpanParameter<T>*>(&rhs);
+    const auto* src = static_cast<const ZNumericSpanParameter<T>*>(&rhs);
     setSingleStep(src->m_step);
     setDecimal(src->m_decimal);
     setTracking(src->m_tracking);
@@ -679,12 +678,12 @@ public:
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override
   {
     CHECK(this->isSameType(prev) && this->isSameType(dest));
-    const ZNumericSpanParameter<T>& prevPara = static_cast<const ZNumericSpanParameter<T>&>(prev);
-    ZNumericSpanParameter<T>& desPara = static_cast<ZNumericSpanParameter<T>&>(dest);
+    const auto& prevPara = static_cast<const ZNumericSpanParameter<T>&>(prev);
+    auto& desPara = static_cast<ZNumericSpanParameter<T>&>(dest);
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  QJsonValue jsonValue() const override
+  [[nodiscard]] QJsonValue jsonValue() const override
   {
     return QJsonValue(toQString(this->m_value));
   }
@@ -720,7 +719,7 @@ protected:
   bool m_tracking;
   int m_decimal;
   Qt::Orientation m_widgetOrientation;
-  QList<QString> m_nameOfEachValue;
+  std::vector<QString> m_nameOfEachValue;
 
   QString m_groupBoxName;
 

@@ -33,8 +33,8 @@ protected:
     QWidget* widget;
   };
 
-  ZLogWidget* m_logWidget;
-  QList<SubWidget> m_subWidgets;
+  ZLogWidget* m_logWidget = nullptr;
+  std::vector<SubWidget> m_subWidgets;
 };
 
 } // namespace nim

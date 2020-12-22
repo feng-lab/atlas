@@ -143,7 +143,7 @@ const QString& ZMesh::getQtReadNameFilter()
   return ZMeshIO::instance().getQtReadNameFilter();
 }
 
-void ZMesh::getQtWriteNameFilter(QStringList& filters, QList<std::string>& formats)
+void ZMesh::getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats)
 {
   ZMeshIO::instance().getQtWriteNameFilter(filters, formats);
 }

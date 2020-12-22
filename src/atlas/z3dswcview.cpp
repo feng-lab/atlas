@@ -9,7 +9,7 @@ Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DView& view)
   connect(&m_doc, &ZSwcDoc::objAdded, this, &Z3DSwcView::docSwcAdded);
 }
 
-void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
+void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
@@ -30,8 +30,8 @@ void Z3DSwcView::docSwcsAdded(const QList<size_t>& objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (auto obj : objs) {
-        emit objViewReady(obj);
+      for (auto id : objs) {
+        emit objViewReady(id);
       }
     }
   }

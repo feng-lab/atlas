@@ -44,8 +44,6 @@ public:
 
   void setData(std::vector<ZMesh*>* meshList);
 
-  void setData(QList<ZMesh*>* meshList);
-
   void setSelectedMeshes(std::set<ZMesh*>* list)
   { m_selectedMeshes = list; }
 
@@ -125,9 +123,9 @@ private:
   std::vector<glm::vec4> m_meshPickingColors;
 
   ZEventListenerParameter m_selectMeshEvent;
-  glm::ivec2 m_startCoord;
+  glm::ivec2 m_startCoord{};
   ZMesh* m_pressedMesh;
-  std::set<ZMesh*>* m_selectedMeshes;   //point to all selected meshes, managed by other class
+  std::set<ZMesh*>* m_selectedMeshes = nullptr;   //point to all selected meshes, managed by other class
 
   // generate and save to speed up bound box rendering for big mesh
   std::map<ZMesh*, ZBBox<glm::dvec3>> m_meshBoundboxMapper;

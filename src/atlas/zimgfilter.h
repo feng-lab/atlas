@@ -8,7 +8,6 @@
 #include "zgraphicsitemgroup.h"
 #include <QGraphicsPixmapItem>
 #include <QPen>
-#include <QList>
 #include <vector>
 
 namespace nim {
@@ -23,7 +22,7 @@ public:
     Type = GraphicsItemType::ZImgScaleBarGraphicsItem
   };
 
-  int type() const override
+  [[nodiscard]] int type() const override
   { return Type; }
 
   explicit ZImgScaleBarGraphicsItem(double lengthInUm, double height, double voxelSizeXInUm,
@@ -107,15 +106,15 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  bool isVisible() const override
+  [[nodiscard]] bool isVisible() const override
   { return m_isVisible; }
 
-  ZBBox<glm::ivec4> boundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
   // location within img, can be out of img range
-  int imgSlice() const;
+  [[nodiscard]] int imgSlice() const;
 
-  int imgTime() const;
+  [[nodiscard]] int imgTime() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
@@ -147,9 +146,9 @@ private:
 
   void updateImgItems();
 
-  double getLowerChannelRange(size_t c) const;
+  [[nodiscard]] double getLowerChannelRange(size_t c) const;
 
-  double getUpperChannelRange(size_t c) const;
+  [[nodiscard]] double getUpperChannelRange(size_t c) const;
 
   void viewportChanged();
 

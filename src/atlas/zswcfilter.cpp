@@ -3,7 +3,6 @@
 #include "zgraphicsview.h"
 #include "znumericparameter.h"
 #include "zwidgetsgroup.h"
-#include "zsaturateoperation.h"
 #include "zgraphicsscene.h"
 #include <QWindow>
 #include <QStyleOption>
@@ -248,12 +247,12 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
 }
 
 ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode,
-                                           QTransform tfm,
+                                           const QTransform& tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
   , m_swcPack(swcPack)
   , m_swcNode(swcNode)
-  , m_transform(std::move(tfm))
+  , m_transform(tfm)
 {
   setFlags(QGraphicsItem::ItemIsSelectable);
 

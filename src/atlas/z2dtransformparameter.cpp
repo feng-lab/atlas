@@ -22,8 +22,7 @@ Z2DTransformParameter::Z2DTransformParameter(const QString& name, QObject* paren
 {
   updateWidget(m_value);
 
-  QStringList names;
-  names << "x:" << "y:";
+  std::vector<QString> names{"x:", "y:"};
   m_scale.setNameForEachValue(names);
   m_translation.setNameForEachValue(names);
   m_center.setNameForEachValue(names);
@@ -63,8 +62,7 @@ Z2DTransformParameter::Z2DTransformParameter(const QString& name, const glm::dma
 {
   updateWidget(m_value);
 
-  QStringList names;
-  names << "x:" << "y:";
+  std::vector<QString> names{"x:", "y:"};
   m_scale.setNameForEachValue(names);
   m_translation.setNameForEachValue(names);
   m_center.setNameForEachValue(names);

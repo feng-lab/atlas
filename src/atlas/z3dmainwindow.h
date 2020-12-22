@@ -97,49 +97,49 @@ private:
   void onViewReady();
 
 private:
-  QMenu* m_fileMenu;
-  QMenu* m_editMenu;
-  QMenu* m_viewMenu;
-  QMenu* m_animationMenu;
-  QMenu* m_windowMenu;
-  QMenu* m_helpMenu;
-  QToolBar* m_fileToolBar;
-  QToolBar* m_editToolBar;
-  QToolBar* m_viewToolBar;
-  QToolBar* m_helpToolBar;
+  QMenu* m_fileMenu = nullptr;
+  QMenu* m_editMenu = nullptr;
+  QMenu* m_viewMenu = nullptr;
+  QMenu* m_animationMenu = nullptr;
+  QMenu* m_windowMenu = nullptr;
+  QMenu* m_helpMenu = nullptr;
+  QToolBar* m_fileToolBar = nullptr;
+  QToolBar* m_editToolBar = nullptr;
+  QToolBar* m_viewToolBar = nullptr;
+  QToolBar* m_helpToolBar = nullptr;
 
-  QAction* m_openAction;
-  QAction* m_saveAction;
-  QAction* m_saveAsAction;
-  QAction* m_loadSceneAction;
-  QAction* m_saveSceneAction;
-  QAction* m_closeAction;
+  QAction* m_openAction = nullptr;
+  QAction* m_saveAction = nullptr;
+  QAction* m_saveAsAction = nullptr;
+  QAction* m_loadSceneAction = nullptr;
+  QAction* m_saveSceneAction = nullptr;
+  QAction* m_closeAction = nullptr;
 
-  QAction* m_separatorAction;
+  QAction* m_separatorAction = nullptr;
 
-  QDockWidget* m_objectsDockWidget;
-  QDockWidget* m_viewSettingDockWidget;
-  QDockWidget* m_objectDetailedInfoDockWidget;
-  QDockWidget* m_globalSettingDockWidget;
-  QDockWidget* m_captureDockWidget;
-  QDockWidget* m_helpDockWidget;
-  QDockWidget* m_backgroundDockWidget;
-  QDockWidget* m_axisDockWidget;
-  ZViewSettingWidget* m_viewSettingWidget;
-  ZObjDetailedInfoWidget* m_objDetailedInfoWidget;
-  QDockWidget* m_editObjDockWidget;
-  ZObjEditWidget* m_objEditWidget;
+  QDockWidget* m_objectsDockWidget = nullptr;
+  QDockWidget* m_viewSettingDockWidget = nullptr;
+  QDockWidget* m_objectDetailedInfoDockWidget = nullptr;
+  QDockWidget* m_globalSettingDockWidget = nullptr;
+  QDockWidget* m_captureDockWidget = nullptr;
+  QDockWidget* m_helpDockWidget = nullptr;
+  QDockWidget* m_backgroundDockWidget = nullptr;
+  QDockWidget* m_axisDockWidget = nullptr;
+  ZViewSettingWidget* m_viewSettingWidget = nullptr;
+  ZObjDetailedInfoWidget* m_objDetailedInfoWidget = nullptr;
+  QDockWidget* m_editObjDockWidget = nullptr;
+  ZObjEditWidget* m_objEditWidget = nullptr;
 
-  QAction* m_changeBackgroundAction;
-  QAction* m_changeAxisAction;
-  QAction* m_screenShotAction;
-  QAction* m_helpAction;
+  QAction* m_changeBackgroundAction = nullptr;
+  QAction* m_changeAxisAction = nullptr;
+  QAction* m_screenShotAction = nullptr;
+  QAction* m_helpAction = nullptr;
 
   //
   ZDoc& m_doc;
-  Z3DView* m_view;
+  Z3DView* m_view = nullptr;
 
-  bool m_isStereoView;
+  bool m_isStereoView = false;
 
   ZMainWindow& m_2dWindow;
 };

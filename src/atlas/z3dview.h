@@ -34,7 +34,7 @@ public:
 
   ~Z3DView() override;
 
-  const ZDoc& doc() const;
+  [[nodiscard]] const ZDoc& doc() const;
 
   inline QAction* zoomInAction()
   { return m_zoomInAction; }
@@ -50,7 +50,7 @@ public:
   Z3DCameraParameter& camera()
   { return m_globalParas->camera; }
 
-  const Z3DCameraParameter& camera() const
+  [[nodiscard]] const Z3DCameraParameter& camera() const
   { return m_globalParas->camera; }
 
   Z3DTrackballInteractionHandler& interactionHandler()
@@ -59,7 +59,7 @@ public:
   inline Z3DCanvas& canvas()
   { return *m_canvas; }
 
-  inline const Z3DCanvas& canvas() const
+  [[nodiscard]] inline const Z3DCanvas& canvas() const
   { return *m_canvas; }
 
   inline Z3DCanvasPainter& canvasPainter()
@@ -76,7 +76,7 @@ public:
 
   QWidget* globalParasWidget();
 
-  QWidget* captureWidget() const;
+  [[nodiscard]] QWidget* captureWidget() const;
 
   QWidget* backgroundWidget();
 
@@ -98,12 +98,12 @@ public:
 
   bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
-  QList<Z3DObjView*> objViews()
+  std::vector<Z3DObjView*> objViews()
   { return m_3dObjViews; }
 
-  ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t>& ids) const;
+  [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t>& ids) const;
 
-  ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const;
+  [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const;
 
   void cameraFocusesOn(double x, double y, double z, double radius = 64)
   { m_globalParas->cameraFocusesOn(x, y, z, radius); }
@@ -153,16 +153,16 @@ private:
 private:
   ZDoc& m_doc;
   bool m_isStereoView;
-  QMainWindow* m_mainWin;
+  QMainWindow* m_mainWin = nullptr;
 
   //
-  QAction* m_zoomInAction;
-  QAction* m_zoomOutAction;
-  QAction* m_resetCameraAction;
+  QAction* m_zoomInAction = nullptr;
+  QAction* m_zoomOutAction = nullptr;
+  QAction* m_resetCameraAction = nullptr;
 
-  QList<Z3DObjView*> m_3dObjViews;
+  std::vector<Z3DObjView*> m_3dObjViews;
 
-  Z3DCanvas* m_canvas;
+  Z3DCanvas* m_canvas = nullptr;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
   std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;

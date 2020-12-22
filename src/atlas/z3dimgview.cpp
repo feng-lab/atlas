@@ -9,12 +9,11 @@ Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DView& view)
   connect(&m_doc, &ZImgDoc::objAdded, this, &Z3DImgView::docImgAdded);
 }
 
-void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
+void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
 {
   try {
-    for (int i = 0; i < objs.size(); ++i) {
-      size_t id = objs[i];
-      Z3DImgFilter* viewControl = new Z3DImgFilter(globalParas(), this);
+    for (auto id : objs) {
+      auto viewControl = new Z3DImgFilter(globalParas(), this);
       viewControl->setData(m_doc.imgPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -34,8 +33,8 @@ void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
       networkEvaluator().updateNetwork();
       m_view.updateBoundBox();
 
-      for (int i = 0; i < objs.size(); ++i) {
-        emit objViewReady(objs[i]);
+      for (auto id : objs) {
+        emit objViewReady(id);
       }
     }
   }
@@ -49,7 +48,7 @@ void Z3DImgView::docImgsAdded(const QList<size_t>& objs)
 void Z3DImgView::docImgAdded(size_t id)
 {
   try {
-    Z3DImgFilter* viewControl = new Z3DImgFilter(globalParas(), this);
+    auto viewControl = new Z3DImgFilter(globalParas(), this);
     viewControl->setData(m_doc.imgPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

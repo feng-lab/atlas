@@ -144,13 +144,13 @@ ZMeshIO::ZMeshIO()
   for (size_t i = 0; i < exporter.GetExportFormatCount(); ++i) {
     const aiExportFormatDesc* format = exporter.GetExportFormatDescription(i);
     m_writeExts.push_back(format->fileExtension);
-    m_writeFormats.push_back(format->id);
+    m_writeFormats.emplace_back(format->id);
     QString filter = format->description;
     filter += QString(" (*.%1)").arg(format->fileExtension);
     m_writeFilters.push_back(filter);
   }
   m_writeExts.push_back("vtp");
-  m_writeFormats.push_back("vtp");
+  m_writeFormats.emplace_back("vtp");
   QString filter("VTK Polydata");
   filter += QString(" (*.%1)").arg("vtp");
   m_writeFilters.push_back(filter);
@@ -158,8 +158,8 @@ ZMeshIO::ZMeshIO()
 
 bool ZMeshIO::canReadFile(const QString& filename) const
 {
-  for (int i = 0; i < m_readExts.size(); ++i) {
-    if (filename.endsWith(QString(".%1").arg(m_readExts[i]), Qt::CaseInsensitive))
+  for (const auto& readExt : m_readExts) {
+    if (filename.endsWith(QString(".%1").arg(readExt), Qt::CaseInsensitive))
       return true;
   }
   return false;
@@ -167,14 +167,14 @@ bool ZMeshIO::canReadFile(const QString& filename) const
 
 bool ZMeshIO::canWriteFile(const QString& filename) const
 {
-  for (int i = 0; i < m_writeExts.size(); ++i) {
-    if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
+  for (const auto& writeExt : m_writeExts) {
+    if (filename.endsWith(QString(".%1").arg(writeExt), Qt::CaseInsensitive))
       return true;
   }
   return false;
 }
 
-void ZMeshIO::getQtWriteNameFilter(QStringList& filters, QList<std::string>& formats)
+void ZMeshIO::getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats)
 {
   filters = m_writeFilters;
   formats = m_writeFormats;
@@ -289,7 +289,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
         }
       }
     }
-    CHECK(m_writeFormats.contains(format));
+    CHECK(std::find(m_writeFormats.begin(), m_writeFormats.end(), format) != m_writeFormats.end());
 
     if (format == "vtp") {
       mesh.saveAsVTP(filename);
@@ -327,7 +327,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
 }
 
 void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                                 std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices) const
+                                 std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);

@@ -6,7 +6,7 @@ namespace nim {
 
 const char* const ZLogModelSink::Type = "window";
 
-ZLogModelSink::ZLogModelSink(int max_items)
+ZLogModelSink::ZLogModelSink(size_t max_items)
   : m_maxItems(max_items)
 {
 }
@@ -28,7 +28,7 @@ void ZLogModelSink::addEntry(const LogData& message)
     }
     // Every item changed
     const QModelIndex idx1 = index(0, 0);
-    const QModelIndex idx2 = index(m_logDatas.size(), rowCount());
+    const QModelIndex idx2 = index(m_logDatas.size(), rowCount(QModelIndex()));
     emit dataChanged(idx1, idx2);
   }
 }
@@ -82,8 +82,6 @@ QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
       default:
         return QVariant();
     }
-
-    return QString();
   }
 
   if (role == Qt::BackgroundRole) {

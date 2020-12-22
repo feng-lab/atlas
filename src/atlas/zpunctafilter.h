@@ -5,14 +5,13 @@
 #include "znumericparameter.h"
 #include "zpunctapack.h"
 #include "zgraphicsitemtype.h"
-#include <QList>
 #include <QGraphicsEllipseItem>
 #include <map>
 #include <vector>
 
-class ZWidgetsGroup;
-
 namespace nim {
+
+class ZWidgetsGroup;
 
 #if 0
 class ZPunctaGraphicsItem : public QGraphicsItem
@@ -156,7 +155,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  ZBBox<glm::ivec4> boundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 

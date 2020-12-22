@@ -9,18 +9,18 @@ ZSvgView::ZSvgView(ZSvgDoc& doc, ZView& view)
   connect(&m_doc, &ZSvgDoc::objAdded, this, &ZSvgView::docSvgAdded);
 }
 
-void ZSvgView::docSvgsAdded(const QList<size_t>& objs)
+void ZSvgView::docSvgsAdded(const std::vector<size_t>& objs)
 {
-  for (int i = 0; i < objs.size(); ++i) {
-    ZSvgFilter* viewControl = new ZSvgFilter(m_view);
-    viewControl->setData(m_doc.svg(objs[i]));
+  for (auto id : objs) {
+    auto viewControl = new ZSvgFilter(m_view);
+    viewControl->setData(m_doc.svg(id));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]].reset(viewControl);
+    m_idToFilter[id].reset(viewControl);
     connect(viewControl, &ZSvgFilter::boundBoxChanged, this, &ZSvgView::updateBoundBox);
     connect(viewControl, &ZSvgFilter::objDeselected, this, &ZSvgView::onObjDeselectedFromView);
     connect(viewControl, &ZSvgFilter::objSelected, this, &ZSvgView::onObjSelectedFromView);
     connect(viewControl, &ZSvgFilter::objVisibleChanged, this, &ZSvgView::onObjVisibleChangedFromView);
-    emit objViewReady(objs[i]);
+    emit objViewReady(id);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -29,7 +29,7 @@ void ZSvgView::docSvgsAdded(const QList<size_t>& objs)
 
 void ZSvgView::docSvgAdded(size_t id)
 {
-  ZSvgFilter* viewControl = new ZSvgFilter(m_view);
+  auto viewControl = new ZSvgFilter(m_view);
   viewControl->setData(m_doc.svg(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);

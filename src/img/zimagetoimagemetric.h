@@ -3,7 +3,6 @@
 #include "zbenchtimer.h"
 #include "zimage2dutils.h"
 #include "zstatisticsutils.h"
-#include <QList>
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 #include <cmath>
@@ -27,7 +26,7 @@ public:
   void setType(Type type)
   { m_type = type; }
 
-  Type type() const
+  [[nodiscard]] Type type() const
   { return m_type; }
 
   void setUseMultithreading(bool v)

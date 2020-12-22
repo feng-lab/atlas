@@ -87,10 +87,10 @@ void ZMainWindow::updateRecentFileActions()
   QSettings settings;
   QStringList files = settings.value("recentFileList").toStringList();
 
-  int numRecentFiles = std::min(files.size(), m_recentFileActions.size());
+  auto numRecentFiles = std::min(size_t(files.size()), m_recentFileActions.size());
 
-  int idx = 0;
-  for (int i = 0; i < numRecentFiles; ++i) {
+  size_t idx = 0;
+  for (size_t i = 0; i < numRecentFiles; ++i) {
     if (QFile::exists(files[i])) {
       QString text = QString("&%1 %2").arg(i + 1).arg(strippedName(files[i]));
       m_recentFileActions[idx]->setText(text);
@@ -100,7 +100,7 @@ void ZMainWindow::updateRecentFileActions()
       m_recentFileActions[idx++]->setVisible(true);
     }
   }
-  for (int j = idx; j < m_recentFileActions.size(); ++j)
+  for (size_t j = idx; j < m_recentFileActions.size(); ++j)
     m_recentFileActions[j]->setVisible(false);
 
   m_separatorAction->setVisible(idx > 0);
@@ -521,10 +521,6 @@ void ZMainWindow::init()
   createDockWindows();
 
   readSettings();
-
-  //const QList<QAction*> &loadActList = m_doc->loadFileActions();
-  //for (int i=0; i<loadActList.size(); ++i)
-  //connect(loadActList[i], &QAction::triggered, this, &ZMainWindow::activateWindowIfNot);
 }
 
 void ZMainWindow::createActions()
@@ -649,12 +645,11 @@ void ZMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  const QList<QAction*>& fileActList = m_doc->fileActions();
-  for (auto i : fileActList)
-    m_fileMenu->addAction(i);
+  for (auto act : m_doc->fileActions())
+    m_fileMenu->addAction(act);
   m_separatorAction = m_fileMenu->addSeparator();
-  for (auto& m_recentFileAction : m_recentFileActions)
-    m_fileMenu->addAction(m_recentFileAction);
+  for (auto& recentFileAction : m_recentFileActions)
+    m_fileMenu->addAction(recentFileAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
   m_fileMenu->addAction(m_exitAction);
@@ -680,9 +675,8 @@ void ZMainWindow::createMenus()
   m_viewMenu->addAction(m_open3DViewAction);
   m_viewMenu->addAction(m_screenShotAction);
 
-  const QList<QMenu*>& menuList = m_doc->processObjMenu();
-  for (auto i : menuList) {
-    menuBar()->addMenu(i);
+  for (auto menu : m_doc->processObjMenu()) {
+    menuBar()->addMenu(menu);
   }
 
   m_animationMenu = menuBar()->addMenu(tr("&Animation"));
@@ -724,9 +718,6 @@ void ZMainWindow::createToolBars()
   //m_fileToolBar->addAction(m_newAction);
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
-  //const QList<QAction*> &loadFileActList = m_doc->loadFileActions();
-  //for (int i=0; i<loadFileActList.size(); ++i)
-  //m_fileToolBar->addAction(loadFileActList[i]);
   m_fileToolBar->setIconSize(iconSize);
 
   m_editToolBar = addToolBar(tr("Edit"));
@@ -1000,8 +991,8 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
   m_doc->write(docObj, true);
   sceneObj.insert("Doc", docObj);
 
-  QList<size_t> objs = m_doc->objs();
-  for (size_t id : objs) {
+  auto objs = m_doc->objs();
+  for (auto id : objs) {
     QJsonObject jObj;
 
     QJsonObject view2DObj;

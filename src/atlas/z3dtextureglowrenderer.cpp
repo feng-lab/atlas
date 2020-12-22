@@ -14,10 +14,10 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   , m_VAO(1)
 {
   m_blurScale.setSingleStep(0.5);
-  m_glowMode.addOptionsWithData(qMakePair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
-                                qMakePair<QString, QString>("Screen", "SCREEN_BLENDING"),
-                                qMakePair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
-                                qMakePair<QString, QString>("Glowmap", "GLOWMAP")
+  m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
+                                std::make_pair<QString, QString>("Screen", "SCREEN_BLENDING"),
+                                std::make_pair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
+                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP")
   );
   m_glowMode.select("Screen");
   connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);

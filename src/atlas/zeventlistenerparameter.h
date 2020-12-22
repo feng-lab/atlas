@@ -1,10 +1,10 @@
 #pragma once
 
 #include "zparameter.h"
-#include <QList>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QContextMenuEvent>
+#include <utility>
 
 namespace nim {
 
@@ -17,7 +17,7 @@ public:
   inline void setSharing(bool s)
   { if (m_sharing != s) { m_sharing = s; emit valueChanged(); }}
 
-  inline bool isSharing() const
+  [[nodiscard]] inline bool isSharing() const
   { return m_sharing; }
 
   // buttons and modifiers should be exact match with the input to trigger the event signal
@@ -46,7 +46,7 @@ public:
 
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
-  QJsonValue jsonValue() const override;
+  [[nodiscard]] QJsonValue jsonValue() const override;
 
   void readValue(const QJsonValue& jsonValue) override;
 
@@ -65,9 +65,9 @@ signals:
 protected:
   struct MouseEvent
   {
-    MouseEvent(const QString& actionName_, Qt::MouseButtons buttons_,
+    MouseEvent(QString  actionName_, Qt::MouseButtons buttons_,
                Qt::KeyboardModifiers modifiers_, QEvent::Type type_)
-      : actionName(actionName_), buttons(buttons_), modifiers(modifiers_), type(type_)
+      : actionName(std::move(actionName_)), buttons(buttons_), modifiers(modifiers_), type(type_)
     {}
 
     QString actionName;
@@ -78,9 +78,9 @@ protected:
 
   struct KeyEvent
   {
-    KeyEvent(const QString& actionName_, Qt::Key key_, Qt::KeyboardModifiers modifiers_,
+    KeyEvent(QString  actionName_, Qt::Key key_, Qt::KeyboardModifiers modifiers_,
              QEvent::Type type_ = QEvent::KeyPress)
-      : actionName(actionName_), key(key_), modifiers(modifiers_), type(type_)
+      : actionName(std::move(actionName_)), key(key_), modifiers(modifiers_), type(type_)
     {}
 
     QString actionName;
@@ -93,9 +93,9 @@ protected:
 
 private:
   bool m_sharing;
-  QList<MouseEvent> m_mouseEvents;
-  QList<KeyEvent> m_keyEvents;
-  bool m_listeningToContextMenuEvent;
+  std::vector<MouseEvent> m_mouseEvents;
+  std::vector<KeyEvent> m_keyEvents;
+  bool m_listeningToContextMenuEvent = false;
 };
 
 } // namespace nim

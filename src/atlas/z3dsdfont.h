@@ -41,18 +41,18 @@ public:
     float tMax;
   };
 
-  Z3DSDFont(const QString& imageFileName, const QString& txtFileName);
+  Z3DSDFont(QString imageFileName, QString txtFileName);
 
-  inline QString fontName() const
+  [[nodiscard]] inline QString fontName() const
   { return m_fontName; }
 
-  inline int maxFontHeight() const
+  [[nodiscard]] inline int maxFontHeight() const
   { return m_maxFontHeight; }
 
-  bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   { return m_isEmpty; }
 
-  CharInfo charInfo(int id) const;
+  [[nodiscard]] CharInfo charInfo(int id) const;
 
   Z3DTexture* texture();
 
@@ -70,7 +70,7 @@ private:
 
   QString m_fontName;
   bool m_isEmpty;   //if load image or txt failed, the font is empty
-  QList<CharInfo> m_charInfos;
+  std::vector<CharInfo> m_charInfos;
   int m_maxFontHeight;
 
   std::unique_ptr<Z3DTexture> m_texture;

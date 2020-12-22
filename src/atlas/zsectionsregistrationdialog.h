@@ -39,10 +39,10 @@ private:
   QGroupBox* m_paraGroupBox;
 
   ZBoolParameter m_useCurrentActiveImage;
-  ZSelectFileWidget* m_inputImagesFileWidget;
+  ZSelectFileWidget* m_inputImagesFileWidget = nullptr;
   ZBoolParameter m_openLoadedStack;
-  ZSelectFileWidget* m_outputStackWidget;
-  ZSelectFileWidget* m_outputLogFileWidget;
+  ZSelectFileWidget* m_outputStackWidget = nullptr;
+  ZSelectFileWidget* m_outputLogFileWidget = nullptr;
   ZBoolParameter m_openStackAfterRegistering;
 
   ZStringIntOptionParameter m_referenceChannel;

@@ -4,13 +4,11 @@
 #include "zselectfilewidget.h"
 #include "ztheme.h"
 #include <QHBoxLayout>
-#include <QVBoxLayout>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QLabel>
 #include <QGroupBox>
 #include <QScrollBar>
-#include <QSettings>
 #include <QApplication>
 
 namespace nim {
@@ -27,7 +25,7 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");
-  QList<QString> names;
+  std::vector<QString> names;
   names.push_back("Width:");
   names.push_back("Height:");
   m_customSize.setNameForEachValue(names);
@@ -103,8 +101,8 @@ void ZAnimationExportWidget::createWidget()
 {
   auto lo = new QVBoxLayout;
 
-  QHBoxLayout* hlo = nullptr;
-  QWidget* wg = nullptr;
+  QHBoxLayout* hlo;
+  QWidget* wg;
 
   if (!m_is2DAnimation) {
     hlo = new QHBoxLayout;

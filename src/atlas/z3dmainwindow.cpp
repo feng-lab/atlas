@@ -1,6 +1,5 @@
 #include "z3dmainwindow.h"
 
-#include "z3dgl.h"
 #include "zdoc.h"
 #include "z3dview.h"
 #include "zviewsettingwidget.h"
@@ -198,10 +197,6 @@ void Z3DMainWindow::init()
   connect(m_view, &Z3DView::networkConstructed, this, &Z3DMainWindow::onViewReady);
 
   readSettings();
-
-  //const QList<QAction*> &loadActList = m_doc.loadFileActions();
-  //for (int i=0; i<loadActList.size(); ++i)
-  //connect(loadActList[i], &QAction::triggered, this, &Z3DMainWindow::activateWindowIfNot);
 }
 
 void Z3DMainWindow::createActions()
@@ -266,12 +261,10 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  const QList<QAction*>& fileActList = m_doc.fileActions();
-  for (auto i : fileActList)
-    m_fileMenu->addAction(i);
+  for (auto act : m_doc.fileActions())
+    m_fileMenu->addAction(act);
   m_separatorAction = m_fileMenu->addSeparator();
-  const QList<QAction*>& recentFileActions = m_2dWindow.recentFileActions();
-  for (auto recentFileAction : recentFileActions)
+  for (auto recentFileAction : m_2dWindow.recentFileActions())
     m_fileMenu->addAction(recentFileAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
@@ -291,9 +284,8 @@ void Z3DMainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_screenShotAction);
 
-  const QList<QMenu*>& menuList = m_doc.processObjMenu();
-  for (auto i : menuList) {
-    menuBar()->addMenu(i);
+  for (auto menu : m_doc.processObjMenu()) {
+    menuBar()->addMenu(menu);
   }
 
   m_animationMenu = menuBar()->addMenu(tr("&Animation"));
@@ -320,9 +312,6 @@ void Z3DMainWindow::createToolBars()
   m_fileToolBar = addToolBar(tr("File"));
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
-  //const QList<QAction*> &loadFileActList = m_doc.loadFileActions();
-  //for (int i=0; i<loadFileActList.size(); ++i)
-  //m_fileToolBar->addAction(loadFileActList[i]);
   m_fileToolBar->setIconSize(iconSize);
 
   m_editToolBar = addToolBar(tr("Edit"));

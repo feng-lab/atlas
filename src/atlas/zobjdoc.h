@@ -22,12 +22,12 @@ public:
   { return !objs().empty(); }
 
   [[nodiscard]] inline bool hasObjWithID(size_t id) const
-  { return m_doc.objsOfDoc(this).contains(id); }
+  { auto objs = m_doc.objsOfDoc(this); return std::find(objs.begin(), objs.end(), id) != objs.end(); }
 
-  [[nodiscard]] inline QList<size_t> objs() const
+  [[nodiscard]] inline std::vector<size_t> objs() const
   { return m_doc.objsOfDoc(this); }
 
-  [[nodiscard]] inline QList<size_t> selectedObjs() const
+  [[nodiscard]] inline std::vector<size_t> selectedObjs() const
   { return m_doc.selectedObjsOfDoc(this); }
 
   [[nodiscard]] inline bool isObjSelected(size_t id) const
@@ -61,7 +61,7 @@ public:
 
   virtual size_t loadFile(const QJsonValue& jValue, QString& errorMsg) = 0;
 
-  [[nodiscard]] virtual QList<QAction*> loadFileActions() const = 0;
+  [[nodiscard]] virtual std::vector<QAction*> loadFileActions() const = 0;
 
   [[nodiscard]] virtual QMenu* processObjMenu() const
   { return nullptr; }
@@ -115,7 +115,7 @@ public:
   virtual QWidget* createObjEditWidget(size_t /*id*/)
   { return nullptr; }
 
-  std::map<size_t, size_t> read(const QList<QPair<QString, QJsonValue>>& docKeyValueList, QString& err);
+  std::map<size_t, size_t> read(const std::vector<std::pair<QString, QJsonValue>>& docKeyValueList, QString& err);
 
   void write(QJsonObject& json) const;
 
@@ -128,12 +128,12 @@ public:
 //  { emit objLockedChanged(id, v); }
 
   //
-  void sendObjSelectionChangedFromDocSignal(const QList<size_t>& selected, const QList<size_t>& deselected)
+  void sendObjSelectionChangedFromDocSignal(const std::vector<size_t>& selected, const std::vector<size_t>& deselected)
   { emit selectionChangedFromDoc(selected, deselected); }
 
-  QString lastOpenedObjPath();
+  [[nodiscard]] QString lastOpenedObjPath() const;
 
-  void setLastOpenedObjPath(const QString& path);
+  void setLastOpenedObjPath(const QString& path) const;
 
 signals:
 
@@ -145,10 +145,10 @@ signals:
 
   void objVisibleChanged(size_t id, bool v);
 
-  void selectionChangedFromDoc(const QList<size_t>& selected, const QList<size_t>& deselected);
+  void selectionChangedFromDoc(const std::vector<size_t>& selected, const std::vector<size_t>& deselected);
 
 protected:
-  QString strippedName(const QString& fullFileName);
+  static QString strippedName(const QString& fullFileName);
 
 protected:
   ZDoc& m_doc;

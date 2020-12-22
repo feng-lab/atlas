@@ -3,7 +3,7 @@
 #include "zlog.h"
 #include <QObject>
 #include <QMutexLocker>
-#include <QList>
+#include <deque>
 #include <limits>
 
 class QTimer;
@@ -23,8 +23,8 @@ public:
   ZLogCache& operator=(ZLogCache&&) = delete;      // Move assign
 
   // LogSink interface
-  virtual void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-                    const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len) override;
+  void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
+            const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len) override;
 
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>
@@ -40,20 +40,20 @@ public:
 
 signals:
   // send the list and valid range [start, end), end is always larger than start
-  void logDataReady(const QList<LogData>* messages, int start, int end);
+  void logDataReady(const std::deque<LogData>* messages, size_t start, size_t end);
 
 protected:
-  explicit ZLogCache(int maxNumItems = 1000000);
+  explicit ZLogCache(size_t maxNumItems = 1000000);
 
 private:
   void sendLogData();
 
 private:
-  QList<LogData> m_logDatas;
+  std::deque<LogData> m_logDatas;
   mutable QMutex m_mutex;
-  int m_maxNumItems;
+  size_t m_maxNumItems;
   QTimer* m_timer;
-  int m_unsendLogDataStart = 0;
+  size_t m_unsendLogDataStart = 0;
 };
 
 } // namespace nim

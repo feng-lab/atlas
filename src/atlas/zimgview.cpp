@@ -50,18 +50,18 @@ QString ZImgView::infoOfPos(double x, double y)
   return info;
 }
 
-void ZImgView::docImgsAdded(const QList<size_t>& objs)
+void ZImgView::docImgsAdded(const std::vector<size_t>& objs)
 {
-  for (int i = 0; i < objs.size(); ++i) {
-    ZImgFilter* viewControl = new ZImgFilter(m_view);
-    viewControl->setData(m_doc.imgPack(objs[i]));
+  for (auto id : objs) {
+    auto viewControl = new ZImgFilter(m_view);
+    viewControl->setData(m_doc.imgPack(id));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]].reset(viewControl);
+    m_idToFilter[id].reset(viewControl);
     connect(viewControl, &ZImgFilter::boundBoxChanged, this, &ZImgView::updateBoundBox);
     connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
     connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
     connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
-    emit objViewReady(objs[i]);
+    emit objViewReady(id);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -70,7 +70,7 @@ void ZImgView::docImgsAdded(const QList<size_t>& objs)
 
 void ZImgView::docImgAdded(size_t id)
 {
-  ZImgFilter* viewControl = new ZImgFilter(m_view);
+  auto viewControl = new ZImgFilter(m_view);
   viewControl->setData(m_doc.imgPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);

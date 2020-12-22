@@ -9,11 +9,11 @@ Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)
   connect(&m_doc, &Z3DAnimationDoc::objAdded, this, &Z3DAnimationView::docAnimationAdded);
 }
 
-void Z3DAnimationView::docAnimationsAdded(const QList<size_t>& objs)
+void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      Z3DAnimationFilter* viewControl = new Z3DAnimationFilter(globalParas(), this);
+      auto viewControl = new Z3DAnimationFilter(globalParas(), this);
       viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
@@ -40,7 +40,7 @@ void Z3DAnimationView::docAnimationsAdded(const QList<size_t>& objs)
 void Z3DAnimationView::docAnimationAdded(size_t id)
 {
   try {
-    Z3DAnimationFilter* viewControl = new Z3DAnimationFilter(globalParas(), this);
+    auto viewControl = new Z3DAnimationFilter(globalParas(), this);
     viewControl->setData(&m_doc.animation(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());

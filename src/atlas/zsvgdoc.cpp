@@ -7,7 +7,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
 
 namespace nim {
@@ -74,9 +73,9 @@ size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
   return 0;
 }
 
-QList<QAction*> ZSvgDoc::loadFileActions() const
+std::vector<QAction*> ZSvgDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadSvgAction);
   return res;
 }

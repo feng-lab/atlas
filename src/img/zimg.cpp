@@ -88,13 +88,13 @@ ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes
   : catDim(catDim_), catScenes(catScenes_), region(rgn), scene(scene_), format(format_), expandXY(expandXY_)
   , expandWithMaxValue(expandWithMaxValue_)
 {
-  for (int i = 0; i < fns.size(); ++i) {
-    QFileInfo fi(fns[i]);
+  for (const auto& fn : fns) {
+    QFileInfo fi(fn);
     if (fi.exists()) {
       filenames << fi.canonicalFilePath();
       totalFileSize += fi.size();
     } else {
-      throw ZIOException(QString("file %1 does not exist").arg(fns[i]));
+      throw ZIOException(QString("file %1 does not exist").arg(fn));
     }
   }
 }
@@ -110,13 +110,13 @@ ZImgSource::ZImgSource(const QJsonValue& jValue)
   } else {
     filenames = readStringList(obj, "filenames");
   }
-  for (int i = 0; i < filenames.size(); ++i) {
-    QFileInfo fi(filenames[i]);
+  for (auto& filename : filenames) {
+    QFileInfo fi(filename);
     if (fi.exists()) {
-      filenames[i] = fi.canonicalFilePath();
+      filename = fi.canonicalFilePath();
       totalFileSize += fi.size();
     } else {
-      throw ZIOException(QString("file %1 does not exist").arg(filenames[i]));
+      throw ZIOException(QString("file %1 does not exist").arg(filename));
     }
   }
 
@@ -309,12 +309,12 @@ void ZImg::swap(ZImg& other) noexcept
   std::swap(m_ownData, other.m_ownData);
 }
 
-void ZImg::getQtReadNameFilter(QStringList& filters, QList<FileFormat>& formats)
+void ZImg::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& formats)
 {
   ZImgIO().getQtReadNameFilter(filters, formats);
 }
 
-void ZImg::getQtWriteNameFilter(QStringList& filters, QList<FileFormat>& formats, QList<Compression>& comps)
+void ZImg::getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps)
 {
   ZImgIO().getQtWriteNameFilter(filters, formats, comps);
 }
@@ -637,7 +637,7 @@ ZImg ZImg::createView(int c, int t)
   return res;
 }
 
-const ZImg ZImg::createView(int c, int t) const
+ZImg ZImg::createView(int c, int t) const
 {
   ZImgRegion rgn;
   if (c >= 0) {
@@ -685,7 +685,7 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t)
   return res;
 }
 
-const ZImg ZImg::createView(size_t z, size_t c, size_t t) const
+ZImg ZImg::createView(size_t z, size_t c, size_t t) const
 {
   ZImgRegion rgn;
   rgn.start.z = z;
@@ -2404,7 +2404,7 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
     double scale = res.size() / (maxData - minData);
     for (size_t t = 0; t < numTimes(); ++t) {
-      const TVoxel* data = timeData<TVoxel>(t);
+      const auto* data = timeData<TVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
@@ -2418,14 +2418,14 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t = 0; t < numTimes(); ++t) {
-          const TVoxel* data = timeData<TVoxel>(t);
+          const auto* data = timeData<TVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
             res[data[v] - minData] += 1;
           }
         }
       } else {
         for (size_t t = 0; t < numTimes(); ++t) {
-          const TVoxel* data = timeData<TVoxel>(t);
+          const auto* data = timeData<TVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
             if (data[v] >= minData && data[v] <= maxData) {
               res[data[v] - minData] += 1;
@@ -2436,7 +2436,7 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
     } else {
       double scale = res.size() / (maxData + 1. - minData);
       for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
+        const auto* data = timeData<TVoxel>(t);
         for (size_t v = 0; v < timeVoxelNumber(); ++v) {
           if (data[v] >= minData && data[v] <= maxData) {
             size_t idx = (data[v] - minData) * scale;
@@ -2469,8 +2469,8 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
     double scale = res.size() / (maxData - minData);
     for (size_t t = 0; t < numTimes(); ++t) {
-      const TVoxel* data = timeData<TVoxel>(t);
-      const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+      const auto* data = timeData<TVoxel>(t);
+      const auto* maskData = mask.timeData<TMaskVoxel>(t);
       for (size_t v = 0; v < timeVoxelNumber(); ++v) {
         if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
           size_t idx = (data[v] - minData) * scale;
@@ -2484,8 +2484,8 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t = 0; t < numTimes(); ++t) {
-          const TVoxel* data = timeData<TVoxel>(t);
-          const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+          const auto* data = timeData<TVoxel>(t);
+          const auto* maskData = mask.timeData<TMaskVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
             if (maskData[v]) {
               res[data[v] - minData] += 1;
@@ -2494,8 +2494,8 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
         }
       } else {
         for (size_t t = 0; t < numTimes(); ++t) {
-          const TVoxel* data = timeData<TVoxel>(t);
-          const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+          const auto* data = timeData<TVoxel>(t);
+          const auto* maskData = mask.timeData<TMaskVoxel>(t);
           for (size_t v = 0; v < timeVoxelNumber(); ++v) {
             if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
               res[data[v] - minData] += 1;
@@ -2506,8 +2506,8 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
     } else {
       double scale = res.size() / (maxData + 1. - minData);
       for (size_t t = 0; t < numTimes(); ++t) {
-        const TVoxel* data = timeData<TVoxel>(t);
-        const TMaskVoxel* maskData = mask.timeData<TMaskVoxel>(t);
+        const auto* data = timeData<TVoxel>(t);
+        const auto* maskData = mask.timeData<TMaskVoxel>(t);
         for (size_t v = 0; v < timeVoxelNumber(); ++v) {
           if (maskData[v] && data[v] >= minData && data[v] <= maxData) {
             size_t idx = (data[v] - minData) * scale;

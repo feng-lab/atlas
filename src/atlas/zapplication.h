@@ -1,8 +1,8 @@
 #pragma once
 
 #include <QApplication>
-#include <QUrl>
 #include <QList>
+#include <QUrl>
 
 namespace nim {
 

@@ -118,9 +118,9 @@ size_t ZRegionAnnotationDoc::loadFile(const QJsonValue& jValue, QString& errorMs
   }
 }
 
-QList<QAction*> ZRegionAnnotationDoc::loadFileActions() const
+std::vector<QAction*> ZRegionAnnotationDoc::loadFileActions() const
 {
-  QList<QAction*> res;
+  std::vector<QAction*> res;
   res.push_back(m_loadRegionAnnotationAction);
   return res;
 }
@@ -242,7 +242,7 @@ void ZRegionAnnotationDoc::loadRegionAnnotation()
 void ZRegionAnnotationDoc::importLabelImage()
 {
   QStringList filters;
-  QList<FileFormat> formats;
+  std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
 
   int fmtIdx = -1;
@@ -279,8 +279,8 @@ void ZRegionAnnotationDoc::importLabelImage()
 void ZRegionAnnotationDoc::exportLabelImage()
 {
   QStringList filters;
-  QList<FileFormat> formats;
-  QList<Compression> comps;
+  std::vector<FileFormat> formats;
+  std::vector<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
   if (m_idToRegionAnnotationPacks.empty()) {
@@ -308,7 +308,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
     dialog.setAcceptMode(QFileDialog::AcceptSave);
     dialog.setFileMode(QFileDialog::AnyFile);
     dialog.setNameFilters(filters);
-    for (int i = 0; i < formats.size(); ++i) {
+    for (size_t i = 0; i < formats.size(); ++i) {
       if (formats[i] == FileFormat::MetaImage) {
         dialog.selectNameFilter(filters[i]);
       }

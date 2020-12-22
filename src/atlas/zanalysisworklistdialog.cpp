@@ -100,14 +100,14 @@ void ZAnalysisWorklistDialog::onGenerate()
 {
   onSave();
 
-  const QList<ZAnalysisTextFileInput>& list = m_model->worklist();
+  const auto& list = m_model->worklist();
   if (!list.empty()) {
     ZGenerateAnalysisTextFile gen;
     QProgressDialog progress("Generating analysis text files...", "Cancel", 0, list.size(), this);
     progress.setWindowModality(Qt::WindowModal);
     progress.show();
     try {
-      for (int i = 0; i < list.size(); ++i) {
+      for (size_t i = 0; i < list.size(); ++i) {
         progress.setValue(i);
         if (progress.wasCanceled())
           break;

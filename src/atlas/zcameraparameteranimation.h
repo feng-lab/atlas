@@ -26,7 +26,7 @@ public:
   { return m_interpolationMethod; }
 
   // create a new key based on current view
-  std::unique_ptr<ZParameterKey> createKey(double secs) const override;
+  [[nodiscard]] std::unique_ptr<ZParameterKey> createKey(double secs) const override;
 
   void updateParaToTime(double secs, ZParameter* para) const override;
 
@@ -37,13 +37,10 @@ signals:
   void interpolationMethodChanged();
 
 protected:
-  glm::vec3 accelerationAL(double fS);
-
-protected:
   class Poly
   {
   public:
-    glm::vec3 Position(float fU) const; // P(u)
+    [[nodiscard]] glm::vec3 Position(float fU) const; // P(u)
     glm::vec3 Velocity(float fU); // P'(u)
     glm::vec3 Acceleration(float fU); // P"(u)
     float Speed(float fU);
@@ -65,7 +62,7 @@ protected:
   class SquadPoly
   {
   public:
-    glm::quat Q(float fU) const;
+    [[nodiscard]] glm::quat Q(float fU) const;
 
     // Time interval on which polynomial is valid, tmin <= t <= tmax.
     // The normalized time is u = (t - tmin)/(tmax - tmin). The inverse
@@ -80,49 +77,49 @@ protected:
   {
     SplineRange() = default;
 
-    explicit SplineRange(QList<ZCameraParameterKey*>& kys);
+    explicit SplineRange(std::vector<ZCameraParameterKey*>& kys);
 
-    glm::quat rotation(float fTime) const;
+    [[nodiscard]] glm::quat rotation(float fTime) const;
 
-    glm::vec3 position(double fTime) const; // X(t)
-    glm::vec3 velocity(double fTime); // X'(t)
-    glm::vec3 acceleration(double fTime); // X"(t)
+    [[nodiscard]] glm::vec3 position(float fTime) const; // X(t)
+    glm::vec3 velocity(float fTime); // X'(t)
+    glm::vec3 acceleration(float fTime); // X"(t)
     // length of the spline
-    double length(double fTime);
+    float length(float fTime);
 
-    double totalLength();
+    [[nodiscard]] float totalLength() const;
 
     // Evaluate position and derivatives by specifying arc length s along the
     // spline. If L is the total length of the curve, then 0 <= s <= L is
     // required.
-    glm::vec3 positionAL(double fS);
+    glm::vec3 positionAL(float fS);
 
-    glm::vec3 velocityAL(double fS);
+    glm::vec3 velocityAL(float fS);
 
-    glm::vec3 accelerationAL(double fS);
+    glm::vec3 accelerationAL(float fS);
 
     void buildPosSpline();
 
     void buildRotSpline();
 
-    void doPolyLookup(float fTime, int& riI, float& rfU) const;
+    void doPolyLookup(float fTime, size_t& riI, float& rfU) const;
 
     // support for arc length parameterization of spline
-    void invertIntegral(float fS, int& riI, float& rfU);
+    void invertIntegral(float fS, size_t& riI, float& rfU);
 
-    double startTime() const
+    [[nodiscard]] float startTime() const
     { return keys[0]->time(); }
 
-    double endTime() const
+    [[nodiscard]] float endTime() const
     { return keys[keys.size() - 1]->time(); }
 
     void swap(SplineRange& rhs) noexcept;
 
-    QList<ZCameraParameterKey*> keys;
-    QList<Poly> posSpline;
+    std::vector<ZCameraParameterKey*> keys;
+    std::vector<Poly> posSpline;
     std::vector<float> posSplineLengths;
     float posSplineTotalLength = 0;
-    QList<SquadPoly> rotSpline;
+    std::vector<SquadPoly> rotSpline;
     bool m_hasSpline = false;
     std::unique_ptr<ZCameraParameterKey> firstKey;
     std::unique_ptr<ZCameraParameterKey> lastKey;

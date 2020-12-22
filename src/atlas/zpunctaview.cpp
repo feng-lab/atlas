@@ -9,18 +9,18 @@ ZPunctaView::ZPunctaView(ZPunctaDoc& doc, ZView& view)
   connect(&m_doc, &ZPunctaDoc::objAdded, this, &ZPunctaView::docPunctaAdded);
 }
 
-void ZPunctaView::docPunctasAdded(const QList<size_t>& objs)
+void ZPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
 {
-  for (int i = 0; i < objs.size(); ++i) {
-    ZPunctaFilter* viewControl = new ZPunctaFilter(m_view);
-    viewControl->setData(m_doc.punctaPack(objs[i]));
+  for (auto id : objs) {
+    auto viewControl = new ZPunctaFilter(m_view);
+    viewControl->setData(m_doc.punctaPack(id));
     expandBoundBox(viewControl->boundBox());
-    m_idToFilter[objs[i]].reset(viewControl);
+    m_idToFilter[id].reset(viewControl);
     connect(viewControl, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaView::updateBoundBox);
     connect(viewControl, &ZPunctaFilter::objDeselected, this, &ZPunctaView::onObjDeselectedFromView);
     connect(viewControl, &ZPunctaFilter::objSelected, this, &ZPunctaView::onObjSelectedFromView);
     connect(viewControl, &ZPunctaFilter::objVisibleChanged, this, &ZPunctaView::onObjVisibleChangedFromView);
-    emit objViewReady(objs[i]);
+    emit objViewReady(id);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -29,7 +29,7 @@ void ZPunctaView::docPunctasAdded(const QList<size_t>& objs)
 
 void ZPunctaView::docPunctaAdded(size_t id)
 {
-  ZPunctaFilter* viewControl = new ZPunctaFilter(m_view);
+  auto viewControl = new ZPunctaFilter(m_view);
   viewControl->setData(m_doc.punctaPack(id));
   expandBoundBox(viewControl->boundBox());
   m_idToFilter[id].reset(viewControl);
