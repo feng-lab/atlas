@@ -1,12 +1,14 @@
 #include "z3dport.h"
 
+#include <utility>
+
 #include "zlog.h"
 
 namespace nim {
 
-Z3DInputPortBase::Z3DInputPortBase(const QString& name, bool allowMultipleConnections, Z3DFilter* filter,
+Z3DInputPortBase::Z3DInputPortBase(QString name, bool allowMultipleConnections, Z3DFilter* filter,
                                    Z3DFilter::State invalidationState)
-  : m_name(name)
+  : m_name(std::move(name))
   , m_allowMultipleConnections(allowMultipleConnections)
   , m_filter(filter)
   , m_invalidationState(invalidationState)
@@ -28,8 +30,7 @@ void Z3DInputPortBase::invalidate()
 
 bool Z3DInputPortBase::isConnectedTo(const Z3DOutputPortBase* port) const
 {
-  return std::find(m_connectedOutputPorts.begin(), m_connectedOutputPorts.end(), port)
-         != m_connectedOutputPorts.end();
+  return contains(m_connectedOutputPorts, port);
 }
 
 bool Z3DInputPortBase::connect(Z3DOutputPortBase* outport)
@@ -55,8 +56,8 @@ void Z3DInputPortBase::disconnectAll()
   }
 }
 
-Z3DOutputPortBase::Z3DOutputPortBase(const QString& name, Z3DFilter* filter)
-  : m_name(name)
+Z3DOutputPortBase::Z3DOutputPortBase(QString name, Z3DFilter* filter)
+  : m_name(std::move(name))
   , m_filter(filter)
   , m_size(32, 32)
 {
@@ -93,8 +94,7 @@ void Z3DOutputPortBase::invalidate()
 
 bool Z3DOutputPortBase::isConnectedTo(const Z3DInputPortBase* port) const
 {
-  return std::find(m_connectedInputPorts.begin(), m_connectedInputPorts.end(), port)
-         != m_connectedInputPorts.end();
+  return contains(m_connectedInputPorts, port);
 }
 
 bool Z3DOutputPortBase::connect(Z3DInputPortBase* inport)

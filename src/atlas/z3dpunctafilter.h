@@ -110,7 +110,7 @@ private:
   ZEventListenerParameter m_selectPunctumEvent;
   ZEventListenerParameter m_deleteSelectedPunctaEvent;
   ZEventListenerParameter m_contextMenuEvent;
-  glm::ivec2 m_startCoord;
+  glm::ivec2 m_startCoord{};
   const ZPunctum* m_pressedPunctum = nullptr;
 
   std::vector<glm::vec4> m_pointAndRadius;

@@ -357,7 +357,7 @@ void stnTrajectory()
   for (size_t i = 0; i < annotation.voxelNumber(); ++i) {
     if (annotation.value(i) == stnID) {
       stnIdxs.push_back(i);
-    } else if (std::find(cortexIDs.begin(), cortexIDs.end(), annotation.value(i)) != cortexIDs.end()) {
+    } else if (contains(cortexIDs, annotation.value(i))) {
       isoCortexMask.setValue(1, i);
     }
   }

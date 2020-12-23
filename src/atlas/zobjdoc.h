@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zglobal.h"
 #include "zdoc.h"
 #include "zjson.h"
 #include "zsysteminfo.h"
@@ -22,7 +23,7 @@ public:
   { return !objs().empty(); }
 
   [[nodiscard]] inline bool hasObjWithID(size_t id) const
-  { auto objs = m_doc.objsOfDoc(this); return std::find(objs.begin(), objs.end(), id) != objs.end(); }
+  { return contains(m_doc.objsOfDoc(this), id); }
 
   [[nodiscard]] inline std::vector<size_t> objs() const
   { return m_doc.objsOfDoc(this); }

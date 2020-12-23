@@ -1,7 +1,6 @@
 #include "z3dshaderprogram.h"
 
 #include "z3dgl.h"
-#include "zsysteminfo.h"
 #include "zlog.h"
 #include "z3dshadermanager.h"
 #include "zexception.h"
@@ -24,7 +23,7 @@ Z3DShaderProgram::~Z3DShaderProgram()
 
 void Z3DShaderProgram::addShader(Z3DShader& shader)
 {
-  if (std::find(m_shaders.begin(), m_shaders.end(), &shader) != m_shaders.end())
+  if (contains(m_shaders, &shader))
     return;
   if (m_context != shader.context()) {
     throw ZGLException(

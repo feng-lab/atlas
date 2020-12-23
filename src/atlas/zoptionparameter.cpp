@@ -22,17 +22,18 @@ void ZOptionParameter<T, T2>::select(const T& value)
 template<class T, class T2>
 void ZOptionParameter<T, T2>::selectNext()
 {
-  if (m_options.size() < 2)
+  if (m_options.size() < 2) {
     return;
+  }
   if (!m_dataIsValid) {
     select(m_options[0]);
     m_dataIsValid = true;
   } else {
-    auto iter = std::find(m_options.begin(), m_options.end(), this->m_value);
-    CHECK(iter != m_options.end());
-    auto index = size_t(iter - m_options.begin());
-    if (++index >= m_options.size())
+    auto index = indexOf(m_options, this->m_value);
+    CHECK(index >= 0);
+    if (size_t(++index) >= m_options.size()) {
       index = 0;
+    }
     select(m_options[index]);
   }
 }
@@ -52,8 +53,9 @@ template<class T, class T2>
 void ZOptionParameter<T, T2>::reservedIntSlot1(int index)
 {
   // notify all widgets
-  if (index >= 0 && index < int(m_options.size()))
+  if (index >= 0 && index < int(m_options.size())) {
     this->set(m_options[index]);
+  }
 }
 
 template<class T, class T2>
@@ -65,9 +67,8 @@ QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
     cb->addItem(comboBoxItemString(m_options[i]));
   }
   if (!m_options.empty()) {
-    auto iter = std::find(m_options.begin(), m_options.end(), this->m_value);
-    auto index = iter - m_options.begin();
-    if (iter != m_options.end()) {
+    auto index = indexOf(m_options, this->m_value);
+    if (index >= 0) {
       cb->setCurrentIndex(index);
     } else {
       cb->setCurrentIndex(0);
@@ -85,11 +86,11 @@ QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
 template<class T, class T2>
 void ZOptionParameter<T, T2>::makeValid(T& value) const
 {
-  if (std::find(m_options.begin(), m_options.end(), value) == m_options.end()) {
+  if (!hasOption(value)) {
     LOG(ERROR) << QString("Optiong value <%1> does not exist.").arg(value);
-    if (m_options.empty())
+    if (m_options.empty()) {
       LOG(ERROR) << QString("Error: Try to select <%1> from empty options list. Call addOptions() first!").arg(value);
-    else if (m_dataIsValid) {
+    } else if (m_dataIsValid) {
       LOG(ERROR) << QString("Warning: Select failed, value is still <%1>").arg(this->m_value);
       value = this->m_value;
     } else {
@@ -108,7 +109,7 @@ QString ZOptionParameter<T, T2>::comboBoxItemString(const T& value) const
 template<class T, class T2>
 void ZOptionParameter<T, T2>::beforeChange(T& value)
 {
-  int index = std::find(m_options.begin(), m_options.end(), value) - m_options.begin();
+  auto index = indexOf(m_options, value);
   m_associatedData = m_associatedDatas[index];
   emit this->reservedIntSignal1(index);
 }

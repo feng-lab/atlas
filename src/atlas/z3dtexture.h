@@ -114,7 +114,7 @@ private:
 
   GLuint m_id = 0; // texture id
 
-  int m_type;
+  int m_type = 0;
 };
 
 // provide unique texture units

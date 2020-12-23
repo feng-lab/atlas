@@ -289,7 +289,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
         }
       }
     }
-    CHECK(std::find(m_writeFormats.begin(), m_writeFormats.end(), format) != m_writeFormats.end());
+    CHECK(contains(m_writeFormats, format));
 
     if (format == "vtp") {
       mesh.saveAsVTP(filename);

@@ -33,14 +33,14 @@ public:
   { return m_options.empty(); }
 
   [[nodiscard]] bool hasOption(const T& value) const
-  { return std::find(m_options.begin(), m_options.end(), value) != m_options.end(); }
+  { return contains(m_options, value); }
 
   [[nodiscard]] inline T2 associatedData() const
   { return m_associatedData; }
 
   void addOption(const T& value)
   {
-    if (std::find(m_options.begin(), m_options.end(), value) != m_options.end()) {
+    if (hasOption(value)) {
       return;
     }
     m_options.push_back(value);
@@ -62,16 +62,16 @@ public:
 
   void removeOption(const T& value)
   {
-    auto iter = std::find(m_options.begin(), m_options.end(), value);
-    if (iter == m_options.end()) {
+    auto index = indexOf(m_options, value);
+    if (index < 0) {
       return;
     }
-    m_options.erase(iter);
-    m_associatedDatas.erase(m_associatedDatas.begin() + (iter - m_options.begin()));
+    removeAt(m_options, index);
+    removeAt(m_associatedDatas, index);
     emit this->reservedStringSignal2(comboBoxItemString(value));
-    iter = std::find(m_options.begin(), m_options.end(), this->m_value);
-    if (iter != m_options.end()) {
-      emit this->reservedIntSignal1(iter - m_options.begin());
+    index = indexOf(m_options, this->m_value);
+    if (index >= 0) {
+      emit this->reservedIntSignal1(index);
     } else {
       emit this->reservedIntSignal1(0);
       this->set(m_options[0]);
@@ -125,8 +125,9 @@ public:
 
   inline void addOptionWithData(const std::pair<T, T2>& value)
   {
-    if (std::find(m_options.begin(), m_options.end(), value.first) != m_options.end())
+    if (hasOption(value.first)) {
       return;
+    }
     m_options.push_back(value.first);
     m_associatedDatas.push_back(value.second);
     emit this->reservedStringSignal1(comboBoxItemString(value.first));
@@ -149,14 +150,16 @@ public:
   }
 
   inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
+                     const std::pair<T, T2>& op4)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4);
   }
 
   inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
+                     const std::pair<T, T2>& op4,
                      const std::pair<T, T2>& op5)
   {
     addOptionWithData(op1);
@@ -164,7 +167,8 @@ public:
   }
 
   inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
+                     const std::pair<T, T2>& op4,
                      const std::pair<T, T2>& op5, const std::pair<T, T2>& op6)
   {
     addOptionWithData(op1);
@@ -172,7 +176,8 @@ public:
   }
 
   inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
+                     const std::pair<T, T2>& op4,
                      const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7)
   {
     addOptionWithData(op1);
@@ -180,8 +185,10 @@ public:
   }
 
   inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3, const std::pair<T, T2>& op4,
-                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7, const std::pair<T, T2>& op8)
+  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
+                     const std::pair<T, T2>& op4,
+                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7,
+                     const std::pair<T, T2>& op8)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7, op8);

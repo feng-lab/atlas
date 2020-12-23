@@ -306,7 +306,7 @@ void Z3DMeshFilter::deregisterPickingObjects()
 
 ZBBox<glm::dvec3> Z3DMeshFilter::meshBound(ZMesh* p)
 {
-  std::map<ZMesh*, ZBBox<glm::dvec3>>::const_iterator it = m_meshBoundboxMapper.find(p);
+  auto it = m_meshBoundboxMapper.find(p);
   if (it != m_meshBoundboxMapper.end()) {
     ZBBox<glm::dvec3> result = it->second;
     //    result[0] *= getCoordTransform().x;
@@ -332,8 +332,8 @@ ZBBox<glm::dvec3> Z3DMeshFilter::meshBound(ZMesh* p)
 void Z3DMeshFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.reset();
-  for (size_t i = 0; i < m_origMeshList.size(); ++i) {
-    m_notTransformedBoundBox.expand(m_origMeshList[i]->boundBox());
+  for (auto &mesh : m_origMeshList) {
+    m_notTransformedBoundBox.expand(mesh->boundBox());
   }
 }
 
@@ -376,7 +376,7 @@ void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
       emit objDeselected();
       return;
     }
-    bool hit = std::find(m_meshList.begin(), m_meshList.end(), static_cast<const ZMesh*>(obj)) != m_meshList.end();
+    bool hit = contains(m_meshList, static_cast<const ZMesh*>(obj));
     if (hit) {
       emit objSelected(appending);
       e->accept();

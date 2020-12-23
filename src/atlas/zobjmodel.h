@@ -87,7 +87,7 @@ public:
 
   void removeAllObjs();
 
-  static size_t indexToId(const QModelIndex& index);
+  size_t indexToId(const QModelIndex& index);
 
   QModelIndex idToIndex(size_t id, int col = 0);
 

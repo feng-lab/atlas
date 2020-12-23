@@ -429,8 +429,7 @@ void ZDoc::loadFileList(const QStringList& fileList)
 
 size_t ZDoc::viewSettingId()
 {
-  auto obs = objs();
-  if (std::find(obs.begin(), obs.end(), m_viewSettingId) == obs.end()) {
+  if (!contains(objs(), m_viewSettingId)) {
     m_viewSettingId = 0;
   }
   return m_viewSettingId;
@@ -580,7 +579,7 @@ bool ZDoc::saveSelectedObjsAs()
   return res;
 }
 
-bool ZDoc::saveAllObjs()
+bool ZDoc::saveAllObjs() const
 {
   bool res = true;
   auto allObjs = objs();

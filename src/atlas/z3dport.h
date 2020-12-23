@@ -11,43 +11,43 @@ class Z3DOutputPortBase;
 class Z3DInputPortBase
 {
 public:
-  Z3DInputPortBase(const QString& name, bool allowMultipleConnections,
+  Z3DInputPortBase(QString name, bool allowMultipleConnections,
                    Z3DFilter* filter,
                    Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
   virtual ~Z3DInputPortBase();
 
   // return the filter this port belongs to.
-  Z3DFilter* filter() const
+  [[nodiscard]] Z3DFilter* filter() const
   { return m_filter; }
 
-  QString name() const
+  [[nodiscard]] QString name() const
   { return m_name; }
 
   // invalidate filter with the given State and set hasChanged=true.
   void invalidate();
 
   // has the data in this port changed since the last process() call?
-  bool hasChanged() const
+  [[nodiscard]] bool hasChanged() const
   { return m_hasChanged; }
 
   // mark the port as valid.
   void setValid()
   { m_hasChanged = false; }
 
-  const std::vector<Z3DOutputPortBase*> connected() const
+  [[nodiscard]] const std::vector<Z3DOutputPortBase*> connected() const
   { return m_connectedOutputPorts; }
 
-  size_t numConnections() const
+  [[nodiscard]] size_t numConnections() const
   { return m_connectedOutputPorts.size(); }
 
-  bool isConnected() const
+  [[nodiscard]] bool isConnected() const
   { return !m_connectedOutputPorts.empty(); }
 
   bool isConnectedTo(const Z3DOutputPortBase* port) const;
 
   // return true if the port is connected and contains valid data.
-  virtual bool isReady() const = 0;
+  [[nodiscard]] virtual bool isReady() const = 0;
 
   bool connect(Z3DOutputPortBase* outport);
 
@@ -58,7 +58,7 @@ public:
   void setExpectedSize(const glm::uvec2& size)
   { m_expectedSize = size; }
 
-  glm::uvec2 expectedSize() const
+  [[nodiscard]] glm::uvec2 expectedSize() const
   { return m_expectedSize; }
 
 protected:
@@ -66,13 +66,13 @@ protected:
 
   QString m_name;
   bool m_allowMultipleConnections;
-  Z3DFilter* m_filter;
+  Z3DFilter* m_filter = nullptr;
 
   // how changes from this port affect its filter
   Z3DFilter::State m_invalidationState;
 
   std::vector<Z3DOutputPortBase*> m_connectedOutputPorts;
-  bool m_hasChanged;
+  bool m_hasChanged = true;
 
   glm::uvec2 m_expectedSize;
 };
@@ -80,18 +80,18 @@ protected:
 class Z3DOutputPortBase
 {
 public:
-  Z3DOutputPortBase(const QString& name, Z3DFilter* filter);
+  Z3DOutputPortBase(QString name, Z3DFilter* filter);
 
   virtual ~Z3DOutputPortBase();
 
   // return the filter this port belongs to.
-  Z3DFilter* filter() const
+  [[nodiscard]] Z3DFilter* filter() const
   { return m_filter; }
 
-  QString name() const
+  [[nodiscard]] QString name() const
   { return m_name; }
 
-  const std::vector<Z3DInputPortBase*> connected() const
+  [[nodiscard]] const std::vector<Z3DInputPortBase*> connected() const
   { return m_connectedInputPorts; }
 
   // test if this outport can connect to a given inport.
@@ -100,21 +100,21 @@ public:
   // invalidate all connected inports.
   virtual void invalidate();
 
-  size_t numConnections() const
+  [[nodiscard]] size_t numConnections() const
   { return m_connectedInputPorts.size(); }
 
-  bool isConnected() const
+  [[nodiscard]] bool isConnected() const
   { return !m_connectedInputPorts.empty(); }
 
   bool isConnectedTo(const Z3DInputPortBase* port) const;
 
   // returns whether the port is ready to be used by its owning filter.
   // return true if the port is connected.
-  virtual bool isReady() const
+  [[nodiscard]] virtual bool isReady() const
   { return isConnected(); }
 
   // return true if this output port contains valid data
-  virtual bool hasValidData() const = 0;
+  [[nodiscard]] virtual bool hasValidData() const = 0;
 
   bool connect(Z3DInputPortBase* inport);
 
@@ -122,19 +122,19 @@ public:
 
   void disconnectAll();
 
-  glm::uvec2 size() const
+  [[nodiscard]] glm::uvec2 size() const
   { return m_size; }
 
   // return the maximum of expectesize of all connected inports.
   // If no inport connected, return (0, 0)
-  glm::uvec2 expectedSize() const;
+  [[nodiscard]] glm::uvec2 expectedSize() const;
 
   virtual void resize(const glm::uvec2& newsize)
   { m_size = newsize; }
 
 protected:
   QString m_name;
-  Z3DFilter* m_filter;
+  Z3DFilter* m_filter = nullptr;
 
   std::vector<Z3DInputPortBase*> m_connectedInputPorts;
 
@@ -163,13 +163,14 @@ public:
 
   T* firstConnectedFilter() const
   {
-    if (isConnected())
+    if (isConnected()) {
       return static_cast<T*>(m_connectedOutputPorts[0]->filter());
-    else
+    } else {
       return 0;
+    }
   }
 
-  bool isReady() const override
+  [[nodiscard]] bool isReady() const override
   { return isConnected(); }
 };
 
@@ -191,7 +192,7 @@ public:
   }
 
   // data is filter itself, so it is always valid
-  bool hasValidData() const override
+  [[nodiscard]] bool hasValidData() const override
   { return true; }
 };
 

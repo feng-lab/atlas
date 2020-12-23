@@ -29,12 +29,12 @@ public:
   void setMeshColor(const glm::vec4& col)
   { m_singleColorForAllMesh.set(col); }
 
-  glm::vec4 meshColor() const
+  [[nodiscard]] glm::vec4 meshColor() const
   { return m_singleColorForAllMesh.get(); }
 
-  QString regionName() const;
+  [[nodiscard]] QString regionName() const;
 
-  bool isFixed() const
+  [[nodiscard]] bool isFixed() const
   { return m_meshList[0]->numVertices() == 96957; }
 
   void setGlow(bool v)
@@ -47,18 +47,18 @@ public:
   void setSelectedMeshes(std::set<ZMesh*>* list)
   { m_selectedMeshes = list; }
 
-  bool isReady(Z3DEye eye) const override;
+  [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroupForAnnotationFilter();
 
-  bool hasOpaque(Z3DEye eye) const override
+  [[nodiscard]] bool hasOpaque(Z3DEye eye) const override
   { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye eye) const override
+  [[nodiscard]] bool hasTransparent(Z3DEye eye) const override
   { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
 
   void renderTransparent(Z3DEye eye) override;

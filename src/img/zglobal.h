@@ -140,6 +140,29 @@ std::vector<size_t> argSort(RAIter first, RAIter last)
   return idx;
 }
 
+template<typename C, typename V>
+inline bool contains(const C& iterable, const V& v)
+{
+  return std::find(std::begin(iterable), std::end(iterable), v) != std::end(iterable);
+}
+
+template<typename C, typename V>
+inline ptrdiff_t indexOf(const C& iterable, const V& v)
+{
+  if (auto it = std::find(std::begin(iterable), std::end(iterable), v); it != std::end(iterable)) {
+    return std::distance(std::begin(iterable), it);
+  } else {
+    return -1;
+  }
+}
+
+template<typename C>
+inline void removeAt(C& iterable, size_t idx)
+{
+  // CHECK(idx < iterable.size());
+  iterable.erase(iterable.begin() + idx);
+}
+
 class ZGlobal
 {
 public:

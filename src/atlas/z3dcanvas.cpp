@@ -463,11 +463,7 @@ void Z3DCanvas::setFakeStereoOnce()
 
 void Z3DCanvas::removeEventListener(Z3DCanvasEventListener& e)
 {
-  std::deque<Z3DCanvasEventListener*>::iterator pos;
-  pos = std::find(m_listeners.begin(), m_listeners.end(), &e);
-
-  if (pos != m_listeners.end())
-    m_listeners.erase(pos);
+  std::erase(m_listeners, &e);
 }
 
 void Z3DCanvas::clearEventListeners()

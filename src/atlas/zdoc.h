@@ -198,7 +198,7 @@ public:
 
   bool saveSelectedObjsAs();
 
-  bool saveAllObjs();
+  bool saveAllObjs() const;
 
   void showSelectedObjsInGraphicalShell();
 
