@@ -204,12 +204,11 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
 {
   CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
 
-  auto& pack = m_idToRegionAnnotationPacks.at(id);
-  for (const auto& idPack : m_idToRegionAnnotationPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  return std::any_of(m_idToRegionAnnotationPacks.begin(), m_idToRegionAnnotationPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToRegionAnnotationPacks.at(id);
+                     }
+  );
 }
 
 QWidget* ZRegionAnnotationDoc::createObjEditWidget(size_t id)

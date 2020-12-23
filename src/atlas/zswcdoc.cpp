@@ -182,12 +182,13 @@ size_t ZSwcDoc::makeAlias(size_t id)
 
 bool ZSwcDoc::isAlias(size_t id) const
 {
-  auto& pack = m_idToSwcPacks.at(id);
-  for (const auto& idPack : m_idToSwcPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+
+  return std::any_of(m_idToSwcPacks.begin(), m_idToSwcPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToSwcPacks.at(id);
+                     }
+  );
 }
 
 QWidget* ZSwcDoc::createObjEditWidget(size_t id)

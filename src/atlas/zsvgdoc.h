@@ -66,8 +66,6 @@ private:
   { // svg and its associated data
     explicit SvgPack(std::unique_ptr<QSvgRenderer> svg, const QString& path);
 
-    ~SvgPack();
-
     void updateDerivedData();
 
     const QString& info() const;

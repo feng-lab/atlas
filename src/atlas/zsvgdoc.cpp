@@ -144,12 +144,13 @@ size_t ZSvgDoc::makeAlias(size_t id)
 
 bool ZSvgDoc::isAlias(size_t id) const
 {
-  auto& pack = m_idToSvgPacks.at(id);
-  for (const auto& idPack : m_idToSvgPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  CHECK(m_idToSvgPacks.find(id) != m_idToSvgPacks.end());
+
+  return std::any_of(m_idToSvgPacks.begin(), m_idToSvgPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToSvgPacks.at(id);
+                     }
+  );
 }
 
 void ZSvgDoc::loadSvg()
@@ -184,10 +185,6 @@ ZSvgDoc::SvgPack::SvgPack(std::unique_ptr<QSvgRenderer> svg_, const QString& pat
   : svg(std::move(svg_)), path(QFileInfo(path_).canonicalFilePath())
 {
   updateDerivedData();
-}
-
-ZSvgDoc::SvgPack::~SvgPack()
-{
 }
 
 void ZSvgDoc::SvgPack::updateDerivedData()

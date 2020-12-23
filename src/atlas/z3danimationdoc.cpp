@@ -201,12 +201,11 @@ bool Z3DAnimationDoc::isAlias(size_t id) const
 {
   CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
-  auto& pack = m_idToAnimationPacks.at(id);
-  for (const auto& idPack : m_idToAnimationPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
+                     }
+  );
 }
 
 QWidget* Z3DAnimationDoc::createObjEditWidget(size_t id)

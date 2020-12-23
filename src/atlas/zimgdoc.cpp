@@ -98,7 +98,7 @@ std::vector<QAction*> ZImgDoc::loadFileActions() const
 
 QMenu* ZImgDoc::processObjMenu() const
 {
-  QMenu* res = new QMenu(typeName());
+  auto res = new QMenu(typeName());
   res->addAction(m_stitchImageAction);
   res->addAction(m_alignSectionsAction);
   res->addAction(m_correctChromaticShiftAction);
@@ -186,12 +186,11 @@ bool ZImgDoc::isAlias(size_t id) const
 {
   CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
-  auto& pack = m_idToImgPacks.at(id);
-  for (const auto& idPack : m_idToImgPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  return std::any_of(m_idToImgPacks.begin(), m_idToImgPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToImgPacks.at(id);
+                     }
+  );
 }
 
 void ZImgDoc::loadImg()

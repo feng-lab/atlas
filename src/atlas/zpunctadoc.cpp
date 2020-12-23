@@ -9,7 +9,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 
 namespace nim {
 
@@ -194,12 +193,11 @@ bool ZPunctaDoc::isAlias(size_t id) const
 {
   CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
-  auto& pack = m_idToPunctaPacks.at(id);
-  for (const auto& idPack : m_idToPunctaPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  return std::any_of(m_idToPunctaPacks.begin(), m_idToPunctaPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToPunctaPacks.at(id);
+                     }
+  );
 }
 
 QWidget* ZPunctaDoc::createObjEditWidget(size_t id)

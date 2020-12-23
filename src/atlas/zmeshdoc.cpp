@@ -7,7 +7,6 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QApplication>
-#include <QIcon>
 #include <set>
 
 namespace nim {
@@ -219,12 +218,11 @@ bool ZMeshDoc::isAlias(size_t id) const
 {
   CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
-  auto& pack = m_idToMeshPacks.at(id);
-  for (const auto& idPack : m_idToMeshPacks) {
-    if (idPack.first != id && idPack.second == pack)
-      return true;
-  }
-  return false;
+  return std::any_of(m_idToMeshPacks.begin(), m_idToMeshPacks.end(),
+                     [&, this](const auto& idPack) {
+                       return idPack.first != id && idPack.second == m_idToMeshPacks.at(id);
+                     }
+  );
 }
 
 void ZMeshDoc::loadMesh()
