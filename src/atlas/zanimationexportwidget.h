@@ -59,7 +59,7 @@ private:
 private:
   bool m_group;
 
-  QGroupBox* m_groupBox;
+  QGroupBox* m_groupBox = nullptr;
 
   ZBoolParameter m_captureStereoImage;
   ZStringIntOptionParameter m_stereoImageType;
@@ -67,8 +67,8 @@ private:
   ZIVec2Parameter m_customSize;
   ZDoubleParameter m_framePerSecond;
 
-  ZSelectFileWidget* m_filenameWidget;
-  QPushButton* m_captureButton;
+  ZSelectFileWidget* m_filenameWidget = nullptr;
+  QPushButton* m_captureButton = nullptr;
 
   QString m_lastFName;
 

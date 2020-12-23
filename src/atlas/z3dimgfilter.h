@@ -31,7 +31,7 @@ public:
 
   void setData(const ZImgPack& imgPack);
 
-  virtual bool isStayOnTop() const
+  [[nodiscard]] virtual bool isStayOnTop() const
   { return m_stayOnTop.get(); }
 
   virtual void setStayOnTop(bool s)
@@ -39,13 +39,13 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  bool isReady(Z3DEye eye) const override;
+  [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
-  bool hasOpaque(Z3DEye eye) const override;
+  [[nodiscard]] bool hasOpaque(Z3DEye eye) const override;
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye eye) const override;
+  [[nodiscard]] bool hasTransparent(Z3DEye eye) const override;
 
   void renderTransparent(Z3DEye eye) override;
 
@@ -84,15 +84,15 @@ protected:
 
   void process(Z3DEye eye) override;
 
-  bool hasSlices() const;
+  [[nodiscard]] bool hasSlices() const;
 
   void renderSlices(Z3DEye eye);
 
-  bool hasImage() const;
+  [[nodiscard]] bool hasImage() const;
 
   void renderImage(Z3DEye eye);
 
-  bool onlyBoundBox() const;
+  [[nodiscard]] bool onlyBoundBox() const;
 
   void renderOnlyBoundBox(Z3DEye eye);
 
@@ -182,7 +182,7 @@ private:
 
   ZEventListenerParameter m_leftMouseButtonPressEvent;
   ZEventListenerParameter m_contextMenuEvent;
-  glm::ivec2 m_startCoord;
+  glm::ivec2 m_startCoord{};
 };
 
 } // namespace nim

@@ -299,16 +299,12 @@ TValue ZImgInfo::dataRangeMin() const
     switch (bytesPerVoxel) {
       case 1:
         return std::numeric_limits<int8_t>::min();
-        break;
       case 2:
         return std::numeric_limits<int16_t>::min();
-        break;
       case 4:
         return std::numeric_limits<int32_t>::min();
-        break;
       case 8:
         return std::numeric_limits<int64_t>::min();
-        break;
       default:
         break;
     }
@@ -348,16 +344,12 @@ TValue ZImgInfo::dataRangeMax() const
     switch (bytesPerVoxel) {
       case 1:
         return std::numeric_limits<int8_t>::max();
-        break;
       case 2:
         return std::numeric_limits<int16_t>::max();
-        break;
       case 4:
         return static_cast<TValue>(std::numeric_limits<int32_t>::max());
-        break;
       case 8:
         return static_cast<TValue>(std::numeric_limits<int64_t>::max());
-        break;
       default:
         break;
     }
@@ -365,16 +357,12 @@ TValue ZImgInfo::dataRangeMax() const
     switch (bytesPerVoxel) {
       case 1:
         return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint8_t>::max();
-        break;
       case 2:
         return validBitCount ? ((1 << validBitCount) - 1) : std::numeric_limits<uint16_t>::max();
-        break;
       case 4:
         return static_cast<TValue>(std::numeric_limits<uint32_t>::max());
-        break;
       case 8:
         return static_cast<TValue>(std::numeric_limits<uint64_t>::max());
-        break;
       default:
         break;
     }

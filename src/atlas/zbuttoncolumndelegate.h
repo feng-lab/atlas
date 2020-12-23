@@ -12,8 +12,8 @@ Q_OBJECT
 public:
   explicit ZButtonColumnDelegate(QObject* parent = nullptr);
 
-  virtual QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
-                                const QModelIndex& index) const override;
+  QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+                        const QModelIndex& index) const override;
 
   void setEditorData(QWidget* editor, const QModelIndex& index) const override;
 
@@ -21,7 +21,7 @@ public:
 
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
-  virtual void
+  void
   updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
   QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -36,7 +36,7 @@ protected:
   void buttonClicked();
 
 private:
-  QAbstractItemView* m_widget;
+  QAbstractItemView* m_widget = nullptr;
   mutable std::unique_ptr<QPushButton> m_button;
   bool m_isOneCellInEditMode;
   QPersistentModelIndex m_currentEditedCellIndex;

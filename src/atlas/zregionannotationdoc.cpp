@@ -44,7 +44,7 @@ bool ZRegionAnnotationDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
     return false;
   }
   return saveAs(id);
@@ -65,7 +65,7 @@ bool ZRegionAnnotationDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -231,7 +231,7 @@ void ZRegionAnnotationDoc::loadRegionAnnotation()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read regionAnnotation.\n" + errorMsg);
       }
     }
@@ -269,7 +269,7 @@ void ZRegionAnnotationDoc::importLabelImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             QString("Can not import label image:\n%1").arg(e.what()));
     }
   }
@@ -283,19 +283,19 @@ void ZRegionAnnotationDoc::exportLabelImage()
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
   if (m_idToRegionAnnotationPacks.empty()) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("No RegionAnnotation to Export"));
     return;
   }
   if (m_idToRegionAnnotationPacks.size() > 1) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("Two many RegionAnnotations, don't know which one to export. "
                              "Right now this function only works when there is only one regionannotation object"));
     return;
   }
   auto id = m_idToRegionAnnotationPacks.begin()->first;
   if (objHasUnsavedChange(id)) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("Please Save RegionAnnotation First"));
     return;
   }
@@ -331,7 +331,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             QString("Can not export label image:\n%1").arg(e.what()));
     }
   }

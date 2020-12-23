@@ -356,6 +356,7 @@ bool ZDoc::saveOrDiscard(size_t id)
       return true;
     case QMessageBox::Cancel:
       // Cancel was clicked
+      LOG(INFO) << "cancel clicked";
       break;
     default:
       // should never be reached
@@ -403,7 +404,7 @@ void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("Can not read file %1. Error: %2")
                             .arg(fileName).arg(error));
   }
@@ -422,7 +423,7 @@ void ZDoc::loadFileList(const QStringList& fileList)
     }
   }
   if (!error.isEmpty()) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), error);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), error);
   }
 }
 

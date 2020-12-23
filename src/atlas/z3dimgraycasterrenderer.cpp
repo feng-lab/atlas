@@ -1,7 +1,6 @@
 #include "z3dimgraycasterrenderer.h"
 
 #include "z3dtexture.h"
-#include "z3dvolume.h"
 #include "z3dimg.h"
 #include "zimgformat.h"
 #include "zbenchtimer.h"
@@ -295,10 +294,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         m_exitTexCoordTexture == nullptr || m_exitEyeCoordTexture == nullptr)
       return;
   } else {
-    for (size_t i = 0; i < m_quads.size(); ++i) {
-      if (m_img->is2DData() && m_quads[i].numVertices() != m_quads[i].num2DTextureCoordinates())
+    for (auto& quad : m_quads) {
+      if (m_img->is2DData() && quad.numVertices() != quad.num2DTextureCoordinates())
         return;
-      if (m_img->is3DData() && m_quads[i].numVertices() != m_quads[i].num3DTextureCoordinates())
+      if (m_img->is3DData() && quad.numVertices() != quad.num3DTextureCoordinates())
         return;
     }
   }
@@ -318,8 +317,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       if (visibleIdxs.size() == 1) {
         bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[0]);
 
-        for (size_t i = 0; i < m_quads.size(); ++i)
-          renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
+        for (auto& quad : m_quads)
+          renderTriangleList(m_VAO, m_sc2dImageShader, quad);
 
       } else {
         for (size_t j = 0; j < visibleIdxs.size(); ++j) {
@@ -328,8 +327,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->clear();
           bindVolumeAndTransferFunc(m_sc2dImageShader, visibleIdxs[j]);
 
-          for (size_t i = 0; i < m_quads.size(); ++i)
-            renderTriangleList(m_VAO, m_sc2dImageShader, m_quads[i]);
+          for (auto& quad : m_quads)
+            renderTriangleList(m_VAO, m_sc2dImageShader, quad);
 
           m_layerTarget->release();
         }
@@ -341,7 +340,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         float n = m_rendererBase.camera().nearDist();
         glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
         float ze_to_screen_pixel_voxel_size =
-          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
+          -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
 
         LOG(INFO) << "";
         ZBenchTimer bt("render and collect blockids");
@@ -370,12 +369,12 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
         m_img->bindFullResBlockIDsShader(m_image3DSliceWithTransferfunBlockIDsShader);
 
-        for (size_t q = 0; q < m_quads.size(); ++q) {
+        for (auto& quad : m_quads) {
           m_blockIDsRenderTarget->bind();
           glDrawBuffers(2, g_drawBuffers);
           glClear(GL_COLOR_BUFFER_BIT);
 
-          renderTriangleList(m_VAO, m_image3DSliceWithTransferfunBlockIDsShader, m_quads[q]);
+          renderTriangleList(m_VAO, m_image3DSliceWithTransferfunBlockIDsShader, quad);
 
           m_blockIDsRenderTarget->release();
 
@@ -434,8 +433,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithTransferfunShader, visibleIdxs[0]);
           m_image3DSliceWithTransferfunShader.bindTexture("transfer_function",
                                                           m_transferFuncParas[visibleIdxs[0]]->get().texture());
-          for (size_t q = 0; q < m_quads.size(); ++q)
-            renderTriangleList(m_VAO, m_image3DSliceWithTransferfunShader, m_quads[q]);
+          for (auto& quad : m_quads)
+            renderTriangleList(m_VAO, m_image3DSliceWithTransferfunShader, quad);
         } else {
           for (size_t i = 0; i < visibleIdxs.size(); ++i) {
             m_layerTarget->attachSlice(i);
@@ -446,8 +445,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithTransferfunShader, visibleIdxs[i]);
             m_image3DSliceWithTransferfunShader.bindTexture("transfer_function",
                                                             m_transferFuncParas[visibleIdxs[i]]->get().texture());
-            for (size_t q = 0; q < m_quads.size(); ++q)
-              renderTriangleList(m_VAO, m_image3DSliceWithTransferfunShader, m_quads[q]);
+            for (auto& quad : m_quads)
+              renderTriangleList(m_VAO, m_image3DSliceWithTransferfunShader, quad);
 
             m_layerTarget->release();
           }
@@ -463,8 +462,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         if (visibleIdxs.size() == 1) {
           bindVolumeAndTransferFunc(m_scVolumeSliceWithTransferfunShader, visibleIdxs[0]);
 
-          for (size_t i = 0; i < m_quads.size(); ++i)
-            renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, m_quads[i]);
+          for (auto& quad : m_quads)
+            renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, quad);
         } else {
           for (size_t j = 0; j < visibleIdxs.size(); ++j) {
             m_layerTarget->attachSlice(j);
@@ -473,8 +472,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
             bindVolumeAndTransferFunc(m_scVolumeSliceWithTransferfunShader, visibleIdxs[j]);
 
-            for (size_t i = 0; i < m_quads.size(); ++i)
-              renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, m_quads[i]);
+            for (auto& quad : m_quads)
+              renderTriangleList(m_VAO, m_scVolumeSliceWithTransferfunShader, quad);
 
             m_layerTarget->release();
           }
@@ -495,7 +494,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float ze_to_zw_a = f * n / (f - n);
       float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
       float ze_to_screen_pixel_voxel_size =
-        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
+        -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
 
       LOG(INFO) << "";
       ZBenchTimer btrb("render blockids");

@@ -192,7 +192,7 @@ private:
   QAction* m_openLogFolderAction = nullptr;
 #ifdef ATLAS_WITH_TESTS
   QAction* m_runBenchmarkAction = nullptr;
-  QAction* m_testAction;
+  QAction* m_testAction = nullptr;
 #endif
   QAction* m_runCustomCommandAction = nullptr;
 

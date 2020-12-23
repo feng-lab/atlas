@@ -45,7 +45,7 @@ QString ZImgView::infoOfPos(double x, double y)
       }
     }
   } catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
   }
   return info;
 }

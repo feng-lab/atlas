@@ -158,7 +158,7 @@ public:
 
   static QString lastOpenedFilePath();
 
-  void setLastOpenedFilePath(const QString& path);
+  static void setLastOpenedFilePath(const QString& path);
 
   ZImgDoc& imgDoc()
   { return *m_imgDoc; }

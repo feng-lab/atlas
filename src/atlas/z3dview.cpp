@@ -298,7 +298,7 @@ bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int he
   bool res = true;
   if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
     res = false;
-    QMessageBox::critical(m_mainWin, qApp->applicationName(), m_canvasPainter->renderToImageError());
+    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
   }
   return res;
 }
@@ -321,7 +321,7 @@ bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
   bool res = true;
   if (!m_canvasPainter->renderToImage(filename, sst)) {
     res = false;
-    QMessageBox::critical(m_mainWin, qApp->applicationName(), m_canvasPainter->renderToImageError());
+    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
   }
   return res;
 }

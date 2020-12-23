@@ -35,8 +35,8 @@ private:
   void createParaGroupBox();
 
 private:
-  QGroupBox* m_ioGroupBox;
-  QGroupBox* m_paraGroupBox;
+  QGroupBox* m_ioGroupBox = nullptr;
+  QGroupBox* m_paraGroupBox = nullptr;
 
   ZBoolParameter m_useCurrentActiveImage;
   ZSelectFileWidget* m_inputImagesFileWidget = nullptr;

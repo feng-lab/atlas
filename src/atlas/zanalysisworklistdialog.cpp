@@ -50,7 +50,7 @@ void ZAnalysisWorklistDialog::onOpen()
   if (!fileName.isEmpty()) {
     QString res = m_model->setSource(fileName);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, qApp->applicationName(), res);
+      QMessageBox::critical(this, QApplication::applicationName(), res);
     }
     m_filename = fileName;
     m_saveButton->setEnabled(false);
@@ -70,7 +70,7 @@ void ZAnalysisWorklistDialog::onSave()
   if (!m_filename.isEmpty()) {
     QString res = m_model->toCSV(m_filename, true);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, qApp->applicationName(), res);
+      QMessageBox::critical(this, QApplication::applicationName(), res);
     }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
@@ -89,7 +89,7 @@ void ZAnalysisWorklistDialog::onSaveAs()
     m_filename = fileName;
     QString res = m_model->toCSV(m_filename, true);
     if (!res.isEmpty()) {
-      QMessageBox::critical(this, qApp->applicationName(), res);
+      QMessageBox::critical(this, QApplication::applicationName(), res);
     }
     m_saveButton->setEnabled(false);
     setWindowTitle(m_filename);
@@ -112,20 +112,20 @@ void ZAnalysisWorklistDialog::onGenerate()
         if (progress.wasCanceled())
           break;
 
-        qApp->processEvents();
+        QApplication::processEvents();
         gen.generate(list[i]);
       }
       progress.setValue(list.size());
-      QMessageBox::information(this, qApp->applicationName(), "Analysis files generated!");
+      QMessageBox::information(this, QApplication::applicationName(), "Analysis files generated!");
     }
     catch (const ZException& e) {
       progress.setValue(list.size());
       LOG(ERROR) << "Error while generating analysis files: " << e.what();
-      QMessageBox::critical(this, qApp->applicationName(),
+      QMessageBox::critical(this, QApplication::applicationName(),
                             QString("Error while generating analysis files:\n%1").arg(e.what()));
     }
   } else {
-    QMessageBox::information(this, qApp->applicationName(), "Empty list.\nNo work to do.");
+    QMessageBox::information(this, QApplication::applicationName(), "Empty list.\nNo work to do.");
   }
 }
 
@@ -141,16 +141,16 @@ void ZAnalysisWorklistDialog::createWidget()
 {
   auto vlayout = new QVBoxLayout;
   auto hlayout = new QHBoxLayout;
-  QPushButton* newButton = new QPushButton(tr("new"), this);
+  auto newButton = new QPushButton(tr("new"), this);
   connect(newButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onNew);
   hlayout->addWidget(newButton);
-  QPushButton* openButton = new QPushButton(tr("open"), this);
+  auto openButton = new QPushButton(tr("open"), this);
   connect(openButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onOpen);
   hlayout->addWidget(openButton);
   m_saveButton = new QPushButton(tr("save"), this);
   connect(m_saveButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSave);
   hlayout->addWidget(m_saveButton);
-  QPushButton* saveAsButton = new QPushButton(tr("save as..."), this);
+  auto saveAsButton = new QPushButton(tr("save as..."), this);
   connect(saveAsButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::onSaveAs);
   hlayout->addWidget(saveAsButton);
 
@@ -164,9 +164,9 @@ void ZAnalysisWorklistDialog::createWidget()
   vlayout->addLayout(hlayout);
   vlayout->addWidget(m_view);
 
-  QPushButton* runButton = new QPushButton(tr("Generate"), this);
-  QPushButton* exitButton = new QPushButton(tr("Exit"), this);
-  QDialogButtonBox* buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
+  auto runButton = new QPushButton(tr("Generate"), this);
+  auto exitButton = new QPushButton(tr("Exit"), this);
+  auto buttonBox = new QDialogButtonBox(Qt::Horizontal, this);
   buttonBox->addButton(exitButton, QDialogButtonBox::RejectRole);
   buttonBox->addButton(runButton, QDialogButtonBox::ActionRole);
   connect(exitButton, &QPushButton::clicked, this, &ZAnalysisWorklistDialog::reject);

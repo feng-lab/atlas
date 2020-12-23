@@ -18,6 +18,8 @@ ZButtonColumnDelegate::ZButtonColumnDelegate(QObject* parent)
     m_button = std::make_unique<QPushButton>("...", m_widget);
     m_button->hide();
     m_isOneCellInEditMode = false;
+  } else {
+    LOG(FATAL) << "wrong usage";
   }
 }
 
@@ -88,8 +90,8 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
     m_button->hide();
     QSize res = m_button->grab().size();
 
-    res.setWidth(res.width()  * 2 / qApp->devicePixelRatio());
-    res.setHeight(res.height() / qApp->devicePixelRatio());
+    res.setWidth(res.width()  * 2. / m_widget->devicePixelRatio());
+    res.setHeight(res.height() / m_widget->devicePixelRatio());
     return res;
   }
   return QStyledItemDelegate::sizeHint(option, index);

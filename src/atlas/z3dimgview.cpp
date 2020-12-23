@@ -40,7 +40,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(),
+    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
                           QString("Failed to render image:\n%1").arg(e.what()));
   }
 }
@@ -71,7 +71,7 @@ void Z3DImgView::docImgAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), qApp->applicationName(),
+    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
                           QString("Failed to render image:\n%1").arg(e.what()));
   }
 }

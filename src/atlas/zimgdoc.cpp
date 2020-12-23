@@ -39,7 +39,7 @@ bool ZImgDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
     return false;
   }
   return saveAs(id);
@@ -68,7 +68,7 @@ bool ZImgDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -209,7 +209,7 @@ void ZImgDoc::loadImg()
     int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadImg(dialog.selectedFiles().at(i), formats[fmtIdx], errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read image.\n" + errorMsg);
       }
     }
@@ -226,7 +226,7 @@ void ZImgDoc::importImgSequence()
 
     QString errorMsg;
     if (!loadImg(files, dlg.alongDimension(), dlg.catScences(),FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             "Can not load image sequence.\n" + errorMsg);
     }
   }

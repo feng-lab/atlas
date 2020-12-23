@@ -4,12 +4,13 @@
 #include <QWidget>
 #include <QLabel>
 #include <QCheckBox>
+#include <utility>
 
 namespace nim {
 
-ZParameter::ZParameter(const QString& name, QObject* parent)
+ZParameter::ZParameter(QString name, QObject* parent)
   : QObject(parent)
-  , m_name(name)
+  , m_name(std::move(name))
 {
   addStyle("DEFAULT");
 }

@@ -22,8 +22,9 @@ Z3DFilter::Z3DFilter(QObject* parent)
 ZParameter* Z3DFilter::parameter(const QString& name) const
 {
   for (auto para : m_parameters) {
-    if (para->name() == name)
+    if (para->name() == name) {
       return para;
+    }
   }
   return nullptr;
 }
@@ -32,14 +33,16 @@ void Z3DFilter::invalidate(State inv)
 {
   set_flag(m_state, inv);
 
-  if (inv == State::Valid)
+  if (inv == State::Valid) {
     return;
+  }
 
   if (!m_invalidationVisited) {
     m_invalidationVisited = true;
 
-    for (auto port : m_outputPorts)
+    for (auto port : m_outputPorts) {
       port->invalidate();
+    }
 
     m_invalidationVisited = false;
   }
@@ -48,8 +51,9 @@ void Z3DFilter::invalidate(State inv)
 Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
 {
   for (auto port : m_inputPorts) {
-    if (port->name() == name)
+    if (port->name() == name) {
       return port;
+    }
   }
 
   return nullptr;
@@ -58,8 +62,9 @@ Z3DInputPortBase* Z3DFilter::inputPort(const QString& name) const
 Z3DOutputPortBase* Z3DFilter::outputPort(const QString& name) const
 {
   for (auto port : m_outputPorts) {
-    if (port->name() == name)
+    if (port->name() == name) {
       return port;
+    }
   }
 
   return nullptr;
@@ -76,8 +81,9 @@ void Z3DFilter::onEvent(QEvent* e, int w, int h)
   }
 
   // propagate to event listeners
-  for (size_t i = 0; (i < m_eventListeners.size()) && !e->isAccepted(); ++i)
+  for (size_t i = 0; (i < m_eventListeners.size()) && !e->isAccepted(); ++i) {
     m_eventListeners[i]->sendEvent(e, w, h);
+  }
 }
 
 void Z3DFilter::disconnectAllPorts()
@@ -107,90 +113,80 @@ void Z3DFilter::write(QJsonObject& json) const
 
 void Z3DFilter::setValid(Z3DEye eye)
 {
-  if (eye == Z3DEye::Mono)
+  if (eye == Z3DEye::Mono) {
     reset_flag(m_state, State::MonoViewResultInvalid);
-  else if (eye == Z3DEye::Left)
+  } else if (eye == Z3DEye::Left) {
     reset_flag(m_state, State::LeftEyeResultInvalid);
-  else
+  } else {
     reset_flag(m_state, State::RightEyeResultInvalid);
+  }
 
-  for (auto port : m_inputPorts)
+  for (auto port : m_inputPorts) {
     port->setValid();
+  }
 }
 
 bool Z3DFilter::isValid(Z3DEye eye) const
 {
-  if (eye == Z3DEye::Mono)
+  if (eye == Z3DEye::Mono) {
     return !is_flag_set(m_state, State::MonoViewResultInvalid);
-  else if (eye == Z3DEye::Left)
+  } else if (eye == Z3DEye::Left) {
     return !is_flag_set(m_state, State::LeftEyeResultInvalid);
-  else
+  } else {
     return !is_flag_set(m_state, State::RightEyeResultInvalid);
+  }
 }
 
 bool Z3DFilter::isReady(Z3DEye /*unused*/) const
 {
-  for (auto port : m_inputPorts)
-    if (!port->isReady())
-      return false;
-
-  for (auto port : m_outputPorts)
-    if (!port->isReady())
-      return false;
-
-  return true;
+  bool isReady = std::all_of(m_inputPorts.begin(), m_inputPorts.end(), [](auto port) { return port->isReady(); });
+  if (isReady) {
+    isReady = std::all_of(m_outputPorts.begin(), m_outputPorts.end(), [](auto port) { return port->isReady(); });
+  }
+  return isReady;
 }
 
 void Z3DFilter::addPort(Z3DInputPortBase& port)
 {
-  m_inputPorts.push_back(&port);
-
-  std::map<QString, Z3DInputPortBase*>::const_iterator it = m_inputPortMap.find(port.name());
-  if (it == m_inputPortMap.end())
-    m_inputPortMap.emplace(port.name(), &port);
-  else {
+  if (m_inputPortMap.contains(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
+  } else {
+    m_inputPortMap.emplace(port.name(), &port);
+    m_inputPorts.push_back(&port);
   }
 }
 
 void Z3DFilter::addPort(Z3DOutputPortBase& port)
 {
-  m_outputPorts.push_back(&port);
-  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
-  if (it == m_outputPortMap.end())
-    m_outputPortMap.emplace(port.name(), &port);
-  else {
+  if (m_outputPortMap.contains(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
+  } else {
+    m_outputPortMap.emplace(port.name(), &port);
+    m_outputPorts.push_back(&port);
   }
 }
 
 void Z3DFilter::removePort(Z3DInputPortBase& port)
 {
-  m_inputPorts.erase(std::find(m_inputPorts.begin(), m_inputPorts.end(), &port));
+  std::erase(m_inputPorts, &port);
 
-  std::map<QString, Z3DInputPortBase*>::iterator inIt = m_inputPortMap.find(port.name());
-  if (inIt != m_inputPortMap.end())
-    m_inputPortMap.erase(inIt);
-  else {
+  if (m_inputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
   }
 }
 
 void Z3DFilter::removePort(Z3DOutputPortBase& port)
 {
-  m_outputPorts.erase(std::find(m_outputPorts.begin(), m_outputPorts.end(), &port));
+  std::erase(m_outputPorts, &port);
 
-  std::map<QString, Z3DOutputPortBase*>::iterator outIt = m_outputPortMap.find(port.name());
-  if (outIt != m_outputPortMap.end())
-    m_outputPortMap.erase(outIt);
-  else {
+  if (m_outputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
   }
 }
 
 void Z3DFilter::addParameter(ZParameter& para, State inv)
 {
-  if (m_parameterNames.find(para.name()) != m_parameterNames.end()) {
+  if (m_parameterNames.contains(para.name())) {
     LOG(FATAL) << "Duplicated para name " << para.name();
   }
   m_parameters.push_back(&para);
@@ -202,13 +198,12 @@ void Z3DFilter::addParameter(ZParameter& para, State inv)
 
 void Z3DFilter::removeParameter(ZParameter& para)
 {
-  if (!parameter(para.name())) {
+  if (!m_parameterNames.contains(para.name())) {
     LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
-  } else {
-    para.disconnect(this);
-    m_parameters.erase(std::find(m_parameters.begin(), m_parameters.end(), &para));
-    m_parameterNames.erase(para.name());
   }
+  para.disconnect(this);
+  std::erase(m_parameters, &para);
+  m_parameterNames.erase(para.name());
 }
 
 void Z3DFilter::addEventListener(ZEventListenerParameter& para)
@@ -234,29 +229,29 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
 
       m_interactionModeSources.insert(source);
 
-      if (m_interactionModeSources.size() == 1)
+      if (m_interactionModeSources.size() == 1) {
         enterInteractionMode();
+      }
     }
   } else {
     if (m_interactionModeSources.find(source) != m_interactionModeSources.end()) {
 
       m_interactionModeSources.erase(source);
 
-      if (m_interactionModeSources.empty())
+      if (m_interactionModeSources.empty()) {
         exitInteractionMode();
+      }
     }
   }
 }
 
 void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
 {
-  m_privateRenderPorts.push_back(&port);
-
-  std::map<QString, Z3DOutputPortBase*>::const_iterator it = m_outputPortMap.find(port.name());
-  if (it == m_outputPortMap.end())
-    m_outputPortMap.emplace(port.name(), &port);
-  else {
+  if (m_outputPortMap.contains(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
+  } else {
+    m_outputPortMap.emplace(port.name(), &port);
+    m_privateRenderPorts.push_back(&port);
   }
 }
 
@@ -267,8 +262,9 @@ void Z3DFilter::addPrivateRenderTarget(Z3DRenderTarget& target)
 
 void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
-  if (!shader.isLinked())
+  if (!shader.isLinked()) {
     return;
+  }
 
   glDepthFunc(GL_ALWAYS);
 

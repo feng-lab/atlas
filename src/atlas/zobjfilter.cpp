@@ -65,7 +65,7 @@ void ZObjFilter::addParameter(ZParameter* para)
 
 void ZObjFilter::removeParameter(ZParameter* para)
 {
-  m_parameters.erase(std::remove(m_parameters.begin(), m_parameters.end(), para), m_parameters.end());
+  std::erase(m_parameters, para);
 }
 
 void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const

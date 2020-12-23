@@ -9,7 +9,7 @@
 #include <QScrollArea>
 #include <QPushButton>
 #include <QLabel>
-#include <QToolBox>
+#include <utility>
 
 namespace {
 
@@ -31,9 +31,9 @@ ZWidgetsGroup::ZWidgetsGroup(QWidget& widget, int visibleLevel)
 {
 }
 
-ZWidgetsGroup::ZWidgetsGroup(const QString& groupName, int visibleLevel)
+ZWidgetsGroup::ZWidgetsGroup(QString groupName, int visibleLevel)
   : m_type(Type::Group)
-  , m_groupName(groupName)
+  , m_groupName(std::move(groupName))
   , m_visibleLevel(visibleLevel)
 {
 }
@@ -97,45 +97,39 @@ void ZWidgetsGroup::removeAllChildren()
 void ZWidgetsGroup::removeChild(const QWidget& widget)
 {
   const auto origSize = m_childGroups.size();
-  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
-                                     [&widget, this](const std::shared_ptr<ZWidgetsGroup>& child) {
-                                       if (child->m_type == Type::Widget && child->m_widget == &widget) {
-                                         child->disconnect(this);
-                                         return true;
-                                       }
-                                       return false;
-                                     }),
-                      m_childGroups.end());
+  std::erase_if(m_childGroups, [&widget, this](const auto& child) {
+    if (child->m_type == Type::Widget && child->m_widget == &widget) {
+      child->disconnect(this);
+      return true;
+    }
+    return false;
+  });
   CHECK(m_childGroups.size() < origSize);
 }
 
 void ZWidgetsGroup::removeChild(const ZParameter& para)
 {
   const auto origSize = m_childGroups.size();
-  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
-                                     [&para, this](const std::shared_ptr<ZWidgetsGroup>& child) {
-                                       if (child->m_type == Type::Parameter && child->m_parameter == &para) {
-                                         child->disconnect(this);
-                                         return true;
-                                       }
-                                       return false;
-                                     }),
-                      m_childGroups.end());
+  std::erase_if(m_childGroups, [&para, this](const auto& child) {
+    if (child->m_type == Type::Parameter && child->m_parameter == &para) {
+      child->disconnect(this);
+      return true;
+    }
+    return false;
+  });
   CHECK(m_childGroups.size() < origSize);
 }
 
 void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& childIn)
 {
   const auto origSize = m_childGroups.size();
-  m_childGroups.erase(std::remove_if(m_childGroups.begin(), m_childGroups.end(),
-                                     [&childIn, this](const std::shared_ptr<ZWidgetsGroup>& child) {
-                                       if (child == childIn) {
-                                         child->disconnect(this);
-                                         return true;
-                                       }
-                                       return false;
-                                     }),
-                      m_childGroups.end());
+  std::erase_if(m_childGroups, [&childIn, this](const auto& child) {
+    if (child == childIn) {
+      child->disconnect(this);
+      return true;
+    }
+    return false;
+  });
   CHECK(m_childGroups.size() < origSize);
 }
 

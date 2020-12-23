@@ -35,7 +35,7 @@ public:
 
   void setData(const ZImgPack& img);
 
-  virtual bool isStayOnTop() const
+  [[nodiscard]] virtual bool isStayOnTop() const
   { return m_stayOnTop.get(); }
 
   virtual void setStayOnTop(bool s)
@@ -47,14 +47,14 @@ public:
 
   void exitZoomInView();
 
-  const ZBBox<glm::dvec3>& zoomInBound() const
+  [[nodiscard]] const ZBBox<glm::dvec3>& zoomInBound() const
   { return m_zoomInBound; }
 
-  bool volumeNeedDownsample() const;
+  [[nodiscard]] bool volumeNeedDownsample() const;
 
-  bool isVolumeDownsampled() const;
+  [[nodiscard]] bool isVolumeDownsampled() const;
 
-  bool isSubvolume() const
+  [[nodiscard]] bool isSubvolume() const
   { return m_isSubVolume.get(); }
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
@@ -63,7 +63,7 @@ public:
 
   void exitInteractionMode() override;
 
-  bool isReady(Z3DEye eye) const override;
+  [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
   // get salient 3d position hit by 2d point
   // check success before using the returned value
@@ -71,11 +71,11 @@ public:
   // otherwise don't use the returned value
   glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
-  bool hasOpaque(Z3DEye eye) const override;
+  [[nodiscard]] bool hasOpaque(Z3DEye eye) const override;
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye eye) const override;
+  [[nodiscard]] bool hasTransparent(Z3DEye eye) const override;
 
   void renderTransparent(Z3DEye eye) override;
 
@@ -115,11 +115,11 @@ protected slots:
 protected:
   void process(Z3DEye eye) override;
 
-  bool hasSlices() const;
+  [[nodiscard]] bool hasSlices() const;
 
   void renderSlices(Z3DEye eye);
 
-  const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
+  [[nodiscard]] const std::vector<std::unique_ptr<Z3DVolume>>& getVolumes() const;
 
   void updateNotTransformedBoundBoxImpl() override;
 
@@ -165,7 +165,7 @@ private:
   ZBoolParameter m_isVolumeDownsampled;
   ZBoolParameter m_isSubVolume;
   ZIntParameter m_zoomInViewSize;
-  glm::ivec3 m_zoomInPos;
+  glm::ivec3 m_zoomInPos{};
   ZBBox<glm::dvec3> m_zoomInBound;
 
   size_t m_maxVoxelNumber;
@@ -209,14 +209,14 @@ private:
   ZIntParameter m_zSlice2Position;
 
   ZEventListenerParameter m_leftMouseButtonPressEvent;
-  glm::ivec2 m_startCoord;
+  glm::ivec2 m_startCoord{};
 
   ZMesh m_2DImageQuad;
 
   std::map<std::string, ZMesh> m_cubeSerieSlices;
 
-  double m_imgMinIntensity;
-  double m_imgMaxIntensity;
+  double m_imgMinIntensity{};
+  double m_imgMaxIntensity{};
 
   size_t m_nChannels;
 };

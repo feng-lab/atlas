@@ -9,7 +9,6 @@
 #include <QPushButton>
 #include <QGraphicsSceneMouseEvent>
 #include <memory>
-#include <utility>
 
 namespace nim {
 
@@ -367,9 +366,9 @@ void ZSwcFilter::setData(ZSwcPack& swcPack)
 
 void ZSwcFilter::releaseItemsOwnership()
 {
-  m_item.release();
+  static_cast<void>(m_item.release());
   for (auto& item : m_swcNodeItems) {
-    item.release();
+    static_cast<void>(item.release());
   }
 }
 

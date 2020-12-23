@@ -30,7 +30,7 @@ bool ZPunctaDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save Error.\n" + err);
     return false;
   }
   return saveAs(id);
@@ -56,7 +56,7 @@ bool ZPunctaDoc::saveAs(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), "Save As Error.\n" + err);
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), "Save As Error.\n" + err);
   }
   return false;
 }
@@ -219,7 +219,7 @@ void ZPunctaDoc::loadPuncta()
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read puncta.\n" + errorMsg);
       }
     }

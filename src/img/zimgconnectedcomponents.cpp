@@ -45,18 +45,16 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
   }
   if (includeThre)
     sizeThre++;
-  voxelIdxList.erase(std::remove_if(voxelIdxList.begin(), voxelIdxList.end(),
-                                    [sizeThre](const std::vector<size_t>& v) {
-                                      return v.size() < sizeThre;
-                                    }),
-                     voxelIdxList.end());
+  std::erase_if(voxelIdxList, [sizeThre](const auto& v) {
+    return v.size() < sizeThre;
+  });
 }
 
 size_t ConnComp::toatalNumVoxels() const
 {
   size_t res = 0;
-  for (size_t o = 0; o < voxelIdxList.size(); ++o) {
-    res += voxelIdxList[o].size();
+  for (const auto& o : voxelIdxList) {
+    res += o.size();
   }
   return res;
 }
@@ -97,7 +95,7 @@ ZImg ConnComp::createTypedLabelImg() const
   info.setVoxelFormat<TVoxel>();
   info.createDefaultDescriptions();
   ZImg res(info);
-  TVoxel* data = res.channelData<TVoxel>(0, 0);
+  auto data = res.channelData<TVoxel>(0, 0);
   for (size_t o = 0; o < voxelIdxList.size(); ++o) {
     for (size_t v = 0; v < voxelIdxList[o].size(); ++v) {
       data[voxelIdxList[o][v]] = o + 1;
@@ -199,7 +197,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   size_t voxelNumber = markerImg.voxelNumber();
   ZImgNeighborhoodConstIterator<uint8_t> nit =
     ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
-  uint8_t* marker = markerImg.timeData<uint8_t>(0);
+  auto marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;
   int64_t idx;

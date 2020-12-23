@@ -266,10 +266,7 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
         }
       }
     }
-    shapeOps.erase(
-      std::remove_if(shapeOps.begin(), shapeOps.end(),
-                     [](const auto& so) { return so.poly.empty(); }),
-      shapeOps.end());
+    std::erase_if(shapeOps, [](const auto& so) { return so.poly.empty(); });
 
     while (!shapeOps.empty() && !shapeOps[0].isAdd) {
       shapeOps.erase(shapeOps.begin());

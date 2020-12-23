@@ -10,13 +10,13 @@ struct ConnComp
   ConnComp();
 
   // what connectivity we use for processing
-  size_t connectivity;
+  size_t connectivity = 0;
   // info of original img
   ZImgInfo imgInfo;
   // ConnComp process one channel at a time, c, t and l
   // record which part of img we are processing
-  size_t channel;
-  size_t time;
+  size_t channel = 0;
+  size_t time = 0;
   // voxelIdxList.size() is number of connected components (objects) we found
   // kth vector contains the linear indices of the voxels in the kth object
   std::vector<std::vector<size_t>> voxelIdxList;
@@ -26,16 +26,16 @@ struct ConnComp
   // remove all objects that has size < or <= (if includeThre is true) sizeThre
   void removeSmallObject(size_t sizeThre, bool includeThre = true);
 
-  size_t toatalNumVoxels() const;
+  [[nodiscard]] size_t toatalNumVoxels() const;
 
-  size_t labelImgBytesPerVoxel() const;
+  [[nodiscard]] size_t labelImgBytesPerVoxel() const;
 
   // return a label img with smallest possible voxel type, use labelImgBytesPerVoxel to get type
-  ZImg createLabelImg() const;
+  [[nodiscard]] ZImg createLabelImg() const;
 
   // user decide what type
   template<typename TVoxel>
-  ZImg createTypedLabelImg() const;
+  [[nodiscard]] ZImg createTypedLabelImg() const;
 };
 
 template<bool ReportProgress = false>
@@ -74,7 +74,7 @@ public:
   ConnComp runLabelModifyInput(ZImg& img, size_t conn = 0, size_t label = 1, size_t c = 0, size_t t = 0);
 
 private:
-  ConnComp createRes(const ZImg& img, size_t conn, size_t c, size_t t) const;
+  [[nodiscard]] ConnComp createRes(const ZImg& img, size_t conn, size_t c, size_t t) const;
 
   void getConnectedComponents_Impl(ZImg& markerImg, ConnComp& res, size_t label);
 };

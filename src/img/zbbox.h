@@ -75,10 +75,10 @@ public:
   }
 
   //comparison
-  inline bool operator==(const ZBBox& other)
+  inline bool operator==(const ZBBox& other) const
   { return m_minCorner == other.m_minCorner && m_maxCorner == other.m_maxCorner; }
 
-  inline bool operator!=(const ZBBox& other)
+  inline bool operator!=(const ZBBox& other) const
   { return m_minCorner != other.m_minCorner || m_maxCorner != other.m_maxCorner; }
 
   //expand to contain

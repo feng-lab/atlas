@@ -49,7 +49,7 @@ public:
   void releaseTarget()
   { m_renderTarget->release(); }
 
-  void clearTarget();
+  static void clearTarget();
 
   Z3DRenderTarget& renderTarget() const
   { return *m_renderTarget; }

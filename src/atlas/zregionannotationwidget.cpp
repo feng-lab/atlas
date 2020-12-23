@@ -72,7 +72,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             QString("Can not export label image:\n%1").arg(e.what()));
     }
   }
@@ -129,7 +129,7 @@ void ZRegionAnnotationWidget::exportMeshes()
           m_doc.meshDoc().setLastOpenedObjPath(fn);
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+          QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                                 QString("Save Mesh Error:\n%1").arg(e.what()));
         }
       }

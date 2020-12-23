@@ -25,9 +25,7 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");
-  std::vector<QString> names;
-  names.push_back("Width:");
-  names.push_back("Height:");
+  std::vector<QString> names{"Width:", "Height:"};
   m_customSize.setNameForEachValue(names);
   m_stereoImageType.addOptions("Full Side-By-Side", "Half Side-By-Side");
   m_stereoImageType.select("Half Side-By-Side");
@@ -52,7 +50,7 @@ QSize ZAnimationExportWidget::sizeHint() const
 void ZAnimationExportWidget::captureButtonPressed()
 {
   if (m_filenameWidget->getSelectedSaveFile().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Output filename does not exist");
+    QMessageBox::critical(this, QApplication::applicationName(), "Output filename does not exist");
     return;
   }
 

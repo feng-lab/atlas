@@ -9,8 +9,7 @@ namespace nim {
 
 struct ZImgInfo
 {
-  ZImgInfo()
-  { clear(); }
+  ZImgInfo() = default;
 
   ZImgInfo(size_t w, size_t h, size_t d = 1,
            size_t c = 1, size_t t = 1,
@@ -28,17 +27,17 @@ struct ZImgInfo
 
   ZImgInfo& operator=(const ZImgInfo&) = default;
 
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
   // return img data type as string "float32", "int8" ...
-  QString typeAsQString() const
+  [[nodiscard]] QString typeAsQString() const
   {
     return (voxelFormat == VoxelFormat::Float ? "float" : voxelFormat == VoxelFormat::Signed ? "int" : "uint") +
            QString::number(bytesPerVoxel * 8);
   }
 
   // channel name for interface, prepend ch1, ch2, ...
-  QString displayChannelName(size_t c) const;
+  [[nodiscard]] QString displayChannelName(size_t c) const;
 
   // create default value if not filled or number don't match
   // image reader or creator should take care of this to make sure all information exist
@@ -53,16 +52,16 @@ struct ZImgInfo
   void createDefaultDescriptions();
 
   // return true if one dimension is zero
-  inline bool isEmpty() const
+  [[nodiscard]] inline bool isEmpty() const
   { return width == 0 || height == 0 || depth == 0 || numChannels == 0 || numTimes == 0; }
 
-  inline bool isSameSize(const ZImgInfo& other) const
+  [[nodiscard]] inline bool isSameSize(const ZImgInfo& other) const
   {
     return width == other.width && height == other.height && depth == other.depth &&
            numChannels == other.numChannels && numTimes == other.numTimes;
   }
 
-  inline bool isSameType(const ZImgInfo& other) const
+  [[nodiscard]] inline bool isSameType(const ZImgInfo& other) const
   { return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel; }
 
   static constexpr size_t numDimensions()
@@ -85,21 +84,21 @@ struct ZImgInfo
     createDefaultDescriptions();
   }
 
-  inline size_t size(Dimension dim) const
+  [[nodiscard]] inline size_t size(Dimension dim) const
   { return (&width)[enumToUnderlyingType(dim)]; }
 
-  inline size_t size(size_t dim) const
+  [[nodiscard]] inline size_t size(size_t dim) const
   { return (&width)[dim]; }
 
   // note: time stride is meaningless since the memory is not contiguous
-  inline size_t stride(Dimension dim) const
+  [[nodiscard]] inline size_t stride(Dimension dim) const
   {
     size_t res = 1;
     for (int i = 0; i < enumToUnderlyingType(dim); ++i) res *= (&width)[i];
     return res;
   }
 
-  inline size_t stride(size_t dim) const
+  [[nodiscard]] inline size_t stride(size_t dim) const
   {
     size_t res = 1;
     for (size_t i = 0; i < dim; ++i) res *= (&width)[i];
@@ -118,23 +117,23 @@ struct ZImgInfo
   inline const size_t& operator[](Dimension i) const
   { return (&width)[enumToUnderlyingType(i)]; }
 
-  inline bool isAlphaChannel(size_t ch) const
+  [[nodiscard]] inline bool isAlphaChannel(size_t ch) const
   { return lastChannelIsAlphaChannel && ch + 1 == numChannels; }
 
   // if current or result voxelSizeUnit is Voxel, throw exception
-  double voxelSizeXInUnit(VoxelSizeUnit unit) const;
+  [[nodiscard]] double voxelSizeXInUnit(VoxelSizeUnit unit) const;
 
-  double voxelSizeYInUnit(VoxelSizeUnit unit) const;
+  [[nodiscard]] double voxelSizeYInUnit(VoxelSizeUnit unit) const;
 
-  double voxelSizeZInUnit(VoxelSizeUnit unit) const;
+  [[nodiscard]] double voxelSizeZInUnit(VoxelSizeUnit unit) const;
 
-  inline double voxelSizeXInUm() const
+  [[nodiscard]] inline double voxelSizeXInUm() const
   { return voxelSizeXInUnit(VoxelSizeUnit::um); }
 
-  inline double voxelSizeYInUm() const
+  [[nodiscard]] inline double voxelSizeYInUm() const
   { return voxelSizeYInUnit(VoxelSizeUnit::um); }
 
-  inline double voxelSizeZInUm() const
+  [[nodiscard]] inline double voxelSizeZInUm() const
   { return voxelSizeZInUnit(VoxelSizeUnit::um); }
 
   // set voxel format from template argument, don't accept const type
@@ -148,75 +147,75 @@ struct ZImgInfo
   // intensity range of current img type, for float img, range is [0.0 1.0]
   // use template return type because img can be any type, and even double type can not represent all 64-bit integer type value
   template<typename TValue = double>
-  TValue dataRangeMin() const;
+  [[nodiscard]] TValue dataRangeMin() const;
 
   template<typename TValue = double>
-  TValue dataRangeMax() const;
+  [[nodiscard]] TValue dataRangeMax() const;
 
-  size_t width;
-  size_t height;
-  size_t depth;
-  size_t numChannels;
-  size_t numTimes;
+  size_t width = 0;
+  size_t height = 0;
+  size_t depth = 0;
+  size_t numChannels = 0;
+  size_t numTimes = 0;
   //size_t numLocations;  // not used
 
-  size_t bytesPerVoxel;   // for one channel
-  VoxelFormat voxelFormat;
-  size_t validBitCount;    // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
+  size_t bytesPerVoxel = 1;   // for one channel
+  VoxelFormat voxelFormat = VoxelFormat::Unsigned;
+  size_t validBitCount = 0;    // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
 
-  VoxelSizeUnit voxelSizeUnit;
-  double voxelSizeX;
-  double voxelSizeY;
-  double voxelSizeZ;
+  VoxelSizeUnit voxelSizeUnit = VoxelSizeUnit::none;
+  double voxelSizeX = 1.;
+  double voxelSizeY = 1.;
+  double voxelSizeZ = 1.;
 
   std::vector<double> timeStamps;
   std::vector<QString> channelNames;
   std::vector<col4> channelColors;
   //std::vector<Location> locations;
   std::vector<double> position;
-  bool lastChannelIsAlphaChannel;
+  bool lastChannelIsAlphaChannel = false;
 
-  inline size_t voxelByteNumber() const
+  [[nodiscard]] inline size_t voxelByteNumber() const
   { return bytesPerVoxel; } // voxel of one channel
 
-  inline size_t rowVoxelNumber() const
+  [[nodiscard]] inline size_t rowVoxelNumber() const
   { return width; }
 
-  inline size_t rowByteNumber() const
+  [[nodiscard]] inline size_t rowByteNumber() const
   { return width * bytesPerVoxel; }
 
-  inline size_t planeVoxelNumber() const
+  [[nodiscard]] inline size_t planeVoxelNumber() const
   { return width * height; }
 
-  inline size_t planeByteNumber() const
+  [[nodiscard]] inline size_t planeByteNumber() const
   { return width * height * bytesPerVoxel; }
 
-  inline size_t channelVoxelNumber() const
+  [[nodiscard]] inline size_t channelVoxelNumber() const
   { return width * height * depth; }
 
-  inline size_t channelByteNumber() const
+  [[nodiscard]] inline size_t channelByteNumber() const
   { return width * height * depth * bytesPerVoxel; }
 
-  inline size_t timeVoxelNumber() const
+  [[nodiscard]] inline size_t timeVoxelNumber() const
   { return width * height * depth * numChannels; }
 
-  inline size_t timeByteNumber() const
+  [[nodiscard]] inline size_t timeByteNumber() const
   { return width * height * depth * numChannels * bytesPerVoxel; }
 
   //inline size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
   //inline size_t locationByteNumber() const { return width * height * depth * numChannels * numTimes * bytesPerVoxel; }
-  inline size_t voxelNumber() const
+  [[nodiscard]] inline size_t voxelNumber() const
   { return width * height * depth * numChannels * numTimes; }
 
-  inline size_t byteNumber() const
+  [[nodiscard]] inline size_t byteNumber() const
   { return width * height * depth * numChannels * numTimes * bytesPerVoxel; }
 
   template<typename TVoxel>
-  bool isType() const;
+  [[nodiscard]] bool isType() const;
 
   // given an bin index, return data range this bin represent
   // not very accurate for 64-bit integer type
-  std::pair<double, double> binRange(size_t binIdx, size_t nbins) const
+  [[nodiscard]] std::pair<double, double> binRange(size_t binIdx, size_t nbins) const
   {
     if (voxelFormat == VoxelFormat::Float) {
       return binRange(binIdx, 0.0, 1.0, nbins);
@@ -228,7 +227,7 @@ struct ZImgInfo
   }
 
   template<typename TRange>
-  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  [[nodiscard]] std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
   {
     if (nbins == 0) {
       nbins = bytesPerVoxel > 1 ? 65536 : 256;

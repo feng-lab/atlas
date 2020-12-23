@@ -4,7 +4,6 @@
 #include "zimg.h"
 #include "zeventlistenerparameter.h"
 #include "zmesh.h"
-#include "zlog.h"
 #include "zbenchtimer.h"
 #include "zmeshutils.h"
 #include <QApplication>
@@ -352,8 +351,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DVolumeFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_rendererBase.coordTransformPara(), 1);
 
     const std::vector<ZParameter*>& paras = parameters();
-    for (size_t i = 0; i < paras.size(); ++i) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position"))
         m_widgetsGroup->addChild(*para, 11);
       else if (para->name().contains("Slice"))
@@ -507,10 +505,10 @@ void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
       bool success;
 #ifndef _QT4_
-      glm::vec3 pos3D = getFirstHit3DPosition(e->position().x() * qApp->devicePixelRatio(),
-                                              e->position().y() * qApp->devicePixelRatio(),
-                                              w * qApp->devicePixelRatio(),
-                                              h * qApp->devicePixelRatio(),
+      glm::vec3 pos3D = getFirstHit3DPosition(e->position().x() * m_rendererBase.globalParas().devicePixelRatio.get(),
+                                              e->position().y() * m_rendererBase.globalParas().devicePixelRatio.get(),
+                                              w * m_rendererBase.globalParas().devicePixelRatio.get(),
+                                              h * m_rendererBase.globalParas().devicePixelRatio.get(),
                                               success);
 #else
       glm::vec3 pos3D = getFirstHit3DPosition(e->x(), e->y(), w, h, success);
@@ -554,7 +552,7 @@ void Z3DVolumeFilter::invalidateFRVolumeXSlice2()
   m_FRVolumeSlicesValidState[5] = false;
 }
 
-void Z3DVolumeFilter::updateCubeSerieSlices()
+[[maybe_unused]] void Z3DVolumeFilter::updateCubeSerieSlices()
 {
   m_cubeSerieSlices.clear();
   Z3DVolume* volume = getVolumes()[0].get();
@@ -712,7 +710,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -749,7 +747,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -787,7 +785,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -822,7 +820,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -859,7 +857,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -897,7 +895,7 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
             croped = croped.convertTo<uint8_t>(m_imgMinIntensity, m_imgMaxIntensity);
           else
             croped.normalize(m_imgMinIntensity, m_imgMaxIntensity);
-          Z3DVolume* vh = new Z3DVolume(croped);
+          auto vh = new Z3DVolume(croped);
           vh->setVolColor(glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                     m_imgPack->imgInfo().channelColors[c].g / 255.,
                                     m_imgPack->imgInfo().channelColors[c].b / 255.));
@@ -1122,8 +1120,8 @@ void Z3DVolumeFilter::readSubVolumes(int left, int right, int up, int down, int 
     else
       img.normalize(m_imgMinIntensity, m_imgMaxIntensity);
 
-    Z3DVolume* vh = new Z3DVolume(img, downsampleSpacing, offset,
-                                  m_volumes[0]->physicalToWorldMatrix());
+    auto vh = new Z3DVolume(img, downsampleSpacing, offset,
+                            m_volumes[0]->physicalToWorldMatrix());
     vh->setParentVolumeDimensions(
       glm::uvec3(m_imgPack->imgInfo().width, m_imgPack->imgInfo().height, m_imgPack->imgInfo().depth));
     vh->setParentVolumeOffset(m_volumes[0]->offset());

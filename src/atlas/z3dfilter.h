@@ -53,45 +53,45 @@ public:
 
   explicit Z3DFilter(QObject* parent = nullptr);
 
-  QString className() const
+  [[nodiscard]] QString className() const
   { return metaObject()->className(); }
 
   void setName(const QString& name)
   { m_name = name; }
 
-  QString name() const
+  [[nodiscard]] QString name() const
   { return m_name; }
 
   // returns all parameters
-  const std::vector<ZParameter*>& parameters() const
+  [[nodiscard]] const std::vector<ZParameter*>& parameters() const
   { return m_parameters; }
 
   std::vector<ZParameter*>& parameters()
   { return m_parameters; }
 
   // returns first parameter with the given name. return nullptr if not found
-  ZParameter* parameter(const QString& name) const;
+  [[nodiscard]] ZParameter* parameter(const QString& name) const;
 
   virtual void invalidate(State inv = State::AllResultInvalid);
 
   // returns the port with the given name, or nullptr if such a port does not exist.
-  Z3DInputPortBase* inputPort(const QString& name) const;
+  [[nodiscard]] Z3DInputPortBase* inputPort(const QString& name) const;
 
-  Z3DOutputPortBase* outputPort(const QString& name) const;
+  [[nodiscard]] Z3DOutputPortBase* outputPort(const QString& name) const;
 
   // return all inputports or outputports as vector
-  const std::vector<Z3DInputPortBase*>& inputPorts() const
+  [[nodiscard]] const std::vector<Z3DInputPortBase*>& inputPorts() const
   { return m_inputPorts; }
 
-  const std::vector<Z3DOutputPortBase*>& outputPorts() const
+  [[nodiscard]] const std::vector<Z3DOutputPortBase*>& outputPorts() const
   { return m_outputPorts; }
 
   void onEvent(QEvent* e, int w, int h) override;
 
-  const std::vector<ZEventListenerParameter*> eventListeners() const
+  [[nodiscard]] const std::vector<ZEventListenerParameter*>& eventListeners() const
   { return m_eventListeners; }
 
-  const std::vector<Z3DInteractionHandler*>& interactionHandlers() const
+  [[nodiscard]] const std::vector<Z3DInteractionHandler*>& interactionHandlers() const
   { return m_interactionHandlers; }
 
   // removes all port connections
@@ -119,13 +119,13 @@ protected:
 
   // return true if the output of current filter for certain eye is valid.
   // will be used by networkevalutor to decide whether is neccessary to call process(eye)
-  virtual bool isValid(Z3DEye eye) const;
+  [[nodiscard]] virtual bool isValid(Z3DEye eye) const;
 
   // returns true if filter is ready to do rendering
   // The default implementation checks, whether the filter has been initialized and
   // all input ports and output ports are ready. This is not always necessary since not all
   // input or output ports are needed depending on rendering context.
-  virtual bool isReady(Z3DEye eye) const;
+  [[nodiscard]] virtual bool isReady(Z3DEye eye) const;
 
   // this is the place to do rendering related work
   // the networkevaluator will sets its invalidation level to VALID after calling this

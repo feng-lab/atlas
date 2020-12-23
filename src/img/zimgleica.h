@@ -90,7 +90,7 @@ public:
 private:
   void clearInternalState();
 
-  int parseLIFVersion(const QString& xmlString) const;
+  static int parseLIFVersion(const QString& xmlString) ;
 
   void readXml(const QString& filename, QString& xml,
                std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const;
@@ -107,10 +107,10 @@ private:
 
   std::vector<ImageInfo> splitLeciaImageInfos(const std::vector<ImageInfo>& imageInfos);
 
-  std::vector<std::pair<size_t, size_t>>
+  static std::vector<std::pair<size_t, size_t>>
   getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dimensionInfos);
 
-  void detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& imageInfos);
+  static void detectInfos(std::vector<ZImgInfo>& infos, const std::vector<ImageInfo>& imageInfos);
 
 private:
 };

@@ -7,6 +7,7 @@
 #include "zimginfoio.h"
 #include <QFile>
 #include <QMutexLocker>
+#include <utility>
 
 namespace {
 
@@ -429,10 +430,10 @@ void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
 
 namespace nim {
 
-ZImgHDF5SubBlock::ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info,
+ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, const ZImgInfo& info,
                                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_)
   : ZImgSubBlock(t_, x_ * ratio_, y_ * ratio_, z_, info.width * ratio_, info.height * ratio_, 1, ratio_, ratio_, 1)
-  , m_filename(fileName)
+  , m_filename(std::move(fileName))
   , m_info(info)
   , m_ratio(ratio_)
   , m_x(x_)

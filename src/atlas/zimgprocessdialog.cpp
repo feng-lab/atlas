@@ -17,14 +17,14 @@ ZImgProcessDialog::ZImgProcessDialog(QWidget* parent)
 
 void ZImgProcessDialog::processCanceled()
 {
-  QMessageBox::critical(this, qApp->applicationName(),
+  QMessageBox::critical(this, QApplication::applicationName(),
                         QString("%1 is canceled by user.").arg(m_workerName));
 }
 
 void ZImgProcessDialog::processFinished()
 {
   if (!m_isCanceled && !m_hasError) {
-    QMessageBox::information(this, qApp->applicationName(),
+    QMessageBox::information(this, QApplication::applicationName(),
                              QString("%1 Finished.").arg(m_workerName));
   }
 }
@@ -32,7 +32,7 @@ void ZImgProcessDialog::processFinished()
 void ZImgProcessDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, qApp->applicationName(),
+  QMessageBox::critical(this, QApplication::applicationName(),
                         QString("Error during %1: %2").arg(m_workerName).arg(e));
 }
 
@@ -105,7 +105,7 @@ void ZImgProcessDialog::runWorker()
     m_progressDialog->exec();
   }
   catch (const ZException& e) {
-    QMessageBox::critical(this, qApp->applicationName(), QString("%1 Error.\n").arg(m_workerName) + e.what());
+    QMessageBox::critical(this, QApplication::applicationName(), QString("%1 Error.\n").arg(m_workerName) + e.what());
     return;
   }
 }

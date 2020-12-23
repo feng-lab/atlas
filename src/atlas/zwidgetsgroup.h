@@ -21,7 +21,7 @@ public:
 
   explicit ZWidgetsGroup(QWidget& widget, int visibleLevel);
 
-  explicit ZWidgetsGroup(const QString& groupName, int visibleLevel);
+  explicit ZWidgetsGroup(QString groupName, int visibleLevel);
 
   explicit ZWidgetsGroup(ZParameter& parameter, int visibleLevel);
 

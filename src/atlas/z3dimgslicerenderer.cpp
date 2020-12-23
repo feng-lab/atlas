@@ -1,7 +1,6 @@
 #include "z3dimgslicerenderer.h"
 
 #include "z3dtexture.h"
-#include "z3dvolume.h"
 #include "z3dimg.h"
 #include "zbenchtimer.h"
 #include "zlog.h"
@@ -139,7 +138,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     float n = m_rendererBase.camera().nearDist();
     glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
     float ze_to_screen_pixel_voxel_size =
-      -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * qApp->devicePixelRatio();
+      -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
 
     LOG(INFO) << "";
     ZBenchTimer bt("render and collect blockids");
@@ -166,12 +165,12 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     m_img->bindFullResBlockIDsShader(m_image3DSliceWithColorMapBlockIDsShader);
 
-    for (size_t q = 0; q < m_quads.size(); ++q) {
+    for (auto& quad : m_quads) {
       m_blockIDsRenderTarget->bind();
       glDrawBuffers(2, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, m_quads[q]);
+      renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, quad);
 
       m_blockIDsRenderTarget->release();
 
@@ -230,8 +229,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
       m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
       m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
-      for (size_t q = 0; q < m_quads.size(); ++q)
-        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, m_quads[q]);
+      for (auto& quad : m_quads)
+        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, quad);
     } else {
       for (size_t i = 0; i < m_img->numChannels(); ++i) {
         m_layerTarget->attachSlice(i);
@@ -247,8 +246,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
         m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, i);
         m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
-        for (size_t q = 0; q < m_quads.size(); ++q)
-          renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, m_quads[q]);
+        for (auto& quad : m_quads)
+          renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, quad);
 
         m_layerTarget->release();
 
@@ -267,8 +266,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     if (m_img->numChannels() == 1) {
       bindVolume(m_scVolumeSliceShader, 0);
-      for (size_t i = 0; i < m_quads.size(); ++i)
-        renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
+      for (auto& quad : m_quads)
+        renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
     } else {
       for (size_t j = 0; j < m_img->numChannels(); ++j) {
         m_layerTarget->attachSlice(j);
@@ -276,8 +275,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_layerTarget->clear();
 
         bindVolume(m_scVolumeSliceShader, j);
-        for (size_t i = 0; i < m_quads.size(); ++i)
-          renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
+        for (auto& quad : m_quads)
+          renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
 
         m_layerTarget->release();
       }

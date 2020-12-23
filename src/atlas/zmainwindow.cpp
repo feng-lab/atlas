@@ -19,7 +19,6 @@
 #include "zobjwidget.h"
 #include "zobjeditwidget.h"
 #include "zobjdetailedinfowidget.h"
-#include "zimgdoc.h"
 #include "zimgview.h"
 #include "zpunctadoc.h"
 #include "zpunctaview.h"
@@ -48,13 +47,11 @@
 #include <QDockWidget>
 #include <QMimeData>
 #include <QMenuBar>
-#include <QToolBar>
 #include <QToolButton>
 #include <QStatusBar>
 #include <QDesktopServices>
 #include <QProcess>
 #include <QTextStream>
-#include <QProcess>
 
 namespace nim {
 
@@ -75,7 +72,7 @@ void ZMainWindow::initOpenglContext()
   if (!ZSystemInfo::instance().initializeGL()) {
     QString msg = ZSystemInfo::instance().errorMessage();
     msg += ". 3D functions will be disabled.";
-    QMessageBox::warning(this, qApp->applicationName(), "OpenGL Initialization.\n" + msg);
+    QMessageBox::warning(this, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
   }
 
   ZSystemInfo::instance().setStereoSupported(m_sharedContext->format().stereo());
@@ -401,12 +398,12 @@ void ZMainWindow::open3DWindow()
     }
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
-      QMessageBox::critical(this, qApp->applicationName(), QString("Failed to open 3D window:\n%1").arg(e.what()));
+      QMessageBox::critical(this, QApplication::applicationName(), QString("Failed to open 3D window:\n%1").arg(e.what()));
       delete m_3dWindow.data();
       m_3dWindow.clear();
     }
   } else {
-    QMessageBox::critical(this, qApp->applicationName(),
+    QMessageBox::critical(this, QApplication::applicationName(),
                           QString("3D functions are disabled:\n%1").arg(ZSystemInfo::instance().errorMessage()));
   }
 }
@@ -419,7 +416,7 @@ void ZMainWindow::loadScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!loadJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             tr("Can not load scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
@@ -431,7 +428,7 @@ void ZMainWindow::loadScene()
 void ZMainWindow::saveScene()
 {
   if (!m_doc->saveAllObjs()) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("Can not save scene because some objects have unsaved changes"));
     return;
   }
@@ -442,13 +439,13 @@ void ZMainWindow::saveScene()
   if (!fn.isEmpty()) {
     QString err;
     if (!saveJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             tr("Can not save scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       QMessageBox::information(QApplication::activeWindow(),
-                               qApp->applicationName(),
+                               QApplication::applicationName(),
                                QString("scene saved as %1").arg(fn),
                                QMessageBox::Ok);
     }
@@ -459,11 +456,11 @@ void ZMainWindow::loadJsonScene(const QString& fn)
 {
   QString err;
   if (!loadJsonSceneImpl(fn, err)) {
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           tr("Can not load scene %1: %2").arg(fn).arg(err));
   } else {
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                             tr("Error while loading scene %1: %2").arg(fn).arg(err));
     }
     ZSystemInfo::instance().addFileToRecentFileList(fn);

@@ -37,9 +37,9 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   //LOG(INFO) << bt;
 
   locmaxMask.fill(0);
-  uint8_t* locmaxMaskData = locmaxMask.timeData<uint8_t>(0);
-  for (size_t i = 0; i < CC.voxelIdxList.size(); ++i) {
-    locmaxMaskData[CC.voxelIdxList[i][0]] = 1;
+  auto locmaxMaskData = locmaxMask.timeData<uint8_t>(0);
+  for (auto& vidx : CC.voxelIdxList) {
+    locmaxMaskData[vidx[0]] = 1;
   }
   CC.voxelIdxList.clear();
 
@@ -84,7 +84,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, s
   std::vector<double> nhist(minIndex - maxIndex + 1);
   double scale = (nhist.size() - 1.0) / (hist[maxIndex] * 1.0 - hist[minIndex]);
   for (size_t i = 0; i < nhist.size(); ++i) {
-    nhist[i] = (hist[i + maxIndex] - hist[minIndex]) * scale;
+    nhist[i] = (hist[i + maxIndex] * 1.0 - hist[minIndex]) * scale;
   }
 
   size_t threBin = 0;

@@ -148,7 +148,7 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufObjects[bufIdx++]);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
                  GL_STATIC_DRAW);
-    glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   }
 
@@ -184,7 +184,7 @@ void Z3DPrimitiveRenderer::invalidateOpenglPickingRenderer()
 }
 #endif
 
-void Z3DPrimitiveRenderer::setShaderParameters(Z3DShaderProgram& shader)
+void Z3DPrimitiveRenderer::setShaderParameters(Z3DShaderProgram& shader) const
 {
   shader.setLightingEnabledUniform(m_needLighting);
   if (!m_followCoordTransform)
@@ -195,7 +195,7 @@ void Z3DPrimitiveRenderer::setShaderParameters(Z3DShaderProgram& shader)
     shader.setSizeScaleUniform(1.f);
 }
 
-void Z3DPrimitiveRenderer::setPickingShaderParameters(Z3DShaderProgram& shader)
+void Z3DPrimitiveRenderer::setPickingShaderParameters(Z3DShaderProgram& shader) const
 {
   shader.setLightingEnabledUniform(false);
   if (!m_followCoordTransform)

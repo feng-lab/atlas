@@ -37,7 +37,7 @@ void ZSvgFilter::setData(QSvgRenderer& svg)
 
 void ZSvgFilter::releaseItemsOwnership()
 {
-  m_item.release();
+  static_cast<void>(m_item.release());
 }
 
 void ZSvgFilter::setSelected(bool v)
@@ -73,7 +73,7 @@ std::shared_ptr<ZWidgetsGroup> ZSvgFilter::viewSettingWidgetsGroup()
     m_widgetsGroup = std::make_shared<ZWidgetsGroup>("", 1);
     m_widgetsGroup->addChild(m_visible, 1);
 
-    QPushButton* pb = new QPushButton("Bring to Front");
+    auto pb = new QPushButton("Bring to Front");
     connect(pb, &QPushButton::clicked, this, &ZSvgFilter::bringToFront);
     m_widgetsGroup->addChild(*pb, 1);
 

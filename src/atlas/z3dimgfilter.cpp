@@ -3,7 +3,6 @@
 #include "z3dgpuinfo.h"
 #include "zbenchtimer.h"
 #include "zeventlistenerparameter.h"
-#include "zimg.h"
 #include "zlog.h"
 #include "zmesh.h"
 #include "zmeshutils.h"
@@ -299,9 +298,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_showYSlice2.setVisible(!is2DImage);
     m_showZSlice2.setVisible(!is2DImage);
 
-    m_imgRaycasterRenderer.setData(*m_3dImg.get());
+    m_imgRaycasterRenderer.setData(*m_3dImg);
     if (!is2DImage) {
-      m_imgSliceRenderer.setData(*m_3dImg.get(), m_sliceColormaps);
+      m_imgSliceRenderer.setData(*m_3dImg, m_sliceColormaps);
     }
 
     updateBoundBox();
@@ -338,7 +337,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   catch (const ZException& e) {
     m_3dImg.reset();
     LOG(ERROR) << e.what();
-    QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                           QString("import 3d img error: %1").arg(e.what()));
   }
 
@@ -495,10 +494,10 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 {
   if (isVisible() && isSelected() && m_3dImg) {
     bool success = false;
-    auto pos3D = get3DPosition(event->pos().x() * qApp->devicePixelRatio(),
-                               event->pos().y() * qApp->devicePixelRatio(),
-                               w * qApp->devicePixelRatio(),
-                               h * qApp->devicePixelRatio(),
+    auto pos3D = get3DPosition(event->pos().x() * m_rendererBase.globalParas().devicePixelRatio.get(),
+                               event->pos().y() * m_rendererBase.globalParas().devicePixelRatio.get(),
+                               w * m_rendererBase.globalParas().devicePixelRatio.get(),
+                               h * m_rendererBase.globalParas().devicePixelRatio.get(),
                                success);
     QMenu menu;
     QAction* enterSubregionViewAction = success ? menu.addAction("Enter Subregion View") : nullptr;

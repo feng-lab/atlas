@@ -280,7 +280,7 @@ void ZImgLeica::clearInternalState()
 {
 }
 
-int ZImgLeica::parseLIFVersion(const QString& xmlString) const
+int ZImgLeica::parseLIFVersion(const QString& xmlString)
 {
   int res = 0;
   QXmlStreamReader xml(xmlString);
@@ -326,13 +326,13 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-    NextBlock nb;
+    NextBlock nb{};
     readStream(inputFileStream, &nb, sizeof(NextBlock));
     if (nb.test != 0x70) {
       throw ZIOException("incorrect leica file header");
     }
 
-    XMLOrTypeContent xtc;
+    XMLOrTypeContent xtc{};
     readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
     if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
       throw ZIOException("incorrect lecia xml or type content");
@@ -344,25 +344,25 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
 
     int majorVersion = 0;
     if (isLOF) {
-      Int32Block majorVersionBlock;
+      Int32Block majorVersionBlock{};
       readStream(inputFileStream, &majorVersionBlock, sizeof(majorVersionBlock));
       if (majorVersionBlock.test == 0x2A) {
         majorVersion = majorVersionBlock.number;
       } else {
         throw ZIOException("incorrect lecia LOF major version");
       }
-      Int32Block minorVersionBlock;
+      Int32Block minorVersionBlock{};
       readStream(inputFileStream, &minorVersionBlock, sizeof(minorVersionBlock));
       if (minorVersionBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF minor version");
       }
-      UInt64Block memorySizeBlock;
+      UInt64Block memorySizeBlock{};
       readStream(inputFileStream, &memorySizeBlock, sizeof(memorySizeBlock));
       if (memorySizeBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF memory size");
       }
-      memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
-                                                       QString(""), size_t(memorySizeBlock.Number)));
+      memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
+                                          QString(""), size_t(memorySizeBlock.Number));
       inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
 
       readStream(inputFileStream, &nb, sizeof(NextBlock));
@@ -385,7 +385,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
         }
 
         if (majorVersion == 1) {
-          MemoryBlock32 md;
+          MemoryBlock32 md{};
           readStream(inputFileStream, &md, sizeof(MemoryBlock32));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
             throw ZIOException("incorrect lecia LOF xml content");
@@ -393,12 +393,12 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
-                                                           imageDescription, size_t(md.memorySize)));
+          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
+                                              imageDescription, size_t(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else if (majorVersion == 2) {
-          MemoryBlock64 md;
+          MemoryBlock64 md{};
           readStream(inputFileStream, &md, sizeof(MemoryBlock64));
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
             throw ZIOException("incorrect lecia LOF xml content");
@@ -406,8 +406,8 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.push_back(std::make_tuple(size_t(inputFileStream.tellg()),
-                                                           imageDescription, size_t(md.memorySize)));
+          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
+                                              imageDescription, size_t(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
@@ -476,14 +476,16 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
   }
   if (attributes.hasAttribute("Visibility")) {
     int v = attributes.value("Visibility").toInt(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse leica element Visibility");
+    }
     visibilityInvalid = v != 1;
   }
   if (attributes.hasAttribute("CopyOption")) {
     int v = attributes.value("CopyOption").toInt(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse leica element CopyOption");
+    }
     copyOptionInvalid = v != 1;
   }
   if (visibilityInvalid || copyOptionInvalid) {
@@ -509,32 +511,40 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                       ChannelDescription cd;
                       attributes = xml.attributes();
                       cd.dataType = attributes.value("DataType").toInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription DataType");
+                      }
                       cd.channelTag = attributes.value("ChannelTag").toInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription ChannelTag");
+                      }
                       cd.resolution = attributes.value("Resolution").toUInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription Resolution");
+                      }
                       cd.nameOfMeasuredQuantity = attributes.value("NameOfMeasuredQuantity").toString();
                       cd.min = attributes.value("Min").toDouble(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription Min");
+                      }
                       cd.max = attributes.value("Max").toDouble(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription Max");
+                      }
                       cd.unit = attributes.value("Unit").toString();
                       cd.LUTName = attributes.value("LUTName").toString();
                       cd.isLUTInverted = attributes.value("IsLUTInverted").toInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription isLUTInverted");
+                      }
                       cd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription BytesInc");
+                      }
                       cd.bitInc = attributes.value("BitInc").toUInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica ChannelDescription BitInc");
+                      }
                       imageInfo.channels.push_back(cd);
                     }
                     xml.skipCurrentElement();
@@ -545,24 +555,30 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
                       DimensionDescription dd;
                       attributes = xml.attributes();
                       dd.dimID = attributes.value("DimID").toInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription DimID");
+                      }
                       dd.numberOfElements = attributes.value("NumberOfElements").toUInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription NumberOfElements");
+                      }
                       dd.origin = attributes.value("Origin").toDouble(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription Origin");
+                      }
                       dd.length = attributes.value("Length").toDouble(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription Length");
+                      }
                       dd.unit = attributes.value("Unit").toString();
                       dd.bytesInc = attributes.value("BytesInc").toULongLong(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription BytesInc");
+                      }
                       dd.bitInc = attributes.value("BitInc").toUInt(&ok);
-                      if (!ok)
+                      if (!ok) {
                         throw ZIOException("Can not parse leica DimensionDescription BitInc");
+                      }
                       imageInfo.dimensions.push_back(dd);
                     }
                     xml.skipCurrentElement();
@@ -576,31 +592,36 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
               attributes = xml.attributes();
               if (attributes.hasAttribute("NumberOfTimeStamps")) {
                 uint64_t nts = attributes.value("NumberOfTimeStamps").toULongLong(&ok);
-                if (!ok)
+                if (!ok) {
                   throw ZIOException("Can not parse leica TimeStampList NumberOfTimeStamps");
+                }
                 QString tsText = xml.readElementText();
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
                 QStringList nums = tsText.split(" ", Qt::SkipEmptyParts);
 #else
                 QStringList nums = tsText.split(" ", QString::SkipEmptyParts);
 #endif
-                if (uint64_t(nums.size()) != nts)
+                if (uint64_t(nums.size()) != nts) {
                   throw ZIOException("TimeStampList NumberOfTimeStamps does not match actual number");
+                }
                 for (const auto& num : nums) {
                   values.push_back(num.toULongLong(&ok, 16));
-                  if (!ok)
+                  if (!ok) {
                     throw ZIOException(QString("Can not parse leica TimeStamp string: %1").arg(num));
+                  }
                 }
               } else {
                 while (xml.readNextStartElement()) {
                   if (xml.name() == QString("TimeStamp")) {
                     attributes = xml.attributes();
                     uint64_t highInteger = attributes.value("HighInteger").toULongLong(&ok);
-                    if (!ok)
+                    if (!ok) {
                       throw ZIOException("Can not parse leica TimeStamp HighInteger");
+                    }
                     uint64_t lowInteger = attributes.value("LowInteger").toULongLong(&ok);
-                    if (!ok)
+                    if (!ok) {
                       throw ZIOException("Can not parse leica TimeStamp LowInteger");
+                    }
                     values.push_back((highInteger << 32) + lowInteger);
                   } else {
                     throw ZIOException(QString("invalid child of leica TimeStampList: %1").arg(xml.name().toString()));
@@ -629,8 +650,9 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
     } else if (xml.name() == QString("Memory")) {
       attributes = xml.attributes();
       imageInfo.imageMemory.size = attributes.value("Size").toULongLong(&ok);
-      if (!ok)
+      if (!ok) {
         throw ZIOException("Can not parse leica Memory Size");
+      }
       imageInfo.imageMemory.memoryBlockID = attributes.value("MemoryBlockID").toString();
       while (xml.readNextStartElement()) {
         if (xml.name() == QString("Block") || xml.name() == QString("Frame")) {
@@ -639,11 +661,13 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
           fp.replace(QChar('\\'), QChar('/'));
           fp = xmlDir.filePath(fp);
           uint64_t foffset = attributes.value("Offset").toULongLong(&ok);
-          if (!ok)
+          if (!ok) {
             throw ZIOException("Can not parse leica Memory Block/Frame Offset");
+          }
           uint64_t fsize = attributes.value("Size").toULongLong(&ok);
-          if (!ok)
+          if (!ok) {
             throw ZIOException("Can not parse leica Memory Block/Frame Size");
+          }
           imageInfo.imageMemory.fileNames.push_back(fp);
           imageInfo.imageMemory.fileOffsets.push_back(foffset);
           imageInfo.imageMemory.fileSizes.push_back(fsize);
@@ -735,8 +759,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
     bool hasSceneDim = false;
     std::vector<DimensionInfo> dims;
     for (const auto& dd : ii.dimensions) {
-      if (dd.numberOfElements <= 1 || dd.dimID == 0)
+      if (dd.numberOfElements <= 1 || dd.dimID == 0) {
         continue;
+      }
 
       if (dd.dimID >= 5 && dd.dimID <= 11) {
         hasSceneDim = true;
@@ -788,11 +813,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
 
     if (!hasSceneDim) {
       ImageInfo info = ii;
-      info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
-                                           [](const DimensionDescription& ddd) {
-                                             return ddd.dimID >= 5;
-                                           }),
-                            info.dimensions.end());
+      std::erase_if(info.dimensions, [](const auto& ddd) {
+        return ddd.dimID >= 5;
+      });
       res.push_back(info);
     } else {
       if (ii.channels.size() > 1) {
@@ -855,11 +878,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
             }
           }
         }
-        info.dimensions.erase(std::remove_if(info.dimensions.begin(), info.dimensions.end(),
-                                             [](const DimensionDescription& ddd) {
-                                               return ddd.dimID >= 5;
-                                             }),
-                              info.dimensions.end());
+        std::erase_if(info.dimensions, [](const auto& ddd) {
+          return ddd.dimID >= 5;
+        });
         res.push_back(info);
 
         // advance to next scene
@@ -1065,7 +1086,7 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
     }
 
     if (info.timeStamps.size() > 1) {
-      double timeInterval = lastTime / (info.timeStamps.size() - 1);
+      double timeInterval = lastTime / (info.timeStamps.size() - 1.);
       for (size_t i = 0; i < info.timeStamps.size(); ++i) {
         info.timeStamps[i] = i * timeInterval;
       }

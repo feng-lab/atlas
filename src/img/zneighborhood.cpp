@@ -204,7 +204,7 @@ void ZNeighborhood::removeSymmetricalOffsets()
 
 void ZNeighborhood::removeCenter()
 {
-  m_offsets.erase(std::remove(m_offsets.begin(), m_offsets.end(), ZVoxelCoordinate()), m_offsets.end());
+  std::erase(m_offsets, ZVoxelCoordinate());
 }
 
 } // namespace nim

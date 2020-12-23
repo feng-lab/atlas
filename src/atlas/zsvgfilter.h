@@ -8,9 +8,9 @@
 #include <map>
 #include <vector>
 
-class ZWidgetsGroup;
-
 namespace nim {
+
+class ZWidgetsGroup;
 
 class ZSvgFilter : public ZObjFilter
 {
@@ -34,7 +34,7 @@ public:
 
   void setMaxZProjView(int t) override;
 
-  ZBBox<glm::ivec4> boundBox() const;
+  [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroup();
 
@@ -54,7 +54,7 @@ private:
   std::unique_ptr<QGraphicsSvgItem> m_item;
 
   ZDoubleParameter m_opacity;
-  bool m_sliceValid;
+  bool m_sliceValid = false;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
 };

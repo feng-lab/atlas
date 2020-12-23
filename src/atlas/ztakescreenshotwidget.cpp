@@ -69,7 +69,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
     }
   } else {  // auto generate file name based on folder and prefix
     if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-      QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
+      QMessageBox::critical(this, QApplication::applicationName(), "Output Folder do not exist");
       return;
     }
     QDir dir(m_folderWidget->getSelectedDirectory());
@@ -112,7 +112,7 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 void ZTakeScreenShotWidget::captureSequenceButtonPressed()
 {
   if (m_folderWidget->getSelectedDirectory().isEmpty()) {
-    QMessageBox::critical(this, qApp->applicationName(), "Output Folder do not exist");
+    QMessageBox::critical(this, QApplication::applicationName(), "Output Folder do not exist");
     return;
   }
   QDir dir(m_folderWidget->getSelectedDirectory());

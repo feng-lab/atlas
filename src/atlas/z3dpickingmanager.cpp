@@ -3,7 +3,6 @@
 #include "z3dgl.h"
 #include "z3dtexture.h"
 #include "zlog.h"
-#include <QApplication>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -103,25 +102,25 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   std::vector<const void*> res;
   if (ascend) {
     std::multimap<int, const void*> dist2obj;
-    for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
+    for (auto it = col2dist.begin();
          it != col2dist.end(); ++it) {
       const void* obj = objectOfColor(it->first);
       if (obj)
         dist2obj.emplace(it->second, obj);
     }
-    for (std::multimap<int, const void*>::const_iterator it = dist2obj.begin();
+    for (auto it = dist2obj.begin();
          it != dist2obj.end(); ++it) {
       res.push_back(it->second);
     }
   } else {
-    std::multimap<int, const void*, std::greater<int>> dist2obj;
-    for (std::map<glm::col4, int>::const_iterator it = col2dist.begin();
+    std::multimap<int, const void*, std::greater<>> dist2obj;
+    for (auto it = col2dist.begin();
          it != col2dist.end(); ++it) {
       const void* obj = objectOfColor(it->first);
       if (obj)
         dist2obj.emplace(it->second, obj);
     }
-    for (std::multimap<int, const void*>::const_iterator it = dist2obj.begin();
+    for (auto it = dist2obj.begin();
          it != dist2obj.end(); ++it) {
       res.push_back(it->second);
     }
@@ -136,7 +135,7 @@ void Z3DPickingManager::clearTarget()
 
 void Z3DPickingManager::increaseColor()
 {
-  uint32_t col = bit_cast<uint32_t>(m_currentColor);
+  auto col = bit_cast<uint32_t>(m_currentColor);
   if (col != 0xffffffff) {
     ++col;
     m_currentColor = bit_cast<glm::col4>(col);

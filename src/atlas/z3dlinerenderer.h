@@ -59,7 +59,7 @@ protected:
 
   QString generateHeader();
 
-  virtual float lineWidth() const;
+  [[nodiscard]] virtual float lineWidth() const;
 
   virtual std::vector<glm::vec4>* lineColors();
 
@@ -79,11 +79,11 @@ private:
   void updateLineWidth()
   {
     if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2"))
-      m_lineWidth = (m_srcLineWidth - 0.9) * 2.f;
+      m_lineWidth = (m_srcLineWidth - 0.9f) * 2.f;
     else
-      m_lineWidth = m_srcLineWidth - 0.9;
+      m_lineWidth = m_srcLineWidth - 0.9f;
 
-    m_lineWidth *= qApp->devicePixelRatio();
+    m_lineWidth *= m_rendererBase.globalParas().devicePixelRatio.get();
   }
 
   Z3DShaderGroup& currentShaderGrp()

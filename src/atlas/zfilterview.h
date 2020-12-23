@@ -56,7 +56,7 @@ public:
         idFilter.second->setNormalView(slice, time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -68,7 +68,7 @@ public:
         idFilter.second->setMaxZProjView(time);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -89,7 +89,7 @@ public:
         idFilter.second->deleteKeyPressed();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -101,7 +101,7 @@ public:
         idFilter.second->copyKeyPressed();
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -113,7 +113,7 @@ public:
         idFilter.second->pasteKeyPressed(slice, point, hFlip, vFlip);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -125,7 +125,7 @@ public:
         idFilter.second->mousePressed(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -137,7 +137,7 @@ public:
         idFilter.second->mouseMoved(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -149,7 +149,7 @@ public:
         idFilter.second->mouseReleased(scenePos);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -166,7 +166,7 @@ public:
         idFilter.second->rotateClockwise(x, y);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -178,7 +178,7 @@ public:
         idFilter.second->rotateCounterclockwise(x, y);
       }
       catch (const ZException& e) {
-        QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(), e.what());
+        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
       }
     }
   }
@@ -213,11 +213,9 @@ protected:
 
   void onObjAboutToBeRemoved(size_t id) override
   {
-    auto it = m_idToFilter.find(id);
-    if (it == m_idToFilter.end())
-      return;
-    m_idToFilter.erase(it);
-    updateBoundBox();
+    if (m_idToFilter.erase(id) > 0) {
+      updateBoundBox();
+    }
   }
 
   void onObjVisibleChanged(size_t id, bool v) override

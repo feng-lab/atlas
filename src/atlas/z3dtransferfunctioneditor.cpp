@@ -921,7 +921,7 @@ void Z3DTransferFunctionEditor::domainMinSpinBoxChanged(double min)
   if (m_transferFunction->get().isValidDomainMin(min)) {
     m_transferFunction->get().setDomainMin(min, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, qApp->applicationName(), "invalid transfer function range start");
+    QMessageBox::critical(this, QApplication::applicationName(), "invalid transfer function range start");
     m_domainMinSpinBox->setValue(m_transferFunction->get().domainMin());
   }
 }
@@ -931,7 +931,7 @@ void Z3DTransferFunctionEditor::domainMaxSpinBoxChanged(double max)
   if (m_transferFunction->get().isValidDomainMax(max)) {
     m_transferFunction->get().setDomainMax(max, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, qApp->applicationName(), "invalid transfer function range end");
+    QMessageBox::critical(this, QApplication::applicationName(), "invalid transfer function range end");
     m_domainMaxSpinBox->setValue(m_transferFunction->get().domainMax());
   }
 }

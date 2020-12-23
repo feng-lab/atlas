@@ -25,16 +25,16 @@ class ZParameter : public QObject
 {
 Q_OBJECT
 public:
-  explicit ZParameter(const QString& name, QObject* parent = nullptr);
+  explicit ZParameter(QString name, QObject* parent = nullptr);
 
-  inline QString name() const
+  [[nodiscard]] inline QString name() const
   { return m_name; }
 
   void setName(const QString& name);
 
-  QString type() const;
+  [[nodiscard]] QString type() const;
 
-  inline QString style() const
+  [[nodiscard]] inline QString style() const
   { return m_style; }
 
   // if style does not exist, fall back to "DEFAULT"
@@ -45,15 +45,15 @@ public:
 
   QWidget* createWidget(QWidget* parent = nullptr);
 
-  bool isVisible() const
+  [[nodiscard]] bool isVisible() const
   { return m_isWidgetsVisible; }
 
-  bool isEnabled() const
+  [[nodiscard]] bool isEnabled() const
   { return m_isWidgetsEnabled; }
 
-  QString jsonKey() const;
+  [[nodiscard]] QString jsonKey() const;
 
-  virtual QJsonValue jsonValue() const = 0;
+  [[nodiscard]] virtual QJsonValue jsonValue() const = 0;
 
   virtual void readValue(const QJsonValue& value) = 0;
 
@@ -71,11 +71,11 @@ public:
   virtual void forceSetValueSameAs(const ZParameter& rhs)
   { setValueSameAs(rhs); }
 
-  inline bool isSameType(const ZParameter& rhs) const
+  [[nodiscard]] inline bool isSameType(const ZParameter& rhs) const
   { return metaObject()->className() == rhs.metaObject()->className(); }
 
   // return true if new value can be interpolated between two state
-  virtual bool supportInterpolation() const
+  [[nodiscard]] virtual bool supportInterpolation() const
   { return true; }
 
   // if interpolation is not supported, assign dest to one of prev (if progress < 1) and current (if progress >= 1)
@@ -118,10 +118,10 @@ protected:
   virtual void reservedIntSlot2(int /*unused*/)
   {}
 
-  virtual void reservedStringSlot1(QString /*unused*/)
+  virtual void reservedStringSlot1(const QString& /*unused*/)
   {}
 
-  virtual void reservedStringSlot2(QString /*unused*/)
+  virtual void reservedStringSlot2(const QString& /*unused*/)
   {}
 
   virtual void reservedSlot1()
@@ -157,10 +157,10 @@ public:
 
   void set(const T& valueIn);
 
-  inline const T& get() const
+  [[nodiscard]] inline const T& get() const
   { return m_value; }
 
-  inline T& get()
+  [[nodiscard]] inline T& get()
   { return m_value; }
 
   void setValueSameAs(const ZParameter& rhs) override
@@ -255,10 +255,10 @@ public:
 public:
   void setSameAs(const ZParameter& rhs) override;
 
-  bool supportInterpolation() const override
+  [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  QJsonValue jsonValue() const override;
+  [[nodiscard]] QJsonValue jsonValue() const override;
 
   void readValue(const QJsonValue& jsonValue) override;
 

@@ -109,7 +109,7 @@ void ZPunctaDetectionDialog::inputImageChanged()
     }
     catch (const ZIOException& e) {
       updateInterface(fn, 0, 0, 0, 0);
-      QMessageBox::critical(this, qApp->applicationName(), QString("Can not read input image:\n%1").arg(e.what()));
+      QMessageBox::critical(this, QApplication::applicationName(), QString("Can not read input image:\n%1").arg(e.what()));
     }
   } else {
     updateInterface(fn, 0, 0, 0, 0);
@@ -128,12 +128,12 @@ void ZPunctaDetectionDialog::detectLSMResolution()
                                    info.voxelSizeYInUm(),
                                    info.voxelSizeZInUm()));
       } else {
-        QMessageBox::critical(this, qApp->applicationName(),
+        QMessageBox::critical(this, QApplication::applicationName(),
                               "File does not contain resolution information");
       }
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, qApp->applicationName(),
+      QMessageBox::critical(this, QApplication::applicationName(),
                             QString("Can not detect resolution from lsm file:\n%1").arg(e.what()));
     }
   }

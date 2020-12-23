@@ -24,6 +24,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   , xCut("X Cut", glm::vec2(0, 0), 0, 0)
   , yCut("Y Cut", glm::vec2(0, 0), 0, 0)
   , zCut("Z Cut", glm::vec2(0, 0), 0, 0)
+  , devicePixelRatio("Device Pixel Ratio", canvas.devicePixelRatio(), 1.f, 16.f)
   , m_canvas(canvas)
   , m_view(view)
 {
@@ -247,7 +248,11 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
     }
   }
 
-  pickingManager.setDevicePixelRatio(m_canvas.devicePixelRatioF());
+  devicePixelRatio.setEnabled(false);
+  m_widgetsGrp->addChild(devicePixelRatio, 1);
+  m_widgetsGrpNoCamera->addChild(devicePixelRatio, 1);
+
+  pickingManager.setDevicePixelRatio(m_canvas.devicePixelRatio());
 }
 
 void Z3DGlobalParameters::read(const QJsonObject& json)

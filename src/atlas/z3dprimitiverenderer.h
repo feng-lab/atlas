@@ -86,9 +86,9 @@ protected:
 
   friend class Z3DRendererBase;
 
-  void setShaderParameters(Z3DShaderProgram& shader);
+  void setShaderParameters(Z3DShaderProgram& shader) const;
 
-  void setPickingShaderParameters(Z3DShaderProgram& shader);
+  void setPickingShaderParameters(Z3DShaderProgram& shader) const;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   virtual void renderUsingOpengl() {}

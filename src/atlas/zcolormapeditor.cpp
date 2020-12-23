@@ -448,7 +448,7 @@ void ZColorMapEditor::setDomainMin(double min)
   if (m_colorMap->get().isValidDomainMin(min)) {
     m_colorMap->get().setDomainMin(min, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, qApp->applicationName(), "invalid colormap range start");
+    QMessageBox::critical(this, QApplication::applicationName(), "invalid colormap range start");
     m_domainMinSpinBox->setValue(m_colorMap->get().domainMin());
   }
 }
@@ -458,7 +458,7 @@ void ZColorMapEditor::setDomainMax(double max)
   if (m_colorMap->get().isValidDomainMax(max)) {
     m_colorMap->get().setDomainMax(max, m_rescaleKeys->isChecked());
   } else {
-    QMessageBox::critical(this, qApp->applicationName(), "invalid colormap range end");
+    QMessageBox::critical(this, QApplication::applicationName(), "invalid colormap range end");
     m_domainMaxSpinBox->setValue(m_colorMap->get().domainMax());
   }
 }

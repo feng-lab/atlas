@@ -594,7 +594,7 @@ void Z3DImg::readVolumes()
   size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
 #endif
   if (m_nChannels > maxPossibleChannels) {
-    QMessageBox::warning(QApplication::activeWindow(), qApp->applicationName(),
+    QMessageBox::warning(QApplication::activeWindow(), QApplication::applicationName(),
                          QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(
                            maxPossibleChannels));
     m_nChannels = maxPossibleChannels;

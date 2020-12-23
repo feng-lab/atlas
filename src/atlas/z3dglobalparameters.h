@@ -22,7 +22,7 @@ Q_OBJECT
 public:
   Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view);
 
-  const std::vector<ZParameter*>& parameters() const
+  [[nodiscard]] const std::vector<ZParameter*>& parameters() const
   { return m_parameters; }
 
   void read(const QJsonObject& json);
@@ -32,28 +32,28 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera);
 
   // count is lightCount
-  const glm::vec4* lightPositionArray() const
+  [[nodiscard]] const glm::vec4* lightPositionArray() const
   { return m_lightPositionArray.data(); }
 
-  const glm::vec4* lightAmbientArray() const
+  [[nodiscard]] const glm::vec4* lightAmbientArray() const
   { return m_lightAmbientArray.data(); }
 
-  const glm::vec4* lightDiffuseArray() const
+  [[nodiscard]] const glm::vec4* lightDiffuseArray() const
   { return m_lightDiffuseArray.data(); }
 
-  const glm::vec4* lightSpecularArray() const
+  [[nodiscard]] const glm::vec4* lightSpecularArray() const
   { return m_lightSpecularArray.data(); }
 
-  const glm::vec3* lightAttenuationArray() const
+  [[nodiscard]] const glm::vec3* lightAttenuationArray() const
   { return m_lightAttenuationArray.data(); }
 
-  const float* lightSpotCutoffArray() const
+  [[nodiscard]] const float* lightSpotCutoffArray() const
   { return m_lightSpotCutoffArray.data(); }
 
-  const float* lightSpotExponentArray() const
+  [[nodiscard]] const float* lightSpotExponentArray() const
   { return m_lightSpotExponentArray.data(); }
 
-  const glm::vec3* lightSpotDirectionArray() const
+  [[nodiscard]] const glm::vec3* lightSpotDirectionArray() const
   { return m_lightSpotDirectionArray.data(); }
 
   // must call
@@ -105,6 +105,8 @@ public:
   ZFloatSpanParameter xCut;
   ZFloatSpanParameter yCut;
   ZFloatSpanParameter zCut;
+
+  ZFloatParameter devicePixelRatio;
 
 private:
   std::vector<ZParameter*> m_parameters;

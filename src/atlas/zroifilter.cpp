@@ -206,7 +206,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
           }
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+          QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                                 QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
       } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
@@ -407,7 +407,7 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
           }
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(), qApp->applicationName(),
+          QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                                 QString("Can not create RegionAnnotation:\n%1").arg(e.what()));
         }
       } else if (subtractNextSelectedShapeAction && selectedAction == subtractNextSelectedShapeAction) {
@@ -580,13 +580,13 @@ void ZROIFilter::releaseItemsOwnership()
   for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
     for (auto&[id, ctrlItems] : sliceItem) {
       for (auto& item : ctrlItems) {
-        item.release();
+        static_cast<void>(item.release());
       }
     }
   }
   for (auto&[slice, sliceItem] : m_sliceToROIItem) {
     for (auto&[id, shapeItem] : sliceItem) {
-      shapeItem.release();
+      static_cast<void>(shapeItem.release());
     }
   }
 }

@@ -7,7 +7,7 @@ namespace nim {
 class ZImgHDF5SubBlock : public ZImgSubBlock
 {
 public:
-  ZImgHDF5SubBlock(const QString& fileName, const ZImgInfo& info,
+  ZImgHDF5SubBlock(QString  fileName, const ZImgInfo& info,
                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
 
   std::shared_ptr<ZImg> read() const override;

@@ -20,15 +20,15 @@ public:
   void setVisible(bool v)
   { m_visible.set(v); }
 
-  bool isVisible() const
+  [[nodiscard]] bool isVisible() const
   { return m_visible.get(); }
 
   void setSelected(bool v);
 
-  bool isSelected() const
+  [[nodiscard]] bool isSelected() const
   { return m_isSelected; }
 
-  bool isTransformEnabled() const
+  [[nodiscard]] bool isTransformEnabled() const
   { return m_transformEnabled; }
 
   virtual void setViewport(glm::uvec2 viewport)
@@ -64,75 +64,75 @@ public:
   inline Z3DRendererBase::ShaderHookParameter& shaderHookPara()
   { return m_rendererBase.shaderHookPara(); }
 
-  const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
+  [[nodiscard]] const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
   { return m_axisAlignedBoundBox; }
 
-  const ZBBox<glm::dvec3>& notTransformedBoundBox() const
+  [[nodiscard]] const ZBBox<glm::dvec3>& notTransformedBoundBox() const
   { return m_notTransformedBoundBox; }
 
-  inline glm::mat4 coordTransform() const
+  [[nodiscard]] inline glm::mat4 coordTransform() const
   { return m_rendererBase.coordTransform(); }
 
-  inline glm::mat4 inverseCoordTransform() const
+  [[nodiscard]] inline glm::mat4 inverseCoordTransform() const
   { return m_rendererBase.inverseCoordTransform(); }
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
-  glm::vec3 physicalLUF() const
+  [[nodiscard]] glm::vec3 physicalLUF() const
   { return glm::vec3(m_notTransformedBoundBox.minCorner()); }
 
-  glm::vec3 physicalRDB() const
+  [[nodiscard]] glm::vec3 physicalRDB() const
   { return glm::vec3(m_notTransformedBoundBox.maxCorner()); }
 
-  glm::vec3 physicalLDF() const
+  [[nodiscard]] glm::vec3 physicalLDF() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
 
-  glm::vec3 physicalRDF() const
+  [[nodiscard]] glm::vec3 physicalRDF() const
   { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
 
-  glm::vec3 physicalRUF() const
+  [[nodiscard]] glm::vec3 physicalRUF() const
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
 
-  glm::vec3 physicalLUB() const
+  [[nodiscard]] glm::vec3 physicalLUB() const
   { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
 
-  glm::vec3 physicalLDB() const
+  [[nodiscard]] glm::vec3 physicalLDB() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
 
-  glm::vec3 physicalRUB() const
+  [[nodiscard]] glm::vec3 physicalRUB() const
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
   // bound voxels in world coordinate
-  glm::vec3 worldLUF() const
+  [[nodiscard]] glm::vec3 worldLUF() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUF()); }
 
-  glm::vec3 worldRDB() const
+  [[nodiscard]] glm::vec3 worldRDB() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDB()); }
 
-  glm::vec3 worldLDF() const
+  [[nodiscard]] glm::vec3 worldLDF() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDF()); }
 
-  glm::vec3 worldRDF() const
+  [[nodiscard]] glm::vec3 worldRDF() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDF()); }
 
-  glm::vec3 worldRUF() const
+  [[nodiscard]] glm::vec3 worldRUF() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUF()); }
 
-  glm::vec3 worldLUB() const
+  [[nodiscard]] glm::vec3 worldLUB() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUB()); }
 
-  glm::vec3 worldLDB() const
+  [[nodiscard]] glm::vec3 worldLDB() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDB()); }
 
-  glm::vec3 worldRUB() const
+  [[nodiscard]] glm::vec3 worldRUB() const
   { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUB()); }
 
-  virtual bool hasOpaque(Z3DEye) const
+  [[nodiscard]] virtual bool hasOpaque(Z3DEye) const
   { return m_rendererBase.opacity() == 1.f; }
 
   virtual void renderOpaque(Z3DEye)
   {}
 
-  virtual bool hasTransparent(Z3DEye) const
+  [[nodiscard]] virtual bool hasTransparent(Z3DEye) const
   { return m_rendererBase.opacity() < 1.f; }
 
   virtual void renderTransparent(Z3DEye)
@@ -158,9 +158,9 @@ public:
 
   void rotateZM() override;
 
-  ZBBox<glm::dvec3> axisAlignedBoundBoxAfterClipping() const;
+  [[nodiscard]] ZBBox<glm::dvec3> axisAlignedBoundBoxAfterClipping() const;
 
-  ZBBox<glm::dvec3> notTransformedBoundBoxAfterClipping() const;
+  [[nodiscard]] ZBBox<glm::dvec3> notTransformedBoundBoxAfterClipping() const;
 
 signals:
 
