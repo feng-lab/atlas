@@ -1264,16 +1264,16 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
 
   if (hdr.common.tiff_magic != TIFF_BIGENDIAN
       && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
-      hdr.common.tiff_magic != (hostIsLittleEndian() ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
+      hdr.common.tiff_magic != (std::endian::native == std::endian::little ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
     throw ZIOException(QString("Not a TIFF or MDI file, bad magic number %1")
                          .arg(hdr.common.tiff_magic, 0, 16));
   }
 
   bool swabflag;
   if (hdr.common.tiff_magic == TIFF_BIGENDIAN || hdr.common.tiff_magic == MDI_BIGENDIAN) {
-    swabflag = hostIsLittleEndian();
+    swabflag = std::endian::native == std::endian::little;
   } else {
-    swabflag = !hostIsLittleEndian();
+    swabflag = std::endian::native == std::endian::big;
   }
   isNativeEndianness = !swabflag;
   //LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);

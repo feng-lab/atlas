@@ -378,7 +378,7 @@ public:
     } else if constexpr (std::is_floating_point_v<std::remove_reference_t<T>>) {
       return x.colwise().mean();
     } else {
-      static_assert(dependent_false<T>::value, "Must be number");
+      static_assert(!std::is_arithmetic_v<T>, "Must be number");
     }
   }
 

@@ -51,11 +51,11 @@ inline bool is_aligned(Type* ptr, size_t a)
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
 }
 
-inline bool hostIsLittleEndian()
-{
-  int32_t num = 1;
-  return *reinterpret_cast<char*>(&num) == 1;
-}
+//inline bool hostIsLittleEndian()
+//{
+//  int32_t num = 1;
+//  return *reinterpret_cast<char*>(&num) == 1;
+//}
 
 template<typename Container>
 inline void clearAndDeallocate(Container& c)
@@ -139,11 +139,6 @@ std::vector<size_t> argSort(RAIter first, RAIter last)
 
   return idx;
 }
-
-template<class T>
-struct dependent_false : std::false_type
-{
-};
 
 class ZGlobal
 {
