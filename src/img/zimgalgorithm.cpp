@@ -16,7 +16,7 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
   if (interval != m_reportInterval) {
     m_reportInterval = interval;
     for (const auto& soWP : m_subOperationsWeightProgress) {
-      ZImgAlgorithmBaseWithProgressReporter* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(soWP.first);
+      auto* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(soWP.first);
       sub->setProgressReportInterval(m_reportInterval / soWP.second.weight);
     }
   }
@@ -25,14 +25,14 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
   if (false && isCancelledFun && isCancelledFun()) {
-    std::set<itk::ProcessObject*>::iterator it = m_itkOperations.find(static_cast<itk::ProcessObject*>(sender));
+    auto it = m_itkOperations.find(static_cast<itk::ProcessObject*>(sender));
     if (it != m_itkOperations.end()) {
       (*it)->AbortGenerateDataOn();
     } else {
       throw ZProcessAbortException("");
     }
   } else {
-    std::map<void*, WeightProgress>::iterator it = m_subOperationsWeightProgress.find(sender);
+    auto it = m_subOperationsWeightProgress.find(sender);
     if (it != m_subOperationsWeightProgress.end() &&
         ((p - it->second.progress) * it->second.weight >= m_reportInterval || p == 1.0)) {
       it->second.progress = p;
@@ -86,7 +86,7 @@ void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
     m_parent->subOperationProgressChanged(currentProgress, this);
   } else {
     emit progressChanged(currentProgress, this);
-    emit progressChanged(currentProgress * 100);
+    emit progressChanged(currentProgress * 100.);
   }
 }
 
@@ -100,7 +100,7 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
           LOG(INFO) << "abort itk 1";
         }
       } else {
-        subOperationProgressChanged(clamp(process->GetProgress()), process);
+        subOperationProgressChanged(std::clamp(process->GetProgress(), 0.f, 1.f), process);
       }
     }
   }
@@ -117,7 +117,7 @@ ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* c
           LOG(INFO) << "abort itk 2";
         }
       } else {
-        subOperationProgressChanged(clamp(process->GetProgress()), process);
+        subOperationProgressChanged(std::clamp(process->GetProgress(), 0.f, 1.f), process);
       }
     }
   }

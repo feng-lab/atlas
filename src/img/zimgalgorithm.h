@@ -61,15 +61,12 @@ protected:
 
   void clearRegisteredSubOperations();
 
-  inline bool hasParent() const
+  [[nodiscard]] inline bool hasParent() const
   { return m_parent; }
 
 private:
   // calculate and send signal
   void sendProgressSignal();
-
-  inline double clamp(double progress, double min = 0.0, double max = 1.0)
-  { return std::max(min, std::min(progress, max)); }
 
   using CommandType = itk::MemberCommand<ZImgAlgorithmBaseWithProgressReporter>;
   using CommandPointer = CommandType::Pointer;

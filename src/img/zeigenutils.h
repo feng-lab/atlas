@@ -45,7 +45,7 @@ struct CwiseClampOp
   CwiseClampOp(const Scalar& inf, const Scalar& sup) : m_inf(inf), m_sup(sup)
   {}
 
-  const Scalar operator()(const Scalar& x) const
+  Scalar operator()(const Scalar& x) const
   { return x < m_inf ? m_inf : (x > m_sup ? m_sup : x); }
 
   Scalar m_inf, m_sup;
@@ -142,7 +142,7 @@ public:
     openFileStream(outFile, filename, std::ios_base::out);
 
     std::string sepstr(sep);
-    if (sepstr == " " || sepstr == "") {
+    if (sepstr == " " || sepstr.empty()) {
       Eigen::IOFormat fmt(Eigen::FullPrecision, Eigen::DontAlignCols, " ");
       if (startRow == 0 && startCol == 0 && endRow == mat.rows() && endCol == mat.cols()) {
         outFile << mat.format(fmt);
@@ -404,7 +404,7 @@ public:
   {
     CHECK(x.rows() > 0);
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
-    ResultDataType factor = 0;
+    ResultDataType factor;
     if (!bias && x.rows() > 1)
       factor = 1.0 / (x.rows() - 1.0);
     else
@@ -425,7 +425,7 @@ public:
   {
     CHECK(x.rows() > 0 && weight.rows() >= x.rows());
     using ResultDataType = typename MaxFloatType<T, WeightT>::type;
-    ResultDataType factor = 0;
+    ResultDataType factor;
     // convert to result type
     const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>& rtX = x.template cast<ResultDataType>();
     const Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>& rtWeight = weight.template cast<ResultDataType>();

@@ -44,7 +44,7 @@ protected:
 protected:
   void readOmeInfo(ZTiff& tiff);
 
-  void makeImageDescriptionTag(const ZImgInfo& info, const QString& dimensionOrder, ZImgMetatag& tag);
+  static void makeImageDescriptionTag(const ZImgInfo& info, const QString& dimensionOrder, ZImgMetatag& tag);
 
   //
   void parseOME(QXmlStreamReader& xml, ZTiff& tiff);

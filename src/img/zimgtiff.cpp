@@ -218,10 +218,10 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
   m_imgInfo.resize(1);
   m_imgInfo[0].depth = 0;
   m_imgInfo[0].numTimes = 1;
-  for (size_t i = 0; i < ifds.size(); ++i) {
-    if (ifds[i].isNormalImage()) {
+  for (const auto& ifd : ifds) {
+    if (ifd.isNormalImage()) {
       ZImgInfo tmpInfo;
-      tiff.readInfoFromIFD(ifds[i], tmpInfo);
+      tiff.readInfoFromIFD(ifd, tmpInfo);
 
       widths.insert(tmpInfo.width);
       heights.insert(tmpInfo.height);
@@ -259,16 +259,16 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
 #else
       QStringList fields = m_imageDescription.split("\n", QString::SkipEmptyParts);
 #endif
-      for (int i = 0; i < fields.size(); ++i) {
-        if (fields[i].startsWith("images=")) {
-          images = fields[i].remove(0, 7).toInt();
-        } else if (fields[i].startsWith("channels=")) {
-          channels = fields[i].remove(0, 9).toInt();
-        } else if (fields[i].startsWith("slices=")) {
-          slices = fields[i].remove(0, 7).toInt();
-        } else if (fields[i].startsWith("frames=")) {
-          frames = fields[i].remove(0, 7).toInt();
-        } else if (fields[i].startsWith("hyperstack=true")) {
+      for (auto& field : fields) {
+        if (field.startsWith("images=")) {
+          images = field.remove(0, 7).toInt();
+        } else if (field.startsWith("channels=")) {
+          channels = field.remove(0, 9).toInt();
+        } else if (field.startsWith("slices=")) {
+          slices = field.remove(0, 7).toInt();
+        } else if (field.startsWith("frames=")) {
+          frames = field.remove(0, 7).toInt();
+        } else if (field.startsWith("hyperstack=true")) {
           hyperstack = true;
         }
       }
@@ -313,12 +313,12 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tif
     ZImgMetatag tag("metadata", m_imageDescription);
     meta.attachToTopLevel(tag);
   }
-  for (size_t i = 0; i < ifds.size(); ++i) {
-    if (ifds[i].isNormalImage()) {
+  for (const auto& ifd : ifds) {
+    if (ifd.isNormalImage()) {
       mapIFDToImgLocation(ifdIdx, z, c, t, l);
       if (l != static_cast<int>(scene))
         continue;
-      std::vector<ZImgMetatag> tags = ifds[i].extractMetadata();
+      std::vector<ZImgMetatag> tags = ifd.extractMetadata();
       if (!tags.empty()) {
         if (c == -1)
           meta.attachToPlane(tags, z, t);
@@ -346,28 +346,28 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
   int t = 0;
   int l = 0;
   size_t ifdIdx = 0;
-  for (size_t i = 0; i < ifds.size(); ++i) {
-    if (ifds[i].isNormalImage()) {
+  for (const auto& ifd : ifds) {
+    if (ifd.isNormalImage()) {
       mapIFDToImgLocation(ifdIdx, z, c, t, l);
       if ((region.zInRegion(z)) &&
           (region.cInRegion(c) || c == -1) &&
           (region.tInRegion(t)) &&
           (static_cast<int>(scene) == l)) {
-        const std::vector<ZTiffIFD>& subifds = ifds[i].subIFDs();
-        for (size_t sub = 0; sub < subifds.size(); ++sub) {
-          ZImg thumb = tiff.readThumbnailFromIFD(subifds[sub]);
+        const std::vector<ZTiffIFD>& subifds = ifd.subIFDs();
+        for (const auto& subifd : subifds) {
+          ZImg thumb = tiff.readThumbnailFromIFD(subifd);
           if (!thumb.isEmpty())
             thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);
         }
       }
       ifdIdx++;
-    } else if (ifds[i].isReducedResolutionImage() && ifdIdx > 0) {
+    } else if (ifd.isReducedResolutionImage() && ifdIdx > 0) {
       mapIFDToImgLocation(ifdIdx - 1, z, c, t, l);
       if ((region.zInRegion(z)) &&
           (region.cInRegion(c) || c == -1) &&
           (region.tInRegion(t)) &&
           (static_cast<int>(scene) == l)) {
-        ZImg thumb = tiff.readThumbnailFromIFD(ifds[i]);
+        ZImg thumb = tiff.readThumbnailFromIFD(ifd);
         if (!thumb.isEmpty()) {
           thumbnail.attachToPlane(thumb, z - region.start.z, t - region.start.t);
         }
