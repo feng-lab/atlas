@@ -29,23 +29,23 @@ public:
   // make empty, release all data
   void clear();
 
-  bool isEmpty() const;
+  [[nodiscard]] bool isEmpty() const;
 
-  bool isSameSize(const ZComplexImg& rhs) const;
+  [[nodiscard]] bool isSameSize(const ZComplexImg& rhs) const;
 
-  inline size_t width() const
+  [[nodiscard]] inline size_t width() const
   { return m_width; }
 
-  inline size_t height() const
+  [[nodiscard]] inline size_t height() const
   { return m_height; }
 
-  inline size_t depth() const
+  [[nodiscard]] inline size_t depth() const
   { return m_depth; }
 
   inline std::complex<double>* rawData()
   { return m_data.data(); }
 
-  inline QString toQString() const
+  [[nodiscard]] inline QString toQString() const
   {
     return QString("width:%1, height:%2, depth:%3").arg(m_width).arg(m_height).arg(m_depth);
   }
