@@ -7,6 +7,7 @@
 #include "zimg.h"
 #include <QImage>
 #include <QImageWriter>
+#include <memory>
 
 namespace nim {
 
@@ -47,7 +48,7 @@ void Z3DRenderTarget::createColorAttachment(GLint internalColorFormat, GLenum at
   std::unique_ptr<Z3DTexture> colorTex;
 
   glm::uvec3 size3(m_size, 1);
-  colorTex.reset(new Z3DTexture(internalColorFormat, size3, GL_RGBA, GL_FLOAT));
+  colorTex = std::make_unique<Z3DTexture>(internalColorFormat, size3, GL_RGBA, GL_FLOAT);
   colorTex->uploadImage();
 
   attachTextureToFBO(colorTex.release(), attachment);
@@ -73,7 +74,7 @@ void Z3DRenderTarget::createDepthAttachment(GLint internalDepthFormat)
   std::unique_ptr<Z3DTexture> depthTex;
 
   glm::uvec3 size3(m_size, 1);
-  depthTex.reset(new Z3DTexture(internalDepthFormat, size3, GL_DEPTH_COMPONENT, GL_FLOAT));
+  depthTex = std::make_unique<Z3DTexture>(internalDepthFormat, size3, GL_DEPTH_COMPONENT, GL_FLOAT);
   depthTex->uploadImage();
 
   attachTextureToFBO(depthTex.release(), GL_DEPTH_ATTACHMENT);

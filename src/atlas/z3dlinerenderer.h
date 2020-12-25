@@ -107,7 +107,7 @@ protected:
 
   bool m_useSmoothLine;
   float m_srcLineWidth;
-  float m_lineWidth;
+  float m_lineWidth = 1.f;
   bool m_enableMultisample;
   std::vector<float> m_lineWidthArray;
 

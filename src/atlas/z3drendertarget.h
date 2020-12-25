@@ -30,16 +30,16 @@ public:
 
   void release();
 
-  bool isBound() const;
+  [[nodiscard]] bool isBound() const;
 
   void clear() const;
 
   //Returns the OpenGL framebuffer object handle for this framebuffer object (returned by the glGenFrameBuffers() function).
   // returned fbo should only be used for read if multisample is used
-  GLuint handle() const;
+  [[nodiscard]] GLuint handle() const;
 
   // might crash
-  const Z3DTexture* attachment(GLenum attachment) const
+  [[nodiscard]] const Z3DTexture* attachment(GLenum attachment) const
   { return m_attachments.at(attachment); }
 
   Z3DTexture* attachment(GLenum attachment)
@@ -52,7 +52,7 @@ public:
 
   GLfloat depthAtPos(const glm::ivec2& pos);
 
-  glm::uvec2 size() const
+  [[nodiscard]] glm::uvec2 size() const
   { return m_size; }
 
   bool resize(const glm::uvec2& newsize);
@@ -87,7 +87,7 @@ protected:
   GLuint m_colorBufferID = 0;
   GLuint m_depthBufferID = 0;
 
-  glm::ivec4 m_previousViewport;
+  glm::ivec4 m_previousViewport{};
   GLuint m_previousDrawFBOID = 0;
   GLuint m_previousReadFBOID = 0;
 

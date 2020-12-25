@@ -85,8 +85,8 @@ Z3DRenderInputPort::Z3DRenderInputPort(const QString& name, bool allowMultipleCo
 size_t Z3DRenderInputPort::numValidInputs() const
 {
   size_t res = 0;
-  for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-    const Z3DRenderOutputPort* p = static_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
+  for (auto connectedOutputPort : m_connectedOutputPorts) {
+    const auto* p = static_cast<const Z3DRenderOutputPort*>(connectedOutputPort);
     if (p->hasValidData())
       ++res;
   }
@@ -122,8 +122,8 @@ const Z3DRenderTarget* Z3DRenderInputPort::renderTarget(size_t idx) const
   if (idx >= numValidInputs())
     return nullptr;
   size_t res = 0;
-  for (size_t i = 0; i < m_connectedOutputPorts.size(); ++i) {
-    const Z3DRenderOutputPort* p = static_cast<const Z3DRenderOutputPort*>(m_connectedOutputPorts[i]);
+  for (auto connectedOutputPort : m_connectedOutputPorts) {
+    const auto* p = static_cast<const Z3DRenderOutputPort*>(connectedOutputPort);
     if (p->hasValidData())
       ++res;
     if (idx == res - 1)

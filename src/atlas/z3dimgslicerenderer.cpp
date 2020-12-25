@@ -205,7 +205,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     m_image3DSliceWithColorMapBlockIDsShader.release();
     //glFinish();
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
@@ -259,7 +259,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     m_image3DSliceWithColorMapShader.release();
     //glFinish();
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
   } else {
     m_scVolumeSliceShader.bind();
     m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);

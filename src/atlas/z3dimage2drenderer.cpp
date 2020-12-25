@@ -26,8 +26,8 @@ void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume
                                      const std::vector<std::unique_ptr<ZColorMapParameter>>& colormapsIn)
 {
   CHECK(colormapsIn.size() >= volsIn.size());
-  for (size_t i = 0; i < volsIn.size(); ++i) {
-    CHECK(volsIn[i]->is2DData());
+  for (const auto& vol : volsIn) {
+    CHECK(vol->is2DData());
   }
   std::vector<Z3DVolume*> vols;
   std::vector<ZColorMapParameter*> colormaps;
@@ -88,8 +88,8 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 
 bool Z3DImage2DRenderer::hasVolume() const
 {
-  for (size_t i = 0; i < m_volumes.size(); ++i) {
-    if (m_volumes[i])
+  for (auto m_volume : m_volumes) {
+    if (m_volume)
       return true;
   }
   return false;
@@ -131,8 +131,8 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
 
   if (m_volumes.size() == 1) {
     bindVolume(m_scImage2DShader, 0);
-    for (size_t i = 0; i < m_quads.size(); ++i)
-      renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
+    for (auto& quad : m_quads)
+      renderTriangleList(m_VAO, m_scImage2DShader, quad);
   } else {
     for (size_t j = 0; j < m_volumes.size(); ++j) {
       m_layerTarget->attachSlice(j);
@@ -140,8 +140,8 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
       m_layerTarget->clear();
 
       bindVolume(m_scImage2DShader, j);
-      for (size_t i = 0; i < m_quads.size(); ++i)
-        renderTriangleList(m_VAO, m_scImage2DShader, m_quads[i]);
+      for (auto& quad : m_quads)
+        renderTriangleList(m_VAO, m_scImage2DShader, quad);
 
       m_layerTarget->release();
     }

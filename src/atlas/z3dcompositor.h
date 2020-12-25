@@ -152,9 +152,9 @@ private:
   std::vector<glm::vec4> m_textColors;
   std::vector<glm::vec3> m_textPositions;
 
-  glm::vec3 m_XEnd;
-  glm::vec3 m_YEnd;
-  glm::vec3 m_ZEnd;
+  glm::vec3 m_XEnd{};
+  glm::vec3 m_YEnd{};
+  glm::vec3 m_ZEnd{};
 
   std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
 

@@ -1,5 +1,7 @@
 #include "z3dcompositor.h"
 
+#include <memory>
+
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3drendertarget.h"
@@ -622,9 +624,9 @@ void Z3DCompositor::process(Z3DEye eye)
   if (!showHandleFilters.empty()) {
     m_tempPort4.bindTarget();
     m_tempPort4.clearTarget();
-    for (size_t i = 0; i < showHandleFilters.size(); ++i) {
-      showHandleFilters[i]->setViewport(m_tempPort4.size());
-      showHandleFilters[i]->renderHandle(eye);
+    for (auto& showHandleFilter : showHandleFilters) {
+      showHandleFilter->setViewport(m_tempPort4.size());
+      showHandleFilter->renderHandle(eye);
     }
     m_tempPort4.releaseTarget();
     CHECK_GL_ERROR
@@ -640,9 +642,9 @@ void Z3DCompositor::process(Z3DEye eye)
     m_rendererBase.render(eye, m_firstOnTopBlendRenderer);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    for (size_t i = 0; i < selectedFilters.size(); ++i) {
-      selectedFilters[i]->setViewport(finalOutport.size());
-      selectedFilters[i]->renderSelectionBox(eye);
+    for (auto& selectedFilter : selectedFilters) {
+      selectedFilter->setViewport(finalOutport.size());
+      selectedFilter->renderSelectionBox(eye);
     }
     glBlendFunc(GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
@@ -652,9 +654,9 @@ void Z3DCompositor::process(Z3DEye eye)
     currentOutport.bindTarget();
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    for (size_t i = 0; i < selectedFilters.size(); ++i) {
-      selectedFilters[i]->setViewport(currentOutport.size());
-      selectedFilters[i]->renderSelectionBox(eye);
+    for (auto& selectedFilter : selectedFilters) {
+      selectedFilter->setViewport(currentOutport.size());
+      selectedFilter->renderSelectionBox(eye);
     }
     glBlendFunc(GL_ONE, GL_ZERO);
     glDisable(GL_BLEND);
@@ -666,9 +668,9 @@ void Z3DCompositor::process(Z3DEye eye)
   if (filters.empty() && !showHandleFilters.empty()) {
     pickingManager().bindTarget();
     pickingManager().clearTarget();
-    for (size_t i = 0; i < showHandleFilters.size(); ++i) {
-      showHandleFilters[i]->setViewport(pickingManager().renderTarget().size());
-      showHandleFilters[i]->renderHandlePicking(eye);
+    for (auto& showHandleFilter : showHandleFilters) {
+      showHandleFilter->setViewport(pickingManager().renderTarget().size());
+      showHandleFilter->renderHandlePicking(eye);
     }
     pickingManager().releaseTarget();
   } else if (showHandleFilters.empty() && !filters.empty()) {
@@ -684,9 +686,9 @@ void Z3DCompositor::process(Z3DEye eye)
   } else if (!filters.empty() && !showHandleFilters.empty()) {
     m_tempPort5.bindTarget();
     m_tempPort5.clearTarget();
-    for (size_t i = 0; i < showHandleFilters.size(); ++i) {
-      showHandleFilters[i]->setViewport(m_tempPort5.size());
-      showHandleFilters[i]->renderHandlePicking(eye);
+    for (auto& showHandleFilter : showHandleFilters) {
+      showHandleFilter->setViewport(m_tempPort5.size());
+      showHandleFilter->renderHandlePicking(eye);
     }
     m_tempPort5.releaseTarget();
     m_tempPort4.bindTarget();
@@ -1056,7 +1058,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
 
 bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
 {
-  m_ddpRT.reset(new Z3DRenderTarget(size));
+  m_ddpRT = std::make_unique<Z3DRenderTarget>(size);
   Z3DTexture* g_dualDepthTexId[2];
   Z3DTexture* g_dualFrontBlenderTexId[2];
   Z3DTexture* g_dualBackTempTexId[2];
@@ -1232,7 +1234,7 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
 
 bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 {
-  m_waRT.reset(new Z3DRenderTarget(size));
+  m_waRT = std::make_unique<Z3DRenderTarget>(size);
   Z3DTexture* g_accumulationTexId[2];
 
 #ifdef USE_RECT_TEX
@@ -1366,7 +1368,7 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
 
 bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
 {
-  m_wbRT.reset(new Z3DRenderTarget(size));
+  m_wbRT = std::make_unique<Z3DRenderTarget>(size);
   Z3DTexture* g_accumulationTexId[2];
 
   g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA16F), glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);

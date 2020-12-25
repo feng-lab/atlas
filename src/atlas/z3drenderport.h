@@ -25,32 +25,32 @@ public:
   void releaseTarget()
   { m_renderTarget.release(); }
 
-  GLint internalDepthFormat() const
+  [[nodiscard]] GLint internalDepthFormat() const
   { return m_internalDepthFormat; }
 
-  GLint internalColorFormat() const
+  [[nodiscard]] GLint internalColorFormat() const
   { return m_internalColorFormat; }
 
   // Clears the contents of an activated outport's RenderTarget,
   void clearTarget() const;
 
-  bool hasValidData() const override
+  [[nodiscard]] bool hasValidData() const override
   { return m_resultIsValid; }
 
   // Returns true, if the associated RenderTarget is currently bound.
-  bool isBound() const
+  [[nodiscard]] bool isBound() const
   { return m_renderTarget.isBound(); }
 
-  const Z3DRenderTarget& renderTarget() const
+  [[nodiscard]] const Z3DRenderTarget& renderTarget() const
   { return m_renderTarget; }
 
   Z3DRenderTarget& renderTarget()
   { return m_renderTarget; }
 
-  const Z3DTexture* colorTexture() const
+  [[nodiscard]] const Z3DTexture* colorTexture() const
   { return m_renderTarget.attachment(GL_COLOR_ATTACHMENT0); }
 
-  const Z3DTexture* depthTexture() const
+  [[nodiscard]] const Z3DTexture* depthTexture() const
   { return m_renderTarget.attachment(GL_DEPTH_ATTACHMENT); }
 
   Z3DTexture* colorTexture()
@@ -90,22 +90,22 @@ public:
                      Z3DFilter* filter,
                      Z3DFilter::State invalidationState = Z3DFilter::State::AllResultInvalid);
 
-  bool isReady() const override
+  [[nodiscard]] bool isReady() const override
   { return numValidInputs() > 0; }
 
   // go through all connected output render ports and count how many have valid rendering
-  size_t numValidInputs() const;
+  [[nodiscard]] size_t numValidInputs() const;
 
   // once we have the number of valid inputs, we can use a index as parameter to query data from input
   // idx range from 0 to numValidInputs() - 1
-  glm::uvec2 size(size_t idx = 0) const;
+  [[nodiscard]] glm::uvec2 size(size_t idx = 0) const;
 
-  const Z3DTexture* colorTexture(size_t idx = 0) const;
+  [[nodiscard]] const Z3DTexture* colorTexture(size_t idx = 0) const;
 
-  const Z3DTexture* depthTexture(size_t idx = 0) const;
+  [[nodiscard]] const Z3DTexture* depthTexture(size_t idx = 0) const;
 
 private:
-  const Z3DRenderTarget* renderTarget(size_t idx) const;
+  [[nodiscard]] const Z3DRenderTarget* renderTarget(size_t idx) const;
 };
 
 } // namespace nim

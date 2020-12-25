@@ -33,13 +33,13 @@ public:
 protected:
   void compile() override;
 
-  QString generateHeader() const;
+  [[nodiscard]] QString generateHeader() const;
 
   void render(Z3DEye eye) override;
 
 protected:
-  const Z3DTexture* m_colorTexture;
-  const Z3DTexture* m_depthTexture;
+  const Z3DTexture* m_colorTexture = nullptr;
+  const Z3DTexture* m_depthTexture = nullptr;
 
   Z3DShaderGroup m_copyTextureShaderGrp;
   bool m_discardTransparent;

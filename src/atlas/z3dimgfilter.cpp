@@ -9,6 +9,7 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QMenu>
+#include <memory>
 
 namespace nim {
 
@@ -237,7 +238,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   }
 
   try {
-    m_3dImg.reset(new Z3DImg(imgPack, m_rendererBase.coordTransformPara().scale()));
+    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale());
 
     updateBlockIDTarget();
 
@@ -494,8 +495,8 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 {
   if (isVisible() && isSelected() && m_3dImg) {
     bool success = false;
-    auto pos3D = get3DPosition(event->pos().x() * m_rendererBase.globalParas().devicePixelRatio.get(),
-                               event->pos().y() * m_rendererBase.globalParas().devicePixelRatio.get(),
+    auto pos3D = get3DPosition(event->x() * m_rendererBase.globalParas().devicePixelRatio.get(),
+                               event->y() * m_rendererBase.globalParas().devicePixelRatio.get(),
                                w * m_rendererBase.globalParas().devicePixelRatio.get(),
                                h * m_rendererBase.globalParas().devicePixelRatio.get(),
                                success);
@@ -802,16 +803,16 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   glm::vec3 coordLuf = m_3dImg->physicalLUF();
   glm::vec3 coordRdb = m_3dImg->physicalRDB();
 
-  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum() + 1) / (volDim.x - 1);
-  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum() - 1) / (volDim.x - 1);
+  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum() + 1) / (volDim.x - 1.f);
+  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum() - 1) / (volDim.x - 1.f);
   float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
   float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
-  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum() + 1) / (volDim.y - 1);
-  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum() - 1) / (volDim.y - 1);
+  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum() + 1) / (volDim.y - 1.f);
+  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum() - 1) / (volDim.y - 1.f);
   float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
   float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
-  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum() + 1) / (volDim.z - 1);
-  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum() - 1) / (volDim.z - 1);
+  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum() + 1) / (volDim.z - 1.f);
+  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum() - 1) / (volDim.z - 1.f);
   float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
   float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 

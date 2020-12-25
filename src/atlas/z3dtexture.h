@@ -49,34 +49,34 @@ public:
   void bind() const
   { glBindTexture(m_textureTarget, m_id); }
 
-  GLuint id() const
+  [[nodiscard]] GLuint id() const
   { return m_id; }
 
-  GLenum textureTarget() const
+  [[nodiscard]] GLenum textureTarget() const
   { return m_textureTarget; }
 
-  glm::uvec3 dimension() const
+  [[nodiscard]] glm::uvec3 dimension() const
   { return m_dimension; }
 
-  size_t width() const
+  [[nodiscard]] size_t width() const
   { return m_dimension.x; }
 
-  size_t height() const
+  [[nodiscard]] size_t height() const
   { return m_dimension.y; }
 
-  size_t depth() const
+  [[nodiscard]] size_t depth() const
   { return m_dimension.z; }
 
-  size_t numPixels() const
+  [[nodiscard]] size_t numPixels() const
   { return m_dimension.x * m_dimension.y * m_dimension.z; }
 
-  GLenum dataFormat() const
+  [[nodiscard]] GLenum dataFormat() const
   { return m_dataFormat; }
 
-  GLenum dataType() const
+  [[nodiscard]] GLenum dataType() const
   { return m_dataType; }
 
-  GLint internalFormat() const
+  [[nodiscard]] GLint internalFormat() const
   { return m_internalFormat; }
 
   // calculates the bytes per pixel from dataFormat and dataType
@@ -88,7 +88,7 @@ public:
   // buffer must have at least bypePerPixel(dataFormat, dataType) * numPixels() bytes space, crash otherwise
   void downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const;
 
-  size_t textureSizeOnGPU() const
+  [[nodiscard]] size_t textureSizeOnGPU() const
   { return bypePerPixel(m_internalFormat) * numPixels(); }
 
   void saveAsColorImage(const QString& filename) const;
@@ -96,11 +96,11 @@ public:
   void saveAsDepthImage(const QString& filename) const;
 
 private:
-  bool is1DTexture() const;
+  [[nodiscard]] bool is1DTexture() const;
 
-  bool is2DTexture() const;
+  [[nodiscard]] bool is2DTexture() const;
 
-  bool is3DTexture() const;
+  [[nodiscard]] bool is3DTexture() const;
 
   void getType();
 
@@ -136,10 +136,10 @@ public:
 
   void activateCurrentUnit();
 
-  GLint currentUnitNumber() const
+  [[nodiscard]] GLint currentUnitNumber() const
   { return m_currentUnitNumber; }
 
-  GLenum currentUnitEnum() const;
+  [[nodiscard]] GLenum currentUnitEnum() const;
 
   // clear assigned unit
   void reset()
