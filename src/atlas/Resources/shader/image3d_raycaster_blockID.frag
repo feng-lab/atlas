@@ -122,8 +122,6 @@ void main()
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
     ivec4 pageDirEntry = ivec4(-1,-1,-1,-1);
-    ivec3 pageTableAddress = ivec3(-1,-1,-1);
-    ivec4 pageTableEntry = ivec4(-1,-1,-1,-1);
 
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
@@ -135,8 +133,7 @@ void main()
         }
         vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
-        ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
-        ivec3 pageTableCoord = voxelCoord / image_block_size;
+        ivec3 pageTableCoord = ivec3(samplePos * image_dimensions[curLevel]) / image_block_size;
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
@@ -148,15 +145,11 @@ void main()
         }
         int pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-          ivec3 curPageTableAddress = pageDirEntry.xyz + pageTableCoord % page_table_block_size;
-          if (curPageTableAddress != pageTableAddress) {
-            pageTableAddress = curPageTableAddress;
 #if GLSL_VERSION >= 130
-            pageTableEntry = texelFetch(page_table_cache, pageTableAddress, 0);
+          ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
 #else
-            pageTableEntry = texelFetch3D(page_table_cache, pageTableAddress, 0);
+          ivec4 pageTableEntry = texelFetch3D(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
 #endif
-          }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             // save missed blockid
@@ -165,11 +158,6 @@ void main()
               missBlockIDs[missBlockIDsIndex++] = blockID;
               finished = missBlockIDsIndex == 32;
             }
-//            // save used blockid
-//            if (usedBlockIDsIndex < 16) {
-//              uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
-//              usedBlockIDs[usedBlockIDsIndex++] = blockID;
-//            }
 
             // goto next block
             do {
@@ -178,6 +166,13 @@ void main()
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
+              // save missed blockid
+              if (missBlockIDsIndex < 32) {
+                uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
+                missBlockIDs[missBlockIDsIndex++] = blockID;
+                finished = missBlockIDsIndex == 32;
+              }
+
               do {
                 currentRayLength += stepSize;
               } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
@@ -218,17 +213,17 @@ void main()
               currentRayLength += stepSize;
             } while (page_directory_bases[curLevel] + ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength < 1.0);
           } else { // pagingFlag == UNMAPPED
+            // save missed blockid
+            if (missBlockIDsIndex < 32) {
+              uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
+              missBlockIDs[missBlockIDsIndex++] = blockID;
+              finished = missBlockIDsIndex == 32;
+            }
+
             do { // skip empty space page table entry
               currentRayLength += stepSize;
             } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           }
-        }
-
-        // save missed blockid
-        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 32) {
-          uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
-          missBlockIDs[missBlockIDsIndex++] = blockID;
-          finished = missBlockIDsIndex == 32;
         }
 
         finished = finished || (currentRayLength >= 1.0);

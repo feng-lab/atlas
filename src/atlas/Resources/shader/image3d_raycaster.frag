@@ -172,7 +172,7 @@ void main()
     gl_FragDepth = texelFetch2D(last_depth, ivec2(gl_FragCoord.xy), 0).r;
 #endif
     FragData0 = result;
-    FragData1 = vec4(1.0, 0., 0., 0.);
+    FragData1.x = 1.0;
     return;
   }
 
@@ -292,25 +292,30 @@ void main()
               float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
               do {
                 currentRayLength += testStepSize;
-                samplePos = startRayPosition + currentRayLength * rayVector;
-              } while (ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
             }
           }
         } else {
-          hitMissedBlock = true;
+          if (pagingFlag == EMPTY) {
+            do { // skip empty space page directory entry
+              currentRayLength += stepSize;
+            } while (page_directory_bases[curLevel] + ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength < 1.0);
+          } else { // pagingFlag == UNMAPPED
+            hitMissedBlock = true;
+          }
         }
 
         finished = finished || hitMissedBlock || (currentRayLength > 1.0);
       } // for
     }
 
-    if (hitMissedBlock) {
+    if (hitMissedBlock && currentRayLength < 1.0) {
 #ifdef MIP
       FragData0 = vec4(ch1V, 0, 0, 0);
 #else
       FragData0 = result;
 #endif
-      FragData1 = vec4(currentRayLength, 0, 0, 0);
+      FragData1.x = currentRayLength;
       if (rayDepth >= 0.0) {
         gl_FragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
       } else {
@@ -347,7 +352,7 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
-    FragData1 = vec4(1.0, 0., 0., 0.);
+    FragData1.x = 1.0;
   }
 }
 

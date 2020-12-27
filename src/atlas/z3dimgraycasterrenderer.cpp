@@ -605,6 +605,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             break;  // no blocks to render
           }
 
+          bool lastRound = false;
           if (numberBlock != ccSet.size()) {
             numberBlock = ccSet.size();
             m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT2)->downloadTextureToBuffer(GL_RGBA_INTEGER,
@@ -617,6 +618,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           if (numberBlock != ccSet.size()) {
@@ -631,6 +634,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           if (numberBlock != ccSet.size()) {
@@ -645,6 +650,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           if (numberBlock != ccSet.size()) {
@@ -659,6 +666,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           if (numberBlock != ccSet.size()) {
@@ -673,6 +682,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           if (numberBlock != ccSet.size()) {
@@ -687,6 +698,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+          } else {
+            lastRound = true;
           }
 
           ccSet.unsafe_erase(0_u32);
@@ -695,7 +708,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           STOP_AND_LOG(btcb)
 
           if (!missingBlockIDs.empty()) {
-            m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
+            lastRound = lastRound && m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
           } else {
             break;
           }
@@ -741,10 +754,14 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_currentImageRenderTarget->release();
 
           m_image3DRaycasterShader.release();
-          glFinish();
+          // glFinish();
           STOP_AND_LOG(btri)
 
           std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
+
+          if (lastRound) {
+            break;
+          }
         }
 
         if (visibleIdxs.size() == 1) {

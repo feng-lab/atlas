@@ -511,7 +511,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
 
   //checkPageSystemError();
 
-  return count > 0;
+  return count == int(missingBlockIDs.size());
 }
 
 void Z3DImg::uploadImageCache(size_t channel)
