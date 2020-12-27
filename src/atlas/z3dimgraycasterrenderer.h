@@ -27,6 +27,9 @@ public:
   void setBlockIDsRenderTarget(Z3DRenderTarget& target)
   { m_blockIDsRenderTarget = &target; }
 
+  void setImageRenderTargetWithRayDepthLayer(Z3DRenderTarget& target1, Z3DRenderTarget& target2)
+  { m_lastImageRenderTarget = &target1; m_currentImageRenderTarget = &target2; }
+
   // quad or entryexit texture should be set before rendering
 
   // For 2D Image rendering, once set, entry exit textures will be cleared and
@@ -111,9 +114,12 @@ protected:
   Z3DShaderProgram m_image3DRaycasterBlockIDsShader;
   Z3DShaderProgram m_image3DRaycasterShader;
   Z3DShaderProgram m_mergeChannelShader;
+  Z3DShaderProgram m_copyTextureShader;
 
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DRenderTarget* m_blockIDsRenderTarget = nullptr;
+  Z3DRenderTarget* m_lastImageRenderTarget = nullptr;
+  Z3DRenderTarget* m_currentImageRenderTarget = nullptr;
 
   ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled

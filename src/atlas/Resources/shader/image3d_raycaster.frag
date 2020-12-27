@@ -28,14 +28,21 @@ uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
 
+uniform isampler2D last_ray_depth;
+uniform isampler2D last_color;
+uniform isampler2D last_depth;
+
 uniform sampler1D transfer_function;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
+layout(location = 1) out vec4 FragData1;
 #elif GLSL_VERSION >= 130
 out vec4 FragData0;  // call glBindFragDataLocation before linking
+out vec4 FragData1;  // call glBindFragDataLocation before linking
 #else
 #define FragData0 gl_FragData[0]
+#define FragData1 gl_FragData[1]
 #endif
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
@@ -89,7 +96,7 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
   ivec3 voxelCoord = ivec3(samplePos * image_dimensions[curLevel]);
   vec3 fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
 #endif
-  for (int loop0=0; !blockFinished && loop0<64; loop0++) {
+  for (int loop0=0; !blockFinished && loop0<128; loop0++) {
     //ivec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size;
     //float voxel = texelFetch(image_cache, voxelAddress, 0).r;
     voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
@@ -150,6 +157,26 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
 void main()
 {
 #if GLSL_VERSION >= 130
+  float currentRayLength = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
+  vec4 result = texelFetch(last_color, ivec2(gl_FragCoord.xy), 0);
+  gl_FragDepth = texelFetch(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#else
+  float currentRayLength = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
+  vec4 result = texelFetch2D(last_color, ivec2(gl_FragCoord.xy), 0);
+  gl_FragDepth = texelFetch2D(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#endif
+  if (currentRayLength >= 1.0) {
+#if GLSL_VERSION >= 130
+    gl_FragDepth = texelFetch(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#else
+    gl_FragDepth = texelFetch2D(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#endif
+    FragData0 = result;
+    FragData1 = vec4(1.0, 0., 0., 0.);
+    return;
+  }
+
+#if GLSL_VERSION >= 130
   vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
   vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #else
@@ -162,10 +189,14 @@ void main()
   if (startRayPosition == exitRayPosition) {
     discard;   // background
   } else {
-    vec4 result = vec4(0.0);
-
+    // vec4 result = vec4(0.0);
+#if GLSL_VERSION >= 130
+    gl_FragDepth = texelFetch(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#else
+    gl_FragDepth = texelFetch2D(last_depth, ivec2(gl_FragCoord.xy), 0).r;
+#endif
 #ifdef MIP
-    float ch1V = 0.0;
+    float ch1V = result.r;
 #endif
 
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
@@ -183,15 +214,14 @@ void main()
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
     float stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
 
-    float currentRayLength = 0.0;
+    // float currentRayLength = 0.0;
     float rayDepth = -1.0;
-    bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
     ivec4 pageDirEntry = ivec4(-1,-1,-1,-1);
 
-    vec3 samplePos = startRayPosition;
-
+    bool finished = false;
+    bool hitMissedBlock = false;
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float desiredVoxelSize = mix(zeFront, zeBack, currentRayLength) * ze_to_screen_pixel_voxel_size;
@@ -200,6 +230,7 @@ void main()
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
           stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
+        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
         ivec3 pageTableCoord = ivec3(samplePos * image_dimensions[curLevel]) / image_block_size;
         ivec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
@@ -232,10 +263,7 @@ void main()
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
-              do {
-                currentRayLength += stepSize;
-                samplePos = startRayPosition + currentRayLength * rayVector;
-              } while (ivec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+              hitMissedBlock = true;
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               int testPagingFlag = EMPTY;
@@ -265,19 +293,34 @@ void main()
               do {
                 currentRayLength += testStepSize;
                 samplePos = startRayPosition + currentRayLength * rayVector;
-              } while (ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength <= 1.0);
+              } while (ivec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
             }
           }
         } else {
-          // skip empty space page directory entry
-          do {
-            currentRayLength += stepSize;
-            samplePos = startRayPosition + currentRayLength * rayVector;
-          } while (page_directory_bases[curLevel] + ivec3(samplePos * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+          hitMissedBlock = true;
         }
 
-        finished = finished || (currentRayLength > 1.0);
+        finished = finished || hitMissedBlock || (currentRayLength > 1.0);
       } // for
+    }
+
+    if (hitMissedBlock) {
+#ifdef MIP
+      FragData0 = vec4(ch1V, 0, 0, 0);
+#else
+      FragData0 = result;
+#endif
+      FragData1 = vec4(currentRayLength, 0, 0, 0);
+      if (rayDepth >= 0.0) {
+        gl_FragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
+      } else {
+#ifdef RESULT_OPAQUE
+        gl_FragDepth = entryTexCoordAndZ.w;
+#else
+        gl_FragDepth = 1.0;
+#endif
+      }
+      return;
     }
 
 #ifdef MIP
@@ -304,6 +347,7 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
+    FragData1 = vec4(1.0, 0., 0., 0.);
   }
 }
 

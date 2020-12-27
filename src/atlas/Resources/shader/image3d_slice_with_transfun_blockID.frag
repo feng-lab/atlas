@@ -24,13 +24,10 @@ uniform float ze_to_screen_pixel_voxel_size;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out uvec4 FragData0;
-layout(location = 1) out uvec4 FragData1;
 #elif GLSL_VERSION >= 130
 out uvec4 FragData0;  // call glBindFragDataLocation before linking
-out uvec4 FragData1;  // call glBindFragDataLocation before linking
 #else
 varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData1;  // call glBindFragDataLocationForce before linking
 #endif
 
 #define UNMAPPED 0
@@ -61,10 +58,9 @@ void main()
 #endif
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-      FragData1 = uvec4(blockID, 0, 0, 0);
+      FragData0 = uvec4(blockID, 0, 0, 0);
     }
-  }
-  if (pagingFlag == UNMAPPED) {
+  } else if (pagingFlag == UNMAPPED) {
     FragData0 = uvec4(blockID, 0, 0, 0);
   }
 #else

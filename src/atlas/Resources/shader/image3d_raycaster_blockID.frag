@@ -12,7 +12,7 @@ uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform ivec3 image_block_size;
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
-uniform vec2 screen_dim_RCP;
+// uniform vec2 screen_dim_RCP;
 uniform float sampling_rate;
 uniform float ze_to_screen_pixel_voxel_size;
 
@@ -20,6 +20,8 @@ uniform sampler2D ray_entry_tex_coord;
 uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
+
+uniform isampler2D last_ray_depth;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out uvec4 FragData0;
@@ -55,13 +57,29 @@ varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
 
 void main()
 {
-  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
 #if GLSL_VERSION >= 130
-  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
-  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
+  float currentRayLength = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
 #else
-  vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
-  vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
+  float currentRayLength = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
+#endif
+  if (currentRayLength >= 1.0) {
+    discard;
+  }
+
+//  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
+//#if GLSL_VERSION >= 130
+//  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
+//  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
+//#else
+//  vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
+//  vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
+//#endif
+#if GLSL_VERSION >= 130
+  vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
+#else
+  vec4 entryTexCoordAndZ = texelFetch2D(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 exitTexCoordAndZ = texelFetch2D(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
 #endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
@@ -71,25 +89,35 @@ void main()
   } else {
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+//#if GLSL_VERSION >= 130
+//    float zeFront = texture(ray_entry_eye_coord, texCoords).z;
+//    float zeBack = texture(ray_exit_eye_coord, texCoords).z;
+//#else
+//    float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
+//    float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
+//#endif
 #if GLSL_VERSION >= 130
-    float zeFront = texture(ray_entry_eye_coord, texCoords).z;
-    float zeBack = texture(ray_exit_eye_coord, texCoords).z;
+    float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+    float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #else
-    float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
-    float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
+    float zeFront = texelFetch2D(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
+    float zeBack = texelFetch2D(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
 #endif
     int curLevel = 0;
 
-    uint missBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
+//    uint missBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
+//    int missBlockIDsIndex = 0;
+//    uint usedBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
+//    int usedBlockIDsIndex = 0;
+    uint missBlockIDs[32] = uint[32](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u,
+                                     0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
     int missBlockIDsIndex = 0;
-    uint usedBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);
-    int usedBlockIDsIndex = 0;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
     vec3 numVoxels = abs(rayVector * image_dimensions[curLevel]);
     float stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
 
-    float currentRayLength = 0.0;
+    // float currentRayLength = 0.0;
     bool finished = false;
 
     ivec3 pageDirAddress = ivec3(-1,-1,-1);
@@ -131,22 +159,28 @@ void main()
           }
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-            // save used blockid
-            if (usedBlockIDsIndex < 16) {
+            // save missed blockid
+            if (missBlockIDsIndex < 32) {
               uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
-              usedBlockIDs[usedBlockIDsIndex++] = blockID;
+              missBlockIDs[missBlockIDsIndex++] = blockID;
+              finished = missBlockIDsIndex == 32;
             }
+//            // save used blockid
+//            if (usedBlockIDsIndex < 16) {
+//              uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
+//              usedBlockIDs[usedBlockIDsIndex++] = blockID;
+//            }
 
             // goto next block
             do {
               currentRayLength += stepSize;
-            } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+            } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           } else {
             // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
               do {
                 currentRayLength += stepSize;
-              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               int testPagingFlag = EMPTY;
@@ -175,29 +209,29 @@ void main()
               float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
               do {
                 currentRayLength += testStepSize;
-              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength <= 1.0);
+              } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
             }
           }
         } else {
           if (pagingFlag == EMPTY) {
             do { // skip empty space page directory entry
               currentRayLength += stepSize;
-            } while (page_directory_bases[curLevel] + ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+            } while (page_directory_bases[curLevel] + ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength < 1.0);
           } else { // pagingFlag == UNMAPPED
             do { // skip empty space page table entry
               currentRayLength += stepSize;
-            } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+            } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           }
         }
 
         // save missed blockid
-        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 16) {
+        if (pagingFlag == UNMAPPED && missBlockIDsIndex < 32) {
           uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
           missBlockIDs[missBlockIDsIndex++] = blockID;
-          finished = missBlockIDsIndex == 16;
+          finished = missBlockIDsIndex == 32;
         }
 
-        finished = finished || (currentRayLength > 1.0);
+        finished = finished || (currentRayLength >= 1.0);
       } // for
     }
 
@@ -205,10 +239,14 @@ void main()
     FragData1 = uvec4(missBlockIDs[4], missBlockIDs[5], missBlockIDs[6], missBlockIDs[7]);
     FragData2 = uvec4(missBlockIDs[8], missBlockIDs[9], missBlockIDs[10], missBlockIDs[11]);
     FragData3 = uvec4(missBlockIDs[12], missBlockIDs[13], missBlockIDs[14], missBlockIDs[15]);
-    FragData4 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
-    FragData5 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
-    FragData6 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
-    FragData7 = uvec4(usedBlockIDs[12], usedBlockIDs[13], usedBlockIDs[14], usedBlockIDs[15]);
+    FragData4 = uvec4(missBlockIDs[16], missBlockIDs[17], missBlockIDs[18], missBlockIDs[19]);
+    FragData5 = uvec4(missBlockIDs[20], missBlockIDs[21], missBlockIDs[22], missBlockIDs[23]);
+    FragData6 = uvec4(missBlockIDs[24], missBlockIDs[25], missBlockIDs[26], missBlockIDs[27]);
+    FragData7 = uvec4(missBlockIDs[28], missBlockIDs[29], missBlockIDs[30], missBlockIDs[31]);
+//    FragData4 = uvec4(usedBlockIDs[0], usedBlockIDs[1], usedBlockIDs[2], usedBlockIDs[3]);
+//    FragData5 = uvec4(usedBlockIDs[4], usedBlockIDs[5], usedBlockIDs[6], usedBlockIDs[7]);
+//    FragData6 = uvec4(usedBlockIDs[8], usedBlockIDs[9], usedBlockIDs[10], usedBlockIDs[11]);
+//    FragData7 = uvec4(usedBlockIDs[12], usedBlockIDs[13], usedBlockIDs[14], usedBlockIDs[15]);
   }
 }
 

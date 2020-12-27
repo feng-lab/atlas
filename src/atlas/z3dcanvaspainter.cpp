@@ -175,7 +175,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
   m_renderToImageType = sst;
   CHECK(m_monoImg.isEmpty() && m_leftImg.isEmpty() && m_rightImg.isEmpty());
 
-  const int tileSize = 480; //2048;
+  const int tileSize = 7680; //2048;
   const int tileBorder = 128;
   const int tileInnerSize = tileSize - 2 * tileBorder;
 

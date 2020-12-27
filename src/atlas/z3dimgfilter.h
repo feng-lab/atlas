@@ -152,6 +152,8 @@ private:
   Z3DTexture m_usedBlocksTexture3;
   Z3DTexture m_usedBlocksTexture4;
   Z3DRenderTarget m_blockIDsRenderTarget;
+  Z3DRenderTarget m_imageRenderTarget1;
+  Z3DRenderTarget m_imageRenderTarget2;
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;

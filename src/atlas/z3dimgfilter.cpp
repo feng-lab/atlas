@@ -41,6 +41,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_usedBlocksTexture4(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_blockIDsRenderTarget(glm::uvec2(32, 32))
+  , m_imageRenderTarget1()
+  , m_imageRenderTarget2()
   , m_outport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
   , m_rightEyeOutport("RightEyeImage", this)
@@ -135,10 +137,23 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture4, GL_COLOR_ATTACHMENT7, false);
   m_blockIDsRenderTarget.isFBOComplete();
 
+  auto texture = new Z3DTexture(GLint(GL_R32F), glm::uvec3(32, 32, 1), GL_RED, GL_FLOAT);
+  texture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  texture->uploadImage();
+  m_imageRenderTarget1.attachTextureToFBO(texture, GL_COLOR_ATTACHMENT1, true);
+  m_imageRenderTarget1.isFBOComplete();
+  texture = new Z3DTexture(GLint(GL_R32F), glm::uvec3(32, 32, 1), GL_RED, GL_FLOAT);
+  texture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  texture->uploadImage();
+  m_imageRenderTarget2.attachTextureToFBO(texture, GL_COLOR_ATTACHMENT1, true);
+  m_imageRenderTarget2.isFBOComplete();
+
   // ports
   addPrivateRenderTarget(m_entryTarget);
   addPrivateRenderTarget(m_exitTarget);
   addPrivateRenderTarget(m_layerTarget);
+  addPrivateRenderTarget(m_imageRenderTarget1);
+  addPrivateRenderTarget(m_imageRenderTarget2);
   addPort(m_outport);
   addPort(m_leftEyeOutport);
   addPort(m_rightEyeOutport);
@@ -190,6 +205,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_imgSliceRenderer.setLayerTarget(m_layerTarget);
   m_imgRaycasterRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
   m_imgSliceRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
+  m_imgRaycasterRenderer.setImageRenderTargetWithRayDepthLayer(m_imageRenderTarget1, m_imageRenderTarget2);
   //  for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
   //    m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
   //    m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);

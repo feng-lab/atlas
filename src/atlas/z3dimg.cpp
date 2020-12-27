@@ -331,13 +331,20 @@ void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_
 }
 
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
-                                                const std::set<uint32_t>& usedBlockIDs)
+                                                const std::set<uint32_t>& usedBlockIDs,
+                                                bool silenceExistingWarning)
 {
   int numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
-  LOG(INFO) << "total " << m_imageCacheManager->size()
-            << " reuse " << usedBlockIDs.size()
-            << " missing " << missingBlockIDs.size()
-            << " will upload " << std::min<int>(missingBlockIDs.size(), numBlocksToRead);
+  if (silenceExistingWarning) {
+    CHECK(usedBlockIDs.empty());
+    LOG(INFO) << "total " << m_imageCacheManager->size()
+              << " need " << missingBlockIDs.size();
+  } else {
+    LOG(INFO) << "total " << m_imageCacheManager->size()
+              << " reuse " << usedBlockIDs.size()
+              << " missing " << missingBlockIDs.size()
+              << " will upload " << std::min<int>(missingBlockIDs.size(), numBlocksToRead);
+  }
   if (missingBlockIDs.empty() || numBlocksToRead <= 0) {
     return false;
   }
@@ -360,8 +367,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     glm::ivec4 blockKey(level, blockID, y, z);
     if (!glm::all(glm::lessThan(blockKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
         !glm::all(glm::greaterThanEqual(blockKey.yzw(), glm::ivec3(0)))) {
-      LOG(INFO) << blockID << " " << blockKey << " " << m_pageTableDimensions[level];
-      CHECK(false);
+      LOG(FATAL) << blockID << " " << blockKey << " " << m_pageTableDimensions[level];
     }
     usedPageTableKeys.insert(blockKey / glm::ivec4(1, m_pageTableBlockSize));
     m_imageCacheManager->touch(blockKey);
@@ -392,8 +398,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
     if (!glm::all(glm::lessThan(pageTableEntryKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
         !glm::all(glm::greaterThanEqual(pageTableEntryKey.yzw(), glm::ivec3(0)))) {
-      LOG(INFO) << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
-      CHECK(false);
+      LOG(FATAL) << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
     }
     glm::ivec4 pageDirectoryEntryKey = pageTableEntryKey / glm::ivec4(1, m_pageTableBlockSize);
     glm::ivec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.x] + pageDirectoryEntryKey.yzw();
@@ -406,7 +411,13 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
       pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % glm::ivec3(m_pageTableBlockSize);
       if (m_pageTableCache[pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                            pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x].w != 0) {
-        LOG(ERROR) << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
+        if (silenceExistingWarning) {
+          m_imageCacheManager->touch(pageTableEntryKey);
+          m_pageTableCacheManager->touch(pageDirectoryEntryKey);
+          ++count;
+        } else {
+          LOG(ERROR) << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
+        }
         continue;
       }
     }
@@ -484,10 +495,15 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     glm::ivec4 blockImagePos = pageTableEntryKey * glm::ivec4(1, glm::ivec3(m_imageBlockSize));
     auto blockCachePos = glm::uvec3(imageBlockCachePos);
     for (auto& pu : m_channelPendingUpdates) {
+      if (auto it = std::find_if(pu.begin(), pu.end(), [&](const auto& pr) { return pr.first == blockCachePos; });
+        it != pu.end()) {
+        pu.erase(it);
+      }
       pu.emplace_back(blockCachePos, blockImagePos);
     }
     ++count;
   }
+  LOG(INFO) << "filled " << count << " blocks";
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
   //glFinish();

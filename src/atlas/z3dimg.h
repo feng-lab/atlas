@@ -26,71 +26,71 @@ public:
   // Z3DVolume will take ownership of the img
   Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = nullptr);
 
-  const ZImgPack& imgPack() const
+  [[nodiscard]] const ZImgPack& imgPack() const
   { return m_imgPack; }
 
-  bool is2DData() const
+  [[nodiscard]] bool is2DData() const
   { return m_imgPack.imgInfo().depth == 1; }
 
-  bool is3DData() const
+  [[nodiscard]] bool is3DData() const
   { return m_imgPack.imgInfo().depth > 1; }
 
-  double minIntensity() const
+  [[nodiscard]] double minIntensity() const
   { return m_imgPack.minIntensity(); }
 
-  double maxsIntensity() const
+  [[nodiscard]] double maxsIntensity() const
   { return m_imgPack.maxIntensity(); }
 
-  glm::uvec3 dimensions() const
+  [[nodiscard]] glm::uvec3 dimensions() const
   { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
 
-  size_t numChannels() const
+  [[nodiscard]] size_t numChannels() const
   { return m_nChannels; }
 
-  col4 channelColor(size_t c) const
+  [[nodiscard]] col4 channelColor(size_t c) const
   { return m_imgPack.imgInfo().channelColors[c]; }
 
-  bool isVolumeDownsampled() const
+  [[nodiscard]] bool isVolumeDownsampled() const
   { return m_isVolumeDownsampled; }
 
-  const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
+  [[nodiscard]] const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
   { return m_volumes; }
 
   static glm::uvec3 imageBlockSize()
-  { return glm::uvec3(252, 252, 60); }
+  { return glm::uvec3(60, 60, 60); }
 
   static glm::uvec3 imageBlockSizePad()
   { return glm::uvec3(4, 4, 4); }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
-  QString samplerType() const;
+  [[nodiscard]] QString samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
-  glm::vec3 physicalLUF() const
+  [[nodiscard]] glm::vec3 physicalLUF() const
   { return glm::vec3(0, 0, 0); }
 
-  glm::vec3 physicalRDB() const
+  [[nodiscard]] glm::vec3 physicalRDB() const
   { return glm::max(glm::vec3(1, 1, 1),
                     glm::vec3(m_imgPack.imgInfo().width - 1,
                               m_imgPack.imgInfo().height - 1,
                               m_imgPack.imgInfo().depth - 1)); }
 
-  glm::vec3 physicalLDF() const
+  [[nodiscard]] glm::vec3 physicalLDF() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
 
-  glm::vec3 physicalRDF() const
+  [[nodiscard]] glm::vec3 physicalRDF() const
   { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
 
-  glm::vec3 physicalRUF() const
+  [[nodiscard]] glm::vec3 physicalRUF() const
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
 
-  glm::vec3 physicalLUB() const
+  [[nodiscard]] glm::vec3 physicalLUB() const
   { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
 
-  glm::vec3 physicalLDB() const
+  [[nodiscard]] glm::vec3 physicalLDB() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
 
-  glm::vec3 physicalRUB() const
+  [[nodiscard]] glm::vec3 physicalRUB() const
   { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
 
   std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
@@ -99,12 +99,12 @@ public:
 
   std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
-  ZBBox<glm::dvec3> physicalBoundBox() const
+  [[nodiscard]] ZBBox<glm::dvec3> physicalBoundBox() const
   { return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB())); }
 
   void setScale(const glm::vec3& scale);
 
-  size_t numLevels() const
+  [[nodiscard]] size_t numLevels() const
   { return m_numLevels; }
 
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader) const;
@@ -114,7 +114,8 @@ public:
   void bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
 
   bool updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
-                                          const std::set<uint32_t>& usedBlockIDs);
+                                          const std::set<uint32_t>& usedBlockIDs,
+                                          bool silenceExistingWarning = true);
 
   void uploadImageCache(size_t channel);
 

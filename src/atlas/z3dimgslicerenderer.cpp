@@ -27,7 +27,7 @@ Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
                                           m_rendererBase.generateHeader() + generateHeader());
 
   m_image3DSliceWithColorMapBlockIDsShader.bindFragDataLocation(0, "FragData0");
-  m_image3DSliceWithColorMapBlockIDsShader.bindFragDataLocation(1, "FragData1");
+  // m_image3DSliceWithColorMapBlockIDsShader.bindFragDataLocation(1, "FragData1");
   m_image3DSliceWithColorMapBlockIDsShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                               "image3d_slice_with_transfun_blockID.frag",
                                                               m_rendererBase.generateHeader() + generateHeader());
@@ -159,15 +159,14 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     std::set<uint32_t> usedBlockIDs;
     tbb::concurrent_unordered_set<uint32_t> ccSet;
 
-    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
-                                    GL_COLOR_ATTACHMENT1
+    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0
     };
 
     m_img->bindFullResBlockIDsShader(m_image3DSliceWithColorMapBlockIDsShader);
 
     for (auto& quad : m_quads) {
       m_blockIDsRenderTarget->bind();
-      glDrawBuffers(2, g_drawBuffers);
+      glDrawBuffers(1, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
       renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, quad);
@@ -187,21 +186,21 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       missingBlockIDs.insert(ccSet.begin(), ccSet.end());
       ccSet.clear();
 
-      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER,
-                                                                                        GL_UNSIGNED_INT,
-                                                                                        m_blockIDs.data());
-      tbb::parallel_for(
-        tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-          ccSet.insert(range.begin(), range.end()); // inserts a sequence
-        }
-      );
-
-      usedBlockIDs.insert(ccSet.begin(), ccSet.end());
-      ccSet.clear();
+//      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER,
+//                                                                                        GL_UNSIGNED_INT,
+//                                                                                        m_blockIDs.data());
+//      tbb::parallel_for(
+//        tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+//        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+//          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+//        }
+//      );
+//
+//      usedBlockIDs.insert(ccSet.begin(), ccSet.end());
+//      ccSet.clear();
     }
     missingBlockIDs.erase(0_u32);
-    usedBlockIDs.erase(0_u32);
+    // usedBlockIDs.erase(0_u32);
 
     m_image3DSliceWithColorMapBlockIDsShader.release();
     //glFinish();

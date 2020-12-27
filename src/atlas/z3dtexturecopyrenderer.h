@@ -24,7 +24,7 @@ public:
   void setDepthTexture(const Z3DTexture* depthTex)
   { m_depthTexture = depthTex; }
 
-  // if true, color with zero alpha value should be discarded, which might save many depth texture lookup. default is false
+  // if true, color with zero alpha value should be discarded, which might save many depth texture lookup. default is true
   // Make sure your color and depth buffer are cleared before if set to true
   // glClear + discard transparent  is usually faster than   not discard transparent if many pixels are empty
   void setDiscardTransparent(bool v)
@@ -42,7 +42,7 @@ protected:
   const Z3DTexture* m_depthTexture = nullptr;
 
   Z3DShaderGroup m_copyTextureShaderGrp;
-  bool m_discardTransparent;
+  bool m_discardTransparent = true;
 
   OutputColorOption m_mode;
   ZVertexArrayObject m_VAO;

@@ -8,7 +8,6 @@ namespace nim {
 Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, OutputColorOption mode)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_copyTextureShaderGrp(rendererBase)
-  , m_discardTransparent(false)
   , m_mode(mode)
   , m_VAO(1)
 {
