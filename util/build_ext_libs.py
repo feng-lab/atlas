@@ -200,7 +200,8 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard()):
     return env
 
 
-def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: int = cpp_standard()):
+def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: int = cpp_standard(),
+                              cpp_extention: bool = False):
     cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_windows():
         res = [get_cmake_binary(),  # '-E', 'echo',
@@ -238,7 +239,7 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                f'-DCMAKE_CXX_STANDARD={cpp_standard}',
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
-               '-DCMAKE_CXX_EXTENSIONS=OFF',
+               '-DCMAKE_CXX_EXTENSIONS=' + ('ON' if cpp_extention else 'OFF'),
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -956,7 +957,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                              'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
                                              ])
 
-            cmakecmd = get_cmake_cmd_common_part(install_dir)
+            cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
             cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DPYTHON_EXTENSIONS:BOOL=OFF',
                              '-DBUILD_TESTS:BOOL=OFF',
