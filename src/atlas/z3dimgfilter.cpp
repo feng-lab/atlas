@@ -41,8 +41,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_usedBlocksTexture3(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_usedBlocksTexture4(GL_TEXTURE_2D, GLint(GL_RGBA32UI), glm::uvec3(32, 32, 1), GL_RGBA_INTEGER, GL_UNSIGNED_INT)
   , m_blockIDsRenderTarget(glm::uvec2(32, 32))
-  , m_imageRenderTarget1()
-  , m_imageRenderTarget2()
+  , m_imageRenderTarget1(glm::uvec2(32, 32))
+  , m_imageRenderTarget2(glm::uvec2(32, 32))
   , m_outport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
   , m_rightEyeOutport("RightEyeImage", this)
@@ -137,15 +137,23 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_blockIDsRenderTarget.attachTextureToFBO(&m_usedBlocksTexture4, GL_COLOR_ATTACHMENT7, false);
   m_blockIDsRenderTarget.isFBOComplete();
 
-  auto texture = new Z3DTexture(GLint(GL_R32F), glm::uvec3(32, 32, 1), GL_RED, GL_FLOAT);
-  texture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  texture->uploadImage();
-  m_imageRenderTarget1.attachTextureToFBO(texture, GL_COLOR_ATTACHMENT1, true);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_TexId[0]->uploadImage();
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGB32F), glm::uvec3(32, 32, 1), GL_RGB, GL_FLOAT);
+  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_TexId[1]->uploadImage();
+  m_imageRenderTarget1.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
+  m_imageRenderTarget1.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
   m_imageRenderTarget1.isFBOComplete();
-  texture = new Z3DTexture(GLint(GL_R32F), glm::uvec3(32, 32, 1), GL_RED, GL_FLOAT);
-  texture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  texture->uploadImage();
-  m_imageRenderTarget2.attachTextureToFBO(texture, GL_COLOR_ATTACHMENT1, true);
+  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
+  g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_TexId[0]->uploadImage();
+  g_TexId[1] = new Z3DTexture(GLint(GL_RGB32F), glm::uvec3(32, 32, 1), GL_RGB, GL_FLOAT);
+  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+  g_TexId[1]->uploadImage();
+  m_imageRenderTarget2.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
+  m_imageRenderTarget2.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
   m_imageRenderTarget2.isFBOComplete();
 
   // ports

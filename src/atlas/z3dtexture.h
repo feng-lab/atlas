@@ -95,6 +95,10 @@ public:
 
   void saveAsDepthImage(const QString& filename) const;
 
+  void saveAsRGBFloatImage(const QString& filename) const;
+
+  void saveAsRGBAFloatImage(const QString& filename) const;
+
 private:
   [[nodiscard]] bool is1DTexture() const;
 

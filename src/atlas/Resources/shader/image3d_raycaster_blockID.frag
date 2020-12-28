@@ -21,7 +21,7 @@ uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
 uniform sampler2D ray_exit_eye_coord;
 
-uniform isampler2D last_ray_depth;
+uniform sampler2D last_ray_depth;
 
 #if GLSL_VERSION >= 330
 layout(location = 0) out uvec4 FragData0;
@@ -58,9 +58,9 @@ varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
 void main()
 {
 #if GLSL_VERSION >= 130
-  float currentRayLength = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
+  float currentRayLength = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).x;
 #else
-  float currentRayLength = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).r;
+  float currentRayLength = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).x;
 #endif
   if (currentRayLength >= 1.0) {
     discard;
@@ -164,7 +164,6 @@ void main()
               currentRayLength += stepSize;
             } while (ivec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           } else {
-            // skip empty space page table entry recursive
             if (pagingFlag == UNMAPPED) {
               // save missed blockid
               if (missBlockIDsIndex < 32) {

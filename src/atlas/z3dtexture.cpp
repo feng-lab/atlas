@@ -3,6 +3,7 @@
 #include "zlog.h"
 #include "z3dgpuinfo.h"
 #include "zimg.h"
+#include "zimgformat.h"
 #include <QImage>
 #include <QImageWriter>
 
@@ -355,6 +356,44 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
     img.wrapData(depthBuffer.data(), width(), height(), 1);
     img.flip(nim::Dimension::Y);
     img.save(filename);
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << "Exception: " << e.what();
+  }
+}
+
+void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
+{
+  try {
+    GLenum dataFormat = GL_RGB;
+    GLenum dataType = GL_FLOAT;
+    std::vector<float, boost::alignment::aligned_allocator<float, 32>> depthBuffer(numPixels() * 3);
+    downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
+    nim::ZImg img;
+    img.wrapData(depthBuffer.data(), width(), height(), 1, 3);
+    ZImg tmpImg(img.info());
+    ZImgFormat::CXYZtoXYZC(img, tmpImg);
+    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.save(filename);
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << "Exception: " << e.what();
+  }
+}
+
+void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
+{
+  try {
+    GLenum dataFormat = GL_RGBA;
+    GLenum dataType = GL_FLOAT;
+    std::vector<float, boost::alignment::aligned_allocator<float, 32>> depthBuffer(numPixels() * 4);
+    downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
+    nim::ZImg img;
+    img.wrapData(depthBuffer.data(), width(), height(), 1, 4);
+    ZImg tmpImg(img.info());
+    ZImgFormat::CXYZtoXYZC(img, tmpImg);
+    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.save(filename);
   }
   catch (ZException const& e) {
     LOG(ERROR) << "Exception: " << e.what();

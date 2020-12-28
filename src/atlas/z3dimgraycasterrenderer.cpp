@@ -90,7 +90,7 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
   m_copyTextureShader.bindFragDataLocation(0, "FragData0");
-  m_copyTextureShader.loadFromSourceFile("pass.vert", "copyimage_simple.frag",
+  m_copyTextureShader.loadFromSourceFile("pass.vert", "copy_raycaster_image.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
   CHECK_GL_ERROR
 }
@@ -730,7 +730,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_image3DRaycasterShader.bindTexture("last_color", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
           m_image3DRaycasterShader.bindTexture("last_ray_depth",
                                                m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1));
-          m_image3DRaycasterShader.bindTexture("last_depth", m_lastImageRenderTarget->attachment(GL_DEPTH_ATTACHMENT));
 
           if (m_compositingMode.get() == "ISO Surface")
             m_image3DRaycasterShader.setUniform("iso_value", m_isoValue.get());
@@ -759,6 +758,9 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
 
+          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(QString("/Users/feng/Downloads/att1_repeat%1.nim").arg(repeat));
+          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(QString("/Users/feng/Downloads/att2_repeat%1.nim").arg(repeat));
+
           if (lastRound) {
             break;
           }
@@ -767,7 +769,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         if (visibleIdxs.size() == 1) {
           m_copyTextureShader.bind();
           m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
-          m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTarget->attachment(GL_DEPTH_ATTACHMENT));
+          m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1));
           renderScreenQuad(m_VAO, m_copyTextureShader);
           m_copyTextureShader.release();
         } else {
@@ -777,7 +779,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           m_copyTextureShader.bind();
           m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
-          m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTarget->attachment(GL_DEPTH_ATTACHMENT));
+          m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1));
           renderScreenQuad(m_VAO, m_copyTextureShader);
           m_copyTextureShader.release();
 
