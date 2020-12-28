@@ -708,7 +708,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           STOP_AND_LOG(btcb)
 
           if (!missingBlockIDs.empty()) {
-            lastRound = lastRound && m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs);
+            lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs) && lastRound;
           } else {
             break;
           }
