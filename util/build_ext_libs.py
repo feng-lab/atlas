@@ -907,14 +907,37 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
             orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
             bak_file2 = patch_file(orig_file2,
                                    from_texts=[r'${ZLIB_INCLUDE_DIRS}',
-                                               r'${BZIP2_INCLUDE_DIRS}'],
+                                               r'${BZIP2_INCLUDE_DIRS}',
+                                               r'find_package(OpenSSL MODULE REQUIRED)',
+                                               r'find_package(BZip2 MODULE)',
+                                               r'find_package(LibLZMA MODULE)',
+                                               r'find_package(LZ4 MODULE)',
+                                               r'find_package(Zstd MODULE)',
+                                               r'find_package(Snappy MODULE)',
+                                               r'find_package(Libsodium)',
+                                               ],
                                    to_texts=[r'',
-                                             r''])
+                                             r'',
+                                             'find_package(OpenSSL MODULE REQUIRED)\n'
+                                             '#if (WIN32)\n'
+                                             'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
+                                             '#endif (WIN32)\n',
+                                             r'find_package(BZip2 MODULE REQUIRED)',
+                                             r'find_package(LibLZMA MODULE REQUIRED)',
+                                             r'find_package(LZ4 MODULE REQUIRED)',
+                                             r'find_package(Zstd MODULE REQUIRED)',
+                                             r'find_package(Snappy MODULE REQUIRED)',
+                                             r'find_package(Libsodium REQUIRED)',
+                                             ])
 
             orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
             bak_file3 = patch_file(orig_file3,
-                                  from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)'],
-                                  to_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib)'])
+                                  from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
+                                              r'/std:${MSVC_LANGUAGE_VERSION}',
+                                              ],
+                                  to_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
+                                            r'#/std:${MSVC_LANGUAGE_VERSION}',
+                                            ])
 
             orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
             bak_file4 = patch_file(orig_file4,
@@ -924,7 +947,7 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                              'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
                                              ])
 
-            cmakecmd = get_cmake_cmd_common_part(install_dir)
+            cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard='20')
             cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DPYTHON_EXTENSIONS:BOOL=OFF',
                              '-DBUILD_TESTS:BOOL=OFF',
