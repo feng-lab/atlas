@@ -14,8 +14,8 @@ def macos_min_version():
     return '10.14'
 
 
-def cpp_standard():
-    return '17'
+def cpp_standard() -> int:
+    return 17
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
@@ -154,10 +154,10 @@ def get_tbb_env():
     return env
 
 
-def get_common_build_flags(cpp_standard: str = cpp_standard()):
+def get_common_build_flags(cpp_standard: int = cpp_standard()):
     res = {}
     if is_mac():
-        if cpp_standard == '20':
+        if cpp_standard == 20:
             cpp_standard = '2a'
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
@@ -170,19 +170,19 @@ def get_common_build_flags(cpp_standard: str = cpp_standard()):
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_linux():
-        if cpp_standard == '20':
+        if cpp_standard == 20:
             cpp_standard = '2a'
         res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
         res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
-        if cpp_standard == '20':
+        if cpp_standard == 20:
             cpp_standard = 'latest'
         res['CFLAGS'] = f'/utf-8'
         res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
 
 
-def get_env_for_config_make(cpp_standard: str = cpp_standard()):
+def get_env_for_config_make(cpp_standard: int = cpp_standard()):
     env = get_vcvars_environment() if is_windows() else os.environ.copy()
     cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_mac():
@@ -200,7 +200,7 @@ def get_env_for_config_make(cpp_standard: str = cpp_standard()):
     return env
 
 
-def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: str = cpp_standard()):
+def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: int = cpp_standard()):
     cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_windows():
         res = [get_cmake_binary(),  # '-E', 'echo',
@@ -956,12 +956,11 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                              'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
                                              ])
 
-            cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard='20')
+            cmakecmd = get_cmake_cmd_common_part(install_dir)
             cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                              '-DPYTHON_EXTENSIONS:BOOL=OFF',
                              '-DBUILD_TESTS:BOOL=OFF',
                              '-DBOOST_LINK_STATIC=ON',
-                             #'-DCXX_STD=c++17',
                              src_dir])
             build_and_install_cmakecmd(cmakecmd, build_dir)
         finally:
@@ -1582,7 +1581,7 @@ def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard='14')
+        cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard=14)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',

@@ -37,7 +37,7 @@
 * $Repository_DIR/util/build_ext_libs.py: def cpp_standard() ... // fix to 17 now
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: -stdlib=libc++ -std=c++14 // todo: change to 17
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: -stdlib=libc++ -std=c++14 // todo: change to 17
-* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)
+* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 20)
 
 ## Minimum macOS Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
