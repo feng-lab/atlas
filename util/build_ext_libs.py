@@ -157,6 +157,8 @@ def get_tbb_env():
 def get_common_build_flags(cpp_standard: str = cpp_standard()):
     res = {}
     if is_mac():
+        if cpp_standard == '20':
+            cpp_standard = '2a'
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
@@ -168,9 +170,13 @@ def get_common_build_flags(cpp_standard: str = cpp_standard()):
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_linux():
+        if cpp_standard == '20':
+            cpp_standard = '2a'
         res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
         res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
+        if cpp_standard == '20':
+            cpp_standard = 'latest'
         res['CFLAGS'] = f'/utf-8'
         res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
@@ -692,6 +698,9 @@ def build_bzip2(src_dir: str, install_dir: str):
         if not is_windows():
             shutil.copy2(os.path.join(install_dir, 'lib', 'libbz2_static.a'),
                          os.path.join(install_dir, 'lib', 'libbz2.a'))
+        else:
+            shutil.copy2(os.path.join(install_dir, 'lib', 'bz2_static.lib'),
+                         os.path.join(install_dir, 'lib', 'bz2.lib'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
@@ -919,9 +928,9 @@ def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
                                    to_texts=[r'',
                                              r'',
                                              'find_package(OpenSSL MODULE REQUIRED)\n'
-                                             '#if (WIN32)\n'
+                                             'if (WIN32)\n'
                                              'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
-                                             '#endif (WIN32)\n',
+                                             'endif (WIN32)\n',
                                              r'find_package(BZip2 MODULE REQUIRED)',
                                              r'find_package(LibLZMA MODULE REQUIRED)',
                                              r'find_package(LZ4 MODULE REQUIRED)',
