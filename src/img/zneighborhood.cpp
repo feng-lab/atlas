@@ -1,5 +1,7 @@
 #include "zneighborhood.h"
 
+#include <boost/range/algorithm_ext/erase.hpp>
+
 namespace nim {
 
 ZNeighborhood::ZNeighborhood(size_t nb)
@@ -53,11 +55,9 @@ void ZNeighborhood::set(size_t nb)
     case 8:
       set(1, 1, 0, false);
       return;
-      break;
     case 9:
       set(1, 1, 0, true);
       return;
-      break;
     case 6:
       m_offsets[0] = ZVoxelCoordinate(0, 0, -1);
       m_offsets[1] = ZVoxelCoordinate(0, -1, 0);
@@ -123,14 +123,11 @@ void ZNeighborhood::set(size_t nb)
     case 26:
       set(1, 1, 1, false);
       return;
-      break;
     case 27:
       set(1, 1, 1, true);
       return;
-      break;
     default:
       throw ZImgException(QString("Not supported neighborhood option: %1").arg(nb));
-      break;
   }
 }
 
@@ -204,7 +201,7 @@ void ZNeighborhood::removeSymmetricalOffsets()
 
 void ZNeighborhood::removeCenter()
 {
-  std::erase(m_offsets, ZVoxelCoordinate());
+  boost::remove_erase(m_offsets, ZVoxelCoordinate());
 }
 
 } // namespace nim

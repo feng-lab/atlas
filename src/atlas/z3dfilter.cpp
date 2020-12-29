@@ -9,6 +9,7 @@
 #include "zparameter.h"
 #include "z3drenderport.h"
 #include "zvertexarrayobject.h"
+#include <boost/range/algorithm_ext/erase.hpp>
 
 namespace nim {
 
@@ -148,7 +149,7 @@ bool Z3DFilter::isReady(Z3DEye /*unused*/) const
 
 void Z3DFilter::addPort(Z3DInputPortBase& port)
 {
-  if (m_inputPortMap.contains(port.name())) {
+  if (m_inputPortMap.count(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   } else {
     m_inputPortMap.emplace(port.name(), &port);
@@ -158,7 +159,7 @@ void Z3DFilter::addPort(Z3DInputPortBase& port)
 
 void Z3DFilter::addPort(Z3DOutputPortBase& port)
 {
-  if (m_outputPortMap.contains(port.name())) {
+  if (m_outputPortMap.count(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   } else {
     m_outputPortMap.emplace(port.name(), &port);
@@ -168,7 +169,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase& port)
 
 void Z3DFilter::removePort(Z3DInputPortBase& port)
 {
-  std::erase(m_inputPorts, &port);
+  boost::remove_erase(m_inputPorts, &port);
 
   if (m_inputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -177,7 +178,7 @@ void Z3DFilter::removePort(Z3DInputPortBase& port)
 
 void Z3DFilter::removePort(Z3DOutputPortBase& port)
 {
-  std::erase(m_outputPorts, &port);
+  boost::remove_erase(m_outputPorts, &port);
 
   if (m_outputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -186,7 +187,7 @@ void Z3DFilter::removePort(Z3DOutputPortBase& port)
 
 void Z3DFilter::addParameter(ZParameter& para, State inv)
 {
-  if (m_parameterNames.contains(para.name())) {
+  if (m_parameterNames.count(para.name())) {
     LOG(FATAL) << "Duplicated para name " << para.name();
   }
   m_parameters.push_back(&para);
@@ -198,11 +199,11 @@ void Z3DFilter::addParameter(ZParameter& para, State inv)
 
 void Z3DFilter::removeParameter(ZParameter& para)
 {
-  if (!m_parameterNames.contains(para.name())) {
+  if (!m_parameterNames.count(para.name())) {
     LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
   }
   para.disconnect(this);
-  std::erase(m_parameters, &para);
+  boost::remove_erase(m_parameters, &para);
   m_parameterNames.erase(para.name());
 }
 
@@ -247,7 +248,7 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
 
 void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
 {
-  if (m_outputPortMap.contains(port.name())) {
+  if (m_outputPortMap.count(port.name())) {
     LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
   } else {
     m_outputPortMap.emplace(port.name(), &port);

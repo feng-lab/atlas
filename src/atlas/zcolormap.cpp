@@ -5,8 +5,10 @@
 #include "zlog.h"
 #include "zcolormapwidgetwitheditorwindow.h"
 #include <QWidget>
+#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 #include <limits>
+#include <memory>
 
 namespace nim {
 
@@ -450,7 +452,7 @@ glm::col4 ZColorMap::mappedColor(double i) const
     return glm::col4(0, 0, 0, 0);
 
   // iterate through all keys until we get to the correct position
-  std::vector<std::pair<ZColorMapKey, bool>>::const_iterator keyIt = m_keys.begin();
+  auto keyIt = m_keys.begin();
 
   while ((keyIt != m_keys.end()) && (i > (*keyIt).first.intensity()))
     keyIt++;
@@ -636,10 +638,10 @@ void ZColorMap::setKeySelected(size_t index, bool v)
 void ZColorMap::deselectAllKeys()
 {
   bool change = false;
-  for (size_t i = 0; i < m_keys.size(); ++i) {
-    if (m_keys[i].second) {
+  for (auto& key : m_keys) {
+    if (key.second) {
       change = true;
-      m_keys[i].second = false;
+      key.second = false;
     }
   }
   if (change)
@@ -706,8 +708,8 @@ bool ZColorMap::setKeys(const std::vector<ZColorMapKey>& keys)
     return false;
   blockSignals(true);
   clearKeys();
-  for (size_t i = 0; i < keys.size(); ++i)
-    addKey(keys[i]);
+  for (const auto& key : keys)
+    addKey(key);
   blockSignals(false);
   emit changed();
   return true;
@@ -720,7 +722,7 @@ ZColorMapKey& ZColorMap::addKey(const ZColorMapKey& key, bool select)
     emit changed();
     return m_keys.back().first;
   }
-  KeyIterType keyIt = m_keys.begin();
+  auto keyIt = m_keys.begin();
   // Forward to the correct position
   while ((keyIt != m_keys.end()) && (key.intensity() > (*keyIt).first.intensity()))
     keyIt++;
@@ -729,7 +731,7 @@ ZColorMapKey& ZColorMap::addKey(const ZColorMapKey& key, bool select)
     emit changed();
     return m_keys.back().first;
   } else {
-    KeyIterType iter = m_keys.emplace(keyIt, key, select);
+    auto iter = m_keys.emplace(keyIt, key, select);
     emit changed();
     return (*iter).first;
   }
@@ -791,11 +793,9 @@ void ZColorMap::addKeyAtFraction(double fraction, double alpha, bool select)
 bool ZColorMap::removeDuplicatedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  m_keys.erase(std::unique(m_keys.begin(), m_keys.end(),
-                           [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
-                             return key1.first.intensity() == key2.first.intensity();
-                           }),
-               m_keys.end());
+  boost::unique_erase(m_keys, [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
+    return key1.first.intensity() == key2.first.intensity();
+  });
   if (m_keys.size() != sizeBefore)
     emit changed();
   return m_keys.size() != sizeBefore;
@@ -804,7 +804,7 @@ bool ZColorMap::removeDuplicatedKeys()
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  std::erase_if(m_keys, [](const auto& key) { return key.second; });
+  boost::remove_erase_if(m_keys, [](const auto& key) { return key.second; });
   if (m_keys.size() != sizeBefore)
     emit changed();
   return m_keys.size() != sizeBefore;
@@ -817,8 +817,8 @@ void ZColorMap::updateKeys()
 
 void ZColorMap::removeKey(const ZColorMapKey& key)
 {
-  std::erase(m_keys, std::make_pair(key, false));
-  std::erase(m_keys, std::make_pair(key, true));
+  boost::remove_erase(m_keys, std::make_pair(key, false));
+  boost::remove_erase(m_keys, std::make_pair(key, true));
   emit changed();
 }
 
@@ -844,7 +844,7 @@ void ZColorMap::create1DTexture(size_t width) const
   size_t maxTexSize = Z3DGpuInfo::instance().maxTextureSize();
   if (maxTexSize < width)
     width = maxTexSize;
-  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV));
+  m_texture = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
 }
 
 void ZColorMap::update1DTexture() const
@@ -854,7 +854,7 @@ void ZColorMap::update1DTexture() const
 
   std::vector<glm::col4> tfData(m_texture->dimension().x);
   for (size_t x = 0; x < tfData.size(); ++x)
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1));
+    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
   m_texture->uploadImage(tfData.data());
 
   m_textureIsInvalid = false;

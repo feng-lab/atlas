@@ -1,18 +1,18 @@
 #include "zparameteranimation.h"
 
 #include "zlog.h"
-#include "zglmutils.h"
-#include "zlog.h"
 #include "zparameterfactory.h"
 #include "zcameraparameteranimation.h"
 #include "zserializationutils.h"
 #include "zglobal.h"
+#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
+#include <utility>
 
 namespace nim {
 
-ZParameterAnimation::ZParameterAnimation(const QString& name, const QString& type, const QColor& color, QObject* parent)
-  : QObject(parent), m_name(name), m_type(type), m_color(color)
+ZParameterAnimation::ZParameterAnimation(QString name, QString type, const QColor& color, QObject* parent)
+  : QObject(parent), m_name(std::move(name)), m_type(std::move(type)), m_color(color)
 {
 }
 
@@ -36,7 +36,7 @@ void ZParameterAnimation::releaseParameter()
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
   emit keyAboutToDelete(key);
-  std::erase_if(m_keys, [key](const auto& ckey) {
+  boost::remove_erase_if(m_keys, [key](const auto& ckey) {
     return ckey.get() == key;
   });
 }
@@ -127,9 +127,9 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
     auto res = new ZCameraParameterAnimation(name, color, parent);
     if (obj.contains("keys")) {
       QJsonArray keyArray = obj.value("keys").toArray();
-      for (int i = 0; i < keyArray.size(); ++i) {
+      for (auto&& i : keyArray) {
         auto cpkey = std::make_unique<ZCameraParameterKey>();
-        if (cpkey->readValue(keyArray.at(i))) {
+        if (cpkey->readValue(i)) {
           res->addKey(std::unique_ptr<ZParameterKey>(std::move(cpkey)));
         }
       }
@@ -139,9 +139,9 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
     auto res = new ZParameterAnimation(name, type, color, parent);
     if (obj.contains("keys")) {
       QJsonArray keyArray = obj.value("keys").toArray();
-      for (int i = 0; i < keyArray.size(); ++i) {
+      for (auto&& i : keyArray) {
         auto cpkey = std::make_unique<ZParameterKey>(type);
-        if (cpkey->readValue(keyArray.at(i))) {
+        if (cpkey->readValue(i)) {
           res->addKey(std::move(cpkey));
         }
       }
@@ -156,8 +156,8 @@ void ZParameterAnimation::write(QJsonObject& json) const
   obj["color"] = toQString(m_color);
   if (!m_keys.empty()) {
     QJsonArray keysArray;
-    for (size_t i = 0; i < m_keys.size(); ++i) {
-      keysArray.append(m_keys[i]->jsonValue());
+    for (const auto& key : m_keys) {
+      keysArray.append(key->jsonValue());
     }
     obj["keys"] = keysArray;
   }

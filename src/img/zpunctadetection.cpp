@@ -19,7 +19,6 @@
 #include <itkBinaryDilateImageFilter.h>
 #include <itkBinaryMorphologicalOpeningImageFilter.h>
 #include <itkBinaryThresholdImageFilter.h>
-#include <itkStreamingImageFilter.h>
 #include <QFileInfo>
 #include <QFile>
 #include <boost/math/distributions/chi_squared.hpp>
@@ -28,6 +27,7 @@
 #include <boost/geometry/geometries/adapted/c_array.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
 #include <boost/geometry/multi/geometries/multi_polygon.hpp>
+#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -1219,15 +1219,15 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
     labelImg = CC.createTypedLabelImg<uint32_t>();
   }
 
-  uint32_t* labelData = labelImg.channelData<uint32_t>(0, 0);
+  auto* labelData = labelImg.channelData<uint32_t>(0, 0);
   ZImgNeighborhoodConstIterator<uint32_t> nit(ZNeighborhood(26), labelImg);
-  for (size_t i = 0; i < m_barrierVoxels.size(); ++i) {
-    nit.goToIndex(m_barrierVoxels[i]);
+  for (auto barrierVoxel : m_barrierVoxels) {
+    nit.goToIndex(barrierVoxel);
     CHECK(*nit == 0);
     for (size_t nb = 0; nb < nit.numNeighbors(); ++nb) {
       if (nit.isInBound(nb) && nit.valueRef(nb) > 0) {
-        CC.voxelIdxList[nit.valueRef(nb) - 1].push_back(m_barrierVoxels[i]);
-        labelData[m_barrierVoxels[i]] = nit.valueRef(nb);
+        CC.voxelIdxList[nit.valueRef(nb) - 1].push_back(barrierVoxel);
+        labelData[barrierVoxel] = nit.valueRef(nb);
         break;
       }
     }
@@ -1237,10 +1237,10 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
   LOG(INFO) << "number of voxels after watershed: " << CC.toatalNumVoxels() << " " << m_barrierVoxels.size();
 
   std::vector<Eigen::MatrixXi> m_labelObjects;
-  for (size_t obj = 0; obj < CC.voxelIdxList.size(); ++obj) {
-    Eigen::MatrixXi allVoxels(CC.voxelIdxList[obj].size(), 3);
-    for (size_t v = 0; v < CC.voxelIdxList[obj].size(); ++v) {
-      ZVoxelCoordinate coord = img.indexToCoord(CC.voxelIdxList[obj][v]);
+  for (auto& obj : CC.voxelIdxList) {
+    Eigen::MatrixXi allVoxels(obj.size(), 3);
+    for (size_t v = 0; v < obj.size(); ++v) {
+      ZVoxelCoordinate coord = img.indexToCoord(obj[v]);
       allVoxels(v, 0) = coord[0];
       allVoxels(v, 1) = coord[1];
       allVoxels(v, 2) = coord[2];
@@ -1410,7 +1410,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
       }
     }
     // remove empty group
-    std::erase_if(modelGroups, [](const auto& v) {
+    boost::remove_erase_if(modelGroups, [](const auto& v) {
       return v.empty();
     });
     // create new group

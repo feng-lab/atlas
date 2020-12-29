@@ -62,34 +62,34 @@ public:
   inline ZVoxelCoordinate& offset(size_t n)
   { return m_offsets[n]; }
 
-  inline const ZVoxelCoordinate& offset(size_t n) const
+  [[nodiscard]] inline const ZVoxelCoordinate& offset(size_t n) const
   { return m_offsets[n]; }
 
-  inline const std::vector<ZVoxelCoordinate>& offsets() const
+  [[nodiscard]] inline const std::vector<ZVoxelCoordinate>& offsets() const
   { return m_offsets; }
 
-  inline size_t size() const
+  [[nodiscard]] inline size_t size() const
   { return m_offsets.size(); }
 
-  inline bool empty() const
+  [[nodiscard]] inline bool empty() const
   { return m_offsets.empty(); }
 
-  inline size_t leftExtend() const
+  [[nodiscard]] inline size_t leftExtend() const
   { return m_leftExtend; }
 
-  inline size_t rightExtend() const
+  [[nodiscard]] inline size_t rightExtend() const
   { return m_rightExtend; }
 
-  inline size_t upExtend() const
+  [[nodiscard]] inline size_t upExtend() const
   { return m_upExtend; }
 
-  inline size_t downExtend() const
+  [[nodiscard]] inline size_t downExtend() const
   { return m_downExtend; }
 
-  inline size_t frontExtend() const
+  [[nodiscard]] inline size_t frontExtend() const
   { return m_frontExtend; }
 
-  inline size_t backExtend() const
+  [[nodiscard]] inline size_t backExtend() const
   { return m_backExtend; }
 
 private:

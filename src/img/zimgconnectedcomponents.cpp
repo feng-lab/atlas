@@ -1,6 +1,7 @@
 #include "zimgconnectedcomponents.h"
 
 #include "zimgneighborhooditerator.h"
+#include <boost/range/algorithm_ext/erase.hpp>
 #include <stack>
 
 namespace nim {
@@ -45,7 +46,7 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
   }
   if (includeThre)
     sizeThre++;
-  std::erase_if(voxelIdxList, [sizeThre](const auto& v) {
+  boost::remove_erase_if(voxelIdxList, [sizeThre](const auto& v) {
     return v.size() < sizeThre;
   });
 }

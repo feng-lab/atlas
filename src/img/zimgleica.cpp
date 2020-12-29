@@ -8,6 +8,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QUrl>
+#include <boost/range/algorithm_ext/erase.hpp>
 
 namespace {
 
@@ -813,7 +814,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
 
     if (!hasSceneDim) {
       ImageInfo info = ii;
-      std::erase_if(info.dimensions, [](const auto& ddd) {
+      boost::remove_erase_if(info.dimensions, [](const auto& ddd) {
         return ddd.dimID >= 5;
       });
       res.push_back(info);
@@ -878,7 +879,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
             }
           }
         }
-        std::erase_if(info.dimensions, [](const auto& ddd) {
+        boost::remove_erase_if(info.dimensions, [](const auto& ddd) {
           return ddd.dimID >= 5;
         });
         res.push_back(info);

@@ -12,35 +12,35 @@ class ZParameterAnimation : public QObject
 {
 Q_OBJECT
 public:
-  ZParameterAnimation(const QString& name, const QString& type,
+  ZParameterAnimation(QString name, QString type,
                       const QColor& color = QColor(ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255)),
                       QObject* parent = nullptr);
 
-  virtual ~ZParameterAnimation();
+  ~ZParameterAnimation() override;
 
   // not valid means parameter type is wrong or no key
-  bool isValid() const
+  [[nodiscard]] bool isValid() const
   { return m_boundPara && !m_keys.empty(); }
 
   void bindParameter(ZParameter& para);
 
   void releaseParameter();
 
-  ZParameter* boundParameter() const
+  [[nodiscard]] ZParameter* boundParameter() const
   { return m_boundPara; }
 
-  inline QString name() const
+  [[nodiscard]] inline QString name() const
   { return m_name; }
 
   inline void setName(const QString& n)
   { m_name = n; }
 
-  inline QString type() const
+  [[nodiscard]] inline QString type() const
   { return m_type; }
 
-  inline QColor color() const
+  [[nodiscard]] inline QColor color() const
   { return m_color; }
 
   inline void setColor(const QColor& c)
@@ -50,10 +50,10 @@ public:
 
   void addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant = true);
 
-  const std::vector<std::unique_ptr<ZParameterKey>>& keys() const
+  [[nodiscard]] const std::vector<std::unique_ptr<ZParameterKey>>& keys() const
   { return m_keys; }
 
-  int numKeys() const
+  [[nodiscard]] int numKeys() const
   { return m_keys.size(); }
 
   void sortKeys();
@@ -64,7 +64,7 @@ public:
   void emitKeysChangedSignal()
   { emit keysChanged(); }
 
-  QString jsonKey() const;
+  [[nodiscard]] QString jsonKey() const;
 
   // might return nullptr
   static ZParameterAnimation* create(const QString& key, const QJsonValue& value, QObject* parent = nullptr);
@@ -72,7 +72,7 @@ public:
   void write(QJsonObject& json) const;
 
   // create a new key based on current view
-  virtual std::unique_ptr<ZParameterKey> createKey(double secs) const;
+  [[nodiscard]] virtual std::unique_ptr<ZParameterKey> createKey(double secs) const;
 
   void setCurrentTime(double secs);
 
@@ -91,7 +91,7 @@ signals:
 protected:
   virtual void updateParaToTime(double secs, ZParameter* para) const;
 
-  inline const ZParameterKey& lastKey() const
+  [[nodiscard]] inline const ZParameterKey& lastKey() const
   { return *m_keys[m_keys.size() - 1]; }
 
 protected:

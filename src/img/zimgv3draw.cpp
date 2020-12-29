@@ -156,8 +156,8 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   imgInfo.createDefaultDescriptions();
 
   img = readRawImg(filename, imgInfo, "XYZCT", dataOffset, region);
-  if ((std::endian::native == std::endian::little && (endian == 'B' || endian == 'b')) ||
-      (std::endian::native == std::endian::big && (endian == 'L' || endian == 'l'))) {
+  if ((QSysInfo::ByteOrder == QSysInfo::LittleEndian && (endian == 'B' || endian == 'b')) ||
+      (QSysInfo::ByteOrder == QSysInfo::BigEndian && (endian == 'L' || endian == 'l'))) {
     img.reverseEndianness();
   }
 }
