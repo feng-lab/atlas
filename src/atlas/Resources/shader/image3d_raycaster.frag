@@ -156,17 +156,17 @@ void sampleBlock(in ivec3 pageTableEntry, in int curLevel, in ivec3 pageTableCoo
 void main()
 {
 #if GLSL_VERSION >= 130
-  vec3 lastRayDepth = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xyz;
+  vec2 lastRayDepth = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xy;
   vec4 result = texelFetch(last_color, ivec2(gl_FragCoord.xy), 0);
 #else
-  vec3 lastRayDepth = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xyz;
+  vec2 lastRayDepth = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xy;
   vec4 result = texelFetch2D(last_color, ivec2(gl_FragCoord.xy), 0);
 #endif
   float currentRayLength = lastRayDepth.x;
   float rayDepth = lastRayDepth.y;
   if (currentRayLength >= 1.0) {
     FragData0 = result;
-    FragData1.xyz = lastRayDepth;
+    FragData1.xy = lastRayDepth;
     return;
   }
   if (currentRayLength == 0.0) {
@@ -307,7 +307,7 @@ void main()
 #else
       FragData0 = result;
 #endif
-      FragData1.xyz = vec3(currentRayLength, rayDepth, 0.);
+      FragData1.xy = vec2(currentRayLength, rayDepth);
       return;
     }
 
@@ -336,7 +336,7 @@ void main()
 
     result.rgb *= result.a;
     FragData0 = result;
-    FragData1.xyz = vec3(1.0, rayDepth, fragDepth);
+    FragData1.xy = vec2(1.0, fragDepth);
   }
 }
 

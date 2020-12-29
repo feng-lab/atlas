@@ -140,7 +140,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGB32F), glm::uvec3(32, 32, 1), GL_RGB, GL_FLOAT);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(32, 32, 1), GL_RG, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_imageRenderTarget1.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
@@ -149,7 +149,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGB32F), glm::uvec3(32, 32, 1), GL_RGB, GL_FLOAT);
+  g_TexId[1] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(32, 32, 1), GL_RG, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[1]->uploadImage();
   m_imageRenderTarget2.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);

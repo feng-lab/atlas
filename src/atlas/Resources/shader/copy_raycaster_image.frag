@@ -22,5 +22,5 @@ void main()
 
   FragData0 = fragColor;
 
-  gl_FragDepth = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).z;
+  gl_FragDepth = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).y;
 }
