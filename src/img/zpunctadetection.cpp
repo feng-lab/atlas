@@ -23,11 +23,7 @@
 #include <QFile>
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/geometry/geometry.hpp>
-#include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/adapted/c_array.hpp>
-#include <boost/geometry/geometries/polygon.hpp>
-#include <boost/geometry/multi/geometries/multi_polygon.hpp>
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 #include <limits>
 #include <cmath>
@@ -1410,7 +1406,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
       }
     }
     // remove empty group
-    boost::remove_erase_if(modelGroups, [](const auto& v) {
+    erase_if(modelGroups, [](const auto& v) {
       return v.empty();
     });
     // create new group

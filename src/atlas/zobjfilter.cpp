@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include "zparameter.h"
-#include <boost/range/algorithm_ext/erase.hpp>
 
 namespace nim {
 
@@ -66,7 +65,7 @@ void ZObjFilter::addParameter(ZParameter* para)
 
 void ZObjFilter::removeParameter(ZParameter* para)
 {
-  boost::remove_erase(m_parameters, para);
+  erase(m_parameters, para);
 }
 
 void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const

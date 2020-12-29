@@ -5,7 +5,6 @@
 #include "zcameraparameteranimation.h"
 #include "zserializationutils.h"
 #include "zglobal.h"
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 #include <utility>
 
@@ -36,7 +35,7 @@ void ZParameterAnimation::releaseParameter()
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
   emit keyAboutToDelete(key);
-  boost::remove_erase_if(m_keys, [key](const auto& ckey) {
+  erase_if(m_keys, [key](const auto& ckey) {
     return ckey.get() == key;
   });
 }

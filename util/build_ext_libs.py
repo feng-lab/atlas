@@ -2198,15 +2198,6 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_contrib_dir)
         build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
-    if libs['conda-opencv']:
-        src_dir = os.path.join(ext_dir(), 'opencv')
-        src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
-        build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
-
-    if libs['conda-zimg']:
-        src_dir = os.path.join(atlas_src_dir(), 'python')
-        build_conda_zimg(src_dir, ext_conda_build_dir())
-
     # if libs['botan']:
     #     src_dir = os.path.join(ext_dir(), 'botan')
     #     if update_src:
@@ -2272,6 +2263,15 @@ def build_libs(libs: dict, update_src: bool):
             print('no ANTs')
         else:
             build_ants(src_dir, os.path.join(ext_build_dir(), 'ANTs'))
+
+    if libs['conda-opencv']:
+        src_dir = os.path.join(ext_dir(), 'opencv')
+        src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
+        build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
+
+    if libs['conda-zimg']:
+        src_dir = os.path.join(atlas_src_dir(), 'python')
+        build_conda_zimg(src_dir, ext_conda_build_dir())
 
 
 def parse_inputs(argv: list):
@@ -2363,6 +2363,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
             build_all = build_all and libs[lib]
     if build_all:
         shutil.rmtree(ext_build_dir(), ignore_errors=True)
+        shutil.rmtree(ext_conda_build_dir(), ignore_errors=True)
 
     if is_linux():
         libs['curl'] = False

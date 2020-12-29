@@ -5,7 +5,6 @@
 #include "zlog.h"
 #include "zcolormapwidgetwitheditorwindow.h"
 #include <QWidget>
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 #include <limits>
 #include <memory>
@@ -793,7 +792,7 @@ void ZColorMap::addKeyAtFraction(double fraction, double alpha, bool select)
 bool ZColorMap::removeDuplicatedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  boost::unique_erase(m_keys, [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
+  unique_if(m_keys, [](const std::pair<ZColorMapKey, bool>& key1, const std::pair<ZColorMapKey, bool>& key2) {
     return key1.first.intensity() == key2.first.intensity();
   });
   if (m_keys.size() != sizeBefore)
@@ -804,7 +803,7 @@ bool ZColorMap::removeDuplicatedKeys()
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  boost::remove_erase_if(m_keys, [](const auto& key) { return key.second; });
+  erase_if(m_keys, [](const auto& key) { return key.second; });
   if (m_keys.size() != sizeBefore)
     emit changed();
   return m_keys.size() != sizeBefore;
@@ -817,8 +816,8 @@ void ZColorMap::updateKeys()
 
 void ZColorMap::removeKey(const ZColorMapKey& key)
 {
-  boost::remove_erase(m_keys, std::make_pair(key, false));
-  boost::remove_erase(m_keys, std::make_pair(key, true));
+  erase(m_keys, std::make_pair(key, false));
+  erase(m_keys, std::make_pair(key, true));
   emit changed();
 }
 

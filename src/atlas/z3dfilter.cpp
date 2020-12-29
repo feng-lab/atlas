@@ -9,7 +9,6 @@
 #include "zparameter.h"
 #include "z3drenderport.h"
 #include "zvertexarrayobject.h"
-#include <boost/range/algorithm_ext/erase.hpp>
 
 namespace nim {
 
@@ -169,7 +168,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase& port)
 
 void Z3DFilter::removePort(Z3DInputPortBase& port)
 {
-  boost::remove_erase(m_inputPorts, &port);
+  erase(m_inputPorts, &port);
 
   if (m_inputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -178,7 +177,7 @@ void Z3DFilter::removePort(Z3DInputPortBase& port)
 
 void Z3DFilter::removePort(Z3DOutputPortBase& port)
 {
-  boost::remove_erase(m_outputPorts, &port);
+  erase(m_outputPorts, &port);
 
   if (m_outputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -203,7 +202,7 @@ void Z3DFilter::removeParameter(ZParameter& para)
     LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
   }
   para.disconnect(this);
-  boost::remove_erase(m_parameters, &para);
+  erase(m_parameters, &para);
   m_parameterNames.erase(para.name());
 }
 

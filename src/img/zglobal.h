@@ -178,4 +178,41 @@ public:
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>; // not needed as of C++20
 
+// some c++20 lib functions
+template< class Container, class T >
+inline Container& erase( Container& on, const T& val )
+{
+  on.erase(
+    std::remove(std::begin(on), std::end(on), val),
+    std::end(on));
+  return on;
+}
+
+template< class Container, class Pred >
+inline Container& erase_if( Container& on, Pred pred )
+{
+  on.erase(
+    std::remove_if(std::begin(on), std::end(on), pred),
+    std::end(on));
+  return on;
+}
+
+template< class Container >
+inline Container& unique( Container& on)
+{
+  on.erase(
+    std::unique(std::begin(on), std::end(on)),
+    std::end(on));
+  return on;
+}
+
+template< class Container, class Pred >
+inline Container& unique_if( Container& on, Pred pred )
+{
+  on.erase(
+    std::unique(std::begin(on), std::end(on), pred),
+    std::end(on));
+  return on;
+}
+
 } // namespace nim

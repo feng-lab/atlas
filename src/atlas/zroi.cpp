@@ -7,7 +7,6 @@
 #include "zroiutils.h"
 #include <QFile>
 #include <QTransform>
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <cmath>
 
 namespace nim {
@@ -267,7 +266,7 @@ void ZSliceROI::deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
         }
       }
     }
-    boost::remove_erase_if(shapeOps, [](const auto& so) { return so.poly.empty(); });
+    erase_if(shapeOps, [](const auto& so) { return so.poly.empty(); });
 
     while (!shapeOps.empty() && !shapeOps[0].isAdd) {
       shapeOps.erase(shapeOps.begin());

@@ -1,7 +1,5 @@
 #include "zneighborhood.h"
 
-#include <boost/range/algorithm_ext/erase.hpp>
-
 namespace nim {
 
 ZNeighborhood::ZNeighborhood(size_t nb)
@@ -201,7 +199,7 @@ void ZNeighborhood::removeSymmetricalOffsets()
 
 void ZNeighborhood::removeCenter()
 {
-  boost::remove_erase(m_offsets, ZVoxelCoordinate());
+  erase(m_offsets, ZVoxelCoordinate());
 }
 
 } // namespace nim

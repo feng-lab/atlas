@@ -9,7 +9,6 @@
 #include <QScrollArea>
 #include <QPushButton>
 #include <QLabel>
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <utility>
 
 namespace {
@@ -98,7 +97,7 @@ void ZWidgetsGroup::removeAllChildren()
 void ZWidgetsGroup::removeChild(const QWidget& widget)
 {
   const auto origSize = m_childGroups.size();
-  boost::remove_erase_if(m_childGroups, [&widget, this](const auto& child) {
+  erase_if(m_childGroups, [&widget, this](const auto& child) {
     if (child->m_type == Type::Widget && child->m_widget == &widget) {
       child->disconnect(this);
       return true;
@@ -111,7 +110,7 @@ void ZWidgetsGroup::removeChild(const QWidget& widget)
 void ZWidgetsGroup::removeChild(const ZParameter& para)
 {
   const auto origSize = m_childGroups.size();
-  boost::remove_erase_if(m_childGroups, [&para, this](const auto& child) {
+  erase_if(m_childGroups, [&para, this](const auto& child) {
     if (child->m_type == Type::Parameter && child->m_parameter == &para) {
       child->disconnect(this);
       return true;
@@ -124,7 +123,7 @@ void ZWidgetsGroup::removeChild(const ZParameter& para)
 void ZWidgetsGroup::removeChild(const std::shared_ptr<ZWidgetsGroup>& childIn)
 {
   const auto origSize = m_childGroups.size();
-  boost::remove_erase_if(m_childGroups, [&childIn, this](const auto& child) {
+  erase_if(m_childGroups, [&childIn, this](const auto& child) {
     if (child == childIn) {
       child->disconnect(this);
       return true;

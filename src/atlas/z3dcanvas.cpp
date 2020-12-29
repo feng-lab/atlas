@@ -5,7 +5,6 @@
 #include "z3dscene.h"
 #include "zlog.h"
 #include "z3dopenglwidget.h"
-#include <boost/range/algorithm_ext/erase.hpp>
 #include <algorithm>
 
 namespace nim {
@@ -463,7 +462,7 @@ void Z3DCanvas::setFakeStereoOnce()
 
 void Z3DCanvas::removeEventListener(Z3DCanvasEventListener& e)
 {
-  boost::remove_erase(m_listeners, &e);
+  erase(m_listeners, &e);
 }
 
 void Z3DCanvas::clearEventListeners()
