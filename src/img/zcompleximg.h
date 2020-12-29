@@ -90,7 +90,7 @@ public:
   ZComplexImg operator/(const ZComplexImg& rhs) const;
 
 private:
-  std::vector<std::complex<double>, boost::alignment::aligned_allocator<std::complex<double>, 32>> m_data;
+  std::vector<std::complex<double>, boost::alignment::aligned_allocator<std::complex<double>, 64>> m_data;
   size_t m_width = 0;
   size_t m_height = 0;
   size_t m_depth = 0;

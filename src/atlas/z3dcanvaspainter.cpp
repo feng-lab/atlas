@@ -298,7 +298,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
 
     if (eye == Z3DEye::Mono) {
       // get color buffer content
-      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> colorBuffer(
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
         tex->bypePerPixel(dataFormat, dataType) * tex->numPixels());
       tex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
       ZImg bufImg;
@@ -317,7 +317,7 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
       if (!leftTex) {
         throw ZGLException("not ready to capture image");
       }
-      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> colorBuffer(
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
         leftTex->bypePerPixel(dataFormat, dataType) * leftTex->numPixels());
       leftTex->downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
       ZImg bufImg;

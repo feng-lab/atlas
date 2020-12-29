@@ -546,7 +546,7 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
   size_t desDepth = frontPad + depth + backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight * desDepth);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight * desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, padImg.data(),
@@ -555,7 +555,7 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
 
   //image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth * kernelHeight * kernelDepth);
   const double* adjKernel = alignedKernel.data();
   if (!corr) {
@@ -592,7 +592,7 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
   size_t desDepth = frontPad + depth + backPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight * desDepth);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight * desDepth);
   //ZBenchTimer bt;
   //bt.start();
   image3DPad(img, width, height, depth, leftPad, rightPad, upPad, downPad, frontPad, backPad, padImg.data(),
@@ -601,9 +601,9 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
 
   //image3DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedRowKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedColKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedZKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedRowKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedColKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedZKernel;
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   alignedZKernel.insert(alignedZKernel.end(), zkernel, zkernel + kernelDepth);
@@ -618,14 +618,14 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth * height * desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg1(desWidth * height * desDepth);
     Image3DColFilterForOneBlock<TPixel, double> colfunctor(padImg.data(), desWidth, desHeight,
                                                            adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
                                                            height);
     colfunctor(tbb::blocked_range<size_t>(0, desDepth));
     clearAndDeallocate(padImg);
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg2(width * height * desDepth);
     Image3DRowFilterForOneBlock<double, double> rowfunctor(bufImg1.data(), desWidth, height,
                                                            adjrowkernel, kernelWidth, bufImg2.data(), width, height);
     rowfunctor(tbb::blocked_range<size_t>(0, desDepth));
@@ -635,14 +635,14 @@ void image3DFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                                                           adjzkernel, kernelDepth, imgOut, width, height);
     zfunctor(tbb::blocked_range<size_t>(0, depth));
   } else {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg1(desWidth * height * desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg1(desWidth * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DColFilterForOneBlock<TPixel, double>(padImg.data(), desWidth, desHeight,
                                                                   adjcolkernel, kernelHeight, bufImg1.data(), desWidth,
                                                                   height));
     clearAndDeallocate(padImg);
 
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg2(width * height * desDepth);
+    std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg2(width * height * desDepth);
     tbb::parallel_for(tbb::blocked_range<size_t>(0, desDepth),
                       Image3DRowFilterForOneBlock<double, double>(bufImg1.data(), desWidth, height,
                                                                   adjrowkernel, kernelWidth, bufImg2.data(), width,

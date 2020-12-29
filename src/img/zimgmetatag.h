@@ -104,7 +104,7 @@ private:
   uint32_t m_tag = 0;
   DataType m_dataType = DataType::Byte;
   uint64_t m_count = 0;
-  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> m_data;
+  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> m_data;
 };
 
 }  // namespace nim

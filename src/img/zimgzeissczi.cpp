@@ -152,7 +152,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
   inputFileStream.seekg(directoryEntriesSize + fill + sb.metaDataSize, std::ios_base::cur);
 
   if (sb.dataSize > 0) {
-    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> fileBuf(192 + sb.dataSize);
+    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> fileBuf(192 + sb.dataSize);
     if (sb.directoryEntry.compression == 2) {
       readStream(inputFileStream, fileBuf.data() + 192, sb.dataSize); // wrap a tif header and use tif decoder
     } else {

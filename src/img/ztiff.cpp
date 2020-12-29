@@ -1450,7 +1450,7 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
       if (separatePlane || img.numChannels() == 1) {
         uint32_t tilesPerChannel = TIFFNumberOfTiles(m_tif.get()) / img.numChannels();
 
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(
           tileWidth * tileHeight * img.voxelByteNumber());
 
         for (size_t c = 0; c < img.numChannels(); ++c) {
@@ -1464,7 +1464,7 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
           }
         }
       } else {
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> tileBuf(
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(
           tileWidth * tileHeight * img.voxelByteNumber() * img.numChannels());
 
         for (uint32_t tile = 0; tile < TIFFNumberOfTiles(m_tif.get()); tile++) {

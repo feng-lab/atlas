@@ -407,7 +407,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString& filename)
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
 
-    std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 32>> depthBuffer(m_size.x * m_size.y);
+    std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 64>> depthBuffer(m_size.x * m_size.y);
     glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, depthBuffer.data());
     ZImg img;
     img.wrapData(depthBuffer.data(), m_size.x, m_size.y, 1);

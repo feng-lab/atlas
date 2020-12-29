@@ -310,6 +310,8 @@ TEST(Img, OperatorAdd)
     ASSERT_EQ(static_cast<uint8_t>(std::min(255,int(*it3)+220)), *it4);
   }
 
+  LOG(INFO) << "test SIMD version";
+
   // test SSE2 version
   img = imgOld;
   img1 = img + 5_u8;

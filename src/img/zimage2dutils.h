@@ -596,7 +596,7 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight);
   //ZBenchTimer bt;
   //bt.start();
   image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
@@ -605,17 +605,17 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
   //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth * kernelHeight);
   if (!corr) {
     image2DReflect(alignedKernel.data(), kernelWidth, kernelHeight);
   }
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> rowKernel(kernelWidth);
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> colKernel(kernelHeight);
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> rowKernel(kernelWidth);
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> colKernel(kernelHeight);
   if (seperate2DKernel(alignedKernel.data(), kernelWidth, kernelHeight,
                        rowKernel.data(), colKernel.data())) {
-    std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width * desHeight);
+    std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg(width * desHeight);
 
     Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(), desWidth,
                                                            rowKernel.data(), kernelWidth, bufImg.data(), width);
@@ -657,7 +657,7 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
   size_t downPad = (kernelHeight - 1) / 2;
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
-  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 32>> padImg(desWidth * desHeight);
+  std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight);
   //ZBenchTimer bt;
   //bt.start();
   image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
@@ -666,8 +666,8 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
   //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedRowKernel;
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> alignedColKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedRowKernel;
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedColKernel;
   alignedRowKernel.insert(alignedRowKernel.end(), rowkernel, rowkernel + kernelWidth);
   alignedColKernel.insert(alignedColKernel.end(), colkernel, colkernel + kernelHeight);
   if (!corr) {
@@ -675,7 +675,7 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
     image2DFlip(alignedColKernel.data(), kernelHeight, 1, Dimension::X);
   }
 
-  std::vector<double, boost::alignment::aligned_allocator<double, 32>> bufImg(width * desHeight);
+  std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg(width * desHeight);
 
   Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(), desWidth,
                                                          alignedRowKernel.data(), kernelWidth, bufImg.data(), width);

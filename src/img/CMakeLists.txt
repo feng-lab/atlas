@@ -245,7 +245,8 @@ set(IMG_SOURCES
     zlogcache.cpp
     zlogcache.h
     zminimumspanningtree.cpp
-    zminimumspanningtree.h zsubrange.h zmkl.h)
+    zminimumspanningtree.h zsubrange.h zmkl.h zsaturateoperation.cpp
+    zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -306,6 +307,8 @@ if (WIN32)
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
   # for some files
+  set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS /arch:AVX512)
+  set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS /arch:AVX2)
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS /arch:AVX)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
@@ -346,6 +349,8 @@ else (WIN32)
   endif ()
 
   # for some files
+  set_source_files_properties(zsaturateoperation_avx512.cpp PROPERTIES COMPILE_FLAGS -mavx512bw)
+  set_source_files_properties(zsaturateoperation_avx2.cpp PROPERTIES COMPILE_FLAGS -mavx2)
   set_source_files_properties(zimageavx.cpp PROPERTIES COMPILE_FLAGS -mavx)
   set_source_files_properties(zimagesse3.cpp PROPERTIES COMPILE_FLAGS -msse3)
 

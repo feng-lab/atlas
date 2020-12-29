@@ -537,7 +537,7 @@ void ZImg::allocate()
   m_data.resize(m_info.numTimes);
 
   for (size_t t = 0; t < m_info.numTimes; ++t) {
-    m_data[t] = static_cast<uint8_t*>(boost::alignment::aligned_alloc(32, timeByteNumber()));
+    m_data[t] = static_cast<uint8_t*>(boost::alignment::aligned_alloc(64, timeByteNumber()));
 
     if (m_data[t] == nullptr) {
       clearData();
@@ -1555,7 +1555,7 @@ ZImg& ZImg::flip(Dimension dim)
     std::reverse(m_data.begin(), m_data.end());
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
-      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 32>> buf(channelByteNumber());
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> buf(channelByteNumber());
       for (size_t t = 0; t < numTimes(); ++t) {
         size_t j = numChannels() - 1;
         for (size_t i = 0; i < numChannels() / 2; ++i, --j) {

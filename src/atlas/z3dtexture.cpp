@@ -350,7 +350,7 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
-    std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 32>> depthBuffer(numPixels());
+    std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 64>> depthBuffer(numPixels());
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), 1);
@@ -367,7 +367,7 @@ void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_RGB;
     GLenum dataType = GL_FLOAT;
-    std::vector<float, boost::alignment::aligned_allocator<float, 32>> depthBuffer(numPixels() * 3);
+    std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 3);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), 1, 3);
@@ -386,7 +386,7 @@ void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_RGBA;
     GLenum dataType = GL_FLOAT;
-    std::vector<float, boost::alignment::aligned_allocator<float, 32>> depthBuffer(numPixels() * 4);
+    std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 4);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), 1, 4);

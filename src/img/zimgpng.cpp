@@ -364,7 +364,7 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
   if (rowBytes * info.height != info.byteNumber()) {
     throw ZIOException("fatal png read error");
   }
-  std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 32>> outRaw(info.byteNumber());
+  std::vector<png_byte, boost::alignment::aligned_allocator<png_byte, 64>> outRaw(info.byteNumber());
   std::vector<png_bytep> rowPointers(info.height);
   for (size_t i = 0; i < rowPointers.size(); ++i) {
     rowPointers[i] = outRaw.data() + i * rowBytes;
