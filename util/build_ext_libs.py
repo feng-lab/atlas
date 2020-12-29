@@ -1743,12 +1743,14 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_opencv_sfm:BOOL=ON',
             '-DBUILD_opencv_videostab:BOOL=ON',
             '-DBUILD_opencv_xfeatures2d:BOOL=ON',
+
+            '-DCPU_BASELINE=AVX',
         ])
 
         if is_windows():
             cmakecmd.extend(['-DBUILD_WITH_STATIC_CRT:BOOL=OFF',
                              '-DWITH_WIN32UI:BOOL=OFF',
-                             '-DOpenJPEG_DIR=' + ext_build_dir() + '\\lib\\openjpeg-2.3',
+                             '-DOpenJPEG_DIR=' + ext_build_dir() + '\\lib\\openjpeg-2.4',
                              '-DOPENCV_EXTRA_MODULES_PATH:PATH=' + src_contrib_dir + '\\modules',
                              ])
         elif is_linux():
