@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimage2dutils.h"
 #include "zioutils.h"
+#include <tiff.h>
 #include <tiffio.h>
 #include <tiffio.hxx>
 #include <QFile>
@@ -11,7 +12,7 @@
 #include <cmath>
 #include <set>
 #include <sstream>
-#include <tiff.h>
+#include <bit>
 
 namespace {
 

@@ -3,6 +3,7 @@
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
+#include <bit>
 
 namespace nim {
 

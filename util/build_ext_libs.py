@@ -157,8 +157,6 @@ def get_tbb_env():
 def get_common_build_flags(cpp_standard: int = cpp_standard()):
     res = {}
     if is_mac():
-        if cpp_standard == 20:
-            cpp_standard = '2a'
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
@@ -170,13 +168,9 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_linux():
-        if cpp_standard == 20:
-            cpp_standard = '2a'
         res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
         res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
-        if cpp_standard == 20:
-            cpp_standard = 'latest'
         res['CFLAGS'] = f'/utf-8'
         res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
