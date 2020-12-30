@@ -4,15 +4,17 @@
 
 namespace nim {
 
+#define HACK_HDF5
+
 class ZImgHDF5SubBlock : public ZImgSubBlock
 {
 public:
-  ZImgHDF5SubBlock(QString  fileName, const ZImgInfo& info,
+  ZImgHDF5SubBlock(QString fileName, const ZImgInfo& info,
                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
 
-  std::shared_ptr<ZImg> read() const override;
+  [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
-  ZImgInfo readInfo() const override;
+  [[nodiscard]] ZImgInfo readInfo() const override;
 
 protected:
   QString m_filename;
@@ -21,6 +23,15 @@ protected:
   size_t m_ratio;
   size_t m_x;
   size_t m_y;
+
+#ifdef HACK_HDF5
+  struct HDF5ChunkInfo {
+    size_t offset = 0;
+    size_t length = 0;
+    bool compressed = true;
+  };
+  std::vector<HDF5ChunkInfo> m_hdf5Tiles;
+#endif
 };
 
 class ZImgHDF5 : public ZImgFormat
@@ -29,13 +40,13 @@ public:
 
   // ZImgFormat interface
 public:
-  QString shortName() const override;
+  [[nodiscard]] QString shortName() const override;
 
-  QString fullName() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  QStringList extensions() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   { return FileFormat::HDF5Img; }
 
   void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
@@ -57,9 +68,9 @@ public:
   void writeImg(const QString& filename, const ZImgBlockProvider& imgBlockrovider,
                 const ZImgWriteParameters& paras) override;
 
-  bool supportRead() const override;
+  [[nodiscard]] bool supportRead() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] bool supportWrite() const override;
 };
 
 } // namespace nim
