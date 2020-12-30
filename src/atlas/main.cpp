@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
     QCoreApplication::setApplicationName("Atlas");
 
     if (!nim::ZCpuInfo::instance().bAVX) {
-      QMessageBox::critical(nullptr, app.applicationName(),
+      QMessageBox::critical(nullptr, QCoreApplication::applicationName(),
                             "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
       LOG(ERROR) << "CPU not supported";
       return 1;
@@ -131,8 +131,8 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::instance().logDir();
     removeOldLogs(logDir);
 
-    QString jdkDIR = app.resourcesDirPath() + QString("/jdk");
-    QString jarsDIR = app.resourcesDirPath() + QString("/jars");
+    QString jdkDIR = ZApplication::resourcesDirPath() + QString("/jdk");
+    QString jarsDIR = ZApplication::resourcesDirPath() + QString("/jars");
     initImgLib(argv[0], jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();
@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
     mainWin->show();
     mainWin->initOpenglContext();
 
-    return app.exec();
+    return ZApplication::exec();
   }
   catch (const nim::ZException& e) {
     LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
