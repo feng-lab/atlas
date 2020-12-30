@@ -31,6 +31,9 @@ public:
   void setBlockIDsRenderTarget(Z3DRenderTarget& target)
   { m_blockIDsRenderTarget = &target; }
 
+  [[nodiscard]] bool lastRenderingIsFastRendering() const
+  { return m_lastRenderingIsFastRendering; }
+
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear
   void clearQuads()
@@ -70,6 +73,7 @@ private:
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = false;
+  bool m_lastRenderingIsFastRendering = false;
 };
 
 } // namespace nim

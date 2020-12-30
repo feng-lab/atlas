@@ -22,9 +22,9 @@ public:
   ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
                    int64_t x, int64_t y, size_t width, size_t height);
 
-  std::shared_ptr<ZImg> read() const override;
+  [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
-  ZImgInfo readInfo() const override;
+  [[nodiscard]] ZImgInfo readInfo() const override;
 
 protected:
   std::shared_ptr<ZImg> m_img;
@@ -41,9 +41,9 @@ public:
     Invalid, Partial, Complete
   };
 
-  ZImgPack(ZImgSource  imgSource,
-           const ZImgInfo* info = nullptr,
-           const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
+  explicit ZImgPack(ZImgSource imgSource,
+                    const ZImgInfo* info = nullptr,
+                    const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
   virtual ~ZImgPack();
 
@@ -213,7 +213,7 @@ private:
   using RTreeValueType = std::pair<TileBoxType, size_t>;
   using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;
   using RTToTileBoxRTreeType = std::map<RTType, std::unique_ptr<RTreeType>>;
-  RTToTileBoxRTreeType m_rtToTileBoxRTree;
+  RTToTileBoxRTreeType m_rtToTileBoxRTree{};
 
   double m_minIntensity;
   double m_maxIntensity;

@@ -295,7 +295,7 @@ void ZImgPack::retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs, 
   }
   if (m_mipImgs[t] && zStart == m_mipZStart && zEnd == m_mipZEnd) {
     imgs.push_back(m_mipImgs[t]);
-    locs.push_back(QPoint(0, 0));
+    locs.emplace_back(0, 0);
     scales.push_back(1);
     return;
   }
@@ -309,7 +309,7 @@ void ZImgPack::retrieveCoveredMIPImgs(std::vector<std::shared_ptr<ZImg>>& imgs, 
   LOG(INFO) << "MIP: " << m_mipZStart << " " << m_mipZEnd;
 
   imgs.push_back(m_mipImgs[t]);
-  locs.push_back(QPoint(0, 0));
+  locs.emplace_back(0, 0);
   scales.push_back(1);
 }
 

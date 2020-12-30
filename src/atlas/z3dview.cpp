@@ -165,18 +165,17 @@ QWidget* Z3DView::helpWidget()
   edt->appendPlainText("zoom/dolly:");
   edt->appendPlainText("    1) command/control key + mouse wheel scroll");
   edt->appendPlainText("    2) command/control key + =(+)/- key");
-  edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
-  edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
+  //edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
+  //edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
   edt->appendPlainText("rotate:");
-  edt->appendPlainText("    1) mouse drag");
+  edt->appendPlainText("    1) [(optional) command/control key] + mouse drag");
   edt->appendPlainText("    2) command/control key + Left/Right/Up/Down key");
   edt->appendPlainText("shift:");
   edt->appendPlainText("    1) shift key + mouse drag");
-  edt->appendPlainText(
-    "    2) shift key + Left/Right/Up/Down key (might be slow if image is rendered in full-resolution)");
+  edt->appendPlainText("    2) shift key + Left/Right/Up/Down key");
   edt->appendPlainText("roll:");
   edt->appendPlainText("    1) alt key + mouse drag");
-  edt->appendPlainText("    2) alt key + Left/Right key (might be slow if image is rendered in full-resolution)");
+  edt->appendPlainText("    2) alt key + Left/Right key");
   edt->moveCursor(QTextCursor::Start);
   edt->ensureCursorVisible();
   return edt;

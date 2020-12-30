@@ -130,6 +130,8 @@ QString Z3DImgSliceRenderer::generateHeader()
 
 void Z3DImgSliceRenderer::render(Z3DEye eye)
 {
+  m_lastRenderingIsFastRendering = false;
+
   bool needRender = m_img && !m_quads.empty();
   if (!needRender)
     return;
@@ -260,6 +262,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     //glFinish();
     STOP_AND_LOG(bt)
   } else {
+    m_lastRenderingIsFastRendering = true;
+
     m_scVolumeSliceShader.bind();
     m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceShader, eye);
 

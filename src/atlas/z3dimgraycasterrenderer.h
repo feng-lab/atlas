@@ -54,10 +54,13 @@ public:
   void setFastRendering(bool v)
   { m_fastRendering = v; }
 
-  // return true if something is rendered by this renderer
-  bool hasVisibleRendering() const;
+  [[nodiscard]] bool lastRenderingIsFastRendering() const
+  { return m_lastRenderingIsFastRendering; }
 
-  QString compositeMode() const;
+  // return true if something is rendered by this renderer
+  [[nodiscard]] bool hasVisibleRendering() const;
+
+  [[nodiscard]] QString compositeMode() const;
 
   ZStringIntOptionParameter& compositingModePara()
   { return m_compositingMode; }
@@ -71,13 +74,13 @@ public:
   ZFloatParameter& localMIPThresholdPara()
   { return m_localMIPThreshold; }
 
-  const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
+  [[nodiscard]] const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
   { return m_channelVisibleParas; }
 
-  const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
+  [[nodiscard]] const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
   { return m_transferFuncParas; }
 
-  const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
+  [[nodiscard]] const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
   { return m_texFilterModeParas; }
 
   void compile() override;
@@ -148,6 +151,7 @@ private:
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = false;
+  bool m_lastRenderingIsFastRendering = false;
 };
 
 } // namespace nim

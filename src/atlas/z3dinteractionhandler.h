@@ -38,13 +38,9 @@ signals:
 
   void cameraMoved();
 
-  void mousePressed();
+  void enterInteractionMode();
 
-  void mouseReleased();
-
-  void controlPressed();
-
-  void controlReleased();
+  void exitInteractionMode();
 
 protected:
   enum class State

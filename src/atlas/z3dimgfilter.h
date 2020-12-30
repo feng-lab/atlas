@@ -78,9 +78,9 @@ protected:
   void setClipPlanes() override
   {}
 
-  void mousePressed();
+  void enterFastMode();
 
-  void mouseReleased();
+  void exitFastMode();
 
   void process(Z3DEye eye) override;
 

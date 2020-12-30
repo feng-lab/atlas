@@ -290,6 +290,8 @@ QString Z3DImgRaycasterRenderer::generateHeader()
 
 void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 {
+  m_lastRenderingIsFastRendering = false;
+
   if (!hasVisibleRendering())
     return;
 
@@ -459,6 +461,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         //glFinish();
         STOP_AND_LOG(bt)
       } else {
+        m_lastRenderingIsFastRendering = true;
+
         m_scVolumeSliceWithTransferfunShader.bind();
         m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceWithTransferfunShader, eye);
 
@@ -787,6 +791,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
       }
     } else {
+      m_lastRenderingIsFastRendering = true;
+
       m_scRaycasterShader.bind();
 
       if (!GLVersionGE(3, 0)) {

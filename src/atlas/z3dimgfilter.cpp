@@ -74,14 +74,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_stayOnTop);
   addParameter(m_fullResolutionRendering);
   connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
-  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::mousePressed,
-          this, &Z3DImgFilter::mousePressed);
-  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::mouseReleased,
-          this, &Z3DImgFilter::mouseReleased);
-  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::controlPressed,
-          this, &Z3DImgFilter::mousePressed);
-  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::controlReleased,
-          this, &Z3DImgFilter::mouseReleased);
+  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::enterInteractionMode,
+          this, &Z3DImgFilter::enterFastMode);
+  connect(&m_rendererBase.globalParas().interactionHandler, &Z3DTrackballInteractionHandler::exitInteractionMode,
+          this, &Z3DImgFilter::exitFastMode);
 
   //addParameter(m_interactionDownsample);
   addParameter(m_smoothInteraction);
@@ -583,7 +579,7 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 //  m_FRVolumeSlicesValidState[5] = false;
 //}
 
-void Z3DImgFilter::mousePressed()
+void Z3DImgFilter::enterFastMode()
 {
   if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
     m_imgRaycasterRenderer.setFastRendering(true);
@@ -591,14 +587,16 @@ void Z3DImgFilter::mousePressed()
   }
 }
 
-void Z3DImgFilter::mouseReleased()
+void Z3DImgFilter::exitFastMode()
 {
   if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
     m_imgRaycasterRenderer.setFastRendering(false);
     m_imgSliceRenderer.setFastRendering(false);
     // upstream will invalidate the network, but in case there are no upstream
     // do one more invalidation
-    invalidateResult();
+    if (m_imgRaycasterRenderer.lastRenderingIsFastRendering() || m_imgSliceRenderer.lastRenderingIsFastRendering()) {
+      invalidateResult();
+    }
   }
 }
 
