@@ -458,111 +458,16 @@ void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
 
 namespace nim {
 
-ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, const ZImgInfo& info,
+ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, std::vector<std::string> tiles, const ZImgInfo& info,
                                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_)
   : ZImgSubBlock(t_, x_ * ratio_, y_ * ratio_, z_, info.width * ratio_, info.height * ratio_, 1, ratio_, ratio_, 1)
   , m_filename(std::move(fileName))
+  , m_tiles(std::move(tiles))
   , m_info(info)
   , m_ratio(ratio_)
   , m_x(x_)
   , m_y(y_)
 {
-  for (size_t c = 0; c < info.numChannels; ++c) {
-    if (m_ratio == 1) {
-      m_tiles.push_back(QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t_).arg(c).arg(z_).toStdString());
-    } else {
-      m_tiles.push_back(
-        QString("/Img/TimePoint%1/Channel%2/Z%3/DownsampledBy%4Data").arg(t_).arg(c).arg(z_).arg(m_ratio).toStdString());
-    }
-  }
-#ifdef HACK_HDF5
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
-  try {
-    if (m_tiles.empty()) {
-      throw ZIOException("empty hdf5 sub block");
-    }
-    // H5::Exception::dontPrint();
-
-    H5::H5File file(QFile::encodeName(m_filename).constData(), H5F_ACC_RDONLY,
-                    H5::FileCreatPropList::DEFAULT, accPropList());
-
-    hsize_t offset[2];
-    for (auto& tile : m_tiles) {
-      H5::DataSet ds = file.openDataSet(tile);
-      //LOG(INFO) << ds.getId() << " " << ds.getObjName();
-      //LOG(INFO) << H5Pget_layout(H5Dget_create_plist(ds.getId()));
-      H5Ddebug(ds.getId());
-      auto* dset = (H5D_t*)H5VLobject(ds.getId());
-      if (!dset) {
-        throw ZIOException("can not get dataset from hdf5, maybe wrong code");
-      }
-      // H5D__chunk_dump_index(dset, stdout);
-      CHECK(H5D_CHUNKED == dset->shared->layout.type) << dset->shared->layout.type;
-      // LOG(INFO) << dset;
-      const H5O_layout_t* layout = &(dset->shared->layout); // Dataset layout
-      hsize_t scaled[3]; // Scaled coordinates for this chunk
-      offset[0] = m_x;
-      offset[1] = m_y;
-      //LOG(INFO) << dset->shared;
-      //LOG(INFO) << dset->shared->ndims;
-      CHECK(dset->shared->ndims == 2) << dset->shared->ndims;
-      for (size_t d = 0; d < dset->shared->ndims; ++d) {
-        scaled[d] = offset[d] / layout->u.chunk.dim[d];
-      }
-      scaled[dset->shared->ndims] = 0;
-      //LOG(INFO) << scaled[0] << " " << scaled[1];
-
-      H5O_storage_chunk_t* sc = &(dset->shared->layout.storage.u.chunk);
-      //LOG(INFO) << sc;
-
-      H5D_chunk_ud_t udata;  // User data for querying chunk info
-      /* Initialize the query information about the chunk we are looking for */
-      udata.common.layout = &(dset->shared->layout.u.chunk);
-      udata.common.storage = sc;
-      udata.common.scaled = scaled;
-
-      /* Reset information about the chunk we are looking for */
-      udata.chunk_block.offset = HADDR_UNDEF;
-      udata.chunk_block.length = 0;
-      udata.filter_mask = 0;
-      udata.new_unfilt_chunk = FALSE;
-      udata.idx_hint = UINT_MAX;
-      //LOG(INFO) << "udata";
-
-      H5D_chk_idx_info_t idx_info;        /* Chunked index info */
-      /* Compose chunked index info struct */
-      idx_info.f = dset->oloc.file;
-      idx_info.pline = &dset->shared->dcpl_cache.pline;
-      idx_info.layout = &dset->shared->layout.u.chunk;
-      idx_info.storage = sc;
-      LOG(INFO) << idx_info.f;
-      LOG(INFO) << dset->shared->layout.u.chunk.ndims;
-
-//      if ((sc->ops->dump)(sc, stdout) < 0) {
-//        throw ZIOException("unable to dump chunk index info");
-//      }
-
-      if ((sc->ops->get_addr)(&idx_info, &udata) < 0) {
-        throw ZIOException("can't query chunk address");
-      }
-      if (!H5F_addr_defined(udata.chunk_block.offset) && udata.chunk_block.length == 0) {
-        throw ZIOException("empty chunk");
-      } else if (!H5F_addr_defined(udata.chunk_block.offset)) {
-        throw ZIOException("invalid chunk");
-      }
-      HDF5ChunkInfo chunkInfo;
-      chunkInfo.offset = udata.chunk_block.offset;
-      chunkInfo.length = udata.chunk_block.length;
-      chunkInfo.compressed = ~udata.filter_mask & H5Z_FILTER_DEFLATE;
-      LOG(INFO) << chunkInfo.offset << " " << chunkInfo.length << " " << chunkInfo.compressed;
-      m_hdf5Tiles.push_back(chunkInfo);
-    }
-  }
-  catch (H5::Exception const& e) {
-    throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename).arg(e.getDetailMsg().c_str()));
-  }
-#endif
 }
 
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
@@ -647,8 +552,8 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
       subBlocks->resize(infos.size());
       auto& subBlock = subBlocks->at(0);
       if (!infos[0].isEmpty()) {
-        H5::DataSet ds = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
-        H5::DSetCreatPropList pList = ds.getCreatePlist();
+        H5::DataSet ds0 = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
+        H5::DSetCreatPropList pList = ds0.getCreatePlist();
         hsize_t chunk_dims[2];
         int rank_chunk = pList.getChunk(2, chunk_dims);
         if (rank_chunk != 2) {
@@ -667,8 +572,95 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
               inf.height = std::min<size_t>(chunk_dims[1], height - y);
               for (size_t t = 0; t < infos[0].numTimes; ++t) {
                 for (size_t z = 0; z < infos[0].depth; ++z) {
-                  subBlock.emplace_back(
-                    std::make_shared<ZImgHDF5SubBlock>(filename, inf, level, t, z, x, y));
+                  std::vector<std::string> tiles;
+                  for (size_t c = 0; c < inf.numChannels; ++c) {
+                    std::string tile;
+                    if (level == 1) {
+                      tile = QString("/Img/TimePoint%1/Channel%2/Z%3/Data").arg(t).arg(c).arg(z).toStdString();
+                    } else {
+                      tile = QString("/Img/TimePoint%1/Channel%2/Z%3/DownsampledBy%4Data").arg(t).arg(c).arg(z).arg(
+                        level).toStdString();
+                    }
+                    tiles.push_back(tile);
+                  }
+                  auto hdf5SubBlock = std::make_shared<ZImgHDF5SubBlock>(filename, tiles, inf, level, t, z, x, y);
+                  subBlock.push_back(hdf5SubBlock);
+
+#ifdef HACK_HDF5
+                  hsize_t offset[2];
+                  std::vector<HDF5ChunkInfo> cinfos;
+                  for (const auto& tile : tiles) {
+                    H5::DataSet ds = file.openDataSet(tile);
+                    //LOG(INFO) << ds.getId() << " " << ds.getObjName();
+                    //LOG(INFO) << H5Pget_layout(H5Dget_create_plist(ds.getId()));
+                    //H5Ddebug(ds.getId());
+                    auto* dset = (H5D_t*)H5VLobject(ds.getId());
+                    if (!dset) {
+                      throw ZIOException("can not get dataset from hdf5, maybe wrong code");
+                    }
+                    // H5D__chunk_dump_index(dset, stdout);
+                    CHECK(H5D_CHUNKED == dset->shared->layout.type) << dset->shared->layout.type;
+                    // LOG(INFO) << dset;
+                    const H5O_layout_t* layout = &(dset->shared->layout); // Dataset layout
+                    hsize_t scaled[3]; // Scaled coordinates for this chunk
+                    offset[0] = x;
+                    offset[1] = y;
+                    //LOG(INFO) << dset->shared;
+                    //LOG(INFO) << dset->shared->ndims;
+                    CHECK(dset->shared->ndims == 2) << dset->shared->ndims;
+                    for (size_t d = 0; d < dset->shared->ndims; ++d) {
+                      scaled[d] = offset[d] / layout->u.chunk.dim[d];
+                    }
+                    scaled[dset->shared->ndims] = 0;
+                    //LOG(INFO) << scaled[0] << " " << scaled[1];
+
+                    H5O_storage_chunk_t* sc = &(dset->shared->layout.storage.u.chunk);
+                    //LOG(INFO) << sc;
+
+                    H5D_chunk_ud_t udata;  // User data for querying chunk info
+                    /* Initialize the query information about the chunk we are looking for */
+                    udata.common.layout = &(dset->shared->layout.u.chunk);
+                    udata.common.storage = sc;
+                    udata.common.scaled = scaled;
+
+                    /* Reset information about the chunk we are looking for */
+                    udata.chunk_block.offset = HADDR_UNDEF;
+                    udata.chunk_block.length = 0;
+                    udata.filter_mask = 0;
+                    udata.new_unfilt_chunk = FALSE;
+                    udata.idx_hint = UINT_MAX;
+                    //LOG(INFO) << "udata";
+
+                    H5D_chk_idx_info_t idx_info;        /* Chunked index info */
+                    /* Compose chunked index info struct */
+                    idx_info.f = dset->oloc.file;
+                    idx_info.pline = &dset->shared->dcpl_cache.pline;
+                    idx_info.layout = &dset->shared->layout.u.chunk;
+                    idx_info.storage = sc;
+                    LOG(INFO) << idx_info.f;
+                    LOG(INFO) << dset->shared->layout.u.chunk.ndims;
+
+                    if ((sc->ops->dump)(sc, stdout) < 0) {
+                      throw ZIOException("unable to dump chunk index info");
+                    }
+
+                    if ((sc->ops->get_addr)(&idx_info, &udata) < 0) {
+                      throw ZIOException("can't query chunk address");
+                    }
+                    if (!H5F_addr_defined(udata.chunk_block.offset) && udata.chunk_block.length == 0) {
+                      throw ZIOException("empty chunk");
+                    } else if (!H5F_addr_defined(udata.chunk_block.offset)) {
+                      throw ZIOException("invalid chunk");
+                    }
+                    HDF5ChunkInfo chunkInfo;
+                    chunkInfo.offset = udata.chunk_block.offset;
+                    chunkInfo.length = udata.chunk_block.length;
+                    chunkInfo.compressed = ~udata.filter_mask & H5Z_FILTER_DEFLATE;
+                    LOG(INFO) << chunkInfo.offset << " " << chunkInfo.length << " " << chunkInfo.compressed;
+                    cinfos.push_back(chunkInfo);
+                  }
+                  hdf5SubBlock->setHDF5ChunkInfos(cinfos);
+#endif
                 }
               }
             }

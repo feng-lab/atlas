@@ -6,15 +6,30 @@ namespace nim {
 
 #define HACK_HDF5
 
+#ifdef HACK_HDF5
+struct HDF5ChunkInfo {
+  size_t offset = 0;
+  size_t length = 0;
+  bool compressed = true;
+};
+#endif
+
 class ZImgHDF5SubBlock : public ZImgSubBlock
 {
 public:
-  ZImgHDF5SubBlock(QString fileName, const ZImgInfo& info,
+  ZImgHDF5SubBlock(QString fileName,
+                   std::vector<std::string> tiles,
+                   const ZImgInfo& info,
                    size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
   [[nodiscard]] ZImgInfo readInfo() const override;
+
+#ifdef HACK_HDF5
+  void setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos)
+  { m_hdf5Tiles = cinfos; }
+#endif
 
 protected:
   QString m_filename;
@@ -25,11 +40,6 @@ protected:
   size_t m_y;
 
 #ifdef HACK_HDF5
-  struct HDF5ChunkInfo {
-    size_t offset = 0;
-    size_t length = 0;
-    bool compressed = true;
-  };
   std::vector<HDF5ChunkInfo> m_hdf5Tiles;
 #endif
 };
