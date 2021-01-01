@@ -40,13 +40,13 @@ __forceinline Dest bit_cast(const Source& source)
 }
 
 template<typename Type>
-inline bool is_aligned(Type* ptr)
+__forceinline bool is_aligned(Type* ptr)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (alignof(Type) - 1)) == 0;
 }
 
 template<typename Type>
-inline bool is_aligned(Type* ptr, size_t a)
+__forceinline bool is_aligned(Type* ptr, size_t a)
 {
   return (reinterpret_cast<uintptr_t>(ptr) & (a - 1)) == 0;
 }
@@ -58,7 +58,7 @@ inline bool is_aligned(Type* ptr, size_t a)
 //}
 
 template<typename Container>
-inline void clearAndDeallocate(Container& c)
+__forceinline void clearAndDeallocate(Container& c)
 {
   Container().swap(c);
 }
@@ -102,19 +102,19 @@ struct reversion_wrapper
 };
 
 template<typename T>
-inline auto begin(reversion_wrapper<T> w)
+__forceinline auto begin(reversion_wrapper<T> w)
 { return std::rbegin(w.iterable); }
 
 template<typename T>
-inline auto end(reversion_wrapper<T> w)
+__forceinline auto end(reversion_wrapper<T> w)
 { return std::rend(w.iterable); }
 
 template<typename T>
-inline reversion_wrapper<T> make_reverse(T&& iterable)
+__forceinline reversion_wrapper<T> make_reverse(T&& iterable)
 { return {iterable}; }
 
 template<class RAIter, class Compare>
-std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
+__forceinline std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
 {
   std::vector<size_t> idx(last - first);
   std::iota(idx.begin(), idx.end(), 0);
@@ -129,7 +129,7 @@ std::vector<size_t> argSort(RAIter first, RAIter last, Compare comp)
 }
 
 template<class RAIter>
-std::vector<size_t> argSort(RAIter first, RAIter last)
+__forceinline std::vector<size_t> argSort(RAIter first, RAIter last)
 {
   std::vector<size_t> idx(last - first);
   std::iota(idx.begin(), idx.end(), 0);
@@ -141,13 +141,13 @@ std::vector<size_t> argSort(RAIter first, RAIter last)
 }
 
 template<typename C, typename V>
-inline bool contains(const C& iterable, const V& v)
+__forceinline bool contains(const C& iterable, const V& v)
 {
   return std::find(std::begin(iterable), std::end(iterable), v) != std::end(iterable);
 }
 
 template<typename C, typename V>
-inline ptrdiff_t indexOf(const C& iterable, const V& v)
+__forceinline ptrdiff_t indexOf(const C& iterable, const V& v)
 {
   if (auto it = std::find(std::begin(iterable), std::end(iterable), v); it != std::end(iterable)) {
     return std::distance(std::begin(iterable), it);
@@ -157,7 +157,7 @@ inline ptrdiff_t indexOf(const C& iterable, const V& v)
 }
 
 template<typename C>
-inline void removeAt(C& iterable, size_t idx)
+__forceinline void removeAt(C& iterable, size_t idx)
 {
   // CHECK(idx < iterable.size());
   iterable.erase(iterable.begin() + idx);
@@ -181,7 +181,7 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>; // not needed as o
 
 // some c++20 lib functions
 template< class Container, class T >
-inline Container& erase( Container& on, const T& val )
+__forceinline Container& erase( Container& on, const T& val )
 {
   on.erase(
     std::remove(std::begin(on), std::end(on), val),
@@ -190,7 +190,7 @@ inline Container& erase( Container& on, const T& val )
 }
 
 template< class Container, class Pred >
-inline Container& erase_if( Container& on, Pred pred )
+__forceinline Container& erase_if( Container& on, Pred pred )
 {
   on.erase(
     std::remove_if(std::begin(on), std::end(on), pred),
@@ -199,7 +199,7 @@ inline Container& erase_if( Container& on, Pred pred )
 }
 
 template< class Container >
-inline Container& unique( Container& on)
+__forceinline Container& unique( Container& on)
 {
   on.erase(
     std::unique(std::begin(on), std::end(on)),
@@ -208,7 +208,7 @@ inline Container& unique( Container& on)
 }
 
 template< class Container, class Pred >
-inline Container& unique_if( Container& on, Pred pred )
+__forceinline Container& unique_if( Container& on, Pred pred )
 {
   on.erase(
     std::unique(std::begin(on), std::end(on), pred),

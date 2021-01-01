@@ -587,15 +587,24 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   if (m_tiles.empty() || m_info.isEmpty()) {
     throw ZIOException("empty hdf5 sub block");
   }
+  std::shared_ptr<ZImg> res;
   try {
-    if (m_hdf5Tiles.size() == m_tiles.size() && m_hdf5Tiles[0].length > 0) {
+    if (m_hdf5Tiles.size() == m_tiles.size()) {
+      if (m_emptyBlock) {
+        res = std::make_shared<ZImg>(m_info);
+        return res;
+      }
+
       auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
       std::ifstream inputFileStream;
       openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
-      auto res = std::make_shared<ZImg>(m_chunkImgInfo);
+      res = std::make_shared<ZImg>(m_chunkImgInfo);
       std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
       for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
         auto& hdf5Tile = m_hdf5Tiles[c];
+        if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
+          continue;
+        }
         inputFileStream.seekg(hdf5Tile.offset);
         readStream(inputFileStream, chunkBuf.data(), hdf5Tile.length);
         if (hdf5Tile.compressed) {
@@ -632,7 +641,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   static QMutex mutex;
   QMutexLocker lock(&mutex);
   try {
-    auto res = std::make_shared<ZImg>(m_info);
+    res = std::make_shared<ZImg>(m_info);
 
     H5::Exception::dontPrint();
 
@@ -683,11 +692,13 @@ QStringList ZImgHDF5::extensions() const
 void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, nim::HDF5ChunkInfo> hdf5Chunks;
+  std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> hdf5Chunks;
   if (subBlocks) {
     hdf5Chunks = parseHDF5Chunks(filename);
   }
   try {
+    HDF5ChunkInfo defaultChunk;  // no actual chunk in hdf5, value is filled with data_type_min
+
     H5::Exception::dontPrint();
 
     H5::H5File file(QFile::encodeName(filename).constData(), H5F_ACC_RDONLY,
@@ -737,7 +748,14 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                       tiles.push_back(fmt::format("/Img/TimePoint{}/Channel{}/Z{}/DownsampledBy{}Data", t, c, z, level));
                     }
                     if (!hdf5Chunks.empty()) {
-                      chunkInfos.push_back(hdf5Chunks.at(std::make_tuple(level, t, c, z, y, x)));
+                      //LOG(INFO) << level << " " << t << " " << c << " " << z << " " << y << " " << x;
+                      auto key = std::make_tuple(level, t, c, z, y, x);
+                      auto iter = hdf5Chunks.find(key);
+                      if (iter != hdf5Chunks.end()) {
+                        chunkInfos.push_back(iter->second);
+                      } else {
+                        chunkInfos.push_back(defaultChunk);
+                      }
                     }
                   }
                   auto hdf5SubBlock = std::make_shared<ZImgHDF5SubBlock>(filename, tiles, inf, level, t, z, x, y,
