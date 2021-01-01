@@ -815,13 +815,23 @@ def build_snappy(src_dir: str, install_dir: str):
 def build_xz(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'#define LZMA_H'],
+                              to_texts=['#define LZMA_H\n'
+                                        '#ifndef LZMA_API_STATIC\n'
+                                        '#define LZMA_API_STATIC\n'
+                                        '#endif\n'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_zstd(src_dir: str, install_dir: str):
