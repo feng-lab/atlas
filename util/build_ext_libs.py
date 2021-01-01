@@ -819,11 +819,13 @@ def build_xz(src_dir: str, install_dir: str):
     try:
         orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
         bak_file = patch_file(orig_file,
-                              from_texts=[r'#define LZMA_H'],
-                              to_texts=['#define LZMA_H\n'
-                                        '#ifndef LZMA_API_STATIC\n'
+                              from_texts=[r'#ifndef LZMA_API_IMPORT',
+                                          ],
+                              to_texts=['#ifndef LZMA_API_STATIC\n'
                                         '#define LZMA_API_STATIC\n'
-                                        '#endif\n'])
+                                        '#endif\n'
+                                        '#ifndef LZMA_API_IMPORT\n',
+                                        ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
