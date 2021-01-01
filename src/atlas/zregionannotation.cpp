@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QTransform>
 #include <QTemporaryDir>
+#include <fmt/core.h>
 
 namespace {
 
@@ -547,7 +548,7 @@ void ZRegionAnnotation::load(const QString& filename)
 
     std::map<int64_t, RegionNode> nodeMap;
     for (int i = 0; i < numRegion; ++i) {
-      H5::Group regionGrp = allGrp.openGroup(qUtf8Printable(QString("Region%1").arg(i + 1)));
+      H5::Group regionGrp = allGrp.openGroup(fmt::format("Region{}", i + 1));
 
       RegionNode p;
 
@@ -649,7 +650,7 @@ void ZRegionAnnotation::save(const QString& filename) const
 
     int idx = 0;
     for (auto it = m_ontology.cbegin(); it != m_ontology.cend(); ++it) {
-      H5::Group regionGrp = allGrp.createGroup(qUtf8Printable(QString("Region%1").arg(idx + 1)));
+      H5::Group regionGrp = allGrp.createGroup(fmt::format("Region{}", idx + 1));
       ++idx;
       const RegionNode& p = *it;
 

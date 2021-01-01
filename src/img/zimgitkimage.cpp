@@ -17,6 +17,7 @@
 #include <QStringList>
 #include <QFileInfo>
 #include <QDir>
+#include <fmt/core.h>
 
 namespace nim {
 
@@ -410,7 +411,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       if (entryvalue) {
         std::string tagkey = itr->first;
         for (size_t ch = 0; ch < info.numChannels; ++ch) {
-          if (tagkey == QString("CH%1ChannelColor").arg(ch + 1).toStdString()) {
+          if (tagkey == fmt::format("CH{}ChannelColor", ch + 1)) {
             QString tagvalue = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
             bool ok;
             int color = tagvalue.toInt(&ok);
@@ -422,7 +423,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
             info.channelColors[ch] = col;
             break;
           }
-          if (tagkey == QString("CH%1ChannelDyeName").arg(ch + 1).toStdString()) {
+          if (tagkey == fmt::format("CH{}ChannelDyeName", ch + 1)) {
             info.channelNames[ch] = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
             break;
           }

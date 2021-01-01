@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QString>
+#include <fmt/core.h>
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <memory>
@@ -520,7 +521,7 @@ void Z3DImg::uploadImageCache(size_t channel)
     return;
   }
 
-  ZBenchTimer bt(QString("upload image ch%1 cache").arg(channel).toStdString());
+  ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
   bt.start();
 
   std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());

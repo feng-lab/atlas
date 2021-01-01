@@ -7,6 +7,7 @@
 #include "zroiutils.h"
 #include <QFile>
 #include <QTransform>
+#include <fmt/core.h>
 #include <cmath>
 
 namespace nim {
@@ -417,7 +418,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
     H5std_string strBuf;
     for (int j = 0; j < numShape; ++j) {
       if (roiVer == 100) {
-        H5::Group shapeGrp = sliceGrp.openGroup(qUtf8Printable(QString("Shape%1").arg(j + 1)));
+        H5::Group shapeGrp = sliceGrp.openGroup(fmt::format("Shape{}", j + 1));
 
         H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
         typeAttr.read(strType, strBuf);
@@ -504,14 +505,14 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
             break;
         }
       } else {
-        H5::Group allShapeGrp = sliceGrp.openGroup(qUtf8Printable(QString("Shape%1").arg(j + 1)));
+        H5::Group allShapeGrp = sliceGrp.openGroup(fmt::format("Shape{}", j + 1));
 
         H5::Attribute numSubShapesAttr = allShapeGrp.openAttribute("SubShapeNumber");
         int numSubShape;
         numSubShapesAttr.read(intType, &numSubShape);
 
         for (int k = 0; k < numSubShape; ++k) {
-          H5::Group shapeGrp = allShapeGrp.openGroup(qUtf8Printable(QString("SubShape%1").arg(k + 1)));
+          H5::Group shapeGrp = allShapeGrp.openGroup(fmt::format("SubShape{}", k + 1));
 
           H5::Attribute typeAttr = shapeGrp.openAttribute("Type");
           typeAttr.read(strType, strBuf);
@@ -633,7 +634,7 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
 
     size_t i = 0;
     for (const auto&[id, shapes] : m_idToShapeOperations) {
-      H5::Group allShapeGrp = sliceGrp.createGroup(qUtf8Printable(QString("Shape%1").arg(i + 1)));
+      H5::Group allShapeGrp = sliceGrp.createGroup(fmt::format("Shape{}", i + 1));
       ++i;
 
       H5::Attribute subShapeNumberAttr = allShapeGrp.createAttribute("SubShapeNumber", intType, attrDataSpace);
@@ -641,7 +642,7 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
       subShapeNumberAttr.write(intType, &subShapeNumber);
 
       for (int si = 0; si < subShapeNumber; ++si) {
-        H5::Group shapeGrp = allShapeGrp.createGroup(qUtf8Printable(QString("SubShape%1").arg(si + 1)));
+        H5::Group shapeGrp = allShapeGrp.createGroup(fmt::format("SubShape{}", si + 1));
         const auto& shape = shapes[si];
         H5::Attribute type = shapeGrp.createAttribute("Type", strType, attrDataSpace);
         switch (shape.type) {
@@ -1486,7 +1487,7 @@ void ZROI::load(H5::Group& allGrp)
     numSliceAttr.read(intType, &numSlice);
 
     for (int i = 0; i < numSlice; ++i) {
-      H5::Group sliceGrp = allGrp.openGroup(qUtf8Printable(QString("Slice%1").arg(i + 1)));
+      H5::Group sliceGrp = allGrp.openGroup(fmt::format("Slice{}", i + 1));
 
       H5::Attribute sliceAttr = sliceGrp.openAttribute("Slice");
       int slice;
@@ -1520,7 +1521,7 @@ void ZROI::save(H5::Group& allGrp) const
       if (sliceROI.second.isEmpty())
         continue;
 
-      H5::Group sliceGrp = allGrp.createGroup(qUtf8Printable(QString("Slice%1").arg(idx + 1)));
+      H5::Group sliceGrp = allGrp.createGroup(fmt::format("Slice{}", idx + 1));
       ++idx;
 
       H5::Attribute sliceAttr = sliceGrp.createAttribute("Slice", intType, attrDataSpace);

@@ -1,18 +1,15 @@
 #pragma once
 
 #include "zimgformat.h"
+#include <folly/compression/Compression.h>
 
 namespace nim {
 
-#define HACK_HDF5
-
-#ifdef HACK_HDF5
 struct HDF5ChunkInfo {
   size_t offset = 0;
   size_t length = 0;
   bool compressed = true;
 };
-#endif
 
 class ZImgHDF5SubBlock : public ZImgSubBlock
 {
@@ -26,10 +23,8 @@ public:
 
   [[nodiscard]] ZImgInfo readInfo() const override;
 
-#ifdef HACK_HDF5
   void setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos)
   { m_hdf5Tiles = cinfos; }
-#endif
 
 protected:
   QString m_filename;
@@ -39,9 +34,8 @@ protected:
   size_t m_x;
   size_t m_y;
 
-#ifdef HACK_HDF5
   std::vector<HDF5ChunkInfo> m_hdf5Tiles;
-#endif
+  std::unique_ptr<folly::io::Codec> m_codec;
 };
 
 class ZImgHDF5 : public ZImgFormat

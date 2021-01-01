@@ -9,6 +9,7 @@
 #include <H5Cpp.h>
 #include <QFile>
 #include <QTextStream>
+#include <fmt/core.h>
 
 namespace nim {
 
@@ -125,7 +126,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
     numPunctaAttr.read(intType, &numPuncta);
 
     for (int32_t i = 0; i < numPuncta; ++i) {
-      H5::Group punctumGrp = allGrp.openGroup(qUtf8Printable(QString("Punctum%1").arg(i + 1)));
+      H5::Group punctumGrp = allGrp.openGroup(fmt::format("Punctum{}", i + 1));
       ZPunctum p;
 
       H5std_string strBuf;
@@ -238,7 +239,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
 
     int32_t idx = 0;
     for (const auto& p : puncta) {
-      H5::Group punctumGrp = allGrp.createGroup(qUtf8Printable(QString("Punctum%1").arg(idx + 1)));
+      H5::Group punctumGrp = allGrp.createGroup(fmt::format("Punctum{}", idx + 1));
       ++idx;
 
       if (!p.name().isEmpty()) {
