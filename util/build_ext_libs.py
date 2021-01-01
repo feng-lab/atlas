@@ -510,6 +510,15 @@ def build_glog(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'logging.h'),
+                   from_texts=[r'#ifndef GOOGLE_GLOG_DLL_DECL',
+                               ],
+                   to_texts=['#ifndef GOOGLE_GLOG_DLL_DECL\n'
+                             '#define GOOGLE_GLOG_DLL_DECL\n'
+                             '#endif\n'
+                             '#ifndef GOOGLE_GLOG_DLL_DECL\n',
+                             ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 

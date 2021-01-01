@@ -674,7 +674,7 @@ if (WIN32)
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.
-    target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE)
+    target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
   endif()
 
   # for some files
