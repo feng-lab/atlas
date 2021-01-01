@@ -864,18 +864,18 @@ std::set<int> ZROI::mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, in
 
     onSliceROIUpdated(slice, newShapes, std::set<size_t>(), std::set<size_t>());
   } else { // merge all
-    for (const auto& [slice, sliceROI] : sliceROIs) {
+    for (const auto& [s, sliceROI] : sliceROIs) {
       if (!sliceROI.isEmpty()) {
-        changedSlices.insert(slice);
+        changedSlices.insert(s);
         std::set<size_t> newShapes;
 
         for (const auto&[ido, shape] : sliceROI.m_idToShapeOperations) {
-          m_sliceROIs[slice].m_idToShapeOperations[m_shapeID] = shape;
+          m_sliceROIs[s].m_idToShapeOperations[m_shapeID] = shape;
           newShapes.insert(m_shapeID);
-          m_sliceROIs[slice].m_idToPainterPath[m_shapeID++] = sliceROI.m_idToPainterPath.at(ido);
+          m_sliceROIs[s].m_idToPainterPath[m_shapeID++] = sliceROI.m_idToPainterPath.at(ido);
         }
 
-        onSliceROIUpdated(slice, newShapes, std::set<size_t>(), std::set<size_t>());
+        onSliceROIUpdated(s, newShapes, std::set<size_t>(), std::set<size_t>());
       }
     }
   }
@@ -913,31 +913,31 @@ std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, 
 
     onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), editedShapes);
   } else { // all
-    for (const auto& [slice, sliceROI] : sliceROIs) {
-      if (!sliceROI.isEmpty() && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty()) {
-        changedSlices.insert(slice);
+    for (const auto& [s, sliceROI] : sliceROIs) {
+      if (!sliceROI.isEmpty() && m_sliceROIs.find(s) != m_sliceROIs.end() && !m_sliceROIs.at(s).isEmpty()) {
+        changedSlices.insert(s);
         std::set<size_t> editedShapes;
 
-        for (const auto& [shapeID, shapePP] : sliceROI.m_idToPainterPath) {
-          if (sliceROI.m_idToShapeOperations.at(shapeID)[0].type == ROIType::Line) {
+        for (const auto& [shID, shapePP] : sliceROI.m_idToPainterPath) {
+          if (sliceROI.m_idToShapeOperations.at(shID)[0].type == ROIType::Line) {
             continue;
           }
-          for (auto&[id, pp] : m_sliceROIs.at(slice).m_idToPainterPath) {
-            if (m_sliceROIs.at(slice).m_idToShapeOperations.at(id)[0].type == ROIType::Line) {
+          for (auto&[id, pp] : m_sliceROIs.at(s).m_idToPainterPath) {
+            if (m_sliceROIs.at(s).m_idToShapeOperations.at(id)[0].type == ROIType::Line) {
               continue;
             }
             if (pp.intersects(shapePP)) {
               editedShapes.insert(id);
-              for (auto subShape : sliceROI.m_idToShapeOperations.at(shapeID)) {
+              for (auto subShape : sliceROI.m_idToShapeOperations.at(shID)) {
                 subShape.isAdd = !subShape.isAdd;
-                m_sliceROIs.at(slice).m_idToShapeOperations[id].push_back(subShape);
+                m_sliceROIs.at(s).m_idToShapeOperations[id].push_back(subShape);
               }
               pp -= shapePP;
             }
           }
         }
 
-        onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), editedShapes);
+        onSliceROIUpdated(s, std::set<size_t>(), std::set<size_t>(), editedShapes);
       }
     }
   }
