@@ -492,7 +492,7 @@ std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkIn
     LOG(ERROR) << "can not start h5ls";
     return res;
   }
-  if (!printChunkInfos.waitForFinished()) {
+  if (!printChunkInfos.waitForFinished(-1)) {
     LOG(ERROR) << "h5ls error";
     return res;
   }
