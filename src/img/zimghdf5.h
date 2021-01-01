@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zimgformat.h"
-#include <folly/compression/Compression.h>
+// #include <folly/compression/Compression.h>
 
 namespace nim {
 
@@ -17,7 +17,8 @@ public:
   ZImgHDF5SubBlock(QString fileName,
                    std::vector<std::string> tiles,
                    const ZImgInfo& info,
-                   size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_);
+                   size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_,
+                   size_t chunkWidth, size_t chunkHeight);
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
@@ -35,7 +36,8 @@ protected:
   size_t m_y;
 
   std::vector<HDF5ChunkInfo> m_hdf5Tiles;
-  std::unique_ptr<folly::io::Codec> m_codec;
+  // std::unique_ptr<folly::io::Codec> m_codec;
+  ZImgInfo m_chunkImgInfo;
 };
 
 class ZImgHDF5 : public ZImgFormat

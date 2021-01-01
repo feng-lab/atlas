@@ -66,16 +66,19 @@ int main(int argc, char* argv[])
     if (FLAGS_run_unit_tests || FLAGS_run_benchmarks) {
       QCoreApplication app(argc, argv);
 #ifdef _WIN32
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/Resources");
       QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
       QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
 #elif defined(__APPLE__)
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/../Resources");
       QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jdk");
       QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jars");
 #else
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/Resources");
       QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
       QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
 #endif
-      initImgLib(argv[0], jdkDIR, jarsDIR, "", false);
+      initImgLib(argv[0], resourcesDIR, jdkDIR, jarsDIR, "", false);
       [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
         nim::shutdownImgLib(false);
       });
@@ -133,7 +136,8 @@ int main(int argc, char* argv[])
 
     QString jdkDIR = ZApplication::resourcesDirPath() + QString("/jdk");
     QString jarsDIR = ZApplication::resourcesDirPath() + QString("/jars");
-    initImgLib(argv[0], jdkDIR, jarsDIR, logDir.filePath("atlas"));
+    initImgLib(argv[0], ZApplication::resourcesDirPath(),
+               jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();
     });

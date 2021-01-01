@@ -2,7 +2,8 @@ import sys
 import os
 import numpy as np
 
-jarsDIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jars')
+os.environ['Resources_DIR'] = os.path.dirname(os.path.abspath(__file__))
+jarsDIR = os.path.join(os.environ['Resources_DIR'], 'jars')
 os.environ['ZIMG_JARS_DIR'] = jarsDIR
 
 from ._imgpy import *

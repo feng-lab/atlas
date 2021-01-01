@@ -1,5 +1,6 @@
 #include "zimghdf5.h"
 
+#include "zglobal.h"
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
@@ -8,6 +9,8 @@
 #include "zioutils.h"
 #include <QFile>
 #include <QMutexLocker>
+#include <QProcess>
+#include <QRegularExpression>
 #include <folly/io/IOBuf.h>
 #include <folly/compression/Compression.h>
 #include <fmt/format.h>
@@ -462,8 +465,109 @@ void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
 
 namespace nim {
 
+std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> parseHDF5Chunks(const QString& filename)
+{
+  // level, t, c, z, y, x
+  std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> res;
+
+  if (ZGlobal::resourcesDIR.isEmpty()) {
+    return res;
+  }
+
+#ifdef _WIN32
+  QString program = ZGlobal::resourcesDIR + QString("/h5ls.exe");
+#else
+  QString program = ZGlobal::resourcesDIR + QString("/h5ls");
+#endif
+  if (!QFile::exists(program)) {
+    LOG(ERROR) << "can not find h5ls in resources folder " << ZGlobal::resourcesDIR;
+    return res;
+  }
+  QStringList arguments;
+  arguments << "-v" << "-a" << "-r" << filename;
+  LOG(INFO) << program << " " << arguments.join(" ");
+  QProcess printChunkInfos;
+  printChunkInfos.start(program, arguments);
+  if (!printChunkInfos.waitForStarted()) {
+    LOG(ERROR) << "can not start h5ls";
+    return res;
+  }
+  if (!printChunkInfos.waitForFinished()) {
+    LOG(ERROR) << "h5ls error";
+    return res;
+  }
+
+  QRegularExpression dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
+  dataset.optimize();
+  QRegularExpression dsDataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
+  dsDataset.optimize();
+  QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
+  chunk.optimize();
+
+  QByteArray result = printChunkInfos.readAllStandardOutput();
+  QTextStream in(result, QIODevice::ReadOnly);
+
+  QString line;
+  bool dataSetStarted = false;
+  std::tuple<size_t, size_t, size_t, size_t> currentDataset;
+  bool ok1, ok2, ok3, ok4;
+  while (in.readLineInto(&line)) {
+    auto match = dataset.match(line);
+    if (match.hasMatch()) {
+      dataSetStarted = true;
+      currentDataset =
+        std::make_tuple<size_t, size_t, size_t, size_t>(1,
+                                                        match.captured(1).toUInt(&ok1),
+                                                        match.captured(2).toUInt(&ok2),
+                                                        match.captured(3).toUInt(&ok3));
+      CHECK(ok1 && ok2 && ok3) << line << ok1 << ok2 << ok3;
+      continue;
+    }
+    match = dsDataset.match(line);
+    if (match.hasMatch()) {
+      dataSetStarted = true;
+      currentDataset =
+        std::make_tuple<size_t, size_t, size_t, size_t>(match.captured(4).toUInt(&ok4),
+                                                        match.captured(1).toUInt(&ok1),
+                                                        match.captured(2).toUInt(&ok2),
+                                                        match.captured(3).toUInt(&ok3));
+      CHECK(ok1 && ok2 && ok3 && ok4) << line << ok1 << ok2 << ok3 << ok4;
+      continue;
+    }
+    match = chunk.match(line);
+    if (match.hasMatch()) {
+      if (!dataSetStarted) {
+        LOG(ERROR) << "parse hdf5 chunk error: " << line;
+        res.clear();
+        return res;
+      }
+      uint32_t filterMask = match.captured(1).toUInt(&ok1, 0);
+      CHECK(ok1) << match.captured(0);
+      HDF5ChunkInfo info;
+      info.compressed = ~filterMask & H5Z_FILTER_DEFLATE;
+      info.length = match.captured(2).toULongLong(&ok1);
+      info.offset = match.captured(3).toULongLong(&ok2);
+      size_t y = match.captured(4).toULongLong(&ok3);
+      size_t x = match.captured(5).toULongLong(&ok4);
+      CHECK(ok1 && ok2 && ok3 && ok4) << line << ok1 << ok2 << ok3 << ok4;
+      auto insertRes = res.insert({std::make_tuple(std::get<0>(currentDataset),
+                                                   std::get<1>(currentDataset),
+                                                   std::get<2>(currentDataset),
+                                                   std::get<3>(currentDataset),
+                                                   y, x),
+                                   info});
+      CHECK(insertRes.second) << line;
+      continue;
+    }
+  }
+  LOG(INFO) << "done";
+
+  return res;
+}
+
 ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, std::vector<std::string> tiles, const ZImgInfo& info,
-                                   size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_)
+                                   size_t ratio_, size_t t_, size_t z_, size_t x_, size_t y_,
+                                   size_t chunkWidth, size_t chunkHeight)
   : ZImgSubBlock(t_, x_ * ratio_, y_ * ratio_, z_, info.width * ratio_, info.height * ratio_, 1, ratio_, ratio_, 1)
   , m_filename(std::move(fileName))
   , m_tiles(std::move(tiles))
@@ -472,7 +576,10 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, std::vector<std::string> ti
   , m_x(x_)
   , m_y(y_)
 {
-  m_codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
+  // m_codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
+  m_chunkImgInfo = m_info;
+  m_chunkImgInfo.width = chunkWidth;
+  m_chunkImgInfo.height = chunkHeight;
 }
 
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
@@ -482,30 +589,45 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   }
   try {
     if (m_hdf5Tiles.size() == m_tiles.size() && m_hdf5Tiles[0].length > 0) {
+      auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
       std::ifstream inputFileStream;
       openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
-      auto res = std::make_shared<ZImg>(m_info);
-      auto chunkBuf = folly::IOBuf::createCombined(res->channelByteNumber());
+      auto res = std::make_shared<ZImg>(m_chunkImgInfo);
+      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
       for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
         auto& hdf5Tile = m_hdf5Tiles[c];
         inputFileStream.seekg(hdf5Tile.offset);
-        readStream(inputFileStream, chunkBuf->writableData(), hdf5Tile.length);
+        readStream(inputFileStream, chunkBuf.data(), hdf5Tile.length);
         if (hdf5Tile.compressed) {
-          auto decompressedBuf = m_codec->uncompress(chunkBuf.get(), res->channelByteNumber());
+          auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
+          //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+          //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+          //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
+          //LOG(INFO) << m_info.toQString();
+          //LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+          //auto decompressedBuf = codec->uncompress(ioBuf.get());
+          //LOG(INFO) << decompressedBuf->length();
+          auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
           std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
         } else {
           CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
-          std::memcpy(res->channelData(c), chunkBuf->data(), res->channelByteNumber());
+          std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
         }
+      }
+      if (m_chunkImgInfo.width != m_info.width || m_chunkImgInfo.height != m_info.height) {
+        ZImg tmp(m_info);
+        tmp.pasteImg(*res);
+        res->swap(tmp);
       }
 
       return res;
     }
   }
   catch (std::exception const& e) {
-    throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename).arg(e.what()));
+    throw ZIOException(QString("read %1 folly:%2").arg(m_filename).arg(e.what()));
   }
 
+  LOG(WARNING) << "fall back to single thread hdf5 image reading!";
   // todo: fix hdf5 multithread reading
   static QMutex mutex;
   QMutexLocker lock(&mutex);
@@ -561,6 +683,10 @@ QStringList ZImgHDF5::extensions() const
 void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
+  std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, nim::HDF5ChunkInfo> hdf5Chunks;
+  if (subBlocks) {
+    hdf5Chunks = parseHDF5Chunks(filename);
+  }
   try {
     H5::Exception::dontPrint();
 
@@ -587,6 +713,8 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
         if (rank_chunk != 2) {
           throw ZIOException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
         }
+        size_t chunkHeight = chunk_dims[0];
+        size_t chunkWidth = chunk_dims[1];
 
         for (auto level : levels) {
           size_t width = std::ceil(infos[0].width * 1.0 / level);
@@ -594,21 +722,28 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
           ZImgInfo inf = infos[0];
           inf.depth = 1;
           inf.numTimes = 1;
-          for (size_t x = 0; x < width; x += chunk_dims[0]) {
-            inf.width = std::min<size_t>(chunk_dims[0], width - x);
-            for (size_t y = 0; y < height; y += chunk_dims[1]) {
-              inf.height = std::min<size_t>(chunk_dims[1], height - y);
+          for (size_t x = 0; x < width; x += chunkWidth) {
+            inf.width = std::min<size_t>(chunkWidth, width - x);
+            for (size_t y = 0; y < height; y += chunkHeight) {
+              inf.height = std::min<size_t>(chunkHeight, height - y);
               for (size_t t = 0; t < infos[0].numTimes; ++t) {
                 for (size_t z = 0; z < infos[0].depth; ++z) {
                   std::vector<std::string> tiles;
+                  std::vector<HDF5ChunkInfo> chunkInfos;
                   for (size_t c = 0; c < inf.numChannels; ++c) {
                     if (level == 1) {
                       tiles.push_back(fmt::format("/Img/TimePoint{}/Channel{}/Z{}/Data", t, c, z));
                     } else {
                       tiles.push_back(fmt::format("/Img/TimePoint{}/Channel{}/Z{}/DownsampledBy{}Data", t, c, z, level));
                     }
+                    if (!hdf5Chunks.empty()) {
+                      chunkInfos.push_back(hdf5Chunks.at(std::make_tuple(level, t, c, z, y, x)));
+                    }
                   }
-                  auto hdf5SubBlock = std::make_shared<ZImgHDF5SubBlock>(filename, tiles, inf, level, t, z, x, y);
+                  auto hdf5SubBlock = std::make_shared<ZImgHDF5SubBlock>(filename, tiles, inf, level, t, z, x, y,
+                                                                         std::min(chunkWidth, width),
+                                                                         std::min(chunkHeight, height));
+                  hdf5SubBlock->setHDF5ChunkInfos(chunkInfos);
                   subBlock.push_back(hdf5SubBlock);
 
 #ifdef HACK_HDF5_NOT_WORKING_NOW_CRASH_AT_get_addr
@@ -697,7 +832,10 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
+  }
+  catch (std::exception const& e) {
+    throw ZIOException(fmt::format("hdf5:{}", e.what()));
   }
 }
 

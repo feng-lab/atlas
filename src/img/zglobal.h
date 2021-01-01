@@ -168,6 +168,7 @@ class ZGlobal
 public:
   inline static QString jdkDIR;
   inline static QString jarsDIR;
+  inline static QString resourcesDIR;
 };
 
 //std::visit(overloaded {

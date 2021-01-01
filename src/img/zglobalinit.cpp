@@ -40,10 +40,11 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
 }
 
 void
-initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, const QString& logFilename, bool isApp)
+initImgLib(const char* argv0, const QString& resourcesDIR,
+           const QString& jdkDIR, const QString& jarsDIR, const QString& logFilename, bool isApp)
 {
   initLogging(argv0, logFilename);
-  
+
   if (isApp) {
     addLogSink(&ZLogCache::instance());
     qInstallMessageHandler(myMessageOutput);
@@ -101,6 +102,7 @@ initImgLib(const char* argv0, const QString& jdkDIR, const QString& jarsDIR, con
       LOG(INFO) << "jdkDIR: " << ZGlobal::jdkDIR;
     }
   }
+  ZGlobal::resourcesDIR = resourcesDIR;
 
   fftw_init_threads();
   fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
@@ -201,7 +203,7 @@ void shutdownImgLib(bool isApp)
   if (isApp) {
     LOG(INFO) << "--- App Log End ---";
   }
-  
+
   fftw_cleanup_threads();
 
   shutdownLogging();

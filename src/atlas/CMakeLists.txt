@@ -181,7 +181,8 @@ if (WIN32)
 elseif (APPLE)
   set(ASSETS
       ${CMAKE_CURRENT_SOURCE_DIR}/icons/app.icns
-      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg)
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg
+      ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls)
   set(MACOSX_BUNDLE_ICON_FILE app.icns)
 endif (WIN32)
 
@@ -686,6 +687,10 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk"
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk")
   add_custom_command(TARGET ${APP_NAME}
@@ -768,6 +773,10 @@ else (WIN32)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/ffmpeg
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD

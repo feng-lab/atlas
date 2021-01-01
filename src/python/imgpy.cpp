@@ -131,7 +131,10 @@ public:
 
 PYBIND11_MODULE(_imgpy, m)
 {
-  initImgLib("_imgpy", "", qgetenv("ZIMG_JARS_DIR"), "", false);
+  initImgLib("_imgpy",
+             qgetenv("Resources_DIR"),
+             "", qgetenv("ZIMG_JARS_DIR"), "",
+             false);
 
   m.doc() = R"pbdoc(
         Python interface to img lib.
