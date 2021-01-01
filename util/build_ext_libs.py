@@ -872,110 +872,89 @@ def build_libsodium(src_dir: str, install_dir: str):
         print('done')
 
 
-def build_folly(src_dir: str, install_dir: str, header_only: bool = False):
-    if header_only:
-        install_dir = os.path.join(install_dir, 'folly')
-        shutil.rmtree(install_dir, ignore_errors=True)
-        distutils.dir_util.copy_tree(src_dir, install_dir)
-        try:
-            if is_windows():
-                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-win.h'),
-                             os.path.join(install_dir, 'folly', 'folly-config.h'))
-            elif is_mac():
-                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-macos.h'),
-                             os.path.join(install_dir, 'folly', 'folly-config.h'))
-            else:
-                shutil.copy2(os.path.join(ext_dir(), 'folly-configs', 'folly-config-linux.h'),
-                             os.path.join(install_dir, 'folly', 'folly-config.h'))
+def build_folly(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
 
-            orig_file = os.path.join(install_dir, 'folly', 'ScopeGuard.h')
-            patch_file(orig_file,
-                       from_texts=[r'static void warnAboutToCrash() noexcept;'],
-                       to_texts=[r'inline static void warnAboutToCrash() noexcept {}'])
-        finally:
-            print('')
-    else:
-        build_dir = create_build_dir(src_dir)
+    orig_file = bak_file = None
+    orig_file5 = bak_file5 = None
+    orig_file2 = bak_file2 = None
+    orig_file3 = bak_file3 = None
+    orig_file4 = bak_file4 = None
+    try:
+        if is_mac():
+            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'-std=${CXX_STD}'],
+                                  to_texts=[r''])
+        if is_mac() and macos_min_version().startswith('10.'):
+            # preadv and pwritev are only available after macOS 11.0
+            orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
+            bak_file5 = patch_file(orig_file5,
+                                   from_texts=[r'check_symbol_exists(preadv',
+                                               r'check_symbol_exists(pwritev'],
+                                   to_texts=[r'#check_symbol_exists(preadv',
+                                             r'#check_symbol_exists(pwritev'])
 
-        orig_file = bak_file = None
-        orig_file5 = bak_file5 = None
-        orig_file2 = bak_file2 = None
-        orig_file3 = bak_file3 = None
-        orig_file4 = bak_file4 = None
-        try:
-            if is_mac():
-                orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
-                bak_file = patch_file(orig_file,
-                                      from_texts=[r'-std=${CXX_STD}'],
-                                      to_texts=[r''])
-            if is_mac() and macos_min_version().startswith('10.'):
-                # preadv and pwritev are only available after macOS 11.0
-                orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
-                bak_file5 = patch_file(orig_file5,
-                                      from_texts=[r'check_symbol_exists(preadv',
-                                                  r'check_symbol_exists(pwritev'],
-                                      to_texts=[r'#check_symbol_exists(preadv',
-                                                r'#check_symbol_exists(pwritev'])
+        orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
+        bak_file2 = patch_file(orig_file2,
+                               from_texts=[r'${ZLIB_INCLUDE_DIRS}',
+                                           r'${BZIP2_INCLUDE_DIRS}',
+                                           r'find_package(OpenSSL MODULE REQUIRED)',
+                                           r'find_package(BZip2 MODULE)',
+                                           r'find_package(LibLZMA MODULE)',
+                                           r'find_package(LZ4 MODULE)',
+                                           r'find_package(Zstd MODULE)',
+                                           r'find_package(Snappy MODULE)',
+                                           r'find_package(Libsodium)',
+                                           ],
+                               to_texts=[r'',
+                                         r'',
+                                         'find_package(OpenSSL MODULE REQUIRED)\n'
+                                         'if (WIN32)\n'
+                                         'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
+                                         'endif (WIN32)\n',
+                                         r'find_package(BZip2 MODULE REQUIRED)',
+                                         r'find_package(LibLZMA MODULE REQUIRED)',
+                                         r'find_package(LZ4 MODULE REQUIRED)',
+                                         r'find_package(Zstd MODULE REQUIRED)',
+                                         r'find_package(Snappy MODULE REQUIRED)',
+                                         r'find_package(Libsodium REQUIRED)',
+                                         ])
 
-            orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
-            bak_file2 = patch_file(orig_file2,
-                                   from_texts=[r'${ZLIB_INCLUDE_DIRS}',
-                                               r'${BZIP2_INCLUDE_DIRS}',
-                                               r'find_package(OpenSSL MODULE REQUIRED)',
-                                               r'find_package(BZip2 MODULE)',
-                                               r'find_package(LibLZMA MODULE)',
-                                               r'find_package(LZ4 MODULE)',
-                                               r'find_package(Zstd MODULE)',
-                                               r'find_package(Snappy MODULE)',
-                                               r'find_package(Libsodium)',
-                                               ],
-                                   to_texts=[r'',
-                                             r'',
-                                             'find_package(OpenSSL MODULE REQUIRED)\n'
-                                             'if (WIN32)\n'
-                                             'list(APPEND OPENSSL_LIBRARIES ${OPENSSL_LIBRARIES} Bcrypt.lib Crypt32.lib Ws2_32.lib)\n'
-                                             'endif (WIN32)\n',
-                                             r'find_package(BZip2 MODULE REQUIRED)',
-                                             r'find_package(LibLZMA MODULE REQUIRED)',
-                                             r'find_package(LZ4 MODULE REQUIRED)',
-                                             r'find_package(Zstd MODULE REQUIRED)',
-                                             r'find_package(Snappy MODULE REQUIRED)',
-                                             r'find_package(Libsodium REQUIRED)',
-                                             ])
+        orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
+        bak_file3 = patch_file(orig_file3,
+                               from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
+                                           r'/std:${MSVC_LANGUAGE_VERSION}',
+                                           ],
+                               to_texts=[
+                                   r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
+                                   r'#/std:${MSVC_LANGUAGE_VERSION}',
+                                   ])
 
-            orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
-            bak_file3 = patch_file(orig_file3,
-                                  from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
-                                              r'/std:${MSVC_LANGUAGE_VERSION}',
-                                              ],
-                                  to_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
-                                            r'#/std:${MSVC_LANGUAGE_VERSION}',
-                                            ])
+        orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file4 = patch_file(orig_file4,
+                               from_texts=[r'project(${PACKAGE_NAME} CXX C)',
+                                           ],
+                               to_texts=['project(${PACKAGE_NAME} CXX C)\n'
+                                         'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
+                                         ])
 
-            orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
-            bak_file4 = patch_file(orig_file4,
-                                   from_texts=[r'project(${PACKAGE_NAME} CXX C)',
-                                               ],
-                                   to_texts=['project(${PACKAGE_NAME} CXX C)\n'
-                                             'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
-                                             ])
-
-            cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
-            cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                             '-DPYTHON_EXTENSIONS:BOOL=OFF',
-                             '-DBUILD_TESTS:BOOL=OFF',
-                             '-DBOOST_LINK_STATIC=ON',
-                             src_dir])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            if is_mac():
-                os.replace(bak_file, orig_file)
-            if is_mac() and macos_min_version().startswith('10.'):
-                os.replace(bak_file5, orig_file5)
-            os.replace(bak_file2, orig_file2)
-            os.replace(bak_file3, orig_file3)
-            os.replace(bak_file4, orig_file4)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
+        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DPYTHON_EXTENSIONS:BOOL=OFF',
+                         '-DBUILD_TESTS:BOOL=OFF',
+                         '-DBOOST_LINK_STATIC=ON',
+                         src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac():
+            os.replace(bak_file, orig_file)
+        if is_mac() and macos_min_version().startswith('10.'):
+            os.replace(bak_file5, orig_file5)
+        os.replace(bak_file2, orig_file2)
+        os.replace(bak_file3, orig_file3)
+        os.replace(bak_file4, orig_file4)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
@@ -2086,7 +2065,6 @@ def build_libs(libs: dict, update_src: bool):
         src_dir = os.path.join(ext_dir(), 'folly')
         if update_src:
             update_git_submodule(src_dir)
-        # vs2019 build error https://github.com/facebook/folly/issues/1324
         build_folly(src_dir, ext_build_dir())
 
     if libs['suitesparse']:
