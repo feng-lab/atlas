@@ -576,6 +576,7 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, std::vector<std::string> ti
   , m_x(x_)
   , m_y(y_)
 {
+  CHECK(m_tiles.size() == m_info.numChannels) << m_tiles.size() << " " << m_info.numChannels;
   // m_codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
   m_chunkImgInfo = m_info;
   m_chunkImgInfo.width = chunkWidth;
@@ -670,6 +671,18 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 ZImgInfo ZImgHDF5SubBlock::readInfo() const
 {
   return m_info;
+}
+
+void ZImgHDF5SubBlock::setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos)
+{
+  if (!cinfos.empty()) {
+    CHECK(cinfos.size() == m_info.numChannels) << cinfos.size() << " " << m_info.numChannels;
+    m_hdf5Tiles = cinfos;
+    m_emptyBlock = true;
+    for (const auto& chunk : m_hdf5Tiles) {
+      m_emptyBlock = m_emptyBlock && chunk.offset == 0 && chunk.length == 0;
+    }
+  }
 }
 
 QString ZImgHDF5::shortName() const
@@ -853,7 +866,7 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
   catch (std::exception const& e) {
-    throw ZIOException(fmt::format("hdf5:{}", e.what()));
+    throw ZIOException(fmt::format("std:{}", e.what()));
   }
 }
 
@@ -937,7 +950,7 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
           if (!rgn.zInRegion(z)) {
             continue;
           }
-          H5::Group zGrp = channelGrp.openGroup(fmt::format("Z{}, z"));
+          H5::Group zGrp = channelGrp.openGroup(fmt::format("Z{}", z));
 
           H5::DataSet data = zGrp.openDataSet(datasetName);
           ZImg desImg = img.createView(z - rgn.start.z, c - rgn.start.c, t - rgn.start.t);

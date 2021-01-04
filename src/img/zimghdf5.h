@@ -24,14 +24,7 @@ public:
 
   [[nodiscard]] ZImgInfo readInfo() const override;
 
-  inline void setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos)
-  {
-    m_hdf5Tiles = cinfos;
-    m_emptyBlock = true;
-    for (const auto& chunk : m_hdf5Tiles) {
-      m_emptyBlock = m_emptyBlock && chunk.offset == 0 && chunk.length == 0;
-    }
-  }
+  void setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos);
 
 protected:
   QString m_filename;
