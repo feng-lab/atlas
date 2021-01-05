@@ -753,25 +753,12 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
                                  const QStringList& swcFolders,
                                  int mode)
 {
-  QFile file(fn);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+  auto loadObj = loadJsonObject(fn);
+  if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
 
-  QByteArray saveData = file.readAll();
-
-  QJsonParseError jsonError;
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    return;
-  }
-
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-    return;
-  }
-
-  QJsonObject sceneObj = loadObj["Scene"].toObject();
+  auto& sceneObj = loadObj.at("Scene").as_object();
 
   QDir::setCurrent(QFileInfo(fn).absolutePath());
 
@@ -818,25 +805,29 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
     }
   }
 
-  QJsonObject docObject = sceneObj["Doc"].toObject();
-  for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
-    QStringList typeAndID = it.key().split(" ");
+  auto& docObject = sceneObj.at("Doc").as_object();
+  for (auto& [key, value] : docObject) {
+    QString qkey = QString::fromUtf8(key.data(), key.size());
+    QStringList typeAndID = qkey.split(" ");
     QString IDString = typeAndID[1].trimmed();
-    QFileInfo docPath(it.value().toString());
+    QFileInfo docPath(asQString(value));
     QString filename = docPath.completeBaseName();
     if (typeAndID[0] == "Swc") {
       if (filename.endsWith("layer"))
         filename.chop(6);
       else
         LOG(FATAL) << "..";
-      modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Mode StringIntOption") = "Single Color";
       if (filename.startsWith("Py"))
-        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(1, 0, 0, 1))));
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+          json::value_from(glm::vec4(1, 0, 0, 1));
       else if (filename.startsWith("PV169") || filename.startsWith("PV40") || filename.startsWith("PV41") ||
                filename.startsWith("PV42")) {
-        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(0, 1, 1, 1))));
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+          json::value_from(glm::vec4(0, 1, 1, 1));
       } else {
-        modifyJsonValue(sceneObj, IDString + ".View3D.Color Vec4", QJsonValue(toQString(glm::vec4(0, 0, 1, 1))));
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+          json::value_from(glm::vec4(0, 0, 1, 1));
       }
     } else if (typeAndID[0] == "Puncta") {
       if (filename.endsWith("puncta"))
@@ -845,32 +836,28 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
         filename.chop(8);
       else
         LOG(FATAL) << "..";
-      modifyJsonValue(sceneObj, IDString + ".View3D.Use Same Size Bool", QJsonValue(true));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Size Scale Float", QJsonValue("4"));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Color Mode StringIntOption", QJsonValue("Single Color"));
-      modifyJsonValue(sceneObj, IDString + ".View3D.Puncta Color Vec4", QJsonValue(toQString(glm::vec4(0, 1, 0, 1))));
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Use Same Size Bool") = true;
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Size Scale Float") = 4.f;
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Mode StringIntOption") ="Single Color";
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Puncta Color Vec4") =
+        json::value_from(glm::vec4(0, 1, 0, 1));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
     QString locString = toQString(loc);
     QString scaleString = toQString(glm::dvec3(1, 1, 5));
 
-    modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Scale Vec3", scaleString);
-    modifyJsonValue(sceneObj, IDString + ".View3D.Coord Transform 3DTransform.Translation Vec3", locString);
-    modifyJsonValue(sceneObj, IDString + ".View2D.Offset DVec4", toQString(glm::dvec4(loc, 0)));
+    sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Coord Transform 3DTransform").as_object().at("Scale Vec3") =
+      json::value_from(glm::dvec3(1, 1, 5));
+    sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Coord Transform 3DTransform").as_object().at("Translation Vec3") =
+      json::value_from(loc);
+    sceneObj[IDString.toStdString()].as_object().at("View2D").as_object().at("Offset DVec4") =
+      json::value_from(glm::dvec4(loc, 0));
   }
 
-  QFile resfile(resfn);
-  if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    return;
-  }
+  json::object saveObj;
+  saveObj["Scene"] = sceneObj;
 
-  QJsonObject saveObj;
-  saveObj.insert("Scene", sceneObj);
-
-  QJsonDocument saveDoc(saveObj);
-  if (resfile.write(saveDoc.toJson()) == -1) {
-    return;
-  }
+  saveJsonObject(saveObj, resfn);
 }
 
 void createCellTable()
@@ -892,23 +879,12 @@ void createCellTable()
       break;
   }
 
-
-  QFile file("/Users/feng/Downloads/template_cell.scene");
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+  auto loadObj = loadJsonObject("/Users/feng/Downloads/template_cell.scene");
+  if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
-  QByteArray saveData = file.readAll();
-  QJsonParseError jsonError;
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    return;
-  }
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-    return;
-  }
-  QJsonObject sceneObj = loadObj["Scene"].toObject();
-  QJsonObject docObject = sceneObj["Doc"].toObject();
+  auto& sceneObj = loadObj["Scene"].as_object();
+  auto& docObject = sceneObj["Doc"].as_object();
 
   std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
 
@@ -931,34 +907,27 @@ void createCellTable()
     QString swcName = QString("/Users/feng/Documents/PV/PVSWC/%1_layer.swc").arg(cellName);
     QString punctaName = QString("/Users/feng/Documents/PV/PVSWC/%1_neurite.nimp").arg(cellName);
 
-    for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
-      QStringList typeAndID = it.key().split(" ");
+    for (auto& [key, value] : docObject) {
+      QString qkey = QString::fromUtf8(key.data(), key.size());
+      QStringList typeAndID = qkey.split(" ");
       QString IDString = typeAndID[1].trimmed();
-      QFileInfo docPath(it.value().toString());
+      QFileInfo docPath(asQString(value));
       QString filename = docPath.completeBaseName();
       if (typeAndID[0] == "Swc") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+        sceneObj["Doc"].as_object().at(key) = json::value_from(swcName);
       } else if (typeAndID[0] == "Puncta") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+        sceneObj["Doc"].as_object().at(key) = json::value_from(punctaName);
       }
-      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("X Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
     }
     QString scnName = QString("/Users/feng/Downloads/cell_table/%1.scene").arg(cellName);
-    QFile resfile(scnName);
-    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      return;
-    }
 
-    QJsonObject saveObj;
-    saveObj.insert("Scene", sceneObj);
+    json::object saveObj;
+    saveObj["Scene"] = sceneObj;
 
-    QJsonDocument saveDoc(saveObj);
-    if (resfile.write(saveDoc.toJson()) == -1) {
-      return;
-    }
-    resfile.flush();
+    saveJsonObject(saveObj, scnName);
 
     mainWin->removeAllObjs();
     mainWin->loadJsonScene(scnName);
@@ -1350,22 +1319,12 @@ void createGlanceThumbnails()
   punctaSuffix.emplace_back("_neurite.nimp");
 
   for (size_t ti = 0; ti < templateName.size(); ++ti) {
-    QFile file(QString("/Users/feng/Google Drive/eeum/raw/%1").arg(templateName[ti]));
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    auto loadObj = loadJsonObject(QString("/Users/feng/Google Drive/eeum/raw/%1").arg(templateName[ti]));
+    if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
       return;
     }
-    QByteArray saveData = file.readAll();
-    QJsonParseError jsonError;
-    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-    if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-      return;
-    }
-    QJsonObject loadObj = loadDoc.object();
-    if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-      return;
-    }
-    QJsonObject sceneObj = loadObj["Scene"].toObject();
-    QJsonObject docObject = sceneObj["Doc"].toObject();
+    auto& sceneObj = loadObj["Scene"].as_object();
+    auto& docObject = sceneObj["Doc"].as_object();
 
     QDir dir(swcDirs[ti]);
     QStringList filters;
@@ -1382,34 +1341,26 @@ void createGlanceThumbnails()
       QString swcName = QString("%1/%2.swc").arg(swcDirs[ti]).arg(cellName);
       QString punctaName = QString("%1/%2%3").arg(swcDirs[ti]).arg(cellName).arg(punctaSuffix[ti]);
 
-      for (QJsonObject::iterator it = docObject.begin(); it != docObject.end(); ++it) {
-        QStringList typeAndID = it.key().split(" ");
+      for (auto& [key, value] : docObject) {
+        QString qkey = QString::fromUtf8(key.data(), key.size());
+        QStringList typeAndID = qkey.split(" ");
         QString IDString = typeAndID[1].trimmed();
-        QFileInfo docPath(it.value().toString());
+        QFileInfo docPath(asQString(value));
         QString filename = docPath.completeBaseName();
         if (typeAndID[0] == "Swc") {
-          modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+          sceneObj["Doc"].as_object().at(key) = json::value_from(swcName);
         } else if (typeAndID[0] == "Puncta") {
-          modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+          sceneObj["Doc"].as_object().at(key) = json::value_from(punctaName);
         }
-        removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
-        removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
-        removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("X Cut FloatSpan");
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
+        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
       }
       QString scnName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.scene").arg(cellName);
-      QFile resfile(scnName);
-      if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return;
-      }
 
-      QJsonObject saveObj;
-      saveObj.insert("Scene", sceneObj);
-
-      QJsonDocument saveDoc(saveObj);
-      if (resfile.write(saveDoc.toJson()) == -1) {
-        return;
-      }
-      resfile.flush();
+      json::object saveObj;
+      saveObj["Scene"] = sceneObj;
+      saveJsonObject(saveObj, scnName);
 
       mainWin->removeAllObjs();
       mainWin->loadJsonScene(scnName);
@@ -1497,7 +1448,7 @@ void exportSceneForGlance()
     }
   }
 
-  QJsonArray allObjs;
+  json::array allObjs;
   for (auto cellname : cellnames) {
     QStringList fileList;
     QString somaMeshName = QString("/Users/feng/Google Drive/eeum/static/data/%1_soma.vtp").arg(cellname);
@@ -1537,39 +1488,30 @@ void exportSceneForGlance()
     LOG(INFO) << "position: " << view3d->camera().get().eye();
     LOG(INFO) << "focalPoint: " << view3d->camera().get().center();
 
-    QJsonObject obj;
-    obj["cellname"] = cellname;
-    obj["soma"] = somaMeshFileName;
-    obj["neurite"] = branchMeshFileName;
-    obj["root"] = rootMeshFileName;
-    obj["puncta"] = punctaMeshFileName;
-    QJsonArray arr;
-    arr.append(view3d->camera().get().eye().x);
-    arr.append(view3d->camera().get().eye().y);
-    arr.append(view3d->camera().get().eye().z);
+    json::object obj;
+    obj["cellname"] = json::value_from(cellname);
+    obj["soma"] = json::value_from(somaMeshFileName);
+    obj["neurite"] = json::value_from(branchMeshFileName);
+    obj["root"] = json::value_from(rootMeshFileName);
+    obj["puncta"] = json::value_from(punctaMeshFileName);
+    json::array arr;
+    arr.push_back(view3d->camera().get().eye().x);
+    arr.push_back(view3d->camera().get().eye().y);
+    arr.push_back(view3d->camera().get().eye().z);
     obj["camera position"] = arr;
 
-    QJsonArray arr2;
-    arr2.append(view3d->camera().get().center().x);
-    arr2.append(view3d->camera().get().center().y);
-    arr2.append(view3d->camera().get().center().z);
+    json::array arr2;
+    arr2.push_back(view3d->camera().get().center().x);
+    arr2.push_back(view3d->camera().get().center().y);
+    arr2.push_back(view3d->camera().get().center().z);
     obj["camera focalPoint"] = arr2;
 
-    allObjs.append(obj);
+    allObjs.push_back(obj);
   }
-
-  QJsonDocument saveDoc(allObjs);
 
   QString scnName = QString("/Users/feng/Google Drive/eeum/raw/meshes/allObjs.json");
-  QFile resfile(scnName);
-  if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    return;
-  }
 
-  if (resfile.write(saveDoc.toJson()) == -1) {
-    return;
-  }
-  resfile.flush();
+  saveJsonArray(allObjs, scnName);
 }
 
 void stitchAndDetectPuncta()
@@ -1818,23 +1760,12 @@ void createPCCellTable()
       break;
   }
 
-
-  QFile file("/Users/feng/Downloads/template_cell.scene");
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+  auto loadObj = loadJsonObject("/Users/feng/Downloads/template_cell.scene");
+  if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
-  QByteArray saveData = file.readAll();
-  QJsonParseError jsonError;
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    return;
-  }
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-    return;
-  }
-  QJsonObject sceneObj = loadObj["Scene"].toObject();
-  QJsonObject docObject = sceneObj["Doc"].toObject();
+  auto& sceneObj = loadObj["Scene"].as_object();
+  auto& docObject = sceneObj["Doc"].as_object();
 
   std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;
 
@@ -1856,34 +1787,26 @@ void createPCCellTable()
     QString swcName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_layer.swc").arg(cellName);
     QString punctaName = QString("/Volumes/shared/feng/PVPY/PY/PySWC/%1_puncta_small.apo").arg(cellName);
 
-    for (auto it = docObject.begin(); it != docObject.end(); ++it) {
-      QStringList typeAndID = it.key().split(" ");
+    for (auto& [key, value] : docObject) {
+      QString qkey = QString::fromUtf8(key.data(), key.size());
+      QStringList typeAndID = qkey.split(" ");
       QString IDString = typeAndID[1].trimmed();
-      QFileInfo docPath(it.value().toString());
+      QFileInfo docPath(asQString(value));
       QString filename = docPath.completeBaseName();
       if (typeAndID[0] == "Swc") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(swcName));
+        sceneObj["Doc"].as_object().at(key) = json::value_from(swcName);
       } else if (typeAndID[0] == "Puncta") {
-        modifyJsonValue(sceneObj, "Doc." + it.key(), QJsonValue(punctaName));
+        sceneObj["Doc"].as_object().at(key) = json::value_from(punctaName);
       }
-      removeJsonValue(sceneObj, IDString + ".View3D.X Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Y Cut FloatSpan");
-      removeJsonValue(sceneObj, IDString + ".View3D.Z Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("X Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Y Cut FloatSpan");
+      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().erase("Z Cut FloatSpan");
     }
     QString scnName = QString("/Users/feng/Desktop/cell_table_pc/%1.scene").arg(cellName);
-    QFile resfile(scnName);
-    if (!resfile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      return;
-    }
 
-    QJsonObject saveObj;
-    saveObj.insert("Scene", sceneObj);
-
-    QJsonDocument saveDoc(saveObj);
-    if (resfile.write(saveDoc.toJson()) == -1) {
-      return;
-    }
-    resfile.flush();
+    json::object saveObj;
+    saveObj["Scene"] = sceneObj;
+    saveJsonObject(saveObj, scnName);
 
     mainWin->removeAllObjs();
     mainWin->loadJsonScene(scnName);

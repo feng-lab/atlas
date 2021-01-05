@@ -1,9 +1,7 @@
 #pragma once
 
 #include "zexception.h"
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
+#include <QStringList>
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-W#warnings"
@@ -51,31 +49,6 @@ inline QStringList tag_invoke(const json::value_to_tag<QStringList>&, const json
 
 namespace nim {
 
-void modifyJsonValue(QJsonObject& obj, const QString& path, const QJsonValue& newValue);
-
-void modifyJsonValue(QJsonArray& array, const QString& path, const QJsonValue& newValue);
-
-void modifyJsonValue(QJsonDocument& doc, const QString& path, const QJsonValue& newValue);
-
-void removeJsonValue(QJsonObject& obj, const QString& path);
-
-void removeJsonValue(QJsonDocument& doc, const QString& path);
-
-QJsonObject loadQJsonObject(const QString& file);
-
-void saveJsonObject(const QJsonObject& json, const QString& file);
-
-QStringList readStringList(const QJsonObject& json, const QString& key);
-
-QString readString(const QJsonObject& json, const QString& key);
-
-double readNumber(const QJsonObject& json, const QString& key);
-
-std::vector<double> readNumberArray(const QJsonObject& json, const QString& key);
-
-bool readBool(const QJsonObject& json, const QString& key);
-
-
 void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr);
 
 inline std::ostream& operator<<(std::ostream& os, const json::value& jv)
@@ -89,6 +62,13 @@ QString formatJsonToQString(const json::value& jv);
 json::object loadJsonObject(const QString& file);
 
 void saveJsonObject(const json::object& jo, const QString& file);
+
+void saveJsonArray(const json::array& ja, const QString& file);
+
+inline QString asQString(const json::value& jv)
+{
+  return json::value_to<QString>(jv);
+}
 
 // tuple-like types
 template<class T, typename std::enable_if<
@@ -107,10 +87,26 @@ inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
   return res;
 }
 
-inline QString asQString(const json::value& jv)
+} // namespace nim
+
+namespace glm {
+
+// tuple-like types
+template<class T, typename std::enable_if<
+  (std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
+inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 {
-  return json::value_to<QString>(jv);
+  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
+  const auto& ja = jv.as_array();
+  if (ja.size() < n) {
+    throw nim::ZIOException("json array too short");
+  }
+  T res;
+  for (size_t i = 0; i < n; ++i) {
+    res[i] = json::value_to<typename T::value_type>(ja[i]);
+  }
+  return res;
 }
 
-} // namespace nim
+} // namespace glm
 

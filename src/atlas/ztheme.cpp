@@ -50,54 +50,42 @@ bool ZTheme::event(QEvent* event)
 
 void ZTheme::loadTheme(const QString& fn)
 {
-  QFile file(fn);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    throw ZIOException(tr("Can not open file"));
-  }
-
-  QByteArray saveData = file.readAll();
-
-  QJsonParseError jsonError;
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    throw ZIOException(QString("Incorrect file format <%1>").arg(jsonError.errorString()));
-  }
-
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("AtlasTheme") || !loadObj["AtlasTheme"].isObject()) {
+  const auto& loadObj = loadJsonObject(fn);
+  if (!loadObj.contains("AtlasTheme") || !loadObj.at("AtlasTheme").is_object()) {
     throw ZIOException(tr("File is not AtlasTheme format"));
   }
 
-  QJsonObject themeObj = loadObj["AtlasTheme"].toObject();
+  const auto& themeObj = loadObj.at("AtlasTheme").as_object();
 
   const QMetaObject &m = *metaObject();
 
-  for (QJsonObject::const_iterator it = themeObj.begin(); it != themeObj.end(); ++it) {
-    if (it.key() == "Palette") {
-      auto po = it.value().toObject();
-      for (auto pit = po.begin(); pit != po.end(); ++pit) {
-        m_palette[pit.key()] = readNamedColor(pit.value().toString()).first;
+  for (const auto& [key, value] : themeObj) {
+    if (key == "Palette") {
+      auto& po = value.as_object();
+      for (const auto& [pkey, pvalue] : po) {
+        QString qpkey = QString::fromUtf8(pkey.data(), pkey.size());
+        m_palette[qpkey] = readNamedColor(asQString(pvalue)).first;
       }
     }
   }
 
-  for (QJsonObject::const_iterator it = themeObj.begin(); it != themeObj.end(); ++it) {
-    if (it.key() == "Colors") {
-      auto po = it.value().toObject();
+  for (const auto& [key, value] : themeObj) {
+    if (key == "Colors") {
+      auto& po = value.as_object();
       QMetaEnum e = m.enumerator(m.indexOfEnumerator("Color"));
       for (int i = 0, total = e.keyCount(); i < total; ++i) {
-        const QString key = QLatin1String(e.key(i));
-        if (!po.contains(key)) {
+        auto ekey = json::string_view(e.key(i));
+        if (!po.contains(ekey)) {
           continue;
         }
-        m_colors[i] = readNamedColor(po[key].toString());
+        m_colors[i] = readNamedColor(asQString(po.at(ekey)));
       }
-    } else if (it.key() == "Icons") {
-      auto po = it.value().toObject();
+    } else if (key == "Icons") {
+      auto& po = value.as_object();
       QMetaEnum e = m.enumerator(m.indexOfEnumerator("Icon"));
       for (int i = 0, total = e.keyCount(); i < total; ++i) {
-        const QString key = QLatin1String(e.key(i));
-        m_iconFiles[i] = po[key].toString();
+        auto ekey = json::string_view(e.key(i));
+        m_iconFiles[i] = asQString(po.at(ekey));
         QIcon(m_iconFiles[i]).swap(m_icons[i]);
       }
     }

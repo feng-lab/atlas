@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QIODevice>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -8,9 +9,11 @@
 namespace nim {
 
 // safe io functions, throw exceptions if error
-void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode);
+void openFileStream(std::ifstream& fs, const QString& filename,
+                    std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
 
-void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode);
+void openFileStream(std::ofstream& fs, const QString& filename,
+                    std::ios_base::openmode mode = std::ios_base::out | std::ios_base::binary);
 
 // mac: if count >= 2G, fs.read() will fail, this is a workaround
 void readStream_impl(std::istream& fs, char* buf, size_t count);
@@ -47,6 +50,12 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
 QString getTemporaryFilename(const QString& filename);
 
 void renameFile(const QString& oldName, const QString& newName);
+
+std::string readFileIntoString(const QString& filename,
+                               std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
+
+QByteArray readFileIntoByteArray(const QString& filename,
+                                 QIODevice::OpenMode openMode = QIODevice::ReadOnly);
 
 } // namespace nim
 

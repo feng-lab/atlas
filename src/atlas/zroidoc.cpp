@@ -150,7 +150,7 @@ size_t ZROIDoc::loadFile(const json::value& jValue, QString& errorMsg)
   }
   catch (const ZException& e) {
     errorMsg = QString("Can not read ROI from %1: %2")
-      .arg(fileName).arg(e.what());
+      .arg(formatJsonToQString(jValue)).arg(e.what());
     return 0;
   }
 }

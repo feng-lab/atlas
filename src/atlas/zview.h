@@ -3,6 +3,7 @@
 #include "zviewsettinginterface.h"
 #include "zglmutils.h"
 #include "zbbox.h"
+#include "zjson.h"
 #include <QWidget>
 #include <QAction>
 #include <array>

@@ -110,4 +110,34 @@ void renameFile(const QString& oldName, const QString& newName)
   }
 }
 
+std::string readFileIntoString(const QString& filename, std::ios_base::openmode mode)
+{
+  std::string res;
+  std::ifstream fs;
+#ifdef _MSC_VER
+  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+#else
+  fs.open(QFile::encodeName(filename).constData(), mode);
+#endif
+  if (!fs.is_open()) {
+    throw ZIOException("Can not open file for reading.");
+  }
+  fs.seekg(0, std::ios::end);
+  res.resize(fs.tellg());
+  fs.seekg(0, std::ios::beg);
+  fs.read(&res[0], res.size());
+  return res;
+}
+
+QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode openMode)
+{
+  QFile loadFile(filename);
+
+  if (!loadFile.open(openMode)) {
+    throw ZIOException("could not open: " + filename);
+  }
+
+  return loadFile.readAll();
+}
+
 } // namespace nim

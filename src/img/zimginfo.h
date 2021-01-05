@@ -276,7 +276,7 @@ inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgI
   jo["lastChannelIsAlphaChannel"] = info.lastChannelIsAlphaChannel;
 }
 
-ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::value& jv)
+inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::value& jv)
 {
   ZImgInfo info;
   info.width = json::value_to<size_t>(jv.at("width"));

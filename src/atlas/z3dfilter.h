@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dcanvaseventlistener.h"
 #include "zflags.h"
+#include "zjson.h"
 #include <QObject>
 #include <map>
 #include <set>

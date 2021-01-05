@@ -116,7 +116,7 @@ public:
   virtual QWidget* createObjEditWidget(size_t /*id*/)
   { return nullptr; }
 
-  std::map<size_t, size_t> read(const std::vector<std::pair<QString, json:;value>>& docKeyValueList, QString& err);
+  std::map<size_t, size_t> read(const std::vector<std::pair<QString, json::value>>& docKeyValueList, QString& err);
 
   void write(json::object& json) const;
 
