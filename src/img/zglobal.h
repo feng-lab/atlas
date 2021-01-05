@@ -7,6 +7,7 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <utility>
 #include <type_traits>
 #include <vector>
 #include <numeric>
@@ -217,3 +218,10 @@ __forceinline Container& unique_if( Container& on, Pred pred )
 }
 
 } // namespace nim
+
+template<std::size_t Index, std::size_t N, typename T>
+constexpr auto&& tuple_like_get_helper(T&& t) noexcept
+{
+  static_assert(Index < N, "Index out of bounds for tuple_like");
+  return std::forward<T>(t)[Index];
+}

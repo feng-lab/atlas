@@ -58,10 +58,10 @@ public:
 protected:
   void doWork() override;
 
-  void read(const QJsonObject&) override
+  void read(const json::object&) override
   {}
 
-  void write(QJsonObject&) const override
+  void write(json::object&) const override
   {}
 
 private:

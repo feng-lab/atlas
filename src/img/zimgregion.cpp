@@ -4,27 +4,6 @@
 
 namespace nim {
 
-ZImgRegion::ZImgRegion(const QJsonValue& jValue)
-  : ZImgRegion()
-{
-  if (!jValue.isObject()) {
-    throw ZIOException(QString("Invalid json for ZImgRegion"));
-  }
-  QJsonObject obj = jValue.toObject();
-
-  auto startArray = readNumberArray(obj, "start");
-  auto endArray = readNumberArray(obj, "end");
-  if (startArray.size() == start.size() && endArray.size() == end.size()) {
-    start = ZVoxelCoordinate(startArray[0], startArray[1], startArray[2], startArray[3], startArray[4]);
-    end = ZVoxelCoordinate(endArray[0], endArray[1], endArray[2], endArray[3], endArray[4]);
-    if (isEmpty()) {
-      throw ZIOException(QString("Invalid json creates empty ZImgRegion"));
-    }
-  } else {
-    throw ZIOException(QString("Invalid json for ZImgRegion"));
-  }
-}
-
 bool ZImgRegion::containsCoord(const nim::ZVoxelCoordinate& coord, const nim::ZImgInfo& info) const
 {
   ZImgRegion rgn = *this;
@@ -54,22 +33,6 @@ void ZImgRegion::resolveRegionEnd(const ZImgInfo& info)
   if (end.c < 0) end.c = info.numChannels;
   if (end.t < 0) end.t = info.numTimes;
   //if (end.l < 0) end.l = info.numLocations;
-}
-
-QJsonValue ZImgRegion::toJson() const
-{
-  QJsonObject obj;
-  QJsonArray startArray;
-  for (size_t i = 0; i < start.size(); ++i) {
-    startArray.append(start[i]);
-  }
-  obj.insert("start", startArray);
-  QJsonArray endArray;
-  for (size_t i = 0; i < end.size(); ++i) {
-    endArray.append(end[i]);
-  }
-  obj.insert("end", endArray);
-  return obj;
 }
 
 //std::string ZImgRegion::toString() const

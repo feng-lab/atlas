@@ -128,9 +128,9 @@ signals:
 protected:
   void doWork() override;
 
-  void read(const QJsonObject& json) override;
+  void read(const json::object& jo) override;
 
-  void write(QJsonObject& json) const override;
+  void write(json::object& jo) const override;
 
 private:
   void getTileMatrixFromConnImage(ZImg& img);

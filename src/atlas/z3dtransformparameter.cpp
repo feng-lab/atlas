@@ -361,9 +361,9 @@ void Z3DTransformParameter::setSameAs(const ZParameter& rhs)
   ZParameter::setSameAs(rhs);
 }
 
-QJsonValue Z3DTransformParameter::jsonValue() const
+json::value Z3DTransformParameter::jsonValue() const
 {
-  QJsonObject obj;
+  json::object obj;
   m_scale.write(obj);
   m_translation.write(obj);
   m_rotation.write(obj);
@@ -371,10 +371,10 @@ QJsonValue Z3DTransformParameter::jsonValue() const
   return obj;
 }
 
-void Z3DTransformParameter::readValue(const QJsonValue& jsonValue)
+void Z3DTransformParameter::readValue(const json::value& jsonValue)
 {
-  if (jsonValue.isObject()) {
-    QJsonObject obj = jsonValue.toObject();
+  if (jsonValue.is_object()) {
+    const auto& obj = jsonValue.as_object();
     m_receiveWidgetSignal = false;
     m_scale.read(obj);
     m_translation.read(obj);

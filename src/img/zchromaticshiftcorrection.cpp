@@ -67,39 +67,40 @@ void ZChromaticShiftCorrection::doWork()
   reportProgress(1.0);
 }
 
-void ZChromaticShiftCorrection::read(const QJsonObject& json)
+void ZChromaticShiftCorrection::read(const json::object& jo)
 {
-  setInputOutput(readString(json, "input_file"), readString(json, "result_file"));
+  setInputOutput(json::value_to<QString>(jo.at("input_file")),
+                 json::value_to<QString>(jo.at("result_file")));
 
-  setReferenceChannel(readNumber(json, "reference_channel"));
-  setTargetChannel(readNumber(json, "target_channel"));
-  setRemoveBackground(readBool(json, "remove_background"));
-  setRemoveHighForeground(readBool(json, "remove_high_foreground"));
-  setBrightBackground(readBool(json, "bright_background"));
-  setMethod(readString(json, "method"));
-  setMetric(readString(json, "metric"));
-  setTransform(readString(json, "transform"));
-  setOptimizer(readString(json, "optimizer"));
-  setUseMultithreading(readBool(json, "use_multithreading"));
-  setNumScales(readNumber(json, "num_scales"));
+  setReferenceChannel(json::value_to<int>(jo.at("reference_channel")));
+  setTargetChannel(json::value_to<int>(jo.at("target_channel")));
+  setRemoveBackground(jo.at("remove_background").as_bool());
+  setRemoveHighForeground(jo.at("remove_high_foreground").as_bool());
+  setBrightBackground(jo.at("bright_background").as_bool());
+  setMethod(json::value_to<QString>(jo.at("method")));
+  setMetric(json::value_to<QString>(jo.at("metric")));
+  setTransform(json::value_to<QString>(jo.at("transform")));
+  setOptimizer(json::value_to<QString>(jo.at("optimizer")));
+  setUseMultithreading(jo.at("use_multithreading").as_bool());
+  setNumScales(json::value_to<int>(jo.at("num_scales")));
 }
 
-void ZChromaticShiftCorrection::write(QJsonObject& json) const
+void ZChromaticShiftCorrection::write(json::object& jo) const
 {
-  json["input_file"] = m_imgFilename;
-  json["result_file"] = m_resultFilename;
+  jo["input_file"] = json::value_from(m_imgFilename);
+  jo["result_file"] = json::value_from(m_resultFilename);
 
-  json["reference_channel"] = m_referenceChannel;
-  json["target_channel"] = m_targetChannel;
-  json["remove_background"] = m_removeBackground;
-  json["remove_high_foreground"] = m_removeHighForeground;
-  json["bright_background"] = m_brightBackground;
-  json["method"] = m_method;
-  json["metric"] = m_metric;
-  json["transform"] = m_transform;
-  json["optimizer"] = m_optimizer;
-  json["use_multithreading"] = m_useMultithreading;
-  json["num_scales"] = m_numScales;
+  jo["reference_channel"] = m_referenceChannel;
+  jo["target_channel"] = m_targetChannel;
+  jo["remove_background"] = m_removeBackground;
+  jo["remove_high_foreground"] = m_removeHighForeground;
+  jo["bright_background"] = m_brightBackground;
+  jo["method"] = json::value_from(m_method);
+  jo["metric"] = json::value_from(m_metric);
+  jo["transform"] = json::value_from(m_transform);
+  jo["optimizer"] = json::value_from(m_optimizer);
+  jo["use_multithreading"] = m_useMultithreading;
+  jo["num_scales"] = m_numScales;
 }
 
 template<typename ImagePixelType>

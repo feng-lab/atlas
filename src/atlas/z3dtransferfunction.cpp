@@ -192,35 +192,41 @@ void Z3DTransferFunctionParameter::setSameAs(const ZParameter& rhs)
   ZParameter::setSameAs(rhs);
 }
 
-QJsonValue Z3DTransferFunctionParameter::jsonValue() const
+json::value Z3DTransferFunctionParameter::jsonValue() const
 {
-  QJsonArray keyArray;
+  json::array keyArray;
   for (const auto& k : m_value.m_keys) {
-    QJsonObject key;
-    key.insert("intensity", toQString(k.first.m_intensity));
-    key.insert("colorL", toQString(k.first.m_colorL));
-    key.insert("colorR", toQString(k.first.m_colorR));
-    key.insert("split", k.first.m_split);
-    keyArray.append(key);
+    keyArray.push_back({
+                         {"intensity", k.first.m_intensity},
+                         {"colorL",    json::value_from(k.first.m_colorL)},
+                         {"colorR",    json::value_from(k.first.m_colorR)},
+                         {"split",     k.first.m_split},
+                       });
   }
   return keyArray;
 }
 
-void Z3DTransferFunctionParameter::readValue(const QJsonValue& jsonValue)
+void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
 {
   m_value.m_keys.clear();
-  QJsonArray keyArray = jsonValue.toArray();
-  for (const auto i : keyArray) {
-    QJsonObject keyObj = i.toObject();
+  const auto& keyArray = jsonValue.as_array();
+  for (const auto jv : keyArray) {
+    const auto& keyObj = jv.as_object();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&
         keyObj.contains("colorL") &&
         keyObj.contains("colorR") &&
         keyObj.contains("split")) {
-      toVal(keyObj["intensity"].toString(), key.m_intensity);
-      toVal(keyObj["colorL"].toString(), key.m_colorL);
-      toVal(keyObj["colorR"].toString(), key.m_colorR);
-      key.m_split = keyObj["split"].toBool();
+      if (keyObj.at("intensity").is_string()) {
+        toVal(toQString(keyObj.at("intensity")), key.m_intensity);
+        toVal(toQString(keyObj.at("colorL")), key.m_colorL);
+        toVal(toQString(keyObj.at("colorR")), key.m_colorR);
+      } else {
+        key.m_intensity = json::value_to<double>(keyObj.at("intensity"));
+        key.m_colorL = json::value_to<glm::col4>(keyObj.at("colorL"));
+        key.m_colorR = json::value_to<glm::col4>(keyObj.at("colorR"));
+      }
+      key.m_split = keyObj.at("split").as_bool();
       m_value.m_keys.emplace_back(key, false);
     } else {
       LOG(WARNING) << "Invalid transfer function key " << keyObj.keys().join("  ");

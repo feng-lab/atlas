@@ -20,26 +20,25 @@ public:
 
   void loadTask(const QString& file)
   {
-    QJsonObject json = loadJsonObject(file);
-    m_logFile = readString(json, "log_file");
-    read(json);
+    auto jo = loadJsonObject(file);
+    m_logFile = json::value_to<QString>(jo.at("log_file"));
+    read(jo);
   }
 
   void saveTask(const QString& file) const
   {
-    QJsonObject json;
-    json["log_file"] = m_logFile;
-    write(json);
-    saveJsonObject(json, file);
+    json::object jo;
+    jo["log_file"] = json::value_from(m_logFile);
+    write(jo);
+    saveJsonObject(jo, file);
   }
 
-  QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
-    QJsonObject json;
-    json["log_file"] = m_logFile;
-    write(json);
-    QJsonDocument jsonDoc(json);
-    return jsonDoc.toJson(QJsonDocument::Indented);
+    json::object jo;
+    jo["log_file"] = json::value_from(m_logFile);
+    write(jo);
+    return jsonToQString(jo);
   }
 
 signals:
@@ -53,9 +52,9 @@ signals:
 protected:
   virtual void doWork() = 0;
 
-  virtual void read(const QJsonObject&) = 0;
+  virtual void read(const json::object&) = 0;
 
-  virtual void write(QJsonObject&) const = 0;
+  virtual void write(json::object&) const = 0;
 
 private:
   QString m_logFile;

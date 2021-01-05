@@ -212,14 +212,14 @@ void Z3DView::updateBoundBox()
 
 }
 
-void Z3DView::read(size_t id, const QJsonObject& json)
+void Z3DView::read(size_t id, const json::object& json)
 {
   for (auto & m_3dObjView : m_3dObjViews) {
     if (m_3dObjView->hasObj(id)) {
-      if (json.value("ViewObjType").toString() == m_3dObjView->doc().typeName()) {
+      if (asQString(json.at("ViewObjType")) == m_3dObjView->doc().typeName()) {
         m_3dObjView->read(id, json);
       } else {
-        LOG(WARNING) << "view object type " << json.value("ViewObjType").toString()
+        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType"))
                      << " dones't match object type " << m_3dObjView->doc().typeName() << ". abort.";
       }
       return;
@@ -227,37 +227,37 @@ void Z3DView::read(size_t id, const QJsonObject& json)
   }
 }
 
-void Z3DView::write(size_t id, QJsonObject& json) const
+void Z3DView::write(size_t id, json::object& json) const
 {
   for (auto m_3dObjView : m_3dObjViews) {
     if (m_3dObjView->hasObj(id)) {
-      json.insert("ViewObjType", m_3dObjView->doc().typeName());
-      json.insert("ViewVersion", QJsonValue(1.0));
+      json["ViewObjType"] = json::value_from(m_3dObjView->doc().typeName());
+      json["ViewVersion"] = 1.0;
       m_3dObjView->write(id, json);
       return;
     }
   }
 }
 
-void Z3DView::read(const QJsonObject& json)
+void Z3DView::read(const json::object& json)
 {
-  if (json.contains("Compositor") && json.value("Compositor").isObject()) {
-    m_compositor->read(json.value("Compositor").toObject());
+  if (json.contains("Compositor") && json.at("Compositor").is_object()) {
+    m_compositor->read(json.at("Compositor").as_object());
   }
-  if (json.contains("Global") && json.value("Global").isObject()) {
-    m_globalParas->read(json.value("Global").toObject());
+  if (json.contains("Global") && json.at("Global").is_object()) {
+    m_globalParas->read(json.at("Global").as_object());
   }
 }
 
-void Z3DView::write(QJsonObject& json) const
+void Z3DView::write(json::object& json) const
 {
-  QJsonObject compObj;
+  json::object compObj;
   m_compositor->write(compObj);
-  json.insert("Compositor", compObj);
+  json["Compositor"] = compObj;
 
-  QJsonObject globObj;
+  json::object globObj;
   m_globalParas->write(globObj);
-  json.insert("Global", globObj);
+  json["Global"] = globObj;
 }
 
 void Z3DView::zoomIn()

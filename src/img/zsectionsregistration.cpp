@@ -96,41 +96,42 @@ void ZSectionsRegistration::doWork()
   reportProgress(1.0);
 }
 
-void ZSectionsRegistration::read(const QJsonObject& json)
+void ZSectionsRegistration::read(const json::object& jo)
 {
-  setInputOutput(readStringList(json, "input_files"), readString(json, "result_file"),
-                 readNumber(json, "fixed_slice_index"));
+  setInputOutput(json::value_to<QStringList>(jo.at("input_files")),
+                 json::value_to<QString>(jo.at("result_file")),
+                 json::value_to<int>(jo.at("fixed_slice_index")));
 
-  setReferenceChannel(readNumber(json, "reference_channel"));
-  setRemoveBackground(readBool(json, "remove_background"));
-  setRemoveHighForeground(readBool(json, "remove_high_foreground"));
-  setAllowFlip(readBool(json, "allow_flip"));
-  setBrightBackground(readBool(json, "bright_background"));
-  setMetric(readString(json, "metric"));
-  setTransform(readString(json, "transform"));
-  setOptimizer(readString(json, "optimizer"));
-  setUseMultithreading(readBool(json, "use_multithreading"));
-  setNumScales(readNumber(json, "num_scales"));
-  setNumNeighbors(readNumber(json, "num_neighbors"));
+  setReferenceChannel(json::value_to<int>(jo.at("reference_channel")));
+  setRemoveBackground(jo.at("remove_background").as_bool());
+  setRemoveHighForeground(jo.at("remove_high_foreground").as_bool());
+  setAllowFlip(jo.at("allow_flip").as_bool());
+  setBrightBackground(jo.at("bright_background").as_bool());
+  setMetric(json::value_to<QString>(jo.at("metric")));
+  setTransform(json::value_to<QString>(jo.at("transform")));
+  setOptimizer(json::value_to<QString>(jo.at("optimizer")));
+  setUseMultithreading(jo.at("use_multithreading").as_bool());
+  setNumScales(json::value_to<int>(jo.at("num_scales")));
+  setNumNeighbors(json::value_to<int>(jo.at("num_neighbors")));
 }
 
-void ZSectionsRegistration::write(QJsonObject& json) const
+void ZSectionsRegistration::write(json::object& jo) const
 {
-  json["input_files"] = QJsonArray::fromStringList(m_imgFilenames);
-  json["result_file"] = m_resultFilename;
-  json["fixed_slice_index"] = m_fixedSliceIndex;
+  jo["input_files"] = json::value_from(m_imgFilenames);
+  jo["result_file"] = json::value_from(m_resultFilename);
+  jo["fixed_slice_index"] = m_fixedSliceIndex;
 
-  json["reference_channel"] = m_referenceChannel;
-  json["remove_background"] = m_removeBackground;
-  json["remove_high_foreground"] = m_removeHighForeground;
-  json["allow_flip"] = m_allowFlip;
-  json["bright_background"] = m_brightBackground;
-  json["metric"] = m_metric;
-  json["transform"] = m_transform;
-  json["optimizer"] = m_optimizer;
-  json["use_multithreading"] = m_useMultithreading;
-  json["num_scales"] = m_numScales;
-  json["num_neighbors"] = m_numNeighbors;
+  jo["reference_channel"] = m_referenceChannel;
+  jo["remove_background"] = m_removeBackground;
+  jo["remove_high_foreground"] = m_removeHighForeground;
+  jo["allow_flip"] = m_allowFlip;
+  jo["bright_background"] = m_brightBackground;
+  jo["metric"] = json::value_from(m_metric);
+  jo["transform"] = json::value_from(m_transform);
+  jo["optimizer"] = json::value_from(m_optimizer);
+  jo["use_multithreading"] = m_useMultithreading;
+  jo["num_scales"] = m_numScales;
+  jo["num_neighbors"] = m_numNeighbors;
 }
 
 template<typename ImagePixelType>

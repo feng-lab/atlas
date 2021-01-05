@@ -103,9 +103,9 @@ public:
     return nullptr;
   }
 
-  [[nodiscard]] virtual QJsonValue jsonValue(size_t id) const = 0;
+  [[nodiscard]] virtual json::value jsonValue(size_t id) const = 0;
 
-  [[nodiscard]] virtual bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const = 0;
+  [[nodiscard]] virtual bool isSameObj(const json::value& v1, const json::value& v2) const = 0;
 
   // make alias of obj (many id point to same actual object)
   virtual size_t makeAlias(size_t id) = 0;

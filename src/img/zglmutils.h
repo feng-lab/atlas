@@ -29,6 +29,8 @@
 #include <iostream>
 #include <sstream>
 #include <tuple>
+#include <utility>
+#include <type_traits>
 
 namespace glm {
 
@@ -63,7 +65,97 @@ inline quat mix(const quat& q1, const quat& q2, double p)
   return mix(q1, q2, float(p));
 }
 
+template<std::size_t Index, auto N, typename T, auto Q>
+constexpr auto&& get(glm::vec<N, T, Q>& v) noexcept
+{ return tuple_like_get_helper<Index, N>(v); }
+
+template<std::size_t Index, auto N, typename T, auto Q>
+constexpr auto&& get(const glm::vec<N, T, Q>& v) noexcept
+{ return tuple_like_get_helper<Index, N>(v); }
+
+template<std::size_t Index, auto N, typename T, auto Q>
+constexpr auto&& get(glm::vec<N, T, Q>&& v) noexcept
+{ return tuple_like_get_helper<Index, N>(std::move(v)); }
+
+template<std::size_t Index, auto N, typename T, auto Q>
+constexpr auto&& get(const glm::vec<N, T, Q>&& v) noexcept
+{ return tuple_like_get_helper<Index, N>(std::move(v)); }
+
+
+template<std::size_t Index, typename T, auto Q>
+constexpr auto&& get(glm::tquat<T, Q>& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
+template<std::size_t Index, typename T, auto Q>
+constexpr auto&& get(const glm::tquat<T, Q>& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
+template<std::size_t Index, typename T, auto Q>
+constexpr auto&& get(glm::tquat<T, Q>&& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(std::move(v)); }
+
+template<std::size_t Index, typename T, auto Q>
+constexpr auto&& get(const glm::tquat<T, Q>&& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(std::move(v)); }
+
+
+template<std::size_t Index, auto C, auto R, typename T, auto Q>
+constexpr auto&& get(glm::mat<C, R, T, Q>& m) noexcept
+{ return tuple_like_get_helper<Index, C>(m); }
+
+template<std::size_t Index, auto C, auto R, typename T, auto Q>
+constexpr auto&& get(const glm::mat<C, R, T, Q>& m) noexcept
+{ return tuple_like_get_helper<Index, C>(m); }
+
+template<std::size_t Index, auto C, auto R, typename T, auto Q>
+constexpr auto&& get(glm::mat<C, R, T, Q>&& m) noexcept
+{ return tuple_like_get_helper<Index, C>(std::move(m)); }
+
+template<std::size_t Index, auto C, auto R, typename T, auto Q>
+constexpr auto&& get(const glm::mat<C, R, T, Q>&& m) noexcept
+{ return tuple_like_get_helper<Index, C>(std::move(m)); }
+
 } // namespace glm
+
+namespace std {
+
+template<auto N, typename T, auto Q>
+struct tuple_size<glm::vec<N, T, Q>> : integral_constant<std::size_t, N>
+{
+};
+
+template<std::size_t Index, auto N, typename T, auto Q>
+struct tuple_element<Index, glm::vec<N, T, Q>>
+{
+  static_assert(Index < N, "Index out of bounds for vec");
+  using type = typename glm::vec<N, T, Q>::value_type;
+};
+
+template<typename T, auto Q>
+struct tuple_size<glm::tquat<T, Q>> : integral_constant<std::size_t, 4>
+{
+};
+
+template<std::size_t Index, typename T, auto Q>
+struct tuple_element<Index, glm::tquat<T, Q>>
+{
+  static_assert(Index < 4, "Index out of bounds for quat");
+  using type = typename glm::tquat<T, Q>::value_type;
+};
+
+template<auto C, auto R, typename T, auto Q>
+struct tuple_size<glm::mat<C, R, T, Q>> : integral_constant<std::size_t, C>
+{
+};
+
+template<std::size_t Index, auto C, auto R, typename T, auto Q>
+struct tuple_element<Index, glm::mat<C, R, T, Q>>
+{
+  static_assert(Index < C, "Index out of bounds for mat");
+  using type = typename glm::mat<C, R, T, Q>::col_type;
+};
+
+} // namespace std
 
 namespace nim {
 

@@ -29,9 +29,9 @@ public:
 
   [[nodiscard]] virtual ZBBox<glm::dvec3> boundBoxOfObjAfterClipping(size_t id) const = 0;
 
-  virtual void read(size_t id, const QJsonObject& json) = 0;
+  virtual void read(size_t id, const json::object& json) = 0;
 
-  virtual void write(size_t id, QJsonObject& json) const = 0;
+  virtual void write(size_t id, json::object& json) const = 0;
 
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);

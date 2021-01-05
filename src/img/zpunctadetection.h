@@ -104,9 +104,9 @@ public:
 protected:
   void doWork() override;
 
-  void read(const QJsonObject& json) override;
+  void read(const json::object& jo) override;
 
-  void write(QJsonObject& json) const override;
+  void write(json::object& jo) const override;
 
 private:
   // all works are done here, detect from img with thre and put result into resList

@@ -124,7 +124,7 @@ void ZAnimation::addKeyFrame(double time)
   }
   for (auto id : objs) {
     QString objTypeName;
-    QJsonValue objJsonValue;
+    json::value objJsonValue;
     if (id == 1) {
       objTypeName = "Background";
     } else if (id == 2) {
@@ -684,7 +684,7 @@ void ZAnimation::disableAnimationOf(size_t id)
 void ZAnimation::tryLinkAnimationWith(size_t id)
 {
   ZObjDoc* doc = m_doc.idToDoc(id);
-  QJsonValue jv = doc->jsonValue(id);
+  auto jv = doc->jsonValue(id);
   for (const auto& obj : m_objList) {
     if (obj->boundId == 0 && obj->objType == doc->typeName() &&
         doc->isSameObj(obj->objJsonValue, jv)) {
@@ -784,11 +784,10 @@ void ZAnimation::buildDisplayPacks()
     pack.showAll = obj->isShowAll;
     pack.paraAnimation = nullptr;
     QString objInfo;
-    if (obj->objJsonValue.isString()) {
-      objInfo = obj->objJsonValue.toString();
-    } else if (obj->objJsonValue.isObject()) {
-      QJsonDocument jd(obj->objJsonValue.toObject());
-      objInfo = jd.toJson();
+    if (obj->objJsonValue.is_string()) {
+      objInfo = asQString(obj->objJsonValue);
+    } else if (obj->objJsonValue.is_object()) {
+      objInfo = formatJsonToQString(obj->objJsonValue);
       QStringList infoList = objInfo.split("\n");
       if (infoList.size() > 6) {
         QStringList::iterator it = infoList.begin() + 6;

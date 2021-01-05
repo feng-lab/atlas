@@ -70,9 +70,9 @@ public:
 public:
   void setSameAs(const ZParameter& rhs) override;
 
-  QJsonValue jsonValue() const override;
+  json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
 protected:
   void updateMatrix();

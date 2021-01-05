@@ -31,7 +31,7 @@ public:
 
   size_t loadFile(const QString& fileName, QString& errorMsg) override;
 
-  size_t loadFile(const QJsonValue& jValue, QString& errorMsg) override;
+  size_t loadFile(const json::value& jValue, QString& errorMsg) override;
 
   [[nodiscard]] std::vector<QAction*> loadFileActions() const override;
 
@@ -49,9 +49,9 @@ public:
 
   [[nodiscard]] const QUndoStack* objUndoStack(size_t id) const override;
 
-  [[nodiscard]] QJsonValue jsonValue(size_t id) const override;
+  [[nodiscard]] json::value jsonValue(size_t id) const override;
 
-  [[nodiscard]] bool isSameObj(const QJsonValue& v1, const QJsonValue& v2) const override;
+  [[nodiscard]] bool isSameObj(const json::value& v1, const json::value& v2) const override;
 
   size_t makeAlias(size_t id) override;
 

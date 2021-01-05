@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimginterface.h"
+#include "zjson.h"
 #include <vector>
 
 namespace nim {
@@ -252,6 +253,51 @@ struct ZImgInfo
 };
 
 #pragma pack(pop)
+
+inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgInfo& info)
+{
+  auto& jo = jv.emplace_object();
+  jo["width"] = info.width;
+  jo["height"] = info.height;
+  jo["depth"] = info.depth;
+  jo["numChannels"] = info.numChannels;
+  jo["numTimes"] = info.numTimes;
+  jo["bytesPerVoxel"] = info.bytesPerVoxel;
+  jo["voxelFormat"] = json::value_from(enumToString(info.voxelFormat));
+  jo["validBitCount"] = info.validBitCount;
+  jo["voxelSizeUnit"] = json::value_from(enumToString(info.voxelSizeUnit));
+  jo["voxelSizeX"] = info.voxelSizeX;
+  jo["voxelSizeY"] = info.voxelSizeY;
+  jo["voxelSizeZ"] = info.voxelSizeZ;
+  jo["timeStamps"] = json::value_from(info.timeStamps);
+  jo["channelNames"] = json::value_from(info.channelNames);
+  jo["channelColors"] = json::value_from(info.channelColors);
+  jo["position"] = json::value_from(info.position);
+  jo["lastChannelIsAlphaChannel"] = info.lastChannelIsAlphaChannel;
+}
+
+ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::value& jv)
+{
+  ZImgInfo info;
+  info.width = json::value_to<size_t>(jv.at("width"));
+  info.height = json::value_to<size_t>(jv.at("height"));
+  info.depth = json::value_to<size_t>(jv.at("depth"));
+  info.numChannels = json::value_to<size_t>(jv.at("numChannels"));
+  info.numTimes = json::value_to<size_t>(jv.at("numTimes"));
+  info.bytesPerVoxel = json::value_to<size_t>(jv.at("bytesPerVoxel"));
+  info.voxelFormat = stringToVoxelFormat(json::value_to<QString>(jv.at("voxelFormat")));
+  info.validBitCount = json::value_to<size_t>(jv.at("validBitCount"));
+  info.voxelSizeUnit = stringToVoxelSizeUnit(json::value_to<QString>(jv.at("voxelSizeUnit")));
+  info.voxelSizeX = json::value_to<double>(jv.at("voxelSizeX"));
+  info.voxelSizeY = json::value_to<double>(jv.at("voxelSizeY"));
+  info.voxelSizeZ = json::value_to<double>(jv.at("voxelSizeZ"));
+  info.timeStamps = json::value_to<std::vector<double>>(jv.at("timeStamps"));
+  info.channelNames = json::value_to<std::vector<QString>>(jv.at("channelNames"));
+  info.channelColors = json::value_to<std::vector<col4>>(jv.at("channelColors"));
+  info.position = json::value_to<std::vector<double>>(jv.at("position"));
+  info.lastChannelIsAlphaChannel = jv.at("lastChannelIsAlphaChannel").as_bool();
+  return info;
+}
 
 }  // namespace nim
 

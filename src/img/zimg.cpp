@@ -99,71 +99,6 @@ ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes
   }
 }
 
-ZImgSource::ZImgSource(const QJsonValue& jValue)
-{
-  if (!jValue.isObject()) {
-    throw ZIOException(QString("Invalid json for ZImgSource"));
-  }
-  QJsonObject obj = jValue.toObject();
-  if (obj.contains("Path")) {  // compat to old version
-    filenames = readStringList(obj, "Path");
-  } else {
-    filenames = readStringList(obj, "filenames");
-  }
-  for (auto& filename : filenames) {
-    QFileInfo fi(filename);
-    if (fi.exists()) {
-      filename = fi.canonicalFilePath();
-      totalFileSize += fi.size();
-    } else {
-      throw ZIOException(QString("file %1 does not exist").arg(filename));
-    }
-  }
-
-  catDim = Dimension::Z;
-  if (obj.contains("CatDimension")) {  // compat to old version
-    catDim = stringToDimension(readString(obj, "catDimension"));
-  } else if (obj.contains("CatDim")) {
-    catDim = stringToDimension(readString(obj, "catDim"));
-  }
-  scene = 0;
-  if (obj.contains("TileIndex")) {  // compat to old version
-    scene = readNumber(obj, "TileIndex");
-  } else if (obj.contains("scene")) {
-    scene = readNumber(obj, "scene");
-  }
-
-  if (obj.contains("catScenes")) {
-    catScenes = readBool(obj, "catScenes");
-  }
-  if (obj.contains("region")) {
-    region = ZImgRegion(obj["region"]);
-  }
-  if (obj.contains("format")) {
-    format = stringToFileFormat(readString(obj, "format"));
-  }
-  if (obj.contains("expandXY")) {
-    expandXY = readBool(obj, "expandXY");
-  }
-  if (obj.contains("expandWithMaxValue")) {
-    expandWithMaxValue = readBool(obj, "expandWithMaxValue");
-  }
-}
-
-QJsonValue ZImgSource::toJson() const
-{
-  QJsonObject obj;
-  obj["filenames"] = QJsonArray::fromStringList(filenames);
-  obj["catDim"] = enumToString(catDim);
-  obj["catScenes"] = catScenes;
-  obj["region"] = region.toJson();
-  obj["scene"] = int(scene);
-  obj["format"] = enumToString(format);
-  obj["expandXY"] = expandXY;
-  obj["expandWithMaxValue"] = expandWithMaxValue;
-  return obj;
-}
-
 QString ZImgSource::toQString() const
 {
   QString res;
@@ -179,6 +114,65 @@ QString ZImgSource::toQString() const
     }
   }
   return res;
+}
+
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& imgSource)
+{
+  auto& ja = jv.emplace_object();
+  ja["filenames"] = json::value_from(imgSource.filenames);
+  ja["catDim"] = json::value_from(enumToString(imgSource.catDim));
+  ja["catScenes"] = imgSource.catScenes;
+  ja["region"] = json::value_from(imgSource.region);
+  ja["scene"] = imgSource.scene;
+  ja["format"] = json::value_from(enumToString(imgSource.format));
+  ja["expandXY"] = imgSource.expandXY;
+  ja["expandWithMaxValue"] = imgSource.expandWithMaxValue;
+}
+
+ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& jv)
+{
+  QStringList filenames;
+  const auto& obj = jv.as_object();
+  if (obj.contains("Path")) {  // compat to old version
+    filenames = json::value_to<QStringList>(obj.at("Path"));
+  } else {
+    filenames = json::value_to<QStringList>(obj.at("filenames"));
+  }
+
+  auto catDim = Dimension::Z;
+  if (obj.contains("CatDimension")) {  // compat to old version
+    catDim = stringToDimension(json::value_to<QString>(obj.at("catDimension")));
+  } else if (obj.contains("CatDim")) {
+    catDim = stringToDimension(json::value_to<QString>(obj.at("catDim")));
+  }
+  size_t scene = 0;
+  if (obj.contains("TileIndex")) {  // compat to old version
+    scene = json::value_to<size_t>(obj.at("TileIndex"));
+  } else if (obj.contains("scene")) {
+    scene = json::value_to<size_t>(obj.at("scene"));
+  }
+
+  auto catScenes = false;
+  if (obj.contains("catScenes")) {
+    catScenes = obj.at("catScenes").as_bool();
+  }
+  ZImgRegion region;
+  if (obj.contains("region")) {
+    region = json::value_to<ZImgRegion>(obj.at("region"));
+  }
+  auto format = FileFormat::Unknown;
+  if (obj.contains("format")) {
+    format = stringToFileFormat(json::value_to<QString>(obj.at("format")));
+  }
+  auto expandXY = true;
+  if (obj.contains("expandXY")) {
+    expandXY = obj.at("expandXY").as_bool();
+  }
+  bool expandWithMaxValue = false;
+  if (obj.contains("expandWithMaxValue")) {
+    expandWithMaxValue = obj.at("expandWithMaxValue").as_bool();
+  }
+  return ZImgSource(filenames, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
 }
 
 ZImgSubBlock::~ZImgSubBlock() = default;
@@ -1230,8 +1224,6 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   }
 
   IMG_RETURN_TYPED_CALL(combine_Impl, firstInfo, imgs, mode)
-
-  return ZImg();
 }
 
 ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int endIn) const
@@ -1384,7 +1376,6 @@ ZImg& ZImg::normalize()
     return *this;
   }
   IMG_RETURN_TYPED_CALL(normalize_Impl, m_info)
-  return *this;
 }
 
 template<typename TDesVoxel>
@@ -1775,61 +1766,6 @@ ZImg& ZImg::correctPreMultipliedColor()
     }
   }
   return *this;
-}
-
-QJsonValue ZImg::toJson() const
-{
-  CHECK(!isEmpty() && info().isType<int32_t>());
-  QJsonObject res;
-  QString size = QString("[%1, %2, %3, %4, %5]").arg(width()).arg(height()).arg(depth()).arg(
-    numChannels()).arg(numTimes());
-  res["size"] = size;
-  QString vl = QString::number(value<int32_t>(0));
-  for (size_t i = 1; i < voxelNumber(); ++i) {
-    if (i % width() == 0) {
-      vl += QString("; %1").arg(value<int32_t>(i));
-    } else {
-      vl += QString(", %1").arg(value<int32_t>(i));
-    }
-  }
-  res["values"] = vl;
-  return res;
-}
-
-ZImg ZImg::fromJson(const QJsonValue& value)
-{
-  if (!value.isObject()) {
-    throw ZIOException("not object");
-  }
-  QJsonObject obj = value.toObject();
-  QString size = readString(obj, "size");
-  QString values = readString(obj, "values");
-
-  ZImgInfo info(0, 0, 0, 0, 0, 4, VoxelFormat::Signed);
-
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
-  QStringList numList = size.split(rx, Qt::SkipEmptyParts);
-#else
-  QStringList numList = size.split(rx, QString::SkipEmptyParts);
-#endif
-  CHECK(numList.size() == 5);
-  info.width = numList[0].toInt();
-  info.height = numList[1].toInt();
-  info.depth = numList[2].toInt();
-  info.numChannels = numList[3].toInt();
-  info.numTimes = numList[4].toInt();
-  ZImg img(info);
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
-  numList = values.split(rx, Qt::SkipEmptyParts);
-#else
-  numList = values.split(rx, QString::SkipEmptyParts);
-#endif
-  CHECK(img.voxelNumber() == size_t(numList.size()));
-  for (size_t i = 0; i < size_t(numList.size()); ++i) {
-    img.setValue(numList[i].toInt(), i);
-  }
-  return img;
 }
 
 void ZImg::clearData()
@@ -3029,6 +2965,45 @@ void ZImg::showContentAsQString_Impl(QString& res) const
   }
   os << "\n";
   os << "end img\n";
+}
+
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img)
+{
+  IMG_TYPED_CALL(tag_invoke_img_Impl, img.info(), jv, img)
+}
+
+template<typename TVoxel>
+void tag_invoke_img_Impl(json::value& jv, const ZImg& img)
+{
+  auto& jo = jv.emplace_object();
+  jo["info"] = json::value_from(img.info());
+  json::array ja(img.voxelNumber());
+  size_t i = 0;
+  for (size_t t = 0; t < img.numTimes(); ++t) {
+    auto* data = img.timeData<TVoxel>(t);
+    for (size_t v = 0; v < img.timeVoxelNumber(); ++v) {
+      ja[i++] = data[v];
+    }
+  }
+  jo["data"] = ja;
+}
+
+ZImg tag_invoke(const json::value_to_tag<ZImg>&, const json::value& jv)
+{
+  auto info = json::value_to<ZImgInfo>(jv.at("info"));
+  ZImg res(info);
+
+  IMG_RETURN_TYPED_CALL(tag_invoke_img_Impl, info, res, jv)
+}
+
+template<typename TVoxel>
+ZImg tag_invoke_img_Impl(ZImg& img, const json::value& jv)
+{
+  auto data = json::value_to<std::vector<TVoxel>>(jv.at("data"));
+  ZImg tmp;
+  tmp.wrapData(data.data(), img.info());
+  img.pasteImg(tmp);
+  return img;
 }
 
 }  // namespace nim

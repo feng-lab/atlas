@@ -97,14 +97,14 @@ void Z3DFilter::disconnectAllPorts()
   }
 }
 
-void Z3DFilter::read(const QJsonObject& json)
+void Z3DFilter::read(const json::object& json)
 {
   for (auto para : m_parameters) {
     para->read(json);
   }
 }
 
-void Z3DFilter::write(QJsonObject& json) const
+void Z3DFilter::write(json::object& json) const
 {
   for (auto para : m_parameters) {
     para->write(json);

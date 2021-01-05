@@ -255,14 +255,14 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   pickingManager.setDevicePixelRatio(m_canvas.devicePixelRatio());
 }
 
-void Z3DGlobalParameters::read(const QJsonObject& json)
+void Z3DGlobalParameters::read(const json::object& json)
 {
   for (auto & m_parameter : m_parameters) {
     m_parameter->read(json);
   }
 }
 
-void Z3DGlobalParameters::write(QJsonObject& json) const
+void Z3DGlobalParameters::write(json::object& json) const
 {
   for (auto m_parameter : m_parameters) {
     m_parameter->write(json);

@@ -25,9 +25,9 @@ public:
   [[nodiscard]] const std::vector<ZParameter*>& parameters() const
   { return m_parameters; }
 
-  void read(const QJsonObject& json);
+  void read(const json::object& json);
 
-  void write(QJsonObject& json) const;
+  void write(json::object& json) const;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera);
 

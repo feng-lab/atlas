@@ -95,6 +95,19 @@ inline QString enumToString(VoxelFormat vf)
   }
 }
 
+inline VoxelFormat stringToVoxelFormat(const QString& str)
+{
+  if (str == "Unsigned") {
+    return VoxelFormat::Unsigned;
+  } else if (str == "Signed") {
+    return VoxelFormat::Signed;
+  } else if (str == "Float") {
+    return VoxelFormat::Float;
+  } else {
+    throw ZIOException("invalid VoxelFormat " + str);
+  }
+}
+
 enum class VoxelSizeUnit
 {
   none = 0,  // No unit
@@ -134,13 +147,40 @@ inline QString enumToString(VoxelSizeUnit vsu)
   }
 }
 
+inline VoxelSizeUnit stringToVoxelSizeUnit(const QString& str)
+{
+  if (str == "none") {
+    return VoxelSizeUnit::none;
+  } else if (str == "inch") {
+    return VoxelSizeUnit::inch;
+  } else if (str == "cm") {
+    return VoxelSizeUnit::cm;
+  } else if (str == "mm") {
+    return VoxelSizeUnit::mm;
+  } else if (str == "um") {
+    return VoxelSizeUnit::um;
+  } else if (str == "nm") {
+    return VoxelSizeUnit::nm;
+  } else if (str == "m") {
+    return VoxelSizeUnit::m;
+  } else if (str == "hm") {
+    return VoxelSizeUnit::hm;
+  } else if (str == "km") {
+    return VoxelSizeUnit::km;
+  } else {
+    throw ZIOException("invalid VoxelSizeUnit " + str);
+  }
+}
+
 double unitSizeInMeter(VoxelSizeUnit vsu);
 
 #pragma pack(push, 1)
 
 struct col4
 {
-  uint8_t r, g, b, a;
+  using value_type = uint8_t;
+
+  value_type r, g, b, a;
 
   col4()
     : r(0), g(0), b(0), a(255)
@@ -210,6 +250,13 @@ struct col4
     col4 res = c1;
     return res.mix(c2, coef);
   }
+
+  // access
+  inline value_type& operator[](size_t i)
+  { return (&r)[i]; }
+
+  inline const value_type& operator[](size_t i) const
+  { return (&r)[i]; }
 };
 
 struct Location
@@ -486,5 +533,37 @@ inline ImgMergeMode stringToImgMergeMode(const QString& str)
   }
 }
 
+template<std::size_t Index>
+constexpr auto&& get(col4& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(const col4& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(col4&& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(const col4&& v) noexcept
+{ return tuple_like_get_helper<Index, 4>(v); }
+
 } // namespace nim
+
+namespace std {
+
+template<>
+struct tuple_size<nim::col4> : integral_constant<size_t, 4>
+{
+};
+
+template<std::size_t Index>
+struct tuple_element<Index, nim::col4>
+{
+  static_assert(Index < 4, "Index out of bounds for col4");
+  using type = nim::col4::value_type;
+};
+
+} // namespace std
 

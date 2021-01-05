@@ -32,8 +32,6 @@ struct ZImgRegion
     , end(endCoord)
   {}
 
-  explicit ZImgRegion(const QJsonValue& jValue);
-
   inline bool operator==(const ZImgRegion& other) const
   {
     return start == other.start && end == other.end;
@@ -46,7 +44,7 @@ struct ZImgRegion
 
   // return true if contained by img, can be an empty region
   // always return false for empty img
-  inline bool isValid(const ZImgInfo& info) const
+  [[nodiscard]] inline bool isValid(const ZImgInfo& info) const
   {
     return start.allGreaterEqual(0) &&
            start.allLessThan(ZVoxelCoordinate(info.width, info.height, info.depth,
@@ -58,14 +56,14 @@ struct ZImgRegion
            (end.t == -1 || static_cast<size_t>(end.t) <= info.numTimes);
   }
 
-  inline bool isDefault() const
+  [[nodiscard]] inline bool isDefault() const
   {
     return start.x == 0 && start.y == 0 && start.z == 0 && start.c == 0 && start.t == 0 &&
            end.x == -1 && end.y == -1 && end.z == -1 && end.c == -1 && end.t == -1;
   }
 
   // check if this is an empty region
-  inline bool isEmpty() const
+  [[nodiscard]] inline bool isEmpty() const
   {
     return start.anyLessThan(0) ||
            (end.x != -1 && start.x >= end.x) ||
@@ -75,7 +73,7 @@ struct ZImgRegion
            (end.t != -1 && start.t >= end.t);
   }
 
-  bool containsCoord(const ZVoxelCoordinate& coord, const ZImgInfo& info) const;
+  [[nodiscard]] bool containsCoord(const ZVoxelCoordinate& coord, const ZImgInfo& info) const;
 
   // clamp region into img, might result in a empty region
   void fitInto(const ZImgInfo& info);
@@ -83,85 +81,83 @@ struct ZImgRegion
   // if *End is -1, change it to actual positive value based on img info
   void resolveRegionEnd(const ZImgInfo& info);
 
-  inline bool containsWholeRow(const ZImgInfo& info) const
+  [[nodiscard]] inline bool containsWholeRow(const ZImgInfo& info) const
   {
     return start.x == 0 && (end.x == -1 || end.x == static_cast<value_type>(info.width));
   }
 
-  inline bool containsWholePlane(const ZImgInfo& info) const
+  [[nodiscard]] inline bool containsWholePlane(const ZImgInfo& info) const
   {
     return containsWholeRow(info) &&
            start.y == 0 && (end.y == -1 || end.y == static_cast<value_type>(info.height));
   }
 
-  inline bool containsWholeChannel(const ZImgInfo& info) const
+  [[nodiscard]] inline bool containsWholeChannel(const ZImgInfo& info) const
   {
     return containsWholePlane(info) &&
            start.z == 0 && (end.z == -1 || end.z == static_cast<value_type>(info.depth));
   }
 
-  inline bool containsWholeTime(const ZImgInfo& info) const
+  [[nodiscard]] inline bool containsWholeTime(const ZImgInfo& info) const
   {
     return containsWholeChannel(info) &&
            start.c == 0 && (end.c == -1 || end.c == static_cast<value_type>(info.numChannels));
   }
 
-  inline bool containsWholeImg(const ZImgInfo& info) const
+  [[nodiscard]] inline bool containsWholeImg(const ZImgInfo& info) const
   {
     return containsWholeTime(info) &&
            start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
   }
 
-  [[nodiscard]] QJsonValue toJson() const;
+  [[nodiscard]] QString toQString() const;
 
-  QString toQString() const;
+  [[nodiscard]] ZImgInfo clip(const ZImgInfo& info) const;
 
-  ZImgInfo clip(const ZImgInfo& info) const;
-
-  inline bool xInRegion(value_type x) const
+  [[nodiscard]] inline bool xInRegion(value_type x) const
   { return x >= start.x && (end.x == -1 || x < end.x); }
 
-  inline bool yInRegion(value_type y) const
+  [[nodiscard]] inline bool yInRegion(value_type y) const
   { return y >= start.y && (end.y == -1 || y < end.y); }
 
-  inline bool zInRegion(value_type z) const
+  [[nodiscard]] inline bool zInRegion(value_type z) const
   { return z >= start.z && (end.z == -1 || z < end.z); }
 
-  inline bool cInRegion(value_type c) const
+  [[nodiscard]] inline bool cInRegion(value_type c) const
   { return c >= start.c && (end.c == -1 || c < end.c); }
 
-  inline bool tInRegion(value_type t) const
+  [[nodiscard]] inline bool tInRegion(value_type t) const
   { return t >= start.t && (end.t == -1 || t < end.t); }
   //inline bool lInRegion(value_type l) const { return l >= start.l && (end.l == -1 || l < end.l); }
 
-  inline value_type xStart() const
+  [[nodiscard]] inline value_type xStart() const
   { return start.x; }
 
-  inline value_type xEnd() const
+  [[nodiscard]] inline value_type xEnd() const
   { return end.x; }
 
-  inline value_type yStart() const
+  [[nodiscard]] inline value_type yStart() const
   { return start.y; }
 
-  inline value_type yEnd() const
+  [[nodiscard]] inline value_type yEnd() const
   { return end.y; }
 
-  inline value_type zStart() const
+  [[nodiscard]] inline value_type zStart() const
   { return start.z; }
 
-  inline value_type zEnd() const
+  [[nodiscard]] inline value_type zEnd() const
   { return end.z; }
 
-  inline value_type cStart() const
+  [[nodiscard]] inline value_type cStart() const
   { return start.c; }
 
-  inline value_type cEnd() const
+  [[nodiscard]] inline value_type cEnd() const
   { return end.c; }
 
-  inline value_type tStart() const
+  [[nodiscard]] inline value_type tStart() const
   { return start.t; }
 
-  inline value_type tEnd() const
+  [[nodiscard]] inline value_type tEnd() const
   { return end.t; }
   //inline value_type lStart() const { return start.l; }
   //inline value_type lEnd() const { return end.l; }
@@ -173,5 +169,23 @@ struct ZImgRegion
   ZVoxelCoordinate start;
   ZVoxelCoordinate end;
 };
+
+inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgRegion& rgn)
+{
+  auto& jo = jv.emplace_object();
+  jo["start"] = json::value_from(rgn.start);
+  jo["end"] = json::value_from(rgn.end);
+}
+
+inline ZImgRegion tag_invoke(const json::value_to_tag<ZImgRegion>&, const json::value& jv)
+{
+  ZImgRegion res;
+  res.start = json::value_to<ZVoxelCoordinate>(jv.at("begin"));
+  res.end = json::value_to<ZVoxelCoordinate>(jv.at("end"));
+  if (res.isEmpty()) {
+    throw ZIOException(QString("Invalid json creates empty ZImgRegion"));
+  }
+  return res;
+}
 
 } // namespace nim

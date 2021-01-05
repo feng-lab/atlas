@@ -3,7 +3,8 @@
 #include "zglobal.h"
 #include "zrandom.h"
 #include <sstream>
-#include <tuple>
+#include <utility>
+#include <type_traits>
 
 namespace nim {
 
@@ -71,10 +72,10 @@ struct ZVoxelCoordinate
     t = tin;
   }
 
-  inline constexpr size_t size() const
+  [[nodiscard]] inline constexpr size_t size() const
   { return 5; }
 
-  inline constexpr size_t length() const
+  [[nodiscard]] inline constexpr size_t length() const
   { return 5; }
 
   // access
@@ -84,92 +85,92 @@ struct ZVoxelCoordinate
   inline const value_type& operator[](size_t i) const
   { return (&x)[i]; }
 
-  inline bool allGreaterThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool allGreaterThan(const ZVoxelCoordinate& other) const
   {
     return x > other.x && y > other.y && z > other.z && c > other.c && t > other.t;
   }
 
-  inline bool allGreaterEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool allGreaterEqual(const ZVoxelCoordinate& other) const
   {
     return x >= other.x && y >= other.y && z >= other.z && c >= other.c && t >= other.t;
   }
 
-  inline bool allLessThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool allLessThan(const ZVoxelCoordinate& other) const
   {
     return other.allGreaterThan(*this);
   }
 
-  inline bool allLessEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool allLessEqual(const ZVoxelCoordinate& other) const
   {
     return other.allGreaterEqual(*this);
   }
 
-  inline bool allGreaterThan(value_type other) const
+  [[nodiscard]] inline bool allGreaterThan(value_type other) const
   {
     return x > other && y > other && z > other && c > other && t > other;
   }
 
-  inline bool allGreaterEqual(value_type other) const
+  [[nodiscard]] inline bool allGreaterEqual(value_type other) const
   {
     return x >= other && y >= other && z >= other && c >= other && t >= other;
   }
 
-  inline bool allLessThan(value_type other) const
+  [[nodiscard]] inline bool allLessThan(value_type other) const
   {
     return x < other && y < other && z < other && c < other && t < other;
   }
 
-  inline bool allLessEqual(value_type other) const
+  [[nodiscard]] inline bool allLessEqual(value_type other) const
   {
     return x <= other && y <= other && z <= other && c <= other && t <= other;
   }
 
-  inline bool anyGreaterThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool anyGreaterThan(const ZVoxelCoordinate& other) const
   {
     return !allLessEqual(other);
   }
 
-  inline bool anyGreaterEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool anyGreaterEqual(const ZVoxelCoordinate& other) const
   {
     return !allLessThan(other);
   }
 
-  inline bool anyLessThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool anyLessThan(const ZVoxelCoordinate& other) const
   {
     return !allGreaterEqual(other);
   }
 
-  inline bool anyLessEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool anyLessEqual(const ZVoxelCoordinate& other) const
   {
     return !allGreaterThan(other);
   }
 
-  inline bool anyGreaterThan(value_type other) const
+  [[nodiscard]] inline bool anyGreaterThan(value_type other) const
   {
     return !allLessEqual(other);
   }
 
-  inline bool anyGreaterEqual(value_type other) const
+  [[nodiscard]] inline bool anyGreaterEqual(value_type other) const
   {
     return !allLessThan(other);
   }
 
-  inline bool anyLessThan(value_type other) const
+  [[nodiscard]] inline bool anyLessThan(value_type other) const
   {
     return !allGreaterEqual(other);
   }
 
-  inline bool anyLessEqual(value_type other) const
+  [[nodiscard]] inline bool anyLessEqual(value_type other) const
   {
     return !allGreaterThan(other);
   }
 
-  inline bool anyEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] inline bool anyEqual(const ZVoxelCoordinate& other) const
   {
     return x == other.x || y == other.y || z == other.z || c == other.c || t == other.t;
   }
 
-  inline bool anyEqual(value_type other) const
+  [[nodiscard]] inline bool anyEqual(value_type other) const
   {
     return x == other || y == other || z == other || c == other || t == other;
   }
@@ -275,7 +276,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline QString toQString() const
+  [[nodiscard]] inline QString toQString() const
   {
     return QString("(%1,%2,%3,%4,%5)").arg(x).arg(y).arg(z).arg(c).arg(t);
   }
@@ -425,5 +426,37 @@ inline std::ostream& operator<<(std::ostream& cout, const ZVoxelCoordinate& c)
   return cout << qUtf8Printable(c.toQString());
 }
 
+template<std::size_t Index>
+constexpr auto&& get(ZVoxelCoordinate& v) noexcept
+{ return tuple_like_get_helper<Index, 5>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(const ZVoxelCoordinate& v) noexcept
+{ return tuple_like_get_helper<Index, 5>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(ZVoxelCoordinate&& v) noexcept
+{ return tuple_like_get_helper<Index, 5>(v); }
+
+template<std::size_t Index>
+constexpr auto&& get(const ZVoxelCoordinate&& v) noexcept
+{ return tuple_like_get_helper<Index, 5>(v); }
+
 } // namespace nim
+
+namespace std {
+
+template<>
+struct tuple_size<nim::ZVoxelCoordinate> : integral_constant<size_t, 5>
+{
+};
+
+template<std::size_t Index>
+struct tuple_element<Index, nim::ZVoxelCoordinate>
+{
+  static_assert(Index < 5, "Index out of bounds for ZVoxelCoordinate");
+  using type = nim::ZVoxelCoordinate::value_type;
+};
+
+} // namespace std
 

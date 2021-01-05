@@ -296,9 +296,9 @@ void Z3DCameraParameter::setValueSameAs(const ZParameter& rhs)
   updatePara();
 }
 
-QJsonValue Z3DCameraParameter::jsonValue() const
+json::value Z3DCameraParameter::jsonValue() const
 {
-  QJsonObject obj;
+  json::object obj;
   m_projectionType.write(obj);
   m_eye.write(obj);
   m_center.write(obj);
@@ -310,11 +310,11 @@ QJsonValue Z3DCameraParameter::jsonValue() const
   return obj;
 }
 
-void Z3DCameraParameter::readValue(const QJsonValue& jsonValue)
+void Z3DCameraParameter::readValue(const json::value& jsonValue)
 {
   m_receiveWidgetSignal = false;
-  if (jsonValue.isObject()) {
-    QJsonObject obj = jsonValue.toObject();
+  if (jsonValue.is_object()) {
+    const auto& obj = jsonValue.as_object();
     m_projectionType.read(obj);
     m_eye.read(obj);
     m_center.read(obj);

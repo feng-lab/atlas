@@ -91,7 +91,7 @@ namespace nim {
       return function<uint64_t>(__VA_ARGS__);               \
       break;                                                \
     default:                                                \
-      break;                                                \
+      throw ZImgException(QString("unsupported image type").arg(imgInfo.toQString())); \
     }                                                       \
   } else if (imgInfo.voxelFormat == VoxelFormat::Float) {   \
     switch (imgInfo.bytesPerVoxel) {                        \
@@ -102,7 +102,7 @@ namespace nim {
       return function<double>(__VA_ARGS__);                 \
       break;                                                \
     default:                                                \
-      break;                                                \
+      throw ZImgException(QString("unsupported image type").arg(imgInfo.toQString())); \
     }                                                       \
   } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {  \
     switch (imgInfo.bytesPerVoxel) {                        \
@@ -119,8 +119,10 @@ namespace nim {
       return function<int64_t>(__VA_ARGS__);                \
       break;                                                \
     default:                                                \
-      break;                                                \
+      throw ZImgException(QString("unsupported image type").arg(imgInfo.toQString())); \
     }                                                       \
+  } else {                                                  \
+    throw ZImgException(QString("unsupported image type").arg(imgInfo.toQString()));   \
   }                                                         \
 }
 
@@ -376,8 +378,6 @@ struct ZImgSource
              FileFormat format_ = FileFormat::Unknown,
              bool expandXY_ = true, bool expandWithMaxValue_ = false);
 
-  explicit ZImgSource(const QJsonValue& jValue);
-
   inline bool operator==(const ZImgSource& other) const
   {
     if (filenames == other.filenames) {
@@ -396,8 +396,6 @@ struct ZImgSource
     return !(*this == other);
   }
 
-  [[nodiscard]] QJsonValue toJson() const;
-
   [[nodiscard]] QString toQString() const;
 
   QStringList filenames;
@@ -411,6 +409,10 @@ struct ZImgSource
 
   int64_t totalFileSize = 0;
 };
+
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& imgSource);
+
+ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& jv);
 
 class ZImgSubBlock
 {
@@ -1200,7 +1202,6 @@ public:
   [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
   {
     IMG_RETURN_TYPED_CALL(convertTo, targetImgType.info(), minData, maxData)
-    return ZImg();
   }
 
   // resize in x-y-z dimensions
@@ -1590,7 +1591,6 @@ public:
     }
     if (isCoordValid(coord)) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, coord)
-      return 0;
     } else {
       throw ZImgException(QString("value: Invalid coordinate %1 of img <%2>")
                             .arg(coord.toQString()).arg(m_info.toQString()));
@@ -1607,7 +1607,6 @@ public:
     if (x < m_info.width && y < m_info.height && z < m_info.depth &&
         c < m_info.numChannels && t < m_info.numTimes) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, x, y, z, c, t)
-      return 0;
     } else {
       throw ZImgException(QString("value: Invalid coordinate (%1,%2,%3,%4,%5) of img <%6>")
                             .arg(x).arg(y).arg(z).arg(c).arg(t).arg(m_info.toQString()));
@@ -1623,7 +1622,6 @@ public:
     }
     if (idx < voxelNumber()) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, idx)
-      return 0;
     } else {
       throw ZImgException(QString("value: Invalid voxel idx %1 of img <%2>")
                             .arg(idx).arg(m_info.toQString()));
@@ -1641,7 +1639,6 @@ public:
       return 0;
     }
     IMG_RETURN_TYPED_CALL(valueWithPad_Impl, m_info, coord, padOption, padValue)
-    return 0;
   }
 
   // overload
@@ -1736,11 +1733,6 @@ public:
 
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
-
-  // only int32_t now
-  [[nodiscard]] QJsonValue toJson() const;
-
-  static ZImg fromJson(const QJsonValue& value);
 
 #ifdef _NEUTUBE_
   // only for interface with zstack
@@ -2169,5 +2161,15 @@ void image3DWrite(const TPixel* data, size_t width, size_t height, size_t depth,
   img.wrapData(const_cast<TPixel*>(data), width, height, depth);
   img.save(filename);
 }
+
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImg& img);
+
+template<typename TVoxel>
+void tag_invoke_img_Impl(json::value& jv, const ZImg& img);
+
+ZImg tag_invoke(const json::value_to_tag<ZImg>&, const json::value& jv);
+
+template<typename TVoxel>
+ZImg tag_invoke_img_Impl(ZImg& img, const json::value& jv);
 
 }  // namespace nim

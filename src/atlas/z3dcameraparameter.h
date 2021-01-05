@@ -186,9 +186,9 @@ public:
 
   void setValueSameAs(const ZParameter& rhs) override;
 
-  [[nodiscard]] QJsonValue jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
 signals:
 

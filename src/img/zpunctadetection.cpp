@@ -644,72 +644,74 @@ void ZPunctaDetection::doWork()
   }
 }
 
-void ZPunctaDetection::read(const QJsonObject& json)
+void ZPunctaDetection::read(const json::object& jo)
 {
-  setInputFile(readString(json, "input_file"), readNumber(json, "puncta_channel"),
-               readNumber(json, "t"), readNumber(json, "scene"),
-               readNumber(json, "voxel_size_in_um_x"),
-               readNumber(json, "voxel_size_in_um_y"),
-               readNumber(json, "voxel_size_in_um_z"));
+  setInputFile(json::value_to<QString>(jo.at("input_file")),
+               json::value_to<size_t>(jo.at("puncta_channel")),
+               json::value_to<size_t>(jo.at("t")),
+               json::value_to<size_t>(jo.at("scene")),
+               json::value_to<double>(jo.at("voxel_size_in_um_x")),
+               json::value_to<double>(jo.at("voxel_size_in_um_y")),
+               json::value_to<double>(jo.at("voxel_size_in_um_z")));
 
   // parameters
-  setPunctaThreshold(readNumber(json, "puncta_threshold"));
-  setSomaPunctaThreshold(readNumber(json, "soma_puncta_threshold"));
-  setSplitThreshold(readNumber(json, "split_size_threshold"));
-  setConfidenceRegionForRadiusEstimate(readNumber(json, "conf_radius"));
-  setConfidenceRegionForOverlapArea(readNumber(json, "conf_overlap_area"));
-  setOverlapRateThreshold(readNumber(json, "overlap_rate_threshold"));
-  setSeedSizeThreshold(readNumber(json, "seed_size_threshold"));
-  setUseMultithreading(readBool(json, "use_multithreading"));
+  setPunctaThreshold(json::value_to<int>(jo.at("puncta_threshold")));
+  setSomaPunctaThreshold(json::value_to<int>(jo.at("soma_puncta_threshold")));
+  setSplitThreshold(json::value_to<int>(jo.at("split_size_threshold")));
+  setConfidenceRegionForRadiusEstimate(json::value_to<double>(jo.at("conf_radius")));
+  setConfidenceRegionForOverlapArea(json::value_to<double>(jo.at("conf_overlap_area")));
+  setOverlapRateThreshold(json::value_to<double>(jo.at("overlap_rate_threshold")));
+  setSeedSizeThreshold(json::value_to<int>(jo.at("seed_size_threshold")));
+  setUseMultithreading(jo.at("use_multithreading").as_bool());
 
   // parameters for soma detection
-  setDendriteChannel(readNumber(json, "dendrite_channel"));
-  setMaxDendriteTubeRadiusInUm(readNumber(json, "max_dendrite_tube_radius"));
-  setDendriteThreshold(readNumber(json, "dendrite_threshold"));
+  setDendriteChannel(json::value_to<int>(jo.at("dendrite_channel")));
+  setMaxDendriteTubeRadiusInUm(json::value_to<double>(jo.at("max_dendrite_tube_radius")));
+  setDendriteThreshold(json::value_to<double>(jo.at("dendrite_threshold")));
 
   // parameters for assign puncta to swc tree
-  setMaxDistToBranchInUm(readNumber(json, "max_dist_to_branch"));
-  setAmbiguousFactor(readNumber(json, "ambiguous_factor"));
+  setMaxDistToBranchInUm(json::value_to<double>(jo.at("max_dist_to_branch")));
+  setAmbiguousFactor(json::value_to<double>(jo.at("ambiguous_factor")));
 
-  setSwcFiles(readStringList(json, "swc_paths"));
+  setSwcFiles(json::value_to<QStringList>(jo.at("swc_paths")));
 
-  setResultPunctaFilename(readString(json, "detected_puncta_filename"));
-  setResultSomaPunctaFilename(readString(json, "detected_soma_puncta_filename"));
+  setResultPunctaFilename(json::value_to<QString>(jo.at("detected_puncta_filename")));
+  setResultSomaPunctaFilename(json::value_to<QString>(jo.at("detected_soma_puncta_filename")));
 }
 
-void ZPunctaDetection::write(QJsonObject& json) const
+void ZPunctaDetection::write(json::object& jo) const
 {
-  json["input_file"] = m_filename;
-  json["voxel_size_in_um_x"] = m_imgInfo.voxelSizeXInUm();
-  json["voxel_size_in_um_y"] = m_imgInfo.voxelSizeYInUm();
-  json["voxel_size_in_um_z"] = m_imgInfo.voxelSizeZInUm();
-  json["puncta_channel"] = int(m_punctaChannel);
-  json["t"] = int(m_t);
-  json["scene"] = int(m_scene);
+  jo["input_file"] = json::value_from(m_filename);
+  jo["voxel_size_in_um_x"] = m_imgInfo.voxelSizeXInUm();
+  jo["voxel_size_in_um_y"] = m_imgInfo.voxelSizeYInUm();
+  jo["voxel_size_in_um_z"] = m_imgInfo.voxelSizeZInUm();
+  jo["puncta_channel"] = m_punctaChannel;
+  jo["t"] = m_t;
+  jo["scene"] = m_scene;
 
   // parameters
-  json["puncta_threshold"] = m_punctaThreshold;
-  json["soma_puncta_threshold"] = m_somaPunctaThreshold;
-  json["split_size_threshold"] = m_splitSizeThreshold;
-  json["conf_radius"] = m_confRadius;
-  json["conf_overlap_area"] = m_confOverlapArea;
-  json["overlap_rate_threshold"] = m_overlapRateThreshold;
-  json["seed_size_threshold"] = m_seedSizeThreshold;
-  json["use_multithreading"] = m_useMultithreading;
+  jo["puncta_threshold"] = m_punctaThreshold;
+  jo["soma_puncta_threshold"] = m_somaPunctaThreshold;
+  jo["split_size_threshold"] = m_splitSizeThreshold;
+  jo["conf_radius"] = m_confRadius;
+  jo["conf_overlap_area"] = m_confOverlapArea;
+  jo["overlap_rate_threshold"] = m_overlapRateThreshold;
+  jo["seed_size_threshold"] = m_seedSizeThreshold;
+  jo["use_multithreading"] = m_useMultithreading;
 
   // parameters for soma detection
-  json["dendrite_channel"] = m_dendriteChannel;
-  json["max_dendrite_tube_radius"] = m_maxDendriteTubeRadius;  // in um
-  json["dendrite_threshold"] = m_dendriteThreshold;
+  jo["dendrite_channel"] = m_dendriteChannel;
+  jo["max_dendrite_tube_radius"] = m_maxDendriteTubeRadius;  // in um
+  jo["dendrite_threshold"] = m_dendriteThreshold;
 
   // parameters for assign puncta to swc tree
-  json["max_dist_to_branch"] = m_maxDistToBranch; // in um
-  json["ambiguous_factor"] = m_ambiguousFactor;
+  jo["max_dist_to_branch"] = m_maxDistToBranch; // in um
+  jo["ambiguous_factor"] = m_ambiguousFactor;
 
-  json["swc_paths"] = QJsonArray::fromStringList(m_swcPaths);
+  jo["swc_paths"] = json::value_from(m_swcPaths);
 
-  json["detected_puncta_filename"] = m_detectedPunctaFileName;
-  json["detected_soma_puncta_filename"] = m_detectedSomaPunctaFileName;
+  jo["detected_puncta_filename"] = json::value_from(m_detectedPunctaFileName);
+  jo["detected_soma_puncta_filename"] = json::value_from(m_detectedSomaPunctaFileName);
 }
 
 double

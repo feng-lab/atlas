@@ -141,7 +141,6 @@ double getNCCOfOffset(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVo
     }
   }
   IMG_RETURN_TYPED_CALL(getNCCOfOffset_Impl, fixedImg.info(), fixedImg, movingImg)
-  return -2;
 }
 
 // reference: matlab code normxcorr2_general.m

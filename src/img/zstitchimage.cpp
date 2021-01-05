@@ -729,140 +729,119 @@ void ZStitchImage::doWork()
   emit resultReady(m_resFileName);
 }
 
-void ZStitchImage::read(const QJsonObject& json)
+void ZStitchImage::read(const json::object& jo)
 {
-  setInputFilenames(readStringList(json, "input_files"), readNumber(json, "input_files_scene"));
+  setInputFilenames(json::value_to<QStringList>(jo.at("input_files")),
+                    json::value_to<size_t>(jo.at("input_files_scene")));
 
-  setResultFilename(readString(json, "result_file"));
+  setResultFilename(json::value_to<QString>(jo.at("result_file")));
 
-  setUseMultithreading(readBool(json, "use_multithreading"));
+  setUseMultithreading(jo.at("use_multithreading").as_bool());
 
   setUseChannels();
-  if (json.contains("channels_to_use")) {
-    std::vector<size_t> chs;
-    auto numberArray = readNumberArray(json, "channels_to_use");
-    chs.insert(chs.end(), numberArray.begin(), numberArray.end());
-    setUseChannels(chs);
+  if (jo.contains("channels_to_use")) {
+    setUseChannels(json::value_to<std::vector<size_t>>(jo.at("channels_to_use")));
   }
 
   setRemoveBackgroundForChannels();
-  if (json.contains("channels_to_remove_background")) {
-    std::vector<size_t> chs;
-    auto numberArray = readNumberArray(json, "channels_to_remove_background");
-    chs.insert(chs.end(), numberArray.begin(), numberArray.end());
-    setRemoveBackgroundForChannels(chs);
+  if (jo.contains("channels_to_remove_background")) {
+    setRemoveBackgroundForChannels(json::value_to<std::vector<size_t>>(jo.at("channels_to_remove_background")));
   }
 
-  if (json.contains("input_2_files")) {
+  if (jo.contains("input_2_files")) {
     std::vector<size_t> chsToUse;
     std::vector<size_t> chsToRB;
-    if (json.contains("input_2_channels_to_use")) {
-      auto numberArray = readNumberArray(json, "input_2_channels_to_use");
-      chsToUse.insert(chsToUse.end(), numberArray.begin(), numberArray.end());
+    if (jo.contains("input_2_channels_to_use")) {
+      chsToUse = json::value_to<std::vector<size_t>>(jo.at("input_2_channels_to_use"));
     }
-    if (json.contains("input_2_channels_to_remove_background")) {
-      auto numberArray = readNumberArray(json, "input_2_channels_to_remove_background");
-      chsToRB.insert(chsToRB.end(), numberArray.begin(), numberArray.end());
+    if (jo.contains("input_2_channels_to_remove_background")) {
+      chsToRB = json::value_to<std::vector<size_t>>(jo.at("input_2_channels_to_remove_background"));
     }
-    set2ndInput(readStringList(json, "input_2_files"), readNumber(json, "input_2_files_scene"),
-                chsToUse, chsToRB, readNumber(json, "input_common_channel"),
-                readNumber(json, "input_2_common_channel"));
+    set2ndInput(json::value_to<QStringList>(jo.at("input_2_files")),
+                json::value_to<size_t>(jo.at("input_2_files_scene")),
+                chsToUse, chsToRB,
+                json::value_to<size_t>(jo.at("input_common_channel")),
+                json::value_to<size_t>(jo.at("input_2_common_channel")));
   }
 
-  setMergeMode(stringToImgMergeMode(readString(json, "merge_mode")));
-  if (json.contains("downsample_block_width")) {
-    setDownsampleBeforeStitching(readNumber(json, "downsample_block_width"),
-                                 readNumber(json, "downsample_block_height"),
-                                 readNumber(json, "downsample_block_depth"),
-                                 stringToImgMergeMode(readString(json, "downsample_block_merge_mode")));
+  setMergeMode(stringToImgMergeMode(json::value_to<QString>(jo.at("merge_mode"))));
+  if (jo.contains("downsample_block_width")) {
+    setDownsampleBeforeStitching(json::value_to<size_t>(jo.at("downsample_block_width")),
+                                 json::value_to<size_t>(jo.at("downsample_block_height")),
+                                 json::value_to<size_t>(jo.at("downsample_block_depth")),
+                                 stringToImgMergeMode(json::value_to<QString>(jo.at("downsample_block_merge_mode"))));
   }
-  setStartResolution(readNumber(json, "start_resolution_intv_X"),
-                     readNumber(json, "start_resolution_intv_Y"),
-                     readNumber(json, "start_resolution_intv_Z"));
-  if (json.contains("concatenate_only") && readBool(json, "concatenate_only")) {
+  setStartResolution(json::value_to<size_t>(jo.at("start_resolution_intv_X")),
+                     json::value_to<size_t>(jo.at("start_resolution_intv_Y")),
+                     json::value_to<size_t>(jo.at("start_resolution_intv_Z")));
+  if (jo.contains("concatenate_only") && jo.at("concatenate_only").as_bool()) {
     setConcatenateOnly();
   }
-  setMaxOverlapRate(readNumber(json, "max_overlap_rate"));
+  setMaxOverlapRate(json::value_to<double>(jo.at("max_overlap_rate")));
 
-  if (json.contains("tile_grid")) {
-    setTileGrid(ZImg::fromJson(json["tile_grid"]));
-  } else if (json.contains("conn_text_file")) {
-    setConnInfoFromConnTextFile(readString(json, "conn_text_file"));
-  } else if (json.contains("restitch") && readBool(json, "restitch")) {
+  if (jo.contains("tile_grid")) {
+    setTileGrid(json::value_to<ZImg>(jo.at("tile_grid")));
+  } else if (jo.contains("conn_text_file")) {
+    setConnInfoFromConnTextFile(json::value_to<QString>(jo.at("conn_text_file")));
+  } else if (jo.contains("restitch") && jo.at("restitch").as_bool()) {
     setRestitch();
   } else {
     setBlindStitching();
   }
 }
 
-void ZStitchImage::write(QJsonObject& json) const
+void ZStitchImage::write(json::object& jo) const
 {
-  json["input_files"] = QJsonArray::fromStringList(m_inputFilenames);
+  jo["input_files"] = json::value_from(m_inputFilenames);
 
-  json["input_files_scene"] = int(m_scene);
+  jo["input_files_scene"] = m_scene;
 
-  json["result_file"] = m_resFileName;
+  jo["result_file"] = json::value_from(m_resFileName);
 
-  json["use_multithreading"] = m_useMultithreading;
+  jo["use_multithreading"] = m_useMultithreading;
 
   if (!m_channelsToUse.empty()) {
-    QJsonArray channelArray;
-    for (auto ch : m_channelsToUse) {
-      channelArray.append(QJsonValue(int(ch)));
-    }
-    json["channels_to_use"] = channelArray;
+    jo["channels_to_use"] = json::value_from(m_channelsToUse);
   }
   if (!m_channelsToRemoveBackground.empty()) {
-    QJsonArray channelArray;
-    for (auto ch : m_channelsToRemoveBackground) {
-      channelArray.append(QJsonValue(int(ch)));
-    }
-    json["channels_to_remove_background"] = channelArray;
+    jo["channels_to_remove_background"] = json::value_from(m_channelsToRemoveBackground);;
   }
   if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
-    json["downsample_block_width"] = (int) m_downsampleBlockWidth;
-    json["downsample_block_height"] = (int) m_downsampleBlockHeight;
-    json["downsample_block_depth"] = (int) m_downsampleBlockDepth;
-    json["downsample_block_merge_mode"] = enumToString(m_downsampleMergeMode);
+    jo["downsample_block_width"] = m_downsampleBlockWidth;
+    jo["downsample_block_height"] = m_downsampleBlockHeight;
+    jo["downsample_block_depth"] = m_downsampleBlockDepth;
+    jo["downsample_block_merge_mode"] = json::value_from(enumToString(m_downsampleMergeMode));
   }
-  json["merge_mode"] = enumToString(m_mergeMode);
+  jo["merge_mode"] = json::value_from(enumToString(m_mergeMode));
   if (m_concatenateOnly) {
-    json["concatenate_only"] = m_concatenateOnly;
+    jo["concatenate_only"] = m_concatenateOnly;
   }
-  json["start_resolution_intv_X"] = (int) m_startResolutionIntvX;
-  json["start_resolution_intv_Y"] = (int) m_startResolutionIntvY;
-  json["start_resolution_intv_Z"] = (int) m_startResolutionIntvZ;
-  json["max_overlap_rate"] = m_maxOverlapRate;
+  jo["start_resolution_intv_X"] = m_startResolutionIntvX;
+  jo["start_resolution_intv_Y"] = m_startResolutionIntvY;
+  jo["start_resolution_intv_Z"] = m_startResolutionIntvZ;
+  jo["max_overlap_rate"] = m_maxOverlapRate;
 
   if (!m_tileGrid.isEmpty()) {
-    json["tile_grid"] = m_tileGrid.toJson();
+    jo["tile_grid"] = json::value_from(m_tileGrid);
   } else if (!m_connTextFile.isEmpty()) {
-    json["conn_text_file"] = m_connTextFile;
+    jo["conn_text_file"] = json::value_from(m_connTextFile);
   } else if (m_restitch) {
-    json["restitch"] = m_restitch;
+    jo["restitch"] = m_restitch;
   }
 
   if (!m_2ndInputFilenames.isEmpty()) {
-    json["input_2_files"] = QJsonArray::fromStringList(m_2ndInputFilenames);
+    jo["input_2_files"] = json::value_from(m_2ndInputFilenames);
 
-    json["input_2_files_scene"] = int(m_2ndScene);
+    jo["input_2_files_scene"] = m_2ndScene;
 
     if (!m_2ndChannelsToUse.empty()) {
-      QJsonArray channelArray;
-      for (auto ch : m_2ndChannelsToUse) {
-        channelArray.append(QJsonValue(int(ch)));
-      }
-      json["input_2_channels_to_use"] = channelArray;
+      jo["input_2_channels_to_use"] = json::value_from(m_2ndChannelsToUse);
     }
     if (!m_2ndChannelsToRemoveBackground.empty()) {
-      QJsonArray channelArray;
-      for (auto ch : m_2ndChannelsToRemoveBackground) {
-        channelArray.append(QJsonValue(int(ch)));
-      }
-      json["input_2_channels_to_remove_background"] = channelArray;
+      jo["input_2_channels_to_remove_background"] = json::value_from(m_2ndChannelsToRemoveBackground);
     }
-    json["input_common_channel"] = int(m_commonChannelOfInput);
-    json["input_2_common_channel"] = int(m_commonChannelOf2ndInput);
+    jo["input_common_channel"] = m_commonChannelOfInput;
+    jo["input_2_common_channel"] = m_commonChannelOf2ndInput;
   }
 }
 

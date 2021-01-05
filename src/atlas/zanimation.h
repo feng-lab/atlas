@@ -160,12 +160,12 @@ protected:
 
   struct AnimationObj
   {
-    AnimationObj(const QString& type, const QJsonValue& value)
+    AnimationObj(const QString& type, const json::value& value)
       : objType(type), objJsonValue(value), isExpanded(false), isShowAll(false), boundId(0), uniqueId(0)
     {}
 
     QString objType;
-    QJsonValue objJsonValue;
+    json::value objJsonValue;
     std::vector<std::unique_ptr<ZParameterAnimation>> objParaAnimations;
     bool isExpanded;
     bool isShowAll;

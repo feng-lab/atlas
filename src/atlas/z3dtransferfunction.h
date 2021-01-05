@@ -105,9 +105,9 @@ public:
   bool supportInterpolation() const override
   { return false; }
 
-  QJsonValue jsonValue() const override;
+  json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
 protected:
   QWidget* actualCreateWidget(QWidget* parent) override;

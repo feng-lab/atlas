@@ -267,9 +267,9 @@ void Z2DTransformParameter::setSameAs(const ZParameter& rhs)
   ZParameter::setSameAs(rhs);
 }
 
-QJsonValue Z2DTransformParameter::jsonValue() const
+json::value Z2DTransformParameter::jsonValue() const
 {
-  QJsonObject obj;
+  json::object obj;
   m_scale.write(obj);
   m_translation.write(obj);
   m_rotation.write(obj);
@@ -277,10 +277,10 @@ QJsonValue Z2DTransformParameter::jsonValue() const
   return obj;
 }
 
-void Z2DTransformParameter::readValue(const QJsonValue& jsonValue)
+void Z2DTransformParameter::readValue(const json::value& jsonValue)
 {
-  if (jsonValue.isObject()) {
-    QJsonObject obj = jsonValue.toObject();
+  if (jsonValue.is_object()) {
+    const auto& obj = jsonValue.as_object();
     m_receiveWidgetSignal = false;
     m_scale.read(obj);
     m_translation.read(obj);
