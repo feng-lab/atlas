@@ -50,9 +50,9 @@ size_t ZSvgDoc::loadFile(const QString& fileName, QString& errorMsg)
   return 0;
 }
 
-size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
+size_t ZSvgDoc::loadFile(const json::value& jValue, QString& errorMsg)
 {
-  if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
+  if (!jValue.is_string() || asQString(jValue).trimmed().isEmpty()) {
     errorMsg = QString("File path is not string or is empty");
     return 0;
   }
@@ -60,7 +60,7 @@ size_t ZSvgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
     if (isSameObj(jValue, jsonValue(idPack.first)))
       return idPack.first;
   }
-  QString fileName = jValue.toString();
+  QString fileName = asQString(jValue);
   auto svg = std::make_unique<QSvgRenderer>(fileName);
   if (svg->isValid()) {
     size_t id = addSvg(std::move(svg), fileName);
@@ -113,18 +113,18 @@ QString ZSvgDoc::objTooltip(size_t id) const
   return m_idToSvgPacks.at(id)->tooltip();
 }
 
-QJsonValue ZSvgDoc::jsonValue(size_t id) const
+json::value ZSvgDoc::jsonValue(size_t id) const
 {
-  return QJsonValue(m_idToSvgPacks.at(id)->path);
+  return json::value_from(m_idToSvgPacks.at(id)->path);
 }
 
-bool ZSvgDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
+bool ZSvgDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
-  CHECK(v1.isString() && v2.isString());
+  CHECK(v1.is_string() && v2.is_string());
   if (v1 == v2)
     return true;
-  QString f1 = v1.toString();
-  QString f2 = v2.toString();
+  QString f1 = asQString(v1);
+  QString f2 = asQString(v2);
   if (!QFile::exists(f1) || !QFile::exists(f2))
     return false;
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();

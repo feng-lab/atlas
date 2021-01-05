@@ -42,14 +42,14 @@ void ZStringParameter::setSameAs(const ZParameter& rhs)
   ZParameter::setSameAs(rhs);
 }
 
-QJsonValue ZStringParameter::jsonValue() const
+json::value ZStringParameter::jsonValue() const
 {
-  return QJsonValue(this->m_value);
+  return json::value_from(this->m_value);
 }
 
-void ZStringParameter::readValue(const QJsonValue& jsonValue)
+void ZStringParameter::readValue(const json::value& jsonValue)
 {
-  this->set(jsonValue.toString(this->m_value));
+  this->set(asQString(jsonValue));
 }
 
 } // namespace nim

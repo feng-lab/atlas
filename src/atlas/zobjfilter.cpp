@@ -33,14 +33,14 @@ ZObjFilter::ZObjFilter(ZView& view)
   addParameter(&m_offsetPara);
 }
 
-void ZObjFilter::read(const QJsonObject& json)
+void ZObjFilter::read(const json::object& json)
 {
   for (auto para : m_parameters) {
     para->read(json);
   }
 }
 
-void ZObjFilter::write(QJsonObject& json) const
+void ZObjFilter::write(json::object& json) const
 {
   for (auto para : m_parameters) {
     para->write(json);

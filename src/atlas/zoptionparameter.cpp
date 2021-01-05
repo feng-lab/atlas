@@ -133,16 +133,20 @@ void ZOptionParameter<T, T2>::setSameAs(const ZParameter& rhs)
 }
 
 template<class T, class T2>
-QJsonValue ZOptionParameter<T, T2>::jsonValue() const
+json::value ZOptionParameter<T, T2>::jsonValue() const
 {
-  return QJsonValue(toQString(this->m_value));
+  return json::value_from(this->m_value);
 }
 
 template<class T, class T2>
-void ZOptionParameter<T, T2>::readValue(const QJsonValue& jsonValue)
+void ZOptionParameter<T, T2>::readValue(const json::value& jsonValue)
 {
   T v;
-  toVal(jsonValue.toString(toQString(this->m_value)), v);
+  if (jsonValue.is_string()) {
+    toVal(asQString(jsonValue.), v);
+  } else {
+    v = json::value_to<T>(jsonValue);
+  }
   if (!hasOption(v)) {
     addOption(v);
   }

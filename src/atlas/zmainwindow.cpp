@@ -896,135 +896,122 @@ ZMainWindow* ZMainWindow::findMainWindow(const QString& /*unused*/)
 
 bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
 {
-  QFile file(fn);
-  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    err = tr("Can not open file");
-    return false;
-  }
-
-  QByteArray saveData = file.readAll();
-
-  QJsonParseError jsonError{};
-  QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-  if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-    err = QString("Incorrect file format <%1>").arg(jsonError.errorString());
-    return false;
-  }
-
-  QJsonObject loadObj = loadDoc.object();
-  if (!loadObj.contains("Scene") || !loadObj["Scene"].isObject()) {
-    err = tr("File is not scene format");
-    return false;
-  }
-
-  QJsonObject sceneObj = loadObj["Scene"].toObject();
-
-  QDir::setCurrent(QFileInfo(fn).absolutePath());
-
-  std::map<size_t, size_t> idmap = m_doc->read(sceneObj["Doc"].toObject(), err);
-  QApplication::processEvents();
-  if (sceneObj.contains("View3DGeneral")) {
-    if (!m_3dWindow) {
-      open3DWindow();
-      QApplication::processEvents();
+  try {
+    auto loadObj = loadJsonObject(fn);
+    if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
+      err = tr("File is not scene format");
+      return false;
     }
-  }
 
-  if (idmap.empty()) {
-    LOG(WARNING) << "Scene " << fn << " contains zero objects";
-  }
+    const auto& sceneObj = loadObj.at("Scene").as_object();
 
-  for (QJsonObject::const_iterator it = sceneObj.begin();
-       it != sceneObj.end(); ++it) {
-    if (it.key() == "View2DGeneral") {
-      m_view->read(it.value().toObject());
-    } else if (it.key() == "View3DGeneral") {
-      if (m_3dWindow) {
-        m_3dWindow->view()->read(it.value().toObject());
+    QDir::setCurrent(QFileInfo(fn).absolutePath());
+
+    std::map<size_t, size_t> idmap = m_doc->read(sceneObj.at("Doc").as_object(), err);
+    QApplication::processEvents();
+    if (sceneObj.contains("View3DGeneral")) {
+      if (!m_3dWindow) {
+        open3DWindow();
+        QApplication::processEvents();
       }
-    } else if (it.key() != "Doc" && it.key() != "Version") {
-      bool ok;
-      size_t objectId = it.key().toLongLong(&ok);
-      if (ok) {
-        if (idmap.find(objectId) != idmap.end()) {
-          size_t id = idmap.at(objectId);
-          QJsonObject viewObj = it.value().toObject();
-          if (viewObj.contains("View2D")) {
-            m_view->read(id, viewObj["View2D"].toObject());
-          }
-          if (viewObj.contains("View3D")) {
-            if (!m_3dWindow) {
-              open3DWindow();
-              QApplication::processEvents();
-            }
-            if (m_3dWindow) {
-              m_3dWindow->view()->read(id, viewObj["View3D"].toObject());
-            }
-          }
+    }
+
+    if (idmap.empty()) {
+      LOG(WARNING) << "Scene " << fn << " contains zero objects";
+    }
+
+    for (const auto& [key, value] : sceneObj) {
+      if (key == "View2DGeneral") {
+        m_view->read(value.as_object());
+      } else if (key == "View3DGeneral") {
+        if (m_3dWindow) {
+          m_3dWindow->view()->read(value.as_object());
         }
-      } else {
-        err += QString("Unknown scene key %1\n").arg(it.key());
+      } else if (key != "Doc" && key != "Version") {
+        QString qkey = QString::fromUtf8(key.data(), key.size());
+        bool ok;
+        size_t objectId = qkey.toLongLong(&ok);
+        if (ok) {
+          if (idmap.find(objectId) != idmap.end()) {
+            size_t id = idmap.at(objectId);
+            const auto& viewObj = value.as_object();
+            if (viewObj.contains("View2D")) {
+              m_view->read(id, viewObj.at("View2D").as_object());
+            }
+            if (viewObj.contains("View3D")) {
+              if (!m_3dWindow) {
+                open3DWindow();
+                QApplication::processEvents();
+              }
+              if (m_3dWindow) {
+                m_3dWindow->view()->read(id, viewObj.at("View3D").as_object());
+              }
+            }
+          }
+        } else {
+          err += QString("Unknown scene key %1\n").arg(qkey);
+        }
       }
     }
-  }
-  QApplication::processEvents();
-  LOG(INFO) << "Finish loading scene";
+    QApplication::processEvents();
+    LOG(INFO) << "Finish loading scene";
 
-  return true;
+    return true;
+  }
+  catch (const std::exception& e) {
+    err += e.what();
+    return false;
+  }
 }
 
 bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 {
-  QFile file(fn);
-  if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-    err = tr("Can not open file");
-    return false;
-  }
+  try {
+    json::object sceneObj;
+    sceneObj["Version"] = 1.0;
 
-  QJsonObject sceneObj;
-  sceneObj.insert("Version", QJsonValue(1.0));
+    json::object docObj;
+    m_doc->write(docObj, true);
+    sceneObj["Doc"] = docObj;
 
-  QJsonObject docObj;
-  m_doc->write(docObj, true);
-  sceneObj.insert("Doc", docObj);
+    auto objs = m_doc->objs();
+    for (auto id : objs) {
+      json::object jObj;
 
-  auto objs = m_doc->objs();
-  for (auto id : objs) {
-    QJsonObject jObj;
+      json::object view2DObj;
+      m_view->write(id, view2DObj);
+      jObj["View2D"] = view2DObj;
 
-    QJsonObject view2DObj;
-    m_view->write(id, view2DObj);
-    jObj.insert("View2D", view2DObj);
+      if (m_3dWindow) {
+        json::object view3DObj;
+        m_3dWindow->view()->write(id, view3DObj);
+        jObj["View3D"] = view3DObj;
+      }
 
-    if (m_3dWindow) {
-      QJsonObject view3DObj;
-      m_3dWindow->view()->write(id, view3DObj);
-      jObj.insert("View3D", view3DObj);
+      sceneObj[QString("%1").arg(id).toStdString()] = jObj;
     }
 
-    sceneObj.insert(QString("%1").arg(id), jObj);
+    json::object view2DGeneralObj;
+    m_view->write(view2DGeneralObj);
+    sceneObj["View2DGeneral"] = view2DGeneralObj;
+
+    if (m_3dWindow) {
+      json::object view3DGeneralObj;
+      m_3dWindow->view()->write(view3DGeneralObj);
+      sceneObj["View3DGeneral"] = view3DGeneralObj;
+    }
+
+    json::object saveObj;
+    saveObj["Scene"] = sceneObj;
+
+    saveJsonObject(saveObj, fn);
+
+    return true;
   }
-
-  QJsonObject view2DGeneralObj;
-  m_view->write(view2DGeneralObj);
-  sceneObj.insert("View2DGeneral", view2DGeneralObj);
-
-  if (m_3dWindow) {
-    QJsonObject view3DGeneralObj;
-    m_3dWindow->view()->write(view3DGeneralObj);
-    sceneObj.insert("View3DGeneral", view3DGeneralObj);
-  }
-
-  QJsonObject saveObj;
-  saveObj.insert("Scene", sceneObj);
-
-  QJsonDocument saveDoc(saveObj);
-  if (file.write(saveDoc.toJson()) == -1) {
-    err = file.errorString();
+  catch (const std::exception& e) {
+    err += e.what();
     return false;
   }
-
-  return true;
 }
 
 } // namespace nim

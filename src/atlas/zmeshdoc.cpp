@@ -116,18 +116,19 @@ size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
   }
 }
 
-size_t ZMeshDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
+size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
 {
-  if (!jValue.isString() || jValue.toString().trimmed().isEmpty()) {
-    errorMsg = QString("File path is not string or is empty");
-    return 0;
-  }
-  for (const auto& idPack : m_idToMeshPacks) {
-    if (isSameObj(jValue, jsonValue(idPack.first)))
-      return idPack.first;
-  }
-  QString fileName = jValue.toString();
   try {
+    if (asQString(jValue).trimmed().isEmpty()) {
+      errorMsg = QString("File path is not string or is empty");
+      return 0;
+    }
+    for (const auto& idPack : m_idToMeshPacks) {
+      if (isSameObj(jValue, jsonValue(idPack.first)))
+        return idPack.first;
+    }
+    QString fileName = asQString(jValue);
+
     ZMesh mesh(fileName);
     size_t id = addMesh(mesh, fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
@@ -185,18 +186,18 @@ QString ZMeshDoc::objTooltip(size_t id) const
   return m_idToMeshPacks.at(id)->tooltip();
 }
 
-QJsonValue ZMeshDoc::jsonValue(size_t id) const
+json::value ZMeshDoc::jsonValue(size_t id) const
 {
-  return QJsonValue(m_idToMeshPacks.at(id)->path);
+  return json::value_from(m_idToMeshPacks.at(id)->path);
 }
 
-bool ZMeshDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
+bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
-  CHECK(v1.isString() && v2.isString());
+  CHECK(v1.is_string() && v2.is_string());
   if (v1 == v2)
     return true;
-  QString f1 = v1.toString();
-  QString f2 = v2.toString();
+  QString f1 = asQString(v1);
+  QString f2 = asQString(v2);
   if (!QFile::exists(f1) || !QFile::exists(f2))
     return false;
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();

@@ -874,103 +874,91 @@ bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAni
 void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
 {
   try {
-    QFile file(fn);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZIOException(tr("Can not open file"));
-    }
-
-    m_objList.clear();
-    m_nextUniqueId = 100;
-
-    QByteArray saveData = file.readAll();
-
-    QJsonParseError jsonError;
-    QJsonDocument loadDoc(QJsonDocument::fromJson(saveData, &jsonError));
-    if (loadDoc.isNull() || loadDoc.isEmpty() || !loadDoc.isObject()) {
-      throw ZIOException(QString("Incorrect file format <%1>").arg(jsonError.errorString()));
-    }
-
-    QJsonObject loadObj = loadDoc.object();
-    if (!loadObj.contains(jsonKey) || !loadObj[jsonKey].isObject()) {
+    auto loadObj = loadJsonObject(fn);
+    if (!loadObj.contains(jsonKey.toStdString()) || !loadObj.at(jsonKey.toStdString()).is_object()) {
       throw ZIOException(tr("File is not %1 format").arg(jsonKey));
     }
 
     QDir::setCurrent(QFileInfo(fn).absolutePath());
 
     QString err;
-    QJsonObject animationObj = loadObj[jsonKey].toObject();
-    QJsonObject docObj = animationObj["Doc"].toObject();
-    for (QJsonObject::const_iterator it = docObj.begin(); it != docObj.end(); ++it) {
-      if (!it.key().contains(QChar(' '))) {
-        err += QString("Invalid obj key %1\n").arg(it.key());
+    const auto& animationObj = loadObj.at(jsonKey.toStdString()).as_object();
+    const auto& docObj = animationObj.at("Doc").as_object();
+    for (const auto& [key, value] : docObj) {
+      QString qkey = QString::fromUtf8(key.data(), key.size());
+      if (!qkey.contains(QChar(' '))) {
+        err += QString("Invalid obj key %1\n").arg(qkey);
         continue;
       }
-      int spaceIdx = it.key().indexOf(QChar(' '));
-      QString type = it.key().left(spaceIdx);
-      QString idString = it.key().mid(spaceIdx + 1);
+      int spaceIdx = qkey.indexOf(QChar(' '));
+      QString type = qkey.left(spaceIdx);
+      QString idString = qkey.mid(spaceIdx + 1);
       if (idString.trimmed().isEmpty()) {
-        err += QString("Invalid obj key %1\n").arg(it.key());
+        err += QString("Invalid obj key %1\n").arg(qkey);
         continue;
       }
       bool ok;
       size_t id = idString.toLongLong(&ok);
       if (!ok || id == 0) {
-        err += QString("Invalid obj key %1\n").arg(it.key());
+        err += QString("Invalid obj key %1\n").arg(qkey);
         continue;
       }
-      auto aniObj = std::make_unique<AnimationObj>(type, it.value());
+      auto aniObj = std::make_unique<AnimationObj>(type, value);
       aniObj->uniqueId = id;
       m_nextUniqueId = std::max(m_nextUniqueId, aniObj->uniqueId + 1);
       m_objList.push_back(std::move(aniObj));
     }
 
     std::vector<std::unique_ptr<ZParameterAnimation>> globalParaAnimations;
-    for (QJsonObject::const_iterator it = animationObj.begin(); it != animationObj.end(); ++it) {
-      if (it.key() == "Duration") {
-        setDuration(it.value().toDouble(1.));
-      } else if (it.key() == "Background" || it.key() == "Axis" || it.key() == "Lighting") {
-        auto aniObj = std::make_unique<AnimationObj>(it.key(), QJsonValue());
+    for (const auto& [key, value] : animationObj) {
+      QString qkey = QString::fromUtf8(key.data(), key.size());
+      if (key == "Duration") {
+        setDuration(json::value_to<double>(value));
+      } else if (key == "Background" || key == "Axis" || key == "Lighting") {
+        auto aniObj = std::make_unique<AnimationObj>(qkey, json::value());
         aniObj->uniqueId = m_nextUniqueId++;
-        if (it.key() == "Background") {
+        if (key == "Background") {
           aniObj->boundId = 1;
-        } else if (it.key() == "Axis") {
+        } else if (key == "Axis") {
           aniObj->boundId = 2;
-        } else if (it.key() == "Lighting") {
+        } else if (key == "Lighting") {
           aniObj->boundId = 3;
         }
-        QJsonObject jObj = it.value().toObject();
-        for (QJsonObject::const_iterator it1 = jObj.begin(); it1 != jObj.end(); ++it1) {
-          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(it1.key(), it1.value()));
+        const auto& jObj = value.as_object();
+        for (const auto& [pkey, pvalue] : jObj) {
+          QString qpkey = QString::fromUtf8(pkey.data(), pkey.size());
+          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue));
           if (pa) {
             aniObj->objParaAnimations.push_back(std::move(pa));
           }
         }
         m_objList.push_back(std::move(aniObj));
-      } else if (it.key() != "Doc" && it.key() != "Version") {
-        bool isObj = !it.key().contains(' ');
+      } else if (key != "Doc" && key != "Version") {
+        bool isObj = !qkey.contains(' ');
         if (isObj) {
           bool ok;
-          size_t objectId = it.key().toLongLong(&ok);
+          size_t objectId = qkey.toLongLong(&ok);
           if (ok) {
             AnimationObj* aniObj = findUniqueId(objectId);
             if (aniObj) {
-              QJsonObject jObj = it.value().toObject();
-              for (QJsonObject::const_iterator it1 = jObj.begin(); it1 != jObj.end(); ++it1) {
-                std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(it1.key(), it1.value()));
+              const auto& jObj = value.as_object();
+              for (const auto& [pkey, pvalue] : jObj) {
+                QString qpkey = QString::fromUtf8(pkey.data(), pkey.size());
+                std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qpkey, pvalue));
                 if (pa) {
                   aniObj->objParaAnimations.push_back(std::move(pa));
                 }
               }
             }
           } else {
-            err += QString("Unknown animation object %1\n").arg(it.key());
+            err += QString("Unknown animation object %1\n").arg(qkey);
           }
         } else {
-          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(it.key(), it.value()));
+          std::unique_ptr<ZParameterAnimation> pa(ZParameterAnimation::create(qkey, value));
           if (pa) {
             globalParaAnimations.push_back(std::move(pa));
           } else {
-            err += QString("Can not parse key %1\n").arg(it.key());
+            err += QString("Can not parse key %1\n").arg(qkey);
           }
         }
       }
@@ -1036,26 +1024,20 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
       }
     }
 
-    QFile file(nName);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-      throw ZIOException(tr("Can not open file"));
-    }
+    json::object animationObj;
+    animationObj["Version"] = 1.0;
 
-    QJsonObject animationObj;
-    animationObj.insert("Version", QJsonValue(1.0));
-
-    QJsonObject docObj;
+    json::object docObj;
     for (auto& i : m_objList) {
       if (i->objType == "Axis" || i->objType == "Background" ||
           i->objType == "Lighting") {
         continue;
       }
-      docObj.insert(QString("%1 %2").arg(i->objType).arg(i->uniqueId),
-                    i->objJsonValue);
+      docObj[QString("%1 %2").arg(i->objType).arg(i->uniqueId).toStdString()] = i->objJsonValue;
     }
-    animationObj.insert("Doc", docObj);
+    animationObj["Doc"] = docObj;
 
-    animationObj.insert("Duration", m_duration);
+    animationObj["Duration"] = m_duration;
     for (auto& globalParaAnimation : m_globalParaAnimations) {
       globalParaAnimation->write(animationObj);
     }
@@ -1063,7 +1045,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
       size_t id = i->uniqueId;
       const auto& pas = i->objParaAnimations;
       if (!pas.empty()) {
-        QJsonObject jObj;
+        json::object jObj;
         for (const auto& pa : pas) {
           pa->write(jObj);
         }
@@ -1077,17 +1059,14 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
         } else {
           name = QString("%1").arg(id);
         }
-        animationObj.insert(name, jObj);
+        animationObj[name.toStdString()] = jObj;
       }
     }
 
-    QJsonObject saveObj;
-    saveObj.insert(jsonKey, animationObj);
+    json::object saveObj;
+    saveObj[jsonKey.toStdString()] = animationObj;
 
-    QJsonDocument saveDoc(saveObj);
-    if (file.write(saveDoc.toJson()) == -1) {
-      throw ZIOException(file.errorString());
-    }
+    saveJsonObject(saveObj, nName);
 
     if ((QFile::exists(fn) && !QFile::remove(fn)) || !QFile::rename(nName, fn)) {
       throw ZIOException(QString("Can not replace old file with new file %2").arg(nName));

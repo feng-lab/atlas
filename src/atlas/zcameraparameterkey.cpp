@@ -32,26 +32,26 @@ ZCameraParameterKey::ZCameraParameterKey(const ZCameraParameterKey& key)
   setType(key.type());
 }
 
-bool ZCameraParameterKey::readValue(const QJsonValue& value)
+bool ZCameraParameterKey::readValue(const json::value& value)
 {
   if (!ZParameterKey::readValue(value)) {
     return false;
   }
-  QJsonObject obj = value.toObject();
-  m_posTension = obj.value("posTension").toDouble(m_posTension);
-  m_posContinuity = obj.value("posContinuity").toDouble(m_posContinuity);
-  m_posBias = obj.value("posBias").toDouble(m_posBias);
-  m_rotTension = obj.value("rotTension").toDouble(m_rotTension);
-  m_rotContinuity = obj.value("rotContinuity").toDouble(m_rotContinuity);
-  m_rotBias = obj.value("rotBias").toDouble(m_rotBias);
+  const auto& obj = value.as_object();
+  m_posTension = json::value_to<float>(obj.at("posTension"));
+  m_posContinuity = json::value_to<float>(obj.at("posContinuity"));
+  m_posBias = json::value_to<float>(obj.at("posBias"));
+  m_rotTension = json::value_to<float>(obj.at("rotTension"));
+  m_rotContinuity = json::value_to<float>(obj.at("rotContinuity"));
+  m_rotBias = json::value_to<float>(obj.at("rotBias"));
   return true;
 }
 
-QJsonValue ZCameraParameterKey::jsonValue() const
+json::value ZCameraParameterKey::jsonValue() const
 {
-  QJsonValue val = ZParameterKey::jsonValue();
-  CHECK(val.isObject());
-  QJsonObject obj = val.toObject();
+  auto val = ZParameterKey::jsonValue();
+  CHECK(val.is_object());
+  auto& obj = val.as_object();
   obj["posTension"] = m_posTension;
   obj["posContinuity"] = m_posContinuity;
   obj["posBias"] = m_posBias;

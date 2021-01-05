@@ -60,7 +60,7 @@ public:
   // return last id if more than one object loaded from file
   virtual size_t loadFile(const QString& fileName, QString& errorMsg) = 0;
 
-  virtual size_t loadFile(const QJsonValue& jValue, QString& errorMsg) = 0;
+  virtual size_t loadFile(const json::value& jValue, QString& errorMsg) = 0;
 
   [[nodiscard]] virtual std::vector<QAction*> loadFileActions() const = 0;
 
@@ -116,9 +116,9 @@ public:
   virtual QWidget* createObjEditWidget(size_t /*id*/)
   { return nullptr; }
 
-  std::map<size_t, size_t> read(const std::vector<std::pair<QString, QJsonValue>>& docKeyValueList, QString& err);
+  std::map<size_t, size_t> read(const std::vector<std::pair<QString, json:;value>>& docKeyValueList, QString& err);
 
-  void write(QJsonObject& json) const;
+  void write(json::object& json) const;
 
 //  // show/hide obj with id
 //  void setObjVisible(size_t id, bool v)

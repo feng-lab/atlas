@@ -435,15 +435,16 @@ size_t ZDoc::viewSettingId()
   return m_viewSettingId;
 }
 
-std::map<size_t, size_t> ZDoc::read(const QJsonObject& json, QString& err)
+std::map<size_t, size_t> ZDoc::read(const json::object& json, QString& err)
 {
   std::map<size_t, size_t> res;
-  if (!json.isEmpty()) {
+  if (!json.empty()) {
     for (auto& docPack : m_docPacks) {
-      std::vector<std::pair<QString, QJsonValue>> docKeyValueList;
-      for (QJsonObject::const_iterator it = json.begin(); it != json.end(); ++it) {
-        if (it.key().startsWith(docPack.doc->typeName())) {
-          docKeyValueList.emplace_back(it.key(), it.value());
+      std::vector<std::pair<QString, json::value>> docKeyValueList;
+      for (const auto& [key, value] : json) {
+        QString qkey = QString::fromUtf8(key.data(), key.size());
+        if (qkey.startsWith(docPack.doc->typeName())) {
+          docKeyValueList.emplace_back(qkey, value);
         }
       }
       if (!docKeyValueList.empty()) {
@@ -456,7 +457,7 @@ std::map<size_t, size_t> ZDoc::read(const QJsonObject& json, QString& err)
   return res;
 }
 
-void ZDoc::write(QJsonObject& json, bool includeAnimation) const
+void ZDoc::write(json::object& json, bool includeAnimation) const
 {
   for (auto& docPack : m_docPacks) {
     if (!includeAnimation && docPack.doc == m_animation3DDoc)

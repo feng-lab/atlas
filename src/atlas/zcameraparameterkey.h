@@ -64,9 +64,9 @@ public:
   void setRotBias(float v)
   { m_rotBias = std::min(std::max(v, -1.f), 1.f); }
 
-  bool readValue(const QJsonValue& value) override;
+  bool readValue(const json::value& value) override;
 
-  [[nodiscard]] QJsonValue jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
 protected:
   float m_posTension = 0;

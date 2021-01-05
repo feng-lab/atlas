@@ -100,7 +100,7 @@ QString ZParameterAnimation::jsonKey() const
   return m_name + QString(" ") + m_type;
 }
 
-ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJsonValue& value, QObject* parent)
+ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json::value& value, QObject* parent)
 {
   int spaceIdx = key.lastIndexOf(QChar(' '));
   if (spaceIdx == -1) {
@@ -114,18 +114,18 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
     LOG(WARNING) << "Invalid Animation Parameter " << key;
     return nullptr;
   }
-  if (!value.isObject()) {
+  if (!value.is_object()) {
     LOG(WARNING) << "Invalid Animation Parameter " << key << " value";
     return nullptr;
   }
-  QJsonObject obj = value.toObject();
-  if (obj.contains("color") && obj.value("color").isString()) {
-    toVal(obj.value("color").toString(), color);
+  const auto& obj = value.as_object();
+  if (obj.contains("color") && obj.at("color").is_string()) {
+    toVal(asQString(obj.at("color")), color);
   }
   if (type == "3DCamera") {
     auto res = new ZCameraParameterAnimation(name, color, parent);
     if (obj.contains("keys")) {
-      QJsonArray keyArray = obj.value("keys").toArray();
+      const auto& keyArray = obj.at("keys").as_array();
       for (auto&& i : keyArray) {
         auto cpkey = std::make_unique<ZCameraParameterKey>();
         if (cpkey->readValue(i)) {
@@ -137,7 +137,7 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
   } else {
     auto res = new ZParameterAnimation(name, type, color, parent);
     if (obj.contains("keys")) {
-      QJsonArray keyArray = obj.value("keys").toArray();
+      const auto& keyArray = obj.at("keys").as_array();
       for (auto&& i : keyArray) {
         auto cpkey = std::make_unique<ZParameterKey>(type);
         if (cpkey->readValue(i)) {
@@ -149,18 +149,18 @@ ZParameterAnimation* ZParameterAnimation::create(const QString& key, const QJson
   }
 }
 
-void ZParameterAnimation::write(QJsonObject& json) const
+void ZParameterAnimation::write(json::object& json) const
 {
-  QJsonObject obj;
-  obj["color"] = toQString(m_color);
+  json::object obj;
+  obj["color"] = json::value_from(toQString(m_color));
   if (!m_keys.empty()) {
-    QJsonArray keysArray;
+    json::array keysArray;
     for (const auto& key : m_keys) {
-      keysArray.append(key->jsonValue());
+      keysArray.push_back(key->jsonValue());
     }
     obj["keys"] = keysArray;
   }
-  json.insert(jsonKey(), obj);
+  json[jsonKey().toStdString()] = obj;
 }
 
 std::unique_ptr<ZParameterKey> ZParameterAnimation::createKey(double secs) const

@@ -35,14 +35,14 @@ public:
   [[nodiscard]] bool hasObj(size_t id) const override
   { return m_idToFilter.find(id) != m_idToFilter.end(); }
 
-  void read(size_t id, const QJsonObject& json) override
+  void read(size_t id, const json::object& json) override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->read(json);
     }
   }
 
-  void write(size_t id, QJsonObject& json) const override
+  void write(size_t id, json::object& json) const override
   {
     if (hasObj(id)) {
       m_idToFilter.at(id)->write(json);

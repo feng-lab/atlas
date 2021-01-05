@@ -14,9 +14,9 @@ Q_OBJECT
 public:
   explicit ZObjFilter(ZView& view);
 
-  virtual void read(const QJsonObject& json);
+  virtual void read(const json::object& json);
 
-  virtual void write(QJsonObject& json) const;
+  virtual void write(json::object& json) const;
 
   void setVisible(bool v)
   { m_visible.set(v); }

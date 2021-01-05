@@ -53,12 +53,12 @@ QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
   return QString("%1 (id: %2)").arg(objName(id)).arg(id);
 }
 
-std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, QJsonValue>>& docKeyValueList, QString& err)
+std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json::value>>& docKeyValueList, QString& err)
 {
   std::map<size_t, size_t> idmap;
   auto allObjs = objs();
 
-  std::map<size_t, QJsonValue> idToJsonValue;
+  std::map<size_t, json::value> idToJsonValue;
   for (const auto& keyValue : docKeyValueList) {
     QString keyString = keyValue.first;
     CHECK(keyString.startsWith(typeName()));
@@ -81,7 +81,7 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, QJso
 
   while (!idToJsonValue.empty()) {
     auto it = idToJsonValue.begin();
-    QJsonValue jv = it->second;
+    const auto& jv = it->second;
     std::set<size_t> ids; // collect all ids that are pointing to jv
     ids.insert(it->first);
     it = idToJsonValue.erase(it);
@@ -131,10 +131,10 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, QJso
   return idmap;
 }
 
-void ZObjDoc::write(QJsonObject& json) const
+void ZObjDoc::write(json::object& json) const
 {
   for (auto id : objs()) {
-    json.insert(QString("%1 %2").arg(typeName()).arg(id), jsonValue(id));
+    json[QString("%1 %2").arg(typeName()).arg(id).toStdString()] = jsonValue(id);
   }
 }
 

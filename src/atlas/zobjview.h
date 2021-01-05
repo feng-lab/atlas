@@ -22,9 +22,9 @@ public:
 
   [[nodiscard]] virtual bool hasObj(size_t id) const = 0;
 
-  virtual void read(size_t id, const QJsonObject& json) = 0;
+  virtual void read(size_t id, const json::object& json) = 0;
 
-  virtual void write(size_t id, QJsonObject& json) const = 0;
+  virtual void write(size_t id, json::object& json) const = 0;
 
   // to show on info bar, default return empty
   virtual QString infoOfPos(double x, double y);

@@ -199,9 +199,9 @@ public:
   [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  [[nodiscard]] QJsonValue jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
   void forceSetValueSameAs(const ZParameter& rhs) override;
 

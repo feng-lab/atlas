@@ -294,14 +294,14 @@ QWidget* ZView::globalParasWidget()
   return widgetsGrp->createWidget(false);
 }
 
-void ZView::read(size_t id, const QJsonObject& json)
+void ZView::read(size_t id, const json::object& json)
 {
   for (const auto& view : m_objViews) {
     if (view->hasObj(id)) {
-      if (json.value("ViewObjType").toString() == view->doc().typeName()) {
+      if (asQString(json.at("ViewObjType")) == view->doc().typeName()) {
         view->read(id, json);
       } else {
-        LOG(WARNING) << "view object type " << json.value("ViewObjType").toString()
+        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType"))
                      << " does not match object type " << view->doc().typeName() << ". abort.";
       }
       return;
@@ -309,19 +309,19 @@ void ZView::read(size_t id, const QJsonObject& json)
   }
 }
 
-void ZView::write(size_t id, QJsonObject& json) const
+void ZView::write(size_t id, json::object& json) const
 {
   for (const auto& view : m_objViews) {
     if (view->hasObj(id)) {
-      json.insert("ViewObjType", view->doc().typeName());
-      json.insert("ViewVersion", QJsonValue(1.0));
+      json["ViewObjType"] = json::value_from(view->doc().typeName());
+      json["ViewVersion"] = 1.0;
       view->write(id, json);
       return;
     }
   }
 }
 
-void ZView::read(const QJsonObject& json)
+void ZView::read(const json::object& json)
 {
   m_imgSlice->read(json);
   m_imgTime->read(json);
@@ -331,7 +331,7 @@ void ZView::read(const QJsonObject& json)
   m_montageColumns->read(json);
 }
 
-void ZView::write(QJsonObject& json) const
+void ZView::write(json::object& json) const
 {
   m_imgSlice->write(json);
   m_imgTime->write(json);

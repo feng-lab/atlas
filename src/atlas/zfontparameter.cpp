@@ -40,14 +40,14 @@ void ZFontParameter::setSameAs(const ZParameter& rhs)
   ZSingleValueParameter<QFont>::setSameAs(rhs);
 }
 
-QJsonValue ZFontParameter::jsonValue() const
+json::value ZFontParameter::jsonValue() const
 {
-  return QJsonValue(this->m_value.toString());
+  return json::value_from(this->m_value.toString());
 }
 
-void ZFontParameter::readValue(const QJsonValue& jsonValue)
+void ZFontParameter::readValue(const json::value& jsonValue)
 {
-  QString text = jsonValue.toString(this->m_value.toString());
+  QString text = asQString(jsonValue);
   QFont font;
   if (!font.fromString(text)) {
     LOG(WARNING) << "Can not load font " << text;

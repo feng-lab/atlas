@@ -310,7 +310,7 @@ json::object loadJsonObject(const QString& file)
 {
   QFile loadFile(file);
 
-  if (!loadFile.open(QIODevice::ReadOnly)) {
+  if (!loadFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
     throw ZIOException("could not open: " + file);
   }
 
@@ -327,7 +327,7 @@ json::object loadJsonObject(const QString& file)
     return jv.as_object();
   }
   catch (const std::exception& e) {
-    throw ZIOException(fmt::format("json error: {}", e.what()));
+    throw ZIOException(fmt::format("json parse error: {}", e.what()));
   }
 }
 

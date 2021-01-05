@@ -38,7 +38,7 @@ public:
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);
     write(jo);
-    return jsonToQString(jo);
+    return formatJsonToQString(jo);
   }
 
 signals:

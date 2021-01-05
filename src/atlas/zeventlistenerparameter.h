@@ -46,9 +46,9 @@ public:
 
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
-  [[nodiscard]] QJsonValue jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
 signals:
 

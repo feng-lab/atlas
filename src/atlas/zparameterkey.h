@@ -51,9 +51,9 @@ public:
   // interpolate value of time and put result to dest
   virtual void interpolate(const ZParameterKey& prev, double time, ZParameter& dest) const;
 
-  virtual bool readValue(const QJsonValue& value);
+  virtual bool readValue(const json::value& value);
 
-  virtual QJsonValue jsonValue() const;
+  virtual json::value jsonValue() const;
 
   QString info() const;
 

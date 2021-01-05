@@ -132,12 +132,12 @@ void ZEventListenerParameter::interpolate(const ZParameter& prev, double /*progr
   CHECK(this->isSameType(prev) && this->isSameType(dest));
 }
 
-QJsonValue ZEventListenerParameter::jsonValue() const
+json::value ZEventListenerParameter::jsonValue() const
 {
-  return QJsonValue(QString(""));
+  return "";
 }
 
-void ZEventListenerParameter::readValue(const QJsonValue& /*value*/)
+void ZEventListenerParameter::readValue(const json::value& /*value*/)
 {
 }
 

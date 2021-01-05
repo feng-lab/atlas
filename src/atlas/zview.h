@@ -160,13 +160,13 @@ public:
 
   QWidget* globalParasWidget();
 
-  void read(size_t id, const QJsonObject& json);
+  void read(size_t id, const json::object& json);
 
-  void write(size_t id, QJsonObject& json) const;
+  void write(size_t id, json::object& json) const;
 
-  void read(const QJsonObject& json);
+  void read(const json::object& json);
 
-  void write(QJsonObject& json) const;
+  void write(json::object& json) const;
 
   void fitContentIntoWindow();
 

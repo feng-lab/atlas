@@ -210,7 +210,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
 {
   m_value.m_keys.clear();
   const auto& keyArray = jsonValue.as_array();
-  for (const auto jv : keyArray) {
+  for (const auto& jv : keyArray) {
     const auto& keyObj = jv.as_object();
     ZColorMapKey key(0, glm::col4());
     if (keyObj.contains("intensity") &&
@@ -218,9 +218,9 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
         keyObj.contains("colorR") &&
         keyObj.contains("split")) {
       if (keyObj.at("intensity").is_string()) {
-        toVal(toQString(keyObj.at("intensity")), key.m_intensity);
-        toVal(toQString(keyObj.at("colorL")), key.m_colorL);
-        toVal(toQString(keyObj.at("colorR")), key.m_colorR);
+        toVal(asQString(keyObj.at("intensity")), key.m_intensity);
+        toVal(asQString(keyObj.at("colorL")), key.m_colorL);
+        toVal(asQString(keyObj.at("colorR")), key.m_colorR);
       } else {
         key.m_intensity = json::value_to<double>(keyObj.at("intensity"));
         key.m_colorL = json::value_to<glm::col4>(keyObj.at("colorL"));
@@ -229,7 +229,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
       key.m_split = keyObj.at("split").as_bool();
       m_value.m_keys.emplace_back(key, false);
     } else {
-      LOG(WARNING) << "Invalid transfer function key " << keyObj.keys().join("  ");
+      LOG(WARNING) << "Invalid transfer function key " << formatJsonToQString(keyObj);
     }
   }
   m_value.invalidateTexture();

@@ -53,13 +53,13 @@ public:
 
   [[nodiscard]] QString jsonKey() const;
 
-  [[nodiscard]] virtual QJsonValue jsonValue() const = 0;
+  [[nodiscard]] virtual json::value jsonValue() const = 0;
 
-  virtual void readValue(const QJsonValue& value) = 0;
+  virtual void readValue(const json::value& value) = 0;
 
-  void read(const QJsonObject& json);
+  void read(const json::object& json);
 
-  void write(QJsonObject& json) const;
+  void write(json::object& json) const;
 
   // set everything same as
   virtual void setSameAs(const ZParameter& rhs) = 0;
@@ -258,9 +258,9 @@ public:
   [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  [[nodiscard]] QJsonValue jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
-  void readValue(const QJsonValue& jsonValue) override;
+  void readValue(const json::value& jsonValue) override;
 
   void setValue(bool v);
 

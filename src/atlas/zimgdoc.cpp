@@ -83,9 +83,9 @@ size_t ZImgDoc::loadFile(const QString& fileName, QString& errorMsg)
   return loadImg(fileName, FileFormat::Unknown, errorMsg);
 }
 
-size_t ZImgDoc::loadFile(const QJsonValue& jValue, QString& errorMsg)
+size_t ZImgDoc::loadFile(const json::value& jValue, QString& errorMsg)
 {
-  return loadImg(ZImgSource(jValue), errorMsg);
+  return loadImg(json::value_to<ZImgSource>(jValue), errorMsg);
 }
 
 std::vector<QAction*> ZImgDoc::loadFileActions() const
@@ -152,19 +152,19 @@ QString ZImgDoc::objTooltip(size_t id) const
   return m_idToImgPacks.at(id)->tooltip();
 }
 
-QJsonValue ZImgDoc::jsonValue(size_t id) const
+json::value ZImgDoc::jsonValue(size_t id) const
 {
   auto& pack = m_idToImgPacks.at(id);
-  return pack->imgSource().toJson();
+  return json::value_from(pack->imgSource());
 }
 
-bool ZImgDoc::isSameObj(const QJsonValue& v1, const QJsonValue& v2) const
+bool ZImgDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
-  CHECK(v1.isObject() && v2.isObject());
+  CHECK(v1.is_object() && v2.is_object());
   if (v1 == v2) {
     return true;
   }
-  if (ZImgSource(v1) == ZImgSource(v2)) {
+  if (json::value_to<ZImgSource>(v1) == json::value_to<ZImgSource>(v2)) {
     return true;
   }
   return false;

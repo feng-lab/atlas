@@ -80,15 +80,19 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  [[nodiscard]] QJsonValue jsonValue() const override
+  [[nodiscard]] json::value jsonValue() const override
   {
-    return QJsonValue(toQString(this->m_value));
+    return json::value_from(this->m_value);
   }
 
-  void readValue(const QJsonValue& jsonValue) override
+  void readValue(const json::value& jsonValue) override
   {
     T v;
-    toVal(jsonValue.toString(toQString(this->m_value)), v);
+    if (jsonValue.is_string()) {
+      toVal(asQString(jsonValue), v);
+    } else {
+      v = json::value_to<T>(jsonValue);
+    }
     this->set(v);
   }
 
@@ -288,15 +292,19 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  [[nodiscard]] QJsonValue jsonValue() const override
+  [[nodiscard]] json::value jsonValue() const override
   {
-    return QJsonValue(toQString(this->m_value));
+    return json::value_from(this->m_value);
   }
 
-  void readValue(const QJsonValue& jsonValue) override
+  void readValue(const json::value& jsonValue) override
   {
     T v;
-    toVal(jsonValue.toString(toQString(this->m_value)), v);
+    if (jsonValue.is_string()) {
+      toVal(asQString(jsonValue), v);
+    } else {
+      v = json::value_to<T>(jsonValue);
+    }
     this->set(v);
   }
 
@@ -683,15 +691,19 @@ public:
     desPara.set(glm::mix(prevPara.get(), this->m_value, progress));
   }
 
-  [[nodiscard]] QJsonValue jsonValue() const override
+  [[nodiscard]] json::value jsonValue() const override
   {
-    return QJsonValue(toQString(this->m_value));
+    return json::value_from(this->m_value);
   }
 
-  void readValue(const QJsonValue& jsonValue) override
+  void readValue(const json::value& jsonValue) override
   {
     T v;
-    toVal(jsonValue.toString(toQString(this->m_value)), v);
+    if (jsonValue.is_string()) {
+      toVal(asQString(jsonValue), v);
+    } else {
+      v = json::value_to<T>(jsonValue);
+    }
     this->set(v);
   }
 

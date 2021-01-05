@@ -85,18 +85,18 @@ QString ZParameter::jsonKey() const
   return m_name + QString(" ") + type();
 }
 
-void ZParameter::read(const QJsonObject& json)
+void ZParameter::read(const json::object& json)
 {
-  if (json.contains(jsonKey())) {
-    readValue(json[jsonKey()]);
+  if (json.contains(jsonKey().toStdString())) {
+    readValue(json.at(jsonKey().toStdString()));
   } else {
     LOG(WARNING) << "Parameter <" << jsonKey() << "> not found.";
   }
 }
 
-void ZParameter::write(QJsonObject& json) const
+void ZParameter::write(json::object& json) const
 {
-  json.insert(jsonKey(), jsonValue());
+  json[jsonKey().toStdString()] = jsonValue();
 }
 
 void ZParameter::setSameAs(const ZParameter& rhs)
@@ -176,14 +176,14 @@ void ZBoolParameter::setSameAs(const ZParameter& rhs)
   ZSingleValueParameter<bool>::setSameAs(rhs);
 }
 
-QJsonValue ZBoolParameter::jsonValue() const
+json::value ZBoolParameter::jsonValue() const
 {
-  return QJsonValue(this->m_value);
+  return this->m_value;
 }
 
-void ZBoolParameter::readValue(const QJsonValue& jsonValue)
+void ZBoolParameter::readValue(const json::value& jsonValue)
 {
-  set(jsonValue.toBool(this->m_value));
+  set(jsonValue.as_bool());
 }
 
 } // namespace nim

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zjson.h"
 #include <QObject>
 #include <QUndoGroup>
 #include <memory>
@@ -152,9 +153,9 @@ public:
 
   size_t viewSettingId();
 
-  std::map<size_t, size_t> read(const QJsonObject& json, QString& err);
+  std::map<size_t, size_t> read(const json::object& json, QString& err);
 
-  void write(QJsonObject& json, bool includeAnimation) const;
+  void write(json::object& json, bool includeAnimation) const;
 
   static QString lastOpenedFilePath();
 

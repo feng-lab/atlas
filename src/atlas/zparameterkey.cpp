@@ -105,39 +105,38 @@ void ZParameterKey::interpolate(const ZParameterKey& prev, double time, ZParamet
   m_value->interpolate(prev.value(), progress, dest);
 }
 
-bool ZParameterKey::readValue(const QJsonValue& value)
+bool ZParameterKey::readValue(const json::value& value)
 {
-  if (!value.isObject()) {
+  if (!value.is_object()) {
     LOG(WARNING) << "Invalid key";
     return false;
   }
-  QJsonObject obj = value.toObject();
+  const auto& obj = value.as_object();
   if (!obj.contains("time") ||
       !obj.contains("type") ||
       !obj.contains("value")) {
-    LOG(WARNING) << "Invalid key " << obj.keys().join("  ") << " time, type and value are required field.";
+    LOG(WARNING) << "Invalid key " << formatJsonToQString(obj) << " time, type and value are required field.";
     return false;
   }
-  m_time = obj.value("time").toDouble();
-  m_type->select(obj.value("type").toString());
+  m_time = json::value_to<double>(obj.at("time"));
+  m_type->select(json::value_to<QString>(obj.at("type")));
   updateEasingCurve();
-  m_value->readValue(obj.value("value"));
+  m_value->readValue(obj.at("value"));
   return true;
 }
 
-QJsonValue ZParameterKey::jsonValue() const
+json::value ZParameterKey::jsonValue() const
 {
-  QJsonObject obj;
+  json::object obj;
   obj["time"] = m_time;
-  obj["type"] = m_type->get();
+  obj["type"] = json::value_from(m_type->get());
   obj["value"] = m_value->jsonValue();
   return obj;
 }
 
 QString ZParameterKey::info() const
 {
-  QJsonDocument doc(jsonValue().toObject());
-  return doc.toJson();
+  return formatJsonToQString(jsonValue());
 }
 
 void ZParameterKey::setDefaultType()
