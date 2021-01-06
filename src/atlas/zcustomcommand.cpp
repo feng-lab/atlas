@@ -757,8 +757,8 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
   if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
-
-  auto& sceneObj = loadObj.at("Scene").as_object();
+  auto& sceneVal = loadObj.at("Scene");
+  auto& sceneObj = sceneVal.as_object();
 
   QDir::setCurrent(QFileInfo(fn).absolutePath());
 
@@ -817,16 +817,16 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
         filename.chop(6);
       else
         LOG(FATAL) << "..";
-      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Mode StringIntOption") = "Single Color";
+      *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Color Mode StringIntOption"] = "Single Color";
       if (filename.startsWith("Py"))
-        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+        *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Color Vec4"] =
           json::value_from(glm::vec4(1, 0, 0, 1));
       else if (filename.startsWith("PV169") || filename.startsWith("PV40") || filename.startsWith("PV41") ||
                filename.startsWith("PV42")) {
-        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+        *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Color Vec4"] =
           json::value_from(glm::vec4(0, 1, 1, 1));
       } else {
-        sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Vec4") =
+        *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Color Vec4"] =
           json::value_from(glm::vec4(0, 0, 1, 1));
       }
     } else if (typeAndID[0] == "Puncta") {
@@ -836,21 +836,21 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
         filename.chop(8);
       else
         LOG(FATAL) << "..";
-      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Use Same Size Bool") = true;
-      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Size Scale Float") = 4.f;
-      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Color Mode StringIntOption") ="Single Color";
-      sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Puncta Color Vec4") =
+      *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Use Same Size Bool"] = true;
+      *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Size Scale Float"] = 4.f;
+      *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Color Mode StringIntOption"] ="Single Color";
+      *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Puncta Color Vec4"] =
         json::value_from(glm::vec4(0, 1, 0, 1));
     }
     glm::dvec3 loc = cellNameToLocations.at(filename);
     QString locString = toQString(loc);
     QString scaleString = toQString(glm::dvec3(1, 1, 5));
 
-    sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Coord Transform 3DTransform").as_object().at("Scale Vec3") =
+    *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Coord Transform 3DTransform"]["Scale Vec3"] =
       json::value_from(glm::dvec3(1, 1, 5));
-    sceneObj[IDString.toStdString()].as_object().at("View3D").as_object().at("Coord Transform 3DTransform").as_object().at("Translation Vec3") =
+    *JsonValueProxy(sceneVal)[IDString.toStdString()]["View3D"]["Coord Transform 3DTransform"]["Translation Vec3"] =
       json::value_from(loc);
-    sceneObj[IDString.toStdString()].as_object().at("View2D").as_object().at("Offset DVec4") =
+    *JsonValueProxy(sceneVal)[IDString.toStdString()]["View2D"]["Offset DVec4"] =
       json::value_from(glm::dvec4(loc, 0));
   }
 
@@ -883,7 +883,8 @@ void createCellTable()
   if (!loadObj.contains("Scene") || !loadObj.at("Scene").is_object()) {
     return;
   }
-  auto& sceneObj = loadObj["Scene"].as_object();
+  auto& sceneVal = loadObj.at("Scene");
+  auto& sceneObj = sceneVal.as_object();
   auto& docObject = sceneObj["Doc"].as_object();
 
   std::map<std::tuple<QString, int, double, double, QString>, std::tuple<QString, double>> cells;

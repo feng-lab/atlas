@@ -111,6 +111,84 @@ inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
   return res;
 }
 
+//json::value jv;
+//*JsonValueProxy(jv)["user:config"]["authority"]["router"][0]["users"] = 42;
+
+class JsonValueProxy
+{
+  json::value& jv_;
+
+public:
+  explicit JsonValueProxy(json::value& jv) noexcept
+    : jv_(jv)
+  {
+  }
+
+  inline JsonValueProxy operator[](json::string_view key)
+  {
+    json::object* obj;
+    if (jv_.is_null()) {
+      obj = &jv_.emplace_object();
+    } else {
+      obj = &jv_.as_object();
+    }
+    return JsonValueProxy((*obj)[key]);
+  }
+
+  inline JsonValueProxy operator[](std::size_t index)
+  {
+    json::array* arr;
+    if (jv_.is_null()) {
+      arr = &jv_.emplace_array();
+    } else {
+      arr = &jv_.as_array();
+    }
+    if (arr->size() <= index) {
+      arr->resize(index + 1);
+    }
+    return JsonValueProxy((*arr)[index]);
+  }
+
+  json::value& operator*() noexcept
+  {
+    return jv_;
+  }
+};
+
+//json::value jv;
+//JsonValuePath(jv, "user:config", "authority", "router", 0, "users") = 42;
+
+inline json::value& JsonValuePath(json::value& jv, std::size_t index)
+{
+  json::array* arr;
+  if (jv.is_null()) {
+    arr = &jv.emplace_array();
+  } else {
+    arr = &jv.as_array();
+  }
+  if (arr->size() <= index) {
+    arr->resize(index + 1);
+  }
+  return (*arr)[index];
+}
+
+inline json::value& JsonValuePath(json::value& jv, json::string_view key)
+{
+  json::object* obj;
+  if (jv.is_null()) {
+    obj = &jv.emplace_object();
+  } else {
+    obj = &jv.as_object();
+  }
+  return (*obj)[key];
+}
+
+template<class Arg0, class Arg1, class... Args>
+inline json::value& JsonValuePath(json::value& jv, Arg0 const& arg0, Arg1 const& arg1, Args const& ... args)
+{
+  return JsonValuePath(JsonValuePath(jv, arg0), arg1, args...);
+}
+
 } // namespace nim
 
 namespace glm {
