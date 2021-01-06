@@ -420,12 +420,6 @@ inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordina
                           std::min(a.c, b), std::min(a.t, b));
 }
 
-//
-inline std::ostream& operator<<(std::ostream& cout, const ZVoxelCoordinate& c)
-{
-  return cout << qUtf8Printable(c.toQString());
-}
-
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate& v) noexcept
 { return tuple_like_get_helper<Index, 5>(v); }

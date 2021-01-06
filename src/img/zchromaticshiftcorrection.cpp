@@ -129,7 +129,7 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
   if (it == presetNameToParameters.end()) {
     throw ZImgException(QString("Unknown preset name: %1. Abort").arg(presetName));
   } else {
-    LOG(INFO) << "Use " << it->first << " preset: " << it->second;
+    LOG(INFO) << "Use " << it->first << " preset: " << json::value_from(it->second);
     transform->setParameters(it->second);
   }
 

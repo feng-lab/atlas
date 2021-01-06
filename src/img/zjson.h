@@ -51,13 +51,9 @@ namespace nim {
 
 void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr);
 
-inline std::ostream& operator<<(std::ostream& os, const json::value& jv)
-{
-  pretty_print(os, jv);
-  return os;
-}
-
 QString formatJsonToQString(const json::value& jv);
+
+std::string formatJsonToString(const json::value& jv);
 
 json::object loadJsonObject(const QString& file);
 
@@ -71,8 +67,8 @@ inline QString asQString(const json::value& jv)
 }
 
 // tuple-like types
-template<class T, typename std::enable_if<
-  (std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
+template<class T,
+  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
 inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 {
   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
@@ -92,8 +88,8 @@ inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 namespace glm {
 
 // tuple-like types
-template<class T, typename std::enable_if<
-  (std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
+template<class T,
+  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
 inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 {
   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;

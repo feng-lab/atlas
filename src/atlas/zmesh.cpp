@@ -7,6 +7,7 @@
 #include "zswc.h"
 #include "zlog.h"
 #include "zpuncta.h"
+#include <QFile>
 #include <vtkPolyData.h>
 #include <vtkPointData.h>
 #include <vtkSmartPointer.h>
@@ -162,7 +163,7 @@ void ZMesh::loadVTP(const QString& filename)
 {
   vtkSmartPointer<vtkXMLPolyDataReader> reader =
     vtkSmartPointer<vtkXMLPolyDataReader>::New();
-  reader->SetFileName(qUtf8Printable(filename));
+  reader->SetFileName(QFile::encodeName(filename).constData());
   reader->Update();
 
   auto msh = vtkPolyDataToMesh(reader->GetOutput());
@@ -174,7 +175,7 @@ void ZMesh::saveAsVTP(const QString& filename) const
   vtkSmartPointer<vtkPolyData> polydata = meshToVtkPolyData(*this);
   vtkSmartPointer<vtkXMLPolyDataWriter> writer =
     vtkSmartPointer<vtkXMLPolyDataWriter>::New();
-  writer->SetFileName(qUtf8Printable(filename));
+  writer->SetFileName(QFile::encodeName(filename).constData());
   writer->SetInputData(polydata);
 
   writer->SetDataModeToBinary();

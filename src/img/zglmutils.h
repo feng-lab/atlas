@@ -12,6 +12,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 
 #include "zglobal.h"
+#include "zjson.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -366,19 +367,19 @@ inline void toVal(const QString& str, glm::tquat<T, Q>& q)
 template<size_t L, typename T, glm::qualifier Q>
 inline std::ostream& operator<<(std::ostream& s, const glm::vec<L, T, Q>& v)
 {
-  return (s << qUtf8Printable(toQString(v)));
+  return (s << json::value_from(v));
 }
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 inline std::ostream& operator<<(std::ostream& s, const glm::mat<C, R, T, Q>& m)
 {
-  return (s << qUtf8Printable(toQString(m)));
+  return (s << json::value_from(m));
 }
 
 template<typename T, glm::qualifier Q>
 inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
 {
-  return (s << qUtf8Printable(toQString(q)));
+  return (s << json::value_from(q));
 }
 
 } // namespace nim

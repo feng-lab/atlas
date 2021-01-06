@@ -669,8 +669,8 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc(ZImg& fixedImg, ZImg& movingImg,
   ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start -
                             ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
                                              movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << maxNCCCoord;
-  LOG(INFO) << "moving image offset: " << offset;
+  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord);
+  LOG(INFO) << "moving image offset: " << json::value_from(offset);
 
   return offset;
 }
@@ -707,9 +707,9 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLoc_S(ZImg& fixedImg, ZImg& movingImg
   ZVoxelCoordinate offset = maxNCCCoord + nccImgValidRegion.start -
                             ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
                                              movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << maxNCCCoord;
+  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord);
   LOG(INFO) << nccImgValidRegion.toQString();
-  LOG(INFO) << "moving image offset: " << offset;
+  LOG(INFO) << "moving image offset: " << json::value_from(offset);
 
   return offset;
 }
@@ -733,10 +733,10 @@ ZVoxelCoordinate ZImgNCCMatch::maxNormXCorrLocPart(ZImg& fixedImg, ZImg& movingI
   ZVoxelCoordinate offset = maxNCCCoord + ZVoxelCoordinate(xStart, yStart, zStart)
                             - ZVoxelCoordinate(movingImgInfo.width - 1, movingImgInfo.height - 1,
                                                movingImgInfo.depth - 1);
-  LOG(INFO) << "max NCC coord: " << maxNCCCoord
+  LOG(INFO) << "max NCC coord: " << json::value_from(maxNCCCoord)
             << QString(" region (x:%1-%2, y:%3-%4, z:%5-%6)").arg(xStart).arg(xEnd).arg(yStart).arg(yEnd).arg(
               zStart).arg(zEnd);
-  LOG(INFO) << "moving image offset: " << offset;
+  LOG(INFO) << "moving image offset: " << json::value_from(offset);
 
   return offset;
 }

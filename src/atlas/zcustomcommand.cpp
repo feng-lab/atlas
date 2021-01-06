@@ -1285,7 +1285,7 @@ void channelCalibration()
     ZImg moving = img.extractChannel(1);
     moving.save(fileInfo.absoluteFilePath() + "_ch1.tif");
     ZImgNCCMatch mat(fixed, moving);
-    LOG(INFO) << mat.computeMovingImgOffset();
+    LOG(INFO) << json::value_from(mat.computeMovingImgOffset());
   }
 }
 
@@ -1841,6 +1841,25 @@ void createPCCellTable()
   }
 }
 
+void testLogDataSupport()
+{
+  glm::vec4 v4(3.5, 2, 0, 1.);
+  glm::mat4 m4;
+  std::array<int, 3> a2 = {1, 2, 3};
+  LOG(INFO) << v4;
+  LOG(INFO) << m4;
+  LOG(INFO) << a2;
+  auto t = std::make_tuple(1.7, 'D', "Ralph Wiggum");
+  LOG(INFO) << t;
+  const std::map<std::string, int> init {
+    {"this", 100},
+    {"can", 100},
+    {"be", 100},
+    {"const", 100},
+  };
+  LOG(INFO) << init;
+  LOG(INFO) << v4 << m4 << a2 << t << init;
+}
 
 }  // namespace nim
 
@@ -1848,7 +1867,7 @@ namespace nim {
 
 void ZCustomCommand::run()
 {
-  createPCCellTable();
+  testLogDataSupport();
   LOG(INFO) << "done";
 }
 

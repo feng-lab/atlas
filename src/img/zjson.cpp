@@ -1,7 +1,6 @@
 #include "zjson.h"
 
 #include "zexception.h"
-#include "zlog.h"
 #include "zioutils.h"
 #include <boost/json/src.hpp>
 #include <sstream>
@@ -98,6 +97,13 @@ QString formatJsonToQString(const json::value& jv)
   std::ostringstream oss;
   pretty_print(oss, jv);
   return QString::fromStdString(oss.str());
+}
+
+std::string formatJsonToString(const json::value& jv)
+{
+  std::ostringstream oss;
+  pretty_print(oss, jv);
+  return oss.str();
 }
 
 json::object loadJsonObject(const QString& file)
