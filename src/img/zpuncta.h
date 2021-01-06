@@ -154,7 +154,11 @@ public:
 
   void save(const QString& filename, const QString& format = "") const;
 
-  QString toQString() const;
+  [[nodiscard]] inline QString toQString() const
+  { return QString("%1 puncta").arg(m_d.size()); }
+
+  [[nodiscard]] inline std::string toString() const
+  { return fmt::format("{} puncta", m_d.size()); }
 
 private:
   friend class ZPunctaIO;

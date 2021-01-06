@@ -92,17 +92,31 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent)
   }
 }
 
-QString formatJsonToQString(const json::value& jv)
+QString jsonToFormattedQString(const json::value& jv)
 {
   std::ostringstream oss;
   pretty_print(oss, jv);
   return QString::fromStdString(oss.str());
 }
 
-std::string formatJsonToString(const json::value& jv)
+std::string jsonToFormattedString(const json::value& jv)
 {
   std::ostringstream oss;
   pretty_print(oss, jv);
+  return oss.str();
+}
+
+QString jsonToQString(const json::value& jv)
+{
+  std::ostringstream oss;
+  oss << jv;
+  return QString::fromStdString(oss.str());
+}
+
+std::string jsonToString(const json::value& jv)
+{
+  std::ostringstream oss;
+  oss << jv;
   return oss.str();
 }
 

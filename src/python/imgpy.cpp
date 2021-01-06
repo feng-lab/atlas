@@ -11,6 +11,7 @@
 #include "zchromaticshiftcorrection.h"
 #include "zroiutils.h"
 #include "zimgautothreshold.h"
+#include <fmt/core.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -224,7 +225,7 @@ PYBIND11_MODULE(_imgpy, m)
       new(&self) col4(t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>());
     })
     .def("__repr__", [](const col4& v) {
-      return QString("<_imgpy.col4 r:%1, g:%2, b:%3, a:%4>").arg(v.r).arg(v.g).arg(v.b).arg(v.a).toStdString();
+      return fmt::format("<_imgpy.col4 rgba:{}>", v.toString());
     });
   py::implicitly_convertible<py::tuple, col4>();
 
@@ -290,7 +291,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("voxelSizeZInUm", &ZImgInfo::voxelSizeZInUm)
     .def("dataTypeString", &ZImgInfo::typeAsQString)
     .def("__repr__", [](const ZImgInfo& v) {
-      return QString("<_imgpy.ZImgInfo %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZImgInfo {}>", v.toString());
     });
 
   py::class_<ZVoxelCoordinate>(m, "ZVoxelCoordinate")
@@ -311,7 +312,7 @@ PYBIND11_MODULE(_imgpy, m)
                                   t[4].cast<ZVoxelCoordinate::value_type>());
     })
     .def("__repr__", [](const ZVoxelCoordinate& v) {
-      return QString("<_imgpy.ZVoxelCoordinate xyzct:%1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZVoxelCoordinate xyzct:{}>", v.toString());
     });
   py::implicitly_convertible<py::tuple, ZVoxelCoordinate>();
 
@@ -321,7 +322,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("start", &ZImgRegion::start)
     .def_readwrite("end", &ZImgRegion::end)
     .def("__repr__", [](const ZImgRegion& v) {
-      return QString("<_imgpy.ZImgRegion %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZImgRegion {}>", v.toString());
     });
 
   py::class_<ZImgSource>(m, "ZImgSource")
@@ -342,7 +343,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("totalFileSize", &ZImgSource::totalFileSize)
     .def_readwrite("catScenes", &ZImgSource::catScenes)
     .def("__repr__", [](const ZImgSource& v) {
-      return QString("<_imgpy.ZImgSource %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZImgSource {}>", v.toString());
     });
 
   py::class_<ZImg>(m, "ZImg")
@@ -548,7 +549,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::self / uint64_t())
     .def(py::self /= uint64_t())
     .def("__repr__", [](const ZImg& v) {
-      return QString("<_imgpy.ZImg %1>").arg(v.info().toQString()).toStdString();
+      return fmt::format("<_imgpy.ZImg {}>", v.info().toString());
     });
 
   py::class_<ZPunctum>(m, "ZPunctum")
@@ -574,7 +575,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_property("voxelLocations", &ZPunctum::voxelLocations, &ZPunctum::setVoxelLocations)
     .def_property("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
     .def("__repr__", [](const ZPunctum& v) {
-      return QString("<_imgpy.ZPunctum %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZPunctum {}>", v.toString());
     });
 
   py::class_<ZPuncta>(m, "ZPuncta")
@@ -585,7 +586,7 @@ PYBIND11_MODULE(_imgpy, m)
          "filename"_a, "format"_a = QString())
     .def_property_readonly("data", py::overload_cast<>(&ZPuncta::data, py::const_))
     .def("__repr__", [](const ZPuncta& v) {
-      return QString("<_imgpy.ZPuncta %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZPuncta {}>", v.toString());
     });
 
   py::class_<ZStitchImage>(m, "ZStitchImage")
@@ -629,7 +630,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("saveTask", &ZStitchImage::saveTask, "filename"_a)
     .def("run", &ZStitchImage::runInPython)
     .def("__repr__", [](const ZStitchImage& v) {
-      return QString("<_imgpy.ZStitchImage %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZStitchImage {}>", v.toString());
     });
 
   py::class_<ZPunctaDetection>(m, "ZPunctaDetection")
@@ -677,7 +678,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("saveTask", &ZPunctaDetection::saveTask, "filename"_a)
     .def("run", &ZPunctaDetection::runInPython)
     .def("__repr__", [](const ZPunctaDetection& v) {
-      return QString("<_imgpy.ZPunctaDetection %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZPunctaDetection {}>", v.toString());
     });
 
   py::class_<ZSectionsRegistration>(m, "ZSectionsRegistration")
@@ -710,7 +711,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("saveTask", &ZSectionsRegistration::saveTask, "filename"_a)
     .def("run", &ZSectionsRegistration::runInPython)
     .def("__repr__", [](const ZSectionsRegistration& v) {
-      return QString("<_imgpy.ZSectionsRegistration %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZSectionsRegistration {}>", v.toString());
     });
 
   py::class_<ZChromaticShiftCorrection>(m, "ZChromaticShiftCorrection")
@@ -744,7 +745,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("saveTask", &ZChromaticShiftCorrection::saveTask, "filename"_a)
     .def("run", &ZChromaticShiftCorrection::runInPython)
     .def("__repr__", [](const ZChromaticShiftCorrection& v) {
-      return QString("<_imgpy.ZChromaticShiftCorrection %1>").arg(v.toQString()).toStdString();
+      return fmt::format("<_imgpy.ZChromaticShiftCorrection {}>", v.toString());
     });
 
   py::class_<ZImgNCCMatch>(m, "ZImgNCCMatch")
@@ -774,7 +775,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("refineMovingImgOffsetMR", &ZImgNCCMatch::refineMovingImgOffsetMR_Python,
          "offset"_a, "radiusX"_a, "radiusY"_a, "radiusZ"_a, "intvX"_a, "intvY"_a, "intvZ"_a)
     .def("__repr__", [](const ZImgNCCMatch&) {
-      return QString("<_imgpy.ZImgNCCMatch>").toStdString();
+      return fmt::format("<_imgpy.ZImgNCCMatch>");
     });
 
   py::class_<ZROIUtils>(m, "ZROIUtils")
@@ -789,7 +790,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_static("shapeToMask", &ZROIUtils::shapeToMask_Python,
                 "shapes"_a)
     .def("__repr__", [](const ZROIUtils&) {
-      return QString("<_imgpy.ZROIUtils>").toStdString();
+      return fmt::format("<_imgpy.ZROIUtils>");
     });
 
   py::class_<ZImgSubBlock, PyZImgSubBlock<>>(m, "ZImgSubBlock")
@@ -798,14 +799,14 @@ PYBIND11_MODULE(_imgpy, m)
     .def("read", &ZImgSubBlock::read)
     .def("readInfo", &ZImgSubBlock::readInfo)
     .def("__repr__", [](const ZImgSubBlock&) {
-      return QString("<_imgpy.ZImgSubBlock>").toStdString();
+      return fmt::format("<_imgpy.ZImgSubBlock>");
     });
   py::class_<ZImgTileSubBlock, ZImgSubBlock, PyZImgTileSubBlock<>>(m, "ZImgTileSubBlock")
     .def(py::init<const ZImgSource&, size_t, size_t, size_t, ImgMergeMode>(),
          "source"_a, "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1,
          "downsampleCombineMode"_a = ImgMergeMode::Interpolation)
     .def("__repr__", [](const ZImgTileSubBlock&) {
-      return QString("<_imgpy.ZImgTileSubBlock>").toStdString();
+      return fmt::format("<_imgpy.ZImgTileSubBlock>");
     });
 
   py::class_<ZImgMerge>(m, "ZImgMerge")
@@ -820,7 +821,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def("save", &ZImgMerge::save,
          "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
     .def("__repr__", [](const ZImgMerge&) {
-      return QString("<_imgpy.ZImgMerge>").toStdString();
+      return fmt::format("<_imgpy.ZImgMerge>");
     });
 
   py::class_<ZImgAutoThreshold<false>>(m, "ZImgAutoThreshold")
@@ -829,7 +830,7 @@ PYBIND11_MODULE(_imgpy, m)
          "filename"_a, "minValue"_a, "maxValue"_a, "c"_a = 0, "t"_a = 0, "scene"_a = 0,
          "mask"_a = std::vector<ZVoxelCoordinate>())
     .def("__repr__", [](const ZImgAutoThreshold<false>&) {
-      return QString("<_imgpy.ZImgAutoThreshold>").toStdString();
+      return fmt::format("<_imgpy.ZImgAutoThreshold>");
     });
 
 

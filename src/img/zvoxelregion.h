@@ -26,7 +26,7 @@ public:
     : m_region(region), m_boxIdx(boxIdx)
   {
     if (m_region && m_boxIdx < m_region->m_boxes.size())
-      m_voxel = m_region->m_boxes[m_boxIdx].minCorner();
+      m_voxel = m_region->m_boxes[m_boxIdx].minCorner;
   }
 
   template<
@@ -64,23 +64,23 @@ public:
     }
 
     do {
-      if (++m_voxel[0] > m_region->m_boxes[m_boxIdx].maxCorner()[0]) {
-        m_voxel[0] = m_region->m_boxes[m_boxIdx].minCorner()[0];
-        if (++m_voxel[1] > m_region->m_boxes[m_boxIdx].maxCorner()[1]) {
-          m_voxel[1] = m_region->m_boxes[m_boxIdx].minCorner()[1];
-          if (++m_voxel[2] > m_region->m_boxes[m_boxIdx].maxCorner()[2]) {
-            m_voxel[2] = m_region->m_boxes[m_boxIdx].minCorner()[2];
-            if (++m_voxel[3] > m_region->m_boxes[m_boxIdx].maxCorner()[3]) {
-              m_voxel[3] = m_region->m_boxes[m_boxIdx].minCorner()[3];
-              if (++m_voxel[4] > m_region->m_boxes[m_boxIdx].maxCorner()[4]) {
-                m_voxel[4] = m_region->m_boxes[m_boxIdx].minCorner()[4];
-                if (++m_voxel[5] > m_region->m_boxes[m_boxIdx].maxCorner()[5]) {
+      if (++m_voxel[0] > m_region->m_boxes[m_boxIdx].maxCorner[0]) {
+        m_voxel[0] = m_region->m_boxes[m_boxIdx].minCorner[0];
+        if (++m_voxel[1] > m_region->m_boxes[m_boxIdx].maxCorner[1]) {
+          m_voxel[1] = m_region->m_boxes[m_boxIdx].minCorner[1];
+          if (++m_voxel[2] > m_region->m_boxes[m_boxIdx].maxCorner[2]) {
+            m_voxel[2] = m_region->m_boxes[m_boxIdx].minCorner[2];
+            if (++m_voxel[3] > m_region->m_boxes[m_boxIdx].maxCorner[3]) {
+              m_voxel[3] = m_region->m_boxes[m_boxIdx].minCorner[3];
+              if (++m_voxel[4] > m_region->m_boxes[m_boxIdx].maxCorner[4]) {
+                m_voxel[4] = m_region->m_boxes[m_boxIdx].minCorner[4];
+                if (++m_voxel[5] > m_region->m_boxes[m_boxIdx].maxCorner[5]) {
                   m_boxIdx++;
                   // goto min corner of next box
                   if (m_boxIdx == m_region->m_boxes.size()) {
                     m_voxel.set(0, 0, 0, 0, 0);
                   } else {
-                    m_voxel = m_region->m_boxes[m_boxIdx].minCorner();
+                    m_voxel = m_region->m_boxes[m_boxIdx].minCorner;
                   }
                 }
               }
@@ -116,15 +116,15 @@ public:
   inline void clear()
   { m_boxes.clear(); }
 
-  inline bool isEmpty() const
+  [[nodiscard]] inline bool isEmpty() const
   { return m_boxes.empty(); }
 
   void getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& maxCoord) const;
 
-  inline const_iterator begin() const
+  [[nodiscard]] inline const_iterator begin() const
   { return const_iterator(this, 0); }
 
-  inline const_iterator end() const
+  [[nodiscard]] inline const_iterator end() const
   { return const_iterator(this, m_boxes.size()); }
 
   bool containsVoxel(const ZVoxelCoordinate& v);
@@ -165,7 +165,9 @@ protected:
   }
 
 private:
-  friend std::ostream& operator<<(std::ostream& s, const ZVoxelRegion& m);
+  friend void tag_invoke(const json::value_from_tag&, json::value& jv, const ZVoxelRegion& vr);
+
+  friend ZVoxelRegion tag_invoke(const json::value_to_tag<ZVoxelRegion>&, const json::value& jv);
 
   template<typename T> friend
   class impl::voxel_iter;
@@ -173,7 +175,25 @@ private:
   std::vector<BoxType> m_boxes;
 };
 
-std::ostream& operator<<(std::ostream& s, const ZVoxelRegion& m);
+inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZVoxelRegion& vr)
+{
+  auto& ja = jv.emplace_array();
+  ja.reserve(vr.m_boxes.size());
+  for (const auto& box : vr.m_boxes) {
+    ja.push_back(json::value_from(box));
+  }
+}
+
+inline ZVoxelRegion tag_invoke(const json::value_to_tag<ZVoxelRegion>&, const json::value& jv)
+{
+  ZVoxelRegion res;
+  const auto& ja = jv.as_array();
+  res.m_boxes.reserve(ja.size());
+  for (const auto& v : ja) {
+    res.m_boxes.push_back(json::value_to<ZVoxelRegion::BoxType>(v));
+  }
+  return res;
+}
 
 } // namespace nim
 

@@ -78,10 +78,10 @@ public:
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   [[nodiscard]] glm::vec3 physicalLUF() const
-  { return glm::vec3(m_notTransformedBoundBox.minCorner()); }
+  { return glm::vec3(m_notTransformedBoundBox.minCorner); }
 
   [[nodiscard]] glm::vec3 physicalRDB() const
-  { return glm::vec3(m_notTransformedBoundBox.maxCorner()); }
+  { return glm::vec3(m_notTransformedBoundBox.maxCorner); }
 
   [[nodiscard]] glm::vec3 physicalLDF() const
   { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }

@@ -28,7 +28,11 @@ struct ZImgInfo
 
   ZImgInfo& operator=(const ZImgInfo&) = default;
 
-  [[nodiscard]] QString toQString() const;
+  [[nodiscard]] inline QString toQString() const
+  { return jsonToQString(*this); }
+
+  [[nodiscard]] inline std::string toString() const
+  { return jsonToString(*this); }
 
   // return img data type as string "float32", "int8" ...
   [[nodiscard]] QString typeAsQString() const

@@ -299,7 +299,7 @@ void Z3DGlobalParameters::cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double
   if (bound.empty()) {
     return;
   }
-  glm::dvec3 cent = (bound.minCorner() + bound.maxCorner()) / 2.;
+  glm::dvec3 cent = (bound.minCorner + bound.maxCorner) / 2.;
   auto bd = bound;
   bd.expand(ZBBox<glm::dvec3>(cent - minRadius, cent + minRadius));
   camera.resetCamera(bd, Z3DCamera::ResetOption::PreserveViewVector);
@@ -315,7 +315,7 @@ void Z3DGlobalParameters::cameraPointsTo(const ZBBox<glm::dvec3>& bound)
   if (bound.empty()) {
     return;
   }
-  auto cent = glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.);
+  auto cent = glm::vec3((bound.minCorner + bound.maxCorner) / 2.);
   camera.setCenter(cent);
 }
 

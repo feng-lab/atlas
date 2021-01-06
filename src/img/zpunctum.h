@@ -3,6 +3,7 @@
 #include "zeigenutils.h"
 #include "zimginterface.h"
 #include <QString>
+#include <fmt/core.h>
 #include <cmath>
 #include <list>
 
@@ -79,7 +80,7 @@ public:
   // parameter conf is used to estimate radius of punctum (model punctum as gaussian)
   void updateFromVoxelsList(double conf = 0.95);
 
-  inline bool containsSignal() const
+  [[nodiscard]] inline bool containsSignal() const
   { return m_voxelLocations.rows() > 0 && m_voxelLocations.rows() == m_voxelIntensities.size(); }
 
   // merge input puncta into one punctum,
@@ -95,60 +96,60 @@ public:
 
   // use gmm to split this punctum into num puncta, image signal (voxelLocations and voxelIntensities) must exist, otherwise
   // return empty list. depends on image signal, returned list size might be less than num
-  std::list<ZPunctum> split(int num, double conf = 0.95) const;
+  [[nodiscard]] std::list<ZPunctum> split(int num, double conf = 0.95) const;
 
-  inline double x() const
+  [[nodiscard]] inline double x() const
   { return m_x; }
 
-  inline double y() const
+  [[nodiscard]] inline double y() const
   { return m_y; }
 
-  inline double z() const
+  [[nodiscard]] inline double z() const
   { return m_z; }
 
-  inline double sDevOfIntensity() const
+  [[nodiscard]] inline double sDevOfIntensity() const
   { return m_sDevOfIntensity; }
 
-  inline double maxIntensity() const
+  [[nodiscard]] inline double maxIntensity() const
   { return m_maxIntensity; }
 
-  inline double meanIntensity() const
+  [[nodiscard]] inline double meanIntensity() const
   { return m_meanIntensity; }
 
-  inline size_t volSize() const
+  [[nodiscard]] inline size_t volSize() const
   { return m_volSize; }
 
-  inline double mass() const
+  [[nodiscard]] inline double mass() const
   { return m_mass; }
 
-  inline double radius() const
+  [[nodiscard]] inline double radius() const
   { return m_radius; }
 
-  inline const QString& name() const
+  [[nodiscard]] inline const QString& name() const
   { return m_name; }
 
-  inline const QString& comment() const
+  [[nodiscard]] inline const QString& comment() const
   { return m_comment; }
 
-  inline const QString& property1() const
+  [[nodiscard]] inline const QString& property1() const
   { return m_property1; }
 
-  inline const QString& property2() const
+  [[nodiscard]] inline const QString& property2() const
   { return m_property2; }
 
-  inline const QString& property3() const
+  [[nodiscard]] inline const QString& property3() const
   { return m_property3; }
 
-  inline const col4& color() const
+  [[nodiscard]] inline const col4& color() const
   { return m_color; }
 
-  inline double score() const
+  [[nodiscard]] inline double score() const
   { return m_score; }
 
-  inline const Eigen::MatrixXi& voxelLocations() const
+  [[nodiscard]] inline const Eigen::MatrixXi& voxelLocations() const
   { return m_voxelLocations; }
 
-  inline const Eigen::VectorXd& voxelIntensities() const
+  [[nodiscard]] inline const Eigen::VectorXd& voxelIntensities() const
   { return m_voxelIntensities; }
 
   inline void setX(double n)
@@ -219,9 +220,13 @@ public:
   inline void updateMass()
   { m_mass = m_volSize * m_meanIntensity; }
 
-  QString toQString() const;
+  [[nodiscard]] inline QString toQString() const
+  { return QString("Puncta (%1): (%2, %3, %4, %5)").arg(m_name).arg(m_x).arg(m_y).arg(m_z).arg(m_radius); }
 
-  inline bool isSelected() const
+  [[nodiscard]] inline std::string toString() const
+  { return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name.toStdString(), m_x, m_y, m_z, m_radius); }
+
+  [[nodiscard]] inline bool isSelected() const
   { return m_selected; }
 
   inline void setSelected(bool v)

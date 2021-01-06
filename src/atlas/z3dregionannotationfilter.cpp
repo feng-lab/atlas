@@ -226,8 +226,8 @@ void Z3DRegionAnnotationFilter::deregisterPickingObjects()
 
 void Z3DRegionAnnotationFilter::updateNotTransformedBoundBoxImpl()
 {
-  m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_regionAnnotationPack->boundBox().minCorner()));
-  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_regionAnnotationPack->boundBox().maxCorner()));
+  m_notTransformedBoundBox.setMinCorner(glm::dvec3(m_regionAnnotationPack->boundBox().minCorner));
+  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_regionAnnotationPack->boundBox().maxCorner));
 }
 
 void Z3DRegionAnnotationFilter::showAllRegions()

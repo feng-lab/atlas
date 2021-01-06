@@ -288,7 +288,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
       bytePerVoxel = 8;
     }
   }
-  ZImgInfo info(m_boundBox.maxCorner().x * scale + 2, m_boundBox.maxCorner().y * scale + 2, m_boundBox.maxCorner().z + 2,
+  ZImgInfo info(m_boundBox.maxCorner.x * scale + 2, m_boundBox.maxCorner.y * scale + 2, m_boundBox.maxCorner.z + 2,
                 1, 1, bytePerVoxel, vf);
   info.voxelSizeUnit = VoxelSizeUnit::um;
   info.voxelSizeX = std::ceil(m_voxelSizeX / scale);
@@ -320,7 +320,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 
 double ZRegionAnnotation::getOptimizedScale() const
 {
-  return std::min(1.0, std::min(2000. / m_boundBox.maxCorner().x, 2000. / m_boundBox.maxCorner().y));
+  return std::min(1.0, std::min(2000. / m_boundBox.maxCorner.x, 2000. / m_boundBox.maxCorner.y));
 }
 
 void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale)

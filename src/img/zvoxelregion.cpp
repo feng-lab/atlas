@@ -5,18 +5,18 @@ namespace nim {
 void ZVoxelRegion::getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& maxCoord) const
 {
   BoxType box;
-  for (size_t i = 0; i < m_boxes.size(); ++i) {
-    box.expand(m_boxes[i]);
+  for (const auto& mbox : m_boxes) {
+    box.expand(mbox);
   }
 
-  minCoord = box.minCorner();
-  maxCoord = box.maxCorner();
+  minCoord = box.minCorner;
+  maxCoord = box.maxCorner;
 }
 
 bool ZVoxelRegion::containsVoxel(const ZVoxelCoordinate& v)
 {
-  for (size_t i = 0; i < m_boxes.size(); ++i) {
-    if (m_boxes[i].contains(v))
+  for (auto& box : m_boxes) {
+    if (box.contains(v))
       return true;
   }
   return false;
@@ -24,8 +24,8 @@ bool ZVoxelRegion::containsVoxel(const ZVoxelCoordinate& v)
 
 ZVoxelRegion& ZVoxelRegion::unite(const ZVoxelRegion& other)
 {
-  for (size_t i = 0; i < other.m_boxes.size(); ++i)
-    addBox(other.m_boxes[i]);
+  for (const auto& box : other.m_boxes)
+    addBox(box);
   return *this;
 }
 
@@ -40,9 +40,9 @@ ZVoxelRegion& ZVoxelRegion::intersect(const ZVoxelRegion& other)
 {
   std::vector<BoxType> currentBoxes;
   currentBoxes.swap(m_boxes);
-  for (size_t i = 0; i < other.m_boxes.size(); ++i) {
-    for (size_t j = 0; j < currentBoxes.size(); ++j) {
-      addBox(nim::intersect(other.m_boxes[i], currentBoxes[j]));
+  for (const auto& box : other.m_boxes) {
+    for (auto& currentBox : currentBoxes) {
+      addBox(nim::intersect(box, currentBox));
     }
   }
   return *this;
@@ -53,14 +53,6 @@ ZVoxelRegion ZVoxelRegion::intersect(const ZVoxelRegion& r1, const ZVoxelRegion&
   ZVoxelRegion res = r1;
   res.intersect(r2);
   return res;
-}
-
-std::ostream& operator<<(std::ostream& s, const ZVoxelRegion& m)
-{
-  for (size_t i = 0; i < m.m_boxes.size(); ++i) {
-    s << "Box " << i << ": " << m << "\n";
-  }
-  return s;
 }
 
 } // namespace nim

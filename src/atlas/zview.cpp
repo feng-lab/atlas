@@ -235,12 +235,12 @@ void ZView::updateBoundBox()
   m_view->updateScaleFactorRange();
   int sliceBefore = m_imgSlice->get();
   int timeBefore = m_imgTime->get();
-  m_imgSlice->setRange(m_boundBox.minCorner().z, m_boundBox.maxCorner().z);
-  m_imgSlice->setVisible(m_boundBox.maxCorner().z > m_boundBox.minCorner().z);
-  m_imgTime->setRange(m_boundBox.minCorner().w, m_boundBox.maxCorner().w);
-  m_imgTime->setVisible(m_boundBox.maxCorner().w > m_boundBox.minCorner().w);
+  m_imgSlice->setRange(m_boundBox.minCorner.z, m_boundBox.maxCorner.z);
+  m_imgSlice->setVisible(m_boundBox.maxCorner.z > m_boundBox.minCorner.z);
+  m_imgTime->setRange(m_boundBox.minCorner.w, m_boundBox.maxCorner.w);
+  m_imgTime->setVisible(m_boundBox.maxCorner.w > m_boundBox.minCorner.w);
   if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
-    m_imgSlice->set((m_boundBox.minCorner().z + m_boundBox.maxCorner().z) / 2);
+    m_imgSlice->set((m_boundBox.minCorner.z + m_boundBox.maxCorner.z) / 2);
     fitContentIntoWindow();
   }
   m_numObjsBefore = m_doc.numObjs();
@@ -248,7 +248,7 @@ void ZView::updateBoundBox()
 
   m_zoomInAction->setEnabled(m_doc.hasObj());
   m_zoomOutAction->setEnabled(m_doc.hasObj());
-  m_imgViewStyleActionGroup->setEnabled(m_doc.hasObj() && m_boundBox.maxCorner().z > m_boundBox.minCorner().z);
+  m_imgViewStyleActionGroup->setEnabled(m_doc.hasObj() && m_boundBox.maxCorner.z > m_boundBox.minCorner.z);
 
   if (m_imgSlice->get() != sliceBefore || m_imgTime->get() != timeBefore)
     sliceChanged();
@@ -419,9 +419,9 @@ void ZView::estimateMontageColumns() const
   if (currentNCols == 0) {
     m_montageColumns->blockSignals(true);
   }
-  auto width = m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1;
-  auto height = m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1;
-  auto depth = m_boundBox.maxCorner().z - m_boundBox.minCorner().z + 1;
+  auto width = m_boundBox.maxCorner.x - m_boundBox.minCorner.x + 1;
+  auto height = m_boundBox.maxCorner.y - m_boundBox.minCorner.y + 1;
+  auto depth = m_boundBox.maxCorner.z - m_boundBox.minCorner.z + 1;
   if (depth >= 1) {
     int bestNCols = 0;
     double bestDist = std::numeric_limits<double>::max();
@@ -790,9 +790,9 @@ void ZView::updateViewportPara() const
 
 void ZView::updateSceneRectFromBoundBox()
 {
-  QRectF sceneRect(m_boundBox.minCorner().x, m_boundBox.minCorner().y,
-                   m_boundBox.maxCorner().x - m_boundBox.minCorner().x + 1,
-                   m_boundBox.maxCorner().y - m_boundBox.minCorner().y + 1);
+  QRectF sceneRect(m_boundBox.minCorner.x, m_boundBox.minCorner.y,
+                   m_boundBox.maxCorner.x - m_boundBox.minCorner.x + 1,
+                   m_boundBox.maxCorner.y - m_boundBox.minCorner.y + 1);
   if (sceneRect != m_scene->sceneRect()) {
     m_scene->setSceneRect(sceneRect);
   }
@@ -801,7 +801,7 @@ void ZView::updateSceneRectFromBoundBox()
     estimateMontageColumns();
   }
   auto nCols = m_montageColumns->get();
-  auto nRows = (m_boundBox.maxCorner().z - m_boundBox.minCorner().z + nCols) / nCols;
+  auto nRows = (m_boundBox.maxCorner.z - m_boundBox.minCorner.z + nCols) / nCols;
   sceneRect = QRectF(sceneRect.x(), sceneRect.y(), sceneRect.width() * nCols, sceneRect.height() * nRows);
   if (sceneRect != m_montageScene->sceneRect()) {
     m_montageScene->setSceneRect(sceneRect);
@@ -820,7 +820,7 @@ void ZView::updateMontageScene()
 
   auto rgn = m_view->getCurrrentlyVisibleRegion();
 
-  for (auto z = 0; z <= m_boundBox.maxCorner().z - m_boundBox.minCorner().z; ++z) {
+  for (auto z = 0; z <= m_boundBox.maxCorner.z - m_boundBox.minCorner.z; ++z) {
     auto r = z / m_montageColumns->get();
     auto c = z % m_montageColumns->get();
     QRectF sceneRgn(c * m_scene->sceneRect().width(), r * m_scene->sceneRect().height(),
@@ -835,7 +835,7 @@ void ZView::updateMontageScene()
     QPainter painter(&img);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
     for (const auto& view : m_objViews) {
-      m_montageZ = z + m_boundBox.minCorner().z;
+      m_montageZ = z + m_boundBox.minCorner.z;
       view->setNormalView(m_montageZ, m_imgTime->get());
     }
     m_scene->render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);

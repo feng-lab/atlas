@@ -92,24 +92,6 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
 //  return res.str();
 //}
 
-QString ZImgInfo::toQString() const
-{
-  return "width: " + QString::number(width) +
-         ", height: " + QString::number(height) +
-         ", depth: " + QString::number(depth) +
-         ", numChannels: " + QString::number(numChannels) +
-         ", numTimes: " + QString::number(numTimes) +
-         //", numLocations: " + QString::number(numLocations) +
-         ", bytesPerVoxel: " + QString::number(bytesPerVoxel) +
-         ", voxelFormat: " + enumToString(voxelFormat) +
-         ", voxelSizeUnit: " + enumToString(voxelSizeUnit) +
-         ", voxelSizeX: " + QString::number(voxelSizeX, 'g', QLocale::FloatingPointShortest) +
-         ", voxelSizeY: " + QString::number(voxelSizeY, 'g', QLocale::FloatingPointShortest) +
-         ", voxelSizeZ: " + QString::number(voxelSizeZ, 'g', QLocale::FloatingPointShortest) +
-         (lastChannelIsAlphaChannel ? QString(", alphaChannel: %1").arg(numChannels - 1) : QString("")) +
-         (validBitCount > 0 ? QString(", validBitCount: %1").arg(validBitCount) : QString(""));
-}
-
 QString ZImgInfo::displayChannelName(size_t c) const
 {
   QString res;

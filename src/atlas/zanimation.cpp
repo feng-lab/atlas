@@ -787,7 +787,7 @@ void ZAnimation::buildDisplayPacks()
     if (obj->objJsonValue.is_string()) {
       objInfo = asQString(obj->objJsonValue);
     } else if (obj->objJsonValue.is_object()) {
-      objInfo = formatJsonToQString(obj->objJsonValue);
+      objInfo = jsonToFormattedQString(obj->objJsonValue);
       QStringList infoList = objInfo.split("\n");
       if (infoList.size() > 6) {
         QStringList::iterator it = infoList.begin() + 6;

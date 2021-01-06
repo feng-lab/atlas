@@ -192,7 +192,7 @@ void Z3DView::updateBoundBox()
     m_boundBox.setMinCorner(glm::dvec3(0.0));
     m_boundBox.setMaxCorner(glm::dvec3(.01));
   }
-  m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner(), m_boundBox.minCorner() + .01));
+  m_boundBox.setMaxCorner(glm::max(m_boundBox.maxCorner, m_boundBox.minCorner + .01));
   if (m_numObjsBefore == 0 && m_doc.numObjs() > 0) {
     resetCamera();
   } else {
@@ -201,14 +201,14 @@ void Z3DView::updateBoundBox()
   m_numObjsBefore = m_doc.numObjs();
 
   // update global cut
-  m_globalParas->xCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().x) - 1,
-                                           std::ceil(m_boundBox.maxCorner().x) + 1);
+  m_globalParas->xCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.x) - 1,
+                                           std::ceil(m_boundBox.maxCorner.x) + 1);
 
-  m_globalParas->yCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().y) - 1,
-                                           std::ceil(m_boundBox.maxCorner().y) + 1);
+  m_globalParas->yCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.y) - 1,
+                                           std::ceil(m_boundBox.maxCorner.y) + 1);
 
-  m_globalParas->zCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner().z) - 1,
-                                           std::ceil(m_boundBox.maxCorner().z) + 1);
+  m_globalParas->zCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.z) - 1,
+                                           std::ceil(m_boundBox.maxCorner.z) + 1);
 
 }
 

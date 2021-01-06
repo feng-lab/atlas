@@ -126,11 +126,6 @@ std::list<ZPunctum> ZPunctum::split(int num, double conf) const
   return res;
 }
 
-QString ZPunctum::toQString() const
-{
-  return QString("Puncta (%1): (%2, %3, %4)").arg(m_name).arg(m_x).arg(m_y).arg(m_z);
-}
-
 void ZPunctum::translate(double dx, double dy, double dz)
 {
   m_x += dx;

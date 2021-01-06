@@ -11,21 +11,21 @@ Q_OBJECT
 public:
 
   // log output
-  void setLogFile(const QString& logFile)
+  inline void setLogFile(const QString& logFile)
   { m_logFile = logFile; }
 
   void run();
 
   void runInPython();
 
-  void loadTask(const QString& file)
+  inline void loadTask(const QString& file)
   {
     auto jo = loadJsonObject(file);
     m_logFile = json::value_to<QString>(jo.at("log_file"));
     read(jo);
   }
 
-  void saveTask(const QString& file) const
+  inline void saveTask(const QString& file) const
   {
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);
@@ -33,12 +33,20 @@ public:
     saveJsonObject(jo, file);
   }
 
-  [[nodiscard]] QString toQString() const
+  [[nodiscard]] inline QString toQString() const
   {
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);
     write(jo);
-    return formatJsonToQString(jo);
+    return jsonToFormattedQString(jo);
+  }
+
+  [[nodiscard]] inline std::string toString() const
+  {
+    json::object jo;
+    jo["log_file"] = json::value_from(m_logFile);
+    write(jo);
+    return jsonToFormattedString(jo);
   }
 
 signals:

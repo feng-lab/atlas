@@ -1848,17 +1848,17 @@ void testLogDataSupport()
   std::array<int, 3> a2 = {1, 2, 3};
   LOG(INFO) << v4;
   LOG(INFO) << m4;
-  LOG(INFO) << a2;
-  auto t = std::make_tuple(1.7, 'D', "Ralph Wiggum");
-  LOG(INFO) << t;
+  LOG(INFO) << json::value_from(a2);
+  auto t = std::make_tuple(1.7, 'D', std::string("Ralph Wiggum"));
+  LOG(INFO) << json::value_from(t);
   const std::map<std::string, int> init {
     {"this", 100},
     {"can", 100},
     {"be", 100},
     {"const", 100},
   };
-  LOG(INFO) << init;
-  LOG(INFO) << v4 << m4 << a2 << t << init;
+  LOG(INFO) << json::value_from(init);
+  LOG(INFO) << v4 << m4 << json::value_from(a2) << json::value_from(t) << json::value_from(init);
 }
 
 }  // namespace nim

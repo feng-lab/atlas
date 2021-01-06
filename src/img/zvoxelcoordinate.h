@@ -2,6 +2,7 @@
 
 #include "zglobal.h"
 #include "zrandom.h"
+#include "zjson.h"
 #include <sstream>
 #include <utility>
 #include <type_traits>
@@ -278,7 +279,12 @@ struct ZVoxelCoordinate
 
   [[nodiscard]] inline QString toQString() const
   {
-    return QString("(%1,%2,%3,%4,%5)").arg(x).arg(y).arg(z).arg(c).arg(t);
+    return jsonToQString(*this);
+  }
+
+  [[nodiscard]] inline std::string toString() const
+  {
+    return jsonToString(*this);
   }
 
   // ttsize[0] to ttsize[4] are the sizes of x to t, advance current coord to next valid coord,

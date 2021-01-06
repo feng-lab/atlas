@@ -48,14 +48,14 @@ void ZImgRegion::resolveRegionEnd(const ZImgInfo& info)
 //  return res.str();
 //}
 
-QString ZImgRegion::toQString() const
-{
-  return QString("x: [%1, %2)").arg(start.x).arg(end.x) %
-         QString(", y: [%1, %2)").arg(start.y).arg(end.y) %
-         QString(", z: [%1, %2)").arg(start.z).arg(end.z) %
-         QString(", c: [%1, %2)").arg(start.c).arg(end.c) %
-         QString(", t: [%1, %2)").arg(start.t).arg(end.t);
-}
+//QString ZImgRegion::toQString() const
+//{
+//  return QString("x: [%1, %2)").arg(start.x).arg(end.x) %
+//         QString(", y: [%1, %2)").arg(start.y).arg(end.y) %
+//         QString(", z: [%1, %2)").arg(start.z).arg(end.z) %
+//         QString(", c: [%1, %2)").arg(start.c).arg(end.c) %
+//         QString(", t: [%1, %2)").arg(start.t).arg(end.t);
+//}
 
 ZImgInfo ZImgRegion::clip(const ZImgInfo& info) const
 {

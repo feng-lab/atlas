@@ -110,7 +110,11 @@ struct ZImgRegion
            start.t == 0 && (end.t == -1 || end.t == static_cast<value_type>(info.numTimes));
   }
 
-  [[nodiscard]] QString toQString() const;
+  [[nodiscard]] inline QString toQString() const
+  { return jsonToQString(*this); }
+
+  [[nodiscard]] inline std::string toString() const
+  { return jsonToString(*this); }
 
   [[nodiscard]] ZImgInfo clip(const ZImgInfo& info) const;
 

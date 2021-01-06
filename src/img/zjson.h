@@ -19,7 +19,7 @@ namespace json = boost::json;
 
 inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QString& str)
 {
-  jv = qUtf8Printable(str);
+  jv.emplace_string() = qUtf8Printable(str);
 }
 
 inline QString tag_invoke(const json::value_to_tag<QString>&, const json::value& jv)
@@ -51,9 +51,37 @@ namespace nim {
 
 void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr);
 
-QString formatJsonToQString(const json::value& jv);
+QString jsonToFormattedQString(const json::value& jv);
 
-std::string formatJsonToString(const json::value& jv);
+std::string jsonToFormattedString(const json::value& jv);
+
+template<typename T>
+inline QString jsonToFormattedQString(const T& v)
+{
+  return jsonToFormattedQString(json::value_from(v));
+}
+
+template<typename T>
+inline std::string jsonToFormattedString(const T& v)
+{
+  return jsonToFormattedString(json::value_from(v));
+}
+
+QString jsonToQString(const json::value& jv);
+
+std::string jsonToString(const json::value& jv);
+
+template<typename T>
+inline QString jsonToQString(const T& v)
+{
+  return jsonToQString(json::value_from(v));
+}
+
+template<typename T>
+inline std::string jsonToString(const T& v)
+{
+  return jsonToString(json::value_from(v));
+}
 
 json::object loadJsonObject(const QString& file);
 

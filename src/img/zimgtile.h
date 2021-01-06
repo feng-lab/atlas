@@ -38,10 +38,10 @@ public:
   { return m_info; }
 
   inline const ZVoxelCoordinate& location() const
-  { return m_box.minCorner(); }
+  { return m_box.minCorner; }
 
   inline const ZVoxelCoordinate& maxCoord() const
-  { return m_box.maxCorner(); }
+  { return m_box.maxCorner; }
 
   inline bool contains(const ZVoxelCoordinate& v) const
   { return m_box.contains(v); }
@@ -50,7 +50,7 @@ public:
   template<typename TVoxel>
   inline TVoxel value(const ZVoxelCoordinate& v) const
   {
-    return *(m_imgCache->data<TVoxel>(v - m_box.minCorner()));
+    return *(m_imgCache->data<TVoxel>(v - m_box.minCorner));
   }
 
 private:

@@ -229,7 +229,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
       key.m_split = keyObj.at("split").as_bool();
       m_value.m_keys.emplace_back(key, false);
     } else {
-      LOG(WARNING) << "Invalid transfer function key " << formatJsonToQString(keyObj);
+      LOG(WARNING) << "Invalid transfer function key " << jsonToFormattedQString(keyObj);
     }
   }
   m_value.invalidateTexture();

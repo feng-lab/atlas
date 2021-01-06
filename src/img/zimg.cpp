@@ -99,22 +99,22 @@ ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes
   }
 }
 
-QString ZImgSource::toQString() const
-{
-  QString res;
-  if (filenames.size() > 1) {
-    res = filenames[0] + QString(" %1 Sequence Scene %2").arg(enumToString(catDim)).arg(scene);
-    if (!region.isDefault()) {
-      res += QString(" Region %1").arg(region.toQString());
-    }
-  } else if (filenames.size() == 1) {
-    res = filenames[0] + QString(" Scene %2").arg(scene);
-    if (!region.isDefault()) {
-      res += QString(" Region %1").arg(region.toQString());
-    }
-  }
-  return res;
-}
+//QString ZImgSource::toQString() const
+//{
+//  QString res;
+//  if (filenames.size() > 1) {
+//    res = filenames[0] + QString(" %1 Sequence Scene %2").arg(enumToString(catDim)).arg(scene);
+//    if (!region.isDefault()) {
+//      res += QString(" Region %1").arg(region.toQString());
+//    }
+//  } else if (filenames.size() == 1) {
+//    res = filenames[0] + QString(" Scene %2").arg(scene);
+//    if (!region.isDefault()) {
+//      res += QString(" Region %1").arg(region.toQString());
+//    }
+//  }
+//  return res;
+//}
 
 void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& imgSource)
 {

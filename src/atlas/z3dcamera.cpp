@@ -45,7 +45,7 @@ void Z3DCamera::setTileFrustum(double left, double right, double bottom, double 
 
 void Z3DCamera::resetCamera(const ZBBox<glm::dvec3>& bound, ResetOption options)
 {
-  glm::vec3 center = glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.0);
+  glm::vec3 center = glm::vec3((bound.minCorner + bound.maxCorner) / 2.0);
 
   if (!is_flag_set(options, ResetOption::PreserveCenterDistance)) {
     auto boundSize = bound.size();
@@ -104,12 +104,12 @@ void Z3DCamera::resetCameraNearFarPlane(const ZBBox<glm::dvec3>& bound)
   double d = -(a * m_eye[0] + b * m_eye[1] + c * m_eye[2]);
 
   double bd[6];
-  bd[0] = bound.minCorner().x;
-  bd[1] = bound.maxCorner().x;
-  bd[2] = bound.minCorner().y;
-  bd[3] = bound.maxCorner().y;
-  bd[4] = bound.minCorner().z;
-  bd[5] = bound.maxCorner().z;
+  bd[0] = bound.minCorner.x;
+  bd[1] = bound.maxCorner.x;
+  bd[2] = bound.minCorner.y;
+  bd[3] = bound.maxCorner.y;
+  bd[4] = bound.minCorner.z;
+  bd[5] = bound.maxCorner.z;
 
   // Set the max near clipping plane and the min far clipping plane
   double range[2];

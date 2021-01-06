@@ -192,10 +192,10 @@ QRectF ZSwcSkeletonGraphicsItem::boundingRect() const
 {
   qreal penWidth = 1 * m_sizeScale;
   auto boundBox = m_swcPack.boundBox();
-  return QRectF(boundBox.minCorner().x - penWidth / 2,
-                boundBox.minCorner().y - penWidth / 2,
-                boundBox.maxCorner().x - boundBox.minCorner().x + penWidth,
-                boundBox.maxCorner().y - boundBox.minCorner().y + penWidth);
+  return QRectF(boundBox.minCorner.x - penWidth / 2,
+                boundBox.minCorner.y - penWidth / 2,
+                boundBox.maxCorner.x - boundBox.minCorner.x + penWidth,
+                boundBox.maxCorner.y - boundBox.minCorner.y + penWidth);
 }
 
 void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget* widget)

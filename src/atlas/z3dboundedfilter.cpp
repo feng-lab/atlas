@@ -262,8 +262,8 @@ ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
   auto notTransformedBBAfterCutting = notTransformedBoundBoxAfterClipping();
   if (!notTransformedBBAfterCutting.empty()) {
     glm::dmat4 tfm(m_rendererBase.coordTransform());
-    auto physicalLUF = notTransformedBBAfterCutting.minCorner();
-    auto physicalRDB = notTransformedBBAfterCutting.maxCorner();
+    auto physicalLUF = notTransformedBBAfterCutting.minCorner;
+    auto physicalRDB = notTransformedBBAfterCutting.maxCorner;
     res.expand(glm::applyMatrix(tfm, physicalLUF));
     res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalLUF.x, physicalRDB.y, physicalRDB.z)));
     res.expand(glm::applyMatrix(tfm, glm::dvec3(physicalLUF.x, physicalRDB.y, physicalLUF.z)));
@@ -279,8 +279,8 @@ ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
 ZBBox<glm::dvec3> Z3DBoundedFilter::notTransformedBoundBoxAfterClipping() const
 {
   ZBBox<glm::dvec3> res = notTransformedBoundBox();
-  res.setMinCorner(glm::max(res.minCorner(), glm::dvec3(m_xCut.get().x, m_yCut.get().x, m_zCut.get().x)));
-  res.setMaxCorner(glm::min(res.maxCorner(), glm::dvec3(m_xCut.get().y, m_yCut.get().y, m_zCut.get().y)));
+  res.setMinCorner(glm::max(res.minCorner, glm::dvec3(m_xCut.get().x, m_yCut.get().x, m_zCut.get().x)));
+  res.setMaxCorner(glm::min(res.maxCorner, glm::dvec3(m_xCut.get().y, m_yCut.get().y, m_zCut.get().y)));
   return res;
 }
 
@@ -404,14 +404,14 @@ void Z3DBoundedFilter::initializeCutRange()
 {
   m_canUpdateClipPlane = false;
   const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
-  m_xCut.setRange(std::floor(bound.minCorner().x) - 1,
-                  std::ceil(bound.maxCorner().x) + 1);
+  m_xCut.setRange(std::floor(bound.minCorner.x) - 1,
+                  std::ceil(bound.maxCorner.x) + 1);
   m_xCut.set(m_xCut.range());
-  m_yCut.setRange(std::floor(bound.minCorner().y) - 1,
-                  std::ceil(bound.maxCorner().y) + 1);
+  m_yCut.setRange(std::floor(bound.minCorner.y) - 1,
+                  std::ceil(bound.maxCorner.y) + 1);
   m_yCut.set(m_yCut.range());
-  m_zCut.setRange(std::floor(bound.minCorner().z) - 1,
-                  std::ceil(bound.maxCorner().z) + 1);
+  m_zCut.setRange(std::floor(bound.minCorner.z) - 1,
+                  std::ceil(bound.maxCorner.z) + 1);
   m_zCut.set(m_zCut.range());
   m_canUpdateClipPlane = true;
   m_rendererBase.setClipPlanes(nullptr);
@@ -420,7 +420,7 @@ void Z3DBoundedFilter::initializeCutRange()
 void Z3DBoundedFilter::initializeRotationCenter()
 {
   const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
-  m_rendererBase.setRotationCenter(glm::vec3((bound.minCorner() + bound.maxCorner()) / 2.0));
+  m_rendererBase.setRotationCenter(glm::vec3((bound.minCorner + bound.maxCorner) / 2.0));
 }
 
 void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
@@ -434,12 +434,12 @@ void Z3DBoundedFilter::renderBoundBox(Z3DEye eye)
 
 void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::vector<glm::vec3>& lines)
 {
-  float xmin = bound.minCorner().x;
-  float xmax = bound.maxCorner().x;
-  float ymin = bound.minCorner().y;
-  float ymax = bound.maxCorner().y;
-  float zmin = bound.minCorner().z;
-  float zmax = bound.maxCorner().z;
+  float xmin = bound.minCorner.x;
+  float xmax = bound.maxCorner.x;
+  float ymin = bound.minCorner.y;
+  float ymax = bound.maxCorner.y;
+  float zmin = bound.minCorner.z;
+  float zmax = bound.maxCorner.z;
   lines.emplace_back(xmin, ymin, zmin);
   lines.emplace_back(xmin, ymin, zmax);
   lines.emplace_back(xmin, ymax, zmin);
@@ -528,12 +528,12 @@ void Z3DBoundedFilter::expandCutRange()
   bool noHighYCut = m_yCut.upperValue() == m_yCut.maximum();
   bool noLowZCut = m_zCut.lowerValue() == m_zCut.minimum();
   bool noHighZCut = m_zCut.upperValue() == m_zCut.maximum();
-  m_xCut.setRange(std::min(m_xCut.minimum(), float(std::floor(bound.minCorner().x) - 1)),
-                  std::max(m_xCut.maximum(), float(std::ceil(bound.maxCorner().x) + 1)));
-  m_yCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner().y) - 1)),
-                  std::max(m_yCut.maximum(), float(std::ceil(bound.maxCorner().y) + 1)));
-  m_zCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner().z) - 1)),
-                  std::max(m_zCut.maximum(), float(std::ceil(bound.maxCorner().z) + 1)));
+  m_xCut.setRange(std::min(m_xCut.minimum(), float(std::floor(bound.minCorner.x) - 1)),
+                  std::max(m_xCut.maximum(), float(std::ceil(bound.maxCorner.x) + 1)));
+  m_yCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner.y) - 1)),
+                  std::max(m_yCut.maximum(), float(std::ceil(bound.maxCorner.y) + 1)));
+  m_zCut.setRange(std::min(m_yCut.minimum(), float(std::floor(bound.minCorner.z) - 1)),
+                  std::max(m_zCut.maximum(), float(std::ceil(bound.maxCorner.z) + 1)));
   float xCutLow = noLowXCut ? m_xCut.minimum() : m_xCut.get().x;
   float xCutHigh = noHighXCut ? m_xCut.maximum() : m_xCut.get().y;
   float yCutLow = noLowYCut ? m_yCut.minimum() : m_yCut.get().x;
@@ -560,7 +560,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBox()
     m_baseBoundBoxRenderer.setData(&m_axisAlignedBoundBoxLines);
   }
 
-  m_center = glm::vec3((m_axisAlignedBoundBox.minCorner() + m_axisAlignedBoundBox.maxCorner()) / 2.0);
+  m_center = glm::vec3((m_axisAlignedBoundBox.minCorner + m_axisAlignedBoundBox.maxCorner) / 2.0);
 
   makeSelectionGeometries();
   m_handleValid = false;
@@ -629,12 +629,12 @@ void Z3DBoundedFilter::makeSelectionGeometries()
   std::vector<glm::vec3> lowcoords;
   std::vector<glm::vec3> highcoords;
   double bd[6];
-  bd[0] = m_selectionBoundBox.minCorner().x;
-  bd[1] = m_selectionBoundBox.maxCorner().x;
-  bd[2] = m_selectionBoundBox.minCorner().y;
-  bd[3] = m_selectionBoundBox.maxCorner().y;
-  bd[4] = m_selectionBoundBox.minCorner().z;
-  bd[5] = m_selectionBoundBox.maxCorner().z;
+  bd[0] = m_selectionBoundBox.minCorner.x;
+  bd[1] = m_selectionBoundBox.maxCorner.x;
+  bd[2] = m_selectionBoundBox.minCorner.y;
+  bd[3] = m_selectionBoundBox.maxCorner.y;
+  bd[4] = m_selectionBoundBox.minCorner.z;
+  bd[5] = m_selectionBoundBox.maxCorner.z;
   for (int k = 0; k < 2; ++k) {
     for (int j = 0; j < 2; ++j) {
       for (int i = 0; i < 2; ++i) {

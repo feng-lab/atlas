@@ -70,17 +70,17 @@ void ZObjFilter::removeParameter(ZParameter* para)
 
 void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const
 {
-  QRectF rect(boundBox.minCorner().x, boundBox.minCorner().y,
-              boundBox.maxCorner().x - boundBox.minCorner().x,
-              boundBox.maxCorner().y - boundBox.minCorner().y);
+  QRectF rect(boundBox.minCorner.x, boundBox.minCorner.y,
+              boundBox.maxCorner.x - boundBox.minCorner.x,
+              boundBox.maxCorner.y - boundBox.minCorner.y);
   QTransform trans = getQTransform();
   QRectF mappedRect = trans.mapRect(rect);
   boundBox.setMinCorner(glm::ivec4(std::floor(mappedRect.left()), std::floor(mappedRect.top()),
-                                   m_offsetPara.get().x + boundBox.minCorner().z,
-                                   m_offsetPara.get().y + boundBox.minCorner().w));
+                                   m_offsetPara.get().x + boundBox.minCorner.z,
+                                   m_offsetPara.get().y + boundBox.minCorner.w));
   boundBox.setMaxCorner(glm::ivec4(std::ceil(mappedRect.right()), std::ceil(mappedRect.bottom()),
-                                   m_offsetPara.get().x + boundBox.maxCorner().z,
-                                   m_offsetPara.get().y + boundBox.maxCorner().w));
+                                   m_offsetPara.get().x + boundBox.maxCorner.z,
+                                   m_offsetPara.get().y + boundBox.maxCorner.w));
 }
 
 QTransform ZObjFilter::getQTransform() const

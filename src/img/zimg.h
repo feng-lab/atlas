@@ -396,7 +396,11 @@ struct ZImgSource
     return !(*this == other);
   }
 
-  [[nodiscard]] QString toQString() const;
+  [[nodiscard]] inline QString toQString() const
+  { return jsonToQString(*this); }
+
+  [[nodiscard]] inline std::string toString() const
+  { return jsonToString(*this); }
 
   QStringList filenames;
   Dimension catDim = Dimension::Z;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zglobal.h"
+#include "zjson.h"
 
 namespace nim {
 
@@ -257,6 +258,12 @@ struct col4
 
   inline const value_type& operator[](size_t i) const
   { return (&r)[i]; }
+
+  [[nodiscard]] inline QString toQString() const
+  { return jsonToQString(*this); }
+
+  [[nodiscard]] inline std::string toString() const
+  { return jsonToString(*this); }
 };
 
 struct Location

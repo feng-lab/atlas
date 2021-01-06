@@ -41,7 +41,7 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  QString toQString() const override
+  inline QString toQString() const override
   { return m_tform.toQString(); }
 
   ZImageTransform* clone() const override;

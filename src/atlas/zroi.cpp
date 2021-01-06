@@ -745,19 +745,19 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
 {
   ZImg img;
   const auto& bBox = boundBox();
-  if (bBox.minCorner().z == bBox.maxCorner().z) {
-    img = ZImg(ZImgInfo(bBox.maxCorner().x * scale + 3, bBox.maxCorner().y * scale + 3, 1));
+  if (bBox.minCorner.z == bBox.maxCorner.z) {
+    img = ZImg(ZImgInfo(bBox.maxCorner.x * scale + 3, bBox.maxCorner.y * scale + 3, 1));
     const QPainterPath& path = slicePaintPath(cbegin()->first, scale);
     auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
     img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start));
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner().x * scale + 1, 0, bBox.maxCorner().y * scale + 1, 0, 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scale + 1, 0, bBox.maxCorner.y * scale + 1, 0, 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
   } else {
-    img = ZImg(ZImgInfo(bBox.maxCorner().x * scale + 3, bBox.maxCorner().y * scale + 3, bBox.maxCorner().z + 3));
+    img = ZImg(ZImgInfo(bBox.maxCorner.x * scale + 3, bBox.maxCorner.y * scale + 3, bBox.maxCorner.z + 3));
     std::map<size_t, ZImg> distMapImgs;
     std::vector<size_t> srcSlices;
     ZImgSignedDistanceMap<> distMap;
@@ -820,7 +820,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner().x * scale + 1, 0, bBox.maxCorner().y * scale + 1, 0, bBox.maxCorner().z + 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scale + 1, 0, bBox.maxCorner.y * scale + 1, 0, bBox.maxCorner.z + 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
@@ -1129,13 +1129,13 @@ void ZROI::pasteROIToCoord(int slice, QPointF point, const ZBBox<glm::ivec4>& sr
 
   std::map<int, ZSliceROI> sliceROIs;
   for (const auto&[s, sliceROI] : m_sliceROICopy) {
-    auto targetSlice = s + slice - srcBoundBox.minCorner().z;
+    auto targetSlice = s + slice - srcBoundBox.minCorner.z;
     sliceROIs[targetSlice] = sliceROI;
     if (hFlip || vFlip) {
       sliceROIs[targetSlice].flipAround(point.x(), point.y(), hFlip, vFlip);
     } else {
-      sliceROIs[targetSlice].translate(point.x() - srcBoundBox.minCorner().x,
-                                       point.y() - srcBoundBox.minCorner().y);
+      sliceROIs[targetSlice].translate(point.x() - srcBoundBox.minCorner.x,
+                                       point.y() - srcBoundBox.minCorner.y);
     }
   }
 
