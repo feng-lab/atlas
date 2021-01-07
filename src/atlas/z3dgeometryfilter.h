@@ -17,22 +17,22 @@ public:
   virtual void renderPicking(Z3DEye /*unused*/)
   {}
 
-  bool isStayOnTop() const
+  [[nodiscard]] bool isStayOnTop() const
   { return m_stayOnTop.get(); }
 
   void setStayOnTop(bool s)
   { m_stayOnTop.set(s); }
 
-  glm::mat4 coordTransform() const
+  [[nodiscard]] glm::mat4 coordTransform() const
   { return m_rendererBase.coordTransform(); }
 
-  float opacity() const
+  [[nodiscard]] float opacity() const
   { return m_rendererBase.opacity(); }
 
   void setOpacity(float v)
   { m_rendererBase.setOpacity(v); }
 
-  float sizeScale() const
+  [[nodiscard]] float sizeScale() const
   { return m_rendererBase.sizeScale(); }
 
   void setSizeScale(float s)

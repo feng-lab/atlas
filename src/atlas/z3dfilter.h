@@ -157,7 +157,7 @@ protected:
   virtual void exitInteractionMode()
   {}
 
-  bool isInInteractionMode() const;
+  [[nodiscard]] bool isInInteractionMode() const;
 
   void toggleInteractionMode(bool interactionMode, void* source);
 

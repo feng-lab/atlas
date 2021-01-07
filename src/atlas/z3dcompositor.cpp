@@ -226,6 +226,7 @@ void Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
   std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
+  // LOG(INFO) << filters.size() << " " << vFilters.size();
   std::vector<Z3DBoundedFilter*> onTopOpaqueFilters;
   std::vector<Z3DBoundedFilter*> onTopTransparentFilters;
   std::vector<Z3DBoundedFilter*> normalOpaqueFilters;

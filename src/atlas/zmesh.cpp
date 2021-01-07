@@ -312,8 +312,8 @@ void ZMesh::save(H5::Group& allGrp) const
 ZBBox<glm::dvec3> ZMesh::boundBox() const
 {
   ZBBox<glm::dvec3> result;
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
-    result.expand(glm::dvec3(m_vertices[i]));
+  for (auto& vertex : m_vertices) {
+    result.expand(glm::dvec3(vertex));
   }
   return result;
 }
@@ -321,8 +321,8 @@ ZBBox<glm::dvec3> ZMesh::boundBox() const
 ZBBox<glm::dvec3> ZMesh::boundBox(const glm::mat4& transform) const
 {
   ZBBox<glm::dvec3> result;
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
-    glm::vec3 vert = glm::applyMatrix(transform, m_vertices[i]);
+  for (auto& vertex : m_vertices) {
+    glm::vec3 vert = glm::applyMatrix(transform, vertex);
     result.expand(glm::dvec3(vert));
   }
   return result;

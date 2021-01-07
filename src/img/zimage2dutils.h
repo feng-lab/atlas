@@ -4,7 +4,6 @@
 #include "zlog.h"
 #include "zimagesse3.h"
 #include "zimageavx.h"
-#include "zlog.h"
 #include "zbenchtimer.h"
 #include "zimginterface.h"
 #include "zsaturateoperation.h"
