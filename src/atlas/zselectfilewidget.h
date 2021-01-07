@@ -57,6 +57,12 @@ public:
 
   void setFiles(const QStringList& fl);
 
+  inline void setSelectedFilter(const QString& f)
+  { m_selectedFilter = f; }
+
+  inline QString selectedFilter() const
+  { return m_selectedFilter; }
+
 signals:
 
   void changed();
@@ -94,6 +100,8 @@ private:
   QLineEdit* m_filterLineEdit;
   QPushButton* m_previewButton;
   QToolButton* m_button;
+
+  QString m_selectedFilter;
 };
 
 } // namespace nim

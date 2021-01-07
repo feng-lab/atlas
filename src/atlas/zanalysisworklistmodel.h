@@ -5,7 +5,6 @@
 #include <QVariant>
 #include <QIODevice>
 #include <QChar>
-#include <QString>
 #include <QStringList>
 #include <QModelIndex>
 #include <QMimeData>

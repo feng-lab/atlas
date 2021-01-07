@@ -29,14 +29,17 @@ public:
 //
 //  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
 
-  void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true, double scale = 1.0);
+  void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true,
+                        double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
 
-  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras, double scale = 1.0,
+  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras,
+                        double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0,
                         bool keepOnlyInterpolatedSlices = false) const;
 
   double getOptimizedScale() const;
 
-  void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format, double scale = 1.0);
+  void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format,
+                                                  double scaleX = 1.0, double scaleY = 1.0);
 
   [[nodiscard]] size_t numRegions() const
   { return m_ontology.size(); }
@@ -93,7 +96,7 @@ public:
   void interpolateRegionAnnotation(double scale = 1.0);
 
   // update Mesh after editing contours
-  void updateMesh(double scale = 1.0);
+  void updateMesh(double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
 
   // apply transformation to mesh
   void transformMesh(const glm::mat4& transformation);

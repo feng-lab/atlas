@@ -63,7 +63,7 @@ struct ZROIShapeOperation
     poly.push_back(rect.bottomRight());
   }
 
-  [[nodiscard]] QPainterPath toPainterPath(double scale = 1.0) const;
+  [[nodiscard]] QPainterPath toPainterPath(double scaleX = 1.0, double scaleY = 1.0) const;
 
   bool isAdd = true;
   ROIType type = ROIType::Spline;
@@ -105,7 +105,8 @@ public:
 
   void updatePaintPath(size_t id);
 
-  static QPainterPath shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape, double scale = 1.0);
+  static QPainterPath shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape,
+                                         double scaleX = 1.0, double scaleY = 1.0);
 
   void newRect(const QRectF& rect, size_t id);
 
@@ -151,7 +152,7 @@ public:
 
   [[nodiscard]] QRectF boundingRect() const;
 
-  [[nodiscard]] QPainterPath paintPath(double scale = 1.0) const;
+  [[nodiscard]] QPainterPath paintPath(double scaleX = 1.0, double scaleY = 1.0) const;
 
   size_t load(H5::Group& sliceGrp, size_t id, int roiVer);
 
@@ -179,7 +180,8 @@ public:
   void importMaskImage(const QString& fn, FileFormat format);
 
   [[nodiscard]] ZImg
-  toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true, double scale = 1.0,
+  toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true,
+            double scaleX = 1.0, double scaleY = 1.0,
             bool keepOnlyInterpolatedSlices = false) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
@@ -418,8 +420,8 @@ public:
   [[nodiscard]] bool sliceHasPolyOrSpline(int slice) const
   { return m_sliceROIs.at(slice).hasPolyOrSpline(); }
 
-  [[nodiscard]] QPainterPath slicePaintPath(int slice, double scale = 1.0) const
-  { return m_sliceROIs.at(slice).paintPath(scale); }
+  [[nodiscard]] QPainterPath slicePaintPath(int slice, double scaleX = 1.0, double scaleY = 1.0) const
+  { return m_sliceROIs.at(slice).paintPath(scaleX, scaleY); }
 
   void sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID = -1);
 

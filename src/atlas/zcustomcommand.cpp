@@ -1860,6 +1860,8 @@ void testLogDataSupport()
   };
   LOG(INFO) << json::value_from(init);
   LOG(INFO) << v4 << m4 << json::value_from(a2) << json::value_from(t) << json::value_from(init);
+  QString str("abdefwfgwtwfwfwfwgwgw");
+  LOG(INFO) << json::value_from(str);
 }
 
 }  // namespace nim

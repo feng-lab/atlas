@@ -3,7 +3,6 @@
 #include "zcombobox.h"
 #include "zglmutils.h"
 #include "zparameter.h"
-#include <QString>
 
 namespace nim {
 

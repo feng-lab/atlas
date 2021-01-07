@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QString>
 #include <QIODevice>
 #include <fstream>
 #include <iostream>

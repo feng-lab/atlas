@@ -11,7 +11,6 @@
 #include "zeventlistenerparameter.h"
 #include "zswccolorparameters.h"
 #include <QObject>
-#include <QString>
 #include <map>
 #include <utility>
 #include <vector>

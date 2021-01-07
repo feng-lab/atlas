@@ -118,59 +118,60 @@ ZImgSource::ZImgSource(const QStringList& fns, Dimension catDim_, bool catScenes
 
 void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& imgSource)
 {
-  auto& ja = jv.emplace_object();
-  ja["filenames"] = json::value_from(imgSource.filenames);
-  ja["catDim"] = json::value_from(enumToString(imgSource.catDim));
-  ja["catScenes"] = imgSource.catScenes;
-  ja["region"] = json::value_from(imgSource.region);
-  ja["scene"] = imgSource.scene;
-  ja["format"] = json::value_from(enumToString(imgSource.format));
-  ja["expandXY"] = imgSource.expandXY;
-  ja["expandWithMaxValue"] = imgSource.expandWithMaxValue;
+  auto& jo = jv.emplace_object();
+  jo["filenames"] = json::value_from(imgSource.filenames);
+  jo["catDim"] = json::value_from(enumToString(imgSource.catDim));
+  jo["catScenes"] = imgSource.catScenes;
+  jo["region"] = json::value_from(imgSource.region);
+  jo["scene"] = imgSource.scene;
+  jo["format"] = json::value_from(enumToString(imgSource.format));
+  jo["expandXY"] = imgSource.expandXY;
+  jo["expandWithMaxValue"] = imgSource.expandWithMaxValue;
 }
 
 ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& jv)
 {
   QStringList filenames;
-  const auto& obj = jv.as_object();
-  if (obj.contains("Path")) {  // compat to old version
-    filenames = json::value_to<QStringList>(obj.at("Path"));
+  const auto& jo = jv.as_object();
+  if (jo.contains("Path")) {  // compat to old version
+    filenames = json::value_to<QStringList>(jo.at("Path"));
   } else {
-    filenames = json::value_to<QStringList>(obj.at("filenames"));
+    filenames = json::value_to<QStringList>(jo.at("filenames"));
   }
+  //LOG(INFO) << filenames;
 
   auto catDim = Dimension::Z;
-  if (obj.contains("CatDimension")) {  // compat to old version
-    catDim = stringToDimension(json::value_to<QString>(obj.at("catDimension")));
-  } else if (obj.contains("CatDim")) {
-    catDim = stringToDimension(json::value_to<QString>(obj.at("catDim")));
+  if (jo.contains("CatDimension")) {  // compat to old version
+    catDim = stringToDimension(json::value_to<QString>(jo.at("catDimension")));
+  } else if (jo.contains("CatDim")) {
+    catDim = stringToDimension(json::value_to<QString>(jo.at("catDim")));
   }
   size_t scene = 0;
-  if (obj.contains("TileIndex")) {  // compat to old version
-    scene = json::value_to<size_t>(obj.at("TileIndex"));
-  } else if (obj.contains("scene")) {
-    scene = json::value_to<size_t>(obj.at("scene"));
+  if (jo.contains("TileIndex")) {  // compat to old version
+    scene = json::value_to<size_t>(jo.at("TileIndex"));
+  } else if (jo.contains("scene")) {
+    scene = json::value_to<size_t>(jo.at("scene"));
   }
 
   auto catScenes = false;
-  if (obj.contains("catScenes")) {
-    catScenes = obj.at("catScenes").as_bool();
+  if (jo.contains("catScenes")) {
+    catScenes = jo.at("catScenes").as_bool();
   }
   ZImgRegion region;
-  if (obj.contains("region")) {
-    region = json::value_to<ZImgRegion>(obj.at("region"));
+  if (jo.contains("region")) {
+    region = json::value_to<ZImgRegion>(jo.at("region"));
   }
   auto format = FileFormat::Unknown;
-  if (obj.contains("format")) {
-    format = stringToFileFormat(json::value_to<QString>(obj.at("format")));
+  if (jo.contains("format")) {
+    format = stringToFileFormat(json::value_to<QString>(jo.at("format")));
   }
   auto expandXY = true;
-  if (obj.contains("expandXY")) {
-    expandXY = obj.at("expandXY").as_bool();
+  if (jo.contains("expandXY")) {
+    expandXY = jo.at("expandXY").as_bool();
   }
   bool expandWithMaxValue = false;
-  if (obj.contains("expandWithMaxValue")) {
-    expandWithMaxValue = obj.at("expandWithMaxValue").as_bool();
+  if (jo.contains("expandWithMaxValue")) {
+    expandWithMaxValue = jo.at("expandWithMaxValue").as_bool();
   }
   return ZImgSource(filenames, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
 }

@@ -1,7 +1,6 @@
 #include "z3dshader.h"
 
 #include "z3dgl.h"
-#include "zexception.h"
 #include <vector>
 
 namespace nim {
@@ -56,7 +55,7 @@ void Z3DShader::compileSourceCode(const char* source)
         "Compute",
         ""
       };
-      const char* type = nullptr;
+      const char* type;
       switch (m_type) {
         case Z3DShader::Type::Fragment:
           type = types[0];

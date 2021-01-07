@@ -5,9 +5,9 @@
 #include <boost/json/src.hpp>
 #include <sstream>
 
-namespace nim {
+namespace  {
 
-void pretty_print(std::ostream& os, const json::value& jv, std::string* indent)
+void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr)
 {
   using namespace boost;
   std::string indent_;
@@ -91,6 +91,10 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent)
     os << "\n";
   }
 }
+
+} // namespace
+
+namespace nim {
 
 QString jsonToFormattedQString(const json::value& jv)
 {

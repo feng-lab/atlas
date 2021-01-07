@@ -11,7 +11,6 @@
 #include "z3dtextureglowrenderer.h"
 #include "z3drenderport.h"
 #include "z3dtexturecopyrenderer.h"
-#include <QString>
 #include <QPoint>
 #include <map>
 #include <vector>

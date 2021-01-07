@@ -11,7 +11,6 @@
 #include "z3dmeshrenderer.h"
 #include "zcolormap.h"
 #include "zmesh.h"
-#include <QString>
 #include <QPoint>
 #include <QMutexLocker>
 #include <map>

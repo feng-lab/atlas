@@ -2,7 +2,6 @@
 
 #include "zparameter.h"
 #include "zglmutils.h"
-#include <QString>
 #include <limits>
 
 namespace nim {

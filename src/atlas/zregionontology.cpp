@@ -369,7 +369,7 @@ void binaryImgToMesh1(const ZImg &img, ZMesh &msh)
 }
 #endif
 
-void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
+void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, double scaleZ)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   vtkSmartPointer<vtkImageData> vimg = vtkSmartPointer<vtkImageData>::New();
@@ -482,7 +482,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale)
 
   msh.clear();
   for (auto& v : vertices) {
-    v *= glm::dvec3(scale, scale, 1.);
+    v *= glm::dvec3(scaleX, scaleY, scaleZ);
   }
   msh.setVertices(vertices);
   msh.setIndices(indices);
@@ -496,12 +496,13 @@ struct ContourNode
   int parentIndex;
 };
 
-void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
+void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, double scaleZ)
 {
   CHECK(img.isType<uint8_t>() && !img.isTimeSeries() && !img.isMultiChannelsImg());
   roi.clear();
 
-  for (size_t s = 0; s < img.depth(); ++s) {
+  for (size_t tmps = 0; tmps < img.depth(); ++tmps) {
+    auto s = static_cast<size_t>(std::round(scaleZ * tmps));
     int64_t min;
     int64_t max;
     ZImg simg = img.extractPlane(s, 0, 0);
@@ -565,7 +566,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scale)
             poly.push_back(poly[0]);
           }
           QTransform tfm;
-          tfm.scale(scale, scale);
+          tfm.scale(scaleX, scaleY);
           poly = tfm.map(poly);
 
           if (ZROIUtils::splineToQPainterPath(poly).isEmpty()) {

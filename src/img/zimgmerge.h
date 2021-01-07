@@ -5,7 +5,6 @@
 #include "zimgblockprovider.h"
 #include "zvoxelregion.h"
 #include "zimgtile.h"
-#include <QString>
 #include <map>
 
 namespace nim {

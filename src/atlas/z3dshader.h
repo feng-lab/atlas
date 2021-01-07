@@ -1,7 +1,7 @@
 #pragma once
 
+#include "zexception.h"
 #include "z3dcontext.h"
-#include <QString>
 
 namespace nim {
 
@@ -22,22 +22,22 @@ public:
 
   Z3DShader& operator=(const Z3DShader&) = delete;
 
-  Z3DShader::Type shaderType() const
+  [[nodiscard]] Z3DShader::Type shaderType() const
   { return m_type; }
 
   void compileSourceCode(const char* source);
 
   void compileSourceCode(const QString& source);
 
-  QByteArray sourceCode() const;
+  [[nodiscard]] QByteArray sourceCode() const;
 
-  bool isCompiled() const
+  [[nodiscard]] bool isCompiled() const
   { return m_compiled; }
 
-  unsigned int shaderId() const
+  [[nodiscard]] unsigned int shaderId() const
   { return m_id; }
 
-  Z3DContextGroup context() const
+  [[nodiscard]] Z3DContextGroup context() const
   { return m_context; }
 
 private:

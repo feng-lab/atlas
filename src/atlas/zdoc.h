@@ -153,7 +153,7 @@ public:
 
   size_t viewSettingId();
 
-  std::map<size_t, size_t> read(const json::object& json, QString& err);
+  std::map<size_t, size_t> read(const json::object& jo, QString& err);
 
   void write(json::object& json, bool includeAnimation) const;
 

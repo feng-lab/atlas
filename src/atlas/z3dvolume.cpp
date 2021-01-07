@@ -4,7 +4,6 @@
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
 #include "zlog.h"
-#include <QString>
 #include <algorithm>
 
 namespace nim {

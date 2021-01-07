@@ -37,11 +37,11 @@ void ZROIShapeOperation::flipAround(double x, double y, bool hFlip, bool vFlip)
   }
 }
 
-QPainterPath ZROIShapeOperation::toPainterPath(double scale) const
+QPainterPath ZROIShapeOperation::toPainterPath(double scaleX, double scaleY) const
 {
   QPainterPath res;
   QTransform tfm;
-  tfm.scale(scale, scale);
+  tfm.scale(scaleX, scaleY);
   if (type == ROIType::Spline || type == ROIType::Line) {
     res.addPath(ZROIUtils::splineToQPainterPath(tfm.map(poly)));
   } else if (type == ROIType::Polygon) {
@@ -72,7 +72,7 @@ void ZSliceROI::updatePaintPath(size_t id)
   m_idToPainterPath[id] = res;
 }
 
-QPainterPath ZSliceROI::shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape, double scale)
+QPainterPath ZSliceROI::shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape, double scaleX, double scaleY)
 {
   auto res = QPainterPath();
   for (const auto& so : shape) {
@@ -80,11 +80,11 @@ QPainterPath ZSliceROI::shapeToPainterPath(const std::vector<ZROIShapeOperation>
       if (!res.isEmpty()) {
         CHECK(so.type != ROIType::Line);
       }
-      res += so.toPainterPath(scale);
+      res += so.toPainterPath(scaleX, scaleY);
     } else {
       CHECK(!res.isEmpty());
       CHECK(so.type != ROIType::Line);
-      res -= so.toPainterPath(scale);
+      res -= so.toPainterPath(scaleX, scaleY);
     }
   }
   return res;
@@ -384,16 +384,16 @@ QRectF ZSliceROI::boundingRect() const
   return res;
 }
 
-QPainterPath ZSliceROI::paintPath(double scale) const
+QPainterPath ZSliceROI::paintPath(double scaleX, double scaleY) const
 {
   auto res = QPainterPath();
-  if (scale == 1.0) {
+  if (scaleX == 1.0 && scaleY == 1.0) {
     for (const auto&[id, pp] : m_idToPainterPath) {
       res += pp;
     }
   } else {
     for (const auto&[id, shapes] : m_idToShapeOperations) {
-      res += shapeToPainterPath(shapes, scale);
+      res += shapeToPainterPath(shapes, scaleX, scaleY);
     }
   }
 
@@ -740,24 +740,24 @@ void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
   STOP_AND_LOG(bt)
 }
 
-ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation, double scale,
+ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation, double scaleX, double scaleY,
                      bool keepOnlyInterpolatedSlices) const
 {
   ZImg img;
   const auto& bBox = boundBox();
   if (bBox.minCorner.z == bBox.maxCorner.z) {
-    img = ZImg(ZImgInfo(bBox.maxCorner.x * scale + 3, bBox.maxCorner.y * scale + 3, 1));
-    const QPainterPath& path = slicePaintPath(cbegin()->first, scale);
+    img = ZImg(ZImgInfo(bBox.maxCorner.x * scaleX + 3, bBox.maxCorner.y * scaleY + 3, 1));
+    const QPainterPath& path = slicePaintPath(cbegin()->first, scaleX, scaleY);
     auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
     img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start));
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scale + 1, 0, bBox.maxCorner.y * scale + 1, 0, 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scaleX + 1, 0, bBox.maxCorner.y * scaleY + 1, 0, 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }
   } else {
-    img = ZImg(ZImgInfo(bBox.maxCorner.x * scale + 3, bBox.maxCorner.y * scale + 3, bBox.maxCorner.z + 3));
+    img = ZImg(ZImgInfo(bBox.maxCorner.x * scaleX + 3, bBox.maxCorner.y * scaleY + 3, bBox.maxCorner.z + 3));
     std::map<size_t, ZImg> distMapImgs;
     std::vector<size_t> srcSlices;
     ZImgSignedDistanceMap<> distMap;
@@ -767,7 +767,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
         continue;
       size_t slice = sliceROI.first;
       //LOG(INFO) << slice;
-      const QPainterPath& path = slicePaintPath(slice, scale);
+      const QPainterPath& path = slicePaintPath(slice, scaleX, scaleY);
       auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
       img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start, slice));
       srcSlices.push_back(slice);
@@ -820,7 +820,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (outWidth <= 0 || outHeight <= 0 || outDepth <= 0) {
-      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scale + 1, 0, bBox.maxCorner.y * scale + 1, 0, bBox.maxCorner.z + 1));
+      img = img.crop(ZImgRegion(0, bBox.maxCorner.x * scaleX + 1, 0, bBox.maxCorner.y * scaleY + 1, 0, bBox.maxCorner.z + 1));
     } else {
       img = img.cropWithPad(ZVoxelCoordinate(), ZVoxelCoordinate(outWidth, outHeight, outDepth, 1, 1));
     }

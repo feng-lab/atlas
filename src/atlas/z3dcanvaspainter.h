@@ -6,7 +6,6 @@
 #include "znumericparameter.h"
 #include "zimg.h"
 #include "zexception.h"
-#include <QString>
 #include <QMutexLocker>
 
 class Z3DTexture;

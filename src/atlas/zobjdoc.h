@@ -5,7 +5,6 @@
 #include "zjson.h"
 #include "zsysteminfo.h"
 #include <QObject>
-#include <QString>
 #include <QMenu>
 #include <QAction>
 #include <QUndoStack>

@@ -2,7 +2,6 @@
 
 #include "zimagecompositetransform.h"
 #include "zimagetransform.h"
-#include <QString>
 #include <map>
 
 namespace nim {

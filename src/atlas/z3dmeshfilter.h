@@ -10,7 +10,6 @@
 #include "z3drenderport.h"
 #include "z3dtexturecopyrenderer.h"
 #include <QObject>
-#include <QString>
 #include <QPoint>
 #include <map>
 #include <vector>

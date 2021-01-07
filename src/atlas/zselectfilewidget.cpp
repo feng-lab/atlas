@@ -200,7 +200,7 @@ void ZSelectFileWidget::selectFile()
   } else if (m_fileMode == FileMode::SaveFile) {
     QString outputFileName = ZFileUtils::getSaveFileName(
       this, m_guiName, getStartDir(), m_filter,
-      nullptr);
+      &m_selectedFilter);
     if (!outputFileName.isEmpty()) {
       setStartDir(outputFileName);
       m_lineEdit->setText(outputFileName);

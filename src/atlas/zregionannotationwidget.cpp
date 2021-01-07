@@ -7,7 +7,9 @@
 #include "z3dtransformparameter.h"
 #include "zparametereditdialog.h"
 #include "zmeshdoc.h"
+#include "zselectfilewidget.h"
 #include <QPushButton>
+#include <QDialogButtonBox>
 #include <QVBoxLayout>
 #include <QFileDialog>
 #include <QApplication>
@@ -36,38 +38,50 @@ void ZRegionAnnotationWidget::exportLabelImage()
 
   int fmtIdx = -1;
   QString fn;
+  FileFormat fileFormat;
+  ZVec3Parameter ratioPara("Scale", glm::vec3(1.f), glm::vec3(1e-5), glm::vec3(1e10));
+
   {
-    QFileDialog dialog(QApplication::activeWindow());
-    dialog.setAcceptMode(QFileDialog::AcceptSave);
-    dialog.setFileMode(QFileDialog::AnyFile);
-    dialog.setNameFilters(filters);
+    QDialog dialog(QApplication::activeWindow());
+    auto alllayout = new QVBoxLayout;
+    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Label Image:",
+                                                   filters.join(";;"),
+                                                   ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
     for (size_t i = 0; i < formats.size(); ++i) {
       if (formats[i] == FileFormat::HDF5Img) {
-        dialog.selectNameFilter(filters[i]);
+        outputImageWidget->setSelectedFilter(filters[i]);
+        break;
       }
     }
-    dialog.setDirectory(ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
+    alllayout->addWidget(outputImageWidget);
+    ratioPara.setNameForEachValue({"X Scale:", "Y Scale:", "Z Scale:"});
+    ratioPara.setDecimal(6);
+    ratioPara.setStyle("SPINBOX");
+    alllayout->addWidget(ratioPara.createWidget());
+    auto bbox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(bbox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(bbox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    alllayout->addWidget(bbox);
+    delete dialog.layout();
+
+    dialog.setLayout(alllayout);
     dialog.setWindowTitle(tr("Export Region Annotation As Label Image"));
+
     if (dialog.exec()) {
-      fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-      fn = dialog.selectedFiles().at(0);
+      fmtIdx = filters.indexOf(outputImageWidget->selectedFilter());
+      fn = outputImageWidget->getSelectedSaveFile();
+    } else {
+      return;
     }
-    dialog.close();
+    fileFormat = fmtIdx >= 0 ? formats[fmtIdx] : FileFormat::Unknown;
   }
-  QApplication::processEvents();
-  if (fn.isEmpty()) {
-    return;
-  }
-  bool ok;
-  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
-  double d = QInputDialog::getDouble(this, tr("Scale Output Label Image"),
-                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
-                                     Qt::WindowFlags(), 1);
-  if (fmtIdx >= 0 && ok) {
+
+  if (!fn.isEmpty()) {
     try {
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];
-      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, formats[fmtIdx], paras, d);
+      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, fileFormat, paras, ratioPara.get().x,
+                                                                 ratioPara.get().y, ratioPara.get().z);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
@@ -101,13 +115,27 @@ void ZRegionAnnotationWidget::interpolateRegionAnnotation()
 
 void ZRegionAnnotationWidget::updateMesh()
 {
-  bool ok;
-  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
-  double d = QInputDialog::getDouble(this, tr("Scale ROI before Generating Mesh"),
-                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
-                                     Qt::WindowFlags(), 1);
-  if (ok) {
-    m_regionAnnotationPack.regionAnnotation().updateMesh(d);
+  ZVec3Parameter ratioPara("Scale", glm::vec3(1.f), glm::vec3(1e-5), glm::vec3(1e10));
+
+  {
+    QDialog dialog(QApplication::activeWindow());
+    auto alllayout = new QVBoxLayout;
+    ratioPara.setNameForEachValue({"X Scale:", "Y Scale:", "Z Scale:"});
+    ratioPara.setDecimal(6);
+    ratioPara.setStyle("SPINBOX");
+    alllayout->addWidget(ratioPara.createWidget());
+    auto bbox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(bbox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(bbox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    alllayout->addWidget(bbox);
+    delete dialog.layout();
+
+    dialog.setLayout(alllayout);
+    dialog.setWindowTitle(tr("Updating Meshes From Annotations"));
+
+    if (dialog.exec()) {
+      m_regionAnnotationPack.regionAnnotation().updateMesh(ratioPara.get().x, ratioPara.get().y, ratioPara.get().z);
+    }
   }
 }
 

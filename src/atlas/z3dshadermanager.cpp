@@ -1,7 +1,6 @@
 #include "z3dshadermanager.h"
 
 #include "zsysteminfo.h"
-#include "zexception.h"
 #include "zlog.h"
 #include "z3dshader.h"
 #include <QTextStream>

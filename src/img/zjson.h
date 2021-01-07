@@ -14,13 +14,6 @@ namespace json = boost::json;
 #include <boost/json.hpp>
 namespace json = boost::json;
 #endif
-#include <vector>
-#include <iosfwd>
-
-inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QString& str)
-{
-  jv.emplace_string() = qUtf8Printable(str);
-}
 
 inline QString tag_invoke(const json::value_to_tag<QString>&, const json::value& jv)
 {
@@ -28,6 +21,12 @@ inline QString tag_invoke(const json::value_to_tag<QString>&, const json::value&
   return QString::fromUtf8(s.data(), s.size());
 }
 
+inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QString& str)
+{
+  jv.emplace_string() = qUtf8Printable(str);
+}
+
+#if 0
 inline void tag_invoke(const json::value_from_tag&, json::value& jv, const QStringList& sl)
 {
   auto& sa = jv.emplace_array();
@@ -46,10 +45,9 @@ inline QStringList tag_invoke(const json::value_to_tag<QStringList>&, const json
   }
   return res;
 }
+#endif
 
 namespace nim {
-
-void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr);
 
 QString jsonToFormattedQString(const json::value& jv);
 

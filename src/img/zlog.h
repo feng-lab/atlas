@@ -1,5 +1,7 @@
 #pragma once
 
+#include "zexception.h"
+
 #ifdef _WIN32
 #undef ERROR
 #endif
@@ -7,7 +9,6 @@
 #define GOOGLE_STRIP_LOG 0
 
 #include <glog/logging.h>
-#include <QString>
 #include <QDateTime>
 #include <QDebug>
 #include <QPoint>

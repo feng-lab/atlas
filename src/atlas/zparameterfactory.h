@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zparameter.h"
-#include <QString>
 #include <QObject>
 #include <map>
 

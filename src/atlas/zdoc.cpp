@@ -435,18 +435,19 @@ size_t ZDoc::viewSettingId()
   return m_viewSettingId;
 }
 
-std::map<size_t, size_t> ZDoc::read(const json::object& json, QString& err)
+std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
 {
   std::map<size_t, size_t> res;
-  if (!json.empty()) {
+  if (!jo.empty()) {
     for (auto& docPack : m_docPacks) {
       std::vector<std::pair<QString, json::value>> docKeyValueList;
-      for (const auto& [key, value] : json) {
+      for (const auto& [key, value] : jo) {
         QString qkey = QString::fromUtf8(key.data(), key.size());
         if (qkey.startsWith(docPack.doc->typeName())) {
           docKeyValueList.emplace_back(qkey, value);
         }
       }
+      // LOG(INFO) << json::value_from(docKeyValueList);
       if (!docKeyValueList.empty()) {
         for (const auto& idid : docPack.doc->read(docKeyValueList, err)) {
           res[idid.first] = idid.second;

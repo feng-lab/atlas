@@ -3,7 +3,6 @@
 #include "ztree.hpp"
 #include "zroi.h"
 #include "zmesh.h"
-#include <QString>
 #include <QStringList>
 #include <cstdint>
 #include <memory>
@@ -53,10 +52,10 @@ int64_t idOfRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNo
 std::vector<int64_t> allIDsWithinRegionAbbreviation(const QString& abbreviation, const ZTree<RegionNode>& ontology);
 
 // input img, an unsigned 8-bit single-channel image. Pixels with value 1 is treated as foreground. Other pixels are background.
-void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scale = 1.0);
+void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
 
 // input img, an unsigned 8-bit single-channel image. Non-zero pixels are treated as 1's. Zero pixels remain 0's, so the image is treated as binary.
-void binaryImgToROI(const ZImg& img, ZROI& roi, double scale = 1.0);
+void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
 
 } // namespace nim
 
