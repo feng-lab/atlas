@@ -186,7 +186,7 @@ void ZImgOmeTiff::makeImageDescriptionTag(const ZImgInfo& info, const QString& d
   tag.setName("ImageDescription");
   tag.setDataType(DataType::Ascii);
 
-  QByteArray xml = createOmeXml(info, dimensionOrder).toUtf8();
+  auto xml = createOmeXml(info, dimensionOrder).toUtf8();
   tag.setCount(xml.size() + 1);
   std::memcpy(tag.dataArray<char>(), xml.constData(), tag.dataByteNumber());
 }
@@ -420,7 +420,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
 
 QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimensionOrder)
 {
-  QByteArray res;  // no " encoding="UTF-8" " if use QString
+  QString res;
   QXmlStreamWriter xml(&res);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   xml.setCodec("UTF-8");

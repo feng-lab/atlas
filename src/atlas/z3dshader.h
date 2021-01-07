@@ -29,7 +29,7 @@ public:
 
   void compileSourceCode(const QString& source);
 
-  [[nodiscard]] QByteArray sourceCode() const;
+  [[nodiscard]] std::string sourceCode() const;
 
   [[nodiscard]] bool isCompiled() const
   { return m_compiled; }

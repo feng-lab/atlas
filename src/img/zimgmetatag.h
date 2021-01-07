@@ -16,7 +16,7 @@ public:
 
   // convenient function to create a name-value pair meta data
   // value will be stored as utf-8 string with datatype DataType::Ascii
-  ZImgMetatag(const QString& name, const QString& value);
+  ZImgMetatag(QString name, const QString& value);
 
   ZImgMetatag(ZImgMetatag&&) = default;
 
@@ -35,21 +35,21 @@ public:
     m_data.swap(other.m_data);
   }
 
-  QString toQString() const;
+  [[nodiscard]] QString toQString() const;
 
-  inline const QString& name() const
+  [[nodiscard]] inline const QString& name() const
   { return m_name; }
 
   inline void setName(const QString& n)
   { m_name = n; }
 
-  inline uint32_t tag() const
+  [[nodiscard]] inline uint32_t tag() const
   { return m_tag; }
 
   inline void setTag(uint32_t t)
   { m_tag = t; }
 
-  inline DataType dataType() const
+  [[nodiscard]] inline DataType dataType() const
   { return m_dataType; }
 
   inline void setDataType(DataType dt)
@@ -58,7 +58,7 @@ public:
     allocateData();
   }
 
-  inline uint64_t count() const
+  [[nodiscard]] inline uint64_t count() const
   { return m_count; }
 
   inline void setCount(uint64_t c)
@@ -67,7 +67,7 @@ public:
     allocateData();
   }
 
-  inline size_t dataByteNumber() const
+  [[nodiscard]] inline size_t dataByteNumber() const
   { return byteNumber(m_dataType) * m_count; }
 
   // read data as array of T, you need to know the correct dataType before calling this

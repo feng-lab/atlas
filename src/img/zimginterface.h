@@ -30,37 +30,37 @@ inline QString enumToString(DataType dt)
 {
   switch (dt) {
     case DataType::Byte:
-      return "Byte";
+      return QStringLiteral("Byte");
     case DataType::Ascii:
-      return "Ascii";
+      return QStringLiteral("Ascii");
     case DataType::Short:
-      return "Short";
+      return QStringLiteral("Short");
     case DataType::Long:
-      return "Long";
+      return QStringLiteral("Long");
     case DataType::Rational:
-      return "Rational";
+      return QStringLiteral("Rational");
     case DataType::SByte:
-      return "SByte";
+      return QStringLiteral("SByte");
     case DataType::Undefined:
-      return "Undefined";
+      return QStringLiteral("Undefined");
     case DataType::SShort:
-      return "SShort";
+      return QStringLiteral("SShort");
     case DataType::SLong:
-      return "SLong";
+      return QStringLiteral("SLong");
     case DataType::SRational:
-      return "SRational";
+      return QStringLiteral("SRational");
     case DataType::Float:
-      return "Float";
+      return QStringLiteral("Float");
     case DataType::Double:
-      return "Double";
+      return QStringLiteral("Double");
     case DataType::IFD:
-      return "IFD";
+      return QStringLiteral("IFD");
     case DataType::Long8:
-      return "Long8";
+      return QStringLiteral("Long8");
     case DataType::SLong8:
-      return "SLong8";
+      return QStringLiteral("SLong8");
     case DataType::IFD8:
-      return "IFD8";
+      return QStringLiteral("IFD8");
     default:
       throw ZIOException("invalid DataType");
   }
@@ -86,11 +86,11 @@ inline QString enumToString(VoxelFormat vf)
 {
   switch (vf) {
     case VoxelFormat::Unsigned:
-      return "Unsigned";
+      return QStringLiteral("Unsigned");
     case VoxelFormat::Signed:
-      return "Signed";
+      return QStringLiteral("Signed");
     case VoxelFormat::Float:
-      return "Float";
+      return QStringLiteral("Float");
     default:
       throw ZIOException("invalid VoxelFormat");
   }
@@ -98,11 +98,11 @@ inline QString enumToString(VoxelFormat vf)
 
 inline VoxelFormat stringToVoxelFormat(const QString& str)
 {
-  if (str == "Unsigned") {
+  if (str == QStringLiteral("Unsigned")) {
     return VoxelFormat::Unsigned;
-  } else if (str == "Signed") {
+  } else if (str == QStringLiteral("Signed")) {
     return VoxelFormat::Signed;
-  } else if (str == "Float") {
+  } else if (str == QStringLiteral("Float")) {
     return VoxelFormat::Float;
   } else {
     throw ZIOException("invalid VoxelFormat " + str);
@@ -126,23 +126,23 @@ inline QString enumToString(VoxelSizeUnit vsu)
 {
   switch (vsu) {
     case VoxelSizeUnit::none:
-      return "none";
+      return QStringLiteral("none");
     case VoxelSizeUnit::inch:
-      return "inch";
+      return QStringLiteral("inch");
     case VoxelSizeUnit::cm:
-      return "cm";
+      return QStringLiteral("cm");
     case VoxelSizeUnit::mm:
-      return "mm";
+      return QStringLiteral("mm");
     case VoxelSizeUnit::um:
-      return "um";
+      return QStringLiteral("um");
     case VoxelSizeUnit::nm:
-      return "nm";
+      return QStringLiteral("nm");
     case VoxelSizeUnit::m:
-      return "m";
+      return QStringLiteral("m");
     case VoxelSizeUnit::hm:
-      return "hm";
+      return QStringLiteral("hm");
     case VoxelSizeUnit::km:
-      return "km";
+      return QStringLiteral("km");
     default:
       throw ZIOException("invalid VoxelSizeUnit");
   }
@@ -150,23 +150,23 @@ inline QString enumToString(VoxelSizeUnit vsu)
 
 inline VoxelSizeUnit stringToVoxelSizeUnit(const QString& str)
 {
-  if (str == "none") {
+  if (str == QStringLiteral("none")) {
     return VoxelSizeUnit::none;
-  } else if (str == "inch") {
+  } else if (str == QStringLiteral("inch")) {
     return VoxelSizeUnit::inch;
-  } else if (str == "cm") {
+  } else if (str == QStringLiteral("cm")) {
     return VoxelSizeUnit::cm;
-  } else if (str == "mm") {
+  } else if (str == QStringLiteral("mm")) {
     return VoxelSizeUnit::mm;
-  } else if (str == "um") {
+  } else if (str == QStringLiteral("um")) {
     return VoxelSizeUnit::um;
-  } else if (str == "nm") {
+  } else if (str == QStringLiteral("nm")) {
     return VoxelSizeUnit::nm;
-  } else if (str == "m") {
+  } else if (str == QStringLiteral("m")) {
     return VoxelSizeUnit::m;
-  } else if (str == "hm") {
+  } else if (str == QStringLiteral("hm")) {
     return VoxelSizeUnit::hm;
-  } else if (str == "km") {
+  } else if (str == QStringLiteral("km")) {
     return VoxelSizeUnit::km;
   } else {
     throw ZIOException("invalid VoxelSizeUnit " + str);
@@ -306,33 +306,33 @@ inline QString enumToString(FileFormat f)
 {
   switch (f) {
     case FileFormat::Unknown:
-      return "Unknown";
+      return QStringLiteral("Unknown");
     case FileFormat::HDF5Img:
-      return "HDF5Img";
+      return QStringLiteral("HDF5Img");
     case FileFormat::OmeTiff:
-      return "OmeTiff";
+      return QStringLiteral("OmeTiff");
     case FileFormat::Tiff:
-      return "Tiff";
+      return QStringLiteral("Tiff");
     case FileFormat::Vaa3DRaw:
-      return "Vaa3DRaw";
+      return QStringLiteral("Vaa3DRaw");
     case FileFormat::ZeissLsm:
-      return "ZeissLsm";
+      return QStringLiteral("ZeissLsm");
     case FileFormat::Jpeg:
-      return "Jpeg";
+      return QStringLiteral("Jpeg");
     case FileFormat::JpegXR:
-      return "JpegXR";
+      return QStringLiteral("JpegXR");
     case FileFormat::Png:
-      return "Png";
+      return QStringLiteral("Png");
     case FileFormat::FreeImage:
-      return "FreeImage";
+      return QStringLiteral("FreeImage");
     case FileFormat::MetaImage:
-      return "MetaImage";
+      return QStringLiteral("MetaImage");
     case FileFormat::ZeissCZI:
-      return "ZeissCZI";
+      return QStringLiteral("ZeissCZI");
     case FileFormat::ITKImage:
-      return "ITKImage";
+      return QStringLiteral("ITKImage");
     case FileFormat::Leica:
-      return "Leica";
+      return QStringLiteral("Leica");
     default:
       throw ZIOException("invalid FileFormat");
   }
@@ -340,33 +340,33 @@ inline QString enumToString(FileFormat f)
 
 inline FileFormat stringToFileFormat(const QString& str)
 {
-  if (str == "Unknown") {
+  if (str == QStringLiteral("Unknown")) {
     return FileFormat::Unknown;
-  } else if (str == "HDF5Img") {
+  } else if (str == QStringLiteral("HDF5Img")) {
     return FileFormat::HDF5Img;
-  } else if (str == "OmeTiff") {
+  } else if (str == QStringLiteral("OmeTiff")) {
     return FileFormat::OmeTiff;
-  } else if (str == "Tiff") {
+  } else if (str == QStringLiteral("Tiff")) {
     return FileFormat::Tiff;
-  } else if (str == "Vaa3DRaw") {
+  } else if (str == QStringLiteral("Vaa3DRaw")) {
     return FileFormat::Vaa3DRaw;
-  } else if (str == "ZeissLsm") {
+  } else if (str == QStringLiteral("ZeissLsm")) {
     return FileFormat::ZeissLsm;
-  } else if (str == "Jpeg") {
+  } else if (str == QStringLiteral("Jpeg")) {
     return FileFormat::Jpeg;
-  } else if (str == "JpegXR") {
+  } else if (str == QStringLiteral("JpegXR")) {
     return FileFormat::JpegXR;
-  } else if (str == "Png") {
+  } else if (str == QStringLiteral("Png")) {
     return FileFormat::Png;
-  } else if (str == "FreeImage") {
+  } else if (str == QStringLiteral("FreeImage")) {
     return FileFormat::FreeImage;
-  } else if (str == "MetaImage") {
+  } else if (str == QStringLiteral("MetaImage")) {
     return FileFormat::MetaImage;
-  } else if (str == "ZeissCZI") {
+  } else if (str == QStringLiteral("ZeissCZI")) {
     return FileFormat::ZeissCZI;
-  } else if (str == "ITKImage") {
+  } else if (str == QStringLiteral("ITKImage")) {
     return FileFormat::ITKImage;
-  } else if (str == "Leica") {
+  } else if (str == QStringLiteral("Leica")) {
     return FileFormat::Leica;
   } else {
     throw ZIOException("invalid FileFormat " + str);
@@ -399,33 +399,33 @@ inline QString enumToString(Compression m)
 {
   switch (m) {
     case Compression::AUTO:
-      return "Auto";
+      return QStringLiteral("Auto");
     case Compression::NONE:
-      return "None";
+      return QStringLiteral("None");
     case Compression::LZW:
-      return "LZW";
+      return QStringLiteral("LZW");
     case Compression::JPEG:
-      return "JPEG";
+      return QStringLiteral("JPEG");
     case Compression::T85:
-      return "T85";
+      return QStringLiteral("T85");
     case Compression::T43:
-      return "T43";
+      return QStringLiteral("T43");
     case Compression::PACKBITS:
-      return "PACKBITS";
+      return QStringLiteral("PACKBITS");
     case Compression::DEFLATE:
-      return "DEFLATE";
+      return QStringLiteral("DEFLATE");
     case Compression::ADOBE_DEFLATE:
-      return "ADOBE_DEFLATE";
+      return QStringLiteral("ADOBE_DEFLATE");
     case Compression::DCS:
-      return "DCS";
+      return QStringLiteral("DCS");
     case Compression::JP2000:
-      return "JP2000";
+      return QStringLiteral("JP2000");
     case Compression::LZMA:
-      return "LZMA";
+      return QStringLiteral("LZMA");
     case Compression::ZSTD:
-      return "ZSTD";
+      return QStringLiteral("ZSTD");
     case Compression::WEBP:
-      return "WEBP";
+      return QStringLiteral("WEBP");
     default:
       throw ZIOException("invalid Compression");
   }
@@ -469,15 +469,15 @@ inline QString enumToString(Dimension d)
 {
   switch (d) {
     case Dimension::X:
-      return "X";
+      return QStringLiteral("X");
     case Dimension::Y:
-      return "Y";
+      return QStringLiteral("Y");
     case Dimension::Z:
-      return "Z";
+      return QStringLiteral("Z");
     case Dimension::C:
-      return "C";
+      return QStringLiteral("C");
     case Dimension::T:
-      return "T";
+      return QStringLiteral("T");
     default:
       throw ZIOException("invalid Dimension");
   }
@@ -485,15 +485,15 @@ inline QString enumToString(Dimension d)
 
 inline Dimension stringToDimension(const QString& str)
 {
-  if (str == "X") {
+  if (str == QStringLiteral("X")) {
     return Dimension::X;
-  } else if (str == "Y") {
+  } else if (str == QStringLiteral("Y")) {
     return Dimension::Y;
-  } else if (str == "Z") {
+  } else if (str == QStringLiteral("Z")) {
     return Dimension::Z;
-  } else if (str == "C") {
+  } else if (str == QStringLiteral("C")) {
     return Dimension::C;
-  } else if (str == "T") {
+  } else if (str == QStringLiteral("T")) {
     return Dimension::T;
   } else {
     throw ZIOException("invalid Dimension " + str);
@@ -509,15 +509,15 @@ inline QString enumToString(ImgMergeMode m)
 {
   switch (m) {
     case ImgMergeMode::Max:
-      return "Max";
+      return QStringLiteral("Max");
     case ImgMergeMode::Min:
-      return "Min";
+      return QStringLiteral("Min");
     case ImgMergeMode::Mean:
-      return "Mean";
+      return QStringLiteral("Mean");
     case ImgMergeMode::Median:
-      return "Median";
+      return QStringLiteral("Median");
     case ImgMergeMode::First:
-      return "First";
+      return QStringLiteral("First");
     default:
       throw ZIOException("invalid ImgMergeMode");
   }
@@ -525,15 +525,15 @@ inline QString enumToString(ImgMergeMode m)
 
 inline ImgMergeMode stringToImgMergeMode(const QString& str)
 {
-  if (str == "Max") {
+  if (str == QStringLiteral("Max")) {
     return ImgMergeMode::Max;
-  } else if (str == "Min") {
+  } else if (str == QStringLiteral("Min")) {
     return ImgMergeMode::Min;
-  } else if (str == "Mean") {
+  } else if (str == QStringLiteral("Mean")) {
     return ImgMergeMode::Mean;
-  } else if (str == "Median") {
+  } else if (str == QStringLiteral("Median")) {
     return ImgMergeMode::Median;
-  } else if (str == "First") {
+  } else if (str == QStringLiteral("First")) {
     return ImgMergeMode::First;
   } else {
     throw ZIOException("invalid ImgMergeMode " + str);

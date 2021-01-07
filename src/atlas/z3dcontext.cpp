@@ -37,8 +37,7 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
     return nullptr;
   }
 
-  const auto qtSymbol = QByteArray::fromStdString(name);
-  return m_context->getProcAddress(qtSymbol);
+  return m_context->getProcAddress(name);
 }
 
 

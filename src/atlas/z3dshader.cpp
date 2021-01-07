@@ -118,19 +118,19 @@ void Z3DShader::compileSourceCode(const QString& source)
   compileSourceCode(source.toUtf8().constData());
 }
 
-QByteArray Z3DShader::sourceCode() const
+std::string Z3DShader::sourceCode() const
 {
+  std::string res;
   if (!m_id)
-    return QByteArray();
+    return res;
   GLint size = 0;
   glGetShaderiv(m_id, GL_SHADER_SOURCE_LENGTH, &size);
   if (size <= 0)
-    return QByteArray();
-  GLint len = 0;
-  std::vector<char> source(size);
-  glGetShaderSource(m_id, size, &len, source.data());
-  QByteArray src(source.data());
-  return src;
+    return res;
+  GLsizei len = 0;
+  res.resize(size);
+  glGetShaderSource(m_id, size, &len, res.data());
+  return res;
 }
 
 } // namespace nim

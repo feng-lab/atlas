@@ -5,6 +5,7 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
+#include <fmt/core.h>
 #include <vector>
 
 namespace nim {
@@ -38,7 +39,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
 #if defined(__APPLE__)
   if (count < 1024_usize * 1024 * 1024 * 2) {
     if (!fs.read(buf, count)) {
-      throw ZIOException(QString("Expect %1 bytes, only read %2 bytes.").arg(count).arg(fs.gcount()));
+      throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()));
     }
     return;
   }
@@ -47,7 +48,7 @@ void readStream_impl(std::istream& fs, char* buf, size_t count)
   while (bytesRemaining > 0) {
     size_t bytesToRead = std::min(bytesRemaining, chunkSize);
     if (!fs.read(buf, bytesToRead)) {
-      throw ZIOException(QString("Expect %1 bytes, only read %2 bytes.").arg(bytesToRead).arg(fs.gcount()));
+      throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", bytesToRead, fs.gcount()));
     }
     bytesRemaining -= bytesToRead;
     buf += bytesToRead;
@@ -95,18 +96,18 @@ std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filen
 QString getTemporaryFilename(const QString& filename)
 {
   QFileInfo fi(filename);
-  return fi.dir().filePath(QString("~$%1").arg(fi.fileName()));
+  return fi.dir().filePath(QString(QStringLiteral("~$%1")).arg(fi.fileName()));
 }
 
 void renameFile(const QString& oldName, const QString& newName)
 {
   if (QFile::exists(newName)) {
     if (!QFile::remove(newName)) {
-      throw nim::ZIOException(QString("Can not remove existing file %1").arg(newName));
+      throw nim::ZIOException(fmt::format("Can not remove existing file {}", newName.toStdString()));
     }
   }
   if (!QFile::rename(oldName, newName)) {
-    throw nim::ZIOException(QString("Can not rename file %1").arg(oldName));
+    throw nim::ZIOException(fmt::format("Can not rename file {}", oldName.toStdString()));
   }
 }
 

@@ -1,11 +1,13 @@
 #include "zimgmetatag.h"
 
+#include <utility>
+
 namespace nim {
 
-ZImgMetatag::ZImgMetatag(const QString& name, const QString& value)
-  : m_name(name), m_dataType(DataType::Ascii)
+ZImgMetatag::ZImgMetatag(QString name, const QString& value)
+  : m_name(std::move(name)), m_dataType(DataType::Ascii)
 {
-  QByteArray utf8array = value.toUtf8();
+  auto utf8array = value.toUtf8();
   setCount(utf8array.size() + 1);
   std::memcpy(dataArray<char>(), utf8array.constData(), dataByteNumber());
 }

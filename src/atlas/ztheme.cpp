@@ -116,7 +116,7 @@ QPalette ZTheme::palette() const
   const QMetaObject &m = QPalette::staticMetaObject;
   QMetaEnum e = m.enumerator(m.indexOfEnumerator("ColorRole"));
   for (int i = 0, total = static_cast<int>(QPalette::NColorRoles); i < total; ++i) {
-    const QString key = QLatin1String(e.key(i));
+    const QString key = e.key(i);
     LOG(INFO) << key
               << " Color A: " << qtTypeToQString(pal.color(QPalette::Active, static_cast<QPalette::ColorRole>(e.value(i))))
               << " Color D: " << qtTypeToQString(pal.color(QPalette::Disabled, static_cast<QPalette::ColorRole>(e.value(i))))

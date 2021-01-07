@@ -50,8 +50,8 @@ struct LogData
   {}
 
   LogSeverity level;
-  QByteArray fullFilename;
-  QByteArray baseFilename;
+  std::string fullFilename;
+  std::string baseFilename;
   int line;
   QDateTime time;
   QByteArray message; // main log message
@@ -95,8 +95,6 @@ inline std::ostream& operator<<(std::ostream& s, QStringView q)
 { return (s << q.toUtf8().constData()); }
 inline std::ostream& operator<<(std::ostream& s, QUtf8StringView q)
 { return (s << q.data()); }
-inline std::ostream& operator<<(std::ostream& s, QLatin1String q)
-{ return (s << q.latin1()); }
 inline std::ostream& operator<<(std::ostream& s, QByteArrayView q)
 { return (s << q.constData()); }
 #else

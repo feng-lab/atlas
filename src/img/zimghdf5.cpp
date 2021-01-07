@@ -476,7 +476,7 @@ std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkIn
   QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
   chunk.optimize();
 
-  QByteArray result = printChunkInfos.readAllStandardOutput();
+  auto result = printChunkInfos.readAllStandardOutput();
   QTextStream in(result, QIODevice::ReadOnly);
 
   QString line;
