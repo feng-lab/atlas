@@ -251,11 +251,13 @@ inline std::ostream& operator<<(std::ostream& s, const QSharedPointer<T>& ptr)
   return (s << qtTypeToQString(ptr).toUtf8().constData());
 }
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 template <typename T, typename Tag>
 inline std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& ptr)
 {
   return (s << qtTypeToQString(ptr).toUtf8().constData());
 }
+#endif
 
 template<typename T>
 inline typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type
@@ -280,9 +282,11 @@ inline std::ostream& operator<<(std::ostream& s, const QFlags<T>& flags)
   return (s << qtTypeToQString(flags).toUtf8().constData());
 }
 
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 inline std::ostream& operator<<(std::ostream& s, QKeyCombination combination)
 {
   return (s << qtTypeToQString(combination).toUtf8().constData());
 }
+#endif
 
 } // namespace nim
