@@ -165,7 +165,7 @@ private:
 
   // another set of stacks that have common channel and same tile configuraton with the main inputs
   QStringList m_2ndInputFilenames;
-  size_t m_2ndScene;
+  size_t m_2ndScene = 0;
   std::vector<size_t> m_2ndChannelsToUse;  //empty means all channel
   std::vector<size_t> m_2ndChannelsToRemoveBackground;
   size_t m_commonChannelOfInput = 0;

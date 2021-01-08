@@ -4,13 +4,13 @@
 #include "zimgconnectedcomponents.h"
 #include "zlog.h"
 #include "zimgfillhole.h"
+#include "zcpuinfo.h"
 #include "zbenchtimer.h"
 #include "zioutils.h"
 #include <QStandardPaths>
 #include <QFile>
 #include <QTransform>
 #include <QTemporaryDir>
-#include <fmt/core.h>
 
 namespace {
 
@@ -290,23 +290,24 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
       bytePerVoxel = 8;
     }
   }
-  ZImgInfo info(m_boundBox.maxCorner.x * scaleX + 2, m_boundBox.maxCorner.y * scaleY + 2, m_boundBox.maxCorner.z + 2,
+  ZImgInfo info(m_boundBox.maxCorner.x + 2, m_boundBox.maxCorner.y + 2, m_boundBox.maxCorner.z + 2,
                 1, 1, bytePerVoxel, vf);
-  info.voxelSizeUnit = VoxelSizeUnit::um;
-  info.voxelSizeX = std::ceil(m_voxelSizeX / scaleX);
-  info.voxelSizeY = std::ceil(m_voxelSizeY / scaleY);
-  info.voxelSizeZ = m_voxelSizeZ;
-  ZImg res(info);
-  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
-    if (it->roi) {
-      LOG(INFO) << "has roi";
-      ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
-                                                scaleX, scaleY,
-                                                keepOnlyInterpolatedSlices);
-      res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+  if (scaleX < 1.0 && scaleY < 1.0 && info.byteNumber() < ZCpuInfo::instance().nPhysicalRAM) {
+    info.voxelSizeUnit = VoxelSizeUnit::um;
+    info.voxelSizeX = m_voxelSizeX;
+    info.voxelSizeY = m_voxelSizeY;
+    info.voxelSizeZ = m_voxelSizeZ;
+    ZImg res(info);
+    for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+      LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
+      if (it->roi) {
+        LOG(INFO) << "has roi";
+        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
+                                                  1.0, 1.0,
+                                                  keepOnlyInterpolatedSlices);
+        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+      }
     }
-  }
 //  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
 //    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
 //        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
@@ -317,10 +318,44 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
 //      }
 //    }
 //  }
-  if (scaleZ != 1.0) {
-    res.zoom(1.0, 1.0, scaleZ);
+    if (scaleX != 1.0 || scaleY != 1.0 || scaleZ != 1.0) {
+      res.zoom(scaleX, scaleY, scaleZ);
+    }
+    res.save(fn, format, paras);
+  } else {
+    info = ZImgInfo(m_boundBox.maxCorner.x * scaleX + 2, m_boundBox.maxCorner.y * scaleY + 2,
+                    m_boundBox.maxCorner.z + 2,
+                    1, 1, bytePerVoxel, vf);
+    info.voxelSizeUnit = VoxelSizeUnit::um;
+    info.voxelSizeX = std::ceil(m_voxelSizeX / scaleX);
+    info.voxelSizeY = std::ceil(m_voxelSizeY / scaleY);
+    info.voxelSizeZ = m_voxelSizeZ;
+    ZImg res(info);
+    for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+      LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
+      if (it->roi) {
+        LOG(INFO) << "has roi";
+        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
+                                                  scaleX, scaleY,
+                                                  keepOnlyInterpolatedSlices);
+        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+      }
+    }
+//  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+//    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
+//        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
+//      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
+//      if (it->roi) {
+//        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+//        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+//      }
+//    }
+//  }
+    if (scaleZ != 1.0) {
+      res.zoom(1.0, 1.0, scaleZ);
+    }
+    res.save(fn, format, paras);
   }
-  res.save(fn, format, paras);
   LOG(INFO) << "Finish exporting label image";
 }
 

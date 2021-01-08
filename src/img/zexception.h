@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <fmt/core.h>
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>

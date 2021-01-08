@@ -14,6 +14,14 @@
 
 namespace nim {
 
+template< class T >
+struct remove_cvref {
+  typedef std::remove_cv_t<std::remove_reference_t<T>> type;
+};
+
+template< class T >
+using remove_cvref_t = typename remove_cvref<T>::type;
+
 #ifdef _MSC_VER
 #else
 #define __forceinline       inline __attribute__((always_inline))
@@ -24,6 +32,34 @@ constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum 
 {
   return static_cast<typename std::underlying_type<TEnum>::type>(e);
 }
+
+template<typename TEnum>
+std::string_view enumToString(TEnum e);
+
+template<typename TEnum>
+TEnum stringToEnum(std::string_view s);
+
+template<typename TEnum>
+inline QString enumToQString(TEnum e)
+{
+  auto str = enumToString(e);
+  return QString::fromUtf8(str.data(), str.size());
+}
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
+template<typename TEnum, size_t S = sizeof(TEnum)>
+inline TEnum stringToEnum(QStringView s)
+{
+  auto str = s.toUtf8();
+  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
+}
+#else
+template<typename TEnum, size_t S = sizeof(TEnum)>
+inline TEnum stringToEnum(const QString& s)
+{
+  return stringToEnum<TEnum>(s.toStdString());
+}
+#endif
 
 // https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
 template<class Dest, class Source>

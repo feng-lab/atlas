@@ -393,7 +393,7 @@ void ZImgPng::checkImgBeforeWriting(const QString &filename, const ZImgInfo &inf
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO &&
       paras.compression != Compression::DEFLATE) {
-    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
+    throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
   }
   if (info.numTimes != 1 || info.depth != 1) {
     throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));

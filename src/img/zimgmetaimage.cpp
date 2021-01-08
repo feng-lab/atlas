@@ -125,7 +125,7 @@ void ZImgMetaImage::checkImgBeforeWriting(const QString& filename, const ZImgInf
   if (!(paras.compression == Compression::AUTO ||
         paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
-    throw ZIOException(QString("compression %1 is not supported").arg(enumToString(paras.compression)));
+    throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
   }
   if (info.numTimes != 1) {
     throw ZIOException("time sequence image is not supported");

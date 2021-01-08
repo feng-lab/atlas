@@ -5,7 +5,6 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
-#include <fmt/core.h>
 #include <vector>
 
 namespace nim {

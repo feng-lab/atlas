@@ -9,7 +9,6 @@
 #include <H5Cpp.h>
 #include <QFile>
 #include <QTextStream>
-#include <fmt/core.h>
 
 namespace nim {
 

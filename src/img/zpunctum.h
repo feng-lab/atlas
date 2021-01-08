@@ -2,7 +2,6 @@
 
 #include "zeigenutils.h"
 #include "zimginterface.h"
-#include <fmt/core.h>
 #include <cmath>
 #include <list>
 

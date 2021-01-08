@@ -9,7 +9,6 @@
 #include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
-#include <fmt/core.h>
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <memory>

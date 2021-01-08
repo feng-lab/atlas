@@ -66,17 +66,17 @@ int main(int argc, char* argv[])
     if (FLAGS_run_unit_tests || FLAGS_run_benchmarks) {
       QCoreApplication app(argc, argv);
 #ifdef _WIN32
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/Resources");
-      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
-      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/Resources";
+      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/Resources/jdk";
+      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/Resources/jars";
 #elif defined(__APPLE__)
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/../Resources");
-      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jdk");
-      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/../Resources/jars");
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/../Resources";
+      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/../Resources/jdk";
+      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/../Resources/jars";
 #else
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + QString("/Resources");
-      QString jdkDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jdk");
-      QString jarsDIR = QCoreApplication::applicationDirPath() + QString("/Resources/jars");
+      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/Resources";
+      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/Resources/jdk";
+      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/Resources/jars";
 #endif
       initImgLib(argv[0], resourcesDIR, jdkDIR, jarsDIR, "", false);
       [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
@@ -134,8 +134,8 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::instance().logDir();
     removeOldLogs(logDir);
 
-    QString jdkDIR = ZApplication::resourcesDirPath() + QString("/jdk");
-    QString jarsDIR = ZApplication::resourcesDirPath() + QString("/jars");
+    QString jdkDIR = ZApplication::resourcesDirPath() + u"/jdk";
+    QString jarsDIR = ZApplication::resourcesDirPath() + u"/jars";
     initImgLib(argv[0], ZApplication::resourcesDirPath(),
                jdkDIR, jarsDIR, logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {

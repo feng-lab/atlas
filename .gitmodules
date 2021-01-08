@@ -109,3 +109,6 @@
 [submodule "src/3rdparty/range-v3"]
 	path = src/3rdparty/range-v3
 	url = https://github.com/ericniebler/range-v3.git
+[submodule "src/3rdparty/magic_enum"]
+	path = src/3rdparty/magic_enum
+	url = https://github.com/Neargye/magic_enum.git

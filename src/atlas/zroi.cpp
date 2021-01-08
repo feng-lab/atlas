@@ -7,7 +7,6 @@
 #include "zroiutils.h"
 #include <QFile>
 #include <QTransform>
-#include <fmt/core.h>
 #include <cmath>
 
 namespace nim {

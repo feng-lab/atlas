@@ -118,8 +118,8 @@ const QString& ZImgPack::detailedInfo() const
     info << QString("Number of Channels: %1").arg(m_imgInfo.numChannels);
     info << QString("Number of Times: %1").arg(m_imgInfo.numTimes);
     info << QString("Bytes per Voxel: %1").arg(m_imgInfo.bytesPerVoxel);
-    info << QString("Voxel Format: %1").arg(enumToString(m_imgInfo.voxelFormat));
-    info << QString("Voxel Size Unit: %1").arg(enumToString(m_imgInfo.voxelSizeUnit));
+    info << QString("Voxel Format: %1").arg(enumToQString(m_imgInfo.voxelFormat));
+    info << QString("Voxel Size Unit: %1").arg(enumToQString(m_imgInfo.voxelSizeUnit));
     info << QString("Voxel Size X: %1").arg(m_imgInfo.voxelSizeX);
     info << QString("Voxel Size Y: %1").arg(m_imgInfo.voxelSizeY);
     info << QString("Voxel Size Z: %1").arg(m_imgInfo.voxelSizeZ);
@@ -894,7 +894,7 @@ void ZImgPack::updateNameTootip()
 {
   if (isSequence()) {
     m_name =
-      QFileInfo(m_imgSource.filenames[0]).fileName() + QString(" %1 Sequence").arg(enumToString(m_imgSource.catDim));
+      QFileInfo(m_imgSource.filenames[0]).fileName() + QString(" %1 Sequence").arg(enumToQString(m_imgSource.catDim));
     m_tooltip = m_imgSource.filenames.join("\n");
   } else {
     m_name = QFileInfo(m_imgSource.filenames[0]).fileName() +

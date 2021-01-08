@@ -248,7 +248,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     vbcAttr.write(uint64Type, &vbc);
 
     H5::Attribute vsu = grp.createAttribute("VoxelSizeUnit", strType, attrDataSpace);
-    vsu.write(strType, enumToString(info.voxelSizeUnit).toStdString());
+    vsu.write(strType, std::string(enumToString(info.voxelSizeUnit)));
 
     H5::Attribute vsxAttr = grp.createAttribute("VoxelSizeX", doubleType, attrDataSpace);
     vsxAttr.write(doubleType, &info.voxelSizeX);

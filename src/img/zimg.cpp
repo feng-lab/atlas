@@ -142,9 +142,9 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
 
   auto catDim = Dimension::Z;
   if (jo.contains("CatDimension")) {  // compat to old version
-    catDim = stringToDimension(json::value_to<QString>(jo.at("catDimension")));
+    catDim = stringToEnum<Dimension>(jo.at("catDimension").as_string());
   } else if (jo.contains("CatDim")) {
-    catDim = stringToDimension(json::value_to<QString>(jo.at("catDim")));
+    catDim = stringToEnum<Dimension>(jo.at("catDim").as_string());
   }
   size_t scene = 0;
   if (jo.contains("TileIndex")) {  // compat to old version
@@ -163,7 +163,7 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
   }
   auto format = FileFormat::Unknown;
   if (jo.contains("format")) {
-    format = stringToFileFormat(json::value_to<QString>(jo.at("format")));
+    format = stringToEnum<FileFormat>(jo.at("format").as_string());
   }
   auto expandXY = true;
   if (jo.contains("expandXY")) {
@@ -1426,8 +1426,8 @@ ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
        && bytePerVoxel != 8) ||
       ((vf == VoxelFormat::Unsigned) && bytePerVoxel != 1 && bytePerVoxel != 2 && bytePerVoxel != 4
        && bytePerVoxel != 8)) {
-    throw ZImgException(QString("Invalid combination of voxel format %1 and bytesPerVoxel %2")
-                          .arg(enumToString(vf)).arg(bytePerVoxel));
+    throw ZImgException(fmt::format("Invalid combination of voxel format {} and bytesPerVoxel {}",
+                                    enumToString(vf), bytePerVoxel));
   }
   ZImgInfo info = m_info;
   info.voxelFormat = vf;

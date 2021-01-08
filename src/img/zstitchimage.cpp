@@ -375,7 +375,7 @@ void ZStitchImage::setTileGridFromLayout(size_t numRows, size_t numCols)
   img.fill(0);
 
   auto data = img.data<int32_t>(0);
-  size_t idx = 0;
+  int32_t idx = 0;
   for (size_t r = 0; r < numRows; ++r) {
     for (size_t c = 0; c < numCols; ++c) {
       data[idx] = idx + 1;
@@ -764,12 +764,12 @@ void ZStitchImage::read(const json::object& jo)
                 json::value_to<size_t>(jo.at("input_2_common_channel")));
   }
 
-  setMergeMode(stringToImgMergeMode(json::value_to<QString>(jo.at("merge_mode"))));
+  setMergeMode(stringToEnum<ImgMergeMode>(jo.at("merge_mode").as_string()));
   if (jo.contains("downsample_block_width")) {
     setDownsampleBeforeStitching(json::value_to<size_t>(jo.at("downsample_block_width")),
                                  json::value_to<size_t>(jo.at("downsample_block_height")),
                                  json::value_to<size_t>(jo.at("downsample_block_depth")),
-                                 stringToImgMergeMode(json::value_to<QString>(jo.at("downsample_block_merge_mode"))));
+                                 stringToEnum<ImgMergeMode>(jo.at("downsample_block_merge_mode").as_string()));
   }
   setStartResolution(json::value_to<size_t>(jo.at("start_resolution_intv_X")),
                      json::value_to<size_t>(jo.at("start_resolution_intv_Y")),
