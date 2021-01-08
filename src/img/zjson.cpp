@@ -71,7 +71,8 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
       break;
 
     case json::kind::double_:
-      os << jv.get_double();
+      // os << jv.get_double();
+      os << json::serialize(jv);
       break;
 
     case json::kind::bool_:

@@ -253,11 +253,12 @@ __forceinline Container& unique_if( Container& on, Pred pred )
   return on;
 }
 
-} // namespace nim
-
+// to support std::get for local type
 template<std::size_t Index, std::size_t N, typename T>
 constexpr auto&& tuple_like_get_helper(T&& t) noexcept
 {
   static_assert(Index < N, "Index out of bounds for tuple_like");
   return std::forward<T>(t)[Index];
 }
+
+} // namespace nim

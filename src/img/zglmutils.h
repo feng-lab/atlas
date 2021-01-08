@@ -66,6 +66,8 @@ inline quat mix(const quat& q1, const quat& q2, double p)
   return mix(q1, q2, float(p));
 }
 
+using nim::tuple_like_get_helper;
+
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(glm::vec<N, T, Q>& v) noexcept
 { return tuple_like_get_helper<Index, N>(v); }

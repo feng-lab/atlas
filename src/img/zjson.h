@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zexception.h"
-#include <QStringList>
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-W#warnings"
