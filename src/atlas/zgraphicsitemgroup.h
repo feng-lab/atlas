@@ -13,7 +13,7 @@ public:
     Type = GraphicsItemType::ZGraphicsItemGroup
   };
 
-  int type() const override
+  [[nodiscard]] int type() const override
   { return Type; }
 
   explicit ZGraphicsItemGroup(QGraphicsItem* parent = nullptr);

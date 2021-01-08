@@ -17,7 +17,7 @@ class Z3DVolumeHistogramThread : public QThread
 public:
   explicit Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* parent = nullptr);
 
-  void run();
+  void run() override;
 
   std::vector<size_t>& histogram()
   { return m_histogram; }
@@ -53,7 +53,7 @@ public:
                      const glm::mat4& transformation = glm::mat4(1.0),
                      QObject* parent = nullptr);
 
-  virtual ~Z3DVolume();
+  ~Z3DVolume() override;
 
   // by default same as dimension.
   void setParentVolumeDimensions(const glm::uvec3& dim)

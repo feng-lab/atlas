@@ -10,8 +10,8 @@ class ZRegistrationCostFunction
 public:
   virtual ~ZRegistrationCostFunction() = default;
 
-  int numParameters() const
-  { return m_transform ? m_transform->numParameters() : -1; }
+  [[nodiscard]] size_t numParameters() const
+  { return m_transform ? m_transform->numParameters() : 0; }
 
   void setTransform(ZImageTransform& transform);
 
@@ -24,7 +24,7 @@ public:
   virtual void setUseMultithreading(bool i);
 
   // given transform parameters, calc cost and gradient (if not nullptr), return true if success
-  virtual bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const = 0;
+  virtual bool evaluate(const double* parameters, double* cost, double* gradient = nullptr) const = 0;
 
 protected:
   ZImageTransform* m_transform = nullptr;

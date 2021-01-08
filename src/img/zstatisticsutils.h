@@ -15,7 +15,7 @@ namespace nim {
 #define MULTITHREAD_THRESHOLD 1e8
 
 template<typename RandomAccessIterator>
-class _MinMaxElementReduce
+class MinMaxElementReduce_Impl
 {
   RandomAccessIterator m_begin;
 public:
@@ -31,11 +31,11 @@ public:
     }
   }
 
-  _MinMaxElementReduce(_MinMaxElementReduce& x, tbb::split /*unused*/)
+  MinMaxElementReduce_Impl(MinMaxElementReduce_Impl& x, tbb::split /*unused*/)
     : m_begin(x.m_begin), m_minmax(m_begin, m_begin)
   {}
 
-  void join(const _MinMaxElementReduce& y)
+  void join(const MinMaxElementReduce_Impl& y)
   {
     if (*y.m_minmax.first < *m_minmax.first) {
       m_minmax.first = y.m_minmax.first;
@@ -45,7 +45,7 @@ public:
     }
   }
 
-  explicit _MinMaxElementReduce(RandomAccessIterator begin)
+  explicit MinMaxElementReduce_Impl(RandomAccessIterator begin)
     : m_begin(begin), m_minmax(m_begin, m_begin)
   {}
 };
@@ -58,14 +58,14 @@ minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMult
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::minmax_element(begin, end);
   } else {
-    _MinMaxElementReduce<RandomAccessIterator> minmax(begin);
+    MinMaxElementReduce_Impl<RandomAccessIterator> minmax(begin);
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), minmax);
     return minmax.m_minmax;
   }
 }
 
 template<typename RandomAccessIterator, typename ResultType>
-class _SumRangeReduce
+class SumRangeReduce_Impl
 {
 public:
   ResultType m_sum;
@@ -75,13 +75,13 @@ public:
     m_sum += std::accumulate(range.begin(), range.end(), ResultType(0));
   }
 
-  _SumRangeReduce(_SumRangeReduce& /*unused*/, tbb::split /*unused*/) : m_sum(0)
+  SumRangeReduce_Impl(SumRangeReduce_Impl& /*unused*/, tbb::split /*unused*/) : m_sum(0)
   {}
 
-  void join(const _SumRangeReduce& y)
+  void join(const SumRangeReduce_Impl& y)
   { m_sum += y.m_sum; }
 
-  _SumRangeReduce() : m_sum(0)
+  SumRangeReduce_Impl() : m_sum(0)
   {}
 };
 
@@ -92,7 +92,7 @@ sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, 
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::accumulate(begin, end, init);
   } else {
-    _SumRangeReduce <RandomAccessIterator, ResultType> sum;
+    SumRangeReduce_Impl <RandomAccessIterator, ResultType> sum;
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), sum);
     return init + sum.m_sum;
   }
@@ -108,7 +108,7 @@ double mean(RandomAccessIterator begin, RandomAccessIterator end, bool useMultit
 }
 
 template<typename RandomAccessIterator, typename DiffIterator, typename ResultType>
-class _StandardDeviationReduce
+class StandardDeviationReduce_Impl
 {
   RandomAccessIterator m_begin;
   DiffIterator m_diffbegin;
@@ -125,16 +125,16 @@ public:
                                   0.0);
   }
 
-  _StandardDeviationReduce(_StandardDeviationReduce& x, tbb::split /*unused*/)
+  StandardDeviationReduce_Impl(StandardDeviationReduce_Impl& x, tbb::split /*unused*/)
     : m_begin(x.m_begin), m_diffbegin(x.m_diffbegin), m_meanV(x.m_meanV), m_sqSum(0)
   {}
 
-  void join(const _StandardDeviationReduce& y)
+  void join(const StandardDeviationReduce_Impl& y)
   {
     m_sqSum += y.m_sqSum;
   }
 
-  _StandardDeviationReduce(RandomAccessIterator begin, DiffIterator diffbegin, ResultType mean)
+  StandardDeviationReduce_Impl(RandomAccessIterator begin, DiffIterator diffbegin, ResultType mean)
     : m_begin(begin), m_diffbegin(diffbegin), m_meanV(mean), m_sqSum(0)
   {}
 };
@@ -158,9 +158,9 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
                    [meanV](ResultType v) { return v - meanV; });
     sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
   } else {
-    _StandardDeviationReduce <RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(begin,
-                                                                                                         diff.begin(),
-                                                                                                         meanV);
+    StandardDeviationReduce_Impl <RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(begin,
+                                                                                                             diff.begin(),
+                                                                                                             meanV);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), sqsum);
     sq_sum = sqsum.m_sqSum;
   }

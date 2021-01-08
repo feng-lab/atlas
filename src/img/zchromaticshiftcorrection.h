@@ -116,8 +116,8 @@ private:
   int m_numScales = 1;
 
   std::vector<SectionInfo> m_channelInfos;
-  double m_minValue;
-  double m_maxValue;
+  double m_minValue{};
+  double m_maxValue{};
 
   QString m_method{"Registration"};
 

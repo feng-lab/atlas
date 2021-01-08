@@ -173,13 +173,9 @@ double ZImgRegistration::run()
     if (i < m_numScales - 1) {
       m_transform->adaptParameters(i + 1, i);
     }
-    LOG(INFO) << "  " << "Initial Parameters: " << m_transform->paraQString();
-    std::vector<double> scales = m_transform->estimateParameterScales(dims);
-    QString scalesQString = QString("%1").arg(scales[0]);
-    for (size_t j = 1; j < scales.size(); ++j) {
-      scalesQString += QString(" %1").arg(scales[j]);
-    }
-    LOG(INFO) << "  " << "Parameter Scales: " << scalesQString;
+    LOG(INFO) << "  " << "Initial Parameters: " << json::value_from(m_transform->parameters());
+    auto scales = m_transform->estimateParameterScales(dims);
+    LOG(INFO) << "  " << "Parameter Scales: " << json::value_from(scales);
 
     m_optimizer.setParameterScales(scales);
     m_optimizer.setInitialParameters(m_transform->parameters());
@@ -188,7 +184,7 @@ double ZImgRegistration::run()
 
     m_transform->setParameters(m_optimizer.currentParameters());
 
-    LOG(INFO) << "  " << "Final Parameters: " << m_transform->paraQString();
+    LOG(INFO) << "  " << "Final Parameters: " << json::value_from(m_transform->parameters());
     LOG(INFO) << "Optimizer brief report: " << m_optimizer.briefReport();
   }
   return m_optimizer.finalCost();

@@ -48,20 +48,20 @@ bool ZApplication::event(QEvent* event)
 QString ZApplication::resourcesDirPath()
 {
 #ifdef Q_OS_MACOS
-  return applicationDirPath() + QString("/../Resources");
+  return applicationDirPath() + u"/../Resources";
 #else
-  return applicationDirPath() + QString("/Resources");
+  return applicationDirPath() + u"/Resources";
 #endif
 }
 
 QString ZApplication::applicationInstallDirPath()
 {
 #ifdef Q_OS_MACOS
-  return applicationDirPath() + QString("/../../..");
+  return applicationDirPath() + u"/../../..";
 #elif defined(Q_OS_WIN64)
-  return applicationDirPath() + QString("/..");
+  return applicationDirPath() + u"/..";
 #else
-  return applicationDirPath() + QString("/..");
+  return applicationDirPath() + u"/..";
 #endif
 }
 

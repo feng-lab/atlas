@@ -21,19 +21,19 @@ public:
 
   void minimize();
 
-  const std::vector<double>& currentParameters() const
+  [[nodiscard]] const std::vector<double>& currentParameters() const
   { return m_currentParameters; }
 
-  QString briefReport() const
-  { return QString::fromUtf8(m_summary.BriefReport().c_str()); }
+  [[nodiscard]] std::string briefReport() const
+  { return m_summary.BriefReport(); }
 
-  QString fullReport() const
-  { return QString::fromUtf8(m_summary.FullReport().c_str()); }
+  [[nodiscard]] std::string fullReport() const
+  { return m_summary.FullReport(); }
 
-  double initialCost() const
+  [[nodiscard]] double initialCost() const
   { return m_summary.initial_cost; }
 
-  double finalCost() const
+  [[nodiscard]] double finalCost() const
   { return m_summary.final_cost; }
 
 protected:

@@ -20,9 +20,7 @@ BOOST_GEOMETRY_REGISTER_RING(QPolygonF)
 
 // Register the QT rectangle. The macro(s) does not offer (yet) enough flexibility to do this in one line,
 // but the traits classes do their job perfectly.
-namespace boost {
-namespace geometry {
-namespace traits {
+namespace boost::geometry::traits {
 
 template<>
 struct tag<QRectF>
@@ -56,8 +54,7 @@ struct indexed_access<QRectF, C, D>
     else if (C == max_corner && D == 1) qr.setHeight(value - qr.y());
   }
 };
-}
-}
+
 }
 
 #if 0

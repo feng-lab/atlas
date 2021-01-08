@@ -24,15 +24,15 @@ public:
 
   ZImageTransform& operator=(const ZImageTransform&) = default;
 
-  virtual size_t numParameters() const = 0;
+  [[nodiscard]] virtual size_t numParameters() const = 0;
 
   void setParameters(const std::vector<double>& para);
 
   virtual void setParameters(double const* para) = 0;
 
-  virtual bool is2DTransform() const = 0;
+  [[nodiscard]] virtual bool is2DTransform() const = 0;
 
-  const std::vector<double>& parameters() const
+  [[nodiscard]] const std::vector<double>& parameters() const
   { return m_parameters; }
 
   virtual void adaptParameters(size_t fromLevel, size_t toLevel) = 0;
@@ -66,13 +66,11 @@ public:
   void transformImage(const TPixel* Iin, size_t width, size_t height,
                       TPixelOut* Iout, int xstart = 0, int xend = -1, int ystart = 0, int yend = -1) const;
 
-  virtual QString toQString() const = 0;
+  [[nodiscard]] virtual QString toQString() const = 0;
 
-  QString paraQString() const;
+  [[nodiscard]] virtual ZImageTransform* clone() const = 0;
 
-  virtual ZImageTransform* clone() const = 0;
-
-  virtual ZImageTransform* makeInverseTransform() const = 0;
+  [[nodiscard]] virtual ZImageTransform* makeInverseTransform() const = 0;
 
 protected:
   ZImageInterpolation m_imageInterpolation{Interpolant::Cubic, PadOption::Constant, 0.0};
@@ -140,11 +138,11 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
                                      int zstart, int zend) const
 {
   if (xend < xstart)
-    xend = xstart + width;
+    xend = xstart + int(width);
   if (yend < ystart)
-    yend = ystart + height;
+    yend = ystart + int(height);
   if (zend < zstart)
-    zend = zstart + depth;
+    zend = zstart + int(depth);
 
   AffineTransform3DForOneBlock<TPixel, TPixelOut> func(Iin, width, height, depth,
                                                        *this,
@@ -205,9 +203,9 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
 {
   CHECK(is2DTransform());
   if (xend < xstart)
-    xend = xstart + width;
+    xend = xstart + int(width);
   if (yend < ystart)
-    yend = ystart + height;
+    yend = ystart + int(height);
 
   AffineTransform2DForOneBlock<TPixel, TPixelOut> func(Iin, width, height,
                                                        *this,

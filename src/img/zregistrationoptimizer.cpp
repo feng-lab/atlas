@@ -6,6 +6,8 @@
 #include <ceres/problem.h>
 #include <ceres/local_parameterization.h>
 
+#include <utility>
+
 namespace {
 
 using namespace nim;
@@ -13,9 +15,9 @@ using namespace nim;
 struct ScalarCostFunctor
 {
   ScalarCostFunctor(const ZRegistrationCostFunction& costFunction,
-                    const std::vector<double>& scales)
+                    std::vector<double> scales)
     : m_costFunc(costFunction)
-    , m_scales(scales)
+    , m_scales(std::move(scales))
   {}
 
   bool operator()(const double* const x, double* residuals) const
@@ -49,9 +51,9 @@ public:
     set_num_residuals(1);
   }
 
-  virtual bool Evaluate(double const* const* para,
-                        double* residuals,
-                        double** jacobians) const override
+  bool Evaluate(double const* const* para,
+                double* residuals,
+                double** jacobians) const override
   {
     std::vector<double> parameters(m_costFunc.numParameters());
     double fallbackdelta = 0.0;
@@ -93,14 +95,14 @@ public:
     , m_costFun(costFun)
   {}
 
-  virtual bool Evaluate(const double* const parameters,
-                        double* cost,
-                        double* gradient) const override
+  bool Evaluate(const double* const parameters,
+                double* cost,
+                double* gradient) const override
   {
     return m_costFun.evaluate(parameters, cost, gradient);
   }
 
-  int NumParameters() const override
+  [[nodiscard]] int NumParameters() const override
   { return m_costFun.numParameters(); }
 
 private:
@@ -152,7 +154,7 @@ void ZRegistrationOptimizer::minimize()
 
 void ZRegistrationOptimizer::checkParameterNumber() const
 {
-  if (m_costFunction && static_cast<int>(m_initialParameters.size()) != m_costFunction->numParameters()) {
+  if (m_costFunction && m_initialParameters.size() != m_costFunction->numParameters()) {
     LOG(FATAL) << "Number of Optimizer Parameters don't match number of Cost Function Parameters.";
   }
   if (!m_parameterScales.empty() && m_parameterScales.size() != m_initialParameters.size()) {

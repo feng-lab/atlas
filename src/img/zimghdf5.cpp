@@ -6,14 +6,12 @@
 #include "zimgblockprovider.h"
 #include "zlog.h"
 #include "zimginfoio.h"
-#include "zioutils.h"
 #include <QFile>
 #include <QMutexLocker>
 #include <QProcess>
 #include <QRegularExpression>
 #include <folly/io/IOBuf.h>
 #include <folly/compression/Compression.h>
-#include <fmt/format.h>
 #include <utility>
 
 namespace {

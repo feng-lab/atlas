@@ -40,8 +40,8 @@ bool ZRegistrationNumericDiffCostFunction::evaluate(const double* const paramete
   if (gradient) {
     std::vector<double> paras(parameters, parameters + numParameters());
     double fallbackdelta = 0.0;
-    for (size_t i = 0; i < paras.size(); ++i) {
-      fallbackdelta += std::abs(paras[i]) * m_relativeStepSize;
+    for (auto para : paras) {
+      fallbackdelta += std::abs(para) * m_relativeStepSize;
     }
     fallbackdelta = (fallbackdelta == 0) ? m_relativeStepSize : (fallbackdelta / paras.size());
 

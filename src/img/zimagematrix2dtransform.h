@@ -26,25 +26,25 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
   void setParameters(double const* para) override;
 
-  bool is2DTransform() const override
+  [[nodiscard]] bool is2DTransform() const override
   { return true; }
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
   void transformPoint(double* inoutCoords) const override;
 
-  inline QString toQString() const override
+  [[nodiscard]] inline QString toQString() const override
   { return m_tform.toQString(); }
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 
 protected:
   ZAffine2D m_tform;
@@ -59,7 +59,7 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
@@ -69,9 +69,9 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageTranslation2DTransform : public ZImageMatrix2DTransform
@@ -81,7 +81,7 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
@@ -91,9 +91,9 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageRigid2DTransform : public ZImageMatrix2DTransform
@@ -103,7 +103,7 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
@@ -113,9 +113,9 @@ public:
 
   std::vector<double> estimateParameterScales(const double* dims) const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageSimilarity2DTransform : public ZImageMatrix2DTransform
@@ -125,7 +125,7 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
@@ -135,9 +135,9 @@ public:
 
   std::vector<double> estimateParameterScales(const double* dims) const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 };
 
 class ZImageAffine2DTransform : public ZImageMatrix2DTransform
@@ -147,7 +147,7 @@ public:
 
   // ZImageTransform interface
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   using ZImageTransform::setParameters;
 
@@ -157,9 +157,9 @@ public:
 
   std::vector<double> estimateParameterScales(const double* dims) const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 };
 
 //((scale-1)/2) in output image maps to 0 in input image, and ((3*scale-1)/2) in output
