@@ -205,7 +205,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -298,7 +298,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
   }
   catch (H5::Exception const& e) {
     QFile::remove(filename);
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

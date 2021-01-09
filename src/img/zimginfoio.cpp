@@ -97,7 +97,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
       } else if (strBuf == "hm") {
         info.voxelSizeUnit = VoxelSizeUnit::hm;
       } else {
-        throw ZIOException(QString("invalid voxel size unit %1").arg(strBuf.c_str()));
+        throw ZIOException(fmt::format("invalid voxel size unit {}", strBuf));
       }
     }
 
@@ -196,7 +196,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
     return info;
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -282,10 +282,11 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
         for (const auto& str : info.channelNames) {
           sa.push_back(str.toStdString());
         }
+        cStrArray.reserve(sa.size());
         for (const auto& str : sa) {
           cStrArray.push_back(str.c_str());
         }
-        attr.write(strType, &cStrArray[0]);
+        attr.write(strType, cStrArray.data());
       }
     }
 
@@ -312,7 +313,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     lciacAttr.write(int32Type, &lastChannelIsAlphaChannel);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

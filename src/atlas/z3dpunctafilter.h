@@ -29,11 +29,6 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  inline void setColorMode(const std::string& mode)
-  {
-    m_colorMode.select(mode.c_str());
-  }
-
   //bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
   void renderOpaque(Z3DEye eye) override;
 

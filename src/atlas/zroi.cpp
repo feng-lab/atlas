@@ -610,7 +610,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 
   return id;
@@ -680,7 +680,7 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1444,7 +1444,7 @@ void ZROI::load(const QString& filename)
     load(allGrp);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1464,7 +1464,7 @@ void ZROI::save(const QString& filename) const
   }
   catch (H5::Exception const& e) {
     QFile::remove(tfn);
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1498,7 +1498,7 @@ void ZROI::load(H5::Group& allGrp)
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1533,7 +1533,7 @@ void ZROI::save(H5::Group& allGrp) const
     numSliceAttr.write(intType, &idx);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

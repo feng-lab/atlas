@@ -247,7 +247,7 @@ void ZMesh::load(H5::Group& allGrp)
     indices.read(m_indices.data(), uintType);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -305,7 +305,7 @@ void ZMesh::save(H5::Group& allGrp) const
     indices.write(m_indices.data(), uintType);
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

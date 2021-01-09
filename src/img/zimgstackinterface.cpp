@@ -74,7 +74,7 @@ ZImg wrapZStackAsZImg(const ZStack &stack)
 ZStack *readZStack(const std::string &filename, ZStack *data, QString *error)
 {
   try {
-    ZImg img(QString::fromLocal8Bit(filename.c_str()));
+    ZImg img(QString::fromStdString(filename));
 
     // workaround QImage limit
     if (img.width() * img.height() * 4 >= 1024_usize*1024*1024*2) {
@@ -99,7 +99,7 @@ bool writeZStack(const std::string &filename, const ZStack &stack, QString *erro
   ZImg img = wrapZStackAsZImg(stack);
 
   try {
-    img.save(QString::fromLocal8Bit(filename.c_str()));
+    img.save(QString::fromStdString(filename));
     LOG(INFO) << "Wrote image: " << filename;
     return true;
   } catch (const ZIOException & e) {

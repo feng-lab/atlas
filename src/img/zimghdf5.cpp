@@ -634,7 +634,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     return res;
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename).arg(e.getDetailMsg().c_str()));
+    throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename).arg(QString::fromStdString(e.getDetailMsg())));
   }
 }
 
@@ -859,7 +859,7 @@ void ZImgHDF5::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
     }
   }
   catch (H5::Exception const& e) {
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -914,7 +914,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img,
   }
   catch (H5::Exception const& e) {
     QFile::remove(filename);
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -975,7 +975,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
   }
   catch (H5::Exception const& e) {
     QFile::remove(filename);
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 
@@ -1068,7 +1068,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgBlockProvider& imgBlo
   }
   catch (H5::Exception const& e) {
     QFile::remove(filename);
-    throw ZIOException(QString("hdf5:%1").arg(e.getDetailMsg().c_str()));
+    throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
 

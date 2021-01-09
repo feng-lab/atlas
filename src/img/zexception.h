@@ -37,7 +37,7 @@ public:
 
   ~ZException() noexcept override;
 
-  inline const char* what() const noexcept override
+  [[nodiscard]] inline const char* what() const noexcept override
   { return m_what.c_str(); }
 
 protected:

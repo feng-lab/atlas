@@ -1864,16 +1864,9 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int ex
   TIFFSetWarningHandler(nullptr);
   TIFFSetErrorHandler(LibtiffErrorHandler);
 #if defined(_WIN32) || defined(_WIN64)
-  if (bigTiff)
-    m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "w8"));
-  else
-    m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), "w"));
+  m_tif.reset(TIFFOpenW(filename.toStdWString().c_str(), bigTiff ? "w8" : "w"));
 #else
-  if (bigTiff) {
-    m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "w8"));
-  } else {
-    m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), "w"));
-  }
+  m_tif.reset(TIFFOpen(QFile::encodeName(filename).constData(), bigTiff ? "w8" : "w"));
 #endif
   if (!m_tif) {
     throw ZIOException(QString("Can't open ") % filename % QString(" for writing"));
