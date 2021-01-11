@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimagesse3.h"
 #include "zimageavx.h"
+#include "zimageavx512.h"
 #include "zbenchtimer.h"
 #include "zimginterface.h"
 #include "zsaturateoperation.h"
@@ -426,7 +427,16 @@ struct Image2DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8) {
+    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
+      Image2DFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
+                                      m_imgOut, m_imgOutWidth, range.begin(), range.end());
+    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+      Image2DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
+                                   m_imgOut, m_imgOutWidth, range.begin(), range.end());
+    } else if (m_kernelWidth >= 2) {
+      Image2DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
+                                    m_imgOut, m_imgOutWidth, range.begin(), range.end());
+    } else {
       for (size_t j = range.begin(); j != range.end(); ++j) {
         for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
@@ -438,12 +448,6 @@ struct Image2DFilterForOneBlock<double, double>
           m_imgOut[j * m_imgOutWidth + i] = sum;
         }
       }
-    } else if (ZCpuInfo::instance().bAVX) {
-      Image2DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
-                                   m_imgOut, m_imgOutWidth, range.begin(), range.end());
-    } else {
-      Image2DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
-                                    m_imgOut, m_imgOutWidth, range.begin(), range.end());
     }
   }
 
@@ -515,7 +519,16 @@ struct Image2DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8) {
+    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
+      Image2DRowFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
+                                         range.begin(), range.end());
+    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+      Image2DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
+                                      range.begin(), range.end());
+    } else if (m_kernelWidth >= 2) {
+      Image2DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
+                                       range.begin(), range.end());
+    } else {
       for (size_t j = range.begin(); j != range.end(); ++j) {
         for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
@@ -525,12 +538,6 @@ struct Image2DRowFilterForOneBlock<double, double>
           m_imgOut[j * m_imgOutWidth + i] = sum;
         }
       }
-    } else if (ZCpuInfo::instance().bAVX) {
-      Image2DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
-                                      range.begin(), range.end());
-    } else {
-      Image2DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
-                                       range.begin(), range.end());
     }
   }
 

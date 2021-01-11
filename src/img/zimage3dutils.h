@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimagesse3.h"
 #include "zimageavx.h"
+#include "zimageavx512.h"
 #include "zimage2dutils.h"
 #include <tbb/parallel_for.h>
 #include <boost/align/aligned_allocator.hpp>
@@ -293,7 +294,19 @@ struct Image3DFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8) {
+    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
+      Image3DFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_padImgHeight,
+                                      m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
+                                      m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+      Image3DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight,
+                                   m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
+                                   m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else if (m_kernelWidth >= 2) {
+      Image3DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight,
+                                    m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
+                                    m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else {
       for (size_t k = range.begin(); k != range.end(); ++k) {
         for (size_t j = 0; j < m_imgOutHeight; ++j) {
           for (size_t i = 0; i < m_imgOutWidth; ++i) {
@@ -310,14 +323,6 @@ struct Image3DFilterForOneBlock<double, double>
           }
         }
       }
-    } else if (ZCpuInfo::instance().bAVX) {
-      Image3DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight,
-                                   m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
-                                   m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
-    } else {
-      Image3DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight,
-                                    m_kernel, m_kernelWidth, m_kernelHeight, m_kernelDepth,
-                                    m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
     }
   }
 
@@ -404,7 +409,16 @@ struct Image3DRowFilterForOneBlock<double, double>
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_kernelWidth < 8) {
+    if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
+      Image3DRowFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
+                                         m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+      Image3DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
+                                      m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else if (m_kernelWidth >= 2) {
+      Image3DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
+                                       m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
+    } else {
       for (size_t k = range.begin(); k != range.end(); ++k) {
         for (size_t j = 0; j < m_imgOutHeight; ++j) {
           for (size_t i = 0; i < m_imgOutWidth; ++i) {
@@ -416,12 +430,6 @@ struct Image3DRowFilterForOneBlock<double, double>
           }
         }
       }
-    } else if (ZCpuInfo::instance().bAVX) {
-      Image3DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
-                                      m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
-    } else {
-      Image3DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_padImgHeight, m_kernel, m_kernelWidth,
-                                       m_imgOut, m_imgOutWidth, m_imgOutHeight, range.begin(), range.end());
     }
   }
 
