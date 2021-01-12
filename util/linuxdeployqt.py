@@ -156,87 +156,6 @@ def lddr(executable, libs, blacklist):
     return libs
 
 
-def determine_qt_plugins(deps, qt_plugin_dir):
-    plugin_list = set()
-
-    for so in deps:
-
-        # Platform plugin
-        if so.startswith("libQt5Gui"):
-            debug("'%s' found" % so)
-            plugin_list.add('platforms' + os.sep + 'libqxcb.so')
-
-        # CUPS print support
-        if so.startswith("libQt5PrintSupport"):
-            debug("'%s' found" % so)
-            plugin_list.add('printsupport' + os.sep + 'libcupsprintersupport.so')
-
-        # SVG support
-        if so.startswith("libQt5Svg"):
-            debug("'%s' found" % so)
-            plugin_list.add('imageformats' + os.sep + 'libqsvg.so')
-
-        # Network support
-        if so.startswith("libQt5Network"):
-            debug("'%s' found" % so)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'bearer'):
-                plugin_list.add('bearer' + os.sep + plugin)
-
-        # SQL support
-        if so.startswith("libQt5Sql"):
-            debug("'%s' found" % so)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'sqldrivers'):
-                plugin_list.add('sqldrivers' + os.sep + plugin)
-
-        # Multimedia support
-        if so.startswith("libQt5Multimedia."):
-            debug("'%s' found" % so)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'mediaservice'):
-                plugin_list.add('mediaservice' + os.sep + plugin)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'audio'):
-                plugin_list.add('audio' + os.sep + plugin)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'playlistformats'):
-                plugin_list.add('playlistformats' + os.sep + plugin)
-
-        # Sensors support
-        if so.startswith("libQt5Sensors"):
-            debug("'%s' found" % so)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'sensors'):
-                plugin_list.add('sensors' + os.sep + plugin)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'sensorgestures'):
-                plugin_list.add('sensorgestures' + os.sep + plugin)
-
-        # Positioning support
-        if so.startswith("libQt5Positioning"):
-            debug("'%s' found" % so)
-            for plugin in os.listdir(qt_plugin_dir + os.sep + 'position'):
-                plugin_list.add('position' + os.sep + plugin)
-
-    for image_plugins in os.listdir(qt_plugin_dir + os.sep + 'imageformats'):
-        if not image_plugins.startswith('libqsvg'):
-            plugin_list.add('imageformats' + os.sep + image_plugins)
-
-    if 'platforms' + os.sep + 'libqxcb.so' in plugin_list:
-        for plugin in os.listdir(qt_plugin_dir + os.sep + 'xcbglintegrations'):
-            plugin_list.add('xcbglintegrations' + os.sep + plugin)
-
-    plugin_list = {p for p in plugin_list if not p.endswith(".debug")}
-
-    not_added = set()
-    for root, subdirs, files in os.walk(qt_plugin_dir):
-        for f in files:
-            plugin = os.path.join(root, f).replace(qt_plugin_dir + os.sep, '')
-            if plugin not in plugin_list:
-                not_added.add(plugin)
-                # print files #os.path.join(root, files)
-                #
-    not_added = list(not_added)
-    debug("Used Qt plugins: %s" % list(plugin_list))
-    debug("Left out these Qt plugins: %s" % not_added)
-
-    return list(plugin_list), not_added
-
-
 def strip(f):
     cp = subprocess.run(['file', f], stdout=subprocess.PIPE, encoding='utf-8')
     if 'not stripped' in cp.stdout:
@@ -292,7 +211,7 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, qt_qml_dir):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -352,22 +271,11 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_plugins, 
             src = details['realpath']
             debug("Unhandled type '%s' (%s)" % (details['type'], src))
 
-    if False:
-        for qt_plugin in qt_plugins:
-            src = qt_plugin_dir + os.sep + qt_plugin
-            dst = dest_dir + os.sep + appdir_plugins + os.sep + qt_plugin
-            if not os.path.exists(os.path.dirname(dst)):
-                os.makedirs(os.path.dirname(dst))
-
-            debug("Copying Qt plugin " + os.path.basename(qt_plugin) + ": " + src + ' -> ' + dst)
-            shutil.copyfile(src, dst)  # overrides dest no questions asked
-            strip(dst)
-    else:
-        shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
-        for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
-            os.remove(dst)
-        for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so')):
-            strip(dst)
+    shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
+    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
+        os.remove(dst)
+    for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so')):
+        strip(dst)
 
     # Make qt.conf file
     create_qt_conf(dest_dir)
@@ -399,6 +307,7 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
                            r' -O - | sort | uniq | grep -v "^#.*" | grep "[^-\s]"'
     blacklist += os.popen(update_blacklist_cmd).read().split('\n')
     print(blacklist)
+    blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
     # exit(0)
 
     qt_qml_dir = qt_base_dir + os.sep + 'qml'
@@ -424,26 +333,5 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
 
     dependencies = merge_dicts(dependencies, exedeps)
 
-    if False:
-        used_plugins = {}
-    else:
-        # Determine what Qt plugins are used so far
-        used_plugins, not_used_plugins = determine_qt_plugins(dependencies, qt_plugin_dir)
-
-        # Resolve dependencies for detected Qt plugins
-        info("Resolving dependencies for %s Qt plugins" % len(used_plugins))
-        for plugin in used_plugins:
-            qp = qt_plugin_dir + os.sep + plugin
-            debug("Resolving shared object dependencies for Qt plugin '%s'" % os.path.basename(
-                qt_plugin_dir + os.sep + plugin))
-            qt_plugin_deps = resolve_dependencies(qp, blacklist)
-            for qt_plugin_dep in qt_plugin_deps:
-
-                qt_plugin_deps[qt_plugin_dep]['dependants'].add(qp)
-
-                if qt_plugin_dep not in dependencies:
-                    debug("Adding Qt plugin shared object dependency '%s'" % qt_plugin_dep)
-                    dependencies[qt_plugin_dep] = qt_plugin_deps[qt_plugin_dep]
-
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, used_plugins, qt_qml_dir)
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir)
