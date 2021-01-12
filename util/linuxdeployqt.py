@@ -1,7 +1,8 @@
 import os
+import shutil
 import subprocess
 import tempfile
-import shutil
+
 import glob
 
 
@@ -250,7 +251,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir):
 
         if details['type'] == 'lib':
             src = details['realpath']
-            if not src.startswith('/usr/lib/') and not src.startswith('/lib/'):
+            if details['so'].startswith('libstdc++.so') or details['so'].startswith('libgcc_s.so') or \
+                    (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
                 dst = dest_dir + os.sep + appdir_libs + os.sep + dep
                 debug("Copying library " + dep + ": " + src + ' -> ' + dst)
                 shutil.copyfile(src, dst)  # overrides dest no questions asked
@@ -308,6 +310,7 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     blacklist += os.popen(update_blacklist_cmd).read().split('\n')
     print(blacklist)
     blacklist = [p for p in blacklist if not p.startswith("libstdc++.so") and not p.startswith("libgcc_s.so")]
+    print(blacklist)
     # exit(0)
 
     qt_qml_dir = qt_base_dir + os.sep + 'qml'
