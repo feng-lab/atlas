@@ -240,6 +240,8 @@ set(IMG_SOURCES
     zglobalinit.cpp
     zjson.h
     zjson.cpp
+    zroiutils.cpp
+    zroiutils.h
     zlogcache.cpp
     zlogcache.h
     zminimumspanningtree.cpp
@@ -325,7 +327,7 @@ if (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
   set_source_files_properties(zimginterface.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/magic_enum/include)
-  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS /I${SKIA_INCLUDE_DIRS})
+  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
   #set_source_files_properties(zimggraph.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(zimagetransformresolve.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(zminimumspanningtree.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
@@ -367,7 +369,7 @@ else (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS -I${SCIFIODIR})
   set_source_files_properties(zimginterface.cpp PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/magic_enum/include)
-  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS -I${SKIA_INCLUDE_DIRS})
+  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
 
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 endif (WIN32)
@@ -377,7 +379,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen Boost::headers
                       GeometricTools glm::glm range-v3::range-v3
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
-                      glog::glog ${SKIA_LIBRARIES} ${_QT_LIBS_})
+                      glog::glog ${_QT_LIBS_})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
