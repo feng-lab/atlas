@@ -33,7 +33,11 @@ if (UNIX AND NOT APPLE)
   #    set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -Wl,-z,defs")
   #  endif()
 
-  set(CMAKE_INSTALL_RPATH "$ORIGIN/")
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/lib")
+endif ()
+
+if (APPLE)
+  set(CMAKE_INSTALL_RPATH "@loader_path/lib")
 endif ()
 
 if (UNIX)
@@ -86,7 +90,7 @@ if (PYTHON_VERSION_MAJOR)
                        POST_BUILD
                        COMMAND install_name_tool -change
                        @rpath/libfreeimageplus.dylib
-                       @loader_path/libfreeimageplus.dylib
+                       @loader_path/lib/libfreeimageplus.dylib
                        $<TARGET_FILE:${module_name}>
                        COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                        $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
@@ -117,7 +121,12 @@ install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 if (WIN32)
   install(FILES ${FREEIMAGE_DLLS} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 else (WIN32)
-  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
+  install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
+  if (UNIX AND NOT APPLE)
+    install(FILES /lib/x86_64-linux-gnu/libstdc++.so.6 /lib/x86_64-linux-gnu/libgcc_s.so.1
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
+            )
+  endif ()
 endif (WIN32)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
         DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
