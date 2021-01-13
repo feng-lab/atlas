@@ -1876,7 +1876,7 @@ def build_skia(src_dir: str, install_dir: str):
                        cwd=src_dir, shell=False, check=True)
         subprocess.run(['bin/gn', 'gen', 'out/Static',
                         "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false"],
-                       cwd=src_dir, shell=False, check=True)
+                       cwd=src_dir, shell=False, check=False)
         subprocess.run([get_ninja_binary(), '-C', 'out/Static'],
                        cwd=src_dir, shell=False, check=True)
         skia_include_dir = os.path.join(install_dir, 'include', 'skia', 'include')
