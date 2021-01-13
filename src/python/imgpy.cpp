@@ -9,7 +9,7 @@
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
 #include "zchromaticshiftcorrection.h"
-#include "zroiutils.h"
+#include "zroiutils2.h"
 #include "zimgautothreshold.h"
 #include <fmt/core.h>
 #include <pybind11/pybind11.h>
@@ -778,18 +778,18 @@ PYBIND11_MODULE(_imgpy, m)
       return fmt::format("<_imgpy.ZImgNCCMatch>");
     });
 
-  py::class_<ZROIUtils>(m, "ZROIUtils")
-    .def_static("splineToMask", &ZROIUtils::splineToMask_Python,
+  py::class_<ZROIUtils2>(m, "ZROIUtils")
+    .def_static("splineToMask", &ZROIUtils2::splineToMask_Python,
                 "spline"_a.noconvert())
-    .def_static("rectToMask", &ZROIUtils::rectToMask_Python,
+    .def_static("rectToMask", &ZROIUtils2::rectToMask_Python,
                 "rect"_a.noconvert())
-    .def_static("ellipseToMask", &ZROIUtils::ellipseToMask_Python,
+    .def_static("ellipseToMask", &ZROIUtils2::ellipseToMask_Python,
                 "ellipse"_a.noconvert())
-    .def_static("polygonToMask", &ZROIUtils::polygonToMask_Python,
+    .def_static("polygonToMask", &ZROIUtils2::polygonToMask_Python,
                 "polygon"_a.noconvert())
-    .def_static("shapeToMask", &ZROIUtils::shapeToMask_Python,
+    .def_static("shapeToMask", &ZROIUtils2::shapeToMask_Python,
                 "shapes"_a)
-    .def("__repr__", [](const ZROIUtils&) {
+    .def("__repr__", [](const ZROIUtils2&) {
       return fmt::format("<_imgpy.ZROIUtils>");
     });
 
