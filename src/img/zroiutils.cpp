@@ -74,7 +74,7 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
     for (int y = minY; y <= maxY; ++y) {
       for (int x = minX; x <= maxX; ++x) {
         if (path.contains(QPointF(x, y))) {       // not accurate for some spline
-          *img.data<uint8_t>(x - minX, y - minY, 0) = 255;
+          *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
         }
       }
     }

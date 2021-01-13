@@ -57,9 +57,9 @@
 ## Python Package Build
 ```bash
 conda install conda-build conda-verify
-conda build purge-all
-conda build zimg-recipe
-conda build conda-opencv-recipe
+conda-build purge-all
+conda-build zimg-recipe
+conda-build conda-opencv-recipe
 conda remove zimg conda-opencv -y
 conda install zimg conda-opencv -c fenglab -y
 ```

@@ -95,27 +95,6 @@ public:
     return res;
   }
 
-#if 0
-  inline static std::tuple<RowMatrixXb, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline)
-  {
-    return qPainterPathToMask_Python(splineToQPainterPath(matToPoly(spline)));
-  }
-
-  inline static std::tuple<RowMatrixXb, int32_t, int32_t> rectToMask_Python(const EigenDRef& rect)
-  {
-    return qPainterPathToMask_Python(rectToQPainterPath(matToPoly(rect)));
-  }
-
-  inline static std::tuple<RowMatrixXb, int32_t, int32_t> ellipseToMask_Python(const EigenDRef& ellipse)
-  {
-    return qPainterPathToMask_Python(ellipseToQPainterPath(matToPoly(ellipse)));
-  }
-
-  inline static std::tuple<RowMatrixXb, int32_t, int32_t> polygonToMask_Python(const EigenDRef& poly)
-  {
-    return qPainterPathToMask_Python(polygonToQPainterPath(matToPoly(poly)));
-  }
-#else
   inline static std::tuple<ZImg, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline)
   {
     return qPainterPathToMask(splineToQPainterPath(matToPoly(spline)));
@@ -163,8 +142,6 @@ public:
     }
     return qPainterPathToMask(pp);
   }
-#endif
-
 };
 
 } // namespace nim

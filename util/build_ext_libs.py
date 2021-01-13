@@ -1,11 +1,10 @@
 import argparse
-from collections import OrderedDict
-import itertools
 import difflib
-from pathlib import Path
-import json
 import distutils.dir_util
+import json
 import mmap
+from collections import OrderedDict
+from pathlib import Path
 
 from common_dirs import *
 
@@ -1871,6 +1870,27 @@ def build_ants(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_skia(src_dir: str, install_dir: str):
+    try:
+        subprocess.run(['python', 'tools/git-sync-deps'],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run(['bin/gn', 'gen', 'out/Static',
+                        "--args=is_official_build=true skia_use_libjpeg_turbo_decode=false skia_use_libjpeg_turbo_encode=false skia_use_libpng_decode=false skia_use_libpng_encode=false skia_use_libwebp_decode=false skia_use_libwebp_encode=false skia_use_icu=false skia_use_harfbuzz=false skia_use_fontconfig=false skia_use_expat=false skia_use_freetype=false skia_use_gl=false skia_use_x11=false skia_enable_gpu=false"],
+                       cwd=src_dir, shell=False, check=True)
+        subprocess.run([get_ninja_binary(), '-C', 'out/Static'],
+                       cwd=src_dir, shell=False, check=True)
+        skia_include_dir = os.path.join(install_dir, 'include', 'skia', 'include')
+        if os.path.exists(skia_include_dir):
+            shutil.rmtree(skia_include_dir, ignore_errors=False)
+        shutil.copytree(os.path.join(src_dir, 'include'), skia_include_dir)
+        skia_lib_dir = os.path.join(install_dir, 'lib', 'skia')
+        if os.path.exists(skia_lib_dir):
+            shutil.rmtree(skia_lib_dir, ignore_errors=False)
+        glob_copy(os.path.join(src_dir, 'out', 'Static', '*.a'), skia_lib_dir)
+    finally:
+        print('done')
+
+
 def build_libs(libs: dict, update_src: bool):
     print('extDIR:', ext_dir())
     print('srcPackageDIR:', src_package_dir())
@@ -2298,6 +2318,14 @@ def build_libs(libs: dict, update_src: bool):
         src_dir = os.path.join(atlas_src_dir(), 'python')
         build_conda_zimg(src_dir, ext_conda_build_dir())
 
+    if libs['skia']:
+        src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
+        update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
+        if not os.path.exists(src_dir):
+            print('no skia')
+        else:
+            build_skia(src_dir, ext_build_dir())
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
@@ -2305,12 +2333,12 @@ def parse_inputs(argv: list):
                 'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg'
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['botan', 'ospray', 'ants']
+    lib_skip_list = ['botan', 'ospray', 'ants', 'skia']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
