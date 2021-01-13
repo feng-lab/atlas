@@ -123,7 +123,8 @@ if (WIN32)
 else (WIN32)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
   if (UNIX AND NOT APPLE)
-    install(FILES /lib/x86_64-linux-gnu/libstdc++.so.6 /lib/x86_64-linux-gnu/libgcc_s.so.1
+    file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)
+    install(FILES ${gcc_stuff}
             DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
             )
   endif ()
