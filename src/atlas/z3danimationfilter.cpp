@@ -221,7 +221,7 @@ void Z3DAnimationFilter::prepareColor()
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
-        for (int j = 0; j < 16; ++j)
+        for (auto j = 0; j < 16; ++j)
           m_lineColors.push_back(m_color.get());
       }
     } else if (m_colorMode.isSelected("Colormap Time")) {
@@ -230,7 +230,7 @@ void Z3DAnimationFilter::prepareColor()
         colors.push_back(color);
         colors.push_back(color);
         colors.push_back(color);
-        for (int j = 0; j < 16; ++j)
+        for (auto j = 0; j < 16; ++j)
           m_lineColors.push_back(color);
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
@@ -240,7 +240,7 @@ void Z3DAnimationFilter::prepareColor()
           colors.push_back(color);
           colors.push_back(color);
           colors.push_back(color);
-          for (int j = 0; j < 16; ++j)
+          for (auto j = 0; j < 16; ++j)
             m_lineColors.push_back(color);
         }
       }

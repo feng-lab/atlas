@@ -508,7 +508,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size()) << m_lastImageRenderTarget->size();
 
       for (size_t i = 0; i < visibleIdxs.size(); ++i) {
-        for (int repeat = 0; repeat < 10; ++repeat) {
+        for (auto repeat = 0; repeat < 10; ++repeat) {
           LOG(INFO) << "repeat " << repeat;
           ZBenchTimer btrb("render blockids");
           ZBenchTimer btcb("collect blockids");

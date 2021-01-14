@@ -225,7 +225,7 @@ void Z2DAnimationDoc::loadAnimation()
   if (dialog.exec()) {
     QString errorMsg;
     //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read Animation.\n" + errorMsg);

@@ -1,6 +1,7 @@
 #include "zshareitemselectionmodel.h"
 
 #include "zlog.h"
+#include "zglobal.h"
 #include <QAbstractProxyModel>
 
 namespace nim {
@@ -74,7 +75,7 @@ QModelIndex ZShareItemSelectionModel::mapIndexToSrc(const QModelIndex& index) co
   if (!index.isValid())
     return QModelIndex();
   QModelIndex res = index;
-  for (int i = m_proxyChain.size(); i-- > 0;) {
+  for (index_t i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapToSource(res);
   }
   return res;
@@ -85,7 +86,7 @@ QModelIndex ZShareItemSelectionModel::mapIndexFromSrc(const QModelIndex& index) 
   if (!index.isValid())
     return QModelIndex();
   QModelIndex res = index;
-  for (int i = 0; i < m_proxyChain.size(); ++i) {
+  for (index_t i = 0; i < m_proxyChain.size(); ++i) {
     res = m_proxyChain[i]->mapFromSource(res);
   }
   return res;
@@ -96,7 +97,7 @@ QItemSelection ZShareItemSelectionModel::mapSelectionToSrc(const QItemSelection&
   if (selection.isEmpty())
     return QItemSelection();
   QItemSelection res = selection;
-  for (int i = m_proxyChain.size(); i-- > 0;) {
+  for (index_t i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapSelectionToSource(res);
   }
   return res;
@@ -107,7 +108,7 @@ QItemSelection ZShareItemSelectionModel::mapSelectionFromSrc(const QItemSelectio
   if (selection.isEmpty())
     return QItemSelection();
   QItemSelection res = selection;
-  for (int i = 0; i < m_proxyChain.size(); ++i) {
+  for (index_t i = 0; i < m_proxyChain.size(); ++i) {
     res = m_proxyChain[i]->mapSelectionFromSource(res);
   }
   return res;

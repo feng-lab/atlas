@@ -314,26 +314,26 @@ ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc& tree, std::map<ConstSwcTre
     if (ZSwc::isRoot(tn)) {
       double maxr = tn->radius + m_input.bluenessExtend / m_input.voxelSizeX;
       double zscale = m_input.voxelSizeZ / m_input.voxelSizeX;
-      int left = std::floor(tn->x - maxr);
-      int right = std::ceil(tn->x + maxr);
-      int up = std::floor(tn->y - maxr);
-      int down = std::ceil(tn->y + maxr);
-      int zup = std::floor(tn->z - maxr / zscale);
-      int zdown = std::ceil(tn->z + maxr / zscale);
+      index_t left = std::floor(tn->x - maxr);
+      index_t right = std::ceil(tn->x + maxr);
+      index_t up = std::floor(tn->y - maxr);
+      index_t down = std::ceil(tn->y + maxr);
+      index_t zup = std::floor(tn->z - maxr / zscale);
+      index_t zdown = std::ceil(tn->z + maxr / zscale);
 
-      left = std::max(0, left);
-      right = std::min(right, static_cast<int>(axonImg.width()) - 1);
-      up = std::max(0, up);
-      down = std::min(down, static_cast<int>(axonImg.height()) - 1);
-      zup = std::max(0, zup);
-      zdown = std::min(zdown, static_cast<int>(axonImg.depth()) - 1);
+      left = std::max(0_z, left);
+      right = std::min(right, static_cast<index_t>(axonImg.width()) - 1);
+      up = std::max(0_z, up);
+      down = std::min(down, static_cast<index_t>(axonImg.height()) - 1);
+      zup = std::max(0_z, zup);
+      zdown = std::min(zdown, static_cast<index_t>(axonImg.depth()) - 1);
 
-      int count = 0;
+      index_t count = 0;
       double intensity = 0.0;
-      for (int z = zup; z <= zdown; z++) {
-        for (int y = up; y <= down; y++) {
-          for (int x = left; x <= right; x++) {
-            if ((x == roundTo<int>(tn->x) && y == roundTo<int>(tn->y) && z == roundTo<int>(tn->z)) ||
+      for (auto z = zup; z <= zdown; z++) {
+        for (auto y = up; y <= down; y++) {
+          for (auto x = left; x <= right; x++) {
+            if ((x == roundTo<index_t>(tn->x) && y == roundTo<index_t>(tn->y) && z == roundTo<index_t>(tn->z)) ||
                 pointSphereDist(x, y, z, tn) <= m_input.bluenessExtend) {
               count++;
               intensity += axonImg.value<double>(x, y, z);
@@ -356,27 +356,27 @@ ZGenerateAnalysisTextFile::getAxonFeature(const ZSwc& tree, std::map<ConstSwcTre
       double maxr = std::max(tn->radius + m_input.bluenessExtend / m_input.voxelSizeX,
                              parent->radius + m_input.bluenessExtend / m_input.voxelSizeX);
       double zscale = m_input.voxelSizeZ / m_input.voxelSizeX;
-      int left = std::floor(std::min(tn->x - maxr, parent->x - maxr));
-      int right = std::ceil(std::max(tn->x + maxr, parent->x + maxr));
-      int up = std::floor(std::min(tn->y - maxr, parent->y - maxr));
-      int down = std::ceil(std::max(tn->y + maxr, parent->y + maxr));
-      int zup = std::floor(std::min(tn->z - maxr / zscale, parent->z - maxr / zscale));
-      int zdown = std::ceil(std::max(tn->z + maxr / zscale, parent->z + maxr / zscale));
+      index_t left = std::floor(std::min(tn->x - maxr, parent->x - maxr));
+      index_t right = std::ceil(std::max(tn->x + maxr, parent->x + maxr));
+      index_t up = std::floor(std::min(tn->y - maxr, parent->y - maxr));
+      index_t down = std::ceil(std::max(tn->y + maxr, parent->y + maxr));
+      index_t zup = std::floor(std::min(tn->z - maxr / zscale, parent->z - maxr / zscale));
+      index_t zdown = std::ceil(std::max(tn->z + maxr / zscale, parent->z + maxr / zscale));
 
-      left = std::max(0, left);
-      right = std::min(right, static_cast<int>(axonImg.width()) - 1);
-      up = std::max(0, up);
-      down = std::min(down, static_cast<int>(axonImg.height()) - 1);
-      zup = std::max(0, zup);
-      zdown = std::min(zdown, static_cast<int>(axonImg.depth()) - 1);
+      left = std::max(0_z, left);
+      right = std::min(right, static_cast<index_t>(axonImg.width()) - 1);
+      up = std::max(0_z, up);
+      down = std::min(down, static_cast<index_t>(axonImg.height()) - 1);
+      zup = std::max(0_z, zup);
+      zdown = std::min(zdown, static_cast<index_t>(axonImg.depth()) - 1);
 
-      int count = 0;
+      index_t count = 0;
       double intensity = 0.0;
-      for (int z = zup; z <= zdown; z++) {
-        for (int y = up; y <= down; y++) {
-          for (int x = left; x <= right; x++) {
-            if ((x == roundTo<int>(tn->x) && y == roundTo<int>(tn->y) && z == roundTo<int>(tn->z)) ||
-                (x == roundTo<int>(parent->x) && y == roundTo<int>(parent->y) && z == roundTo<int>(parent->z)) ||
+      for (auto z = zup; z <= zdown; z++) {
+        for (auto y = up; y <= down; y++) {
+          for (auto x = left; x <= right; x++) {
+            if ((x == roundTo<index_t>(tn->x) && y == roundTo<index_t>(tn->y) && z == roundTo<index_t>(tn->z)) ||
+                (x == roundTo<index_t>(parent->x) && y == roundTo<index_t>(parent->y) && z == roundTo<index_t>(parent->z)) ||
                 pointFrustumConeDist(x, y, z, tn, parent) <= m_input.bluenessExtend) {
               count++;
               intensity += axonImg.value<double>(x, y, z);
@@ -562,28 +562,28 @@ void ZGenerateAnalysisTextFile::mergeSoma(ZSwc& tree,
                  ZImgRegion(0, -1, 0, -1, 0, -1, m_input.axonChannel, m_input.axonChannel + 1, 0, 1));
     double maxr = somaNode->radius + m_input.bluenessExtend / m_input.voxelSizeX;
     double zscale = m_input.voxelSizeZ / m_input.voxelSizeX;
-    int left = std::floor(somaNode->x - maxr);
-    int right = std::ceil(somaNode->x + maxr);
-    int up = std::floor(somaNode->y - maxr);
-    int down = std::ceil(somaNode->y + maxr);
-    int zup = std::floor(somaNode->z - maxr / zscale);
-    int zdown = std::ceil(somaNode->z + maxr / zscale);
+    index_t left = std::floor(somaNode->x - maxr);
+    index_t right = std::ceil(somaNode->x + maxr);
+    index_t up = std::floor(somaNode->y - maxr);
+    index_t down = std::ceil(somaNode->y + maxr);
+    index_t zup = std::floor(somaNode->z - maxr / zscale);
+    index_t zdown = std::ceil(somaNode->z + maxr / zscale);
 
-    left = std::max(0, left);
-    right = std::min(right, static_cast<int>(axonImg.width()) - 1);
-    up = std::max(0, up);
-    down = std::min(down, static_cast<int>(axonImg.height()) - 1);
-    zup = std::max(0, zup);
-    zdown = std::min(zdown, static_cast<int>(axonImg.depth()) - 1);
+    left = std::max(0_z, left);
+    right = std::min(right, static_cast<index_t>(axonImg.width()) - 1);
+    up = std::max(0_z, up);
+    down = std::min(down, static_cast<index_t>(axonImg.height()) - 1);
+    zup = std::max(0_z, zup);
+    zdown = std::min(zdown, static_cast<index_t>(axonImg.depth()) - 1);
 
-    int count = 0;
+    index_t count = 0;
     double intensity = 0.0;
     glm::dvec3 center(somaNode->x, somaNode->y, somaNode->z);
     glm::dvec3 res(m_input.voxelSizeX, m_input.voxelSizeY, m_input.voxelSizeZ);
     center *= res;
-    for (int z = zup; z <= zdown; z++) {
-      for (int y = up; y <= down; y++) {
-        for (int x = left; x <= right; x++) {
+    for (auto z = zup; z <= zdown; z++) {
+      for (auto y = up; y <= down; y++) {
+        for (auto x = left; x <= right; x++) {
           glm::dvec3 pt(x, y, z);
           pt *= res;
           if (glm::length(pt - center) <= maxr * m_input.voxelSizeX) {
@@ -761,28 +761,28 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
                                                         const std::vector<ConstSwcTreeNode>& nodes) const
 {
   //first crop out the region
-  int left = roundTo<int>(x);
-  int right = roundTo<int>(x);
-  int up = roundTo<int>(y);
-  int down = roundTo<int>(y);
-  int zup = roundTo<int>(z);
-  int zdown = roundTo<int>(z);
+  index_t left = roundTo<index_t>(x);
+  index_t right = roundTo<index_t>(x);
+  index_t up = roundTo<index_t>(y);
+  index_t down = roundTo<index_t>(y);
+  index_t zup = roundTo<index_t>(z);
+  index_t zdown = roundTo<index_t>(z);
   for (size_t i = 0; i < nodes.size(); ++i) {
     ConstSwcTreeNode parent = ZSwc::parent(nodes[i]);
-    left = std::min(std::min(left, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
-    right = std::max(std::max(right, roundTo<int>(nodes[i]->x)), roundTo<int>(parent->x));
-    up = std::min(std::min(up, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
-    down = std::max(std::max(down, roundTo<int>(nodes[i]->y)), roundTo<int>(parent->y));
-    zup = std::min(std::min(zup, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
-    zdown = std::max(std::max(zdown, roundTo<int>(nodes[i]->z)), roundTo<int>(parent->z));
+    left = std::min(std::min(left, roundTo<index_t>(nodes[i]->x)), roundTo<index_t>(parent->x));
+    right = std::max(std::max(right, roundTo<index_t>(nodes[i]->x)), roundTo<index_t>(parent->x));
+    up = std::min(std::min(up, roundTo<index_t>(nodes[i]->y)), roundTo<index_t>(parent->y));
+    down = std::max(std::max(down, roundTo<index_t>(nodes[i]->y)), roundTo<index_t>(parent->y));
+    zup = std::min(std::min(zup, roundTo<index_t>(nodes[i]->z)), roundTo<index_t>(parent->z));
+    zdown = std::max(std::max(zdown, roundTo<index_t>(nodes[i]->z)), roundTo<index_t>(parent->z));
   }
   ZImgInfo imgInfo = ZImg::readImgInfos(m_input.imgFilename).at(0);
-  left = std::max(0, left);
-  right = std::min(right, static_cast<int>(imgInfo.width) - 1);
-  up = std::max(0, up);
-  down = std::min(down, static_cast<int>(imgInfo.height) - 1);
-  zup = std::max(0, zup);
-  zdown = std::min(zdown, static_cast<int>(imgInfo.depth) - 1);
+  left = std::max(0_z, left);
+  right = std::min(right, static_cast<index_t>(imgInfo.width) - 1);
+  up = std::max(0_z, up);
+  down = std::min(down, static_cast<index_t>(imgInfo.height) - 1);
+  zup = std::max(0_z, zup);
+  zdown = std::min(zdown, static_cast<index_t>(imgInfo.depth) - 1);
   ZImgRegion rgn(left, right + 1, up, down + 1, zup, zdown + 1, m_input.dendriteChannel, m_input.dendriteChannel + 1, 0,
                  1);
   ZImg img(m_input.imgFilename, rgn);
@@ -809,7 +809,7 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
   std::vector<double> nodeMinDists(nodes.size(), std::numeric_limits<double>::max());
   for (size_t v = 0; v < dist.size(); ++v) {
     ZVoxelCoordinate coord = img.indexToCoord(v);
-    int nodeIdx = -1;
+    index_t nodeIdx = -1;
     for (size_t i = nodes.size(); i-- > 0;) {
       if (pointFrustumConeDist(coord.x + left, coord.y + up, coord.z + zup, nodes[i], ZSwc::parent(nodes[i])) <= 0.0) {
         nodeIdx = i;

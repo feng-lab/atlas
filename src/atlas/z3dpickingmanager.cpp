@@ -89,9 +89,9 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
   if (radius < 0)
     radius = std::max(texSize.x, texSize.y);
-  for (int y = std::max(0, pos.y - radius); y <= std::min(texSize.y - 1, pos.y + radius); ++y) {
-    for (int x = std::max(0, pos.x - radius); x <= std::min(texSize.x - 1, pos.x + radius); ++x) {
-      glm::col4 col = buf[(y * texSize.x) + x];
+  for (auto y = std::max(0, pos.y - radius); y <= std::min(texSize.y - 1, pos.y + radius); ++y) {
+    for (auto x = std::max(0, pos.x - radius); x <= std::min(texSize.x - 1, pos.x + radius); ++x) {
+      auto col = buf[(y * texSize.x) + x];
       std::swap(col.r, col.b);
       if (col2dist[col] == 0)
         col2dist[col] = (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y);

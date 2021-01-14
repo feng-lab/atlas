@@ -34,7 +34,7 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
     dialog.setWindowTitle(title);
 
   if (dialog.exec()) {
-    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
 
     try {
       msh.save(dialog.selectedFiles().at(0), formats[fmtIdx]);
@@ -82,7 +82,7 @@ bool ZMeshDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToMeshPacks.at(id);
-    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     if (saveMesh(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
@@ -235,8 +235,8 @@ void ZMeshDoc::loadMesh()
   dialog.setWindowTitle("Load Mesh File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read mesh.\n" + errorMsg);

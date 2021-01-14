@@ -166,7 +166,7 @@ void ZClickableColorMapLabel::paintEvent(QPaintEvent* e)
 
   QPainter painter(this);
 
-  for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+  for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
     painter.setPen(m_colorMap->get().fractionMappedQColor((x * 1. - contentsRect().left()) / contentsRect().width()));
     painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());
   }
@@ -211,7 +211,7 @@ void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
   QColor color2(255, 255, 255);
   auto height = contentsRect().height() / 4;
   auto width = height;
-  for (int i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
+  for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
       painter.fillRect(
         QRectF(contentsRect().left() + i * width, contentsRect().top(),
@@ -230,7 +230,7 @@ void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
   }
 
   if (m_transferFunction) {
-    for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+    for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
       double fraction = (x * 1. - contentsRect().left()) / contentsRect().width();
       QColor color = m_transferFunction->get().mappedQColor(fraction);
       painter.setPen(color);
@@ -281,7 +281,7 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   QColor color2(255, 255, 255);
   auto height = contentsRect().height() / 5;
   auto width = height;
-  for (int i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
+  for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
       painter.fillRect(
         QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.1 * 5 * height,
@@ -313,7 +313,7 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
                                opacity * 255);
     QColor regionSolidQColor = regionQColor;
     regionSolidQColor.setAlpha(255);
-    for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+    for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
       if (x - contentsRect().left() <= width / 2.0 || contentsRect().right() - x <= width / 2.0) {
         painter.setPen(outlineQColor);
         painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());
@@ -375,7 +375,7 @@ void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   QColor color2(255, 255, 255);
   auto height = contentsRect().height() / 4;
   auto width = height;
-  for (int i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
+  for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
       painter.fillRect(
         QRectF(contentsRect().left() + i * width, contentsRect().top(),
@@ -402,7 +402,7 @@ void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
                              opacity * 255);
     QColor meshSolidQColor = meshQColor;
     meshSolidQColor.setAlpha(255);
-    for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+    for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
       painter.setPen(meshQColor);
       painter.drawLine(x, contentsRect().top() + 0.0 * contentsRect().height(),
                        x, contentsRect().top() + 0.5 * contentsRect().height());

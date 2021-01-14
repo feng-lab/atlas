@@ -51,7 +51,7 @@ bool ZPunctaDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToPunctaPacks.at(id);
-    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     if (savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
@@ -217,8 +217,8 @@ void ZPunctaDoc::loadPuncta()
   dialog.setWindowTitle("Load Puncta File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read puncta.\n" + errorMsg);

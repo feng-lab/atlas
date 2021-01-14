@@ -309,7 +309,7 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
         for (int j = 0; j < qim->width(); ++j) {
           double da = (*(imgDatas[0])++ - chMinValue[0]) / (chMaxValue[0] - chMinValue[0]);
           da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
-          int v = static_cast<int>(m_alpha * da * 255 + 0.5);
+          auto v = static_cast<int>(m_alpha * da * 255 + 0.5);
           qimData[j] = qRgba(v, v, v, v);
         }
       }

@@ -327,7 +327,7 @@ void ZSliceROI::addCtrlPointToShape(const QPointF &pt, size_t shapeID)
     const auto& shape = shapes[i];
     if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
       const QPolygonF& poly = shape.poly;
-      for (int j = 0; j < poly.size() - 1; ++j) {
+      for (index_t j = 0; j < poly.size() - 1; ++j) {
         double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
         if (dist < minDist) {
           minDist = dist;
@@ -969,11 +969,11 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice) const
     for (size_t si = 0; si < shapes.size(); ++si) {
       const auto& shape = shapes[si];
       if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-        for (int j = 0; j < shape.poly.size() - 1; ++j) {
+        for (index_t j = 0; j < shape.poly.size() - 1; ++j) {
           res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Any, j);
         }
       } else if (shape.type == ROIType::Line) {
-        for (int j = 0; j < shape.poly.size(); ++j) {
+        for (index_t j = 0; j < shape.poly.size(); ++j) {
           res.emplace_back(slice, id, si, ZROIControlPoint::Pos::Any, j);
         }
       } else {
@@ -1003,11 +1003,11 @@ std::vector<ZROIControlPoint> ZROI::sliceControlPoints(int slice, size_t shapeID
   for (size_t si = 0; si < shapes.size(); ++si) {
     const auto& shape = shapes[si];
     if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
-      for (int j = 0; j < shape.poly.size() - 1; ++j) {
+      for (index_t j = 0; j < shape.poly.size() - 1; ++j) {
         res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Any, j);
       }
     } else if (shape.type == ROIType::Line) {
-      for (int j = 0; j < shape.poly.size(); ++j) {
+      for (index_t j = 0; j < shape.poly.size(); ++j) {
         res.emplace_back(slice, shapeID, si, ZROIControlPoint::Pos::Any, j);
       }
     } else {

@@ -145,7 +145,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         }
 //        if (m_roiAction == ROIAction::New) {
 //          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-//          for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//          for (auto i = sliceRange.first; i < sliceRange.second; ++i)
 //            m_view->roi().deleteSliceROI(i);
 //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
@@ -166,7 +166,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
           if (m_spline.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             if (m_view->isROIMode()) {
-              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+              for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
                 if (m_roiAction == ROIAction::New) {
                   m_view->currentROIPack().roi().newSpline(i, m_spline);
                 } else if (m_roiAction == ROIAction::Add) {
@@ -178,7 +178,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             } else {
               CHECK(m_view->isRegionAnnotationMode());
               ZROI roi;
-              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+              for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
                 roi.newSpline(i, m_spline);
               }
               m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
@@ -221,7 +221,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         }
 //        if (m_roiAction == ROIAction::New) {
 //          std::pair<int, int> sliceRange = m_view->currentSliceRange();
-//          for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//          for (auto i = sliceRange.first; i < sliceRange.second; ++i)
 //            m_view->roi().deleteSliceROI(i);
 //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
@@ -246,7 +246,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
           if (m_polygon.size() > 3) {
             std::pair<int, int> sliceRange = m_view->currentSliceRange();
             if (m_view->isROIMode()) {
-              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+              for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
                 if (m_roiAction == ROIAction::New) {
                   m_view->currentROIPack().roi().newPolygon(i, m_polygon);
                 } else if (m_roiAction == ROIAction::Add) {
@@ -258,7 +258,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             } else {
               CHECK(m_view->isRegionAnnotationMode());
               ZROI roi;
-              for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+              for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
                 roi.newPolygon(i, m_polygon);
               }
               m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
@@ -330,7 +330,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
     }
 //    if (m_roiAction == ROIAction::New) {
 //      std::pair<int, int> sliceRange = m_view->currentSliceRange();
-//      for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//      for (auto i = sliceRange.first; i < sliceRange.second; ++i)
 //        m_view->roi().deleteSliceROI(i);
 //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
@@ -360,7 +360,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
     }
 //    if (m_roiAction == ROIAction::New) {
 //      std::pair<int, int> sliceRange = m_view->currentSliceRange();
-//      for (int i = sliceRange.first; i < sliceRange.second; ++i)
+//      for (auto i = sliceRange.first; i < sliceRange.second; ++i)
 //        m_view->roi().deleteSliceROI(i);
 //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
@@ -404,7 +404,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
       if (m_spline.size() > 3) {
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         if (m_view->isROIMode()) {
-          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
             if (m_roiAction == ROIAction::New) {
               m_view->currentROIPack().roi().newSpline(i, m_spline);
             } else if (m_roiAction == ROIAction::Add) {
@@ -416,7 +416,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
         } else {
           CHECK(m_view->isRegionAnnotationMode());
           ZROI roi;
-          for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+          for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
             roi.newSpline(i, m_spline);
           }
           m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
@@ -428,7 +428,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
       if (m_spline.size() >= 2 && m_view->isRegionAnnotationMode()) {
         std::pair<int, int> sliceRange = m_view->currentSliceRange();
         ZROI roi;
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           roi.newLine(i, m_spline);
         }
         m_view->currentRegionAnnotationPack().mergeLineROI(roi);
@@ -443,7 +443,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
     if (m_polygon.size() > 3) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       if (m_view->isROIMode()) {
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           if (m_roiAction == ROIAction::New) {
             m_view->currentROIPack().roi().newPolygon(i, m_polygon);
           } else if (m_roiAction == ROIAction::Add) {
@@ -455,7 +455,7 @@ void ZGraphicsScene::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event)
       } else {
         CHECK(m_view->isRegionAnnotationMode());
         ZROI roi;
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           roi.newPolygon(i, m_polygon);
         }
         m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
@@ -477,7 +477,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       if (m_view->isROIMode()) {
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           if (m_roiAction == ROIAction::New) {
             m_view->currentROIPack().roi().newRect(i, rect);
           } else if (m_roiAction == ROIAction::Add) {
@@ -489,7 +489,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
       } else {
         CHECK(m_view->isRegionAnnotationMode());
         ZROI roi;
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           roi.newRect(i, rect);
         }
         m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);
@@ -502,7 +502,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     if (rect.width() >= 1. && rect.height() >= 1.) {
       std::pair<int, int> sliceRange = m_view->currentSliceRange();
       if (m_view->isROIMode()) {
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           if (m_roiAction == ROIAction::New) {
             m_view->currentROIPack().roi().newEllipse(i, rect);
           } else if (m_roiAction == ROIAction::Add) {
@@ -514,7 +514,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
       } else {
         CHECK(m_view->isRegionAnnotationMode());
         ZROI roi;
-        for (int i = sliceRange.first; i < sliceRange.second; ++i) {
+        for (auto i = sliceRange.first; i < sliceRange.second; ++i) {
           roi.newEllipse(i, rect);
         }
         m_view->currentRegionAnnotationPack().mergeROIToCurrentRegion(roi);

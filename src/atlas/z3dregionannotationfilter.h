@@ -64,9 +64,9 @@ private:
 
   ZRegionAnnotationPack* m_regionAnnotationPack = nullptr;
 
-  std::map<int, std::unique_ptr<Z3DMeshFilter>> m_idToMeshFilters;
-  std::map<int, QString> m_idToRegionNames;
-  std::map<QString, int> m_nameToID;
+  std::map<int64_t, std::unique_ptr<Z3DMeshFilter>> m_idToMeshFilters;
+  std::map<int64_t, QString> m_idToRegionNames;
+  std::map<QString, int64_t> m_nameToID;
 
   size_t m_numParas;
 

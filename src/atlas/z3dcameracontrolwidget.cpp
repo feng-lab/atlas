@@ -3,7 +3,6 @@
 #include "z3dview.h"
 #include "zdoc.h"
 #include <QVBoxLayout>
-#include <QHBoxLayout>
 #include <QPushButton>
 #include <QSpinBox>
 
@@ -111,8 +110,8 @@ void Z3DCameraControlWidget::setYZView()
 
 void Z3DCameraControlWidget::createWidget()
 {
-  int minDegrees = -360;
-  int maxDegrees = 360;
+  auto minDegrees = -360;
+  auto maxDegrees = 360;
 
   auto vlo = new QVBoxLayout;
   QHBoxLayout* hlo = nullptr;

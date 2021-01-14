@@ -333,7 +333,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
                                                 const std::set<uint32_t>& usedBlockIDs,
                                                 bool silenceExistingWarning)
 {
-  int numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
+  auto numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
   if (silenceExistingWarning) {
     CHECK(usedBlockIDs.empty());
     LOG(INFO) << "total " << m_imageCacheManager->size()
@@ -359,9 +359,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     }
 
     blockID -= m_posToBlockIDs[level].w;
-    int z = blockID / m_posToBlockIDs[level].z;
+    auto z = blockID / m_posToBlockIDs[level].z;
     blockID -= z * m_posToBlockIDs[level].z;
-    int y = blockID / m_posToBlockIDs[level].y;
+    auto y = blockID / m_posToBlockIDs[level].y;
     blockID -= y * m_posToBlockIDs[level].y;
     glm::ivec4 blockKey(level, blockID, y, z);
     if (!glm::all(glm::lessThan(blockKey.yzw(), glm::ivec3(m_pageTableDimensions[level]))) ||
@@ -375,10 +375,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
     m_pageTableCacheManager->touch(key);
   }
 
-  int count = 0;
+  auto count = 0;
   level = 0;
   glm::ivec4 erasedKey;
-  int numAvailablePageCacheBlock = int(m_pageTableCacheManager->size()) - int(usedPageTableKeys.size());
+  auto numAvailablePageCacheBlock = int(m_pageTableCacheManager->size()) - int(usedPageTableKeys.size());
   CHECK(numAvailablePageCacheBlock >= 0);
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
@@ -656,7 +656,7 @@ void Z3DImg::checkPageSystemError()
     CHECK(glm::all(glm::greaterThanEqual(m_pageDirectory[i].xyz(), glm::ivec3(0, 0, 0))) &&
           glm::all(glm::lessThan(m_pageDirectory[i].xyz(), m_pageTableCacheSize)));
 
-    int numValidEntry = 0;
+    auto numValidEntry = 0;
     for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
       for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
         for (size_t x = 0; x < m_pageTableBlockSize.x; ++x) {

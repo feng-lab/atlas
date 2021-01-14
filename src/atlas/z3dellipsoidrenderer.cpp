@@ -43,8 +43,8 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
   m_axis3.clear();
   m_specularAndShininess.clear();
   m_indexs.clear();
-  int indices[6] = {0, 1, 2, 2, 1, 3};
-  int quadIdx = 0;
+  GLuint indices[6] = {0, 1, 2, 2, 1, 3};
+  GLuint quadIdx = 0;
   for (size_t i = 0; i < centers->size(); ++i) {
     glm::mat4 T(glm::vec4((*axis1)[i], 0.f),
                 glm::vec4((*axis2)[i], 0.f),
@@ -66,7 +66,7 @@ void Z3DEllipsoidRenderer::setData(std::vector<glm::vec3>* centers, std::vector<
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
     m_axis3.push_back(T[2]);
-    for (int k = 0; k < 6; ++k) {
+    for (auto k = 0; k < 6; ++k) {
       m_indexs.push_back(indices[k] + 4 * quadIdx);
     }
     quadIdx++;
@@ -220,13 +220,13 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
     if (m_dataChanged) {
       m_VAO.bind();
       // set vertex data
-      GLint attr_T = shader.TAttributeLocation();
+      auto attr_T = shader.TAttributeLocation();
       GLint attr_a_specular_shininess = -1;
       if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }
-      GLint attr_color = shader.colorAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       glEnableVertexAttribArray(attr_T);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -282,13 +282,13 @@ void Z3DEllipsoidRenderer::render(Z3DEye eye)
 
   } else {
     // set vertex data
-    GLint attr_T = shader.TAttributeLocation();
+    auto attr_T = shader.TAttributeLocation();
     GLint attr_a_specular_shininess = -1;
     if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
       attr_a_specular_shininess = shader.specularShininessAttributeLocation();
     }
-    GLint attr_color = shader.colorAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     glEnableVertexAttribArray(attr_T);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -376,9 +376,9 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
     if (m_pickingDataChanged) {
       m_pickingVAO.bind();
       // set vertex data
-      GLint attr_T = shader.TAttributeLocation();
-      GLint attr_color = shader.colorAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_T = shader.TAttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       glEnableVertexAttribArray(attr_T);
       if (m_dataChanged) {
@@ -450,9 +450,9 @@ void Z3DEllipsoidRenderer::renderPicking(Z3DEye eye)
 
   } else {
     // set vertex data
-    GLint attr_T = shader.TAttributeLocation();
-    GLint attr_color = shader.colorAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_T = shader.TAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     glEnableVertexAttribArray(attr_T);
     if (m_dataChanged) {

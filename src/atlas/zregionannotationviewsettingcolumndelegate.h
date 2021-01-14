@@ -13,11 +13,11 @@ class ZRegionAnnotationViewSettingColumnDelegate : public QStyledItemDelegate
 Q_OBJECT
 public:
   explicit ZRegionAnnotationViewSettingColumnDelegate(
-    std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+    std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
     QObject* parent = nullptr);
 
   explicit ZRegionAnnotationViewSettingColumnDelegate(
-    std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+    std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
     QObject* parent = nullptr);
 
   void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
@@ -28,8 +28,8 @@ private:
   explicit ZRegionAnnotationViewSettingColumnDelegate(QObject* parent = nullptr);
 
 private:
-  std::map<int, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
-  std::map<int, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
+  std::map<int64_t, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
+  std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
 };
 
 } // namespace nim

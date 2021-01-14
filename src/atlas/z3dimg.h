@@ -131,8 +131,8 @@ protected:
   glm::uvec3 m_imageBlockSizePad;
   glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
-  int m_emptyFlag = 40000;
+  const int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
+  const int m_emptyFlag = 40000;
 
   std::vector<glm::ivec4> m_pageDirectory;
   glm::ivec3 m_pageDirectorySize;

@@ -56,8 +56,8 @@ void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QS
     throw ZImgException(QString("Correction log file must be specified."));
   }
 
-  int refChannel = m_referenceChannel.associatedData() - 1;
-  int targetChannel = m_targetChannel.associatedData() - 1;
+  auto refChannel = m_referenceChannel.associatedData() - 1;
+  auto targetChannel = m_targetChannel.associatedData() - 1;
 
   auto* workertmp = new ZChromaticShiftCorrection(m_inputImagesFileWidget->getSelectedOpenFile(),
                                                   m_outputStackWidget->getSelectedSaveFile());

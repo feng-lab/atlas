@@ -219,7 +219,7 @@ void ZRegionAnnotationFilter::allROIChanged()
   }
 
   for (const auto& node : m_regionAnnotationPack->regionAnnotation().annotationTree()) {
-    int id = node.id;
+    auto id = node.id;
     auto flt = new ZROIFilter(m_view, &node);
     if (node.roi) {
       flt->setData(*(node.roi), *m_regionAnnotationPack);

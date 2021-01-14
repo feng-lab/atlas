@@ -409,12 +409,12 @@ void Z3DMeshRenderer::render(Z3DEye eye)
     shader.bindTexture("texture", m_texture);
   }
 
-  GLint attr_vertex = shader.vertexAttributeLocation();
-  GLint attr_1dTexCoord0 = shader.tex1dCoord0AttributeLocation();
-  GLint attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
-  GLint attr_3dTexCoord0 = shader.tex3dCoord0AttributeLocation();
-  GLint attr_normal = shader.normalAttributeLocation();
-  GLint attr_color = shader.colorAttributeLocation();
+  auto attr_vertex = shader.vertexAttributeLocation();
+  auto attr_1dTexCoord0 = shader.tex1dCoord0AttributeLocation();
+  auto attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
+  auto attr_3dTexCoord0 = shader.tex3dCoord0AttributeLocation();
+  auto attr_normal = shader.normalAttributeLocation();
+  auto attr_color = shader.colorAttributeLocation();
 
   if (m_hardwareSupportVAO) {
     if (m_dataChanged) {
@@ -436,7 +436,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         const std::vector<glm::vec4>& colors = (*m_meshPt)[i]->colors();
         const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
 
-        int bufIdx = 0;
+        size_t bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
         m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
         glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
@@ -581,7 +581,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
       GLenum type = (*m_meshPt)[i]->type();
 
-      int bufIdx = 0;
+      size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
       if (m_dataChanged)
@@ -706,8 +706,8 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
   setPickingShaderParameters(shader);
   shader.setUseCustomColorUniform(true);
 
-  GLint attr_vertex = shader.vertexAttributeLocation();
-  GLint attr_normal = shader.normalAttributeLocation();
+  auto attr_vertex = shader.vertexAttributeLocation();
+  auto attr_normal = shader.normalAttributeLocation();
 
   if (m_hardwareSupportVAO) {
     if (m_pickingDataChanged) {
@@ -721,11 +721,11 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       for (size_t i = 0; i < m_meshPt->size(); ++i) {
         m_pickingVAOs.bind(i);
 
-        const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
-        const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
-        const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+        const auto& vertices = (*m_meshPt)[i]->vertices();
+        const auto& normals = (*m_meshPt)[i]->normals();
+        const auto& triangleIndexes = (*m_meshPt)[i]->indices();
 
-        int bufIdx = 0;
+        size_t bufIdx = 0;
         glEnableVertexAttribArray(attr_vertex);
         if (m_dataChanged) {
           m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);
@@ -776,9 +776,9 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
       shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
-      GLenum type = (*m_meshPt)[i]->type();
-      const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
-      const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
+      auto type = (*m_meshPt)[i]->type();
+      const auto& vertices = (*m_meshPt)[i]->vertices();
+      const auto& triangleIndexes = (*m_meshPt)[i]->indices();
 
       m_pickingVAOs.bind(i);
       if (triangleIndexes.empty()) {
@@ -818,12 +818,12 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
       shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
-      const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
-      const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
-      const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
-      GLenum type = (*m_meshPt)[i]->type();
+      const auto& vertices = (*m_meshPt)[i]->vertices();
+      const auto& normals = (*m_meshPt)[i]->normals();
+      const auto& triangleIndexes = (*m_meshPt)[i]->indices();
+      auto type = (*m_meshPt)[i]->type();
 
-      int bufIdx = 0;
+      size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
       if (m_dataChanged) {
         m_pickingVBOs[i].bind(GL_ARRAY_BUFFER, bufIdx++);

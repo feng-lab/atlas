@@ -54,8 +54,8 @@ void SliceROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* even
 {
   if (m_roi.sliceHasPolyOrSpline(m_slice)) {
     QMenu menu;
-    QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
-    QAction* selectedAction = menu.exec(event->screenPos());
+    auto addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+    auto selectedAction = menu.exec(event->screenPos());
     if (selectedAction == addCtrlPointAction) {
       m_roi.sliceAddCtrlPoint(m_slice, event->scenePos());
     }
@@ -175,7 +175,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   for (const auto& shapeOp : shapeOps) {
     if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
       QMenu menu;
-      QAction* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
+      auto* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
 //      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
       QAction* toRegionAction = nullptr;
       QAction* subtractNextSelectedShapeAction = nullptr;
@@ -186,7 +186,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
         subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
         // toRegionAction = menu.addAction("Add ROI to Region...");
       }
-      QAction* selectedAction = menu.exec(event->screenPos());
+      auto* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == addCtrlPointAction) {
         m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
       } else if (toRegionAction && selectedAction == toRegionAction) {
@@ -524,7 +524,7 @@ void ZROIFilter::setData(ZROI& roi, ZROIPack& roiPack)
   m_sliceToCtrlPtItems.clear();
   if (!m_ROI->isEmpty()) {
     for (const auto& sliceROI : *m_ROI) {
-      int slice = sliceROI.first;
+      auto slice = sliceROI.first;
       for (auto shapeID :m_ROI->sliceShapeIDs(slice)) {
         createShapeItem(slice, shapeID);
         createCtrlPtItems(slice, shapeID);
@@ -551,7 +551,7 @@ void ZROIFilter::setData(ZROI& roi, ZRegionAnnotationPack& raPack)
   m_sliceToCtrlPtItems.clear();
   if (!m_ROI->isEmpty()) {
     for (const auto& sliceROI : *m_ROI) {
-      int slice = sliceROI.first;
+      auto slice = sliceROI.first;
       for (auto shapeID :m_ROI->sliceShapeIDs(slice)) {
         createShapeItem(slice, shapeID);
         createCtrlPtItems(slice, shapeID);
@@ -616,7 +616,7 @@ void ZROIFilter::setNormalView(int z, int /*t*/)
   if (!m_visible.get()) {
     return;
   }
-  int rz = realZ(z);
+  auto rz = realZ(z);
 
   m_sliceToROIItem.clear();
   m_sliceToCtrlPtItems.clear();
@@ -639,7 +639,7 @@ void ZROIFilter::setMaxZProjView(int /*t*/)
   m_sliceToCtrlPtItems.clear();
   if (m_ROI) {
     for (const auto& sliceROI : *m_ROI) {
-      int slice = sliceROI.first;
+      auto slice = sliceROI.first;
       for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
         createShapeItem(slice, shapeID);
         createCtrlPtItems(slice, shapeID);
@@ -1035,7 +1035,7 @@ void ZROIFilter::offsetChanged()
   m_sliceToCtrlPtItems.clear();
   if (m_ROI) {
     for (const auto& sliceROI : *m_ROI) {
-      int slice = sliceROI.first;
+      auto slice = sliceROI.first;
       for (auto shapeID : m_ROI->sliceShapeIDs(slice)) {
         createShapeItem(slice, shapeID);
         createCtrlPtItems(slice, shapeID);

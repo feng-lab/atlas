@@ -16,14 +16,14 @@ ZEventListenerParameter::listenTo(const QString& actionName, const Qt::MouseButt
                                   const Qt::KeyboardModifiers& modifiers,
                                   QEvent::Type type)
 {
-  m_mouseEvents.push_back(MouseEvent(actionName, buttons, modifiers, type));
+  m_mouseEvents.emplace_back(actionName, buttons, modifiers, type);
   emit valueChanged();
 }
 
 void ZEventListenerParameter::listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
                                        QEvent::Type type)
 {
-  m_keyEvents.push_back(KeyEvent(actionName, key, modifiers, type));
+  m_keyEvents.emplace_back(actionName, key, modifiers, type);
   emit valueChanged();
 }
 
@@ -115,7 +115,7 @@ QWidget* ZEventListenerParameter::actualCreateWidget(QWidget* parent)
 void ZEventListenerParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const ZEventListenerParameter* src = static_cast<const ZEventListenerParameter*>(&rhs);
+  const auto* src = static_cast<const ZEventListenerParameter*>(&rhs);
   m_sharing = src->m_sharing;
   m_mouseEvents = src->m_mouseEvents;
   m_keyEvents = src->m_keyEvents;

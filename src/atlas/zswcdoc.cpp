@@ -208,8 +208,8 @@ void ZSwcDoc::loadSwc()
   dialog.setWindowTitle("Load Swc File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read swc.\n" + errorMsg);

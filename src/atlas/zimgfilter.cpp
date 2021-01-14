@@ -234,8 +234,8 @@ void ZImgFilter::setSelected(bool v)
 void ZImgFilter::setNormalView(int z, int t)
 {
   bool isVisibleBefore = m_isVisible;
-  int logicalZ = realZ(z);
-  int logicalT = realT(t);
+  auto logicalZ = realZ(z);
+  auto logicalT = realT(t);
   m_sliceValid = logicalT >= 0 && logicalT < int(m_imgPack->imgInfo().numTimes) &&
                  logicalZ >= 0 && logicalZ < int(m_imgPack->imgInfo().depth);
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
@@ -255,7 +255,7 @@ void ZImgFilter::setNormalView(int z, int t)
 void ZImgFilter::setMaxZProjView(int t)
 {
   bool isVisibleBefore = m_isVisible;
-  int logicalT = realT(t);
+  auto logicalT = realT(t);
   m_sliceValid = logicalT >= 0 && logicalT < int(m_imgPack->imgInfo().numTimes);
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 

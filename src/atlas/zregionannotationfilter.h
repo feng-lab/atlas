@@ -60,9 +60,9 @@ private:
 
 private:
   ZRegionAnnotationPack* m_regionAnnotationPack = nullptr;
-  std::map<int, std::unique_ptr<ZROIFilter>> m_idToROIFilters;
-  std::map<int, QString> m_idToRegionNames;
-  std::map<QString, int> m_nameToID;
+  std::map<int64_t, std::unique_ptr<ZROIFilter>> m_idToROIFilters;
+  std::map<int64_t, QString> m_idToRegionNames;
+  std::map<QString, int64_t> m_nameToID;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   ZView& m_view;

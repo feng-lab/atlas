@@ -41,14 +41,14 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
   m_pointAndRadius.clear();
   m_specularAndShininess.clear();
   m_indexs.clear();
-  int indices[6] = {0, 1, 2, 2, 1, 3};
-  int quadIdx = 0;
+  GLuint indices[6] = {0, 1, 2, 2, 1, 3};
+  GLuint quadIdx = 0;
   for (auto pr : *pointAndRadiusInput) {
     m_pointAndRadius.push_back(pr);
     m_pointAndRadius.push_back(pr);
     m_pointAndRadius.push_back(pr);
     m_pointAndRadius.push_back(pr);
-    for (int k = 0; k < 6; ++k) {
+    for (auto k = 0; k < 6; ++k) {
       m_indexs.push_back(indices[k] + 4 * quadIdx);
     }
     quadIdx++;
@@ -219,13 +219,13 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       }
 
       // set vertex data
-      GLint attr_a_vertex_radius = shader.vertexAttributeLocation();
+      auto attr_a_vertex_radius = shader.vertexAttributeLocation();
       GLint attr_a_specular_shininess = -1;
       if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
         attr_a_specular_shininess = shader.specularShininessAttributeLocation();
       }
-      GLint attr_color = shader.colorAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_VAOs.bind(i);
@@ -283,13 +283,13 @@ void Z3DSphereRenderer::render(Z3DEye eye)
       }
     }
     // set vertex data
-    GLint attr_a_vertex_radius = shader.vertexAttributeLocation();
+    auto attr_a_vertex_radius = shader.vertexAttributeLocation();
     GLint attr_a_specular_shininess = -1;
     if (m_useDynamicMaterial.get() && !m_specularAndShininess.empty()) {
       attr_a_specular_shininess = shader.specularShininessAttributeLocation();
     }
-    GLint attr_color = shader.colorAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
@@ -379,9 +379,9 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
       }
 
       // set vertex data
-      GLint attr_a_vertex_radius = shader.vertexAttributeLocation();
-      GLint attr_color = shader.colorAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_a_vertex_radius = shader.vertexAttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_pickingVAOs.bind(i);
@@ -445,9 +445,9 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
       }
     }
     // set vertex data
-    GLint attr_a_vertex_radius = shader.vertexAttributeLocation();
-    GLint attr_color = shader.colorAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_a_vertex_radius = shader.vertexAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;

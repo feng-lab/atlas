@@ -79,8 +79,8 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
     m_smoothLineP1s.clear();
     m_indexs.clear();
     if (linesInput) {
-      int indices[6] = {0, 1, 2, 2, 1, 3};
-      int quadIdx = 0;
+      GLuint indices[6] = {0, 1, 2, 2, 1, 3};
+      GLuint quadIdx = 0;
       if (m_isLineStrip) {
         for (size_t i = 1; i < linesInput->size(); ++i) {
           m_smoothLineP0s.push_back((*linesInput)[i - 1]);
@@ -425,7 +425,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
   if (m_hardwareSupportVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
-      GLint attr_vertex = shader.vertexAttributeLocation();
+      auto attr_vertex = shader.vertexAttributeLocation();
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -433,7 +433,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (!m_useTextureColor) {
-        GLint attr_color = shader.colorAttributeLocation();
+        auto attr_color = shader.colorAttributeLocation();
         glEnableVertexAttribArray(attr_color);
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
         glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
@@ -470,7 +470,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
     m_VAO.release();
 
   } else {
-    GLint attr_vertex = shader.vertexAttributeLocation();
+    auto attr_vertex = shader.vertexAttributeLocation();
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     if (m_dataChanged)
@@ -550,8 +550,8 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
   if (m_hardwareSupportVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAO.bind();
-      GLint attr_vertex = shader.vertexAttributeLocation();
-      GLint attr_color = shader.colorAttributeLocation();
+      auto attr_vertex = shader.vertexAttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
 
       glEnableVertexAttribArray(attr_vertex);
       if (m_dataChanged) {
@@ -583,8 +583,8 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     m_pickingVAO.release();
 
   } else {
-    GLint attr_vertex = shader.vertexAttributeLocation();
-    GLint attr_color = shader.colorAttributeLocation();
+    auto attr_vertex = shader.vertexAttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     if (m_dataChanged) {
@@ -651,15 +651,15 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
       }
 
       // set vertex data
-      GLint attr_p0 = shader.p0AttributeLocation();
-      GLint attr_p1 = shader.p1AttributeLocation();
+      auto attr_p0 = shader.p0AttributeLocation();
+      auto attr_p1 = shader.p1AttributeLocation();
       GLint attr_p0color = -1;
       GLint attr_p1color = -1;
       if (!m_useTextureColor) {
         attr_p0color = shader.p0ColorAttributeLocation();
         attr_p1color = shader.p1ColorAttributeLocation();
       }
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_VAOs.bind(i);
@@ -722,15 +722,15 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
       }
     }
     // set vertex data
-    GLint attr_p0 = shader.p0AttributeLocation();
-    GLint attr_p1 = shader.p1AttributeLocation();
+    auto attr_p0 = shader.p0AttributeLocation();
+    auto attr_p1 = shader.p1AttributeLocation();
     GLint attr_p0color = -1;
     GLint attr_p1color = -1;
     if (!m_useTextureColor) {
       attr_p0color = shader.p0ColorAttributeLocation();
       attr_p1color = shader.p1ColorAttributeLocation();
     }
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
@@ -813,11 +813,11 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
       }
 
       // set vertex data
-      GLint attr_p0 = shader.p0AttributeLocation();
-      GLint attr_p1 = shader.p1AttributeLocation();
-      GLint attr_p0color = shader.p0ColorAttributeLocation();
-      GLint attr_p1color = shader.p1ColorAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
+      auto attr_p0 = shader.p0AttributeLocation();
+      auto attr_p1 = shader.p1AttributeLocation();
+      auto attr_p0color = shader.p0ColorAttributeLocation();
+      auto attr_p1color = shader.p1ColorAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
 
       for (size_t i = 0; i < numBatch; ++i) {
         m_pickingVAOs.bind(i);
@@ -893,11 +893,11 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
     }
 
     // set vertex data
-    GLint attr_p0 = shader.p0AttributeLocation();
-    GLint attr_p1 = shader.p1AttributeLocation();
-    GLint attr_p0color = shader.p0ColorAttributeLocation();
-    GLint attr_p1color = shader.p1ColorAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
+    auto attr_p0 = shader.p0AttributeLocation();
+    auto attr_p1 = shader.p1AttributeLocation();
+    auto attr_p0color = shader.p0ColorAttributeLocation();
+    auto attr_p1color = shader.p1ColorAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;

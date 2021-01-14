@@ -195,7 +195,7 @@ void extractNeuronChannel()
 //  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
 //  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
 //  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 0, -1, 1, 2));
@@ -218,7 +218,7 @@ void convertRawToNim()
   list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
 //  dir = QDir("/Volumes/lq/image/1201_devCA3_CA1/35143_02");
 //  list.append(dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks));
-  for (int i = 26; i < list.size(); ++i) {
+  for (index_t i = 26; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -252,7 +252,7 @@ void convertImagesFormat()
   QStringList filters;
   filters << "*.v3draw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -275,7 +275,7 @@ void resizeInjectionCoreImgs()
   QStringList filters;
   filters << "*.czi";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString fileName = fileInfo.fileName();
     size_t scene = fileName.at(fileName.size() - 5).toLatin1() - '1';
@@ -642,7 +642,7 @@ void changeImgCompressionType()
   QStringList filters;
   filters << "*.tif";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -660,7 +660,7 @@ void makeSWCPyramidal()
   QStringList filters;
   filters << "*c.swc";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZSwc tree(fileInfo.absoluteFilePath());
@@ -680,7 +680,7 @@ void makeAxonChannelImages()
   QStringList filters;
   filters << "*.raw";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -704,7 +704,7 @@ void makeAxonChannelImages()
   axonChannel = 0;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -728,7 +728,7 @@ void makeAxonChannelImages()
   axonChannel = 2;
 
   list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     QFileInfo fileInfo = list.at(i);
     QString outname = outFolder.absoluteFilePath(fileInfo.baseName() + ".tif");
     QString outname1 = outFolder.absoluteFilePath(fileInfo.baseName() + "_rb.tif");
@@ -764,7 +764,7 @@ void moveObjectToCorrectLocation(const QString& fn, const QString& resfn,
 
   QList<QStringList> metaData = QtCSV::Reader::readToList(metaFiles[0]);
   metaData.removeFirst();
-  for (int i = 1; i < metaFiles.size(); ++i) {
+  for (index_t i = 1; i < metaFiles.size(); ++i) {
     QList<QStringList> tmp = QtCSV::Reader::readToList(metaFiles[i]);
     tmp.removeFirst();
     metaData += tmp;
@@ -896,7 +896,7 @@ void createCellTable()
     double AP = metaIdx[4].toDouble();
     double ML = metaIdx[5].toDouble();
     double r2 = metaIdx[27].toDouble();
-    int somaLocationOrder = somaLocationMap[somaLocation];
+    auto somaLocationOrder = somaLocationMap[somaLocation];
     assert(somaLocationOrder > 0 && somaLocationOrder < 5);
 
     if (cellType == "Pyr") {
@@ -985,7 +985,7 @@ void testLogSpeed()
 {
   ZBenchTimer bt;
   QStringList logList;
-  for (int i = 0; i < 500000; ++i)
+  for (auto i = 0; i < 500000; ++i)
     logList << randomString(10, 100);
   bt.start();
   for (const auto& i : logList)
@@ -1183,7 +1183,7 @@ void convertPVRawToNim()
   QList<QStringList> metaData = QtCSV::Reader::readToList("/Volumes/shared/feng/Chris/pv_img/img_srclist.txt");
   ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
   ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
-  for (int i = 0; i < metaData.size(); ++i) {
+  for (index_t i = 0; i < metaData.size(); ++i) {
     QFileInfo fileInfo = QFileInfo(metaData[i][0]);
     LOG(INFO) << i << " " << metaData.size() << " " << fileInfo.absoluteFilePath();
 
@@ -1230,7 +1230,7 @@ void convertPYRawToNim()
   ZImg refPYImg("/Volumes/shared/feng/Chris/slice15/slice15_L18_Sum.lsm");
   ZImg refPVImg("/Volumes/shared/os/PV/201602_contraPV/PV139/5/s9/PV139_5_s9_R1_GR1_B1_L19.lsm");
 
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     auto fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -1277,7 +1277,7 @@ void channelCalibration()
   filters << "*.lsm";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
 
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     auto fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
@@ -1332,7 +1332,7 @@ void createGlanceThumbnails()
     filters << "*_layer.swc";
     QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
 
-    for (int i = 0; i < list.size(); ++i) {
+    for (index_t i = 0; i < list.size(); ++i) {
       auto fileInfo = list.at(i);
       LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
 
@@ -1586,7 +1586,7 @@ void stitchAndDetectPuncta()
 
     QString outputName = inputFiles[0];
     outputName.truncate(outputName.lastIndexOf("_L"));
-    for (int j = 1; j < list.size(); ++j) {
+    for (index_t j = 1; j < list.size(); ++j) {
       QString tmpfn = inputFiles[j];
       tmpfn.truncate(tmpfn.lastIndexOf("_L"));
       CHECK(outputName == tmpfn);
@@ -1717,7 +1717,7 @@ void cutZeroRegion()
   filters << "*.nim";
   QFileInfoList list = dir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
 
-  for (int i = 0; i < list.size(); ++i) {
+  for (index_t i = 0; i < list.size(); ++i) {
     auto fileInfo = list.at(i);
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath(), ZImgRegion(0, -1, 0, -1, 1100, 1800));
@@ -1777,7 +1777,7 @@ void createPCCellTable()
     double AP = metaIdx[4].toDouble();
     double ML = metaIdx[5].toDouble();
     double r2 = metaIdx[27].toDouble();
-    int somaLocationOrder = somaLocationMap[somaLocation];
+    auto somaLocationOrder = somaLocationMap[somaLocation];
     assert(somaLocationOrder > 0 && somaLocationOrder < 5);
 
     if (cellType == "contraPV" || cellType == "ipsiPV") {

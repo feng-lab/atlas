@@ -37,7 +37,7 @@ void Z3DPrimitiveRenderer::renderScreenQuad(const ZVertexArrayObject& vao, const
                               -1.f, -1.f, 0.f, //bottom left corner
                               1.f, 1.f, 0.f, //top right corner
                               1.f, -1.f, 0.f}; // bottom right rocner
-  GLint attr_vertex = shader.vertexAttributeLocation();
+  auto attr_vertex = shader.vertexAttributeLocation();
 
   GLuint bufObjects[1];
   glGenBuffers(1, bufObjects);
@@ -74,12 +74,12 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
 
   vao.bind();
 
-  GLint attr_vertex = shader.vertexAttributeLocation();
-  GLint attr_1dTexCoord0 = shader.tex1dCoord0AttributeLocation();
-  GLint attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
-  GLint attr_3dTexCoord0 = shader.tex3dCoord0AttributeLocation();
-  GLint attr_normal = shader.normalAttributeLocation();
-  GLint attr_color = shader.colorAttributeLocation();
+  auto attr_vertex = shader.vertexAttributeLocation();
+  auto attr_1dTexCoord0 = shader.tex1dCoord0AttributeLocation();
+  auto attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
+  auto attr_3dTexCoord0 = shader.tex3dCoord0AttributeLocation();
+  auto attr_normal = shader.normalAttributeLocation();
+  auto attr_color = shader.colorAttributeLocation();
 
   GLsizei bufObjectsSize = 1;  // vertex
   if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty())
@@ -98,7 +98,7 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   std::vector<GLuint> bufObjects(bufObjectsSize);
   glGenBuffers(bufObjectsSize, bufObjects.data());
 
-  int bufIdx = 0;
+  size_t bufIdx = 0;
   glEnableVertexAttribArray(attr_vertex);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
   glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);

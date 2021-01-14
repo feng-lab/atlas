@@ -11,7 +11,7 @@ namespace nim {
 
 ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
   ZRegionAnnotation& anno,
-  std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+  std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
   QObject* parent)
   : ZRegionAnnotationViewSettingTreeModel(anno, parent)
 {
@@ -20,7 +20,7 @@ ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
 
 ZRegionAnnotationViewSettingTreeModel::ZRegionAnnotationViewSettingTreeModel(
   ZRegionAnnotation& anno,
-  std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+  std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
   QObject* parent)
   : ZRegionAnnotationViewSettingTreeModel(anno, parent)
 {

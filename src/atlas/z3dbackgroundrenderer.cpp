@@ -40,7 +40,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
                                 -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
                                 1.f, 1.f, 1.0f - 1e-5f, //top right corner
                                 1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
-    GLint attr_vertex = m_backgroundShaderGrp.get().vertexAttributeLocation();
+    auto attr_vertex = m_backgroundShaderGrp.get().vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);
@@ -147,7 +147,7 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
                                 -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
                                 1.f, 1.f, 1.0f - 1e-5f, //top right corner
                                 1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
-    GLint attr_vertex = shader.vertexAttributeLocation();
+    auto attr_vertex = shader.vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBO.bind(GL_ARRAY_BUFFER);

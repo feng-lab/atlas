@@ -177,7 +177,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
 
   const int tileSize = 7680; //2048;
   const int tileBorder = 128;
-  const int tileInnerSize = tileSize - 2 * tileBorder;
+  const auto tileInnerSize = tileSize - 2 * tileBorder;
 
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
@@ -206,10 +206,10 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
       m_rightImg = ZImg(ZImgInfo(width, height, 1, 4));
     }
 
-    int numCols = (width + tileInnerSize - 1) / tileInnerSize;
-    int numRows = (height + tileInnerSize - 1) / tileInnerSize;
-    for (int c = 0; c < numCols; ++c) {
-      for (int r = 0; r < numRows; ++r) {
+    auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
+    auto numRows = (height + tileInnerSize - 1) / tileInnerSize;
+    for (auto c = 0; c < numCols; ++c) {
+      for (auto r = 0; r < numRows; ++r) {
         m_tileStartX = c * tileInnerSize - tileBorder;
         m_tileStartY = r * tileInnerSize - tileBorder;
         double left = m_tileStartX / 1.0 / width;

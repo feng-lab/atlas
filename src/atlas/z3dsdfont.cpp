@@ -102,9 +102,9 @@ void Z3DSDFont::parseFontFile()
       int numTokenFound = 0;
       while (!line.isEmpty()) {
         line = line.trimmed();
-        int tokenIndex = -1;
+        index_t tokenIndex = -1;
         QString value;
-        for (int i = 0; i < tokens.size(); ++i) {
+        for (index_t i = 0; i < tokens.size(); ++i) {
           if (line.startsWith(tokens[i])) {
             if (line.indexOf(' ') == -1) {
               value = line.mid(tokens[i].size());

@@ -342,7 +342,7 @@ bool ZDoc::saveOrDiscard(size_t id)
   msgBox.setInformativeText("Your changes will be lost if you don't save them.");
   msgBox.setStandardButtons(QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
   msgBox.setDefaultButton(QMessageBox::Save);
-  int ret = msgBox.exec();
+  auto ret = msgBox.exec();
 
   switch (ret) {
     case QMessageBox::Save:
@@ -377,7 +377,7 @@ bool ZDoc::saveOrDiscard(const std::vector<size_t>& objs)
     return true;
 
   ZSaveObjsDialog dlg(*this, unsavedObjs, QApplication::activeWindow());
-  int ret = dlg.exec();
+  auto ret = dlg.exec();
   switch (ret) {
     case QDialog::Accepted: {
       //LOG(INFO) << "Save or Discard was clicked";

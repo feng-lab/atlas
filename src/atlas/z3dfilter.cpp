@@ -274,7 +274,7 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderP
                               -1.f, -1.f, 0.f, //bottom left corner
                               1.f, 1.f, 0.f, //top right corner
                               1.f, -1.f, 0.f}; // bottom right rocner
-  GLint attr_vertex = shader.vertexAttributeLocation();
+  auto attr_vertex = shader.vertexAttributeLocation();
 
   GLuint bufObjects[1];
   glGenBuffers(1, bufObjects);

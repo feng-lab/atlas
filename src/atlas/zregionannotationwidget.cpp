@@ -36,7 +36,7 @@ void ZRegionAnnotationWidget::exportLabelImage()
   std::vector<Compression> comps;
   ZImg::getQtWriteNameFilter(filters, formats, comps);
 
-  int fmtIdx = -1;
+  index_t fmtIdx = -1;
   QString fn;
   FileFormat fileFormat;
   ZVec3Parameter ratioPara("Scale", glm::vec3(1.f), glm::vec3(1e-5), glm::vec3(1e10));

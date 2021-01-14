@@ -83,7 +83,7 @@ void ZSaveObjsDialog::discard()
 
 void ZSaveObjsDialog::updateSaveButton()
 {
-  int count = m_treeWidget->selectedItems().count();
+  auto count = m_treeWidget->selectedItems().count();
   QPushButton* button = m_buttonBox->button(QDialogButtonBox::Save);
   if (count == m_treeWidget->topLevelItemCount()) {
     button->setEnabled(true);
@@ -107,7 +107,7 @@ void ZSaveObjsDialog::adjustButtonWidths()
   QPushButton* saveButton = m_buttonBox->button(QDialogButtonBox::Save);
   for (const QString& text : possibleTexts) {
     saveButton->setText(text);
-    int hint = saveButton->sizeHint().width();
+    auto hint = saveButton->sizeHint().width();
     if (hint > maxTextWidth)
       maxTextWidth = hint;
   }

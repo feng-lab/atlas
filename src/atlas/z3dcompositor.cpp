@@ -894,7 +894,7 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   const GLenum g_db[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT7};
 
   bool g_useOQ = true;
-  int g_numPasses = 100;
+  size_t g_numPasses = 100;
 
 #define MAX_DEPTH 1.0
 
@@ -947,12 +947,12 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT);
 
-  int currId = 0;
+  size_t currId = 0;
 
-  for (int pass = 1; g_useOQ && pass < g_numPasses; pass++) {
+  for (size_t pass = 1; g_useOQ && pass < g_numPasses; pass++) {
     currId = pass % 2;
-    int prevId = 1 - currId;
-    int bufId = currId * 3;
+    auto prevId = 1 - currId;
+    auto bufId = currId * 3;
 
     glDrawBuffers(2, &g_drawBuffers[bufId + 1]);
     glClearColor(0, 0, 0, 0);
@@ -1067,7 +1067,7 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
   Z3DTexture* g_depthTex;
 
 #ifdef USE_RECT_TEX
-  for (int i = 0; i < 2; ++i)
+  for (auto i = 0; i < 2; ++i)
   {
     g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1), GL_TEXTURE_RECTANGLE,
                                          GL_RG, GL_RG32F, GL_FLOAT,
@@ -1095,7 +1095,7 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
                               GL_NEAREST, GL_NEAREST, GL_CLAMP_TO_EDGE);
   g_depthTex->uploadTexture();
 #else
-  for (int i = 0; i < 2; ++i) {
+  for (auto i = 0; i < 2; ++i) {
     g_dualDepthTexId[i] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(size, 1), GL_RG, GL_FLOAT);
     g_dualDepthTexId[i]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     g_dualDepthTexId[i]->uploadImage();
@@ -1118,7 +1118,7 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
   g_depthTex->uploadImage();
 #endif
 
-  int j = 0;
+  auto j = 0;
   m_ddpRT->attachTextureToFBO(g_dualDepthTexId[j], GL_COLOR_ATTACHMENT0);
   m_ddpRT->attachTextureToFBO(g_dualFrontBlenderTexId[j], GL_COLOR_ATTACHMENT1);
   m_ddpRT->attachTextureToFBO(g_dualBackTempTexId[j], GL_COLOR_ATTACHMENT2);

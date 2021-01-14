@@ -12,7 +12,7 @@
 namespace nim {
 
 ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDelegate(
-  std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+  std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
   QObject* parent)
   : ZRegionAnnotationViewSettingColumnDelegate(parent)
 {
@@ -20,7 +20,7 @@ ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDe
 }
 
 ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDelegate(
-  std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+  std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
   QObject* parent)
   : ZRegionAnnotationViewSettingColumnDelegate(parent)
 {

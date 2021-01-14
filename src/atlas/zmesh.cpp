@@ -43,8 +43,8 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
   }
   vtkIdType npts;
   const vtkIdType* pts;
-  for (int i = 0; i < polyData->GetNumberOfPolys(); ++i) {
-    int h = polys->GetNextCell(npts, pts);
+  for (vtkIdType i = 0; i < polyData->GetNumberOfPolys(); ++i) {
+    auto h = polys->GetNextCell(npts, pts);
     if (h == 0) {
       break;
     }
@@ -734,7 +734,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-frontFaceNormal);
     normals.push_back(-frontFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 0 + i * 24);
     }
 
@@ -748,7 +748,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-upFaceNormal);
     normals.push_back(-upFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 4 + i * 24);
     }
 
@@ -762,7 +762,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-rightFaceNormal);
     normals.push_back(-rightFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 2 * 4 + i * 24);
     }
 
@@ -776,7 +776,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(rightFaceNormal);
     normals.push_back(rightFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 3 * 4 + i * 24);
     }
 
@@ -790,7 +790,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(upFaceNormal);
     normals.push_back(upFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 4 * 4 + i * 24);
     }
 
@@ -804,7 +804,7 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(frontFaceNormal);
     normals.push_back(frontFaceNormal);
 
-    for (GLuint j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       indexes.push_back(idxes[j] + 5 * 4 + i * 24);
     }
   }
@@ -959,7 +959,7 @@ ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, const glm::vec3&
   if (alongDim == 2 && coordfirst.z > coordlast.z)
     reverse = false;
 
-  for (int i = 0; i < numSlices; ++i) {
+  for (auto i = 0; i < numSlices; ++i) {
     float factor = 0.f;
     if (numSlices > 1)
       factor = i / (numSlices - 1.0);
@@ -991,7 +991,7 @@ ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, const glm::vec3&
       texCoords.emplace_back(texfirst[0], texlast[1], glm::mix(texfirst.z, texlast.z, factor));
       texCoords.emplace_back(texlast[0], texlast[1], glm::mix(texfirst.z, texlast.z, factor));
     }
-    for (int j = 0; j < 6; ++j) {
+    for (auto j = 0; j < 6; ++j) {
       if (reverse)
         indexes.push_back(idx[5 - j] + i * 4);
       else

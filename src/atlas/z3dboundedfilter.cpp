@@ -635,9 +635,9 @@ void Z3DBoundedFilter::makeSelectionGeometries()
   bd[3] = m_selectionBoundBox.maxCorner.y;
   bd[4] = m_selectionBoundBox.minCorner.z;
   bd[5] = m_selectionBoundBox.maxCorner.z;
-  for (int k = 0; k < 2; ++k) {
-    for (int j = 0; j < 2; ++j) {
-      for (int i = 0; i < 2; ++i) {
+  for (auto k = 0; k < 2; ++k) {
+    for (auto j = 0; j < 2; ++j) {
+      for (auto i = 0; i < 2; ++i) {
         glm::vec3 pos(bd[i], bd[2 + j], bd[4 + k]);
         lowcoords.push_back(pos - cornerShift);
         highcoords.push_back(pos + cornerShift);

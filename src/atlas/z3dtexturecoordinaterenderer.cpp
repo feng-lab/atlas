@@ -39,10 +39,10 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
   if (m_hardwareSupportVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
-      GLint attr_vertex = m_renderTextureCoordinateShader.vertexAttributeLocation();
-      GLint attr_3dTexCoord0 = m_renderTextureCoordinateShader.tex3dCoord0AttributeLocation();
+      auto attr_vertex = m_renderTextureCoordinateShader.vertexAttributeLocation();
+      auto attr_3dTexCoord0 = m_renderTextureCoordinateShader.tex3dCoord0AttributeLocation();
 
-      int bufIdx = 0;
+      size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
       glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);
@@ -74,10 +74,10 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
     m_VAO.release();
 
   } else {
-    GLint attr_vertex = m_renderTextureCoordinateShader.vertexAttributeLocation();
-    GLint attr_3dTexCoord0 = m_renderTextureCoordinateShader.tex3dCoord0AttributeLocation();
+    auto attr_vertex = m_renderTextureCoordinateShader.vertexAttributeLocation();
+    auto attr_3dTexCoord0 = m_renderTextureCoordinateShader.tex3dCoord0AttributeLocation();
 
-    int bufIdx = 0;
+    size_t bufIdx = 0;
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, bufIdx++);
     glBufferData(GL_ARRAY_BUFFER, vertices.size() * 3 * sizeof(GLfloat), vertices.data(), GL_STATIC_DRAW);

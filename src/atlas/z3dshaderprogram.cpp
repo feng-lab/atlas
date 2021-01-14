@@ -147,7 +147,7 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
   if (!texture)
     return;
 
-  int loc = uniformLocation(name);
+  auto loc = uniformLocation(name);
   if (loc != -1) {
     GLenum textureEnum;
     GLint textureNumber;
@@ -173,7 +173,7 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
   if (!texture)
     return;
 
-  int loc = uniformLocation(name);
+  auto loc = uniformLocation(name);
   if (loc != -1) {
     GLenum textureEnum;
     GLint textureNumber;
@@ -197,7 +197,7 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
 
 void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint textureId)
 {
-  int loc = uniformLocation(name);
+  auto loc = uniformLocation(name);
   if (loc != -1) {
     GLenum textureEnum;
     GLint textureNumber;
@@ -242,7 +242,7 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, co
                                           const QString& geomHeader)
 {
   removeAllShaders();
-  for (int i = 0; i < shaderFilenames.size(); ++i) {
+  for (index_t i = 0; i < shaderFilenames.size(); ++i) {
     if (shaderFilenames[i].isEmpty())
       continue;
     if (shaderFilenames[i].endsWith(".geom", Qt::CaseInsensitive)) {
@@ -259,17 +259,17 @@ void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QSt
                                           const QStringList& fragSrcs, const QString& header, const QString& geomHeader)
 {
   removeAllShaders();
-  for (int i = 0; i < vertSrcs.size(); ++i) {
+  for (index_t i = 0; i < vertSrcs.size(); ++i) {
     QString vertSrc = header + vertSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Vertex, vertSrc);
   }
 
-  for (int i = 0; i < geomSrcs.size(); ++i) {
+  for (index_t i = 0; i < geomSrcs.size(); ++i) {
     QString geomSrc = geomHeader + geomSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Geometry, geomSrc);
   }
 
-  for (int i = 0; i < fragSrcs.size(); ++i) {
+  for (index_t i = 0; i < fragSrcs.size(); ++i) {
     QString fragSrc = header + fragSrcs[i];
     addShaderFromSourceCode(Z3DShader::Type::Fragment, fragSrc);
   }
@@ -360,7 +360,7 @@ void Z3DShaderProgram::storeUniformLocations()
   glGetProgramiv(programId(), GL_ACTIVE_UNIFORMS, &count);
   glGetProgramiv(programId(), GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
-  for (GLint i = 0; i < count; ++i) {
+  for (auto i = 0; i < count; ++i) {
     Uniform u;
     glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetUniformLocation(programId(), name.data());
@@ -470,7 +470,7 @@ void Z3DShaderProgram::storeAttributeLocations()
   glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTES, &count);
   glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
-  for (GLint i = 0; i < count; ++i) {
+  for (auto i = 0; i < count; ++i) {
     Attribute u;
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());

@@ -38,7 +38,7 @@ __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 }
 #endif
 
-void removeOldLogs(const QDir& dir, int numberToKeep = 20)
+void removeOldLogs(const QDir& dir, index_t numberToKeep = 20)
 {
   QDir ld(dir);
   ld.cdUp();
@@ -47,7 +47,7 @@ void removeOldLogs(const QDir& dir, int numberToKeep = 20)
   QFileInfoList list = ld.entryInfoList(filters,
                                         QDir::Dirs | QDir::NoSymLinks,
                                         QDir::Name);
-  for (int i = 0; i < list.size() - numberToKeep; ++i) {
+  for (index_t i = 0; i < list.size() - numberToKeep; ++i) {
     QDir logDir(list.at(i).absoluteFilePath());
     logDir.removeRecursively();
   }

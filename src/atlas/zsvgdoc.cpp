@@ -162,7 +162,7 @@ void ZSvgDoc::loadSvg()
   dialog.setWindowTitle("Load Svg File");
   if (dialog.exec()) {
     QString errorMsg;
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read svg.\n" + errorMsg);

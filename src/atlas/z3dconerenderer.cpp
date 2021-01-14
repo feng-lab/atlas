@@ -60,8 +60,8 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
   m_allFlags.clear();
   m_indexs.clear();
   if (m_useConeShader2) {
-    int indices[6] = {0, 1, 2, 2, 1, 3};
-    int quadIdx = 0;
+    GLuint indices[6] = {0, 1, 2, 2, 1, 3};
+    GLuint quadIdx = 0;
     for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
       m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
       m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
@@ -71,7 +71,7 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
-      for (int k = 0; k < 6; ++k) {
+      for (auto k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
       quadIdx++;
@@ -94,19 +94,19 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
       }
     }
   } else {
-    int indices[6 * 2 * 3] = {0, 2, 1, 2, 0, 3, 1, 6, 5, 6, 1, 2, 0, 1, 5, 5, 4, 0,
-                              0, 7, 3, 7, 0, 4, 3, 6, 2, 6, 3, 7, 4, 5, 6, 6, 7, 4};
-    int rightIdx[8] = {0, 1, 1, 0, 0, 1, 1, 0};
-    int upIdx[8] = {0, 0, 1, 1, 0, 0, 1, 1};
-    int outIdx[8] = {0, 0, 0, 0, 1, 1, 1, 1};
-    int coneIdx = 0;
+    GLuint indices[6 * 2 * 3] = {0, 2, 1, 2, 0, 3, 1, 6, 5, 6, 1, 2, 0, 1, 5, 5, 4, 0,
+                                 0, 7, 3, 7, 0, 4, 3, 6, 2, 6, 3, 7, 4, 5, 6, 6, 7, 4};
+    int32_t rightIdx[8] = {0, 1, 1, 0, 0, 1, 1, 0};
+    int32_t upIdx[8] = {0, 0, 1, 1, 0, 0, 1, 1};
+    int32_t outIdx[8] = {0, 0, 0, 0, 1, 1, 1, 1};
+    GLuint coneIdx = 0;
     for (size_t i = 0; i < baseAndBaseRadius->size(); ++i) {
-      for (int k = 0; k < 8; ++k) {
+      for (auto k = 0; k < 8; ++k) {
         m_baseAndBaseRadius.push_back((*baseAndBaseRadius)[i]);
         m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
         m_allFlags.push_back(rightIdx[k] << 8 | upIdx[k] << 4 | outIdx[k]);
       }
-      for (int k = 0; k < 36; ++k) {
+      for (auto k = 0; k < 36; ++k) {
         m_indexs.push_back(indices[k] + 8 * coneIdx);
       }
       coneIdx++;
@@ -126,9 +126,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneColors)
   m_coneBaseColors.clear();
   m_coneTopColors.clear();
   m_sameColorForBaseAndTop = true;
-  int dup = m_useConeShader2 ? 4 : 8;
+  auto dup = m_useConeShader2 ? 4 : 8;
   for (auto color : *coneColors) {
-    for (int k = 0; k < dup; ++k)
+    for (auto k = 0; k < dup; ++k)
       m_coneBaseColors.push_back(color);
   }
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -142,9 +142,9 @@ void Z3DConeRenderer::setDataColors(std::vector<glm::vec4>* coneBaseColors, std:
   m_coneBaseColors.clear();
   m_coneTopColors.clear();
   m_sameColorForBaseAndTop = false;
-  int dup = m_useConeShader2 ? 4 : 8;
+  auto dup = m_useConeShader2 ? 4 : 8;
   for (size_t i = 0; i < coneBaseColors->size(); ++i) {
-    for (int k = 0; k < dup; ++k) {
+    for (auto k = 0; k < dup; ++k) {
       m_coneBaseColors.push_back((*coneBaseColors)[i]);
       m_coneTopColors.push_back((*coneTopColors)[i]);
     }
@@ -160,9 +160,9 @@ void Z3DConeRenderer::setDataPickingColors(std::vector<glm::vec4>* conePickingCo
   m_conePickingColors.clear();
   if (!conePickingColors)
     return;
-  int dup = m_useConeShader2 ? 4 : 8;
+  auto dup = m_useConeShader2 ? 4 : 8;
   for (auto color : *conePickingColors) {
-    for (int k = 0; k < dup; ++k)
+    for (auto k = 0; k < dup; ++k)
       m_conePickingColors.push_back(color);
   }
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
@@ -189,7 +189,7 @@ void Z3DConeRenderer::renderUsingOpengl()
   appendDefaultColors();
 
   GLUquadricObj* quadric = gluNewQuadric();
-  int dup = m_useConeShader2 ? 4 : 8;
+  auto dup = m_useConeShader2 ? 4 : 8;
   for (size_t i=0; i<m_baseAndBaseRadius.size(); i+=dup) {
     glColor4fv(glm::value_ptr(glm::vec4(m_coneBaseColors[i].rgb(), m_coneBaseColors[i].a * opacity())));
     glm::vec3 bottomPos = m_baseAndBaseRadius[i].xyz();
@@ -248,7 +248,7 @@ void Z3DConeRenderer::renderPickingUsingOpengl()
     return;
 
   GLUquadricObj* quadric = gluNewQuadric();
-  int dup = m_useConeShader2 ? 4 : 8;
+  auto dup = m_useConeShader2 ? 4 : 8;
   for (size_t i=0; i<m_baseAndBaseRadius.size(); i+=dup) {
     glColor4fv(glm::value_ptr(m_conePickingColors[i]));
     glm::vec3 bottomPos = m_baseAndBaseRadius[i].xyz();
@@ -314,11 +314,11 @@ void Z3DConeRenderer::render(Z3DEye eye)
     if (m_dataChanged) {
       m_VAO.bind();
       // set vertex data
-      GLint attr_origin = shader.originAttributeLocation();
-      GLint attr_axis = shader.axisAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
-      GLint attr_colors = shader.colorAttributeLocation();
-      GLint attr_colors2 = shader.color2AttributeLocation();
+      auto attr_origin = shader.originAttributeLocation();
+      auto attr_axis = shader.axisAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
+      auto attr_colors = shader.colorAttributeLocation();
+      auto attr_colors2 = shader.color2AttributeLocation();
 
       glEnableVertexAttribArray(attr_origin);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -369,11 +369,11 @@ void Z3DConeRenderer::render(Z3DEye eye)
 
   } else {
     // set vertex data
-    GLint attr_origin = shader.originAttributeLocation();
-    GLint attr_axis = shader.axisAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
-    GLint attr_colors = shader.colorAttributeLocation();
-    GLint attr_colors2 = shader.color2AttributeLocation();
+    auto attr_origin = shader.originAttributeLocation();
+    auto attr_axis = shader.axisAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
+    auto attr_colors = shader.colorAttributeLocation();
+    auto attr_colors2 = shader.color2AttributeLocation();
 
     glEnableVertexAttribArray(attr_origin);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -453,11 +453,11 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     if (m_pickingDataChanged) {
       m_pickingVAO.bind();
       // set vertex data
-      GLint attr_origin = shader.originAttributeLocation();
-      GLint attr_axis = shader.axisAttributeLocation();
-      GLint attr_flags = shader.flagsAttributeLocation();
-      GLint attr_colors = shader.colorAttributeLocation();
-      GLint attr_colors2 = shader.color2AttributeLocation();
+      auto attr_origin = shader.originAttributeLocation();
+      auto attr_axis = shader.axisAttributeLocation();
+      auto attr_flags = shader.flagsAttributeLocation();
+      auto attr_colors = shader.colorAttributeLocation();
+      auto attr_colors2 = shader.color2AttributeLocation();
 
       glEnableVertexAttribArray(attr_origin);
       if (m_dataChanged) {
@@ -516,11 +516,11 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
 
   } else {
     // set vertex data
-    GLint attr_origin = shader.originAttributeLocation();
-    GLint attr_axis = shader.axisAttributeLocation();
-    GLint attr_flags = shader.flagsAttributeLocation();
-    GLint attr_colors = shader.colorAttributeLocation();
-    GLint attr_colors2 = shader.color2AttributeLocation();
+    auto attr_origin = shader.originAttributeLocation();
+    auto attr_axis = shader.axisAttributeLocation();
+    auto attr_flags = shader.flagsAttributeLocation();
+    auto attr_colors = shader.colorAttributeLocation();
+    auto attr_colors2 = shader.color2AttributeLocation();
 
     glEnableVertexAttribArray(attr_origin);
     if (m_dataChanged) {

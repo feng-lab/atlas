@@ -97,10 +97,10 @@ std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::SwcTreeNode&
     while (!ZSwc::isRoot(pit)) {
       pit = ZSwc::parent(pit);
     }
-    int parentRow = static_cast<int>(indexOf(m_rootNodes, pit));
+    auto parentRow = static_cast<int>(indexOf(m_rootNodes, pit));
     CHECK(parentRow >= 0);
     auto& children = m_rootToChildrenNodes.at(m_rootNodes[parentRow]);
-    int row = static_cast<int>(indexOf(children, node));
+    auto row = static_cast<int>(indexOf(children, node));
     CHECK(row >= 0);
     return std::make_tuple(parentRow, row);
   }

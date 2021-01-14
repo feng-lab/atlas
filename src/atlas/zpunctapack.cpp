@@ -181,7 +181,7 @@ void ZPunctaPack::updateViewRelatedData()
   m_punctaPts.clear();
   m_selectedPuncta.clear();
   m_punctumToRow.clear();
-  int idx = 0;
+  index_t idx = 0;
   for (const auto& p : m_puncta) {
     m_punctaPts.push_back(&p);
     if (p.isSelected()) {

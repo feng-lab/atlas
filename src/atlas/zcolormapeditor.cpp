@@ -14,11 +14,11 @@ ZColorMapWidget::ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent) 
 
   setMinimumHeight(minimumHeight() + m_sliderHeight - 1);
   auto margins = contentsMargins();
-  int l = margins.left();
-  int t = margins.top();
-  int r = margins.right();
-  int b = margins.bottom();
-  int margin = 15;
+  auto l = margins.left();
+  auto t = margins.top();
+  auto r = margins.right();
+  auto b = margins.bottom();
+  auto margin = 15;
   setContentsMargins(l + margin, t + margin, r + margin, b + m_sliderHeight - 1 + margin);
   connect(m_colorMap, &ZColorMapParameter::valueChanged, this, &ZColorMapWidget::updateIntensityScreenWidth);
   updateIntensityScreenWidth();
@@ -81,7 +81,7 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
 {
   if (!m_isDragging)
     return;
-  int dist = e->pos().x() - m_dragStartX;
+  auto dist = e->pos().x() - m_dragStartX;
   if (dist == 0)
     return;
   bool change = true;
@@ -285,7 +285,7 @@ void ZColorMapWidget::paintEvent(QPaintEvent* /*event*/)
   QPainter painter(this);
   //
 
-  for (int x = contentsRect().left(); x <= contentsRect().right(); ++x) {
+  for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
     painter.setPen(
       m_colorMap->get().fractionMappedQColor((x - contentsRect().left()) / (contentsRect().width() * 1.0)));
     painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());

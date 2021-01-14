@@ -102,7 +102,7 @@ QString ZParameterAnimation::jsonKey() const
 
 ZParameterAnimation* ZParameterAnimation::create(const QString& key, const json::value& value, QObject* parent)
 {
-  int spaceIdx = key.lastIndexOf(QChar(' '));
+  auto spaceIdx = key.lastIndexOf(QChar(' '));
   if (spaceIdx == -1) {
     LOG(WARNING) << "Invalid Animation Parameter " << key;
     return nullptr;

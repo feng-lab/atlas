@@ -265,7 +265,7 @@ QStringList Z3DGpuInfo::gpuInfo() const
 void Z3DGpuInfo::logGpuInfo() const
 {
   QStringList info = gpuInfo();
-  for (int i = 0; i < info.size(); ++i) {
+  for (index_t i = 0; i < info.size(); ++i) {
     LOG(INFO) << info[i];
   }
 

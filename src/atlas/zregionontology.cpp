@@ -468,8 +468,8 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
   }
   vtkIdType npts;
   const vtkIdType* pts;
-  for (int i = 0; i < outputPolydata->GetNumberOfPolys(); ++i) {
-    int h = polys->GetNextCell(npts, pts);
+  for (vtkIdType i = 0; i < outputPolydata->GetNumberOfPolys(); ++i) {
+    auto h = polys->GetNextCell(npts, pts);
     if (h == 0) {
       break;
     }
@@ -530,7 +530,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
       while (!nodeMap.empty()) {
         auto it = nodeMap.begin();
         while (it != nodeMap.end()) {
-          int parentID = it->second.parentIndex;
+          auto parentID = it->second.parentIndex;
           auto nodeIt = itMap.find(parentID);
           if (nodeIt != itMap.end()) {
             itMap[it->first] = contoursTree.appendChild(nodeIt->second, it->second);

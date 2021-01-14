@@ -20,12 +20,12 @@ Q_OBJECT
 public:
   ZRegionAnnotationViewSettingTreeView(ZRegionAnnotationViewSettingTreeModel& objModel,
                                        ZRegionAnnotation& anno,
-                                       std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+                                       std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
                                        QWidget* parent = nullptr);
 
   ZRegionAnnotationViewSettingTreeView(ZRegionAnnotationViewSettingTreeModel& objModel,
                                        ZRegionAnnotation& anno,
-                                       std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+                                       std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
                                        QWidget* parent = nullptr);
 
 protected:

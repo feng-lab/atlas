@@ -258,8 +258,8 @@ void ZROIDoc::loadROI()
   dialog.setWindowTitle("Load ROI File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read ROI.\n" + errorMsg);
@@ -301,7 +301,7 @@ void ZROIDoc::importMaskImage()
   std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
 
-  int fmtIdx = -1;
+  index_t fmtIdx = -1;
   QString fn;
   {
     QFileDialog dialog(QApplication::activeWindow());
@@ -363,7 +363,7 @@ void ZROIDoc::createMaskImage()
     try {
       ZImg img = roi.toMaskImg();
 
-      int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+      auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];
       img.save(dialog.selectedFiles().at(0), formats[fmtIdx], paras);

@@ -304,11 +304,11 @@ bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int he
 
 bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
-  int h = m_canvas->height();
+  auto h = m_canvas->height();
   if (h % 2 == 1) {
     ++h;
   }
-  int w = m_canvas->width();
+  auto w = m_canvas->width();
   if (w % 2 == 1) {
     ++w;
   }
@@ -385,7 +385,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
   progress.show();
   double rAngle = two_pi / numFrame;
   bool res = true;
-  for (int i = 0; i < numFrame; ++i) {
+  for (auto i = 0; i < numFrame; ++i) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;
@@ -395,9 +395,9 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
     else
       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
     //resetCameraClippingRange();
-    int fieldWidth = numDigits(numFrame);
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    auto fieldWidth = numDigits(numFrame);
+    auto filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    auto filepath = dir.filePath(filename);
     if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
       res = false;
       break;
@@ -422,7 +422,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
   progress.show();
   double rAngle = two_pi / numFrame;
   bool res = true;
-  for (int i = 0; i < numFrame; ++i) {
+  for (auto i = 0; i < numFrame; ++i) {
     progress.setValue(i);
     if (progress.wasCanceled())
       break;
@@ -432,9 +432,9 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
     else
       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
     //resetCameraClippingRange();
-    int fieldWidth = numDigits(numFrame);
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    QString filepath = dir.filePath(filename);
+    auto fieldWidth = numDigits(numFrame);
+    auto filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    auto filepath = dir.filePath(filename);
     if (!takeScreenShot(filepath, sst)) {
       res = false;
       break;

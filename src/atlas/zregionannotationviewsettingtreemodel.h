@@ -24,12 +24,12 @@ public:
 
   ZRegionAnnotationViewSettingTreeModel(
     ZRegionAnnotation& anno,
-    std::map<int, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+    std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
     QObject* parent = nullptr);
 
   ZRegionAnnotationViewSettingTreeModel(
     ZRegionAnnotation& anno,
-    std::map<int, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
+    std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
     QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
@@ -63,8 +63,8 @@ protected:
   ZRegionAnnotation& m_regionAnnotation;
   ZTree<RegionNode>& m_annotationTree;
   std::map<RegionNode*, ZTree<RegionNode>::Iterator> m_nodeToIter;
-  std::map<int, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
-  std::map<int, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
+  std::map<int64_t, std::unique_ptr<ZROIFilter>>* m_idToROIFilters = nullptr;
+  std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>* m_idToMeshFilters = nullptr;
   std::unique_ptr<QWidget> m_regionViewSettingEditorWindow;
 };
 

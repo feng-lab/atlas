@@ -183,9 +183,9 @@ void Z3DFontRenderer::render(Z3DEye eye)
     if (m_dataChanged) {
       m_VAO.bind();
       // set vertex data
-      GLint attr_vertex = shader.vertexAttributeLocation();
-      GLint attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
-      GLint attr_color = shader.colorAttributeLocation();
+      auto attr_vertex = shader.vertexAttributeLocation();
+      auto attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
+      auto attr_color = shader.colorAttributeLocation();
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -219,9 +219,9 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   } else {
     // set vertex data
-    GLint attr_vertex = shader.vertexAttributeLocation();
-    GLint attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
-    GLint attr_color = shader.colorAttributeLocation();
+    auto attr_vertex = shader.vertexAttributeLocation();
+    auto attr_2dTexCoord0 = shader.tex2dCoord0AttributeLocation();
+    auto attr_color = shader.colorAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -287,9 +287,9 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
   Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
   float scale = m_fontSize.get() / font->maxFontHeight();
-  int indices[6] = {0, 1, 2, 2, 1, 3};
-  int quadIdx = 0;
-  for (int strIdx = 0; strIdx < m_texts.size(); strIdx++) {
+  GLuint indices[6] = {0, 1, 2, 2, 1, 3};
+  GLuint quadIdx = 0;
+  for (index_t strIdx = 0; strIdx < m_texts.size(); strIdx++) {
     QString str = m_texts[strIdx];
     if (str.isEmpty())
       continue;
@@ -299,7 +299,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
     else
       color = (*m_colorsPt)[strIdx];
     glm::vec3 loc = (*m_positionsPt)[strIdx];
-    for (int charIdx = 0; charIdx < str.size(); charIdx++) {
+    for (index_t charIdx = 0; charIdx < str.size(); charIdx++) {
       Z3DSDFont::CharInfo charInfo = font->charInfo(str[charIdx].toLatin1());
       glm::vec3 leftUp = loc + rightVector * charInfo.xoffset * scale + upVector * charInfo.yoffset * scale;
       glm::vec3 leftDown = leftUp - upVector * static_cast<float>(charInfo.height) * scale;
@@ -323,7 +323,7 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
         m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
         m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
       }
-      for (int k = 0; k < 6; ++k) {
+      for (auto k = 0; k < 6; ++k) {
         m_indexs.push_back(indices[k] + 4 * quadIdx);
       }
       quadIdx++;

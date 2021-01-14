@@ -61,7 +61,7 @@ bool ZImgDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToImgPacks.at(id);
-    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     ZImgWriteParameters paras;
     paras.compression = comps[fmtIdx];
     if (saveImg(pack.get(), dialog.selectedFiles().at(0), formats[fmtIdx], paras, err)) {
@@ -206,8 +206,8 @@ void ZImgDoc::loadImg()
   dialog.setWindowTitle("Load Image File");
   if (dialog.exec()) {
     QString errorMsg;
-    int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    for (int i = 0; i < dialog.selectedFiles().size(); ++i) {
+    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadImg(dialog.selectedFiles().at(i), formats[fmtIdx], errorMsg)) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
                               "Can not read image.\n" + errorMsg);

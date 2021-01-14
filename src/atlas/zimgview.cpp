@@ -24,12 +24,12 @@ QString ZImgView::infoOfPos(double x, double y)
       size_t id = idFilter.first;
       const ZImgPack& imgPack = m_doc.imgPack(id);
       QPointF p = idFilter.second->mapFromScene(QPointF(x, y));
-      int lx = p.x();
-      int ly = p.y();
+      index_t lx = p.x();
+      index_t ly = p.y();
       if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
           ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
-        int lz = m_view.isMaxZProjView() ? 0: viewControl->imgSlice();
-        int lt = viewControl->imgTime();
+        auto lz = m_view.isMaxZProjView() ? 0: viewControl->imgSlice();
+        auto lt = viewControl->imgTime();
         info += imgPack.sizeInfo();
         if (imgPack.imgInfo().numTimes == 1) {
           info += QString(" Coord: (%1,%2,%3)").arg(lx).arg(ly).arg(lz);

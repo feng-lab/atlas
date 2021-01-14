@@ -94,7 +94,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
   pNode->mName = "meshName";
   appendChildToParentNode(pParent, pNode);
 
-  for (unsigned int i = 0; i < 1; ++i) {
+  for (auto i = 0; i < 1; ++i) {
     std::unique_ptr<aiMesh> pMesh(createAIMesh(mesh));
     if (pMesh->mNumVertices > 0) {
       MeshArray.push_back(pMesh.release());
@@ -272,7 +272,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
 {
   try {
     if (format.empty()) {
-      for (int i = 0; i < m_writeExts.size(); ++i) {
+      for (index_t i = 0; i < m_writeExts.size(); ++i) {
         if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive) &&
             (m_writeFilters[i].contains("binary", Qt::CaseInsensitive) ||
              m_writeFilters[i].contains("without", Qt::CaseInsensitive))) {
@@ -281,7 +281,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
         }
       }
       if (format.empty()) {
-        for (int i = 0; i < m_writeExts.size(); ++i) {
+        for (index_t i = 0; i < m_writeExts.size(); ++i) {
           if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive)) {
             format = m_writeFormats[i];
             break;

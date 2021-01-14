@@ -160,7 +160,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   m_nameToID.clear();
 
   for (const auto& node : m_regionAnnotationPack->regionAnnotation().annotationTree()) {
-    int id = node.id;
+    auto id = node.id;
     auto flt = new Z3DMeshFilter(m_rendererBase.globalParas(), &node);
     if (node.mesh) {
       std::vector<ZMesh*> meshList;
