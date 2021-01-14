@@ -42,9 +42,9 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
   if (role == Qt::DisplayRole) {
     switch (index.column()) {
       case IDColumn:
-        return item->id;
+        return qlonglong(item->id);
       case TypeColumn:
-        return item->type;
+        return qlonglong(item->type);
       case XColumn:
         return item->x;
       case YColumn:
@@ -56,9 +56,9 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
       case TopologyColumn:
         return topologyType;
       case ParentIDColumn:
-        return item->parentID;
+        return qlonglong(item->parentID);
       case LabelColumn:
-        return item->label;
+        return qlonglong(item->label);
       default:
         break;
     }
