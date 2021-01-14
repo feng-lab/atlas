@@ -62,7 +62,7 @@ void ZImgFormat::writeImg(const QString& filename,
 }
 
 ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrderIn,
-                            uint64_t dataOffset, const ZImgRegion& region, uint64_t timeStride)
+                            size_t dataOffset, const ZImgRegion& region, size_t timeStride)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
@@ -185,7 +185,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
 
 ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
                             const std::vector<size_t>& dimensionStrides,
-                            uint64_t dataOffset, const ZImgRegion& region)
+                            size_t dataOffset, const ZImgRegion& region)
 {
   ZImg res;
 

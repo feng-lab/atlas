@@ -449,12 +449,12 @@ ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, con
         if (exif.isValid()) {
           for (size_t i = 1; i < exif.ifds().size(); ++i) {
             const ZTiffIFD& thumbIFD = exif.ifds()[i];
-            int64_t idx = thumbIFD.indexOf(TIFFTAG_JPEGIFOFFSET);
+            auto idx = thumbIFD.indexOf(TIFFTAG_JPEGIFOFFSET);
             if (idx != -1) {
               // found jpeg thumbnail stream
               std::vector<uint8_t> buf;
               const ZImgMetatag& tag = thumbIFD.tag(idx);
-              size_t off = tag.dataAt<uint32_t>(0);
+              auto off = tag.dataAt<uint32_t>(0);
               buf.assign(marker->data + 6 + off, marker->data + marker->data_length);
 
               struct jpeg_decompress_struct thumbCinfo;

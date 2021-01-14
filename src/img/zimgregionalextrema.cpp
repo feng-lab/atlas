@@ -54,12 +54,12 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
     const TVoxel* data = img.timeData<TVoxel>(t);
     double voxelNumber = img.timeVoxelNumber();
 
-    std::stack<int64_t, std::vector<int64_t>> stk;
+    std::stack<size_t, std::vector<size_t>> stk;
     ZImgNeighborhoodConstIterator<TVoxel> nit =
       ZImgNeighborhoodConstIterator<TVoxel>(ZNeighborhood(conn), img);
 
     TVoxel centerValue;
-    int64_t idx;
+    size_t idx;
     size_t n;
     for (; !nit.isAtEnd(); ++nit) {
       idx = nit.index();

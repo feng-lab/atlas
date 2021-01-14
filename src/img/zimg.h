@@ -411,7 +411,7 @@ struct ZImgSource
   bool expandXY = true;
   bool expandWithMaxValue = false;
 
-  int64_t totalFileSize = 0;
+  size_t totalFileSize = 0;
 };
 
 void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& imgSource);
@@ -421,7 +421,7 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
 class ZImgSubBlock
 {
 public:
-  ZImgSubBlock(size_t t_, int64_t x_, int64_t y_, int64_t z_, int64_t width_, int64_t height_, int64_t depth_,
+  ZImgSubBlock(size_t t_, index_t x_, index_t y_, index_t z_, size_t width_, size_t height_, size_t depth_,
                size_t xRatio_, size_t yRatio_, size_t zRatio_)
     : t(t_), x(x_), y(y_), z(z_), width(width_), height(height_), depth(depth_)
     , xRatio(xRatio_), yRatio(yRatio_), zRatio(zRatio_)
@@ -443,12 +443,12 @@ public:
   [[nodiscard]] virtual ZImgInfo readInfo() const = 0;
 
   size_t t;   // start t
-  int64_t x;   // actual start x regardless of ratio
-  int64_t y;   // actual start y regardless of ratio
-  int64_t z;   // actual start z regardless of ratio
-  int64_t width;  // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
-  int64_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
-  int64_t depth; // real image depth regardless of ratio; if ratio is 2, the stored image will have depth: depth/2
+  index_t x;   // actual start x regardless of ratio
+  index_t y;   // actual start y regardless of ratio
+  index_t z;   // actual start z regardless of ratio
+  size_t width;  // real image width regardless of ratio; if ratio is 2, the stored image will have width: width/2
+  size_t height; // real image height regardless of ratio; if ratio is 2, the stored image will have height: height/2
+  size_t depth; // real image depth regardless of ratio; if ratio is 2, the stored image will have depth: depth/2
   size_t xRatio;  // realsize / storedsize, 2 means downsampled by 2
   size_t yRatio;  // realsize / storedsize, 2 means downsampled by 2
   size_t zRatio;  // realsize / storedsize, 2 means downsampled by 2
@@ -1521,16 +1521,16 @@ public:
   // **note** if info is empty, throw ZImgException
   // for out of bound idx, this return a coord with only last dimension (Dimension::L) invalid, which can be seen
   // as virtual extension of img
-  static ZVoxelCoordinate indexToCoord(int64_t idx, const ZImgInfo& info);
+  static ZVoxelCoordinate indexToCoord(index_t idx, const ZImgInfo& info);
 
   // result is undefined for invalid coord
   // if only last dimension of coord is invalid, result can still be meaningful
-  static int64_t coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info);
+  static index_t coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info);
 
-  [[nodiscard]] inline ZVoxelCoordinate indexToCoord(int64_t idx) const
+  [[nodiscard]] inline ZVoxelCoordinate indexToCoord(index_t idx) const
   { return indexToCoord(idx, m_info); }
 
-  [[nodiscard]] inline int64_t coordToIndex(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] inline index_t coordToIndex(const ZVoxelCoordinate& coord) const
   { return coordToIndex(coord, m_info); }
 
   // coord of one voxel pass each dimension

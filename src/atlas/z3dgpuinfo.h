@@ -103,7 +103,7 @@ public:
   [[nodiscard]] int maxArrayTextureLayers() const
   { return m_maxArrayTextureLayers; }
 
-  [[nodiscard]] uint64_t dedicatedVideoMemoryMB() const
+  [[nodiscard]] size_t dedicatedVideoMemoryMB() const
   { return m_dedicatedVideoMemoryMB; }
 
   // directX 10 resource limit
@@ -117,10 +117,10 @@ public:
   { return std::min(std::max<uint64_t>(128, 0.25 * dedicatedVideoMemoryMB()), 2048_u64) * 1024 * 1024 / 2; }
 
   // get the required scales to fit uint8_t data of size (width, height, depth) to texture limit
-  void getDataScaleForTexture(uint64_t width, uint64_t height, uint64_t depth,
+  void getDataScaleForTexture(size_t width, size_t height, size_t depth,
                               double& widthScale, double& heightScale, double& depthScale) const;
 
-  [[nodiscard]] bool needScaleDataForTexture(uint64_t width, uint64_t height, uint64_t depth);
+  [[nodiscard]] bool needScaleDataForTexture(size_t width, size_t height, size_t depth);
 
   [[nodiscard]] bool isFrameBufferObjectSupported() const;
 

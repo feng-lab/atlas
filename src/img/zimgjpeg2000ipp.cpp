@@ -215,11 +215,11 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       }
     } else {
       if (J2K_32 == j2kArithmetic) {
-        int32_t* src = imagePn.Buffer().DataPtr()[c].p32s;
-        uint16_t* pDst = res.channelData<uint16_t>(c);
+        auto* src = imagePn.Buffer().DataPtr()[c].p32s;
+        auto* pDst = res.channelData<uint16_t>(c);
 
         for (int i = 0; i < size.height; ++i) {
-          int32_t* pSrc = (int32_t*) ((uint8_t*) src + i * dataOrderPn.LineStep()[c]);
+          auto* pSrc = (int32_t*) ((uint8_t*) src + i * dataOrderPn.LineStep()[c]);
           for (int j = 0; j < size.width; ++j)
             *pDst++ = saturate_cast<uint16_t>(*pSrc++);
         }

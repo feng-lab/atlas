@@ -80,7 +80,7 @@ void ZMinimumSpanningTree::addEdge(size_t vs, size_t vt, double weight)
   m_numVertices = std::max(m_numVertices, std::max(vs + 1, vt + 1));
 }
 
-std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(int64_t startVertexOfPreOrderResult,
+std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t startVertexOfPreOrderResult,
                                                                     bool allowDisconnectedGraph)
 {
   std::vector<std::pair<size_t, size_t>> res;
@@ -92,12 +92,12 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(int64_t star
   CHECK(m_numVertices >= 3) << m_numVertices;
 
   enum MSTMethod {Kruskal, Prim};
-  MSTMethod mstMethod = Kruskal;
+  MSTMethod mstMethod;
 
   double graphDensity = 2.0 * m_edges.size() / (m_numVertices * (m_numVertices - 1.0));
   bool graphIsSparse = graphDensity < 0.4;
   bool startVertexIsValid = startVertexOfPreOrderResult >= 0 &&
-        startVertexOfPreOrderResult < static_cast<int64_t>(m_numVertices);
+        startVertexOfPreOrderResult < static_cast<index_t>(m_numVertices);
 
   if (startVertexIsValid) {
     allowDisconnectedGraph = false;
@@ -157,8 +157,8 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(int64_t star
 
       spanning_tree.swap(sortedEdges);
     }
-    for (auto ei = spanning_tree.begin(); ei != spanning_tree.end(); ++ei) {
-      res.emplace_back(boost::source(*ei, g), boost::target(*ei, g));
+    for (auto& ei : spanning_tree) {
+      res.emplace_back(boost::source(ei, g), boost::target(ei, g));
     }
   } else if (mstMethod == Prim) {
     std::vector<Vertex> p(m_numVertices);
@@ -173,8 +173,8 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(int64_t star
               root_vertex(static_cast<size_t>(startVertexOfPreOrderResult)).
               edge_color_map(boost::get(boost::edge_color, g)));
 
-      for (auto ei = sortedEdges.begin(); ei != sortedEdges.end(); ++ei) {
-        res.emplace_back(boost::source(*ei, g), boost::target(*ei, g));
+      for (auto& sortedEdge : sortedEdges) {
+        res.emplace_back(boost::source(sortedEdge, g), boost::target(sortedEdge, g));
       }
     } else {
       for (size_t i = 0; i != p.size(); ++i) {

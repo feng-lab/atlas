@@ -33,7 +33,7 @@ public:
   { return m_entries[idx]; }
 
   // return -1 if not found
-  [[nodiscard]] int64_t indexOf(uint64_t tag) const;
+  [[nodiscard]] index_t indexOf(uint64_t tag) const;
 
   [[nodiscard]] VoxelFormat voxelFormat(size_t sample) const;
 

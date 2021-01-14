@@ -9,21 +9,21 @@ namespace nim {
 // if width == -1 then default size if sigma * 6 and it is returned in kWidth
 template<typename TFloat>
 std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX,
-                                           int32_t width = -1,
+                                           index_t width = -1,
                                            size_t* kWidth = nullptr);
 
 // same as fspecial('gaussian', sz, sigma)
 // if width == -1 then default size if sigma * 6 and it is returned in kWidth
 template<typename TFloat>
 std::vector<TFloat> create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY,
-                                           int32_t width = -1, int32_t height = -1,
+                                           index_t width = -1, index_t height = -1,
                                            size_t* kWidth = nullptr, size_t* kHeight = nullptr);
 
 // same as fspecial('gaussian', sz, sigma)
 // if width == -1 then default size if sigma * 6 and it is returned in kWidth
 template<typename TFloat>
 std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat sigmaZ,
-                                           int32_t width = -1, int32_t height = -1, int32_t depth = -1,
+                                           index_t width = -1, index_t height = -1, index_t depth = -1,
                                            size_t* kWidth = nullptr, size_t* kHeight = nullptr,
                                            size_t* kDepth = nullptr);
 
@@ -36,7 +36,7 @@ std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat 
 // if width == -1 then default size if sigma * 6 and it is returned in kWidth
 template<typename TFloat>
 std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
-                                      int32_t width = -1,
+                                      index_t width = -1,
                                       size_t* kWidth = nullptr);
 
 } // namespace nim

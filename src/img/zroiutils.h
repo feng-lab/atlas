@@ -14,11 +14,11 @@ public:
   static QPainterPath splineToQPainterPath(const QPolygonF& spline, bool showLastSeg = true);
 
   // return tight mask, x_start, y_start in which mask could be empty
-  static std::tuple<ZImg, int32_t, int32_t> qPainterPathToMask(const QPainterPath& path);
+  static std::tuple<ZImg, index_t, index_t> qPainterPathToMask(const QPainterPath& path);
 
-  static std::tuple<ZImg, int32_t, int32_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
+  static std::tuple<ZImg, index_t, index_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
 
-  inline static std::tuple<ZImg, int32_t, int32_t> splineToMask(const QPolygonF& spline)
+  inline static std::tuple<ZImg, index_t, index_t> splineToMask(const QPolygonF& spline)
   {
     return qPainterPathToMask(splineToQPainterPath(spline));
   }
@@ -31,7 +31,7 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> rectToMask(const QPolygonF& rect)
+  inline static std::tuple<ZImg, index_t, index_t> rectToMask(const QPolygonF& rect)
   {
     return qPainterPathToMask(rectToQPainterPath(rect));
   }
@@ -44,7 +44,7 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> ellipseToMask(const QPolygonF& ellipse)
+  inline static std::tuple<ZImg, index_t, index_t> ellipseToMask(const QPolygonF& ellipse)
   {
     return qPainterPathToMask(ellipseToQPainterPath(ellipse));
   }
@@ -57,7 +57,7 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> polygonToMask(const QPolygonF& poly)
+  inline static std::tuple<ZImg, index_t, index_t> polygonToMask(const QPolygonF& poly)
   {
     return qPainterPathToMask(polygonToQPainterPath(poly));
   }
@@ -69,7 +69,7 @@ public:
   using EigenDRef = Eigen::Ref<const RowMatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
 
 // return tight mask, x_start, y_start in which mask could be empty
-  // static std::tuple<RowMatrixXb, int32_t, int32_t> qPainterPathToMask_Python(const QPainterPath& path);
+  // static std::tuple<RowMatrixXb, index_t, index_t> qPainterPathToMask_Python(const QPainterPath& path);
 
   inline static RowMatrixXd polyToMat(const QPolygonF& poly)
   {
@@ -95,27 +95,27 @@ public:
     return res;
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline)
+  inline static std::tuple<ZImg, index_t, index_t> splineToMask_Python(const EigenDRef& spline)
   {
     return qPainterPathToMask(splineToQPainterPath(matToPoly(spline)));
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> rectToMask_Python(const EigenDRef& rect)
+  inline static std::tuple<ZImg, index_t, index_t> rectToMask_Python(const EigenDRef& rect)
   {
     return qPainterPathToMask(rectToQPainterPath(matToPoly(rect)));
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> ellipseToMask_Python(const EigenDRef& ellipse)
+  inline static std::tuple<ZImg, index_t, index_t> ellipseToMask_Python(const EigenDRef& ellipse)
   {
     return qPainterPathToMask(ellipseToQPainterPath(matToPoly(ellipse)));
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> polygonToMask_Python(const EigenDRef& poly)
+  inline static std::tuple<ZImg, index_t, index_t> polygonToMask_Python(const EigenDRef& poly)
   {
     return qPainterPathToMask(polygonToQPainterPath(matToPoly(poly)));
   }
 
-  inline static std::tuple<ZImg, int32_t, int32_t> shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
+  inline static std::tuple<ZImg, index_t, index_t> shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
   {
     QPainterPath pp;
     for (const auto&[points, type, isAdd] : shapeOps) {

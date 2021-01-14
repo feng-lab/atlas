@@ -20,7 +20,7 @@ class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
   ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
-                   int64_t x, int64_t y, size_t width, size_t height);
+                   index_t x, index_t y, size_t width, size_t height);
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
@@ -133,7 +133,7 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
-  void readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t,
+  void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
                        ZImg& res) const;
 
   // only for non-disk-cached image
@@ -202,13 +202,13 @@ private:
   QString m_tooltip;
 
   size_t m_tileSize = 512;
-  int64_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024;  // 2000MB
+  size_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024;  // 2000MB
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::set<std::array<size_t, 3>> m_pyramidalRatios;
   using RTType = std::tuple<size_t, size_t, size_t, size_t>;
   std::map<RTType, std::vector<size_t>> m_rtToTileIndice;
-  using TileCornerType = bg::model::point<int64_t, 3, bg::cs::cartesian>;
+  using TileCornerType = bg::model::point<index_t, 3, bg::cs::cartesian>;
   using TileBoxType = bg::model::box<TileCornerType>;
   using RTreeValueType = std::pair<TileBoxType, size_t>;
   using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;

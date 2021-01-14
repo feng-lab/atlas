@@ -121,7 +121,7 @@ void Z3DTransferFunction::updateTexture() const
 
   std::vector<glm::col4> tfData(m_dimensions.x);
   for (size_t x = 0; x < tfData.size(); ++x)
-    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1));
+    tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
   m_texture->uploadImage(tfData.data());
 
   m_textureIsInvalid = false;
@@ -184,7 +184,7 @@ QWidget* Z3DTransferFunctionParameter::actualCreateWidget(QWidget* parent)
 void Z3DTransferFunctionParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const Z3DTransferFunctionParameter* src = static_cast<const Z3DTransferFunctionParameter*>(&rhs);
+  const auto* src = static_cast<const Z3DTransferFunctionParameter*>(&rhs);
   if (m_value != src->get()) {
     m_value = src->get();
     m_value.invalidateTexture();

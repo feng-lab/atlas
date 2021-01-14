@@ -81,7 +81,7 @@ private:
   inline void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
   { m_parent = p; }
 
-  inline void setNumberOfThreads(uint32_t n)
+  inline void setNumberOfThreads(size_t n)
   { m_numThreads = n; }
 
 protected:
@@ -98,7 +98,7 @@ protected:
   double m_reportInterval = 0.01;
   ZImgAlgorithmBaseWithProgressReporter* m_parent = nullptr;
 
-  uint32_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
+  size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
 };
 
 class ZImgAlgorithmBase
@@ -130,11 +130,11 @@ protected:
   inline void clearRegisteredSubOperations()
   {}
 
-  inline void setNumberOfThreads(uint32_t n)
+  inline void setNumberOfThreads(size_t n)
   { m_numThreads = n; }
 
 protected:
-  uint32_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
+  size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
 };
 
 template<bool ReportProgress = false>

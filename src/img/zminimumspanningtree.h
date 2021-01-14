@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zglobal.h"
 #include <utility>
 #include <vector>
 #include <set>
@@ -19,7 +20,7 @@ public:
   // if startVertexOfPreOrderResult < 0 (not a valid vertex), then returned pairs have no order
   // if startVertexOfPreOrderResult is valid, returned pairs are in pre-order (by dfs) but
   // exception will be thrown if graph is not connected
-  [[nodiscard]] std::vector<std::pair<size_t, size_t>> runMST(int64_t startVertexOfPreOrderResult = -1,
+  [[nodiscard]] std::vector<std::pair<size_t, size_t>> runMST(index_t startVertexOfPreOrderResult = -1,
                                                               bool allowDisconnectedGraph = false);
 
 private:

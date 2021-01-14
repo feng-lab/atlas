@@ -29,7 +29,7 @@ struct MaxOp
 namespace nim {
 
 ZImgPackSubBlock::ZImgPackSubBlock(std::shared_ptr<ZImg>& img,
-                                   size_t ratio, size_t t, size_t z, int64_t x, int64_t y, size_t width, size_t height)
+                                   size_t ratio, size_t t, size_t z, index_t x, index_t y, size_t width, size_t height)
   : ZImgSubBlock(t, x, y, z, width, height, 1, ratio, ratio, 1)
   , m_img(img)
 {
@@ -328,9 +328,9 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
         for (auto tileIndex : tileIndice) {
           const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
           CHECK(tile.x >= 0 && tile.y >= 0 && tile.z >= 0);
-          if (static_cast<int64_t>(x) >= tile.x && static_cast<int64_t>(x) < tile.x + tile.width &&
-              static_cast<int64_t>(y) >= tile.y && static_cast<int64_t>(y) < tile.y + tile.height &&
-              static_cast<int64_t>(z) >= tile.z && static_cast<int64_t>(z) < tile.z + tile.depth) {
+          if (static_cast<index_t>(x) >= tile.x && static_cast<index_t>(x) < tile.x + index_t(tile.width) &&
+              static_cast<index_t>(y) >= tile.y && static_cast<index_t>(y) < tile.y + index_t(tile.height) &&
+              static_cast<index_t>(z) >= tile.z && static_cast<index_t>(z) < tile.z + index_t(tile.depth)) {
             std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, tileIndex), tile);
             return imgPtr->value<double>(x - tile.x, y - tile.y, z - tile.z, c, 0);
           }
@@ -352,9 +352,9 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
     if (m_imgInfo.depth == 1)
       mip = false;
     bool hasTile = false;
-    int64_t ix = x;
-    int64_t iy = y;
-    int64_t iz = z;
+    index_t ix = x;
+    index_t iy = y;
+    index_t iz = z;
 
     if (mip) {
       hasTile = true;
@@ -365,9 +365,9 @@ double ZImgPack::displayValue(size_t x, size_t y, size_t z, size_t c, size_t t, 
           const std::vector<size_t>& tileIndice = tiit->second;
           for (auto tileIndex : tileIndice) {
             const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
-            if (ix >= tile.x && ix < tile.x + tile.width &&
-                iy >= tile.y && iy < tile.y + tile.height &&
-                iz >= tile.z && iz < tile.z + tile.depth) {
+            if (ix >= tile.x && ix < tile.x + index_t(tile.width) &&
+                iy >= tile.y && iy < tile.y + index_t(tile.height) &&
+                iz >= tile.z && iz < tile.z + index_t(tile.depth)) {
               if (ratio[0] == 1 && ratio[1] == 1 && ratio[2] == 1)
                 hasTile = true;
               std::shared_ptr<ZImg> imgPtr = ZImgCache::instance().get(HashKeyType(this, tileIndex));
@@ -467,7 +467,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
   return res;
 }
 
-void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int64_t sy, int64_t sz, size_t sc, size_t t,
+void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
                                ZImg& res) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
@@ -476,9 +476,9 @@ void ZImgPack::readRegionToImg(int64_t xyRatio, int64_t zRatio, int64_t sx, int6
   TileBoxType queryBox(TileCornerType(sx * xyRatio,
                                       sy * xyRatio,
                                       sz * zRatio),
-                       TileCornerType((sx + static_cast<int64_t>(res.width())) * xyRatio - 1,
-                                      (sy + static_cast<int64_t>(res.height())) * xyRatio - 1,
-                                      (sz + static_cast<int64_t>(res.depth())) * zRatio - 1));
+                       TileCornerType((sx + static_cast<index_t>(res.width())) * xyRatio - 1,
+                                      (sy + static_cast<index_t>(res.height())) * xyRatio - 1,
+                                      (sz + static_cast<index_t>(res.depth())) * zRatio - 1));
   auto tmpResInfo = res.info();
   tmpResInfo.width = std::ceil(res.width() * xyRatio * 1.0 / readRatio[0]);
   tmpResInfo.height = std::ceil(res.height() * xyRatio * 1.0 / readRatio[1]);
@@ -835,10 +835,10 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) cons
                       [&](const tbb::blocked_range<size_t>& r) {
                         for (size_t i = r.begin(); i != r.end(); ++i) {
                           const ZImgSubBlock& tile = *m_allTiles[tileIndice[i]].get();
-                          if (int64_t(z) >= tile.z && int64_t(z) < (tile.z + tile.depth)) {
+                          if (index_t(z) >= tile.z && index_t(z) < (tile.z + index_t(tile.depth))) {
                             ZVoxelCoordinate start(std::round(tile.x * 1.0 / ratio[0]),
                                                    std::round(tile.y * 1.0 / ratio[1]),
-                                                   tile.z - int64_t(z), 0, 0);
+                                                   tile.z - index_t(z), 0, 0);
 
                             std::shared_ptr<ZImg> imgPtr =
                               ZImgCache::instance().getOrRead(HashKeyType(this, tileIndice[i]), tile);

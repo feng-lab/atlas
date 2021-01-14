@@ -2,7 +2,6 @@
 
 #include "zimage2dutils.h"
 #include "zimage3dutils.h"
-#include <algorithm>
 #include <cmath>
 
 namespace nim {
@@ -63,14 +62,14 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
     return m_fillValue;
 
   if (m_interpolant == Interpolant::Nearest) {
-    return getImage2DPixelValue(img, width, height, roundTo<int64_t>(x), roundTo<int64_t>(y), m_padOption, TPixel(m_fillValue));
+    return getImage2DPixelValue(img, width, height, roundTo<index_t>(x), roundTo<index_t>(y), m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[4];
     double xCom, yCom;
-    int64_t xBas0 = std::floor(x);
-    int64_t xBas1 = xBas0 + 1;
-    int64_t yBas0 = std::floor(y);
-    int64_t yBas1 = yBas0 + 1;
+    index_t xBas0 = std::floor(x);
+    index_t xBas1 = xBas0 + 1;
+    index_t yBas0 = std::floor(y);
+    index_t yBas1 = yBas0 + 1;
 
     // Linear interpolation constants (percentages)
     xCom = x - xBas0;
@@ -86,13 +85,13 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
            perc[3] * getImage2DPixelValue(img, width, height, xBas1, yBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
-    int64_t xn[4], yn[4];
+    index_t xn[4], yn[4];
     double vecTx[4], vecTy[4];
     double vecPTx[4], vecPTy[4];
 
     // Determine of the zero neighbor
-    int64_t xBas0 = std::floor(x);
-    int64_t yBas0 = std::floor(y);
+    index_t xBas0 = std::floor(x);
+    index_t yBas0 = std::floor(y);
 
     // Determine the location in between the pixels 0..1
     double tx = x - xBas0;
@@ -151,18 +150,18 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
 
   if (m_interpolant == Interpolant::Nearest) {
     return getImage3DPixelValue(img, width, height, depth,
-                                roundTo<int64_t>(x), roundTo<int64_t>(y), roundTo<int64_t>(z),
+                                roundTo<index_t>(x), roundTo<index_t>(y), roundTo<index_t>(z),
                                 m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[8];
     double xCom, yCom, zCom;
     double xComi, yComi, zComi;
-    int64_t xBas0 = std::floor(x);
-    int64_t xBas1 = xBas0 + 1;
-    int64_t yBas0 = std::floor(y);
-    int64_t yBas1 = yBas0 + 1;
-    int64_t zBas0 = std::floor(z);
-    int64_t zBas1 = zBas0 + 1;
+    index_t xBas0 = std::floor(x);
+    index_t xBas1 = xBas0 + 1;
+    index_t yBas0 = std::floor(y);
+    index_t yBas1 = yBas0 + 1;
+    index_t zBas0 = std::floor(z);
+    index_t zBas1 = zBas0 + 1;
 
     // Linear interpolation constants (percentages)
     xCom = x - xBas0;
@@ -202,14 +201,14 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
                                           xBas1, yBas1, zBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
-    int64_t xn[4], yn[4], zn[4];
+    index_t xn[4], yn[4], zn[4];
     double vecTx[4], vecTy[4], vecTz[4];
     double vecPTx[4], vecPTy[4], vecPTz[4];
 
     // Determine of the zero neighbor
-    int64_t xBas0 = std::floor(x);
-    int64_t yBas0 = std::floor(y);
-    int64_t zBas0 = std::floor(z);
+    index_t xBas0 = std::floor(x);
+    index_t yBas0 = std::floor(y);
+    index_t zBas0 = std::floor(z);
 
     // Determine the location in between the pixels 0..1
     double tx = x - xBas0;

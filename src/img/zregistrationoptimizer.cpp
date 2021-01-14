@@ -1,10 +1,7 @@
 #include "zregistrationoptimizer.h"
 
 #include <ceres/autodiff_cost_function.h>
-#include <ceres/numeric_diff_cost_function.h>
 #include <ceres/gradient_problem.h>
-#include <ceres/problem.h>
-#include <ceres/local_parameterization.h>
 
 #include <utility>
 
@@ -45,7 +42,7 @@ public:
     , m_scales(scales)
     , m_relativeStepSize(relativeStepSize)
   {
-    std::vector<int32_t>* parameter_block_sizes = mutable_parameter_block_sizes();
+    auto* parameter_block_sizes = mutable_parameter_block_sizes();
     parameter_block_sizes->resize(1);
     (*parameter_block_sizes)[0] = m_costFunc.numParameters();
     set_num_residuals(1);

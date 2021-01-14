@@ -113,7 +113,7 @@ public:
   }
 
   // go to idx of this region
-  __forceinline void goToIndex(int64_t idx)
+  __forceinline void goToIndex(size_t idx)
   {
     m_idx = idx;
     m_coord = ZImg::indexToCoord(idx, m_regionInfo);
@@ -126,7 +126,7 @@ public:
 
   // return index of current voxel of this region
   // negative index means before the region
-  __forceinline int64_t index() const
+  __forceinline size_t index() const
   { return m_idx; }
 
   // access nb info
@@ -136,7 +136,7 @@ public:
   __forceinline bool isInBound(size_t n) const
   { return m_allNbInBound || m_isNbInBound[n]; }
   // returned index is only meanlingful when that neighbor is within region since the index is idx of voxel in region
-  __forceinline int64_t index(size_t n) const
+  __forceinline size_t index(size_t n) const
   { return m_idx + m_nbIndexOffsets[n]; }
 
   __forceinline ZVoxelCoordinate coord(size_t n) const
@@ -315,9 +315,9 @@ private:
   TImg* m_img;
   ZImgRegion m_region;
   ZImgInfo m_regionInfo;
-  int64_t m_endIdx;
+  size_t m_endIdx;
   // dynamic info of current voxel
-  int64_t m_idx;  // current voxel idx of region
+  size_t m_idx;  // current voxel idx of region
   ZVoxelCoordinate m_coord; // current voxel coord of img
 
   // img info fixed
@@ -325,7 +325,7 @@ private:
   TVoxel m_padValue;
 
   // neighborhood info fixed
-  std::vector<int64_t> m_nbIndexOffsets;
+  std::vector<size_t> m_nbIndexOffsets;
   ZVoxelCoordinate m_innerBoundLow;
   ZVoxelCoordinate m_innerBoundHigh;
 

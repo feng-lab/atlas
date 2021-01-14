@@ -385,8 +385,8 @@ ZImgInfo ZImgCZISubBlock::readInfo() const
       res = ZImgInfo(m_width, m_height, 1, m_numChannels, 1, m_bytePerVoxel, m_voxelFormat);
     } else {
       res = readCZITileInfo(inputFileStream, m_tiles[0]);
-      for (size_t i = 0; i < m_tiles.size(); ++i) {
-        auto tmpInfo = readCZITileInfo(inputFileStream, m_tiles[i]);
+      for (const auto& tile : m_tiles) {
+        auto tmpInfo = readCZITileInfo(inputFileStream, tile);
         res.numChannels += tmpInfo.numChannels;
       }
       res.createDefaultDescriptions();
@@ -1130,10 +1130,10 @@ void ZImgZeissCZI::parseMetadata(QXmlStreamReader& xml)
     m_shouldSeparateChannelsToDifferentScenes = true;
   }
 
-  if (m_channelNames.size() > 0)
+  if (!m_channelNames.empty())
     m_hasChannelInfo = true;
 
-  if (m_sceneCenterX.size() > 0 && m_sceneCenterX.size() == m_sceneCenterY.size()) {
+  if (!m_sceneCenterX.empty() && m_sceneCenterX.size() == m_sceneCenterY.size()) {
     m_hasSceneInfo = true;
   }
 }
@@ -1966,8 +1966,8 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString
     std::vector<DimensionEntryDV1> dimensionEntries(de.dimensionCount);
     readStream(inputFileStream, dimensionEntries.data(), sizeof(DimensionEntryDV1) * dimensionEntries.size());
     dumpDirectoryEntry(de, str, indent);
-    for (size_t i = 0; i < dimensionEntries.size(); ++i) {
-      dumpDimensionEntry(dimensionEntries[i], str, indent);
+    for (auto& dimensionEntry : dimensionEntries) {
+      dumpDimensionEntry(dimensionEntry, str, indent);
     }
     ++idx;
   }

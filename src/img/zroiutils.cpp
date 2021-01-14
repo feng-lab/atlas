@@ -50,22 +50,22 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
   return res;
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
+std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMask(const QPainterPath& path)
 {
   ZImg img;
   if (path.isEmpty()) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
   QRectF pathRect = path.boundingRect();
-  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left())));
-  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()));
-  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top())));
-  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()));
+  auto minX = std::max(0_z, static_cast<index_t>(std::floor(pathRect.left())));
+  auto maxX = static_cast<index_t>(std::ceil(pathRect.right()));
+  auto minY = std::max(0_z, static_cast<index_t>(std::floor(pathRect.top())));
+  auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
-  auto scale = 5;
+  index_t scale = 5;
   while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
     --scale;
   }
@@ -100,19 +100,19 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
   return std::make_tuple(img, minX, minY);
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainterPath& path, double width)
+std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainterPath& path, double width)
 {
   ZImg img;
   if (path.isEmpty()) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
   QRectF pathRect = path.boundingRect();
-  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left()) - width));
-  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()) + width);
-  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top()) - width));
-  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()) + width);
+  auto minX = std::max(0_z, static_cast<index_t>(std::floor(pathRect.left()) - width));
+  auto maxX = static_cast<index_t>(std::ceil(pathRect.right()) + width);
+  auto minY = std::max(0_z, static_cast<index_t>(std::floor(pathRect.top()) - width));
+  auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()) + width);
   if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
   QImage imageOut((maxX - minX + 1) , (maxY - minY + 1), QImage::Format_Mono);
@@ -134,7 +134,7 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainte
   return std::make_tuple(img, minX, minY);
 }
 
-//std::tuple<ZROIUtils::RowMatrixXb, int32_t, int32_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
+//std::tuple<ZROIUtils::RowMatrixXb, index_t, index_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
 //{
 //  RowMatrixXb res;
 //  auto [img, x_start, y_start] = qPainterPathToMask(path);

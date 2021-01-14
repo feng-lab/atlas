@@ -57,21 +57,21 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
   return res;
 }
 
-std::tuple<ZImg, int32_t, int32_t> pathToMask(const SkPath& path)
+std::tuple<ZImg, index_t, index_t> pathToMask(const SkPath& path)
 {
   ZImg img;
   if (path.isEmpty()) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
   path.updateBoundsCache();
   auto& pathRect = path.getBounds();
-  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left())));
-  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()));
-  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top())));
-  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()));
+  auto minX = std::max(0_z, static_cast<index_t>(std::floor(pathRect.left())));
+  auto maxX = static_cast<index_t>(std::ceil(pathRect.right()));
+  auto minY = std::max(0_z, static_cast<index_t>(std::floor(pathRect.top())));
+  auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
   auto scale = 5;
@@ -117,21 +117,21 @@ std::tuple<ZImg, int32_t, int32_t> pathToMask(const SkPath& path)
   return std::make_tuple(img, minX, minY);
 }
 
-std::tuple<ZImg, int32_t, int32_t> pathToStroke(const SkPath& path, double width = 2.)
+std::tuple<ZImg, index_t, index_t> pathToStroke(const SkPath& path, double width = 2.)
 {
   ZImg img;
   if (path.isEmpty()) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
   path.updateBoundsCache();
   auto& pathRect = path.getBounds();
-  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left()) - width));
-  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()) + width);
-  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top()) - width));
-  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()) + width);
+  auto minX = std::max(0_uz, static_cast<index_t>(std::floor(pathRect.left()) - width));
+  auto maxX = static_cast<index_t>(std::ceil(pathRect.right()) + width);
+  auto minY = std::max(0_uz, static_cast<index_t>(std::floor(pathRect.top()) - width));
+  auto maxY = static_cast<index_t>(std::ceil(pathRect.bottom()) + width);
   if (maxX < minX || maxY < minY) {
-    return std::make_tuple(img, 0_i32, 0_i32);
+    return std::make_tuple(img, 0_z, 0_z);
   }
 
   SkImageInfo info = SkImageInfo::Make((maxX - minX + 1), (maxY - minY + 1), kGray_8_SkColorType,
@@ -209,27 +209,27 @@ inline std::vector<QPointF> matToPoly(const ZROIUtils2::EigenDRef& mat)
 
 namespace nim {
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils2::splineToMask_Python(const EigenDRef& spline)
+std::tuple<ZImg, index_t, index_t> ZROIUtils2::splineToMask_Python(const EigenDRef& spline)
 {
   return pathToMask(splineToPath(matToPoly(spline)));
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils2::rectToMask_Python(const EigenDRef& rect)
+std::tuple<ZImg, index_t, index_t> ZROIUtils2::rectToMask_Python(const EigenDRef& rect)
 {
   return pathToMask(rectToPath(matToPoly(rect)));
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils2::ellipseToMask_Python(const EigenDRef& ellipse)
+std::tuple<ZImg, index_t, index_t> ZROIUtils2::ellipseToMask_Python(const EigenDRef& ellipse)
 {
   return pathToMask(ellipseToPath(matToPoly(ellipse)));
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils2::polygonToMask_Python(const EigenDRef& poly)
+std::tuple<ZImg, index_t, index_t> ZROIUtils2::polygonToMask_Python(const EigenDRef& poly)
 {
   return pathToMask(polygonToPath(matToPoly(poly)));
 }
 
-std::tuple<ZImg, int32_t, int32_t> ZROIUtils2::shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
+std::tuple<ZImg, index_t, index_t> ZROIUtils2::shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
 {
   SkPath pp;
   for (const auto&[points, type, isAdd] : shapeOps) {

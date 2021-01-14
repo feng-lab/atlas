@@ -60,7 +60,7 @@ QString ZImgMetatag::toQString() const
         res = res % QString("%1%2").arg(sep).arg(dataAt<int64_t>(i)), sep = " ";
       break;
     case DataType::Rational: {
-      const uint32_t* lp = dataArray<uint32_t>();
+      const auto* lp = dataArray<uint32_t>();
       while (ct-- > 0) {
         if (lp[1] == 0)
           res = res % QString("%1Nan (%2/0)").arg(sep).arg(lp[0]);
@@ -73,7 +73,7 @@ QString ZImgMetatag::toQString() const
       break;
     }
     case DataType::SRational: {
-      const int32_t* lp = dataArray<int32_t>();
+      const auto* lp = dataArray<int32_t>();
       while (ct-- > 0) {
         if (lp[1] == 0)
           res = res % QString("%1Nan (%2/0)").arg(sep).arg(lp[0]);

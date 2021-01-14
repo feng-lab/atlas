@@ -358,7 +358,7 @@ bool ZTiffIFD::isTransparencyMask() const
 
 VoxelFormat ZTiffIFD::voxelFormat(size_t sample) const
 {
-  int64_t i = indexOf(TIFFTAG_SAMPLEFORMAT);
+  auto i = indexOf(TIFFTAG_SAMPLEFORMAT);
   if (i != -1) {
     auto vfn = m_entries[i].dataAt<uint16_t>(sample);
     if (vfn == 4) {  // void
@@ -378,7 +378,7 @@ VoxelFormat ZTiffIFD::voxelFormat(size_t sample) const
 
 size_t ZTiffIFD::samplesPerPixel() const
 {
-  int64_t i = indexOf(TIFFTAG_SAMPLESPERPIXEL);
+  auto i = indexOf(TIFFTAG_SAMPLESPERPIXEL);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
   }
@@ -387,7 +387,7 @@ size_t ZTiffIFD::samplesPerPixel() const
 
 size_t ZTiffIFD::bitsPerSample(size_t sample) const
 {
-  int64_t i = indexOf(TIFFTAG_BITSPERSAMPLE);
+  auto i = indexOf(TIFFTAG_BITSPERSAMPLE);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(sample);
   }
@@ -396,7 +396,7 @@ size_t ZTiffIFD::bitsPerSample(size_t sample) const
 
 size_t ZTiffIFD::bitsPerSampleFromMaxSampleValue(size_t sample) const
 {
-  int64_t i = indexOf(TIFFTAG_MAXSAMPLEVALUE);
+  auto i = indexOf(TIFFTAG_MAXSAMPLEVALUE);
   if (i != -1) {
     return std::ceil(std::log2(m_entries[i].dataAt<uint16_t>(sample)));
   }
@@ -405,7 +405,7 @@ size_t ZTiffIFD::bitsPerSampleFromMaxSampleValue(size_t sample) const
 
 size_t ZTiffIFD::imageWidth() const
 {
-  int64_t i = indexOf(TIFFTAG_IMAGEWIDTH);
+  auto i = indexOf(TIFFTAG_IMAGEWIDTH);
   if (i != -1) {
     if (m_entries[i].dataType() == DataType::Short) {
       return m_entries[i].dataAt<uint16_t>(0);
@@ -420,7 +420,7 @@ size_t ZTiffIFD::imageWidth() const
 
 size_t ZTiffIFD::imageHeight() const
 {
-  int64_t i = indexOf(TIFFTAG_IMAGELENGTH);
+  auto i = indexOf(TIFFTAG_IMAGELENGTH);
   if (i != -1) {
     if (m_entries[i].dataType() == DataType::Short) {
       return m_entries[i].dataAt<uint16_t>(0);
@@ -435,7 +435,7 @@ size_t ZTiffIFD::imageHeight() const
 
 uint16_t ZTiffIFD::photometricInterpretation() const
 {
-  int64_t i = indexOf(TIFFTAG_PHOTOMETRIC);
+  auto i = indexOf(TIFFTAG_PHOTOMETRIC);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
   }
@@ -446,7 +446,7 @@ uint16_t ZTiffIFD::photometricInterpretation() const
 
 QString ZTiffIFD::imageDescriptionAsQString() const
 {
-  int64_t i = indexOf(TIFFTAG_IMAGEDESCRIPTION);
+  auto i = indexOf(TIFFTAG_IMAGEDESCRIPTION);
   if (i != -1) {
     return QString::fromUtf8(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
   }
@@ -456,7 +456,7 @@ QString ZTiffIFD::imageDescriptionAsQString() const
 
 uint16_t ZTiffIFD::orientation() const
 {
-  int64_t i = indexOf(TIFFTAG_ORIENTATION);
+  auto i = indexOf(TIFFTAG_ORIENTATION);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
   }
@@ -466,7 +466,7 @@ uint16_t ZTiffIFD::orientation() const
 
 uint16_t ZTiffIFD::compression() const
 {
-  int64_t i = indexOf(TIFFTAG_COMPRESSION);
+  auto i = indexOf(TIFFTAG_COMPRESSION);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
   }
@@ -476,7 +476,7 @@ uint16_t ZTiffIFD::compression() const
 
 uint16_t ZTiffIFD::planarConfiguration() const
 {
-  int64_t i = indexOf(TIFFTAG_PLANARCONFIG);
+  auto i = indexOf(TIFFTAG_PLANARCONFIG);
   if (i != -1) {
     return m_entries[i].dataAt<uint16_t>(0);
   }
@@ -486,7 +486,7 @@ uint16_t ZTiffIFD::planarConfiguration() const
 
 int32_t ZTiffIFD::extraSample() const
 {
-  int64_t i = indexOf(TIFFTAG_EXTRASAMPLES);
+  auto i = indexOf(TIFFTAG_EXTRASAMPLES);
   if (i != -1) {
     if (m_entries[i].count() > 1) {
       throw ZIOException(QString("Tiff with multiple TIFFTAG_EXTRASAMPLES is not supported."));
@@ -522,7 +522,7 @@ uint64_t ZTiffIFD::tilesPerImage() const
 
 uint64_t ZTiffIFD::rowsPerStrip() const
 {
-  int64_t i = indexOf(TIFFTAG_ROWSPERSTRIP);
+  auto i = indexOf(TIFFTAG_ROWSPERSTRIP);
   if (i != -1) {
     if (m_entries[i].dataType() == DataType::Short) {
       return m_entries[i].dataAt<uint16_t>(0);
@@ -535,7 +535,7 @@ uint64_t ZTiffIFD::rowsPerStrip() const
 
 uint64_t ZTiffIFD::stripOffsets(size_t idx) const
 {
-  int64_t i = indexOf(TIFFTAG_STRIPOFFSETS);
+  auto i = indexOf(TIFFTAG_STRIPOFFSETS);
   if (i != -1) {
     if (idx >= m_entries[i].count()) {
       throw ZIOException(QString("Wrong idx %1 for strip offsets").arg(idx));
@@ -553,7 +553,7 @@ uint64_t ZTiffIFD::stripOffsets(size_t idx) const
 
 uint64_t ZTiffIFD::stripByteCounts(size_t idx) const
 {
-  int64_t i = indexOf(TIFFTAG_STRIPBYTECOUNTS);
+  auto i = indexOf(TIFFTAG_STRIPBYTECOUNTS);
   if (i != -1) {
     if (idx >= m_entries[i].count()) {
       throw ZIOException(QString("Wrong idx %1 for strip byte counts").arg(idx));
@@ -571,7 +571,7 @@ uint64_t ZTiffIFD::stripByteCounts(size_t idx) const
 
 uint64_t ZTiffIFD::tileWidth() const
 {
-  int64_t i = indexOf(TIFFTAG_TILEWIDTH);
+  auto i = indexOf(TIFFTAG_TILEWIDTH);
   if (i < 0) {
     throw ZIOException(QString("Tile width required for tile image"));
   }
@@ -584,7 +584,7 @@ uint64_t ZTiffIFD::tileWidth() const
 
 uint64_t ZTiffIFD::tileHeight() const
 {
-  int64_t i = indexOf(TIFFTAG_TILELENGTH);
+  auto i = indexOf(TIFFTAG_TILELENGTH);
   if (i < 0) {
     throw ZIOException(QString("Tile length required for tile image"));
   }
@@ -597,7 +597,7 @@ uint64_t ZTiffIFD::tileHeight() const
 
 uint64_t ZTiffIFD::tileOffsets(size_t idx) const
 {
-  int64_t i = indexOf(TIFFTAG_TILEOFFSETS);
+  auto i = indexOf(TIFFTAG_TILEOFFSETS);
   if (i != -1) {
     if (idx >= m_entries[i].count()) {
       throw ZIOException(QString("Wrong idx %1 for tile offsets").arg(idx));
@@ -615,7 +615,7 @@ uint64_t ZTiffIFD::tileOffsets(size_t idx) const
 
 uint64_t ZTiffIFD::tileByteCounts(size_t idx) const
 {
-  int64_t i = indexOf(TIFFTAG_TILEBYTECOUNTS);
+  auto i = indexOf(TIFFTAG_TILEBYTECOUNTS);
   if (i != -1) {
     if (idx >= m_entries[i].count()) {
       throw ZIOException(QString("Wrong idx %1 for tile byte counts").arg(idx));
@@ -661,7 +661,7 @@ QString ZTiffIFD::toQString() const
 
 bool ZTiffIFD::isGrayscaleColormap() const
 {
-  int64_t i = indexOf(TIFFTAG_COLORMAP);
+  auto i = indexOf(TIFFTAG_COLORMAP);
   if (i != -1) {
     size_t count = m_entries[i].count();
     if (count % 3 != 0) {
@@ -705,11 +705,11 @@ std::vector<ZImgMetatag> ZTiffIFD::extractMetadata() const
   return res;
 }
 
-int64_t ZTiffIFD::indexOf(uint64_t tag) const
+index_t ZTiffIFD::indexOf(uint64_t tag) const
 {
   for (size_t i = 0; i < m_entries.size(); ++i) {
     if (m_entries[i].tag() == tag) {
-      return static_cast<int>(i);
+      return static_cast<index_t>(i);
     }
   }
   return -1;
@@ -717,7 +717,7 @@ int64_t ZTiffIFD::indexOf(uint64_t tag) const
 
 uint32_t ZTiffIFD::subfileTypeData() const
 {
-  int64_t i = indexOf(TIFFTAG_SUBFILETYPE);
+  auto i = indexOf(TIFFTAG_SUBFILETYPE);
   if (i != -1) {
     return m_entries[i].dataAt<uint32_t>(0);
   }

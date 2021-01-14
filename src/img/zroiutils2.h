@@ -16,15 +16,15 @@ public:
   using EigenDRef = Eigen::Ref<const RowMatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
 
 // return tight mask, x_start, y_start in which mask could be empty
-  static std::tuple<ZImg, int32_t, int32_t> splineToMask_Python(const EigenDRef& spline);
+  static std::tuple<ZImg, index_t, index_t> splineToMask_Python(const EigenDRef& spline);
 
-  static std::tuple<ZImg, int32_t, int32_t> rectToMask_Python(const EigenDRef& rect);
+  static std::tuple<ZImg, index_t, index_t> rectToMask_Python(const EigenDRef& rect);
 
-  static std::tuple<ZImg, int32_t, int32_t> ellipseToMask_Python(const EigenDRef& ellipse);
+  static std::tuple<ZImg, index_t, index_t> ellipseToMask_Python(const EigenDRef& ellipse);
 
-  static std::tuple<ZImg, int32_t, int32_t> polygonToMask_Python(const EigenDRef& poly);
+  static std::tuple<ZImg, index_t, index_t> polygonToMask_Python(const EigenDRef& poly);
 
-  static std::tuple<ZImg, int32_t, int32_t>
+  static std::tuple<ZImg, index_t, index_t>
   shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps);
 };
 

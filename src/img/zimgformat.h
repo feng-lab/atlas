@@ -90,10 +90,10 @@ public:
 
 protected:
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrder,
-                  uint64_t dataOffset, const ZImgRegion& region, uint64_t timeStride = 0);
+                  size_t dataOffset, const ZImgRegion& region, size_t timeStride = 0);
 
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const std::vector<size_t>& dimensionStrides,
-                  uint64_t dataOffset, const ZImgRegion& region);
+                  size_t dataOffset, const ZImgRegion& region);
 
   void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
                               std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);

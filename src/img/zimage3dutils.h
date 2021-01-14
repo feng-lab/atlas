@@ -668,7 +668,7 @@ template<typename TPixel, typename TPixelOut>
 void image3DGaussianFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                            double kernelSigmaX, double kernelSigmaY, double kernelSigmaZ,
                            TPixelOut* imgOut,
-                           int32_t kernelWidth = -1, int32_t kernelHeight = -1, int32_t kernelDepth = -1,
+                           index_t kernelWidth = -1, index_t kernelHeight = -1, index_t kernelDepth = -1,
                            PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                            bool useMultithreading = true)
 {
@@ -706,7 +706,7 @@ template<typename TPixel, typename TPixelOut>
 void image3DLoGFilter(const TPixel* img, size_t width, size_t height, size_t depth,
                       double kernelSigmaX, double kernelSigmaY, double kernelSigmaZ,
                       TPixelOut* imgOut,
-                      int32_t kernelWidth = -1, int32_t kernelHeight = -1, int32_t kernelDepth = -1,
+                      index_t kernelWidth = -1, index_t kernelHeight = -1, index_t kernelDepth = -1,
                       PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                       bool useMultithreading = true)
 {

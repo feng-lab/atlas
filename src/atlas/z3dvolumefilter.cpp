@@ -265,7 +265,7 @@ bool Z3DVolumeFilter::openZoomInView(const glm::ivec3& volPos)
   int up = std::max(volPos[1] - halfsize + 1, 0);
   int down = std::min(volPos[1] + halfsize, int(m_imgPack->imgInfo().height) - 1);
   int front = 0;
-  int back = m_imgPack->imgInfo().depth - 1;
+  int back = int(m_imgPack->imgInfo().depth) - 1;
   readSubVolumes(left, right, up, down, front, back);
 
   m_isSubVolume.set(true);

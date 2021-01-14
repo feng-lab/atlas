@@ -1718,16 +1718,16 @@ bool ZImg::operator==(const ZImg& other) const
   return false;
 }
 
-ZVoxelCoordinate ZImg::indexToCoord(int64_t idx, const ZImgInfo& info)
+ZVoxelCoordinate ZImg::indexToCoord(index_t idx, const ZImgInfo& info)
 {
   if (info.isEmpty()) {
     throw ZImgException(QString("Can not convert index to coord with empty img info <%1>").arg(info.toQString()));
   }
   ZVoxelCoordinate res;
   //  res.l = idx >= 0 ? (idx / info.locationVoxelNumber()) : (- 1 - ((-idx-1) / info.locationVoxelNumber()));
-  //  idx -= res.l * (int64_t)info.locationVoxelNumber();  //idx is positive now
+  //  idx -= res.l * (index_t)info.locationVoxelNumber();  //idx is positive now
   res.t = idx >= 0 ? (idx / info.timeVoxelNumber()) : (-1 - ((-idx - 1) / info.timeVoxelNumber()));
-  idx -= res.t * static_cast<int64_t>(info.timeVoxelNumber());  //idx is positive now
+  idx -= res.t * static_cast<index_t>(info.timeVoxelNumber());  //idx is positive now
   //  res.t = idx / info.timeVoxelNumber();
   //  idx -= res.t * info.timeVoxelNumber();
   res.c = idx / info.channelVoxelNumber();
@@ -1740,12 +1740,12 @@ ZVoxelCoordinate ZImg::indexToCoord(int64_t idx, const ZImgInfo& info)
   return res;
 }
 
-int64_t ZImg::coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info)
+index_t ZImg::coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info)
 {
-  return coord.t * static_cast<int64_t>(info.timeVoxelNumber()) +
-         coord.c * static_cast<int64_t>(info.channelVoxelNumber()) +
-         coord.z * static_cast<int64_t>(info.planeVoxelNumber()) +
-         coord.y * static_cast<int64_t>(info.rowVoxelNumber()) +
+  return coord.t * static_cast<index_t>(info.timeVoxelNumber()) +
+         coord.c * static_cast<index_t>(info.channelVoxelNumber()) +
+         coord.z * static_cast<index_t>(info.planeVoxelNumber()) +
+         coord.y * static_cast<index_t>(info.rowVoxelNumber()) +
          coord.x;
 }
 

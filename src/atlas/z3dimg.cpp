@@ -521,9 +521,9 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                 m_imageBlockSize.z + m_imageBlockSizePad.z,
                                                 1));
                         m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
-                                                  int64_t(blockImagePos.y) - int64_t(m_imageBlockSizePad.x) / 2,
-                                                  int64_t(blockImagePos.z) - int64_t(m_imageBlockSizePad.y) / 2,
-                                                  int64_t(blockImagePos.w) - int64_t(m_imageBlockSizePad.z) / 2,
+                                                  index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                                                  index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                                                  index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
                                                   channel, 0, imgs[i]);
                       }
                     }

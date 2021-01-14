@@ -291,7 +291,7 @@ bool ZImgITKImage::supportWrite() const
 
 void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2)
 {
-  uint32_t ndims = imageIO->GetNumberOfDimensions();
+  auto ndims = imageIO->GetNumberOfDimensions();
   if (ndims == 1) {
     info.width = imageIO->GetDimensions(0);
     info.height = 1;
@@ -386,8 +386,8 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   }
   info.createDefaultDescriptions();
   if (ndims == 4) {
-    for (size_t i = 0; i < info.timeStamps.size(); ++i)
-      info.timeStamps[i] *= imageIO->GetSpacing(3);
+    for (auto timeStamp : info.timeStamps)
+      timeStamp *= imageIO->GetSpacing(3);
   }
 
   if (info.isEmpty()) {

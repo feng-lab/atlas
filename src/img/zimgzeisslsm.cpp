@@ -69,7 +69,7 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
     throw ZIOException(QString("lsm meta info <%1> doesn't match image data <%2>").
       arg(m_lsmImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
 
-  size_t numLocations = 0;
+  size_t numLocations;
   if (m_numScenes > 0) {
     numLocations = m_numScenes;
   } else {
@@ -200,7 +200,6 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
         break;
       default:
         throw ZIOException("lsm data type is not recognized");
-        break;
     }
   } else {
     switch (m_lsmInfo.s32DataType) {
@@ -219,7 +218,6 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
         break;
       default:
         throw ZIOException("lsm data type is not recognized");
-        break;
     }
   }
 }

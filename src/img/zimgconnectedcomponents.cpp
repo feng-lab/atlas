@@ -192,7 +192,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   if (label > 255)
     return;
 
-  std::stack<int64_t, std::vector<int64_t>> stk;
+  std::stack<index_t , std::vector<index_t>> stk;
   size_t conn = res.connectivity;
   size_t voxelNumber = markerImg.voxelNumber();
   ZImgNeighborhoodConstIterator<uint8_t> nit =
@@ -200,7 +200,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   auto marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;
-  int64_t idx;
+  index_t idx;
   size_t n;
   uint8_t objLabel = label;
   for (size_t v = 0; v < voxelNumber; ++v) {
