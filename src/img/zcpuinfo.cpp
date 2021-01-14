@@ -555,22 +555,46 @@ void ZCpuInfo::detectCoreAndThreadNumber()
         } else if (cInfo[0] == "L1d cache") {
           if (cInfo[1].endsWith("K")) {
             cInfo[1].chop(1);
-            nL1DCacheSize = cInfo[1].toLongLong(&ok) * 1024;
+            nL1DCacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("KiB")) {
+            cInfo[1].chop(3);
+            nL1DCacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("MiB")) {
+            cInfo[1].chop(3);
+            nL1DCacheSize = cInfo[1].toLongLong(&ok) * 1024_u64 * 1024;
           }
         } else if (cInfo[0] == "L1i cache") {
           if (cInfo[1].endsWith("K")) {
             cInfo[1].chop(1);
-            nL1ICacheSize = cInfo[1].toLongLong(&ok) * 1024;
+            nL1ICacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("KiB")) {
+            cInfo[1].chop(3);
+            nL1ICacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("MiB")) {
+            cInfo[1].chop(3);
+            nL1ICacheSize = cInfo[1].toLongLong(&ok) * 1024_u64 * 1024;
           }
         } else if (cInfo[0] == "L2 cache") {
           if (cInfo[1].endsWith("K")) {
             cInfo[1].chop(1);
-            nL2CacheSize = cInfo[1].toLongLong(&ok) * 1024;
+            nL2CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("KiB")) {
+            cInfo[1].chop(3);
+            nL2CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("MiB")) {
+            cInfo[1].chop(3);
+            nL2CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64 * 1024;
           }
         } else if (cInfo[0] == "L3 cache") {
           if (cInfo[1].endsWith("K")) {
             cInfo[1].chop(1);
-            nL3CacheSize = cInfo[1].toLongLong(&ok) * 1024;
+            nL3CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("KiB")) {
+            cInfo[1].chop(3);
+            nL3CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64;
+          } else if (cInfo[1].endsWith("MiB")) {
+            cInfo[1].chop(3);
+            nL3CacheSize = cInfo[1].toLongLong(&ok) * 1024_u64 * 1024;
           }
         }
       }
