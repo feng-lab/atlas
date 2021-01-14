@@ -64,12 +64,12 @@ public:
   // 1D 8192 2D 8192 3D 2048
   // directX 11 resource limit
   // 1D 16384 2D 16384 3D 2048
-  [[nodiscard]] int maxTextureSize() const
+  [[nodiscard]] uint32_t maxTextureSize() const
   { return std::min(m_maxViewportDims, std::min(16384, m_maxTexureSize)); }
 
   // Returns the maximal side length of 3D textures.
   // directx limit?
-  [[nodiscard]] int max3DTextureSize() const
+  [[nodiscard]] uint32_t max3DTextureSize() const
   { return std::min(2048, m_max3DTextureSize); }
 
   // Return a value such as 16 or 32. That is the number of image samplers that your GPU supports in the fragment shader.

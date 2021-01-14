@@ -12,7 +12,7 @@ template<typename KeyType>
 class Z3DBlockCache
 {
 public:
-  using KeyValuePairType = typename std::pair<KeyType, glm::ivec3>;
+  using KeyValuePairType = typename std::pair<KeyType, glm::uvec3>;
   using ListIteratorType = typename std::list<KeyValuePairType>::iterator;
 
   Z3DBlockCache(const glm::uvec3& blockSize, const glm::uvec3& numBlocks, const KeyType& invalidKey)
@@ -22,21 +22,20 @@ public:
     , m_invalidKey(invalidKey)
   {
     CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 &&
-           m_blockSize.x > 0 && m_blockSize.y > 0 && m_blockSize.z > 0);
+           m_blockSize.x > 0 && m_blockSize.y > 0 && m_blockSize.z > 0) << blockSize << numBlocks;
 
     m_size = m_numBlocks.x * m_numBlocks.y * m_numBlocks.z;
     for (uint32_t z = 0; z < m_numBlocks.z; ++z) {
       for (uint32_t y = 0; y < m_numBlocks.y; ++y) {
         for (uint32_t x = 0; x < m_numBlocks.x; ++x) {
           m_cacheItemsList.push_front(
-            KeyValuePairType(m_invalidKey, glm::ivec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
-          //LOG(INFO) << glm::ivec3(x*m_blockSize.x, y*m_blockSize.y, z*m_blockSize.z);
+            KeyValuePairType(m_invalidKey, glm::uvec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
         }
       }
     }
   }
 
-  glm::ivec3 insert(const KeyType& key, KeyType& erasedKey)
+  glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
   {
     auto last = m_cacheItemsList.end();
     --last;
@@ -74,7 +73,7 @@ public:
     }
   }
 
-  const glm::ivec3& get(const KeyType& key) const
+  const glm::uvec3& get(const KeyType& key) const
   {
     auto it = m_cacheItemsMap.find(key);
     return it->second->second;

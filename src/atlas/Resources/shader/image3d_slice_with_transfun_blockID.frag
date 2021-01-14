@@ -11,13 +11,13 @@ varying vec3 texCoord0;
 varying vec4 eyeCoord;
 #endif
 
-uniform isampler3D page_directory;
-uniform ivec3 page_directory_bases[LEVEL_COUNT];
-uniform isampler3D page_table_cache;
-uniform ivec3 page_table_block_size;
+uniform usampler3D page_directory;
+uniform uvec3 page_directory_bases[LEVEL_COUNT];
+uniform usampler3D page_table_cache;
+uniform uvec3 page_table_block_size;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
-uniform ivec3 image_block_size;
+uniform uvec3 image_block_size;
 uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
 
 uniform float ze_to_screen_pixel_voxel_size;
@@ -42,19 +42,19 @@ void main()
     ++curLevel;
   }
 
-  ivec3 pageTableCoord = ivec3(texCoord0 * image_dimensions[curLevel]) / image_block_size;
-  uint blockID = pos_to_block_ids[curLevel].w + uint(pageTableCoord.x) + pos_to_block_ids[curLevel].y * uint(pageTableCoord.y) + pos_to_block_ids[curLevel].z * uint(pageTableCoord.z);
+  uvec3 pageTableCoord = uvec3(texCoord0 * image_dimensions[curLevel]) / image_block_size;
+  uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
 #if GLSL_VERSION >= 130
-  ivec4 pageDirEntry = texelFetch(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
+  uvec4 pageDirEntry = texelFetch(page_directory, ivec3(page_directory_bases[curLevel] + pageTableCoord / page_table_block_size), 0);
 #else
-  ivec4 pageDirEntry = texelFetch3D(page_directory, page_directory_bases[curLevel] + pageTableCoord / page_table_block_size, 0);
+  uvec4 pageDirEntry = texelFetch3D(page_directory, ivec3(page_directory_bases[curLevel] + pageTableCoord / page_table_block_size), 0);
 #endif
-  int pagingFlag = pageDirEntry.w;
+  uint pagingFlag = pageDirEntry.w;
   if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
 #if GLSL_VERSION >= 130
-    ivec4 pageTableEntry = texelFetch(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+    uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
 #else
-    ivec4 pageTableEntry = texelFetch3D(page_table_cache, pageDirEntry.xyz + pageTableCoord % page_table_block_size, 0);
+    uvec4 pageTableEntry = texelFetch3D(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
 #endif
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {

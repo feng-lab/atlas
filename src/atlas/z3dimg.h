@@ -128,18 +128,18 @@ protected:
   const int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
   const int m_emptyFlag = 40000;
 
-  std::vector<glm::ivec4> m_pageDirectory;
-  glm::ivec3 m_pageDirectorySize;
+  std::vector<glm::uvec4> m_pageDirectory;
+  glm::uvec3 m_pageDirectorySize;
   std::unique_ptr<Z3DTexture> m_pageDirectoryTexture;
-  std::vector<glm::ivec4> m_pageTableCache;
-  glm::ivec3 m_pageTableCacheSize;
+  std::vector<glm::uvec4> m_pageTableCache;
+  glm::uvec3 m_pageTableCacheSize;
   std::unique_ptr<Z3DTexture> m_pageTableCacheTexture;
-  std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_pageTableCacheManager;
+  std::unique_ptr<Z3DBlockCache<glm::uvec4>> m_pageTableCacheManager;
   std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
-  std::unique_ptr<Z3DBlockCache<glm::ivec4>> m_imageCacheManager;
+  std::unique_ptr<Z3DBlockCache<glm::uvec4>> m_imageCacheManager;
 
   size_t m_numLevels = 1;
-  std::vector<glm::ivec3> m_pageDirectoryBases;
+  std::vector<glm::uvec3> m_pageDirectoryBases;
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;
   std::vector<glm::uvec3> m_imageDimensions;
@@ -157,7 +157,7 @@ private:
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
-  std::vector<std::vector<std::pair<glm::uvec3, glm::ivec4>>> m_channelPendingUpdates;  // block cache pos and block image pos
+  std::vector<std::vector<std::pair<glm::uvec3, glm::uvec4>>> m_channelPendingUpdates;  // block cache pos and block image pos
 };
 
 } // namespace nim
