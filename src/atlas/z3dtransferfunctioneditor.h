@@ -36,7 +36,7 @@ class Z3DTransferFunctionWidget : public QWidget
 Q_OBJECT
 public:
   explicit Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram = true,
-                                     const QString& histogramNormalizeMethod = tr("Log"),
+                                     QString histogramNormalizeMethod = tr("Log"),
                                      QString xAxisText = tr("Intensity"),
                                      QString yAxisText = tr("Opacity"),
                                      QWidget* parent = nullptr);
@@ -59,9 +59,9 @@ public:
 
   bool findkey(const QPoint& pos, size_t& index, bool& isLeftPart);
 
-  QSize minimumSizeHint() const override;
+  [[nodiscard]] QSize minimumSizeHint() const override;
 
-  QSize sizeHint() const override;
+  [[nodiscard]] QSize sizeHint() const override;
 
   void setTransFunc(Z3DTransferFunctionParameter* tf);
 
@@ -107,9 +107,9 @@ protected:
   // Re-calculated the histogram
   void updateHistogram();
 
-  double keyIntensityToRealIntensity(double keyInten) const;
+  [[nodiscard]] double keyIntensityToRealIntensity(double keyInten) const;
 
-  double realIntensityToKeyIntensity(double realInten) const;
+  [[nodiscard]] double realIntensityToKeyIntensity(double realInten) const;
 
 protected:
   Z3DTransferFunctionParameter* m_transferFunction;

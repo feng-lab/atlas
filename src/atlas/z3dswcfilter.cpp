@@ -49,7 +49,8 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 
   addParameter(m_swcColorParameters.colorMapBranchType);
-  connect(&m_swcColorParameters.colorMapBranchType, &ZColorMapParameter::valueChanged, this, &Z3DSwcFilter::prepareColor);
+  connect(&m_swcColorParameters.colorMapBranchType, &ZColorMapParameter::valueChanged, this,
+          &Z3DSwcFilter::prepareColor);
 
   m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
                             Qt::NoModifier, QEvent::MouseButtonPress);
@@ -390,7 +391,7 @@ void Z3DSwcFilter::prepareData()
   m_lines.clear();
 
   bool checkRadius = false; //m_renderingPrimitive.isSelected("Normal") || m_renderingPrimitive.isSelected("Cylinder");
-  for (const auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
+  for (const auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
     if (checkRadius && n1->radius < std::numeric_limits<double>::epsilon() &&
         n2->radius < std::numeric_limits<double>::epsilon()) {
       checkRadius = false;
@@ -527,7 +528,7 @@ void Z3DSwcFilter::prepareColor()
   if (m_swcColorParameters.colorMode.isSelected("Branch Type") ||
       m_swcColorParameters.colorMode.isSelected("Colormap Branch Type") ||
       m_swcColorParameters.colorMode.isSelected("Subclass")) {
-    for (auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
+    for (auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
       glm::vec4 color1 = m_swcColorParameters.colorByType(n1);
       glm::vec4 color2 = m_swcColorParameters.colorByType(n2);
       if (n1->radius > n2->radius) {
@@ -554,7 +555,7 @@ void Z3DSwcFilter::prepareColor()
       m_pointColors.push_back(color);
     }
   } else if (m_swcColorParameters.colorMode.isSelected("Topology")) {
-    for (const auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
+    for (const auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
       glm::vec4 color1, color2;
       if (ZSwc::isRoot(n1)) {
         color1 = m_swcColorParameters.colorsForDifferentTopology[0]->get();

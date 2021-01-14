@@ -124,10 +124,8 @@ QVariant ZRegionAnnotationViewSettingTreeModel::headerData(int section, Qt::Orie
     switch (section) {
       case AbbreviationColumn:
         return QString("Region");
-        break;
       case WidgetColumn:
         return QString("View Settings");
-        break;
       default:
         break;
     }
@@ -137,10 +135,8 @@ QVariant ZRegionAnnotationViewSettingTreeModel::headerData(int section, Qt::Orie
     switch (section) {
       case WidgetColumn:
         return 1;
-        break;
       default:
         return 0;
-        break;
     }
   }
 
@@ -174,13 +170,13 @@ QModelIndex ZRegionAnnotationViewSettingTreeModel::parent(const QModelIndex& ind
     return QModelIndex();
 
   auto it = m_nodeToIter.at(static_cast<RegionNode*>(index.internalPointer()));
-  if (m_annotationTree.isRoot(it)) {
+  if (ZTree<RegionNode>::isRoot(it)) {
     return QModelIndex();
   }
 
-  auto pit = m_annotationTree.parent(it);
+  auto pit = ZTree<RegionNode>::parent(it);
   RegionNode* node = &*pit;
-  if (m_annotationTree.isRoot(pit)) {
+  if (ZTree<RegionNode>::isRoot(pit)) {
     int row = 0;
     for (auto rit = m_annotationTree.beginRoot(); rit != m_annotationTree.endRoot(); ++rit, ++row) {
       if (&*rit == node) {
@@ -189,7 +185,7 @@ QModelIndex ZRegionAnnotationViewSettingTreeModel::parent(const QModelIndex& ind
     }
   } else {
     int row = 0;
-    auto ppit = m_annotationTree.parent(pit);
+    auto ppit = ZTree<RegionNode>::parent(pit);
     for (auto rit = m_annotationTree.beginChild(ppit); rit != m_annotationTree.endChild(ppit); ++rit, ++row) {
       if (&*rit == node) {
         return createIndex(row, 0, node);

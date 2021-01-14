@@ -217,30 +217,35 @@ void ZMesh::load(H5::Group& allGrp)
 
     H5::DataSet vertices = allGrp.openDataSet("Vertices");
     H5::DataSpace verticesDataspace = vertices.getSpace();
-    if (verticesDataspace.getSimpleExtentNdims() != 2)
+    if (verticesDataspace.getSimpleExtentNdims() != 2) {
       throw ZIOException("Wrong mesh file contents");
+    }
     hsize_t verticesDim[2];
     verticesDataspace.getSimpleExtentDims(verticesDim, nullptr);
-    if (verticesDim[1] != 3 || verticesDim[0] < 3)
+    if (verticesDim[1] != 3 || verticesDim[0] < 3) {
       throw ZIOException("Wrong ROI file contents");
+    }
     m_vertices.resize(verticesDim[0]);
     vertices.read(m_vertices.data(), floatType);
 
     H5::DataSet normals = allGrp.openDataSet("Normals");
     H5::DataSpace normalsDataspace = normals.getSpace();
-    if (normalsDataspace.getSimpleExtentNdims() != 2)
+    if (normalsDataspace.getSimpleExtentNdims() != 2) {
       throw ZIOException("Wrong mesh file contents");
+    }
     hsize_t normalsDim[2];
     normalsDataspace.getSimpleExtentDims(normalsDim, nullptr);
-    if (normalsDim[1] != 3 || normalsDim[0] < 3)
+    if (normalsDim[1] != 3 || normalsDim[0] < 3) {
       throw ZIOException("Wrong ROI file contents");
+    }
     m_normals.resize(normalsDim[0]);
     normals.read(m_normals.data(), floatType);
 
     H5::DataSet indices = allGrp.openDataSet("Indices");
     H5::DataSpace indicesDataspace = indices.getSpace();
-    if (indicesDataspace.getSimpleExtentNdims() != 1)
+    if (indicesDataspace.getSimpleExtentNdims() != 1) {
       throw ZIOException("Wrong mesh file contents");
+    }
     hsize_t indicesDim;
     indicesDataspace.getSimpleExtentDims(&indicesDim, nullptr);
     m_indices.resize(indicesDim);
@@ -348,97 +353,114 @@ QString ZMesh::typeAsString() const
 std::vector<glm::dvec3> ZMesh::doubleVertices() const
 {
   std::vector<glm::dvec3> result;
-  for (auto v : m_vertices)
+  for (auto v : m_vertices) {
     result.emplace_back(v.x, v.y, v.z);
+  }
   return result;
 }
 
 void ZMesh::setVertices(const std::vector<glm::dvec3>& vertices)
 {
   for (const auto& v : vertices) {
-    m_vertices.push_back(glm::vec3(v));
+    m_vertices.emplace_back(v);
   }
 }
 
 void ZMesh::setNormals(const std::vector<glm::dvec3>& normals)
 {
   for (const auto& n : normals) {
-    m_normals.push_back(glm::vec3(n));
+    m_normals.emplace_back(n);
   }
 }
 
 void ZMesh::interpolate(const ZMesh& ref)
 {
   std::vector<glm::uvec3> triIdxs = ref.triangleIndices();
-  if (!ref.m_1DTextureCoordinates.empty())
+  if (!ref.m_1DTextureCoordinates.empty()) {
     m_1DTextureCoordinates.clear();
-  if (!ref.m_2DTextureCoordinates.empty())
+  }
+  if (!ref.m_2DTextureCoordinates.empty()) {
     m_2DTextureCoordinates.clear();
-  if (!ref.m_3DTextureCoordinates.empty())
+  }
+  if (!ref.m_3DTextureCoordinates.empty()) {
     m_3DTextureCoordinates.clear();
-  if (!ref.m_colors.empty())
+  }
+  if (!ref.m_colors.empty()) {
     m_colors.clear();
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
+  }
+  for (auto& vertex : m_vertices) {
     bool match = false;
     // first check all ref vertices
     for (size_t j = 0; !match && j < ref.m_vertices.size(); ++j) {
-      if (glm::length(ref.m_vertices[j] - m_vertices[i]) <= 1e-6) {
+      if (glm::length(ref.m_vertices[j] - vertex) <= 1e-6) {
         match = true;
-        if (!ref.m_1DTextureCoordinates.empty())
+        if (!ref.m_1DTextureCoordinates.empty()) {
           m_1DTextureCoordinates.push_back(ref.m_1DTextureCoordinates[j]);
-        if (!ref.m_2DTextureCoordinates.empty())
+        }
+        if (!ref.m_2DTextureCoordinates.empty()) {
           m_2DTextureCoordinates.push_back(ref.m_2DTextureCoordinates[j]);
-        if (!ref.m_3DTextureCoordinates.empty())
+        }
+        if (!ref.m_3DTextureCoordinates.empty()) {
           m_3DTextureCoordinates.push_back(ref.m_3DTextureCoordinates[j]);
-        if (!ref.m_colors.empty())
+        }
+        if (!ref.m_colors.empty()) {
           m_colors.push_back(ref.m_colors[j]);
+        }
       }
     }
     // no vertice match, interpolate
     for (size_t j = 0; !match && j < triIdxs.size(); ++j) {
       glm::uvec3 triIdx = triIdxs[j];
       double s, t;
-      if (ZMeshUtils::vertexTriangleSquaredDistance(glm::dvec3(m_vertices[i]), glm::dvec3(ref.m_vertices[triIdx[0]]),
+      if (ZMeshUtils::vertexTriangleSquaredDistance(glm::dvec3(vertex), glm::dvec3(ref.m_vertices[triIdx[0]]),
                                                     glm::dvec3(ref.m_vertices[triIdx[1]]),
                                                     glm::dvec3(ref.m_vertices[triIdx[2]]),
                                                     s, t)
           <= 1e-6) {
         match = true;
-        float fs = static_cast<float>(s);
-        float ft = static_cast<float>(t);
-        if (!ref.m_1DTextureCoordinates.empty())
+        auto fs = static_cast<float>(s);
+        auto ft = static_cast<float>(t);
+        if (!ref.m_1DTextureCoordinates.empty()) {
           m_1DTextureCoordinates.push_back(ref.m_1DTextureCoordinates[triIdx[0]] +
                                            (ref.m_1DTextureCoordinates[triIdx[1]] -
                                             ref.m_1DTextureCoordinates[triIdx[0]]) * fs +
                                            (ref.m_1DTextureCoordinates[triIdx[2]] -
                                             ref.m_1DTextureCoordinates[triIdx[0]]) * ft);
-        if (!ref.m_2DTextureCoordinates.empty())
+        }
+        if (!ref.m_2DTextureCoordinates.empty()) {
           m_2DTextureCoordinates.push_back(ref.m_2DTextureCoordinates[triIdx[0]] +
                                            (ref.m_2DTextureCoordinates[triIdx[1]] -
                                             ref.m_2DTextureCoordinates[triIdx[0]]) * fs +
                                            (ref.m_2DTextureCoordinates[triIdx[2]] -
                                             ref.m_2DTextureCoordinates[triIdx[0]]) * ft);
-        if (!ref.m_3DTextureCoordinates.empty())
+        }
+        if (!ref.m_3DTextureCoordinates.empty()) {
           m_3DTextureCoordinates.push_back(ref.m_3DTextureCoordinates[triIdx[0]] +
                                            (ref.m_3DTextureCoordinates[triIdx[1]] -
                                             ref.m_3DTextureCoordinates[triIdx[0]]) * fs +
                                            (ref.m_3DTextureCoordinates[triIdx[2]] -
                                             ref.m_3DTextureCoordinates[triIdx[0]]) * ft);
-        if (!ref.m_colors.empty())
+        }
+        if (!ref.m_colors.empty()) {
           m_colors.push_back(ref.m_colors[triIdx[0]] +
                              (ref.m_colors[triIdx[1]] - ref.m_colors[triIdx[0]]) * fs +
                              (ref.m_colors[triIdx[2]] - ref.m_colors[triIdx[0]]) * ft);
+        }
       }
     }
     if (!match) {
-      if (!ref.m_1DTextureCoordinates.empty())
+      if (!ref.m_1DTextureCoordinates.empty()) {
         m_1DTextureCoordinates.push_back(0.0);
-      if (!ref.m_2DTextureCoordinates.empty())
+      }
+      if (!ref.m_2DTextureCoordinates.empty()) {
         m_2DTextureCoordinates.emplace_back(0.0);
-      if (!ref.m_3DTextureCoordinates.empty())
+      }
+      if (!ref.m_3DTextureCoordinates.empty()) {
         m_3DTextureCoordinates.emplace_back(0.0);
-      if (!ref.m_colors.empty())
+      }
+      if (!ref.m_colors.empty()) {
         m_colors.emplace_back(0.0);
+      }
     }
   }
 }
@@ -457,14 +479,17 @@ void ZMesh::clear()
 size_t ZMesh::numTriangles() const
 {
   size_t n = 0;
-  if (m_indices.empty())
+  if (m_indices.empty()) {
     n = m_vertices.size();
-  else
+  } else {
     n = m_indices.size();
-  if (m_type == GL_TRIANGLES)
+  }
+  if (m_type == GL_TRIANGLES) {
     return n / 3;
-  if (m_type == GL_TRIANGLE_STRIP || m_type == GL_TRIANGLE_FAN)
+  }
+  if (m_type == GL_TRIANGLE_STRIP || m_type == GL_TRIANGLE_FAN) {
     return n - 2;
+  }
 
   return 0;
 }
@@ -586,10 +611,11 @@ glm::vec3 ZMesh::triangleVertex(size_t triangleIndex, size_t vertexIndex) const
 
 void ZMesh::transformVerticesByMatrix(const glm::mat4& tfmat)
 {
-  if (tfmat == glm::mat4(1.0))
+  if (tfmat == glm::mat4(1.0)) {
     return;
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
-    m_vertices[i] = glm::applyMatrix(tfmat, m_vertices[i]);
+  }
+  for (auto& vertex : m_vertices) {
+    vertex = glm::applyMatrix(tfmat, vertex);
   }
 }
 
@@ -609,8 +635,10 @@ std::vector<ZMesh> ZMesh::split(size_t numTriangle) const
 void ZMesh::generateNormals(bool useAreaWeight)
 {
   m_normals.resize(m_vertices.size());
-  for (size_t i = 0; i < m_normals.size(); ++i)
-    m_normals[i] = glm::vec3(0.f);
+//  for (auto& normal : m_normals) {
+//    normal = glm::vec3(0.f);
+//  }
+  std::memset(m_normals.data(), 0, m_normals.size() * sizeof(glm::vec3));
 
   for (size_t i = 0; i < numTriangles(); ++i) {
     glm::uvec3 tri = triangleIndices(i);
@@ -622,15 +650,17 @@ void ZMesh::generateNormals(bool useAreaWeight)
     glm::vec3 v1 = p2 - p1;
     glm::vec3 v2 = p3 - p1;
     glm::vec3 normal = glm::cross(v1, v2);
-    if (!useAreaWeight)
+    if (!useAreaWeight) {
       normal = glm::normalize(normal);
+    }
     m_normals[tri[0]] += normal;
     m_normals[tri[1]] += normal;
     m_normals[tri[2]] += normal;
   }
 
-  for (size_t i = 0; i < m_normals.size(); ++i)
-    m_normals[i] = glm::normalize(m_normals[i]);
+  for (auto& normal : m_normals) {
+    normal = glm::normalize(normal);
+  }
 }
 
 //double ZMesh::volume() const
@@ -734,8 +764,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-frontFaceNormal);
     normals.push_back(-frontFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 0 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 0 + i * 24);
     }
 
     vertices.push_back(p2);
@@ -748,8 +778,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-upFaceNormal);
     normals.push_back(-upFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 4 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 4 + i * 24);
     }
 
     vertices.push_back(p4);
@@ -762,8 +792,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(-rightFaceNormal);
     normals.push_back(-rightFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 2 * 4 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 2 * 4 + i * 24);
     }
 
     vertices.push_back(p7);
@@ -776,8 +806,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(rightFaceNormal);
     normals.push_back(rightFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 3 * 4 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 3 * 4 + i * 24);
     }
 
     vertices.push_back(p4);
@@ -790,8 +820,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(upFaceNormal);
     normals.push_back(upFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 4 * 4 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 4 * 4 + i * 24);
     }
 
     vertices.push_back(p6);
@@ -804,8 +834,8 @@ ZMesh ZMesh::createCubesWithNormal(const std::vector<glm::vec3>& coordLlfs, cons
     normals.push_back(frontFaceNormal);
     normals.push_back(frontFaceNormal);
 
-    for (auto j = 0; j < 6; ++j) {
-      indexes.push_back(idxes[j] + 5 * 4 + i * 24);
+    for (auto idx : idxes) {
+      indexes.push_back(idx + 5 * 4 + i * 24);
     }
   }
 
@@ -952,17 +982,21 @@ ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, const glm::vec3&
   GLuint idx[6] = {0, 1, 2, 2, 1, 3};
 
   bool reverse = true;
-  if (alongDim == 0 && coordfirst.x > coordlast.x)
+  if (alongDim == 0 && coordfirst.x > coordlast.x) {
     reverse = false;
-  if (alongDim == 1 && coordfirst.y > coordlast.y)
+  }
+  if (alongDim == 1 && coordfirst.y > coordlast.y) {
     reverse = false;
-  if (alongDim == 2 && coordfirst.z > coordlast.z)
+  }
+  if (alongDim == 2 && coordfirst.z > coordlast.z) {
     reverse = false;
+  }
 
   for (auto i = 0; i < numSlices; ++i) {
     float factor = 0.f;
-    if (numSlices > 1)
+    if (numSlices > 1) {
       factor = i / (numSlices - 1.0);
+    }
     if (alongDim == 0) {
       vertices.emplace_back(glm::mix(coordfirst.x, coordlast.x, factor), coordfirst[1], coordfirst[2]);
       vertices.emplace_back(glm::mix(coordfirst.x, coordlast.x, factor), coordlast[1], coordfirst[2]);
@@ -992,10 +1026,11 @@ ZMesh ZMesh::createCubeSerieSlices(int numSlices, int alongDim, const glm::vec3&
       texCoords.emplace_back(texlast[0], texlast[1], glm::mix(texfirst.z, texlast.z, factor));
     }
     for (auto j = 0; j < 6; ++j) {
-      if (reverse)
+      if (reverse) {
         indexes.push_back(idx[5 - j] + i * 4);
-      else
+      } else {
         indexes.push_back(idx[j] + i * 4);
+      }
     }
   }
 
@@ -1189,8 +1224,9 @@ ZMesh ZMesh::createConeMesh(glm::vec3 base, float baseRadius, glm::vec3 top, flo
 ZMesh ZMesh::merge(const std::vector<ZMesh>& meshes)
 {
   ZMesh res;
-  if (meshes.empty())
+  if (meshes.empty()) {
     return res;
+  }
   vtkSmartPointer<vtkAppendPolyData> appendFilter = vtkSmartPointer<vtkAppendPolyData>::New();
   std::vector<vtkSmartPointer<vtkPolyData>> polys(meshes.size());
   for (size_t i = 0; i < meshes.size(); ++i) {
@@ -1262,7 +1298,7 @@ void ZMesh::createSwcMesh(const ZSwc& tree, int rootType, ZMesh& rootMesh, ZMesh
   }
 
   for (std::vector<SwcTreeNode>& branch : allBranches) {
-    CHECK(branch.size() >= 1);
+    CHECK(!branch.empty());
     size_t lastRootNodeIndex = branch.size();
     for (size_t i = branch.size(); i-- > 1;) {
       if (branch[i]->type == rootType) {
@@ -1349,7 +1385,7 @@ void ZMesh::createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resol
 
   resolution = std::max(resolution, 4);
   std::vector<ZMesh> meshes;
-  for (auto p : puncta) {
+  for (const auto& p : puncta) {
     meshes.push_back(createSphereMesh(glm::vec3(p.x(), p.y(), p.z() * zscale), p.radius(), resolution, resolution));
   }
   if (meshes.empty()) {
@@ -1381,8 +1417,9 @@ void ZMesh::swapXY()
 
 void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)
 {
-  if (!m_indices.empty() || m_type != GL_TRIANGLES)
+  if (!m_indices.empty() || m_type != GL_TRIANGLES) {
     return;
+  }
 
   m_vertices.push_back(mesh.m_vertices[triangle[0]]);
   m_vertices.push_back(mesh.m_vertices[triangle[1]]);
@@ -1442,13 +1479,13 @@ size_t ZMesh::numCoverCubes(double cubeEdgeLength)
   float maxy = maxx;
   float minz = minx;
   float maxz = maxx;
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
-    minx = std::min(minx, m_vertices[i].x);
-    maxx = std::max(maxx, m_vertices[i].x);
-    miny = std::min(miny, m_vertices[i].y);
-    maxy = std::max(maxy, m_vertices[i].y);
-    minz = std::min(minz, m_vertices[i].z);
-    maxz = std::max(maxz, m_vertices[i].z);
+  for (auto& vertex : m_vertices) {
+    minx = std::min(minx, vertex.x);
+    maxx = std::max(maxx, vertex.x);
+    miny = std::min(miny, vertex.y);
+    maxy = std::max(maxy, vertex.y);
+    minz = std::min(minz, vertex.z);
+    maxz = std::max(maxz, vertex.z);
   }
   int xdim = std::ceil((maxx - minx) / cubeEdgeLength);
   int ydim = std::ceil((maxy - miny) / cubeEdgeLength);
@@ -1468,9 +1505,9 @@ size_t ZMesh::numCoverCubes(double cubeEdgeLength)
       }
     }
   }
-  for (size_t i = 0; i < m_vertices.size(); ++i) {
+  for (auto& vertex : m_vertices) {
     for (size_t j = 0; j < boxes.size(); ++j) {
-      if (boxes[j].contains(m_vertices[i])) {
+      if (boxes[j].contains(vertex)) {
         numPts[j] += 1;
         break;
       }
@@ -1478,8 +1515,9 @@ size_t ZMesh::numCoverCubes(double cubeEdgeLength)
   }
   size_t res = 0;
   for (size_t j = 0; j < boxes.size(); ++j) {
-    if (numPts[j] > 0)
+    if (numPts[j] > 0) {
       ++res;
+    }
   }
   return res;
 }

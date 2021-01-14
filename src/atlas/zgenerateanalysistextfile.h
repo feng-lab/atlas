@@ -43,7 +43,7 @@ class ZGenerateAnalysisTextFile
   using SwcTreeNode = ZSwc::Iterator;
   using ConstSwcTreeNode = ZSwc::ConstIterator;
 public:
-  ZGenerateAnalysisTextFile();
+  ZGenerateAnalysisTextFile() = default;
 
   // -----  first way to call ---------
 

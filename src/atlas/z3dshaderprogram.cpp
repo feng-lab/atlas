@@ -242,13 +242,13 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, co
                                           const QString& geomHeader)
 {
   removeAllShaders();
-  for (index_t i = 0; i < shaderFilenames.size(); ++i) {
-    if (shaderFilenames[i].isEmpty())
+  for (const auto& shaderFilename : shaderFilenames) {
+    if (shaderFilename.isEmpty())
       continue;
-    if (shaderFilenames[i].endsWith(".geom", Qt::CaseInsensitive)) {
-      addShader(Z3DShaderManager::instance().shader(shaderFilenames[i], geomHeader, m_context));
+    if (shaderFilename.endsWith(".geom", Qt::CaseInsensitive)) {
+      addShader(Z3DShaderManager::instance().shader(shaderFilename, geomHeader, m_context));
     } else {
-      addShader(Z3DShaderManager::instance().shader(shaderFilenames[i], header, m_context));
+      addShader(Z3DShaderManager::instance().shader(shaderFilename, header, m_context));
     }
   }
   link();
@@ -259,18 +259,18 @@ void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QSt
                                           const QStringList& fragSrcs, const QString& header, const QString& geomHeader)
 {
   removeAllShaders();
-  for (index_t i = 0; i < vertSrcs.size(); ++i) {
-    QString vertSrc = header + vertSrcs[i];
+  for (const auto& i : vertSrcs) {
+    QString vertSrc = header + i;
     addShaderFromSourceCode(Z3DShader::Type::Vertex, vertSrc);
   }
 
-  for (index_t i = 0; i < geomSrcs.size(); ++i) {
-    QString geomSrc = geomHeader + geomSrcs[i];
+  for (const auto& i : geomSrcs) {
+    QString geomSrc = geomHeader + i;
     addShaderFromSourceCode(Z3DShader::Type::Geometry, geomSrc);
   }
 
-  for (index_t i = 0; i < fragSrcs.size(); ++i) {
-    QString fragSrc = header + fragSrcs[i];
+  for (const auto& i : fragSrcs) {
+    QString fragSrc = header + i;
     addShaderFromSourceCode(Z3DShader::Type::Fragment, fragSrc);
   }
 

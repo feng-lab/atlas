@@ -2,7 +2,6 @@
 
 #include "zselectfilewidget.h"
 #include "zchromaticshiftcorrection.h"
-#include "zimgstackinterface.h"
 #include "zstringutils.h"
 #include "zlog.h"
 #include "zsysteminfo.h"
@@ -10,8 +9,6 @@
 #include <QApplication>
 #include <QVBoxLayout>
 #include <QFileInfo>
-#include <QKeyEvent>
-#include <QFileDialog>
 #include <QMessageBox>
 #include <QThread>
 
@@ -106,7 +103,7 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
   QString stackFn = fi.path() + "/" + fi.baseName() + "_chromatic_shift_corrected.nim";
   m_outputStackWidget->setFile(stackFn);
 
-  size_t channelNumber = 0;
+  size_t channelNumber;
   try {
     std::vector<ZImgInfo> info = ZImg::readImgInfos(fn);
     if (info.size() != 1 || info[0].isEmpty()) {

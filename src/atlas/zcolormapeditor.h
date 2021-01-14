@@ -45,7 +45,7 @@ protected:
 
   void resizeEvent(QResizeEvent* /*event*/) override;
 
-  QSize sizeHint() const override;
+  [[nodiscard]] QSize sizeHint() const override;
 
   enum FindKeyResult
   {
@@ -56,11 +56,11 @@ protected:
 
   FindKeyResult findkey(const QPoint& pos, size_t& index, bool includeBoundKey = false) const;
 
-  double intensityToScreenXPosition(double intensity) const;
+  [[nodiscard]] double intensityToScreenXPosition(double intensity) const;
 
-  double screenXPositionToIntensity(double x) const;
+  [[nodiscard]] double screenXPositionToIntensity(double x) const;
 
-  QRect sliderBounds(size_t index) const;
+  [[nodiscard]] QRect sliderBounds(size_t index) const;
 
 private:
   ZColorMapParameter* m_colorMap;

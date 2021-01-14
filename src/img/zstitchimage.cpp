@@ -481,12 +481,12 @@ void ZStitchImage::doWork()
         for (const auto& filename : m_2ndInputFilenames) {
           input2ndStackSources.emplace_back(filename, ZImgRegion(), m_2ndScene);
         }
-        for (size_t i = 0; i < input2ndStackSources.size(); ++i) {
-          auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[i]);
+        for (auto& input2ndStackSource : input2ndStackSources) {
+          auto tmpInfo = ZImg::readImgInfo(input2ndStackSource);
           if (!tmpInfo.isSameType(info)) {
             throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
                                   .arg(inputStackSources[0].toQString()).arg(info.toQString())
-                                  .arg(input2ndStackSources[i].toQString()).arg(tmpInfo.toQString()));
+                                  .arg(input2ndStackSource.toQString()).arg(tmpInfo.toQString()));
           }
         }
       }
@@ -569,7 +569,7 @@ void ZStitchImage::doWork()
 
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
     for (const auto& con : conn) {
-      allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
+      allPairs.emplace_back(con.first.first, con.first.second, con.second);
     }
 
     auto stitch_pair = [&](size_t i) {
@@ -943,7 +943,7 @@ void ZStitchImage::doRestitch()
 
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
     for (const auto& con : conn) {
-      allPairs.push_back(std::make_tuple(con.first.first, con.first.second, con.second));
+      allPairs.emplace_back(con.first.first, con.first.second, con.second);
     }
 
     auto stitch_pair = [&](size_t i) {

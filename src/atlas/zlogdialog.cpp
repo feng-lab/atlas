@@ -3,14 +3,12 @@
 #include "ui_LogDialog.h"
 #include "ztheme.h"
 
-#include <QIcon>
 #include <QSortFilterProxyModel>
 #include <QClipboard>
 #include <QKeyEvent>
 #include <QFileDialog>
 #include <QtGlobal>
 #include <QTextStream>
-#include <cstddef>
 
 namespace nim {
 
@@ -25,7 +23,7 @@ public:
   {
   }
 
-  LogSeverity level() const
+  [[nodiscard]] LogSeverity level() const
   {
     return mLevel;
   }
@@ -45,10 +43,10 @@ public:
   }
 
 protected:
-  bool filterAcceptsRow(int source_row, const QModelIndex& /*source_parent*/) const override
+  [[nodiscard]] bool filterAcceptsRow(int source_row, const QModelIndex& /*source_parent*/) const override
   {
     if (!mLastVisibleRow) {
-      ZLogModelSink* model = dynamic_cast<ZLogModelSink*>(sourceModel());
+      auto* model = dynamic_cast<ZLogModelSink*>(sourceModel());
       const LogData& d = model->at(source_row);
       return d.level >= mLevel;
     }
@@ -61,7 +59,7 @@ private:
   int mLastVisibleRow;
 };
 
-ZLogDialog::ZLogDialog(LogSinkPtr destination, QWidget* parent)
+ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
   : QDialog(parent)
   , mUi(nullptr)
   , mProxyModel(nullptr)
@@ -128,7 +126,7 @@ bool ZLogDialog::eventFilter(QObject* obj, QEvent* event)
 {
   if (obj == mUi->tableViewMessages) {
     if (event->type() == QEvent::KeyPress) {
-      QKeyEvent* keyEvent = static_cast<QKeyEvent*>(event);
+      auto* keyEvent = static_cast<QKeyEvent*>(event);
       if (keyEvent->key() == Qt::Key_C && (keyEvent->modifiers() & Qt::ControlModifier)) {
         copySelection();
         return true;
@@ -208,7 +206,7 @@ void ZLogDialog::saveSelection()
   dialog.exec();
 
   const QStringList sel = dialog.selectedFiles();
-  if (sel.size() < 1) {
+  if (sel.empty()) {
     return;
   }
 
@@ -233,8 +231,8 @@ QString ZLogDialog::getSelectionText() const
       text += mModelDestination->at(srow).formatted + "\n";
     }
   } else {
-    for (QModelIndexList::const_iterator i = rows.begin(); i != rows.end(); ++i) {
-      const int srow = mProxyModel->mapToSource(*i).row();
+    for (const auto& row : rows) {
+      const int srow = mProxyModel->mapToSource(row).row();
       text += mModelDestination->at(srow).formatted + "\n";
     }
   }

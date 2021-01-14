@@ -17,7 +17,6 @@
 #include <QActionGroup>
 #include <QDockWidget>
 #include <QToolBar>
-#include <QMenu>
 #include <QMimeData>
 #include <QMenuBar>
 #include <QSettings>
@@ -440,7 +439,7 @@ void Z3DMainWindow::fillDockWindows()
 
   m_axisDockWidget->setWidget(m_view->axisWidget());
 
-  m_helpDockWidget->setWidget(m_view->helpWidget());
+  m_helpDockWidget->setWidget(Z3DView::helpWidget());
 }
 
 void Z3DMainWindow::readSettings()

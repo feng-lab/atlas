@@ -7,6 +7,7 @@
 #include "z3dtexture.h"
 #include "zlog.h"
 #include <QLabel>
+#include <memory>
 
 namespace nim {
 
@@ -128,7 +129,7 @@ void Z3DTransferFunction::updateTexture() const
 
 void Z3DTransferFunction::createTexture() const
 {
-  m_texture.reset(new Z3DTexture(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType));
+  m_texture = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
 }
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const

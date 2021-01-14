@@ -13,7 +13,7 @@ ZShareItemSelectionModel::ZShareItemSelectionModel(QAbstractItemModel* model,
 {
   const QAbstractItemModel* srcModel = m_srcSelectionModel->model();
   if (srcModel != model) {
-    const QAbstractProxyModel* proxyModel = qobject_cast<const QAbstractProxyModel*>(model);
+    const auto* proxyModel = qobject_cast<const QAbstractProxyModel*>(model);
     CHECK(proxyModel);
     while (true) {
       m_proxyChain.prepend(proxyModel);
@@ -86,8 +86,8 @@ QModelIndex ZShareItemSelectionModel::mapIndexFromSrc(const QModelIndex& index) 
   if (!index.isValid())
     return QModelIndex();
   QModelIndex res = index;
-  for (index_t i = 0; i < m_proxyChain.size(); ++i) {
-    res = m_proxyChain[i]->mapFromSource(res);
+  for (auto i : m_proxyChain) {
+    res = i->mapFromSource(res);
   }
   return res;
 }
@@ -108,8 +108,8 @@ QItemSelection ZShareItemSelectionModel::mapSelectionFromSrc(const QItemSelectio
   if (selection.isEmpty())
     return QItemSelection();
   QItemSelection res = selection;
-  for (index_t i = 0; i < m_proxyChain.size(); ++i) {
-    res = m_proxyChain[i]->mapSelectionFromSource(res);
+  for (auto i : m_proxyChain) {
+    res = i->mapSelectionFromSource(res);
   }
   return res;
 }

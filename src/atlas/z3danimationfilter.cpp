@@ -4,8 +4,6 @@
 #include "z3dgpuinfo.h"
 #include "zcameraparameteranimation.h"
 #include "zeventlistenerparameter.h"
-#include "zmesh.h"
-#include "zrandom.h"
 #include <QFileInfo>
 #include <boost/math/constants/constants.hpp>
 
@@ -178,8 +176,8 @@ void Z3DAnimationFilter::deregisterPickingObjects()
 void Z3DAnimationFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.reset();
-  for (size_t i = 0; i < m_lines.size(); ++i) {
-    m_notTransformedBoundBox.expand(glm::dvec3(m_lines[i]));
+  for (auto& line : m_lines) {
+    m_notTransformedBoundBox.expand(glm::dvec3(line));
   }
   if (!m_lines.empty()) {
     double cameraSize = std::max(m_cameraDirectionSize.get(), m_cameraSize.get());

@@ -135,8 +135,8 @@ void ZColorMapWidget::mouseMoveEvent(QMouseEvent* e)
       }
     }
     m_colorMap->get().removeSelectedKeys();
-    for (size_t i = 0; i < newKeys.size(); ++i) {
-      m_colorMap->get().addKey(newKeys[i], true);
+    for (auto& newKey : newKeys) {
+      m_colorMap->get().addKey(newKey, true);
     }
   }
   m_dragStartX = e->pos().x();
@@ -181,12 +181,12 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent* e)
     QMenu contextMenu(this);
     contextMenu.setTitle(QString("Key %1").arg(index + 1));
     bool isSplit = m_colorMap->get().key(index).isSplit();
-    QAction* mergeAction = nullptr;
-    QAction* editLColorAction = nullptr;
-    QAction* editRColorAction = nullptr;
-    QAction* splitAction = nullptr;
-    QAction* editIntensityAction = nullptr;
-    QAction* removeAction = nullptr;
+    QAction* mergeAction;
+    QAction* editLColorAction;
+    QAction* editRColorAction;
+    QAction* splitAction;
+    QAction* editIntensityAction;
+    QAction* removeAction;
     if (isSplit) {
       editLColorAction = contextMenu.addAction("Change Left Color");
       editRColorAction = contextMenu.addAction("Change Right Color");
@@ -255,7 +255,7 @@ bool ZColorMapWidget::event(QEvent* e)
 {
   if (e->type() == QEvent::ToolTip) {
     size_t index;
-    QHelpEvent* helpEvent = static_cast<QHelpEvent*>(e);
+    auto* helpEvent = static_cast<QHelpEvent*>(e);
     QRect tipRect;
     QString tipText;
     if (findkey(helpEvent->pos(), index, true) != ZColorMapWidget::NONE) {

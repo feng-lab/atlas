@@ -3,13 +3,10 @@
 #include "zexception.h"
 #include "zimgconnectedcomponents.h"
 #include "zlog.h"
-#include "zimgfillhole.h"
 #include "zcpuinfo.h"
 #include "zbenchtimer.h"
 #include "zioutils.h"
-#include <QStandardPaths>
 #include <QFile>
-#include <QTransform>
 #include <QTemporaryDir>
 
 namespace {

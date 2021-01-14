@@ -7,10 +7,7 @@
 #include "znumericparameter.h"
 #include "ztheme.h"
 #include <QHBoxLayout>
-#include <QVBoxLayout>
-#include <QGridLayout>
 #include <QScrollBar>
-#include <QToolBar>
 #include <QAction>
 
 namespace nim {

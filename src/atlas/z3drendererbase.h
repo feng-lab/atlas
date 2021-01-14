@@ -38,8 +38,6 @@ public:
 
   explicit Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  virtual ~Z3DRendererBase();
-
   inline void setCamera(const Z3DCamera& c)
   {
     m_camera = c;
@@ -265,7 +263,9 @@ protected:
 
   bool needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
 
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   bool useDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
+#endif
 
   inline bool hasClipPlanes()
   { return !m_clipPlanes.empty(); }

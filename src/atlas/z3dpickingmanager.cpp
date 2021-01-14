@@ -46,19 +46,22 @@ void Z3DPickingManager::clearRegisteredObjects()
 
 glm::col4 Z3DPickingManager::colorOfObject(const void* obj)
 {
-  if (!obj)
+  if (!obj) {
     return glm::col4(0, 0, 0, 0);
+  }
 
   if (isRegistered(obj)) {
     return m_objectToColor[obj];
-  } else
+  } else {
     return glm::col4(0, 0, 0, 0);
+  }
 }
 
 const void* Z3DPickingManager::objectOfColor(const glm::col4& col)
 {
-  if (col.a == 0)
+  if (col.a == 0) {
     return nullptr;
+  }
 
   if (isRegistered(col)) {
     return m_colorToObject[col];
@@ -84,45 +87,45 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-  auto buf = std::make_unique<glm::col4[]>(tex->bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
+  auto buf = std::make_unique<glm::col4[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
   tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
   glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
-  if (radius < 0)
+  if (radius < 0) {
     radius = std::max(texSize.x, texSize.y);
+  }
   for (auto y = std::max(0, pos.y - radius); y <= std::min(texSize.y - 1, pos.y + radius); ++y) {
     for (auto x = std::max(0, pos.x - radius); x <= std::min(texSize.x - 1, pos.x + radius); ++x) {
       auto col = buf[(y * texSize.x) + x];
       std::swap(col.r, col.b);
-      if (col2dist[col] == 0)
+      if (col2dist[col] == 0) {
         col2dist[col] = (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y);
-      else
+      } else {
         col2dist[col] = std::min(col2dist[col], (x - pos.x) * (x - pos.x) + (y - pos.y) * (y - pos.y));
+      }
     }
   }
   std::vector<const void*> res;
   if (ascend) {
     std::multimap<int, const void*> dist2obj;
-    for (auto it = col2dist.begin();
-         it != col2dist.end(); ++it) {
-      const void* obj = objectOfColor(it->first);
-      if (obj)
-        dist2obj.emplace(it->second, obj);
+    for (auto&[color, dist] : col2dist) {
+      const void* obj = objectOfColor(color);
+      if (obj) {
+        dist2obj.emplace(dist, obj);
+      }
     }
-    for (auto it = dist2obj.begin();
-         it != dist2obj.end(); ++it) {
-      res.push_back(it->second);
+    for (auto& it : dist2obj) {
+      res.push_back(it.second);
     }
   } else {
     std::multimap<int, const void*, std::greater<>> dist2obj;
-    for (auto it = col2dist.begin();
-         it != col2dist.end(); ++it) {
-      const void* obj = objectOfColor(it->first);
-      if (obj)
-        dist2obj.emplace(it->second, obj);
+    for (auto&[color, dist] : col2dist) {
+      const void* obj = objectOfColor(color);
+      if (obj) {
+        dist2obj.emplace(dist, obj);
+      }
     }
-    for (auto it = dist2obj.begin();
-         it != dist2obj.end(); ++it) {
-      res.push_back(it->second);
+    for (auto& it : dist2obj) {
+      res.push_back(it.second);
     }
   }
   return res;

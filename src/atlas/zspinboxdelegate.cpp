@@ -13,7 +13,7 @@ QWidget* ZSpinBoxDelegate::createEditor(QWidget* parent,
                                         const QStyleOptionViewItem&/* option */,
                                         const QModelIndex&/* index */) const
 {
-  QSpinBox* editor = new QSpinBox(parent);
+  auto* editor = new QSpinBox(parent);
   editor->setFrame(false);
   editor->setMinimum(0);
   editor->setMaximum(100);
@@ -26,14 +26,14 @@ void ZSpinBoxDelegate::setEditorData(QWidget* editor,
 {
   int value = index.model()->data(index, Qt::EditRole).toInt();
 
-  QSpinBox* spinBox = static_cast<QSpinBox*>(editor);
+  auto* spinBox = static_cast<QSpinBox*>(editor);
   spinBox->setValue(value);
 }
 
 void ZSpinBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
                                     const QModelIndex& index) const
 {
-  QSpinBox* spinBox = static_cast<QSpinBox*>(editor);
+  auto* spinBox = static_cast<QSpinBox*>(editor);
   spinBox->interpretText();
   int value = spinBox->value();
 

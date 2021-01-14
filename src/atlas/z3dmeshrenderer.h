@@ -81,7 +81,7 @@ private:
   std::vector<ZMesh*> m_splitMeshesWrapper;
   std::vector<glm::vec4> m_splitMeshesColors;
   std::vector<glm::vec4> m_splitMeshesPickingColors;
-  bool m_meshNeedSplit;
+  bool m_meshNeedSplit = false;
   std::vector<size_t> m_splitCount;
   bool m_meshColorReady;
   bool m_meshPickingColorReady;

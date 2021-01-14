@@ -39,10 +39,10 @@ public:
 
   void setColorL(const QColor& color);
 
-  inline glm::col4 colorL() const
+  [[nodiscard]] inline glm::col4 colorL() const
   { return m_colorL; }
 
-  QColor qColorL() const;
+  [[nodiscard]] QColor qColorL() const;
 
   void setColorR(const glm::col4& color);
 
@@ -52,12 +52,12 @@ public:
 
   void setColorR(const QColor& color);
 
-  inline glm::col4 colorR() const
+  [[nodiscard]] inline glm::col4 colorR() const
   { return m_colorR; }
 
-  QColor qColorR() const;
+  [[nodiscard]] QColor qColorR() const;
 
-  inline bool isSplit() const
+  [[nodiscard]] inline bool isSplit() const
   { return m_split; }
 
   void setSplit(bool split, bool useLeft = true);
@@ -70,21 +70,21 @@ public:
 
   void setAlphaL(uint8_t a);
 
-  double floatAlphaR() const;
+  [[nodiscard]] double floatAlphaR() const;
 
-  double floatAlphaL() const;
+  [[nodiscard]] double floatAlphaL() const;
 
-  uint8_t alphaR() const;
+  [[nodiscard]] uint8_t alphaR() const;
 
-  uint8_t alphaL() const;
+  [[nodiscard]] uint8_t alphaL() const;
 
-  inline double intensity() const
+  [[nodiscard]] inline double intensity() const
   { return m_intensity; }
 
   inline void setIntensity(double i)
   { m_intensity = i; }
 
-  ZColorMapKey* clone() const;
+  [[nodiscard]] ZColorMapKey* clone() const;
 
 private:
   friend class ZColorMapParameter;
@@ -475,10 +475,10 @@ public:
 public:
   void setSameAs(const ZParameter& rhs) override;
 
-  bool supportInterpolation() const override
+  [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  json::value jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
   void readValue(const json::value& jsonValue) override;
 

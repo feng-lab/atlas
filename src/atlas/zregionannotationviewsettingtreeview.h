@@ -12,8 +12,6 @@ namespace nim {
 
 class ZROIFilter;
 
-class Z3DMeshFiter;
-
 class ZRegionAnnotationViewSettingTreeView : public QTreeView
 {
 Q_OBJECT

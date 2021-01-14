@@ -51,12 +51,12 @@
 #include <QStatusBar>
 #include <QDesktopServices>
 #include <QProcess>
-#include <QTextStream>
+#include <utility>
 
 namespace nim {
 
-ZMainWindow::ZMainWindow(const QString& versionStr)
-  : m_versionString(versionStr)
+ZMainWindow::ZMainWindow(QString versionStr)
+  : m_versionString(std::move(versionStr))
 {
   init();
   setWindowTitle(QString("Atlas version %1").arg(m_versionString));

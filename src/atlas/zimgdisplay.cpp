@@ -41,7 +41,7 @@ void ZImgDisplay::showChannel(size_t ch, double minData, double maxData)
 
 void ZImgDisplay::hideChannel(size_t ch)
 {
-  std::map<size_t, std::pair<double, double>>::iterator it = m_channels.find(ch);
+  auto it = m_channels.find(ch);
   if (it != m_channels.end())
     m_channels.erase(it);
 }

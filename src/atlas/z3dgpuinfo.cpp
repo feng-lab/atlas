@@ -2,7 +2,6 @@
 
 #include "z3dgl.h"
 #include "zlog.h"
-#include <QStringList>
 #include <QProcess>
 
 namespace nim {
@@ -265,8 +264,8 @@ QStringList Z3DGpuInfo::gpuInfo() const
 void Z3DGpuInfo::logGpuInfo() const
 {
   QStringList info = gpuInfo();
-  for (index_t i = 0; i < info.size(); ++i) {
-    LOG(INFO) << info[i];
+  for (auto& i : info) {
+    LOG(INFO) << i;
   }
 
   LOG(INFO) << "";

@@ -27,7 +27,7 @@ class ZMainWindow : public QMainWindow
 Q_OBJECT
 
 public:
-  explicit ZMainWindow(const QString& versionStr);
+  explicit ZMainWindow(QString versionStr);
 
   void initOpenglContext();
 

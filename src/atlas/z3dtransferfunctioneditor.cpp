@@ -6,7 +6,6 @@
 #include "z3dshaderprogram.h"
 #include "zlog.h"
 #include <QMouseEvent>
-#include <QPaintEvent>
 #include <QPainter>
 #include <QPen>
 #include <QToolTip>
@@ -19,19 +18,20 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <cmath>
+#include <memory>
 #include <utility>
 
 namespace nim {
 
 Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram,
-                                                     const QString& histogramNormalizeMethod,
+                                                     QString histogramNormalizeMethod,
                                                      QString xAxisText, QString yAxisText, QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(tf)
   , m_xAxisText(std::move(xAxisText))
   , m_yAxisText(std::move(yAxisText))
   , m_showHistogram(showHistogram)
-  , m_histogramNormalizeMethod(histogramNormalizeMethod)
+  , m_histogramNormalizeMethod(std::move(histogramNormalizeMethod))
   , m_volume(tf->volume())
 {
   m_xRange = glm::dvec2(0., 1.);
@@ -48,7 +48,7 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
 
   setFocus();
 
-  QAction* cc = new QAction(tr("Change Color"), this);
+  auto* cc = new QAction(tr("Change Color"), this);
   m_keyContextMenu.addAction(cc);
   connect(cc, &QAction::triggered, this, &Z3DTransferFunctionWidget::changeCurrentColor);
 
@@ -112,7 +112,7 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
     if (!m_histogramCache || m_histogramCache->rect() != rect()) {
       m_histogramCache.reset();
       if (m_volume && m_volume->hasHistogram()) {
-        m_histogramCache.reset(new QPixmap(rect().size()));
+        m_histogramCache = std::make_unique<QPixmap>(rect().size());
         m_histogramCache->fill(Qt::transparent);
 
         QPainter cachePaint(m_histogramCache.get());
@@ -240,7 +240,7 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
   pen.setWidthF(1.5);
   paint.setPen(pen);
 
-  origin = relativeToPixelCoordinates(glm::dvec2(0.));
+  // origin = relativeToPixelCoordinates(glm::dvec2(0.));
 
   glm::dvec2 old(0.0);
   for (size_t i = 0; i < m_transferFunction->get().numKeys(); ++i) {
@@ -388,7 +388,7 @@ bool Z3DTransferFunctionWidget::event(QEvent* e)
   if (e->type() == QEvent::ToolTip) {
     size_t index;
     bool isLeftPart;
-    QHelpEvent* helpEvent = static_cast<QHelpEvent*>(e);
+    auto* helpEvent = static_cast<QHelpEvent*>(e);
     QRect tipRect;
     QString tipText;
     if (findkey(helpEvent->pos(), index, isLeftPart)) {

@@ -4,7 +4,6 @@
 #include "zlog.h"
 #include "zimgsliceprovider.h"
 #include <QXmlStreamReader>
-#include <QXmlStreamWriter>
 
 namespace nim {
 
@@ -475,7 +474,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
     col4 col = info.channelColors[i];
     col.a = 0;
     std::swap(col.r, col.b);
-    int32_t color = bit_cast<int32_t>(col);
+    auto color = bit_cast<int32_t>(col);
     xml.writeAttribute("Color", QString("%1").arg(color));
     xml.writeEndElement();
   }

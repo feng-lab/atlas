@@ -8,7 +8,6 @@
 #include <QStyleOption>
 #include <QPushButton>
 #include <QGraphicsSceneMouseEvent>
-#include <utility>
 
 namespace nim {
 
@@ -130,7 +129,7 @@ ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunct
   : QGraphicsEllipseItem(parent)
   , m_punctaPack(punctaPack)
   , m_punctum(punctum)
-  , m_transform(std::move(tfm))
+  , m_transform(tfm)
 {
   setFlags(QGraphicsItem::ItemIsSelectable);
 
@@ -227,7 +226,7 @@ void ZPunctaFilter::setData(ZPunctaPack& puncta)
 void ZPunctaFilter::releaseItemsOwnership()
 {
   for (auto& item : m_puntumItems) {
-    item.release();
+    (void)item.release();
   }
 }
 

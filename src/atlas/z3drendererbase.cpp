@@ -91,16 +91,6 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* pare
           &Z3DRendererBase::makeCoordTransformNormalMatrix);
 }
 
-Z3DRendererBase::~Z3DRendererBase()
-{
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  if ((bool)glIsList(m_displayList))
-    glDeleteLists(m_displayList, 1);
-  if ((bool)glIsList(m_pickingDisplayList))
-    glDeleteLists(m_pickingDisplayList, 1);
-#endif
-}
-
 void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye eye)
 {
   shader.setScreenDimUniform(glm::vec2(m_viewport.z, m_viewport.w));
@@ -587,8 +577,8 @@ void Z3DRendererBase::renderPickingInstant(const std::vector<Z3DPrimitiveRendere
 void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
   activateClipPlanesGLSL();
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    renderers[i]->render(eye);
+  for (auto renderer : renderers) {
+    renderer->render(eye);
   }
   deactivateClipPlanesGLSL();
 }
@@ -596,8 +586,8 @@ void Z3DRendererBase::renderUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitive
 void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers)
 {
   activateClipPlanesGLSL();
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    renderers[i]->renderPicking(eye);
+  for (auto renderer : renderers) {
+    renderer->renderPicking(eye);
   }
   deactivateClipPlanesGLSL();
 }
@@ -605,8 +595,8 @@ void Z3DRendererBase::renderPickingUsingGLSL(Z3DEye eye, const std::vector<Z3DPr
 bool Z3DRendererBase::needLighting(const std::vector<Z3DPrimitiveRenderer*>& renderers) const
 {
   bool needLighting = false;
-  for (size_t i = 0; i < renderers.size(); ++i) {
-    needLighting = needLighting || renderers[i]->needLighting();
+  for (auto renderer : renderers) {
+    needLighting = needLighting || renderer->needLighting();
   }
   return needLighting;
 }

@@ -7,7 +7,6 @@
 #include "zroifilter.h"
 #include "z3dmeshfilter.h"
 #include <QMouseEvent>
-#include <QHelpEvent>
 #include <QToolTip>
 #include <QColorDialog>
 #include <QPainter>

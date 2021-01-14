@@ -1,13 +1,9 @@
 #include "ztimelinekeyeditdialog.h"
 
-#include "zoptionparameter.h"
 #include "zcameraparameterkey.h"
 #include "zcameraparameteranimation.h"
 #include "zparameterfactory.h"
 #include <QVBoxLayout>
-#include <QFormLayout>
-#include <QGridLayout>
-#include <QHBoxLayout>
 #include <QDialogButtonBox>
 
 namespace nim {
@@ -59,7 +55,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
   }
 
   if (m_paraAnimation.type() == "3DCamera") {
-    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+    auto* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
 
     m_posTension.set(cpk->posTension());
     addWidget(m_posTension.createNameLabel(this), m_posTension.createWidget(this), lo);
@@ -71,7 +67,7 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
 
   QVBoxLayout* vlo = new QVBoxLayout(this);
   vlo->addLayout(lo);
-  QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+  auto* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
   vlo->addWidget(buttonBox);
 
   connect(buttonBox, &QDialogButtonBox::accepted, this, &ZTimelineKeyEditDialog::accept);
@@ -90,7 +86,7 @@ void ZTimelineKeyEditDialog::setInitialValue()
     m_paraAnimation.boundParameter()->setValueSameAs(m_paraKey.value());
   }
   if (m_paraAnimation.type() == "3DCamera") {
-    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+    auto* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
 
     m_posTension.set(cpk->posTension());
     m_posContinuity.set(cpk->posContinuity());
@@ -111,11 +107,11 @@ void ZTimelineKeyEditDialog::accept()
     m_paraKey.setValue(*m_paraAnimation.boundParameter());
   }
   if (m_paraAnimation.type() == "3DCamera") {
-    ZCameraParameterKey* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
+    auto* cpk = static_cast<ZCameraParameterKey*>(&m_paraKey);
     cpk->setPosTension(m_posTension.get());
     cpk->setPosContinuity(m_posContinuity.get());
     cpk->setPosBias(m_posBias.get());
-    ZCameraParameterAnimation* cpa = static_cast<ZCameraParameterAnimation*>(&m_paraAnimation);
+    auto* cpa = static_cast<ZCameraParameterAnimation*>(&m_paraAnimation);
     cpa->buildSpline();
   }
   m_paraAnimation.blockSignals(false);

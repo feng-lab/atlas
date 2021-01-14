@@ -6,7 +6,6 @@
 #include <QRect>
 #include <vector>
 
-QT_BEGIN_NAMESPACE
 class QCheckBox;
 
 class QGroupBox;
@@ -44,8 +43,6 @@ class QVBoxLayout;
 class QScrollArea;
 
 class QTabWidget;
-
-QT_END_NAMESPACE
 
 namespace nim {
 
@@ -99,8 +96,8 @@ public:
   void mousePressEvent(QMouseEvent* event) override;
 
 private:
-  QPixmap* m_pixmap;
-  QImage* m_image;
+  QPixmap* m_pixmap = nullptr;
+  QImage* m_image = nullptr;
   const std::vector<std::vector<size_t>>& m_tileMatrix;
   std::vector<ZTile>* m_pTiles;
   double m_scaleFactor;

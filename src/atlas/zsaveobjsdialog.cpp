@@ -18,7 +18,7 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const std::vector<size_t>& obj
 
   for (auto id : objs) {
     ZObjDoc* odoc = m_doc.idToDoc(id);
-    QTreeWidgetItem* item = new QTreeWidgetItem(m_treeWidget, QStringList()
+    auto* item = new QTreeWidgetItem(m_treeWidget, QStringList()
       << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
   }
@@ -36,7 +36,7 @@ ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const std::vector<size_t>& obj
 
 void ZSaveObjsDialog::createWidget()
 {
-  QVBoxLayout* lo = new QVBoxLayout(this);
+  auto* lo = new QVBoxLayout(this);
   m_label = new QLabel("The following objects have unsaved changes:", this);
   m_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   m_treeWidget = new QTreeWidget(this);

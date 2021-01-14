@@ -13,7 +13,6 @@
 #include <intrin.h>
 #elif defined(__APPLE__)
 
-#include <sys/param.h>
 #include <sys/sysctl.h>
 #include <cpuid.h>
 

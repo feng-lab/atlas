@@ -12,10 +12,6 @@
 
 namespace nim {
 
-ZGenerateAnalysisTextFile::ZGenerateAnalysisTextFile()
-{
-}
-
 void ZGenerateAnalysisTextFile::generate(const ZAnalysisTextFileInput& input)
 {
   m_input = input;
@@ -735,7 +731,7 @@ ZGenerateAnalysisTextFile::getNodeSegOfPunctum(const ZSwc& tree, const ZPunctum&
 
   if (distToTree - punctum.radius() * m_input.voxelSizeX <= 0.0) { //puncta inside branch, no more check
     return res;
-  } else if (nodesWithinRange.size() == 0) { // zero branch in range
+  } else if (nodesWithinRange.empty()) { // zero branch in range
     //throw ZImgException("Need check");
     LOG(WARNING) << "Check Punctum from (no branch) " << m_input.punctaFilename << " : "
                  << punctum.x() << " " << punctum.y() << " " << punctum.z() << " " << punctum.radius() << " "
@@ -761,20 +757,20 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
                                                         const std::vector<ConstSwcTreeNode>& nodes) const
 {
   //first crop out the region
-  index_t left = roundTo<index_t>(x);
-  index_t right = roundTo<index_t>(x);
-  index_t up = roundTo<index_t>(y);
-  index_t down = roundTo<index_t>(y);
-  index_t zup = roundTo<index_t>(z);
-  index_t zdown = roundTo<index_t>(z);
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    ConstSwcTreeNode parent = ZSwc::parent(nodes[i]);
-    left = std::min(std::min(left, roundTo<index_t>(nodes[i]->x)), roundTo<index_t>(parent->x));
-    right = std::max(std::max(right, roundTo<index_t>(nodes[i]->x)), roundTo<index_t>(parent->x));
-    up = std::min(std::min(up, roundTo<index_t>(nodes[i]->y)), roundTo<index_t>(parent->y));
-    down = std::max(std::max(down, roundTo<index_t>(nodes[i]->y)), roundTo<index_t>(parent->y));
-    zup = std::min(std::min(zup, roundTo<index_t>(nodes[i]->z)), roundTo<index_t>(parent->z));
-    zdown = std::max(std::max(zdown, roundTo<index_t>(nodes[i]->z)), roundTo<index_t>(parent->z));
+  auto left = roundTo<index_t>(x);
+  auto right = roundTo<index_t>(x);
+  auto up = roundTo<index_t>(y);
+  auto down = roundTo<index_t>(y);
+  auto zup = roundTo<index_t>(z);
+  auto zdown = roundTo<index_t>(z);
+  for (auto node : nodes) {
+    ConstSwcTreeNode parent = ZSwc::parent(node);
+    left = std::min(std::min(left, roundTo<index_t>(node->x)), roundTo<index_t>(parent->x));
+    right = std::max(std::max(right, roundTo<index_t>(node->x)), roundTo<index_t>(parent->x));
+    up = std::min(std::min(up, roundTo<index_t>(node->y)), roundTo<index_t>(parent->y));
+    down = std::max(std::max(down, roundTo<index_t>(node->y)), roundTo<index_t>(parent->y));
+    zup = std::min(std::min(zup, roundTo<index_t>(node->z)), roundTo<index_t>(parent->z));
+    zdown = std::max(std::max(zdown, roundTo<index_t>(node->z)), roundTo<index_t>(parent->z));
   }
   ZImgInfo imgInfo = ZImg::readImgInfos(m_input.imgFilename).at(0);
   left = std::max(0_z, left);
@@ -796,7 +792,7 @@ ZGenerateAnalysisTextFile::intensityWeightedNearestNode(double x, double y, doub
   ZImgAutoThreshold<> imgAutoThre;
   double cent1 = 0;
   double cent2 = 0;
-  double thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, img);
+  auto thre1 = imgAutoThre.centroidThre<double>(cent1, cent2, img);
   double scale = cent2 - cent1;
   if (scale < 1.0)
     scale = 1.0;
@@ -833,8 +829,7 @@ ZGenerateAnalysisTextFile::nearestNode(double x, double y, double z, const std::
 {
   double dist = std::numeric_limits<double>::max();
   ConstSwcTreeNode res;
-  for (size_t i = 0; i < nodes.size(); ++i) {
-    const ConstSwcTreeNode& node = nodes[i];
+  for (auto node : nodes) {
     double nodeDist = pointFrustumConeDist(x, y, z, node, ZSwc::parent(node));
     if (nodeDist < dist) {
       dist = nodeDist;
@@ -934,8 +929,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   branchStream << "# branch id, type, x, y, z, radius, blueness, layer, topological type, "
     "distToBranchStart, distToSoma\n";
 
-  for (size_t i = 0; i < branches.size(); ++i) {
-    Branch& branch = branches[i];
+  for (auto& branch : branches) {
     for (size_t j = 0; j < branch.nodes.size(); ++j) {
       const ConstSwcTreeNode& tn = branch.nodes[j];
       branchStream << branch.id << " " << tn->type << " "
@@ -975,8 +969,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   // techinical branch
   QDir technicalBranchFolder = getSubDir("Technical_Branches");
 
-  for (size_t i = 0; i < branches.size(); ++i) {
-    Branch& branch = branches[i];
+  for (auto& branch : branches) {
     QString outSwcName = technicalBranchFolder.filePath(QString("branch_%1.swc")
                                                           .arg(branch.id, 4, 10, QChar('0')));
     QString outSwcTxtName = technicalBranchFolder.filePath(QString("branch_%1.txt")
@@ -1025,8 +1018,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
       if (j > 0) {
         std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
-        for (size_t k = 0; k < puncta.size(); ++k) {
-          const ZPunctum* punctum = puncta[k];
+        for (auto punctum : puncta) {
           tmpPunc.push_back(*punctum);
           outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                              << punctum->z() << " "
@@ -1131,8 +1123,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
           // don't need to skip i == 0 and j == 0 case because btn will be soma and there
           // should be no puncta for soma
           std::vector<const ZPunctum*> puncta = nodeToPuncta[btn];
-          for (size_t k = 0; k < puncta.size(); ++k) {
-            const ZPunctum* punctum = puncta[k];
+          for (auto punctum : puncta) {
             tmpPunc.push_back(*punctum);
             outPunctaTxtStream << nodeIdx << " " << punctum->x() << " " << punctum->y() << " "
                                << punctum->z() << " "
@@ -1212,9 +1203,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
         branch.length += nodeDistToParent[tn];
       }
     }
-    for (size_t i = 0; i < MTTBranches.size(); ++i) {
-      Branch& branch = MTTBranches[i];
-
+    for (auto& branch : MTTBranches) {
       ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size() - 1];
       size_t nodeSubclass = nodeToSubclass.at(tmptn);
 
@@ -1281,8 +1270,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
         if (j > 0) {
           std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
-          for (size_t k = 0; k < puncta.size(); ++k) {
-            const ZPunctum* punctum = puncta[k];
+          for (auto punctum : puncta) {
             tmpPunc.push_back(*punctum);
             double punctumDistToMTTBranchStart = segmentStartToBranchStartLength + punctumDistToSegmentStart[punctum];
             outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
@@ -1302,9 +1290,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
     }
 
     // other not main trunk and not tuft branches
-    for (size_t i = 0; i < branches.size(); ++i) {
-      Branch& branch = branches[i];
-
+    for (auto& branch : branches) {
       ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size() - 1];
       size_t nodeSubclass = nodeToSubclass.at(tmptn);
       size_t nodeType = tmptn->type;
@@ -1374,8 +1360,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
           if (j > 0) {
             std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
-            for (size_t k = 0; k < puncta.size(); ++k) {
-              const ZPunctum* punctum = puncta[k];
+            for (auto punctum : puncta) {
               tmpPunc.push_back(*punctum);
               outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                                  << punctum->z() << " "

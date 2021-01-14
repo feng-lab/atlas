@@ -5,9 +5,7 @@
 #include "zroifilter.h"
 #include "z3dmeshfilter.h"
 #include <QPainter>
-#include <QStylePainter>
 #include <QAbstractItemView>
-#include <QApplication>
 
 namespace nim {
 

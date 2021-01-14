@@ -191,18 +191,18 @@ void Z3DFontRenderer::render(Z3DEye eye)
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_2dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
       glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
@@ -214,7 +214,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
     }
 
     m_VAO.bind();
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
     m_VAO.release();
 
   } else {
@@ -226,23 +226,23 @@ void Z3DFontRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_2dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
                  GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_color);
     m_VBOs.bind(GL_ARRAY_BUFFER, 2);
     glBufferData(GL_ARRAY_BUFFER, m_fontColors.size() * 4 * sizeof(GLfloat), m_fontColors.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 3);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -299,8 +299,8 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
     else
       color = (*m_colorsPt)[strIdx];
     glm::vec3 loc = (*m_positionsPt)[strIdx];
-    for (index_t charIdx = 0; charIdx < str.size(); charIdx++) {
-      Z3DSDFont::CharInfo charInfo = font->charInfo(str[charIdx].toLatin1());
+    for (auto charIdx : str) {
+      Z3DSDFont::CharInfo charInfo = font->charInfo(charIdx.toLatin1());
       glm::vec3 leftUp = loc + rightVector * charInfo.xoffset * scale + upVector * charInfo.yoffset * scale;
       glm::vec3 leftDown = leftUp - upVector * static_cast<float>(charInfo.height) * scale;
       glm::vec3 rightUp = leftUp + rightVector * static_cast<float>(charInfo.width) * scale;
@@ -323,8 +323,8 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
         m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
         m_fontPickingColors.push_back((*m_pickingColorsPt)[strIdx]);
       }
-      for (auto k = 0; k < 6; ++k) {
-        m_indexs.push_back(indices[k] + 4 * quadIdx);
+      for (auto index : indices) {
+        m_indexs.push_back(index + 4 * quadIdx);
       }
       quadIdx++;
       loc += rightVector * charInfo.xadvance * scale;

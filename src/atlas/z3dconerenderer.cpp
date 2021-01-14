@@ -71,8 +71,8 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
       m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
-      for (auto k = 0; k < 6; ++k) {
-        m_indexs.push_back(indices[k] + 4 * quadIdx);
+      for (auto index : indices) {
+        m_indexs.push_back(index + 4 * quadIdx);
       }
       quadIdx++;
     }
@@ -106,8 +106,8 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
         m_axisAndTopRadius.push_back((*axisAndTopRadius)[i]);
         m_allFlags.push_back(rightIdx[k] << 8 | upIdx[k] << 4 | outIdx[k]);
       }
-      for (auto k = 0; k < 36; ++k) {
-        m_indexs.push_back(indices[k] + 8 * coneIdx);
+      for (auto index : indices) {
+        m_indexs.push_back(index + 8 * coneIdx);
       }
       coneIdx++;
     }
@@ -324,34 +324,34 @@ void Z3DConeRenderer::render(Z3DEye eye)
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_axis);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_flags);
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
       glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_colors);
       m_VBOs.bind(GL_ARRAY_BUFFER, 3);
       glBufferData(GL_ARRAY_BUFFER, m_coneBaseColors.size() * 4 * sizeof(GLfloat), m_coneBaseColors.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (m_sameColorForBaseAndTop) {
         glEnableVertexAttribArray(attr_colors2);
-        glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
       } else {
         glEnableVertexAttribArray(attr_colors2);
         m_VBOs.bind(GL_ARRAY_BUFFER, 4);
         glBufferData(GL_ARRAY_BUFFER, m_coneTopColors.size() * 4 * sizeof(GLfloat), m_coneTopColors.data(),
                      GL_STATIC_DRAW);
-        glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+        glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
       }
 
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
@@ -364,7 +364,7 @@ void Z3DConeRenderer::render(Z3DEye eye)
     }
 
     m_VAO.bind();
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
     m_VAO.release();
 
   } else {
@@ -380,45 +380,45 @@ void Z3DConeRenderer::render(Z3DEye eye)
     if (m_dataChanged)
       glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
                    GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_axis);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     if (m_dataChanged)
       glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
                    GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_flags);
     m_VBOs.bind(GL_ARRAY_BUFFER, 2);
     if (m_dataChanged)
       glBufferData(GL_ARRAY_BUFFER, m_allFlags.size() * sizeof(GLfloat), m_allFlags.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_colors);
     m_VBOs.bind(GL_ARRAY_BUFFER, 3);
     if (m_dataChanged)
       glBufferData(GL_ARRAY_BUFFER, m_coneBaseColors.size() * 4 * sizeof(GLfloat), m_coneBaseColors.data(),
                    GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (m_sameColorForBaseAndTop) {
       glEnableVertexAttribArray(attr_colors2);
-      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
     } else {
       glEnableVertexAttribArray(attr_colors2);
       m_VBOs.bind(GL_ARRAY_BUFFER, 4);
       if (m_dataChanged)
         glBufferData(GL_ARRAY_BUFFER, m_coneTopColors.size() * 4 * sizeof(GLfloat), m_coneTopColors.data(),
                      GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
     }
 
     m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
     if (m_dataChanged)
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_indexs.size() * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
 
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -467,7 +467,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 0);
       }
-      glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_axis);
       if (m_dataChanged) {
@@ -477,7 +477,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
       }
-      glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_flags);
       if (m_dataChanged) {
@@ -486,16 +486,16 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 2);
       }
-      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_colors);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
       glBufferData(GL_ARRAY_BUFFER, m_conePickingColors.size() * 4 * sizeof(GLfloat), m_conePickingColors.data(),
                    GL_STATIC_DRAW);
-      glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_colors2);
-      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+      glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 4);
@@ -511,7 +511,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     }
 
     m_pickingVAO.bind();
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
     m_pickingVAO.release();
 
   } else {
@@ -531,7 +531,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     }
-    glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_axis);
     if (m_dataChanged) {
@@ -542,7 +542,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     }
-    glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_flags);
     if (m_dataChanged) {
@@ -552,17 +552,17 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 2);
     }
-    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_colors);
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
     if (m_pickingDataChanged)
       glBufferData(GL_ARRAY_BUFFER, m_conePickingColors.size() * 4 * sizeof(GLfloat), m_conePickingColors.data(),
                    GL_STATIC_DRAW);
-    glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     glEnableVertexAttribArray(attr_colors2);
-    glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 4);
@@ -572,7 +572,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, 5);
     }
 
-    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, 0);
+    glDrawElements(GL_TRIANGLES, m_indexs.size(), GL_UNSIGNED_INT, nullptr);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

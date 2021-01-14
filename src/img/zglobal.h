@@ -47,14 +47,14 @@ inline QString enumToQString(TEnum e)
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
-template<typename TEnum, size_t S = sizeof(TEnum)>
+template<typename TEnum>
 inline TEnum stringToEnum(QStringView s)
 {
   auto str = s.toUtf8();
   return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
 }
 #else
-template<typename TEnum, size_t S = sizeof(TEnum)>
+template<typename TEnum>
 inline TEnum stringToEnum(const QString& s)
 {
   return stringToEnum<TEnum>(s.toStdString());

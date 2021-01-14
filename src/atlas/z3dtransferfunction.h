@@ -82,7 +82,7 @@ public:
 
   void setVolume(Z3DVolume* volume);
 
-  inline Z3DVolume* volume() const
+  [[nodiscard]] inline Z3DVolume* volume() const
   { return m_volume; }
 
   void setMinMaxIntensity(double minInten, double maxInten)
@@ -92,20 +92,20 @@ public:
     m_maxIntensity = maxInten;
   }
 
-  double minIntensity() const
+  [[nodiscard]] double minIntensity() const
   { return m_minIntensity != std::numeric_limits<double>::lowest() ? m_minIntensity : m_value.domainMin(); }
 
-  double maxIntensity() const
+  [[nodiscard]] double maxIntensity() const
   { return m_maxIntensity != std::numeric_limits<double>::lowest() ? m_maxIntensity : m_value.domainMax(); }
 
   // ZParameter interface
 public:
   void setSameAs(const ZParameter& rhs) override;
 
-  bool supportInterpolation() const override
+  [[nodiscard]] bool supportInterpolation() const override
   { return false; }
 
-  json::value jsonValue() const override;
+  [[nodiscard]] json::value jsonValue() const override;
 
   void readValue(const json::value& jsonValue) override;
 

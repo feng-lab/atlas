@@ -25,85 +25,85 @@ public:
 
   Z3DGpuInfo();
 
-  bool isSupported() const
+  [[nodiscard]] bool isSupported() const
   { return m_isSupported; }
 
-  QString notSupportedReason() const
+  [[nodiscard]] QString notSupportedReason() const
   { return m_notSupportedReason; }
 
-  int glMajorVersion() const
+  [[nodiscard]] int glMajorVersion() const
   { return m_glMajorVersion; }
 
-  int glMinorVersion() const
+  [[nodiscard]] int glMinorVersion() const
   { return m_glMinorVersion; }
 
-  int glReleaseVersion() const
+  [[nodiscard]] int glReleaseVersion() const
   { return m_glReleaseVersion; }
 
-  int glslMajorVersion() const;
+  [[nodiscard]] int glslMajorVersion() const;
 
-  int glslMinorVersion() const;
+  [[nodiscard]] int glslMinorVersion() const;
 
-  int glslReleaseVersion() const;
+  [[nodiscard]] int glslReleaseVersion() const;
 
-  GpuVendor gpuVendor() const;
+  [[nodiscard]] GpuVendor gpuVendor() const;
 
-  bool isExtensionSupported(const QString& extension) const;
+  [[nodiscard]] bool isExtensionSupported(const QString& extension) const;
 
-  QString glVersionString() const;
+  [[nodiscard]] QString glVersionString() const;
 
-  QString glVendorString() const;
+  [[nodiscard]] QString glVendorString() const;
 
-  QString glRendererString() const;
+  [[nodiscard]] QString glRendererString() const;
 
-  QString glExtensionsString() const;
+  [[nodiscard]] QString glExtensionsString() const;
 
-  QString glShadingLanguageVersionString() const;
+  [[nodiscard]] QString glShadingLanguageVersionString() const;
 
   // directX 10 resource limit
   // 1D 8192 2D 8192 3D 2048
   // directX 11 resource limit
   // 1D 16384 2D 16384 3D 2048
-  int maxTextureSize() const
+  [[nodiscard]] int maxTextureSize() const
   { return std::min(m_maxViewportDims, std::min(16384, m_maxTexureSize)); }
 
   // Returns the maximal side length of 3D textures.
   // directx limit?
-  int max3DTextureSize() const
+  [[nodiscard]] int max3DTextureSize() const
   { return std::min(2048, m_max3DTextureSize); }
 
   // Return a value such as 16 or 32. That is the number of image samplers that your GPU supports in the fragment shader.
   // the maximum supported texture image units that can be used to access texture maps from the fragment shader.
   // The value must be at least 16
-  int maxTextureImageUnits() const
+  [[nodiscard]] int maxTextureImageUnits() const
   { return m_maxTextureImageUnits; }
 
   // The following is for the vertex shader (available since GL 2.0). This might return 0 for certain GPUs.
   // the maximum supported texture image units that can be used to access texture maps from the vertex shader.
   // The value may be at least 16.
-  int maxVertexTextureImageUnits() const
+  [[nodiscard]] int maxVertexTextureImageUnits() const
   { return m_maxVertexTextureImageUnits; }
 
   // The following is for the geometry shader (available since GL 3.2)
   // the maximum supported texture image units that can be used to access texture maps from the geometry shader.
   // The value must be at least 16.
-  int maxGeometryTextureImageUnits() const
+  [[nodiscard]] int maxGeometryTextureImageUnits() const
   { return m_maxGeometryTextureImageUnits; }
 
   // The following is VS + GS + FS (available since GL 2.0)
   // the maximum supported texture image units that can be used to access texture maps from the vertex shader and the
   // fragment processor combined. If both the vertex shader and the fragment processing stage access the same texture image unit,
   // then that counts as using two texture image units against this limit. The value must be at least 48
-  int maxCombinedTextureImageUnits() const
+  [[nodiscard]] int maxCombinedTextureImageUnits() const
   { return m_maxCombinedTextureImageUnits; }
 
   // and the following is the number of texture coordinates available which usually is 8
   //int maxTextureCoordinates() const { return m_maxTextureCoords; }
   // The value indicates the maximum number of layers allowed in an array texture, and must be at least 256.
-  int maxArrayTextureLayers() const
+  [[nodiscard]] int maxArrayTextureLayers() const
   { return m_maxArrayTextureLayers; }
 
-  uint64_t dedicatedVideoMemoryMB() const
+  [[nodiscard]] uint64_t dedicatedVideoMemoryMB() const
   { return m_dedicatedVideoMemoryMB; }
 
   // directX 10 resource limit
@@ -113,93 +113,93 @@ public:
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_A_TERM (128)
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_B_TERM (0.25f)
   //D3D11_REQ_RESOURCE_SIZE_IN_MEGABYTES_EXPRESSION_C_TERM (2048)
-  uint64_t textureSizeLimit() const
+  [[nodiscard]] uint64_t textureSizeLimit() const
   { return std::min(std::max<uint64_t>(128, 0.25 * dedicatedVideoMemoryMB()), 2048_u64) * 1024 * 1024 / 2; }
 
   // get the required scales to fit uint8_t data of size (width, height, depth) to texture limit
   void getDataScaleForTexture(uint64_t width, uint64_t height, uint64_t depth,
                               double& widthScale, double& heightScale, double& depthScale) const;
 
-  bool needScaleDataForTexture(uint64_t width, uint64_t height, uint64_t depth);
+  [[nodiscard]] bool needScaleDataForTexture(uint64_t width, uint64_t height, uint64_t depth);
 
-  bool isFrameBufferObjectSupported() const;
+  [[nodiscard]] bool isFrameBufferObjectSupported() const;
 
-  bool isNonPowerOfTwoTextureSupported() const;
+  [[nodiscard]] bool isNonPowerOfTwoTextureSupported() const;
 
-  bool isGeometryShaderSupported() const;
+  [[nodiscard]] bool isGeometryShaderSupported() const;
 
-  bool isTessellationShaderSupported() const;
+  [[nodiscard]] bool isTessellationShaderSupported() const;
 
-  bool isTextureFilterAnisotropicSupported() const;
+  [[nodiscard]] bool isTextureFilterAnisotropicSupported() const;
 
-  bool isTextureRectangleSupported() const;
+  [[nodiscard]] bool isTextureRectangleSupported() const;
 
   // for glBlendEquation
-  bool isImagingSupported() const;
+  [[nodiscard]] bool isImagingSupported() const;
 
-  bool isColorBufferFloatSupported() const;
+  [[nodiscard]] bool isColorBufferFloatSupported() const;
 
-  bool isDepthBufferFloatSupported() const;
+  [[nodiscard]] bool isDepthBufferFloatSupported() const;
 
-  bool isTextureFloatSupported() const;
+  [[nodiscard]] bool isTextureFloatSupported() const;
 
-  bool isTextureRGSupported() const;
+  [[nodiscard]] bool isTextureRGSupported() const;
 
-  bool isVAOSupported() const;
+  [[nodiscard]] bool isVAOSupported() const;
 
-  bool isGPUShader4Supported() const;
+  [[nodiscard]] bool isGPUShader4Supported() const;
 
-  bool isGeometryShader4Supported() const;
+  [[nodiscard]] bool isGeometryShader4Supported() const;
 
-  float maxTextureAnisotropy() const
+  [[nodiscard]] float maxTextureAnisotropy() const
   { return m_maxTextureAnisotropy; }
 
   // Returns the maximal number of color attachments for a FBO
-  int maxColorAttachments() const
+  [[nodiscard]] int maxColorAttachments() const
   { return m_maxColorAttachments; }
 
-  int maxDrawBuffer() const
+  [[nodiscard]] int maxDrawBuffer() const
   { return m_maxDrawBuffer; }
 
-  float minSmoothPointSize() const
+  [[nodiscard]] float minSmoothPointSize() const
   { return m_minSmoothPointSize; }
 
-  float maxSmoothPointSize() const
+  [[nodiscard]] float maxSmoothPointSize() const
   { return m_maxSmoothPointSize; }
 
-  float smoothPointSizeGranularity() const
+  [[nodiscard]] float smoothPointSizeGranularity() const
   { return m_smoothPointSizeGranularity; }
   //float minAliasedPointSize() const { return m_minAliasedPointSize; }
   //float maxAliasedPointSize() const { return m_maxAliasedPointSize; }
 
-  float minSmoothLineWidth() const
+  [[nodiscard]] float minSmoothLineWidth() const
   { return m_minSmoothLineWidth; }
 
-  float maxSmoothLineWidth() const
+  [[nodiscard]] float maxSmoothLineWidth() const
   { return m_maxSmoothLineWidth; }
 
-  float smoothLineWidthGranularity() const
+  [[nodiscard]] float smoothLineWidthGranularity() const
   { return m_smoothLineWidthGranularity; }
 
-  float minAliasedLineWidth() const
+  [[nodiscard]] float minAliasedLineWidth() const
   { return m_minAliasedLineWidth; }
 
-  float maxAliasedLineWidth() const
+  [[nodiscard]] float maxAliasedLineWidth() const
   { return m_maxAliasedLineWidth; }
 
   // log useful gpu info
   void logGpuInfo() const;
 
-  QStringList gpuInfo() const;
+  [[nodiscard]] QStringList gpuInfo() const;
 
   // check avalibility of some special effect
-  bool isWeightedAverageSupported() const;
+  [[nodiscard]] bool isWeightedAverageSupported() const;
 
-  bool isWeightedBlendedSupported() const;
+  [[nodiscard]] bool isWeightedBlendedSupported() const;
 
-  bool isDualDepthPeelingSupported() const;
+  [[nodiscard]] bool isDualDepthPeelingSupported() const;
 
-  bool isLinkedListSupported() const;
+  [[nodiscard]] bool isLinkedListSupported() const;
 
 protected:
   void detectGpuInfo();

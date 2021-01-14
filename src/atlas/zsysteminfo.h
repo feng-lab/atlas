@@ -13,10 +13,10 @@ public:
 
   void logOSInfo() const;
 
-  bool is3DSupported() const
+  [[nodiscard]] bool is3DSupported() const
   { return m_glInitialized; }
 
-  bool isStereoViewSupported() const
+  [[nodiscard]] bool isStereoViewSupported() const
   { return m_stereoViewSupported; }
 
   void setStereoSupported(bool v)
@@ -25,31 +25,31 @@ public:
   // return false if failed
   virtual bool initializeGL();
 
-  QString errorMessage() const
+  [[nodiscard]] QString errorMessage() const
   { return m_errorMsg; }
 
-  QString shaderPath(const QString& filename = "") const;
+  [[nodiscard]] QString shaderPath(const QString& filename = "") const;
 
-  QString fontPath(const QString& filename = "") const;
+  [[nodiscard]] QString fontPath(const QString& filename = "") const;
 
   // return empty if can not find enough space
   static QString imgCachePath(size_t requiredSpaceInBytes) ;
 
-  QDir logDir() const;
+  [[nodiscard]] QDir logDir() const;
 
-  QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
+  [[nodiscard]] QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
   { return QString("%1/lastOpenedPath").arg(typeName); }
 
-  QString lastOpenedObjPath(const QString& typeName) const;
+  [[nodiscard]] QString lastOpenedObjPath(const QString& typeName) const;
 
   void setLastOpenedObjPath(const QString& typeName, const QString& path) const;
 
-  int maxNumRecentFiles() const
+  [[nodiscard]] int maxNumRecentFiles() const
   { return 20; }
 
   void addFileToRecentFileList(const QString& fileName) const;
 
-  QString lastOpenedImagePath() const
+  [[nodiscard]] QString lastOpenedImagePath() const
   { return lastOpenedObjPath("Image"); }
 
   void setLastOpenedImagePath(const QString& path) const

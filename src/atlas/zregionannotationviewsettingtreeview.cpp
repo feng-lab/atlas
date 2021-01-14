@@ -2,7 +2,6 @@
 
 #include "zstyleditemdelegate.h"
 #include "zregionannotationviewsettingcolumndelegate.h"
-#include "zlog.h"
 #include "ztheme.h"
 #include "zroidoc.h"
 #include "zmeshdoc.h"
@@ -11,7 +10,6 @@
 #include <QMessageBox>
 #include <QScrollBar>
 #include <QLabel>
-#include <QApplication>
 #include <QSortFilterProxyModel>
 #include <QKeyEvent>
 #include <QHeaderView>

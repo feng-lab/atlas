@@ -8,8 +8,8 @@ namespace nim {
 // http://research.mssm.edu/cnic/swc.html
 struct SwcNode
 {
-  explicit SwcNode(index_t id_ = -1, index_t type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
-                   double radius_ = -1, index_t parentID_ = -2)
+  explicit SwcNode(int64_t id_ = -1, int64_t type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
+                   double radius_ = -1, int64_t parentID_ = -2)
     : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
   {}
 
@@ -69,7 +69,7 @@ public:
 
   // pos must not be null
   template<typename Iter>
-  static index_t parentID(const Iter& pos)
+  static int64_t parentID(const Iter& pos)
   { return isNull(parent(pos)) ? -1 : parent(pos)->id; }
 
   SwcTreeNode thickestNode();

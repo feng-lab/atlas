@@ -34,20 +34,16 @@ ZPunctaIO::ZPunctaIO()
 
 bool ZPunctaIO::canReadFile(const QString& filename)
 {
-  for (auto& readExt : m_readExts) {
-    if (filename.endsWith(QString(".%1").arg(readExt), Qt::CaseInsensitive))
-      return true;
-  }
-  return false;
+  return std::any_of(m_readExts.begin(), m_readExts.end(), [&](const QString& readExt) {
+    return filename.endsWith(QString(".%1").arg(readExt), Qt::CaseInsensitive);
+  });
 }
 
 bool ZPunctaIO::canWriteFile(const QString& filename)
 {
-  for (auto& writeExt : m_writeExts) {
-    if (filename.endsWith(QString(".%1").arg(writeExt), Qt::CaseInsensitive))
-      return true;
-  }
-  return false;
+  return std::any_of(m_writeExts.begin(), m_writeExts.end(), [&](const QString& writeExt) {
+    return filename.endsWith(QString(".%1").arg(writeExt), Qt::CaseInsensitive);
+  });
 }
 
 void ZPunctaIO::getQtWriteNameFilter(QStringList& filters, QStringList& formats)

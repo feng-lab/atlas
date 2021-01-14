@@ -8,8 +8,6 @@
 #include "zexception.h"
 #include <QMutexLocker>
 
-class Z3DTexture;
-
 namespace nim {
 
 class Z3DCanvas;
@@ -27,24 +25,24 @@ public:
   Z3DCanvas& canvas()
   { return m_canvas; }
 
-  const Z3DTexture* imageColorTexture(Z3DEye eye) const;
+  [[nodiscard]] const Z3DTexture* imageColorTexture(Z3DEye eye) const;
 
-  const Z3DTexture* imageDepthTexture(Z3DEye eye) const;
+  [[nodiscard]] const Z3DTexture* imageDepthTexture(Z3DEye eye) const;
 
   bool renderToImage(const QString& filename, Z3DScreenShotType sst);
 
   bool renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor& compositor);
 
-  QString renderToImageError() const;
+  [[nodiscard]] QString renderToImageError() const;
 
 protected:
   void onCanvasResized(size_t w, size_t h);
 
   void process(Z3DEye eye) override;
 
-  bool isReady(Z3DEye /*eye*/) const override;
+  [[nodiscard]] bool isReady(Z3DEye /*eye*/) const override;
 
-  bool isValid(Z3DEye eye) const override;
+  [[nodiscard]] bool isValid(Z3DEye eye) const override;
 
   void updateSize() override;
 

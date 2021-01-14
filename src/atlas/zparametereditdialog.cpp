@@ -1,8 +1,6 @@
 #include "zparametereditdialog.h"
 
 #include <QVBoxLayout>
-#include <QFormLayout>
-#include <QHBoxLayout>
 #include <QDialogButtonBox>
 
 namespace nim {
@@ -14,9 +12,9 @@ ZParameterEditDialog::ZParameterEditDialog(ZParameter& para, QWidget* parent)
   auto lo = new QGridLayout;
   addWidget(m_para.createNameLabel(this), m_para.createWidget(this), lo);
 
-  QVBoxLayout* vlo = new QVBoxLayout(this);
+  auto* vlo = new QVBoxLayout(this);
   vlo->addLayout(lo);
-  QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+  auto* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
   vlo->addWidget(buttonBox);
 
   connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);

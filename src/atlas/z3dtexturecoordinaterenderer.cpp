@@ -69,7 +69,7 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
     if (triangleIndexes.empty()) {
       glDrawArrays(m_mesh->type(), 0, vertices.size());
     } else {
-      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, 0);
+      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
     }
     m_VAO.release();
 
@@ -94,7 +94,7 @@ void Z3DTextureCoordinateRenderer::render(Z3DEye eye)
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
                    GL_STATIC_DRAW);
-      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, 0);
+      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 

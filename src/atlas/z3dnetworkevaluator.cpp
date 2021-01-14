@@ -4,14 +4,11 @@
 #include "z3dcanvaspainter.h"
 #include "z3dfilter.h"
 #include "z3dmeshfilter.h"
-#include "z3drendertarget.h"
-#include "z3dtexture.h"
 #include "zlog.h"
 #include "zrandom.h"
 #include <boost/graph/topological_sort.hpp>
 #include <algorithm>
 #include <queue>
-#include <set>
 
 //#define PROFILE3DRENDERERS
 
@@ -65,21 +62,21 @@ void Z3DNetworkEvaluator::process(bool stereo)
   m_canvasPainter.canvas().getGLFocus();
 
   // notify filter wrappers
-  for (size_t j = 0; j < m_filterWrappers.size(); ++j)
-    m_filterWrappers[j]->beforeNetworkProcess();
+  for (auto& filterWrapper : m_filterWrappers) {
+    filterWrapper->beforeNetworkProcess();
+  }
   CHECK_GL_ERROR
 
   // Iterate over filters in rendering order
-  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
-    Z3DFilter* currentFilter = m_renderingOrder[i];
-
+  for (auto currentFilter : m_renderingOrder) {
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
 
     // execute the filter, if it needs processing and is ready
     if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
-        m_filterWrappers[j]->beforeFilterProcess(currentFilter);
+      for (auto& filterWrapper : m_filterWrappers) {
+        filterWrapper->beforeFilterProcess(currentFilter);
+      }
       CHECK_GL_ERROR
 
       {
@@ -89,15 +86,17 @@ void Z3DNetworkEvaluator::process(bool stereo)
       }
 
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
+      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
         m_filterWrappers[j]->afterFilterProcess(currentFilter);
+      }
       CHECK_GL_ERROR
     }
 
     if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
+      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
         m_filterWrappers[j]->beforeFilterProcess(currentFilter);
+      }
       CHECK_GL_ERROR
 
       {
@@ -107,15 +106,17 @@ void Z3DNetworkEvaluator::process(bool stereo)
       }
 
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j)
+      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
         m_filterWrappers[j]->afterFilterProcess(currentFilter);
+      }
       CHECK_GL_ERROR
     }
   }
 
   // notify filter wrappers
-  for (size_t j = 0; j < m_filterWrappers.size(); ++j)
+  for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
     m_filterWrappers[j]->afterNetworkProcess();
+  }
   CHECK_GL_ERROR
 
   m_mutex.unlock();
@@ -143,11 +144,11 @@ void Z3DNetworkEvaluator::updateNetwork()
   // build graph of all connected filters
   while (!filterQueue.empty()) {
     Z3DFilter* filter = filterQueue.front();
-    const std::vector<Z3DInputPortBase*> inports = filter->inputPorts();
-    for (size_t i = 0; i < inports.size(); ++i) {
-      const std::vector<Z3DOutputPortBase*> connected = inports[i]->connected();
-      for (size_t j = 0; j < connected.size(); ++j) {
-        Z3DFilter* outFilter = connected[j]->filter();
+    const std::vector<Z3DInputPortBase*>& inports = filter->inputPorts();
+    for (auto inport : inports) {
+      const std::vector<Z3DOutputPortBase*> connected = inport->connected();
+      for (auto j : connected) {
+        Z3DFilter* outFilter = j->filter();
         if (m_filterToVertexMapper.find(outFilter) == m_filterToVertexMapper.end()) {
           filterQueue.push(outFilter);
           v = boost::add_vertex(VertexInfo(outFilter), m_filterGraph);
@@ -155,7 +156,7 @@ void Z3DNetworkEvaluator::updateNetwork()
         }
         boost::add_edge(m_filterToVertexMapper[outFilter],
                         m_filterToVertexMapper[filter],
-                        EdgeInfo(connected[j], inports[i]),
+                        EdgeInfo(j, inport),
                         m_filterGraph);
       }
     }
@@ -183,7 +184,7 @@ void Z3DNetworkEvaluator::updateNetwork()
   // update size
   sizeChangedFromFilter();
   for (auto filter : m_reverseSortedFilters) {
-    QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, 0, 0);
+    QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, nullptr, 0);
     connect(filter, &Z3DFilter::requestUpstreamSizeChange,
             this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
   }
@@ -194,11 +195,12 @@ void Z3DNetworkEvaluator::sizeChangedFromFilter(Z3DFilter* rp)
   if (rp) {
     bool started = false;
     for (auto filter : m_reverseSortedFilters) {
-      if (started)
+      if (started) {
         filter->updateSize();
-      else {
-        if (rp == filter)
+      } else {
+        if (rp == filter) {
           started = true;
+        }
       }
     }
   } else {
@@ -292,7 +294,7 @@ void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
     warn(p, "A shader was active");
   }
 
-   // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
+  // can not check this as we are drawing to QOpenglWidget's (Qt5) fbo which is not 0
 #if 0
   if (Z3DRenderTarget::currentBoundDrawFBO() != 0) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

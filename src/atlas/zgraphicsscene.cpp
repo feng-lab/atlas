@@ -5,9 +5,7 @@
 #include "zroi.h"
 #include "zroifilter.h"
 #include <QGraphicsSceneMouseEvent>
-#include <QGraphicsPolygonItem>
 #include <QGraphicsRectItem>
-#include <QGraphicsEllipseItem>
 #include <QApplication>
 #include <QMenu>
 

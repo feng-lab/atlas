@@ -13,6 +13,7 @@
 #include <QStyleOption>
 #include <QPainter>
 #include <QPushButton>
+#include <memory>
 
 namespace nim {
 
@@ -178,7 +179,7 @@ void ZImgFilter::setData(ZImgPack& pack)
   connect(m_mipRange.get(), &ZIntSpanParameter::valueChanged, this, &ZImgFilter::mipRangeChanged);
   addParameter(m_mipRange.get());
 
-  m_display.reset(new ZImgPackDisplay(*m_imgPack));
+  m_display = std::make_unique<ZImgPackDisplay>(*m_imgPack);
   if (m_view.isMaxZProjView() && m_imgPack->imgInfo().depth > 1) {
     m_display->setMIP(true);
     m_display->setMIPZRange(m_mipRange->get().x, m_mipRange->get().y);
@@ -220,8 +221,8 @@ void ZImgFilter::setData(ZImgPack& pack)
 
 void ZImgFilter::releaseItemsOwnership()
 {
-  m_item.release();
-  m_scaleBarItem.release();
+  (void)m_item.release();
+  (void)m_scaleBarItem.release();
 }
 
 void ZImgFilter::setSelected(bool v)
@@ -417,8 +418,8 @@ void ZImgFilter::updateViewSettingWidgetsGroup()
 void ZImgFilter::channelVisibleChanged()
 {
   m_hasVisibleChannel = false;
-  for (size_t c = 0; c < m_channelVisibleParas.size(); ++c) {
-    m_hasVisibleChannel = m_hasVisibleChannel || m_channelVisibleParas[c]->get();
+  for (auto& channelVisiblePara : m_channelVisibleParas) {
+    m_hasVisibleChannel = m_hasVisibleChannel || channelVisiblePara->get();
   }
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 

@@ -44,7 +44,7 @@ class ZLogDialog : public QDialog
 Q_OBJECT
 
 public:
-  explicit ZLogDialog(LogSinkPtr destination, QWidget* parent = nullptr);
+  explicit ZLogDialog(const LogSinkPtr& destination, QWidget* parent = nullptr);
 
   virtual ~ZLogDialog();
 

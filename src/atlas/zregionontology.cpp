@@ -26,7 +26,6 @@
 #include <vtkCellArray.h>
 #include <vtkQuadricDecimation.h>
 #include <vtkPolyDataNormals.h>
-#include <QFile>
 #include <QTransform>
 #include <QObject>
 #include <limits>

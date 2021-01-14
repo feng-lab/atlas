@@ -24,7 +24,7 @@ public:
 
   void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
-  void load(const QString& filename, ZMesh& mesh) const;
+  static void load(const QString& filename, ZMesh& mesh);
 
   void save(const ZMesh& mesh, const QString& filename, std::string format) const;
 
