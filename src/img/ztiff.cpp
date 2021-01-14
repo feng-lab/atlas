@@ -307,11 +307,7 @@ void LibtiffErrorHandler(const char* /*module*/, const char* fmt, va_list ap)
 {
   char buf[2048];
 
-  int off = 0;
-  //if (module)
-  //off = snprintf(buf, 2048, "libtiff %s: ", module);
-  //else
-  off = std::max(0, snprintf(buf, 2048, "libtiff: "));
+  auto off = std::max(0, snprintf(buf, 2048, "libtiff: "));
   vsnprintf(buf + off, 2048 - off, fmt, ap);
   throw nim::ZIOException(QString(buf));
 }
@@ -320,11 +316,7 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* /*module*/, const char* 
 {
   char buf[2048];
 
-  int off = 0;
-  //if (module)
-  //off = snprintf(buf, 2048, "libtiff %s: ", module);
-  //else
-  off = std::max(0, snprintf(buf, 2048, "libtiff: "));
+  auto off = std::max(0, snprintf(buf, 2048, "libtiff: "));
   vsnprintf(buf + off, 2048 - off, fmt, ap);
   QString str(buf);
   if (str.contains("Colormap", Qt::CaseInsensitive)) {
@@ -492,7 +484,7 @@ uint16_t ZTiffIFD::planarConfiguration() const
   return 1;
 }
 
-int ZTiffIFD::extraSample() const
+int32_t ZTiffIFD::extraSample() const
 {
   int64_t i = indexOf(TIFFTAG_EXTRASAMPLES);
   if (i != -1) {
@@ -1430,7 +1422,7 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
     ZImg bufImg(img.infoRef());
     auto raster = bufImg.channelData<uint32_t>(0);
 
-    int ret = TIFFReadRGBAImageOriented(m_tif.get(), img.width(), img.height(), raster, orientation, 0);
+    auto ret = TIFFReadRGBAImageOriented(m_tif.get(), img.width(), img.height(), raster, orientation, 0);
     if (ret == 0) {
       throw ZIOException("Read tiff as rgba failed");
     }
@@ -1844,7 +1836,7 @@ ZTiffWriter::ZTiffWriter()
   : m_tif(nullptr, TIFFClose)
 {}
 
-void ZTiffWriter::startWriting(const QString& filename, Compression comp, int extraSample, bool bigTiff)
+void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_t extraSample, bool bigTiff)
 {
   m_tif.reset();
 
@@ -1873,7 +1865,7 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int ex
   }
 }
 
-void ZTiffWriter::writeIFD(const ZImg& img, int z, int t, int c, bool writeThumbnails,
+void ZTiffWriter::writeIFD(const ZImg& img, size_t z, size_t t, index_t c, bool writeThumbnails,
                            const std::vector<ZImgMetatag>& additionalTags)
 {
   CHECK(m_tif);

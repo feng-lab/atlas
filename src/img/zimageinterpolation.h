@@ -72,7 +72,7 @@ public:
 
   double tricubicInterpolate(double p[4][4][4], double x, double y, double z) const;
 
-  double nCubicInterpolate(int n, double* p, double coordinates[]) const;
+  double nCubicInterpolate(int32_t n, double* p, double coordinates[]) const;
 
   template<typename TPixel>
   double sample(const TPixel* img, size_t width, size_t height, double x, double y) const;

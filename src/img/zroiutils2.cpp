@@ -28,7 +28,7 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
     return res;
   }
 
-  int numSegments = spline.size() - 1;
+  auto numSegments = spline.size() - 1;
   std::vector<double> times(spline.size());
   times[0] = 0;
   for (size_t i = 1; i < times.size(); ++i) {
@@ -38,8 +38,8 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
   gte::NaturalSplineCurve<2, double> splineCurve(!isClosed, spline.size(), (gte::Vector<2, double> const*) spline.data(),
                                                  times.data());
   res.moveTo(spline[0].x(), spline[0].y());
-  int endSeg = showLastSeg ? numSegments : numSegments - 1;
-  for (int i = 0; i < endSeg; ++i) {
+  auto endSeg = showLastSeg ? numSegments : numSegments - 1;
+  for (size_t i = 0; i < endSeg; ++i) {
     gte::Vector<2, double> values0[4];
     gte::Vector<2, double> values1[4];
     splineCurve.Evaluate(times[i], 1, values0);
@@ -66,22 +66,22 @@ std::tuple<ZImg, int32_t, int32_t> pathToMask(const SkPath& path)
 
   path.updateBoundsCache();
   auto& pathRect = path.getBounds();
-  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left())));
-  int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top())));
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
+  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left())));
+  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()));
+  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top())));
+  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);
   }
 
-  int scale = 5;
+  auto scale = 5;
   while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
     --scale;
   }
   if (scale == 0) {
     img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
-    for (int y = minY; y <= maxY; ++y) {
-      for (int x = minX; x <= maxX; ++x) {
+    for (auto y = minY; y <= maxY; ++y) {
+      for (auto x = minX; x <= maxX; ++x) {
         if (path.contains(x, y)) {       // not accurate for some spline
           *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
         }
@@ -92,7 +92,7 @@ std::tuple<ZImg, int32_t, int32_t> pathToMask(const SkPath& path)
                                          kOpaque_SkAlphaType);
     size_t rowBytes = info.minRowBytes();
     size_t size = info.computeByteSize(rowBytes);
-    std::vector<char> pixelMemory(size);  // allocate memory
+    std::vector<uint8_t> pixelMemory(size);  // allocate memory
     sk_sp<SkSurface> surface = SkSurface::MakeRasterDirect(info, &pixelMemory[0], rowBytes);
     SkCanvas* canvas = surface->getCanvas();
 
@@ -108,7 +108,7 @@ std::tuple<ZImg, int32_t, int32_t> pathToMask(const SkPath& path)
     img = ZImg(ZImgInfo(info.width(), info.height()));
     for (size_t y = 0; y < img.height(); ++y) {
       for (size_t x = 0; x < img.width(); ++x) {
-        *img.data<uint8_t>(x, y, 0) = pixelMemory[info.computeOffset(x, y, rowBytes)] ? 1 : 0;
+        *img.data<uint8_t>(x, y, 0) = pixelMemory[info.computeOffset(x, y, rowBytes)] >= 128_u8 ? 1_u8 : 0_u8;
       }
     }
     img.resize(maxX - minX + 1, maxY - minY + 1, 1);
@@ -126,10 +126,10 @@ std::tuple<ZImg, int32_t, int32_t> pathToStroke(const SkPath& path, double width
 
   path.updateBoundsCache();
   auto& pathRect = path.getBounds();
-  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left()) - width));
-  int maxX = static_cast<int>(std::ceil(pathRect.right()) + width);
-  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top()) - width));
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()) + width);
+  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left()) - width));
+  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()) + width);
+  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top()) - width));
+  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()) + width);
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);
   }
@@ -138,7 +138,7 @@ std::tuple<ZImg, int32_t, int32_t> pathToStroke(const SkPath& path, double width
                                        kOpaque_SkAlphaType);
   size_t rowBytes = info.minRowBytes();
   size_t size = info.computeByteSize(rowBytes);
-  std::vector<char> pixelMemory(size);  // allocate memory
+  std::vector<uint8_t> pixelMemory(size);  // allocate memory
   sk_sp<SkSurface> surface = SkSurface::MakeRasterDirect(info, &pixelMemory[0], rowBytes);
   SkCanvas* canvas = surface->getCanvas();
 
@@ -154,7 +154,7 @@ std::tuple<ZImg, int32_t, int32_t> pathToStroke(const SkPath& path, double width
   img = ZImg(ZImgInfo(info.width(), info.height()));
   for (size_t y = 0; y < img.height(); ++y) {
     for (size_t x = 0; x < img.width(); ++x) {
-      *img.data<uint8_t>(x, y, 0) = pixelMemory[info.computeOffset(x, y, rowBytes)] ? 1 : 0;
+      *img.data<uint8_t>(x, y, 0) = pixelMemory[info.computeOffset(x, y, rowBytes)] >= 128_u8 ? 1_u8 : 0_u8;
     }
   }
   img.resize(maxX - minX + 1, maxY - minY + 1, 1);
@@ -187,7 +187,7 @@ inline SkPath polygonToPath(const std::vector<QPointF>& poly)
     tmp[i].fX = poly[i].x();
     tmp[i].fY = poly[i].y();
   }
-  path.addPoly(tmp.data(), tmp.size() - 1, true);
+  path.addPoly(tmp.data(), static_cast<int>(tmp.size()) - 1, true);
   return path;
 }
 

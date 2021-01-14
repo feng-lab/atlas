@@ -703,7 +703,7 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
         H5::DataSet ds0 = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
         H5::DSetCreatPropList pList = ds0.getCreatePlist();
         hsize_t chunk_dims[2];
-        int rank_chunk = pList.getChunk(2, chunk_dims);
+        auto rank_chunk = pList.getChunk(2, chunk_dims);
         if (rank_chunk != 2) {
           throw ZIOException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
         }

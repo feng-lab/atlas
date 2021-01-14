@@ -921,7 +921,7 @@ ZImgLeica::getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dim
     }
 
     while (dimCurrIdx[0] != dimEnds[0]) {
-      size_t offset = std::inner_product(dimCurrIdx.begin(), dimCurrIdx.end(), dimStrides.begin(), 0_usize);
+      size_t offset = std::inner_product(dimCurrIdx.begin(), dimCurrIdx.end(), dimStrides.begin(), 0_uz);
       res.emplace_back(dimensionInfos[startDim].stride * dimensionInfos[startDim].start + offset,
                        dimensionInfos[startDim].stride * dimensionInfos[startDim].end + offset);
 

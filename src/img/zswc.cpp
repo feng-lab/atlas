@@ -6,7 +6,6 @@
 #include "zexception.h"
 #include <QFile>
 #include <QTextStream>
-#include <QStringList>
 #include <QRegularExpression>
 #include <map>
 
@@ -39,7 +38,7 @@ ZSwc::SwcTreeNode ZSwc::thickestNode(const ZSwc::SwcTreeNode& subtree)
   return thickestNode;
 }
 
-void ZSwc::labelSomaAndOthers(double radiusThre, int somaType, int otherType)
+void ZSwc::labelSomaAndOthers(double radiusThre, int64_t somaType, int64_t otherType)
 {
   for (RootIterator rt = beginRoot(); rt != endRoot(); ++rt) {
     SwcTreeNode rootNode = thickestNode(rt);
@@ -61,7 +60,7 @@ void ZSwc::labelSomaAndOthers(double radiusThre, int somaType, int otherType)
   }
 }
 
-void ZSwc::resortPyramidal(int basalType, int apicalType, int somaType)
+void ZSwc::resortPyramidal(int64_t basalType, int64_t apicalType, int64_t somaType)
 {
   if (empty())
     return;
@@ -161,7 +160,7 @@ void ZSwc::load(const QString& filename)
     while (!nodeMap.empty()) {
       auto it = nodeMap.begin();
       while (it != nodeMap.end()) {
-        int parentID = it->second.parentID;
+        auto parentID = it->second.parentID;
         auto nodeIt = itMap.find(parentID);
         if (nodeIt != itMap.end()) {
           itMap[it->first] = appendChild(nodeIt->second, it->second);

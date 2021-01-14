@@ -419,7 +419,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1, doubl
     prevThreBin = threBin;
 
     double totalPos = std::accumulate(weightPos.begin() + low, weightPos.begin() + threBin + 1, .0);
-    size_t totalWeight = std::accumulate(hist.begin() + low, hist.begin() + threBin + 1, 0_usize);
+    size_t totalWeight = std::accumulate(hist.begin() + low, hist.begin() + threBin + 1, 0_uz);
     if (totalWeight == 0) {
       cent1 = (threBin + low) / 2.0;
     } else {
@@ -427,7 +427,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1, doubl
     }
 
     totalPos = std::accumulate(weightPos.begin() + threBin + 1, weightPos.begin() + high + 1, .0);
-    totalWeight = std::accumulate(hist.begin() + threBin + 1, hist.begin() + high + 1, 0_usize);
+    totalWeight = std::accumulate(hist.begin() + threBin + 1, hist.begin() + high + 1, 0_uz);
     if (totalWeight == 0) {
       cent2 = (high + threBin) / 2.0;
     } else {

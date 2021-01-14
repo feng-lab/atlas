@@ -64,8 +64,8 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height,
     VectorXd s = svd.singularValues();
     //LOG(INFO) << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);
-    int rank = 1;
-    for (int i = 1; i < s.size(); ++i) {
+    auto rank = 1;
+    for (Eigen::Index i = 1; i < s.size(); ++i) {
       if (s(i) > tol)
         ++rank;
     }

@@ -135,7 +135,7 @@ void ZSectionsRegistration::write(json::object& jo) const
 }
 
 template<typename ImagePixelType>
-void ZSectionsRegistration::alignSection(const ZImg& srcImg, int fixedImageIndex, int movingImageIndex, double& cost,
+void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIndex, size_t movingImageIndex, double& cost,
                                          ZImageTransform*& transform)
 {
   LOG(INFO) << "";
@@ -145,8 +145,8 @@ void ZSectionsRegistration::alignSection(const ZImg& srcImg, int fixedImageIndex
   std::vector<double> fixedImageData(length);
   std::vector<double> movingImageData(length);
 
-  const ImagePixelType* fixedImageDataSrc = srcImg.planeData<ImagePixelType>(fixedImageIndex, m_referenceChannel);
-  const ImagePixelType* movingImageDataSrc = srcImg.planeData<ImagePixelType>(movingImageIndex, m_referenceChannel);
+  const auto* fixedImageDataSrc = srcImg.planeData<ImagePixelType>(fixedImageIndex, m_referenceChannel);
+  const auto* movingImageDataSrc = srcImg.planeData<ImagePixelType>(movingImageIndex, m_referenceChannel);
   double fixedMin = std::numeric_limits<double>::max();
   double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;

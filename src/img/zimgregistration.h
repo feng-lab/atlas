@@ -12,13 +12,13 @@ class ZImgRegistration
 {
 public:
 
-  const ZImg& fixedImg() const
+  [[nodiscard]] const ZImg& fixedImg() const
   { return *m_fixedImg; }
 
   void setFixedImg(const ZImg& img)
   { m_fixedImg = &img; }
 
-  const ZImg& movingImg() const
+  [[nodiscard]] const ZImg& movingImg() const
   { return *m_movingImg; }
 
   void setMovingImg(const ZImg& img)
@@ -38,8 +38,8 @@ public:
   { m_useMultithreading = v; }
 
   // use multiscale registration if number of scale > 1, default is 1
-  void setNumScales(int i)
-  { m_numScales = std::max(1, i); }
+  void setNumScales(size_t i)
+  { m_numScales = std::max(1_uz, i); }
 
   // return cost value
   double run();
@@ -52,8 +52,8 @@ private:
   ZRegistrationCostFunction* m_costFunction = nullptr;
   ZImageTransform* m_transform = nullptr;
 
-  int m_useMultithreading = true;
-  int m_numScales = 1;
+  bool m_useMultithreading = true;
+  size_t m_numScales = 1;
 };
 
 } // namespace nim

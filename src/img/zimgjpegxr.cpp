@@ -234,7 +234,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   tmpRegion.end.c = -1;
   resInfo = tmpRegion.clip(info);
 
-  rect = {tmpRegion.start.x, tmpRegion.start.y, 0, 0};
+  rect = {int32_t(tmpRegion.start.x), int32_t(tmpRegion.start.y), 0, 0};
   rect.Width = tmpRegion.end.x < 0 ? (info.width - tmpRegion.start.x) : (region.end.x - tmpRegion.start.x);
   rect.Height = tmpRegion.end.y < 0 ? (info.height - tmpRegion.start.y) : (region.end.y - tmpRegion.start.y);
 

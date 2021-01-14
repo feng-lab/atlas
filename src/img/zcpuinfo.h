@@ -24,8 +24,8 @@ public:
   QString vendor;
   QString brand;
 
-  int nPhysicalCores = 1;
-  int nLogicalCores = 1;
+  int32_t nPhysicalCores = 1;
+  int32_t nLogicalCores = 1;
 
   uint64_t nCacheLine = 0;
   uint64_t nL1ICacheSize = 0;
@@ -123,14 +123,14 @@ public:
 
   bool bPREFTEHCHWT1 = false;
 
-  int nSteppingID = 0;
-  int nModel = 0;
-  int nFamily = 0;
-  int nProcessorType = 0;
-  int nExtendedmodel = 0;
-  int nExtendedfamily = 0;
-  int nMaxLogicalProcessors = 1;
-  int nAPICPhysicalID = 0;
+  int32_t nSteppingID = 0;
+  int32_t nModel = 0;
+  int32_t nFamily = 0;
+  int32_t nProcessorType = 0;
+  int32_t nExtendedmodel = 0;
+  int32_t nExtendedfamily = 0;
+  int32_t nMaxLogicalProcessors = 1;
+  int32_t nAPICPhysicalID = 0;
 };
 
 } // namespace nim

@@ -17,13 +17,13 @@ class ZImgMetadataBase
 protected:
   struct _AttachPoint
   {
-    _AttachPoint(int z_, int c_, int t_)
+    _AttachPoint(index_t z_, index_t c_, index_t t_)
       : z(z_), c(c_), t(t_)
     {}
 
-    int z;
-    int c;
-    int t;
+    index_t z = -1;
+    index_t c = -1;
+    index_t t = -1;
 
     bool operator<(const _AttachPoint& rhs) const
     {
@@ -38,7 +38,7 @@ public:
 
   virtual ~ZImgMetadataBase() = default;
 
-  ZImgMetadataBase(ZImgMetadataBase&&) = default;
+  ZImgMetadataBase(ZImgMetadataBase&&) noexcept = default;
 
   ZImgMetadataBase& operator=(ZImgMetadataBase&&) = default;
 
@@ -59,7 +59,7 @@ public:
   inline void clear()
   { m_data.clear(); }
 
-  inline bool isEmpty() const
+  [[nodiscard]] inline bool isEmpty() const
   { return m_data.empty(); }
 
   inline void attachToTopLevel(const T& d)
@@ -137,31 +137,31 @@ public:
   inline void clearSingleChannelPlaneAttachments(size_t z, size_t c, size_t t)
   { m_data.erase(_AttachPoint(z, c, t)); }
 
-  inline bool hasTopLevelAttachment() const
+  [[nodiscard]] inline bool hasTopLevelAttachment() const
   {
     typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1, -1, -1));
     return it != m_data.end() && !it->second.empty();
   }
 
-  inline bool hasTimeAttachment(size_t t) const
+  [[nodiscard]] inline bool hasTimeAttachment(size_t t) const
   {
     typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1, -1, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  inline bool hasChannelAttachment(size_t c, size_t t) const
+  [[nodiscard]] inline bool hasChannelAttachment(size_t c, size_t t) const
   {
     typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(-1, c, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  inline bool hasPlaneAttachment(size_t z, size_t t) const
+  [[nodiscard]] inline bool hasPlaneAttachment(size_t z, size_t t) const
   {
     typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z, -1, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  inline bool hasSingleChannelPlaneAttachment(size_t z, size_t c, size_t t) const
+  [[nodiscard]] inline bool hasSingleChannelPlaneAttachment(size_t z, size_t c, size_t t) const
   {
     typename std::map<_AttachPoint, std::vector<T>>::const_iterator it = m_data.find(_AttachPoint(z, c, t));
     return it != m_data.end() && !it->second.empty();

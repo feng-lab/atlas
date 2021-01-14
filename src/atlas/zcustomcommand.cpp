@@ -1602,7 +1602,7 @@ void stitchAndDetectPuncta()
       stitch.setMergeMode(ImgMergeMode::First);
       stitch.setResultFilename(outputName);
       std::vector<size_t> chs;
-      chs.push_back(0_usize);
+      chs.push_back(0_uz);
       stitch.setUseChannels(chs);
       stitch.setMaxOverlapRate(0.15);
       QString lfn = QString("%1_stitching_log.txt").arg(outputName);

@@ -94,7 +94,7 @@ public:
 
   // use gmm to split this punctum into num puncta, image signal (voxelLocations and voxelIntensities) must exist, otherwise
   // return empty list. depends on image signal, returned list size might be less than num
-  [[nodiscard]] std::list<ZPunctum> split(int num, double conf = 0.95) const;
+  [[nodiscard]] std::list<ZPunctum> split(size_t num, double conf = 0.95) const;
 
   [[nodiscard]] inline double x() const
   { return m_x; }
@@ -169,7 +169,7 @@ public:
   { m_meanIntensity = n; }
 
   inline void setVolSize(size_t n)
-  { m_volSize = std::max(0_usize, n); }
+  { m_volSize = std::max(0_uz, n); }
 
   inline void setMass(double n)
   { m_mass = n; }

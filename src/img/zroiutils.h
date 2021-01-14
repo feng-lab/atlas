@@ -74,7 +74,7 @@ public:
   inline static RowMatrixXd polyToMat(const QPolygonF& poly)
   {
     RowMatrixXd res(poly.size(), 2);
-    for (int i = 0; i < poly.size(); ++i) {
+    for (index_t i = 0; i < poly.size(); ++i) {
       res(i, 0) = poly[i].x();
       res(i, 1) = poly[i].y();
     }

@@ -36,13 +36,13 @@ void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::o
 void readStream_impl(std::istream& fs, char* buf, size_t count)
 {
 #if defined(__APPLE__)
-  if (count < 1024_usize * 1024 * 1024 * 2) {
+  if (count < 1024_uz * 1024 * 1024 * 2) {
     if (!fs.read(buf, count)) {
       throw ZIOException(fmt::format("Expect {} bytes, only read {} bytes.", count, fs.gcount()));
     }
     return;
   }
-  static size_t chunkSize = 1024_usize * 1024 * 1024;
+  static size_t chunkSize = 1024_uz * 1024 * 1024;
   size_t bytesRemaining = count;
   while (bytesRemaining > 0) {
     size_t bytesToRead = std::min(bytesRemaining, chunkSize);

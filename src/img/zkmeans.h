@@ -716,11 +716,11 @@ protected:
     }
     ResultDataType distSqSum = distSq.sum();
 
-    const int numLocalTries = 5;
+    const size_t numLocalTries = 5;
     for (size_t index = 1; index < m_nclasses; ++index) {
       ResultDataType bestNewDistSqSum = -1;
       Eigen::Index bestNewIndex = -1;
-      for (int localTrial = 0; localTrial < numLocalTries; ++localTrial) {
+      for (size_t localTrial = 0; localTrial < numLocalTries; ++localTrial) {
         Eigen::Index newIdx = -1;
         while (newIdx == -1) {
           ResultDataType rndd = ZRandom::instance().randReal(distSqSum);

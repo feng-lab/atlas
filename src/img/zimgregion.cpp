@@ -84,15 +84,15 @@ ZImgInfo ZImgRegion::clip(const ZImgInfo& info) const
 
 std::vector<ZImgRegion>
 ZImgRegion::splitBigImage(const ZImgInfo& info, std::vector<ZImgRegion>& nonExpandRegions, size_t tileSize,
-                          size_t expand, int ch, int t)
+                          size_t expand, index_t ch, index_t t)
 {
   CHECK(expand < tileSize);
   std::vector<ZImgRegion> res;
   nonExpandRegions.clear();
-  int chs = ch < 0 ? 0 : ch;
-  int che = ch < 0 ? -1 : ch + 1;
-  int ts = t < 0 ? 0 : t;
-  int te = t < 0 ? -1 : t + 1;
+  index_t chs = ch < 0 ? 0 : ch;
+  index_t che = ch < 0 ? -1 : ch + 1;
+  index_t ts = t < 0 ? 0 : t;
+  index_t te = t < 0 ? -1 : t + 1;
   for (size_t y = 0; y < info.height; y += tileSize) {
     for (size_t x = 0; x < info.width; x += tileSize) {
       nonExpandRegions.emplace_back(x, std::min(x + tileSize, info.width),

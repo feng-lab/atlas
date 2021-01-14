@@ -607,7 +607,7 @@ QString ZImg::toQString() const
   return res;
 }
 
-ZImg ZImg::createView(int c, int t)
+ZImg ZImg::createView(index_t c, index_t t)
 {
   ZImgRegion rgn;
   if (c >= 0) {
@@ -632,7 +632,7 @@ ZImg ZImg::createView(int c, int t)
   return res;
 }
 
-ZImg ZImg::createView(int c, int t) const
+ZImg ZImg::createView(index_t c, index_t t) const
 {
   ZImgRegion rgn;
   if (c >= 0) {
@@ -802,7 +802,7 @@ ZImg ZImg::crop(const ZImgRegion& region) const
   return res;
 }
 
-ZImg ZImg::extractVoxel(size_t x, size_t y, int z, int c, int t) const
+ZImg ZImg::extractVoxel(size_t x, size_t y, index_t z, index_t c, index_t t) const
 {
   ZImgRegion rgn;
   rgn.start.x = x;
@@ -824,7 +824,7 @@ ZImg ZImg::extractVoxel(size_t x, size_t y, int z, int c, int t) const
   return crop(rgn);
 }
 
-ZImg ZImg::extractCol(size_t x, int z, int c, int t) const
+ZImg ZImg::extractCol(size_t x, index_t z, index_t c, index_t t) const
 {
   ZImgRegion rgn;
   rgn.start.x = x;
@@ -844,7 +844,7 @@ ZImg ZImg::extractCol(size_t x, int z, int c, int t) const
   return crop(rgn);
 }
 
-ZImg ZImg::extractRow(size_t y, int z, int c, int t) const
+ZImg ZImg::extractRow(size_t y, index_t z, index_t c, index_t t) const
 {
   ZImgRegion rgn;
   rgn.start.y = y;
@@ -864,7 +864,7 @@ ZImg ZImg::extractRow(size_t y, int z, int c, int t) const
   return crop(rgn);
 }
 
-ZImg ZImg::extractPlane(size_t z, int c, int t) const
+ZImg ZImg::extractPlane(size_t z, index_t c, index_t t) const
 {
   ZImgRegion rgn;
   rgn.start.z = z;
@@ -880,7 +880,7 @@ ZImg ZImg::extractPlane(size_t z, int c, int t) const
   return crop(rgn);
 }
 
-ZImg ZImg::extractChannel(size_t c, int t) const
+ZImg ZImg::extractChannel(size_t c, index_t t) const
 {
   ZImgRegion rgn;
   rgn.start.c = c;
@@ -1227,7 +1227,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   IMG_RETURN_TYPED_CALL(combine_Impl, firstInfo, imgs, mode)
 }
 
-ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int endIn) const
+ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, index_t startIn, index_t endIn) const
 {
   if (isEmpty() || m_info.size(dim) == 1) {
     return *this;
@@ -1359,7 +1359,7 @@ ZImg ZImg::projectAlongDim(Dimension dim, ImgMergeMode mode, int startIn, int en
   return res;
 }
 
-ZImg ZImg::maximumZProjection(int start, int end) const
+ZImg ZImg::maximumZProjection(index_t start, index_t end) const
 {
   return projectAlongDim(Dimension::Z, ImgMergeMode::Max, start, end);
 }
@@ -2351,7 +2351,7 @@ void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxDa
       }
     }
   } else {
-    size_t numData = maxData - minData + 1_usize;
+    size_t numData = maxData - minData + 1_uz;
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t = 0; t < numTimes(); ++t) {
@@ -2417,7 +2417,7 @@ void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel m
       }
     }
   } else {
-    size_t numData = maxData - minData + 1_usize;
+    size_t numData = maxData - minData + 1_uz;
     if (numData == res.size()) {
       if (minData == dataRangeMin<TVoxel>() && maxData == dataRangeMax<TVoxel>()) {
         for (size_t t = 0; t < numTimes(); ++t) {
@@ -2758,9 +2758,9 @@ void ZImg::blockSumPart_Impl(ZImg& res, size_t twidth, size_t theight, size_t td
           TVoxel inc = 0;
           TVoxel dec = 0;
           for (size_t x = 0; x < res.width(); ++x) {
-            int tleft = static_cast<int>(xStart + x) - static_cast<int>(twidth) + 1;
+            auto tleft = static_cast<index_t>(xStart + x) - static_cast<index_t>(twidth) + 1;
             size_t tright = xStart + x + 1;
-            size_t blockXStart = std::max(0, tleft);
+            size_t blockXStart = std::max(0_z, tleft);
             size_t blockXEnd = std::min(width(), tright);
             auto srcData = data<TVoxel>(blockXStart, blockYStart, blockZStart, c, t);
             size_t srcOffset = 0;

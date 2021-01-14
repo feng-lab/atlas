@@ -30,11 +30,11 @@ public:
   }
 
   // use this channel to do registration
-  void setReferenceChannel(int ch)
+  void setReferenceChannel(index_t ch)
   { m_referenceChannel = ch; }
 
   // correct this channel
-  void setTargetChannel(int ch)
+  void setTargetChannel(index_t ch)
   { m_targetChannel = ch; }
 
   // some preprocess before registration
@@ -70,7 +70,7 @@ public:
   { m_useMultithreading = i; }
 
   // use multiscale registration if number of scale > 1, default is 1
-  void setNumScales(int i)
+  void setNumScales(size_t i)
   { m_numScales = i; }
 
 signals:
@@ -95,10 +95,10 @@ private:
   };
 
   template<typename ImagePixelType>
-  void alignChannel(const ZImg& srcImg, int fixedChannel, int movingChannel);
+  void alignChannel(const ZImg& srcImg, size_t fixedChannel, size_t movingChannel);
 
   template<typename ImagePixelType>
-  void alignChannelWithPresetTransform(const ZImg& srcImg, int movingChannel, const QString& presetName);
+  void alignChannelWithPresetTransform(const ZImg& srcImg, size_t movingChannel, const QString& presetName);
 
   template<typename ImagePixelType>
   void calcChannelInfs(const ZImg& srcImg);
@@ -106,14 +106,14 @@ private:
 private:
   QString m_imgFilename;
   QString m_resultFilename;
-  int m_referenceChannel = -1;
-  int m_targetChannel = -1;
+  index_t m_referenceChannel = -1;
+  index_t m_targetChannel = -1;
 
   bool m_removeBackground = true;
   bool m_removeHighForeground = true;
   bool m_brightBackground = false;
   bool m_useMultithreading = true;
-  int m_numScales = 1;
+  size_t m_numScales = 1;
 
   std::vector<SectionInfo> m_channelInfos;
   double m_minValue{};

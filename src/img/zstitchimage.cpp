@@ -65,11 +65,11 @@ size_t buildConnectionFromTextFile(const QString& filename,
             header.join(',')));
       }
       bool ok = false;
-      int idx1 = list[0].toInt(&ok);
+      auto idx1 = list[0].toInt(&ok);
       if (!ok || idx1 <= 0)
         throw ZImgException(
           QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
-      int idx2 = list[1].toInt(&ok);
+      auto idx2 = list[1].toInt(&ok);
       if (!ok || idx2 <= 0)
         throw ZImgException(
           QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
@@ -77,7 +77,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
       nStacks = std::max<size_t>(nStacks, idx1);
       nStacks = std::max<size_t>(nStacks, idx2);
       conn[stackPair] = ZImgNCCMatch::PositionHint::None;
-      for (int i = 2; i < list.size(); ++i) {
+      for (index_t i = 2; i < list.size(); ++i) {
         QString pos = list[i].trimmed();
         if (pos.compare("Down", Qt::CaseInsensitive) == 0) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Down;
@@ -661,8 +661,8 @@ void ZStitchImage::doWork()
 //      int nthread =
 //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
 //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
-      int nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
-      nthread = std::max(1, nthread);
+      size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
+      nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch.";
       // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
@@ -856,7 +856,7 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
   size_t numCols = 0;
   size_t numRows = 0;
   for (size_t h = 0; h < img.height(); h++) {
-    int pre = minvalue;
+    auto pre = minvalue;
     for (size_t w = 0; w < img.width(); w++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
         numCols++;
@@ -867,7 +867,7 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
       break;
   }
   for (size_t w = 0; w < img.width(); w++) {
-    int pre = minvalue;
+    auto pre = minvalue;
     for (size_t h = 0; h < img.height(); h++) {
       if (img.value<double>(w, h, 0) > thre1 && img.value<double>(w, h, 0) > pre) {
         numRows++;
@@ -884,14 +884,14 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
 
   m_tileGrid = ZImg(ZImgInfo(numCols, numRows, 1, 1, 1, 4, VoxelFormat::Signed));
   m_tileGrid.fill(0);
-  int tileindex = 1;
+  int32_t tileindex = 1;
   size_t currentrow = 0;
   size_t currentcol = 0;
   for (size_t h = 1; h < img.height() - 1; h++) {
     for (size_t w = 1; w < img.width() - 1; w++) {
-      int value = img.value<int>(w, h, 0);
-      int pre = img.value<int>(w - 1, h, 0);
-      int up = img.value<int>(w, h - 1, 0);
+      auto value = img.value<int32_t>(w, h, 0);
+      auto pre = img.value<int32_t>(w - 1, h, 0);
+      auto up = img.value<int32_t>(w, h - 1, 0);
       if (value > thre1 && value > pre && value > up) {
         if (value > thre2) {
           if (currentrow >= numRows || currentcol >= numCols) {
@@ -1000,8 +1000,8 @@ void ZStitchImage::doRestitch()
 //      int nthread =
 //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
 //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
-      int nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
-      nthread = std::max(1, nthread);
+      size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
+      nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch " << rgns.size() << " regions.";
       // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);

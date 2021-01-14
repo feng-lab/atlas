@@ -106,7 +106,7 @@ private:
   std::map<const ZSwc*, ZPuncta> m_swcTreeToPuncta;
   std::map<const ZSwc*, ZPuncta> m_swcTreeToSomaPuncta;
 
-  const int m_somaType = 1;
+  const int64_t m_somaType = 1;
 };
 
 } // namespace nim

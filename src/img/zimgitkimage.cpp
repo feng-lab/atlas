@@ -413,7 +413,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
           if (tagkey == fmt::format("CH{}ChannelColor", ch + 1)) {
             QString tagvalue = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
             bool ok;
-            int color = tagvalue.toInt(&ok);
+            int32_t color = tagvalue.toInt(&ok);
             if (!ok)
               throw ZIOException("Can not parse nd2 channel Color");
             col4 col;

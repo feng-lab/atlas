@@ -116,16 +116,16 @@ public:
   // the rest will be filled with fillValue. If nData is -1, vector length will be same as nActualData.
   // If strictDelimiter is used, empty data will be filled with fillValue.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::RowVectorXd readRowVector(const std::string& line, const char* uSep = "", int* nActualData = nullptr,
-                                          int nReadData = -1, bool strictDelimiter = false,
+  static Eigen::RowVectorXd readRowVector(const std::string& line, const char* uSep = "", Eigen::Index* nActualData = nullptr,
+                                          Eigen::Index nReadData = -1, bool strictDelimiter = false,
                                           double fillValue = std::numeric_limits<double>::quiet_NaN(),
                                           const std::string& commentStart = "#");
 
 
   template<typename Derived>
   static bool writeMatrix(const Eigen::DenseBase<Derived>& mat, const char* filename, const char* sep = " ",
-                          int startRow = 0, int startCol = 0,
-                          int endRow = -1, int endCol = -1)
+                          Eigen::Index startRow = 0, Eigen::Index startCol = 0,
+                          Eigen::Index endRow = -1, Eigen::Index endCol = -1)
   {
     if (endRow == -1)
       endRow = mat.rows();

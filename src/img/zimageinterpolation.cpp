@@ -41,14 +41,14 @@ double ZImageInterpolation::tricubicInterpolate(double p[][4][4], double x, doub
   return cubicInterpolate(arr, x);
 }
 
-double ZImageInterpolation::nCubicInterpolate(int n, double* p, double coordinates[]) const
+double ZImageInterpolation::nCubicInterpolate(int32_t n, double* p, double coordinates[]) const
 {
   CHECK(n > 0);
   if (n == 1) {
     return cubicInterpolate(p, *coordinates);
   }
   double arr[4];
-  int skip = 1 << (n - 1) * 2;
+  int32_t skip = 1 << (n - 1) * 2;
   arr[0] = nCubicInterpolate(n - 1, p, coordinates + 1);
   arr[1] = nCubicInterpolate(n - 1, p + skip, coordinates + 1);
   arr[2] = nCubicInterpolate(n - 1, p + 2 * skip, coordinates + 1);
@@ -63,14 +63,14 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
     return m_fillValue;
 
   if (m_interpolant == Interpolant::Nearest) {
-    return getImage2DPixelValue(img, width, height, roundTo<int>(x), roundTo<int>(y), m_padOption, TPixel(m_fillValue));
+    return getImage2DPixelValue(img, width, height, roundTo<int64_t>(x), roundTo<int64_t>(y), m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[4];
     double xCom, yCom;
-    int xBas0 = std::floor(x);
-    int xBas1 = xBas0 + 1;
-    int yBas0 = std::floor(y);
-    int yBas1 = yBas0 + 1;
+    int64_t xBas0 = std::floor(x);
+    int64_t xBas1 = xBas0 + 1;
+    int64_t yBas0 = std::floor(y);
+    int64_t yBas1 = yBas0 + 1;
 
     // Linear interpolation constants (percentages)
     xCom = x - xBas0;
@@ -86,13 +86,13 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
            perc[3] * getImage2DPixelValue(img, width, height, xBas1, yBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
-    int xn[4], yn[4];
+    int64_t xn[4], yn[4];
     double vecTx[4], vecTy[4];
     double vecPTx[4], vecPTy[4];
 
     // Determine of the zero neighbor
-    int xBas0 = std::floor(x);
-    int yBas0 = std::floor(y);
+    int64_t xBas0 = std::floor(x);
+    int64_t yBas0 = std::floor(y);
 
     // Determine the location in between the pixels 0..1
     double tx = x - xBas0;
@@ -130,7 +130,7 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
 
     // First do interpolation in the x direction followed by interpolation in the y direction
     double res = 0.0;
-    for (int i = 0; i < 4; ++i) {
+    for (auto i = 0; i < 4; ++i) {
       res += vecPTy[i] *
              (vecPTx[0] * getImage2DPixelValue(img, width, height, xn[0], yn[i], m_padOption, TPixel(m_fillValue)) +
               vecPTx[1] * getImage2DPixelValue(img, width, height, xn[1], yn[i], m_padOption, TPixel(m_fillValue)) +
@@ -151,18 +151,18 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
 
   if (m_interpolant == Interpolant::Nearest) {
     return getImage3DPixelValue(img, width, height, depth,
-                                roundTo<int>(x), roundTo<int>(y), roundTo<int>(z),
+                                roundTo<int64_t>(x), roundTo<int64_t>(y), roundTo<int64_t>(z),
                                 m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[8];
     double xCom, yCom, zCom;
     double xComi, yComi, zComi;
-    int xBas0 = std::floor(x);
-    int xBas1 = xBas0 + 1;
-    int yBas0 = std::floor(y);
-    int yBas1 = yBas0 + 1;
-    int zBas0 = std::floor(z);
-    int zBas1 = zBas0 + 1;
+    int64_t xBas0 = std::floor(x);
+    int64_t xBas1 = xBas0 + 1;
+    int64_t yBas0 = std::floor(y);
+    int64_t yBas1 = yBas0 + 1;
+    int64_t zBas0 = std::floor(z);
+    int64_t zBas1 = zBas0 + 1;
 
     // Linear interpolation constants (percentages)
     xCom = x - xBas0;
@@ -202,14 +202,14 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
                                           xBas1, yBas1, zBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
-    int xn[4], yn[4], zn[4];
+    int64_t xn[4], yn[4], zn[4];
     double vecTx[4], vecTy[4], vecTz[4];
     double vecPTx[4], vecPTy[4], vecPTz[4];
 
     // Determine of the zero neighbor
-    int xBas0 = std::floor(x);
-    int yBas0 = std::floor(y);
-    int zBas0 = std::floor(z);
+    int64_t xBas0 = std::floor(x);
+    int64_t yBas0 = std::floor(y);
+    int64_t zBas0 = std::floor(z);
 
     // Determine the location in between the pixels 0..1
     double tx = x - xBas0;
@@ -260,9 +260,9 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
 
     // First do interpolation in the x direction followed by interpolation in the y and z direction
     double res = 0.0;
-    for (int j = 0; j < 4; ++j) {
+    for (auto j = 0; j < 4; ++j) {
       double Ipixelxy = 0.0;
-      for (int i = 0; i < 4; ++i) {
+      for (auto i = 0; i < 4; ++i) {
         Ipixelxy += vecPTy[i] * (vecPTx[0] * getImage3DPixelValue(img, width, height, depth,
                                                                   xn[0], yn[i], zn[j], m_padOption,
                                                                   TPixel(m_fillValue)) +

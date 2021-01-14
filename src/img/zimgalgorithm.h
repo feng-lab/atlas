@@ -6,8 +6,8 @@
 // There should be no overhead because compiler should optimize
 // all those empty functions call out
 
-#include "zexception.h"
 #include "zcpuinfo.h"
+#include "zglobal.h"
 #include <itkCommand.h>
 #include <itkProcessObject.h>
 #include <QObject>

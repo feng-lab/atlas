@@ -117,7 +117,7 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
     CHECK(catDim != Dimension::X && catDim != Dimension::Y);
   }
   if (catScenes) {
-    for (int i = 1; i < fileList.size(); ++i) {
+    for (index_t i = 1; i < fileList.size(); ++i) {
       std::vector<ZImgInfo> tmpInfo;
       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
       readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
@@ -188,7 +188,7 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
       subBlocks->resize(1);
     }
   } else {
-    for (int i = 1; i < fileList.size(); ++i) {
+    for (index_t i = 1; i < fileList.size(); ++i) {
       std::vector<ZImgInfo> tmpInfo;
       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
       readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
@@ -524,10 +524,10 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
   for (size_t i = 0; i < imgs.size(); ++i) {
     readImg(imgSources[i], imgs[i]);
     if (expandXY && (imgs[i].width() < info.width || imgs[i].height() < info.height)) {
-      int widthPadBefore = int(info.width - imgs[i].width()) / 2;
-      int widthPadAfter = int(info.width - imgs[i].width()) - widthPadBefore;
-      int heightPadBefore = int(info.height - imgs[i].height()) / 2;
-      int heightPadAfter = int(info.height - imgs[i].height()) - heightPadBefore;
+      auto widthPadBefore = index_t(info.width - imgs[i].width()) / 2;
+      auto widthPadAfter = index_t(info.width - imgs[i].width()) - widthPadBefore;
+      auto heightPadBefore = index_t(info.height - imgs[i].height()) / 2;
+      auto heightPadAfter = index_t(info.height - imgs[i].height()) - heightPadBefore;
       if (info.voxelFormat == VoxelFormat::Float) {
         double min;
         double max;
@@ -641,8 +641,8 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
     }
 
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {
-      int widthPadBefore = int(info.width - sliceInfo.width) / 2;
-      int heightPadBefore = int(info.height - sliceInfo.height) / 2;
+      auto widthPadBefore = index_t(info.width - sliceInfo.width) / 2;
+      auto heightPadBefore = index_t(info.height - sliceInfo.height) / 2;
       ZImgRegion sliceRegionFullXY = sliceRegion;
       sliceRegionFullXY.start.x = 0;
       sliceRegionFullXY.end.x = -1;

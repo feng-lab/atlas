@@ -247,7 +247,7 @@ set(IMG_SOURCES
     zminimumspanningtree.cpp
     zminimumspanningtree.h zsubrange.h zmkl.h zsaturateoperation.cpp
     zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h
-    zimageavx512.h zimageavx512.cpp zroiutils2.h zroiutils2.cpp)
+    zimageavx512.h zimageavx512.cpp)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -327,7 +327,7 @@ if (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "WIN32;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS /I${SCIFIODIR})
   set_source_files_properties(zimginterface.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/magic_enum/include)
-  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
+  # set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS /I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
   #set_source_files_properties(zimggraph.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(zimagetransformresolve.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(zminimumspanningtree.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
@@ -369,7 +369,7 @@ else (WIN32)
   set_source_files_properties(zimgjpegxr.cpp PROPERTIES COMPILE_DEFINITIONS "__ANSI__;DISABLE_PERF_MEASUREMENT")
   set_source_files_properties(zimgitkimage.cpp PROPERTIES COMPILE_FLAGS -I${SCIFIODIR})
   set_source_files_properties(zimginterface.cpp PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/magic_enum/include)
-  set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
+  # set_source_files_properties(zroiutils2.cpp PROPERTIES COMPILE_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include/skia)
 
   set_source_files_properties(zregistrationoptimizer.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 endif (WIN32)

@@ -99,7 +99,7 @@ struct ZImgInfo
   [[nodiscard]] inline size_t stride(Dimension dim) const
   {
     size_t res = 1;
-    for (int i = 0; i < enumToUnderlyingType(dim); ++i) res *= (&width)[i];
+    for (std::underlying_type<Dimension>::type i = 0; i < enumToUnderlyingType(dim); ++i) res *= (&width)[i];
     return res;
   }
 

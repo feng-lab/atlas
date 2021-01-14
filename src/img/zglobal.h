@@ -100,11 +100,15 @@ __forceinline void clearAndDeallocate(Container& c)
   Container().swap(c);
 }
 
+using index_t = std::ptrdiff_t;
+
 // literal
-constexpr size_t operator "" _usize(unsigned long long int n) noexcept
+// from c++23 literal 'uz'
+constexpr size_t operator "" _uz(unsigned long long int n) noexcept
 { return static_cast<size_t>(n); }
 
-constexpr ptrdiff_t operator "" _isize(unsigned long long int n) noexcept
+// from c++23 literal 'z'
+constexpr ptrdiff_t operator "" _z(unsigned long long int n) noexcept
 { return static_cast<ptrdiff_t>(n); }
 
 constexpr uint8_t operator "" _u8(unsigned long long int n) noexcept

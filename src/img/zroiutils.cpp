@@ -21,7 +21,7 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
     return res;
   }
 
-  int numSegments = spline.size() - 1;
+  auto numSegments = spline.size() - 1;
   std::vector<double> times(spline.size());
   times[0] = 0;
   for (size_t i = 1; i < times.size(); ++i) {
@@ -31,8 +31,8 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
   gte::NaturalSplineCurve<2, double> splineCurve(!isClosed, spline.size(), (gte::Vector<2, double> const*) spline.data(),
                                                  times.data());
   res.moveTo(spline[0]);
-  int endSeg = showLastSeg ? numSegments : numSegments - 1;
-  for (int i = 0; i < endSeg; ++i) {
+  auto endSeg = showLastSeg ? numSegments : numSegments - 1;
+  for (index_t i = 0; i < endSeg; ++i) {
     gte::Vector<2, double> values0[4];
     gte::Vector<2, double> values1[4];
     splineCurve.Evaluate(times[i], 1, values0);
@@ -57,22 +57,22 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
     return std::make_tuple(img, 0_i32, 0_i32);
   }
   QRectF pathRect = path.boundingRect();
-  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left())));
-  int maxX = static_cast<int>(std::ceil(pathRect.right()));
-  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top())));
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()));
+  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left())));
+  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()));
+  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top())));
+  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()));
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);
   }
 
-  int scale = 5;
+  auto scale = 5;
   while (scale > 0 && ((maxX - minX + 1) * scale > 32767 || (maxY - minY + 1) * scale > 32767)) {
     --scale;
   }
   if (scale == 0) {
     img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
-    for (int y = minY; y <= maxY; ++y) {
-      for (int x = minX; x <= maxX; ++x) {
+    for (auto y = minY; y <= maxY; ++y) {
+      for (auto x = minX; x <= maxX; ++x) {
         if (path.contains(QPointF(x, y))) {       // not accurate for some spline
           *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
         }
@@ -91,7 +91,7 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToMask(const QPainterP
     img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
     for (size_t y = 0; y < img.height(); ++y) {
       for (size_t x = 0; x < img.width(); ++x) {
-        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1 : 0;
+        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) >= 128_u8 ? 1_u8 : 0_u8;
       }
     }
     img.resize(maxX - minX + 1, maxY - minY + 1, 1);
@@ -107,10 +107,10 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainte
     return std::make_tuple(img, 0_i32, 0_i32);
   }
   QRectF pathRect = path.boundingRect();
-  int minX = std::max(0, static_cast<int>(std::floor(pathRect.left()) - width));
-  int maxX = static_cast<int>(std::ceil(pathRect.right()) + width);
-  int minY = std::max(0, static_cast<int>(std::floor(pathRect.top()) - width));
-  int maxY = static_cast<int>(std::ceil(pathRect.bottom()) + width);
+  auto minX = std::max(0, static_cast<int32_t>(std::floor(pathRect.left()) - width));
+  auto maxX = static_cast<int32_t>(std::ceil(pathRect.right()) + width);
+  auto minY = std::max(0, static_cast<int32_t>(std::floor(pathRect.top()) - width));
+  auto maxY = static_cast<int32_t>(std::ceil(pathRect.bottom()) + width);
   if (maxX < minX || maxY < minY) {
     return std::make_tuple(img, 0_i32, 0_i32);
   }
@@ -126,7 +126,7 @@ std::tuple<ZImg, int32_t, int32_t> ZROIUtils::qPainterPathToStroke(const QPainte
   img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
   for (size_t y = 0; y < img.height(); ++y) {
     for (size_t x = 0; x < img.width(); ++x) {
-      *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1 : 0;
+      *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) >= 128_u8 ? 1_u8 : 0_u8;
     }
   }
   img.resize(maxX - minX + 1, maxY - minY + 1, 1);

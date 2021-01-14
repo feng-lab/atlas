@@ -57,7 +57,7 @@ public:
 
   [[nodiscard]] uint16_t planarConfiguration() const;
 
-  [[nodiscard]] int extraSample() const;
+  [[nodiscard]] int32_t extraSample() const;
 
   [[nodiscard]] bool isTiledImage() const;
 
@@ -262,12 +262,12 @@ public:
   ZTiffWriter();
 
   // call in sequence
-  void startWriting(const QString& filename, Compression comp, int extraSample, bool bigTiff);
+  void startWriting(const QString& filename, Compression comp, int32_t extraSample, bool bigTiff);
 
   // write img(z,c,t,l) to next ifd, if c == -1, write all channels
   // z, t, l must be valid index
   // if writeThumbnails is false, thumbnails of img are ignored, otherwise they will be written to subifd
-  void writeIFD(const ZImg& img, int z, int t, int c = -1, bool writeThumbnails = true,
+  void writeIFD(const ZImg& img, size_t z, size_t t, index_t c = -1, bool writeThumbnails = true,
                 const std::vector<ZImgMetatag>& additionalTags = std::vector<ZImgMetatag>());
 
   // close file, destructor of ZTiffWriter will do the same thing.
@@ -285,7 +285,7 @@ private:
 private:
   std::unique_ptr<TIFF, void (*)(TIFF*)> m_tif;
   Compression m_compression = Compression::NONE;
-  int m_extraSample = 0;
+  int32_t m_extraSample = 0;
 };
 
 } // namespace nim

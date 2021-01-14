@@ -152,9 +152,9 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   }
 
   std::vector<int> c(boost::num_vertices(graph));
-  int num = boost::connected_components(graph, boost::make_iterator_property_map(c.begin(),
-                                                                                 boost::get(&VertexInfo::idx, graph)),
-                                        boost::color_map(boost::get(&VertexInfo::m_algo_color, graph)));
+  auto num = boost::connected_components(graph, boost::make_iterator_property_map(c.begin(),
+                                                                                  boost::get(&VertexInfo::idx, graph)),
+                                         boost::color_map(boost::get(&VertexInfo::m_algo_color, graph)));
   if (num != 1) {
     throw ZImgException("Transform resolve error: images are not fully connected");
   }

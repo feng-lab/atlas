@@ -43,9 +43,9 @@ ZImgInfo readCZITileInfo(std::ifstream& inputFileStream, const CZITile& tile)
   SubBlockSegment sb;
   readStream(inputFileStream, &sb, sizeof(SubBlockSegment));
 
-  int directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
-  int directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
-  int fill = std::max(0, 256 - directoryEntrySize - 16);
+  auto directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
+  index_t directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
+  auto fill = std::max(0_z, 256 - directoryEntrySize - 16);
 
   inputFileStream.seekg(directoryEntriesSize + fill + sb.metaDataSize, std::ios_base::cur);
 
@@ -145,9 +145,9 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
   SubBlockSegment sb;
   readStream(inputFileStream, &sb, sizeof(SubBlockSegment));
 
-  int directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
-  int directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
-  int fill = std::max(0, 256 - directoryEntrySize - 16);
+  auto directoryEntriesSize = sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
+  index_t directoryEntrySize = sizeof(DirectoryEntryDV) + directoryEntriesSize;
+  auto fill = std::max(0_z, 256 - directoryEntrySize - 16);
 
   inputFileStream.seekg(directoryEntriesSize + fill + sb.metaDataSize, std::ios_base::cur);
 
@@ -318,8 +318,8 @@ ZImgCZISubBlock::ZImgCZISubBlock(QString  fileName, std::vector<CZITile>& tiles,
 {
   m_tiles.swap(tiles);
   if (m_mixedTiles) {
-    int32_t endx = std::numeric_limits<int32_t>::min();
-    int32_t endy = std::numeric_limits<int32_t>::min();
+    index_t endx = std::numeric_limits<index_t>::min();
+    index_t endy = std::numeric_limits<index_t>::min();
     for (const auto& tile : m_tiles) {
       m_mixedTilesStart = min(m_mixedTilesStart, tile.start);
       endx = std::max(endx, tile.start.x + tile.size.x);
@@ -436,7 +436,7 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, 
   std::vector<ZImg> imgs;
   coords.clear();
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_usize && tile.start.c == static_cast<int>(ch)) {
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
       imgs.push_back(readCZITile(inputFileStream, tile));
       coords.push_back(tile.start);
     }
@@ -481,11 +481,11 @@ ZImg ZImgZeissCZI::stackTiles(const QString& filename, size_t ch, size_t scene, 
 
   std::vector<ZImg> imgs;
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_usize && tile.start.c == static_cast<int>(ch)) {
-      int startX = std::max(0.0, std::floor(tile.start.x * scale));
-      int endX = std::min(inverseMask.width() * 1.0, startX + std::ceil(tile.size.x * scale));
-      int startY = std::max(0.0, std::floor(tile.start.y * scale));
-      int endY = std::min(inverseMask.height() * 1.0, startY + std::ceil(tile.size.y * scale));
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
+      index_t startX = std::max(0.0, std::floor(tile.start.x * scale));
+      index_t endX = std::min(inverseMask.width() * 1.0, startX + std::ceil(tile.size.x * scale));
+      index_t startY = std::max(0.0, std::floor(tile.start.y * scale));
+      index_t endY = std::min(inverseMask.height() * 1.0, startY + std::ceil(tile.size.y * scale));
       bool pass = true;
       ZImgRegion region(startX, endX, startY, endY);
       for (ZImgRegionIterator<uint8_t> rit = ZImgRegionIterator<uint8_t>(inverseMask, region);
@@ -550,7 +550,7 @@ ZImg ZImgZeissCZI::correctShading(const QString& filename, size_t ch, size_t sce
     meanZ = mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
   }
   for (const auto& tile : m_sceneTiles[scene]) {
-    if (tile.ratio == 1_usize && tile.start.c == static_cast<int>(ch)) {
+    if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {
       ZImg origtile = readCZITile(inputFileStream, tile);
       ZImg tileImg = origtile.castTo<double>();
       origtile.clear();
@@ -641,12 +641,12 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
         bool hasMissingTiles = false;
 
         size_t currnetRatio = 0;
-        int currentX = -1;
-        int currentY = -1;
-        int currentZ = -1;
-        int currentT = -1;
+        index_t currentX = -1;
+        index_t currentY = -1;
+        index_t currentZ = -1;
+        index_t currentT = -1;
         for (const auto& tile : m_sceneTiles[s]) {
-          if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.x != currentX ||
+          if (currnetRatio < 1_uz || tile.ratio != currnetRatio || tile.start.x != currentX ||
               tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() > infos[s].numChannels) {
@@ -692,12 +692,12 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
         bool hasMixedTiles = false;
 
         size_t currnetRatio = 0;
-        int currentX = -1;
-        int currentY = -1;
-        int currentZ = -1;
-        int currentT = -1;
+        index_t currentX = -1;
+        index_t currentY = -1;
+        index_t currentZ = -1;
+        index_t currentT = -1;
         for (const auto& tile : m_sceneTiles[s]) {
-          if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
+          if (currnetRatio < 1_uz|| tile.ratio != currnetRatio || tile.start.x != currentX || tile.start.y != currentY ||
               tile.start.z != currentZ || tile.start.t != currentT) {
             if (tiles.size() == infos[s].numChannels) {
               (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles));
@@ -744,7 +744,7 @@ void ZImgZeissCZI::readInfo(const QString& filename, std::vector<ZImgInfo>& info
           currentZ = -1;
           currentT = -1;
           for (const auto& tile : allMixedTiles) {
-            if (currnetRatio < 1_usize || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
+            if (currnetRatio < 1_uz || tile.ratio != currnetRatio || tile.start.z != currentZ || tile.start.t != currentT) {
               if (!tiles.empty()) {
                 (*subBlocks)[s].emplace_back(std::make_shared<ZImgCZISubBlock>(filename, tiles, true, infos[s].numChannels, infos[s].bytesPerVoxel,
                                                                                infos[s].voxelFormat));
@@ -878,7 +878,7 @@ void ZImgZeissCZI::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     // ignore those duplicated signals
     // this is useful if we are extracting internal 3d blocks for restitching
     // we check readRatio is 1 and the region can be exactly covered in x-y direction by 1 CZI tile
-    size_t totalWritten = 0_usize;
+    size_t totalWritten = 0_uz;
     if (readRatio == 1) {
       ZBBox<ZVoxelCoordinate> imgBox(rgn.start, rgn.end - 1);
       for (const auto& tile : m_sceneTiles[scene]) {
@@ -1164,7 +1164,7 @@ void ZImgZeissCZI::parseChannel(QXmlStreamReader& xml)
         colorStr = colorStr.mid(2);
       }
       if (colorStr.size() == 6) {
-        int color = colorStr.toInt(&ok, 16);
+        int32_t color = colorStr.toInt(&ok, 16);
         if (ok) {
           std::memcpy(static_cast<void*>(&col), &color, 3);
           std::swap(col.r, col.b);
@@ -1315,7 +1315,7 @@ void ZImgZeissCZI::parseDisplaySettingChannel(QXmlStreamReader& xml)
         colorStr = colorStr.mid(2);
       }
       if (colorStr.size() == 6) {
-        int color = colorStr.toInt(&ok, 16);
+        int32_t color = colorStr.toInt(&ok, 16);
         if (ok) {
           std::memcpy(static_cast<void*>(&col), &color, 3);
           std::swap(col.r, col.b);
@@ -1370,7 +1370,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
 
   std::vector<CZITile> allTiles;
   std::map<int32_t, int32_t> chPixelType;
-  int idx = 0;
+  int32_t idx = 0;
   while (idx < sd.entryCount) {
     CZITile tile;
     DirectoryEntryDV de;
@@ -1383,8 +1383,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
     if (de.pyramidType == 0)
       tile.ratio = 1;
     bool tileValid = true;
-    for (size_t i = 0; i < dimensionEntries.size(); ++i) {
-      DimensionEntryDV1 dimE = dimensionEntries[i];
+    for (auto& dimE : dimensionEntries) {
       QString dimStr = QString::fromUtf8(dimE.dimension, 4);
       dimStr = dimStr.trimmed();
       dimStr.remove(QChar::Null);
@@ -1401,7 +1400,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
             tileValid = false;
             break;
           }
-          if (tile.ratio > 1_usize && tile.ratio != l) {
+          if (tile.ratio > 1_uz && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
             tile.ratio = l;
@@ -1421,7 +1420,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
             tileValid = false;
             break;
           }
-          if (tile.ratio > 1_usize && tile.ratio != l) {
+          if (tile.ratio > 1_uz && tile.ratio != l) {
             throw ZIOException("level does not match");
           } else {
             tile.ratio = l;
@@ -1530,17 +1529,17 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
   }
 
   std::map<std::array<int32_t, 6>, std::vector<CZITile>> sceneIdxToTiles;
-  for (size_t i = 0; i < allTiles.size(); ++i) {
+  for (auto& tile : allTiles) {
     if (!m_shouldSeparateChannelsToDifferentScenes) { // remove channel info from scene idx
-      allTiles[i].sceneIdx[5] = 0;
+      tile.sceneIdx[5] = 0;
     } else {   // split channels to different scenes
-      CHECK(allTiles[i].size.c == 1);
-      allTiles[i].start.c = 0;
+      CHECK(tile.size.c == 1);
+      tile.start.c = 0;
     }
-    sceneIdxToTiles[allTiles[i].sceneIdx].push_back(allTiles[i]);
+    sceneIdxToTiles[tile.sceneIdx].push_back(tile);
   }
 
-  int channelStart = std::numeric_limits<int32_t>::max();
+  int32_t channelStart = std::numeric_limits<int32_t>::max();
   if (m_shouldSeparateChannelsToDifferentScenes &&
       m_hasChannelInfo) { // find channel start to know how to map info from metadata to different scenes
     for (const auto& sceneIdxTiles : sceneIdxToTiles) {
@@ -1553,7 +1552,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
     ZVoxelCoordinate end(ZVoxelCoordinate::Init::Minimum);
 
     for (const auto& tile : sceneIdxTiles.second) {
-      if (tile.ratio != 1_usize)
+      if (tile.ratio != 1_uz)
         continue;
       start = min(start, tile.start);
       end = max(end, tile.start + tile.size);
@@ -1644,9 +1643,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
       } else if (m_channelNames.size() > info.numChannels &&
                  info.numChannels == 1) {  // channels are separated to different scenes
         CHECK(m_shouldSeparateChannelsToDifferentScenes);
-        int chIdx = sceneIdxTiles.first.at(5) - channelStart;
+        auto chIdx = sceneIdxTiles.first.at(5) - channelStart;
         CHECK(chIdx >= 0);
-        if (chIdx >= static_cast<int>(m_channelNames.size())) {
+        if (chIdx >= static_cast<int32_t>(m_channelNames.size())) {
           throw ZIOException("channel number does not match metadata");
         }
         info.channelNames.push_back(m_channelNames[chIdx]);
@@ -1657,9 +1656,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
       } else if (m_channelColors.size() > info.numChannels &&
                  info.numChannels == 1) {  // channels are separated to different scenes
         CHECK(m_shouldSeparateChannelsToDifferentScenes);
-        int chIdx = sceneIdxTiles.first.at(5) - channelStart;
+        auto chIdx = sceneIdxTiles.first.at(5) - channelStart;
         CHECK(chIdx >= 0);
-        if (chIdx >= static_cast<int>(m_channelColors.size())) {
+        if (chIdx >= static_cast<int32_t>(m_channelColors.size())) {
           throw ZIOException("channel number does not match metadata");
         }
         info.channelColors.push_back(m_channelColors[chIdx]);
@@ -1674,9 +1673,9 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
         } else if (m_channelValidBitCount.size() > info.numChannels &&
                    info.numChannels == 1) { // channels are separated to different scenes
           CHECK(m_shouldSeparateChannelsToDifferentScenes);
-          int chIdx = sceneIdxTiles.first.at(5) - channelStart;
+          auto chIdx = sceneIdxTiles.first.at(5) - channelStart;
           CHECK(chIdx >= 0);
-          if (chIdx >= static_cast<int>(m_channelValidBitCount.size())) {
+          if (chIdx >= static_cast<int32_t>(m_channelValidBitCount.size())) {
             throw ZIOException("channel number does not match metadata");
           }
           info.validBitCount = m_channelValidBitCount[chIdx];
@@ -1734,7 +1733,7 @@ QString ZImgZeissCZI::dump(const QString& filename)
 }
 
 void
-ZImgZeissCZI::dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, int indent)
+ZImgZeissCZI::dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, index_t indent)
 {
   int64_t nextSegPos = offset;
   do {
@@ -1746,7 +1745,7 @@ ZImgZeissCZI::dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, in
   } while (nextSegPos - offset < filesize - 1);
 }
 
-void ZImgZeissCZI::dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   if (std::strncmp(sh.id, "ZISRAWFILE", std::extent<decltype(sh.id)>::value - 1) == 0) {
     dumpFileHeaderSegment(inputFileStream, str, indent);
@@ -1768,7 +1767,7 @@ void ZImgZeissCZI::dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& input
   }
 }
 
-void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   FileHeader fh;
@@ -1787,7 +1786,7 @@ void ZImgZeissCZI::dumpFileHeaderSegment(std::ifstream& inputFileStream, QString
   str += "\n";
 }
 
-void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   MetaDataSegment md;
@@ -1804,7 +1803,7 @@ void ZImgZeissCZI::dumpMetadataSegment(std::ifstream& inputFileStream, QString& 
   str += "\n";
 }
 
-void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   SubBlockSegment sb;
@@ -1816,11 +1815,11 @@ void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, QString& 
   std::vector<DimensionEntryDV1> dimensionEntries(sb.directoryEntry.dimensionCount);
   readStream(inputFileStream, dimensionEntries.data(), sizeof(DimensionEntryDV1) * dimensionEntries.size());
   dumpDirectoryEntry(sb.directoryEntry, str, indent);
-  for (size_t i = 0; i < dimensionEntries.size(); ++i) {
-    dumpDimensionEntry(dimensionEntries[i], str, indent);
+  for (auto& dimensionEntrie : dimensionEntries) {
+    dumpDimensionEntry(dimensionEntrie, str, indent);
   }
-  int directoryEntrySize = sizeof(DirectoryEntryDV) + sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
-  int fill = std::max(0, 256 - directoryEntrySize - 16);
+  index_t directoryEntrySize = sizeof(DirectoryEntryDV) + sizeof(DimensionEntryDV1) * sb.directoryEntry.dimensionCount;
+  auto fill = std::max(0_z, 256 - directoryEntrySize - 16);
   if (fill > 0) {
     inputFileStream.seekg(fill, std::ios_base::cur);
   }
@@ -1845,7 +1844,7 @@ void ZImgZeissCZI::dumpSubBlockSegment(std::ifstream& inputFileStream, QString& 
   str += "\n";
 }
 
-void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, int indent)
+void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   str += QString("%1SchemaType: %2%3\n").arg(ind).arg(de.schemaType[0]).arg(de.schemaType[1]);
@@ -1941,7 +1940,7 @@ void ZImgZeissCZI::dumpDirectoryEntry(const DirectoryEntryDV& de, QString& str, 
   str += QString("%1DimensionCount: %2\n").arg(ind).arg(de.dimensionCount);
 }
 
-void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, QString& str, int indent)
+void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   QString dimStr = QString::fromUtf8(de.dimension, 4);
@@ -1951,7 +1950,7 @@ void ZImgZeissCZI::dumpDimensionEntry(const DimensionEntryDV1& de, QString& str,
     .arg(ind).arg(dimStr).arg(de.start).arg(de.size).arg(de.startCoordinate).arg(de.storedSize);
 }
 
-void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   subBlockDirectorySegment sd;
@@ -1959,7 +1958,7 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString
   str += QString("%1SubBlockDirectorySegment\n").arg(ind);
   str += QString("%1EntryCount: %2\n").arg(ind).arg(sd.entryCount);
 
-  int idx = 0;
+  int32_t idx = 0;
   while (idx < sd.entryCount) {
     str += QString("%1Entry %2:\n").arg(ind).arg(idx);
     DirectoryEntryDV de;
@@ -1976,7 +1975,7 @@ void ZImgZeissCZI::dumpSubBlockDirectory(std::ifstream& inputFileStream, QString
   str += "\n";
 }
 
-void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   AttachmentSegment as;
@@ -2017,7 +2016,7 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, QString
     str += QString("%1Size: %2\n").arg(ind).arg(el.size);
     str += QString("%1NumberEvents: %2\n").arg(ind).arg(el.numberEvents);
     if (el.numberEvents > 0) {
-      int eventIdx = 0;
+      int32_t eventIdx = 0;
       while (eventIdx < el.numberEvents) {
         EventListEntry ele;
         readStream(inputFileStream, &ele, sizeof(EventListEntry));
@@ -2080,7 +2079,7 @@ void ZImgZeissCZI::dumpAttachmentSegment(std::ifstream& inputFileStream, QString
   str += "\n";
 }
 
-void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str, int indent)
+void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   str += QString("%1SchemaType: %2%3\n").arg(ind).arg(ae.schemaType[0]).arg(ae.schemaType[1]);
@@ -2098,7 +2097,7 @@ void ZImgZeissCZI::dumpAttachmentEntry(const AttachmentEntryA1& ae, QString& str
   str += QString("%1Name: %2\n").arg(ind).arg(ae.name);
 }
 
-void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, QString& str, int indent)
+void ZImgZeissCZI::dumpAttachmentDirectory(std::ifstream& inputFileStream, QString& str, index_t indent)
 {
   QString ind(indent, QChar(' '));
   AttachmentDirectorySegment ad;

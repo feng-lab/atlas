@@ -47,7 +47,7 @@ double ZImgRegistration::run()
   m_costFunction->setUseMultithreading(m_useMultithreading);
   m_transform->adaptParameters(0, m_numScales - 1);
 
-  for (int i = m_numScales; i-- > 0;) {
+  for (auto i = m_numScales; i-- > 0;) {
     double scale = std::pow(0.5, i);
     size_t sizeX = m_fixedImg->width();
     size_t sizeY = m_fixedImg->height();

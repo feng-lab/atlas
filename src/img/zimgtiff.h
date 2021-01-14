@@ -68,20 +68,20 @@ protected:
   // index is index of idf of all normal images (not downsampled image)
   // return true if ifd should be read. if ifd doesn't belong to img (e.g. ome-tiff), return false
   // default use start ifd index and dimension order to calculate correct positioin
-  virtual bool mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l);
+  virtual bool mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l);
 
   // utils function
   static bool isDimensionOrderValid(const QString& order);
 
-  static bool IFDToLoc(size_t ifdIdx, int& z, int& c, int& t, int& l,
+  static bool IFDToLoc(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l,
                        size_t startIFDIndex, const QString& dimensionOrder, const ZImgInfo& imgInfo,
                        size_t numScenes,
-                       int startZ = 0, int startC = 0, int startT = 0, int startL = 0);
+                       index_t startZ = 0, index_t startC = 0, index_t startT = 0, index_t startL = 0);
 
 private:
   // img2D contains a 2D image, use x,y,and optional c range to cut it then copy it to img at location (z,c,t)
   // img2D contains all channel if c == -1
-  static void cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, int z, int c, int t);
+  static void cpyImg(const ZImg& img2D, const ZImgRegion& region, ZImg& img, size_t z, index_t c, size_t t);
 
 protected:
   std::vector<ZImgInfo> m_imgInfo;

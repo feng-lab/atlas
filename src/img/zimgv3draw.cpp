@@ -47,7 +47,7 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   uint32_t sz[4];
   readStream(inputFileStream, sz_buffer, 8);
 
-  for (int i = 0; i < 4; ++i) {
+  for (auto i = 0; i < 4; ++i) {
     sz[i] = sz_buffer[i];
   }
 
@@ -130,7 +130,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   uint32_t sz[4];
   readStream(inputFileStream, sz_buffer, 8);
 
-  for (int i = 0; i < 4; ++i) {
+  for (auto i = 0; i < 4; ++i) {
     sz[i] = sz_buffer[i];
   }
   size_t dataOffset = 35;

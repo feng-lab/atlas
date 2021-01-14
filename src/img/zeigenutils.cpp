@@ -2,7 +2,6 @@
 
 #include "zexception.h"
 #include "zstringutils.h"
-#include <QFile>
 
 namespace nim {
 
@@ -17,7 +16,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios::in);
 
-  int nRow = std::count(std::istreambuf_iterator<char>(inputFileStream), std::istreambuf_iterator<char>(), '\n') + 1;
+  auto nRow = std::count(std::istreambuf_iterator<char>(inputFileStream), std::istreambuf_iterator<char>(), '\n') + 1;
   inputFileStream.clear();
   inputFileStream.seekg(0, std::ios::beg);
 
@@ -25,8 +24,8 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool
     throw ZIOException(QString("Error while reading file %1").arg(filename));
   }
 
-  int nCol = 0;
-  int notEmptyLineIdx = 0;
+  Eigen::Index nCol = 0;
+  Eigen::Index notEmptyLineIdx = 0;
   std::string line;
   while (std::getline(inputFileStream, line)) {
     if (nCol == 0) {  //get number of col and make space in mat
@@ -36,7 +35,7 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool
       mat.resize(nRow, nCol);
     }
 
-    int nAData;
+    Eigen::Index nAData;
     RowVectorXd rowVector = readRowVector(line, uSep, &nAData, nCol, strictDelimiter, fillValue, commentStart);
     if (nAData == 0) {
       continue;
@@ -57,15 +56,15 @@ MatrixXd ZEigenUtils::readMatrix(const QString& filename, const char* uSep, bool
   return emptyMat;
 }
 
-RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSep, int* nActualData,
-                                       int nReadData, bool strictDelimiter, double fillValue,
+RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSep, Eigen::Index* nActualData,
+                                       Eigen::Index nReadData, bool strictDelimiter, double fillValue,
                                        const std::string& commentStart)
 {
   RowVectorXd rowVector;
   std::string line = iline.substr(0, iline.find_first_of('\n'));  //extract only one line to process
   // remove comment
   removeComment(line, commentStart, true);
-  int nData = 0;
+  Eigen::Index nData = 0;
   std::string sep;
   std::string possiblespace = " \t\r";
   if (strictDelimiter) {
@@ -121,7 +120,7 @@ RowVectorXd ZEigenUtils::readRowVector(const std::string& iline, const char* uSe
   } else {
     sPos = line.find_first_not_of(sep);   //skip spaces
   }
-  for (int i = 0; i < nReadData; ++i) {
+  for (Eigen::Index i = 0; i < nReadData; ++i) {
     if (!hasData) {
       rowVector(i) = fillValue;
       continue;

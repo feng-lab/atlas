@@ -322,7 +322,7 @@ double ZImgPack::value(size_t x, size_t y, size_t z, size_t c, size_t t, bool mi
       CHECK(m_mipImgs[t] && !m_mipImgs[t]->isEmpty());
       return m_mipImgs[t]->value<double>(x, y, 0, c, 0);
     } else {
-      auto tiit = m_rtToTileIndice.find(std::make_tuple(1_usize, 1_usize, 1_usize, t));
+      auto tiit = m_rtToTileIndice.find(std::make_tuple(1_uz, 1_uz, 1_uz, t));
       if (tiit != m_rtToTileIndice.end()) {
         const std::vector<size_t>& tileIndice = tiit->second;
         for (auto tileIndex : tileIndice) {

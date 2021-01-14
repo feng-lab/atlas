@@ -115,7 +115,7 @@ inline void logLongString(const QString& q)
 {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   for (qsizetype i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
-    int length = std::min(qsizetype(10000), q.size() - i);
+    auto length = std::min(qsizetype(10000), q.size() - i);
     QStringView qView(q.data() + i, length);
     LOG(INFO) << qView;
   }

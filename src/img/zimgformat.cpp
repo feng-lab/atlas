@@ -4,7 +4,6 @@
 #include "zimgsliceprovider.h"
 #include "zimgblockprovider.h"
 #include "zlog.h"
-#include "zimgio.h"
 
 namespace nim {
 
@@ -15,8 +14,8 @@ bool ZImgFormat::canRead(const QString& filename) const
   if (!supportRead())
     return false;
   QStringList exts = extensions();
-  for (int i = 0; i < exts.size(); ++i) {
-    if (filename.endsWith(QString(".") + exts[i], Qt::CaseInsensitive))
+  for (auto& ext : exts) {
+    if (filename.endsWith(QString(".") + ext, Qt::CaseInsensitive))
       return true;
   }
   return false;
@@ -27,8 +26,8 @@ bool ZImgFormat::canWrite(const QString& filename) const
   if (!supportWrite())
     return false;
   QStringList exts = extensions();
-  for (int i = 0; i < exts.size(); ++i) {
-    if (filename.endsWith(QString(".") + exts[i], Qt::CaseInsensitive))
+  for (auto& ext : exts) {
+    if (filename.endsWith(QString(".") + ext, Qt::CaseInsensitive))
       return true;
   }
   return false;
@@ -110,8 +109,8 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
       timeStride = imgInfo.timeByteNumber();
     CHECK(timeStride >= imgInfo.timeByteNumber());
 
-    int tEnd = region.end.t == -1 ? imgInfo.numTimes : region.end.t;
-    for (int t = region.start.t; t < tEnd; ++t) {
+    auto tEnd = region.end.t == -1 ? ZImgRegion::value_type(imgInfo.numTimes) : region.end.t;
+    for (auto t = region.start.t; t < tEnd; ++t) {
       if (region.containsWholeTime(imgInfo) && (dimensionOrder == "XYZCT")) {
         size_t offset = dataOffset + t * timeStride;
         inputFileStream.seekg(offset, std::ios_base::beg);
@@ -121,9 +120,9 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
         inputFileStream.seekg(offset, std::ios_base::beg);
         readStream(inputFileStream, res.timeData<char>(t - region.start.t), res.timeByteNumber());
       } else if (region.containsWholePlane(imgInfo) && (dimensionOrder == "XYZCT")) {
-        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
+        auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;
         // channel by channel
-        for (int c = region.start.c; c < cEnd; ++c) {
+        for (auto c = region.start.c; c < cEnd; ++c) {
           size_t offset = dataOffset + t * timeStride + c * imgInfo.channelByteNumber() +
                           region.start.z * imgInfo.planeByteNumber();
           inputFileStream.seekg(offset, std::ios_base::beg);
@@ -131,12 +130,12 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
                      res.channelByteNumber());
         }
       } else if (region.containsWholeRow(imgInfo)) {
-        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-        int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
+        auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;
+        auto zEnd = region.end.z == -1 ? ZImgRegion::value_type(imgInfo.depth) : region.end.z;
         // plane by plane
-        for (int c = region.start.c; c < cEnd; ++c) {
-          for (int z = region.start.z; z < zEnd; ++z) {
-            size_t offset = 0;
+        for (auto c = region.start.c; c < cEnd; ++c) {
+          for (auto z = region.start.z; z < zEnd; ++z) {
+            size_t offset;
             if ((dimensionOrder == "XYZCT")) {
               offset = dataOffset + t * timeStride +
                        c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
@@ -152,14 +151,14 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
           }
         }
       } else {
-        int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-        int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
-        int yEnd = region.end.y == -1 ? imgInfo.height : region.end.y;
+        auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;
+        auto zEnd = region.end.z == -1 ? ZImgRegion::value_type(imgInfo.depth) : region.end.z;
+        auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(imgInfo.height) : region.end.y;
         // row by row
-        for (int c = region.start.c; c < cEnd; ++c) {
-          for (int z = region.start.z; z < zEnd; ++z) {
-            for (int y = region.start.y; y < yEnd; ++y) {
-              size_t offset = 0;
+        for (auto c = region.start.c; c < cEnd; ++c) {
+          for (auto z = region.start.z; z < zEnd; ++z) {
+            for (auto y = region.start.y; y < yEnd; ++y) {
+              size_t offset;
               if ((dimensionOrder == "XYZCT")) {
                 offset = dataOffset + t * timeStride +
                          c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
@@ -225,17 +224,17 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-    int tEnd = region.end.t == -1 ? imgInfo.numTimes : region.end.t;
-    int cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
-    int zEnd = region.end.z == -1 ? imgInfo.depth : region.end.z;
-    int yEnd = region.end.y == -1 ? imgInfo.height : region.end.y;
-    int xEnd = region.end.x == -1 ? imgInfo.width : region.end.x;
+    auto tEnd = region.end.t == -1 ? ZImgRegion::value_type(imgInfo.numTimes) : region.end.t;
+    auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;
+    auto zEnd = region.end.z == -1 ? ZImgRegion::value_type(imgInfo.depth) : region.end.z;
+    auto yEnd = region.end.y == -1 ? ZImgRegion::value_type(imgInfo.height) : region.end.y;
+    auto xEnd = region.end.x == -1 ? ZImgRegion::value_type(imgInfo.width) : region.end.x;
     // pixel by pixel
-    for (int t = region.start.t; t < tEnd; ++t) {
-      for (int c = region.start.c; c < cEnd; ++c) {
-        for (int z = region.start.z; z < zEnd; ++z) {
-          for (int y = region.start.y; y < yEnd; ++y) {
-            for (int x = region.start.x; x < xEnd; ++x) {
+    for (auto t = region.start.t; t < tEnd; ++t) {
+      for (auto c = region.start.c; c < cEnd; ++c) {
+        for (auto z = region.start.z; z < zEnd; ++z) {
+          for (auto y = region.start.y; y < yEnd; ++y) {
+            for (auto x = region.start.x; x < xEnd; ++x) {
               size_t offset = dataOffset + t * dimensionStrides[4] +
                               c * dimensionStrides[3] + z * dimensionStrides[2] +
                               y * dimensionStrides[1] + x * dimensionStrides[0];
@@ -287,7 +286,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
 
       switch (img.voxelByteNumber()) {
         case 1: {
-          uint8_t* des = img.channelData<uint8_t>(c, t);
+          auto* des = img.channelData<uint8_t>(c, t);
           const uint8_t* src = bufImg.channelData<uint8_t>(0, t) + srcC;
           size_t numCh = img.numChannels();
           size_t i = 0;
@@ -299,7 +298,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
         }
           break;
         case 2: {
-          uint16_t* des = img.channelData<uint16_t>(c, t);
+          auto* des = img.channelData<uint16_t>(c, t);
           const uint16_t* src = bufImg.channelData<uint16_t>(0, t) + srcC;
           size_t numCh = img.numChannels();
           size_t i = 0;
@@ -311,7 +310,7 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
         }
           break;
         default: {
-          uint8_t* des = img.channelData<uint8_t>(c, t);
+          auto* des = img.channelData<uint8_t>(c, t);
           const uint8_t* src = bufImg.channelData<uint8_t>(0, t) + srcC * img.voxelByteNumber();
           size_t voxelByte = img.voxelByteNumber();
           size_t srcStride = img.numChannels() * voxelByte;
@@ -346,8 +345,8 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
       size_t srcC = c;
       switch (img.voxelByteNumber()) {
         case 1: {
-          uint8_t* des = img.channelData<uint8_t>(0, t) + srcC;
-          const uint8_t* src = bufImg.channelData<uint8_t>(c, t);
+          auto* des = img.channelData<uint8_t>(0, t) + srcC;
+          const auto* src = bufImg.channelData<uint8_t>(c, t);
           size_t numCh = img.numChannels();
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
@@ -358,8 +357,8 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
         }
           break;
         case 2: {
-          uint16_t* des = img.channelData<uint16_t>(0, t) + srcC;
-          const uint16_t* src = bufImg.channelData<uint16_t>(c, t);
+          auto* des = img.channelData<uint16_t>(0, t) + srcC;
+          const auto* src = bufImg.channelData<uint16_t>(c, t);
           size_t numCh = img.numChannels();
           size_t i = 0;
           while (i++ < img.channelVoxelNumber()) {
@@ -370,8 +369,8 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
         }
           break;
         default: {
-          uint8_t* des = img.channelData<uint8_t>(0, t) + srcC * img.voxelByteNumber();
-          const uint8_t* src = bufImg.channelData<uint8_t>(c, t);
+          auto* des = img.channelData<uint8_t>(0, t) + srcC * img.voxelByteNumber();
+          const auto* src = bufImg.channelData<uint8_t>(c, t);
           size_t voxelByte = img.voxelByteNumber();
           size_t desStride = img.numChannels() * voxelByte;
           size_t i = 0;
@@ -487,7 +486,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                 desC = 0;
               }
             }
-            uint8_t* desLoc = img.channelData<uint8_t>(desC, desLocs[4]);
+            auto* desLoc = img.channelData<uint8_t>(desC, desLocs[4]);
             std::memcpy(desLoc, srcLoc, srcStride);
             srcLoc += srcStride;
           }
@@ -507,7 +506,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                   desC = 0;
                 }
               }
-              uint8_t* desLoc = img.planeData<uint8_t>(desLocs[2], desC, desLocs[4]);
+              auto* desLoc = img.planeData<uint8_t>(desLocs[2], desC, desLocs[4]);
               std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
@@ -531,7 +530,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                   desC = 0;
                 }
               }
-              uint8_t* desLoc = img.rowData<uint8_t>(desLocs[1], desLocs[2], desC, desLocs[4]);
+              auto* desLoc = img.rowData<uint8_t>(desLocs[1], desLocs[2], desC, desLocs[4]);
               std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
@@ -558,7 +557,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                   desC = 0;
                 }
               }
-              uint8_t* desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
+              auto* desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
               std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }

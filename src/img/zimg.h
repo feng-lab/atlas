@@ -878,7 +878,7 @@ public:
   }
 
   template<typename T>
-  inline T outBoundValue(int x, int y, int z, int c = 0, int t = 0,
+  inline T outBoundValue(index_t x, index_t y, index_t z, index_t c = 0, index_t t = 0,
                          PadOption padOption = PadOption::Constant, T padValue = T(0)) const
   {
     if (padOption == PadOption::Constant) {
@@ -899,9 +899,9 @@ public:
   // operate on img view is same as operate on partial img
   // img view will automatically become to a real img after some operations that need memory reallocation
   // use img view to work with part of img
-  [[nodiscard]] ZImg createView(int c = -1, int t = -1);
+  [[nodiscard]] ZImg createView(index_t c = -1, index_t t = -1);
 
-  [[nodiscard]] ZImg createView(int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg createView(index_t c = -1, index_t t = -1) const;
 
   // view of one single channel slice
   [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t);
@@ -1017,15 +1017,15 @@ public:
   }
 
   // extract part of img
-  [[nodiscard]] ZImg extractVoxel(size_t x, size_t y, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractVoxel(size_t x, size_t y, index_t z = -1, index_t c = -1, index_t t = -1) const;
 
-  [[nodiscard]] ZImg extractCol(size_t x, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractCol(size_t x, index_t z = -1, index_t c = -1, index_t t = -1) const;
 
-  [[nodiscard]] ZImg extractRow(size_t y, int z = -1, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractRow(size_t y, index_t z = -1, index_t c = -1, index_t t = -1) const;
 
-  [[nodiscard]] ZImg extractPlane(size_t z, int c = -1, int t = -1) const;
+  [[nodiscard]] ZImg extractPlane(size_t z, index_t c = -1, index_t t = -1) const;
 
-  [[nodiscard]] ZImg extractChannel(size_t c, int t = -1) const;
+  [[nodiscard]] ZImg extractChannel(size_t c, index_t t = -1) const;
 
   [[nodiscard]] ZImg extractTime(size_t t) const;
 
@@ -1074,9 +1074,9 @@ public:
   static ZImg combine(const std::vector<const ZImg*>& imgs, ImgMergeMode mode);
 
   // projection
-  [[nodiscard]] ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, int start = -1, int end = -1) const;
+  [[nodiscard]] ZImg projectAlongDim(Dimension dim, ImgMergeMode mode, index_t start = -1, index_t end = -1) const;
 
-  [[nodiscard]] ZImg maximumZProjection(int start = -1, int end = -1) const;
+  [[nodiscard]] ZImg maximumZProjection(index_t start = -1, index_t end = -1) const;
 
   // map [minData maxData] to [dataRangeMin, dataRangeMax]
   // for float img, dataRangeMin is 0.0, dataRangeMax is 1.0
@@ -1647,7 +1647,7 @@ public:
 
   // overload
   template<typename TValue = double>
-  inline TValue valueWithPad(int x, int y, int z, int c = 0, int t = 0,
+  inline TValue valueWithPad(index_t x, index_t y, index_t z, index_t c = 0, index_t t = 0,
                              PadOption padOption = PadOption::Constant, TValue padValue = TValue(0)) const
   {
     return valueWithPad(ZVoxelCoordinate(x, y, z, c, t), padOption, padValue);

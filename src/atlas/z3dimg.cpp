@@ -581,9 +581,9 @@ void Z3DImg::readVolumes()
     m_isVolumeDownsampled = true;
 
     if (m_imgPack.imgInfo().depth > 1) {
-      widthScale = info.width <= 512_usize ? 1.0 : 512.0 / info.width;
-      heightScale = info.height <= 512_usize ? 1.0 : 512.0 / info.height;
-      depthScale = info.depth <= 512_usize ? 1.0 : 512.0 / info.depth;
+      widthScale = info.width <= 512_uz ? 1.0 : 512.0 / info.width;
+      heightScale = info.height <= 512_uz ? 1.0 : 512.0 / info.height;
+      depthScale = info.depth <= 512_uz ? 1.0 : 512.0 / info.depth;
     }
 
     //return;

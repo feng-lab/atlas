@@ -40,15 +40,15 @@ public:
   { m_detectedSomaPunctaFileName = fn; }
 
   // if not set, auto threshold will be used
-  void setPunctaThreshold(int thre)
+  void setPunctaThreshold(index_t thre)
   { m_punctaThreshold = thre; }
 
   // if not set, auto threshold will be used
-  void setSomaPunctaThreshold(int thre)
+  void setSomaPunctaThreshold(index_t thre)
   { m_somaPunctaThreshold = thre; }
 
   // miminum voxel number to goto split step, default is 20 voxels
-  void setSplitThreshold(int thre)
+  void setSplitThreshold(index_t thre)
   { m_splitSizeThreshold = thre; }
 
   // confidence region of gaussian, used to estimate punctum radius, default is 0.95
@@ -64,7 +64,7 @@ public:
   { m_overlapRateThreshold = t; }
 
   // for watershed
-  void setSeedSizeThreshold(int i)
+  void setSeedSizeThreshold(index_t i)
   { m_seedSizeThreshold = i; }
 
   // default is true
@@ -73,7 +73,7 @@ public:
 
   // optional, if set, soma will be detected and puncta in soma area will be
   // detected differently.
-  void setDendriteChannel(int c)
+  void setDendriteChannel(index_t c)
   { m_dendriteChannel = c; }
 
   // for soma detection
@@ -98,8 +98,9 @@ public:
   void setAmbiguousFactor(double f)
   { m_ambiguousFactor = f; }
 
-  static double getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1, Eigen::MatrixXd cov1, Eigen::RowVectorXd m2,
-                                                Eigen::MatrixXd cov2, double conf = 0.8);
+  static double getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1, const Eigen::MatrixXd& cov1,
+                                                Eigen::RowVectorXd m2, const Eigen::MatrixXd& cov2,
+                                                double conf = 0.8);
 
 protected:
   void doWork() override;
@@ -113,7 +114,7 @@ private:
   // img will be cleared after using
   // minLoc is the offset of img related to rawimg, so img can be a subimg of rawimg
   void detectImpl(const ZImg& rawimg, size_t pc, size_t t,
-                  ZImg& img, int thre, ZPuncta& resList, ZPuncta& filteredList,
+                  ZImg& img, index_t thre, ZPuncta& resList, ZPuncta& filteredList,
                   const Eigen::RowVectorXi& minLoc, double weight, double baseWeight, double totalSubOpsWeight);
 
 #if 0
@@ -177,17 +178,17 @@ private:
   size_t m_scene = 0;
 
   // parameters
-  int m_punctaThreshold = -1;
-  int m_somaPunctaThreshold = -1;
-  int m_splitSizeThreshold = 20;
+  index_t m_punctaThreshold = -1;
+  index_t m_somaPunctaThreshold = -1;
+  index_t m_splitSizeThreshold = 20;
   double m_confRadius = 0.95;
   double m_confOverlapArea = 0.8;
   double m_overlapRateThreshold = 0.8;
-  int m_seedSizeThreshold = 6;
+  index_t m_seedSizeThreshold = 6;
   bool m_useMultithreading = true;
 
   // parameters for soma detection
-  int m_dendriteChannel = -1;
+  index_t m_dendriteChannel = -1;
   double m_maxDendriteTubeRadius = 2.6;  // in um
   double m_dendriteThreshold = 100;
 

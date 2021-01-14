@@ -261,10 +261,10 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       }
     } else if (padOption == PadOption::Circular) { //circular
       // left
-      int refX = width;
+      int64_t refX = width;
       for (size_t i = leftPad; i-- > 0;) {
         --refX;
-        refX = refX < 0 ? int(width) - 1 : refX;
+        refX = refX < 0 ? int64_t(width) - 1 : refX;
         for (size_t j = 0; j < height; ++j) {
           imgOut[(j + upPad) * desWidth + i] = img[j * width + refX];
         }
@@ -279,10 +279,10 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
         }
       }
       // up
-      int refY = height;
+      int64_t refY = height;
       for (size_t j = upPad; j-- > 0;) {
         --refY;
-        refY = refY < 0 ? int(height) - 1 : refY;
+        refY = refY < 0 ? int64_t(height) - 1 : refY;
         std::memcpy(imgOut + j * desWidth,
                     imgOut + (refY + upPad) * desWidth,
                     sizeof(TPixel) * desWidth);
@@ -703,7 +703,7 @@ template<typename TPixel, typename TPixelOut>
 void image2DGaussianFilter(const TPixel* img, size_t width, size_t height,
                            double kernelSigmaX, double kernelSigmaY,
                            TPixelOut* imgOut,
-                           int kernelWidth = -1, int kernelHeight = -1,
+                           int32_t kernelWidth = -1, int32_t kernelHeight = -1,
                            PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                            bool useMultithreading = true)
 {
@@ -739,7 +739,7 @@ template<typename TPixel, typename TPixelOut>
 void image2DLoGFilter(const TPixel* img, size_t width, size_t height,
                       double kernelSigmaX, double kernelSigmaY,
                       TPixelOut* imgOut,
-                      int kernelWidth = -1, int kernelHeight = -1,
+                      int32_t kernelWidth = -1, int32_t kernelHeight = -1,
                       PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
                       bool useMultithreading = true)
 {

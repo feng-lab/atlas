@@ -10,7 +10,6 @@
 #include "zimagetransformresolve.h"
 #include <algorithm>
 #include <memory>
-#include <numeric>
 #include <utility>
 
 namespace nim {
@@ -105,7 +104,7 @@ void ZChromaticShiftCorrection::write(json::object& jo) const
 
 template<typename ImagePixelType>
 void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcImg,
-                                                                int movingChannel, const QString& presetName)
+                                                                size_t movingChannel, const QString& presetName)
 {
   std::map<QString, std::vector<double>> presetNameToParameters = {
     {"40x_1z", {-0.481418, 0.702386, 0.}},
@@ -153,7 +152,7 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
 }
 
 template<typename ImagePixelType>
-void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, int fixedChannel, int movingChannel)
+void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, size_t fixedChannel, size_t movingChannel)
 {
   LOG(INFO) << "";
   LOG(INFO) << "Registering Channel " << (movingChannel) << " to Channel " << (fixedChannel);
@@ -162,8 +161,8 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, int fixedChanne
   std::vector<double> fixedImageData(length);
   std::vector<double> movingImageData(length);
 
-  const ImagePixelType* fixedImageDataSrc = srcImg.channelData<ImagePixelType>(fixedChannel);
-  const ImagePixelType* movingImageDataSrc = srcImg.channelData<ImagePixelType>(movingChannel);
+  const auto* fixedImageDataSrc = srcImg.channelData<ImagePixelType>(fixedChannel);
+  const auto* movingImageDataSrc = srcImg.channelData<ImagePixelType>(movingChannel);
   double fixedMin = std::numeric_limits<double>::max();
   double fixedMax = std::numeric_limits<double>::lowest();
   double movingMin = fixedMin;
@@ -315,7 +314,7 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, int fixedChanne
   registration.setCostFunction(costFunction);
   registration.setOptimizer(m_optimizer);
   registration.setNumScales(m_numScales);
-  registration.setInitialTransform(*transform.get());
+  registration.setInitialTransform(*transform);
 
   ZImg fixedImg;
   fixedImg.wrapData(filteredFixedImageData.data(), srcImg.width(), srcImg.height(), srcImg.depth());
@@ -352,7 +351,7 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
   m_maxValue = std::numeric_limits<double>::lowest();
   size_t length = srcImg.channelVoxelNumber();
   for (size_t i = 0; i < srcImg.numChannels(); ++i) {
-    const ImagePixelType* data = srcImg.channelData<ImagePixelType>(i);
+    const auto* data = srcImg.channelData<ImagePixelType>(i);
     std::pair<const ImagePixelType*, const ImagePixelType*> minmax =
       minMaxElement(data, data + length);
     m_channelInfos[i].min = *minmax.first;

@@ -17,7 +17,7 @@ public:
                      const std::vector<Vertex>& goals, double weight, bool useVoxelSize, const ZNeighborhood& nb)
     : m_region(region), m_regionInfo(regionInfo), m_goals(goals), m_weight(weight), m_useVoxelSize(useVoxelSize)
   {
-    if (nb.size() == 2_usize || nb.size() == 3_usize) {
+    if (nb.size() == 2_uz || nb.size() == 3_uz) {
       // no diagonal connection
       m_wxyz = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY + m_regionInfo.voxelSizeZ) : 3.0;
       m_wxy = m_useVoxelSize ? (m_regionInfo.voxelSizeX + m_regionInfo.voxelSizeY) : 2.0;

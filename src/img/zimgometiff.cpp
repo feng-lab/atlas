@@ -57,7 +57,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
   //LOG(INFO) << m_imgInfo.toQString() << " " << m_dimensionOrder;
 }
 
-bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l)
+bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l)
 {
   if (m_ifdIdxPosMap.find(ifdIdx) == m_ifdIdxPosMap.end())
     return false;
@@ -92,8 +92,8 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, const ZImgW
   checkImgBeforeWriting(filename, img.info(), paras);
 
   ZTiffWriter tiffWriter;
-  int extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (img.byteNumber() > 1024_usize * 1024 * 3600) {
+  int32_t extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
+  if (img.byteNumber() > 1024_uz * 1024 * 3600) {
     tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
     tiffWriter.startWriting(filename, paras.compression, extraSample, false);
@@ -119,8 +119,8 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& img
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
 
   ZTiffWriter tiffWriter;
-  int extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
-  if (imgSliceProvider.imgInfo().byteNumber() > 1024_usize * 1024 * 3600) {
+  int32_t extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
+  if (imgSliceProvider.imgInfo().byteNumber() > 1024_uz * 1024 * 3600) {
     tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
     tiffWriter.startWriting(filename, paras.compression, extraSample, false);
@@ -249,35 +249,35 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
   m_omeImgInfo.height = 1;
   if (attributes.hasAttribute("SizeX")) {
     bool ok;
-    int sz = attributes.value("SizeX").toString().toInt(&ok);
+    auto sz = attributes.value("SizeX").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome SizeX");
     m_omeImgInfo.width = sz;
   }
   if (attributes.hasAttribute("SizeY")) {
     bool ok;
-    int sz = attributes.value("SizeY").toString().toInt(&ok);
+    auto sz = attributes.value("SizeY").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome SizeY");
     m_omeImgInfo.height = sz;
   }
   if (attributes.hasAttribute("SizeZ")) {
     bool ok;
-    int sz = attributes.value("SizeZ").toString().toInt(&ok);
+    auto sz = attributes.value("SizeZ").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome SizeZ");
     m_omeImgInfo.depth = sz;
   }
   if (attributes.hasAttribute("SizeC")) {
     bool ok;
-    int sz = attributes.value("SizeC").toString().toInt(&ok);
+    auto sz = attributes.value("SizeC").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome SizeC");
     m_omeImgInfo.numChannels = sz;
   }
   if (attributes.hasAttribute("SizeT")) {
     bool ok;
-    int sz = attributes.value("SizeT").toString().toInt(&ok);
+    auto sz = attributes.value("SizeT").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome SizeT");
     m_omeImgInfo.numTimes = sz;
@@ -346,14 +346,14 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
   size_t planeCount = tiff.ifds().size();
   if (attributes.hasAttribute("IFD")) {
     bool ok;
-    ifd = attributes.value("IFD").toString().toInt(&ok);
+    ifd = attributes.value("IFD").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome TiffData IFD");
     planeCount = 1;
   }
   if (attributes.hasAttribute("PlaneCount")) {
     bool ok;
-    planeCount = attributes.value("PlaneCount").toString().toInt(&ok);
+    planeCount = attributes.value("PlaneCount").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome TiffData IFD");
   }
@@ -362,28 +362,28 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
   size_t firstC = 0;
   if (attributes.hasAttribute("FirstZ")) {
     bool ok;
-    firstZ = attributes.value("FirstZ").toString().toInt(&ok);
+    firstZ = attributes.value("FirstZ").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome TiffData FirstZ");
   }
   if (attributes.hasAttribute("FirstT")) {
     bool ok;
-    firstT = attributes.value("FirstT").toString().toInt(&ok);
+    firstT = attributes.value("FirstT").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome TiffData FirstT");
   }
   if (attributes.hasAttribute("FirstC")) {
     bool ok;
-    firstC = attributes.value("FirstC").toString().toInt(&ok);
+    firstC = attributes.value("FirstC").toString().toULongLong(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome TiffData FirstC");
   }
 
   for (size_t i = ifd; i < ifd + planeCount; ++i) {
-    int t;
-    int c;
-    int l;
-    int z;
+    index_t t;
+    index_t c;
+    index_t l;
+    index_t z;
     if (IFDToLoc(i, z, c, t, l, ifd, m_dimensionOrder, m_omeImgInfo, 1,
                  firstZ, firstC, firstT, 0)) {
       //LOG(INFO) << i << " " << z << " " << c << " " << t << " " << l << " " << m_dimensionOrder;
@@ -405,7 +405,7 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
   }
   if (attributes.hasAttribute("Color")) {
     bool ok;
-    int color = attributes.value("Color").toString().toInt(&ok);
+    int32_t color = attributes.value("Color").toString().toInt(&ok);
     if (!ok)
       throw ZIOException("Can not parse ome channel Color");
     col4 col;
@@ -475,7 +475,7 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
     col4 col = info.channelColors[i];
     col.a = 0;
     std::swap(col.r, col.b);
-    int color = bit_cast<int>(col);
+    int32_t color = bit_cast<int32_t>(col);
     xml.writeAttribute("Color", QString("%1").arg(color));
     xml.writeEndElement();
   }

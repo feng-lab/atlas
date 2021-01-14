@@ -8,19 +8,19 @@ namespace nim {
 // http://research.mssm.edu/cnic/swc.html
 struct SwcNode
 {
-  explicit SwcNode(int id_ = -1, int type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
-                   double radius_ = -1, int parentID_ = -2)
+  explicit SwcNode(index_t id_ = -1, index_t type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
+                   double radius_ = -1, index_t parentID_ = -2)
     : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
   {}
 
-  int id = -1;
-  int type = -1;
+  int64_t id = -1;
+  int64_t type = -1;
   double x = 0;
   double y = 0;
   double z = 0;
   double radius = -1;
-  int parentID = -2;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
-  int label = -1;
+  int64_t parentID = -2;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
+  int64_t label = -1;
   bool selected = false;
 };
 
@@ -30,16 +30,16 @@ public:
   using SwcTreeNode = ZSwc::Iterator;
   using ConstSwcTreeNode = ZSwc::ConstIterator;
 
-  static constexpr int SomaType = 1;
-  static constexpr int AxonType = 2;
-  static constexpr int BasalDendriteType = 3;
-  static constexpr int ApicalDendriteType = 4;
-  static constexpr int MainTrunkType = 5;
-  static constexpr int BasalIntermediateType = 6;
-  static constexpr int BasalTerminalType = 7;
-  static constexpr int ApicalObliqueIntermediateType = 8;
-  static constexpr int ApicalObliqueTerminalType = 9;
-  static constexpr int ApicalTuftType = 10;
+  static constexpr int64_t SomaType = 1;
+  static constexpr int64_t AxonType = 2;
+  static constexpr int64_t BasalDendriteType = 3;
+  static constexpr int64_t ApicalDendriteType = 4;
+  static constexpr int64_t MainTrunkType = 5;
+  static constexpr int64_t BasalIntermediateType = 6;
+  static constexpr int64_t BasalTerminalType = 7;
+  static constexpr int64_t ApicalObliqueIntermediateType = 8;
+  static constexpr int64_t ApicalObliqueTerminalType = 9;
+  static constexpr int64_t ApicalTuftType = 10;
 
   ZSwc() = default;
 
@@ -69,7 +69,7 @@ public:
 
   // pos must not be null
   template<typename Iter>
-  static int parentID(const Iter& pos)
+  static index_t parentID(const Iter& pos)
   { return isNull(parent(pos)) ? -1 : parent(pos)->id; }
 
   SwcTreeNode thickestNode();
@@ -77,10 +77,10 @@ public:
   SwcTreeNode thickestNode(const SwcTreeNode& subtree);
 
   // set type of soma as somaType, other as otherType, set root to thickest node
-  void labelSomaAndOthers(double radiusThre = 0, int somaType = SomaType, int otherType = AxonType);
+  void labelSomaAndOthers(double radiusThre = 0, int64_t somaType = SomaType, int64_t otherType = AxonType);
 
   // before calling this, soma nodes type must be somaType and other nodes type must not be somaType
-  void resortPyramidal(int basalType = BasalDendriteType, int apicalType = ApicalDendriteType, int somaType = SomaType);
+  void resortPyramidal(int64_t basalType = BasalDendriteType, int64_t apicalType = ApicalDendriteType, int64_t somaType = SomaType);
 
   void resortID();
 

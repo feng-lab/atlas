@@ -39,7 +39,7 @@ protected:
 
   void detectImgInfo(ZTiff& tiff) override;
 
-  bool mapIFDToImgLocation(size_t ifdIdx, int& z, int& c, int& t, int& l) override;
+  bool mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l) override;
 
 protected:
   void readOmeInfo(ZTiff& tiff);

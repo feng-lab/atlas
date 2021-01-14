@@ -12,12 +12,12 @@ inline bool isNumber(QChar c)
   return c >= QChar('0') && c <= QChar('9');
 }
 
-int lastInteger(const QString& str)
+int64_t lastInteger(const QString& str)
 {
-  int size = str.size();
-  int endNumPos = -1;
-  int startNumPos = -1;
-  int index = size - 1;
+  auto size = str.size();
+  nim::index_t endNumPos = -1;
+  nim::index_t startNumPos = -1;
+  auto index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
       if (endNumPos == -1) {
@@ -37,7 +37,7 @@ int lastInteger(const QString& str)
   if (startNumPos == -1)
     return 0;
 
-  int res = str.mid(startNumPos, endNumPos - startNumPos + 1).toInt();
+  auto res = str.mid(startNumPos, endNumPos - startNumPos + 1).toLongLong();
   if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
     res = -res;
   return res;
@@ -54,18 +54,18 @@ const QCollator& myCollator()
 
 namespace nim {
 
-QString randomString(int minLength, int maxLength)
+QString randomString(index_t minLength, index_t maxLength)
 {
   static const QString possibleCharacters(
     R"(ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`~!@#$%^&*()-_=+[{]}\|;:'",<.>/? )");
   QString res;
-  minLength = std::max(0, minLength);
+  minLength = std::max(0_z, minLength);
   if (maxLength >= minLength) {
-    int length = ZRandom::instance().randInt<int>(maxLength, minLength);
+    auto length = ZRandom::instance().randInt(maxLength, minLength);
     if (length > 0) {
       res.resize(length);
       std::uniform_int_distribution<int> dist(0, possibleCharacters.size() - 1);
-      for (int i = 0; i < length; ++i) {
+      for (index_t i = 0; i < length; ++i) {
         res[i] = possibleCharacters.at(dist(ZRandom::instance().engine()));
       }
     }
@@ -143,10 +143,10 @@ bool lastIntegerLessThan(const QString& s1, const QString& s2)
 
 QString replaceLastInteger(const QString& str, const QString& replacement)
 {
-  int size = str.size();
-  int endNumPos = -1;
-  int startNumPos = -1;
-  int index = size - 1;
+  auto size = str.size();
+  index_t endNumPos = -1;
+  index_t startNumPos = -1;
+  auto index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
       if (endNumPos == -1) {
@@ -241,10 +241,10 @@ void removeComment(std::string& line, const std::string& commentStart, bool chec
 void removeComment(QString& line, const QString& commentStart, bool checkSpecialNumber)
 {
   if (commentStart == "#" && checkSpecialNumber) {
-    std::vector<int> poses;
+    std::vector<index_t> poses;
 
     QString str("1.#inf");
-    int idx = -1;
+    index_t idx = -1;
     do {
       idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
@@ -288,12 +288,12 @@ void removeComment(QString& line, const QString& commentStart, bool checkSpecial
       line.truncate(idx);
     }
 
-    for (size_t i = 0; i < poses.size(); ++i) {
-      if (poses[i] < line.size())
-        line[poses[i]] = QChar('#');
+    for (auto pose : poses) {
+      if (pose < line.size())
+        line[pose] = QChar('#');
     }
   } else {
-    int idx = line.indexOf(commentStart);
+    auto idx = line.indexOf(commentStart);
     if (idx >= 0) {
       line.truncate(idx);
     }

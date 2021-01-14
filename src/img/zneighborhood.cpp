@@ -144,9 +144,9 @@ void ZNeighborhood::set(size_t left, size_t right, size_t up, size_t down,
   m_frontExtend = front;
   m_backExtend = back;
   m_offsets.clear();
-  for (int zoffset = -static_cast<int>(front); zoffset < 1 + static_cast<int>(back); ++zoffset) {
-    for (int yoffset = -static_cast<int>(up); yoffset < 1 + static_cast<int>(down); ++yoffset) {
-      for (int xoffset = -static_cast<int>(left); xoffset < 1 + static_cast<int>(right); ++xoffset) {
+  for (auto zoffset = -static_cast<index_t>(front); zoffset < 1 + static_cast<index_t>(back); ++zoffset) {
+    for (auto yoffset = -static_cast<index_t>(up); yoffset < 1 + static_cast<index_t>(down); ++yoffset) {
+      for (auto xoffset = -static_cast<index_t>(left); xoffset < 1 + static_cast<index_t>(right); ++xoffset) {
         if (xoffset == 0 && yoffset == 0 && zoffset == 0 && !includeCenter)
           continue;
         m_offsets.emplace_back(xoffset, yoffset, zoffset);
@@ -172,12 +172,12 @@ void ZNeighborhood::set(const std::vector<ZVoxelCoordinate>& offsets)
       minOffset = min(minOffset, m_offsets[i]);
       maxOffset = max(maxOffset, m_offsets[i]);
     }
-    m_leftExtend = std::max(0, -(minOffset.x));
-    m_rightExtend = std::max(0, maxOffset.x);
-    m_upExtend = std::max(0, -(minOffset.y));
-    m_downExtend = std::max(0, maxOffset.y);
-    m_frontExtend = std::max(0, -(minOffset.z));
-    m_backExtend = std::max(0, maxOffset.z);
+    m_leftExtend = std::max(0_z, -(minOffset.x));
+    m_rightExtend = std::max(0_z, maxOffset.x);
+    m_upExtend = std::max(0_z, -(minOffset.y));
+    m_downExtend = std::max(0_z, maxOffset.y);
+    m_frontExtend = std::max(0_z, -(minOffset.z));
+    m_backExtend = std::max(0_z, maxOffset.z);
   }
 }
 

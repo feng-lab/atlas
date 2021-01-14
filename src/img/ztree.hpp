@@ -1713,9 +1713,9 @@ public:
       }
       chain2.push_back(it);
     }
-    int i1 = chain1.size() - 1;
-    int i2 = chain2.size() - 1;
-    CHECK(i1 >= 0 && i2 >= 0);
+    CHECK(!chain1.empty() && !chain2.empty());
+    index_t i1 = chain1.size() - 1;
+    index_t i2 = chain2.size() - 1;
 
     TreeNode* res = nullptr;
     while (i1 >= 0 && i2 >= 0 && chain1[i1] == chain2[i2]) {

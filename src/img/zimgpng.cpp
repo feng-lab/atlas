@@ -5,7 +5,6 @@
 #include "zbenchtimer.h"
 #include <png.h>
 #include <folly/ScopeGuard.h>
-#include <boost/align/aligned_allocator.hpp>
 
 namespace {
 
@@ -54,13 +53,13 @@ void readMetaDataFromState(png_const_structrp pngPtr, png_inforp infoPtr, png_in
   png_textp textPtr;
   int numText;
   if (png_get_text(pngPtr, infoPtr, &textPtr, &numText)) {
-    for (int i = 0; i < numText; ++i) {
+    for (auto i = 0; i < numText; ++i) {
       meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
                                         QString::fromUtf8(textPtr[i].text)));
     }
   }
   if (png_get_text(pngPtr, endPtr, &textPtr, &numText)) {
-    for (int i = 0; i < numText; ++i) {
+    for (auto i = 0; i < numText; ++i) {
       meta.attachToTopLevel(ZImgMetatag(QString::fromUtf8(textPtr[i].key),
                                         QString::fromUtf8(textPtr[i].text)));
     }
@@ -72,7 +71,7 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
   info.width = png_get_image_width(pngPtr, infoPtr);
   info.height = png_get_image_height(pngPtr, infoPtr);
   info.depth = 1;
-  int bitDepth = png_get_bit_depth(pngPtr, infoPtr);
+  auto bitDepth = png_get_bit_depth(pngPtr, infoPtr);
   if (bitDepth != 16 && bitDepth != 8 && bitDepth != 4 && bitDepth != 2 && bitDepth != 1) {
     throw nim::ZIOException(QString("invalid bit depth").arg(bitDepth));
   }
@@ -101,7 +100,6 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
       break;
     default:
       throw ZIOException("not supported png colortype");
-      break;
   }
   if (png_get_valid(pngPtr, infoPtr, PNG_INFO_tRNS) &&
       colorType != PNG_COLOR_TYPE_GRAY_ALPHA &&
@@ -134,7 +132,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
     for (size_t c = 0; c < img.numChannels(); ++c) {
       switch (img.voxelByteNumber()) {
         case 1: {
-          uint8_t* des = img.channelData<uint8_t>(c);
+          auto* des = img.channelData<uint8_t>(c);
           const uint8_t* src = bufImg + c + region.start.c;
           size_t numCh = img.numChannels();
           size_t i = 0;
@@ -145,7 +143,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
         }
           break;
         case 2: {
-          uint16_t* des = img.channelData<uint16_t>(c);
+          auto* des = img.channelData<uint16_t>(c);
           const uint16_t* src = reinterpret_cast<uint16_t*>(bufImg) + c + region.start.c;
           size_t numCh = img.numChannels();
           size_t i = 0;
@@ -157,7 +155,6 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
           break;
         default:
           throw ZIOException(QString("Not support png with voxelByteNumber %1").arg(img.voxelByteNumber()));
-          break;
       }
     }
   } else {
@@ -165,7 +162,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
       for (size_t c = 0; c < img.numChannels(); ++c) {
         for (size_t y = 0; y < img.height(); ++y) {
           for (size_t x = 0; x < img.width(); ++x) {
-            uint8_t* des = img.data<uint8_t>(x, y, 0, c);
+            auto* des = img.data<uint8_t>(x, y, 0, c);
             uint8_t* src = bufImg + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
                            (x + region.start.x) * info.numChannels + c + region.start.c;
             *des = *src;
@@ -176,7 +173,7 @@ void separateChannel(uint8_t* bufImg, const ZImgInfo& info, const ZImgRegion& re
       for (size_t c = 0; c < img.numChannels(); ++c) {
         for (size_t y = 0; y < img.height(); ++y) {
           for (size_t x = 0; x < img.width(); ++x) {
-            uint16_t* des = img.data<uint16_t>(x, y, 0, c);
+            auto* des = img.data<uint16_t>(x, y, 0, c);
             uint16_t* src =
               reinterpret_cast<uint16_t*>(bufImg) + (y + region.start.y) * info.rowVoxelNumber() * info.numChannels +
               (x + region.start.x) * info.numChannels + c + region.start.c;

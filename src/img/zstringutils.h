@@ -1,12 +1,12 @@
 #pragma once
 
-#include "zexception.h"
+#include "zglobal.h"
 
 namespace nim {
 
-QString randomString(int minLength, int maxLength);
+QString randomString(index_t minLength, index_t maxLength);
 
-inline QString randomString(int size)
+inline QString randomString(index_t size)
 { return randomString(size, size); }
 
 bool naturalSortLessThan(const QString& s1, const QString& s2);

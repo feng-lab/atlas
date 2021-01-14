@@ -77,7 +77,7 @@ ZStack *readZStack(const std::string &filename, ZStack *data, QString *error)
     ZImg img(QString::fromStdString(filename));
 
     // workaround QImage limit
-    if (img.width() * img.height() * 4 >= 1024_usize*1024*1024*2) {
+    if (img.width() * img.height() * 4 >= 1024_uz*1024*1024*2) {
       double scale =  (1024.0*1024*1024*2) / ((double)img.width() * img.height() * 4);
       size_t newWidth = static_cast<size_t>(std::floor(img.width() * scale));
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));
@@ -115,7 +115,7 @@ ZStack *readZStack(const QStringList &fileList, Dimension catDim, QString *error
     ZImg img;
     img.loadSequence(fileList, catDim);
     // workaround QImage limit
-    if (img.width() * img.height() * 4 >= 1024_usize*1024*1024*2) {
+    if (img.width() * img.height() * 4 >= 1024_uz*1024*1024*2) {
       double scale =  (1024.0*1024*1024*2) / ((double)img.width() * img.height() * 4);
       size_t newWidth = static_cast<size_t>(std::floor(img.width() * scale));
       size_t newHeight = static_cast<size_t>(std::floor(img.height() * scale));

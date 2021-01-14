@@ -18,12 +18,12 @@ Q_OBJECT
 public:
   ZSectionsRegistration() = default;
 
-  ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex)
+  ZSectionsRegistration(const QStringList& imgFilenames, const QString& resultFilename, index_t fixedSliceIndex)
   {
     setInputOutput(imgFilenames, resultFilename, fixedSliceIndex);
   }
 
-  void setInputOutput(const QStringList& imgFilenames, const QString& resultFilename, int fixedSliceIndex)
+  void setInputOutput(const QStringList& imgFilenames, const QString& resultFilename, index_t fixedSliceIndex)
   {
     m_imgFilenames = imgFilenames;
     m_resultFilename = resultFilename;
@@ -32,7 +32,7 @@ public:
 
   // use this channel to do registration, if not set or set to -1, the channel with strongest image signal
   // will be used.
-  void setReferenceChannel(int ch)
+  void setReferenceChannel(index_t ch)
   { m_referenceChannel = ch; }
 
   // some preprocess before registration
@@ -70,11 +70,11 @@ public:
   { m_useMultithreading = i; }
 
   // use multiscale registration if number of scale > 1, default is 1
-  void setNumScales(int i)
+  void setNumScales(size_t i)
   { m_numScales = i; }
 
   // registrate between s, s+1, ..., s+i, s-1, ..., s-i
-  void setNumNeighbors(int i)
+  void setNumNeighbors(size_t i)
   { m_numNeighbors = i; }
 
 signals:
@@ -99,7 +99,7 @@ private:
   };
 
   template<typename ImagePixelType>
-  void alignSection(const ZImg& srcImg, int fixedImageIndex, int movingImageIndex,
+  void alignSection(const ZImg& srcImg, size_t fixedImageIndex, size_t movingImageIndex,
                     double& cost, ZImageTransform*& transform);
 
   template<typename ImagePixelType>
@@ -115,21 +115,21 @@ private:
 private:
   QStringList m_imgFilenames;
   QString m_resultFilename;
-  int m_fixedSliceIndex;
+  index_t m_fixedSliceIndex = 0;
 
-  int m_referenceChannel = -1;
+  index_t m_referenceChannel = -1;
 
   bool m_removeBackground = true;
   bool m_removeHighForeground = true;
   bool m_allowFlip = false;
   bool m_brightBackground = false;
   bool m_useMultithreading = true;
-  int m_numScales = 1;
-  int m_numNeighbors = 1;
+  size_t m_numScales = 1;
+  size_t m_numNeighbors = 1;
 
   std::vector<SectionInfo> m_sectionInfos;
-  double m_minValue;
-  double m_maxValue;
+  double m_minValue = 0.0;
+  double m_maxValue = 0.0;
 
   QString m_metric{"Log Absolute Differences"};
   QString m_transform{"Rigid"};

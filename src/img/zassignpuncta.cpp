@@ -301,12 +301,12 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, dou
                                                                    bool& isAmbiguous)
 {
   //first crop out the region
-  int left = roundTo<int>(x);
-  int right = roundTo<int>(x);
-  int up = roundTo<int>(y);
-  int down = roundTo<int>(y);
-  int zup = roundTo<int>(z);
-  int zdown = roundTo<int>(z);
+  auto left = roundTo<int>(x);
+  auto right = roundTo<int>(x);
+  auto up = roundTo<int>(y);
+  auto down = roundTo<int>(y);
+  auto zup = roundTo<int>(z);
+  auto zdown = roundTo<int>(z);
   for (auto node : nodes) {
     auto parent = ZSwc::parent(node);
     left = std::min(std::min(left, roundTo<int>(node->x)), roundTo<int>(parent->x));
@@ -352,21 +352,21 @@ ZSwc::ConstSwcTreeNode ZAssignPuncta::intensityWeightedNearestNode(double x, dou
   std::vector<double> nodeMinDists(nodes.size(), std::numeric_limits<double>::max());
   for (size_t v = 0; v < dist.size(); ++v) {
     ZVoxelCoordinate coord = img.indexToCoord(v);
-    int nodeIdx = -1;
-    for (size_t i = nodes.size(); i-- > 0;) {
+    auto nodeIdx = nodes.size();
+    for (auto i = nodes.size(); i-- > 0;) {
       if (pointFrustumConeDist(coord.x + left, coord.y + up, coord.z + zup, nodes[i], ZSwc::parent(nodes[i])) <= 0.0) {
         nodeIdx = i;
         break;
       }
     }
-    if (nodeIdx > -1)
+    if (nodeIdx < nodes.size())
       nodeMinDists[nodeIdx] = std::min(nodeMinDists[nodeIdx], dist[v]);
   }
 
-  size_t minIndex = std::min_element(nodeMinDists.begin(), nodeMinDists.end()) - nodeMinDists.begin();
-  double minDist = nodeMinDists[minIndex];
+  auto minIndex = std::min_element(nodeMinDists.begin(), nodeMinDists.end()) - nodeMinDists.begin();
+  auto minDist = nodeMinDists[minIndex];
   nodeMinDists[minIndex] = std::numeric_limits<double>::max();
-  double secondMinDist = *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
+  auto secondMinDist = *std::min_element(nodeMinDists.begin(), nodeMinDists.end());
   //LOG(INFO) << " min dist " << minDist;
   //LOG(INFO) << " second min dist " << secondMinDist;
   isAmbiguous = secondMinDist < m_ambiguousFactor * minDist;

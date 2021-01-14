@@ -34,8 +34,8 @@ ZPunctaIO::ZPunctaIO()
 
 bool ZPunctaIO::canReadFile(const QString& filename)
 {
-  for (int i = 0; i < m_readExts.size(); ++i) {
-    if (filename.endsWith(QString(".%1").arg(m_readExts[i]), Qt::CaseInsensitive))
+  for (auto& readExt : m_readExts) {
+    if (filename.endsWith(QString(".%1").arg(readExt), Qt::CaseInsensitive))
       return true;
   }
   return false;
@@ -43,8 +43,8 @@ bool ZPunctaIO::canReadFile(const QString& filename)
 
 bool ZPunctaIO::canWriteFile(const QString& filename)
 {
-  for (int i = 0; i < m_writeExts.size(); ++i) {
-    if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
+  for (auto& writeExt : m_writeExts) {
+    if (filename.endsWith(QString(".%1").arg(writeExt), Qt::CaseInsensitive))
       return true;
   }
   return false;
@@ -82,7 +82,7 @@ void ZPunctaIO::save(const ZPuncta& puncta, const QString& filename, QString for
 {
   try {
     if (format.isEmpty()) {
-      for (int i = 0; i < m_writeExts.size(); ++i) {
+      for (index_t i = 0; i < m_writeExts.size(); ++i) {
         if (filename.endsWith(QString(".%1").arg(m_writeExts[i]), Qt::CaseInsensitive))
           format = m_writeFormats[i];
       }
@@ -496,15 +496,15 @@ void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
   Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 2) {
-    for (int i = 0; i < mat.rows(); ++i) {
+    for (Eigen::Index i = 0; i < mat.rows(); ++i) {
       puncta.emplace_back(mat(i, 0), mat(i, 1), 0.0, 2);
     }
   } else if (mat.rows() > 0 && mat.cols() == 3) {
-    for (int i = 0; i < mat.rows(); ++i) {
+    for (Eigen::Index i = 0; i < mat.rows(); ++i) {
       puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), 2);
     }
   } else if (mat.rows() > 0 && mat.cols() == 4) {
-    for (int i = 0; i < mat.rows(); ++i) {
+    for (Eigen::Index i = 0; i < mat.rows(); ++i) {
       puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
     }
   } else {

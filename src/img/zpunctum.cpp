@@ -65,7 +65,7 @@ void ZPunctum::updateFromVoxelsList(double conf)
     locs.rowwise() -= centroid.transpose();
     Eigen::MatrixXd cvs(locs.rows(), 2);
     cvs.col(0) = m_voxelIntensities;
-    for (int r = 0; r < locs.rows(); ++r) {
+    for (Eigen::Index r = 0; r < locs.rows(); ++r) {
       cvs(r, 1) = std::exp(-0.5 * locs.row(r) * cov * locs.row(r).transpose());
     }
     Eigen::MatrixXd corrcoef = ZEigenUtils::corrcoef(cvs);
@@ -107,7 +107,7 @@ void ZPunctum::merge(const ZPunctum& other, double conf)
   }
 }
 
-std::list<ZPunctum> ZPunctum::split(int num, double conf) const
+std::list<ZPunctum> ZPunctum::split(size_t num, double conf) const
 {
   std::list<ZPunctum> res;
   if (containsSignal()) {

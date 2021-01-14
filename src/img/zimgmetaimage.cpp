@@ -242,7 +242,7 @@ bool ZImgMetaImage::supportWrite() const
 
 void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
 {
-  int ndims = metaImage.NDims();
+  auto ndims = metaImage.NDims();
   if (ndims == 1) {
     info.width = metaImage.DimSize(0);
     info.height = 1;
