@@ -181,10 +181,10 @@ void ZColorMapWidget::contextMenuEvent(QContextMenuEvent* e)
     QMenu contextMenu(this);
     contextMenu.setTitle(QString("Key %1").arg(index + 1));
     bool isSplit = m_colorMap->get().key(index).isSplit();
-    QAction* mergeAction;
+    QAction* mergeAction = nullptr;
     QAction* editLColorAction;
-    QAction* editRColorAction;
-    QAction* splitAction;
+    QAction* editRColorAction = nullptr;
+    QAction* splitAction = nullptr;
     QAction* editIntensityAction;
     QAction* removeAction;
     if (isSplit) {
