@@ -37,7 +37,7 @@ protected:
 
   void bindVolume(Z3DShaderProgram& shader, size_t idx) const;
 
-  bool hasVolume() const;
+  [[nodiscard]] bool hasVolume() const;
 
   void compile() override;
 

@@ -1496,7 +1496,7 @@ void Z3DCompositor::setupAxisCamera()
 
   float radius = 300.f;
 
-  float distance = radius / std::sin(camera.fieldOfView() * 0.5);
+  float distance = radius / std::sin(camera.fieldOfView() * 0.5f);
   glm::vec3 vn(0, 0, 1);     //plane normal
   glm::vec3 position = center + vn * distance;
   camera.setCamera(position, center, glm::vec3(0.0, 1.0, 0.0));

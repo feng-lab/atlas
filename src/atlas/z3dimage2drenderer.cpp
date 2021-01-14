@@ -66,8 +66,9 @@ void Z3DImage2DRenderer::bindVolumes(Z3DShaderProgram& shader) const
   size_t idx = 0;
   for (size_t i = 0; i < m_volumes.size(); ++i) {
     Z3DVolume* volume = m_volumes[i];
-    if (!volume)
+    if (!volume) {
       continue;
+    }
 
     // volumes
     shader.bindTexture(m_volumeUniformNames[idx], volume->texture(), GLint(GL_NEAREST), GLint(GL_NEAREST));
@@ -88,11 +89,7 @@ void Z3DImage2DRenderer::bindVolume(Z3DShaderProgram& shader, size_t idx) const
 
 bool Z3DImage2DRenderer::hasVolume() const
 {
-  for (auto m_volume : m_volumes) {
-    if (m_volume)
-      return true;
-  }
-  return false;
+  return std::any_of(m_volumes.begin(), m_volumes.end(), [](auto vol) { return vol; });
 }
 
 void Z3DImage2DRenderer::compile()
@@ -123,16 +120,18 @@ QString Z3DImage2DRenderer::generateHeader()
 void Z3DImage2DRenderer::render(Z3DEye eye)
 {
   bool needRender = hasVolume() && !m_quads.empty();
-  if (!needRender)
+  if (!needRender) {
     return;
+  }
 
   m_scImage2DShader.bind();
   m_rendererBase.setGlobalShaderParameters(m_scImage2DShader, eye);
 
   if (m_volumes.size() == 1) {
     bindVolume(m_scImage2DShader, 0);
-    for (auto& quad : m_quads)
+    for (auto& quad : m_quads) {
       renderTriangleList(m_VAO, m_scImage2DShader, quad);
+    }
   } else {
     for (size_t j = 0; j < m_volumes.size(); ++j) {
       m_layerTarget->attachSlice(j);
@@ -140,8 +139,9 @@ void Z3DImage2DRenderer::render(Z3DEye eye)
       m_layerTarget->clear();
 
       bindVolume(m_scImage2DShader, j);
-      for (auto& quad : m_quads)
+      for (auto& quad : m_quads) {
         renderTriangleList(m_VAO, m_scImage2DShader, quad);
+      }
 
       m_layerTarget->release();
     }

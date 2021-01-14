@@ -167,7 +167,7 @@ void Z2DTransformParameter::flipVertically(const QRectF& boundRect)
 void Z2DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const Z2DTransformParameter& src = static_cast<const Z2DTransformParameter&>(rhs);
+  const auto& src = static_cast<const Z2DTransformParameter&>(rhs);
   m_receiveWidgetSignal = false;
   m_scale.set(src.m_scale.get());
   m_translation.set(src.m_translation.get());
@@ -180,8 +180,8 @@ void Z2DTransformParameter::setValueSameAs(const ZParameter& rhs)
 void Z2DTransformParameter::interpolate(const ZParameter& prev, double progress, ZParameter& dest)
 {
   CHECK(this->isSameType(prev) && this->isSameType(dest));
-  const Z2DTransformParameter& prevPara = static_cast<const Z2DTransformParameter&>(prev);
-  Z2DTransformParameter& desPara = static_cast<Z2DTransformParameter&>(dest);
+  const auto& prevPara = static_cast<const Z2DTransformParameter&>(prev);
+  auto& desPara = static_cast<Z2DTransformParameter&>(dest);
   desPara.m_receiveWidgetSignal = false;
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));
   desPara.setRotation(glm::mix(prevPara.m_rotation.get(), m_rotation.get(), progress));
@@ -222,14 +222,14 @@ QWidget* Z2DTransformParameter::actualCreateWidget(QWidget* parent)
   transform.addChild(m_translation, 1);
   transform.addChild(m_center, 1);
 
-  QPushButton* pb = new QPushButton("Show Transform Matrix");
+  auto* pb = new QPushButton("Show Transform Matrix");
   connect(pb, &QPushButton::clicked, this, &Z2DTransformParameter::showTransformMatrix);
   transform.addChild(*pb, 2);
 
   QLayout* lw = transform.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
-  QGroupBox* groupBox = new QGroupBox("Transform Parameters", parent);
+  auto* groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);

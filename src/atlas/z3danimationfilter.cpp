@@ -329,7 +329,7 @@ void Z3DAnimationFilter::updateData()
 
     m_triangles.clear();
     using namespace boost::math::double_constants;
-    float halfHeight = std::tan(pi / 8) * m_cameraSize.get();
+    float halfHeight = std::tan(pi / 8.) * m_cameraSize.get();
     float halfWidth = std::tan(sixth_pi) * m_cameraSize.get();
     float triangleWidth = halfWidth / 2.f;
     std::vector<glm::vec3> vertices;

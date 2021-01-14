@@ -19,7 +19,7 @@ Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DVi
 void Z3DCameraControlWidget::roll()
 {
   if (m_rollDegreeSpinBox->value() % 360 != 0) {
-    double angle = glm::radians(double(m_rollDegreeSpinBox->value()));
+    auto angle = glm::radians(float(m_rollDegreeSpinBox->value()));
     m_camera.roll(angle);
   }
 }
@@ -27,7 +27,7 @@ void Z3DCameraControlWidget::roll()
 void Z3DCameraControlWidget::azimuth()
 {
   if (m_azimuthDegreeSpinBox->value() % 360 != 0) {
-    double angle = glm::radians(double(m_azimuthDegreeSpinBox->value()));
+    auto angle = glm::radians(float(m_azimuthDegreeSpinBox->value()));
     m_camera.azimuth(angle);
   }
 }
@@ -35,7 +35,7 @@ void Z3DCameraControlWidget::azimuth()
 void Z3DCameraControlWidget::yaw()
 {
   if (m_yawDegreeSpinBox->value() % 360 != 0) {
-    double angle = glm::radians(double(m_yawDegreeSpinBox->value()));
+    auto angle = glm::radians(float(m_yawDegreeSpinBox->value()));
     m_camera.yaw(angle);
   }
 }
@@ -43,7 +43,7 @@ void Z3DCameraControlWidget::yaw()
 void Z3DCameraControlWidget::elevation()
 {
   if (m_elevationDegreeSpinBox->value() % 360 != 0) {
-    double angle = glm::radians(double(m_elevationDegreeSpinBox->value()));
+    auto angle = glm::radians(float(m_elevationDegreeSpinBox->value()));
     m_camera.elevation(angle);
   }
 }
@@ -51,7 +51,7 @@ void Z3DCameraControlWidget::elevation()
 void Z3DCameraControlWidget::pitch()
 {
   if (m_pitchDegreeSpinBox->value() % 360 != 0) {
-    double angle = glm::radians(double(m_pitchDegreeSpinBox->value()));
+    auto angle = glm::radians(float(m_pitchDegreeSpinBox->value()));
     m_camera.pitch(angle);
   }
 }
@@ -114,10 +114,8 @@ void Z3DCameraControlWidget::createWidget()
   auto maxDegrees = 360;
 
   auto vlo = new QVBoxLayout;
-  QHBoxLayout* hlo = nullptr;
-
-  hlo = new QHBoxLayout;
-  QPushButton* azimuthButton = new QPushButton("Azimuth Camera", this);
+  auto* hlo = new QHBoxLayout;
+  auto* azimuthButton = new QPushButton("Azimuth Camera", this);
   azimuthButton->setToolTip("Rotate the camera about the view up vector centered at the focal point. "
                               "The result is a horizontal rotation of the camera.");
   hlo->addWidget(azimuthButton);
@@ -131,7 +129,7 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton* elevationButton = new QPushButton("Elevation Camera", this);
+  auto* elevationButton = new QPushButton("Elevation Camera", this);
   elevationButton->setToolTip(
     "Rotate the camera about the cross product of the view up vector and the view vector (point at left in screen), "
       "using the focal point as the center of rotation. "
@@ -147,7 +145,7 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton* rollButton = new QPushButton("Roll Camera", this);
+  auto* rollButton = new QPushButton("Roll Camera", this);
   rollButton->setToolTip("Rotate the camera about the view vector. "
                            "This will spin the camera about its axis.");
   hlo->addWidget(rollButton);
@@ -161,7 +159,7 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   hlo = new QHBoxLayout;
-  QPushButton* yawButton = new QPushButton("Yaw Camera", this);
+  auto* yawButton = new QPushButton("Yaw Camera", this);
   yawButton->setToolTip("Rotate the focal point about the view up vector, "
                           "using the camera's position as the center of rotation. "
                           "The result is a horizontal rotation of the scene.");
@@ -177,7 +175,7 @@ void Z3DCameraControlWidget::createWidget()
 
 
   hlo = new QHBoxLayout;
-  QPushButton* pitchButton = new QPushButton("Pitch Camera", this);
+  auto* pitchButton = new QPushButton("Pitch Camera", this);
   pitchButton->setToolTip(
     "Rotate the focal point about the cross product of the view vector and the view up vector (point right in screen), "
       "using the camera's position as the center of rotation. "

@@ -20,7 +20,7 @@ public:
 
   void save(const QString& fn);
 
-  bool is2DAnimation() const override
+  [[nodiscard]] bool is2DAnimation() const override
   { return true; }
 
 protected:

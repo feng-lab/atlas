@@ -22,7 +22,7 @@ public:
 
   void save(const QString& fn);
 
-  const ZCameraParameterAnimation* cameraParameterAnimation() const
+  [[nodiscard]] const ZCameraParameterAnimation* cameraParameterAnimation() const
   { return m_cameraParameterAnimation; }
 
   ZCameraParameterAnimation* cameraParameterAnimation()

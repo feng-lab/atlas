@@ -9,8 +9,6 @@
 #include <set>
 #include <vector>
 
-class QString;
-
 namespace nim {
 
 class Z3DInputPortBase;

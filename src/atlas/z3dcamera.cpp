@@ -33,10 +33,10 @@ void Z3DCamera::setTileFrustum(double left, double right, double bottom, double 
   float halfheight = std::tan(0.5f * m_fieldOfView) * m_nearDist;
   float halfwidth = halfheight * m_aspectRatio * m_windowAspectRatio;
 
-  m_left = -halfwidth + 2 * halfwidth * left;
-  m_right = -halfwidth + 2 * halfwidth * right;
-  m_bottom = -halfheight + 2 * halfheight * bottom;
-  m_top = -halfheight + 2 * halfheight * top;
+  m_left = -halfwidth + 2.f * halfwidth * left;
+  m_right = -halfwidth + 2.f * halfwidth * right;
+  m_bottom = -halfheight + 2.f * halfheight * bottom;
+  m_top = -halfheight + 2.f * halfheight * top;
 
   //LOG(INFO) << m_left << m_right << m_bottom << m_top << halfheight << halfwidth;
 
@@ -56,11 +56,11 @@ void Z3DCamera::resetCamera(const ZBBox<glm::dvec3>& bound, ResetOption options)
     w2 *= w2;
     w3 *= w3;
     float radius = w1 + w2 + w3;
-    radius = (radius == 0) ? (1.0) : (radius);
+    radius = (radius == 0) ? (1.0f) : (radius);
 
     // compute the radius of the enclosing sphere
     //radius = std::sqrt(radius)*0.5 + m_eyeSeparation/2.f;
-    radius = std::sqrt(radius) * 0.5;
+    radius = std::sqrt(radius) * 0.5f;
 
     // (from VTK) compute the distance from the intersection of the view frustum with the
     // bounding sphere. Basically in 2D draw a circle representing the bounding

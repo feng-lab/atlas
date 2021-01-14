@@ -56,12 +56,6 @@ public:
   [[nodiscard]] const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
   { return m_volumes; }
 
-  static glm::uvec3 imageBlockSize()
-  { return glm::uvec3(60, 60, 60); }
-
-  static glm::uvec3 imageBlockSizePad()
-  { return glm::uvec3(4, 4, 4); }
-
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   [[nodiscard]] QString samplerType() const;
 
@@ -125,11 +119,11 @@ protected:
   void checkPageSystemError();
 
 protected:
-  glm::uvec3 m_pageTableBlockSize;
+  glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
-  glm::uvec3 m_imageBlockSize;
-  glm::uvec3 m_imageBlockSizePad;
-  glm::ivec3 m_imageBlockReadSize;
+  glm::uvec3 m_imageBlockSize = glm::uvec3(60, 60, 60);
+  glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
+  // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
   const int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
   const int m_emptyFlag = 40000;

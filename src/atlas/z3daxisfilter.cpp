@@ -62,8 +62,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_YAxisColor, 1);
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
-    for (size_t i = 0; i < paras.size(); ++i) {
-      ZParameter* para = paras[i];
+    for (auto para : paras) {
       if (para->name() == "Size Scale")
         m_widgetsGroup->addChild(*para, 1);
       else if (para->name() == "Rendering Method")
@@ -131,7 +130,7 @@ void Z3DAxisFilter::setupCamera()
 
   float radius = 300.f;
 
-  float distance = radius / std::sin(camera.fieldOfView() * 0.5);
+  float distance = radius / std::sin(camera.fieldOfView() * 0.5f);
   glm::vec3 vn(0, 0, 1);     //plane normal
   glm::vec3 position = center + vn * distance;
   camera.setCamera(position, center, glm::vec3(0.0, 1.0, 0.0));

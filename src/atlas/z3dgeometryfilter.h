@@ -23,9 +23,6 @@ public:
   void setStayOnTop(bool s)
   { m_stayOnTop.set(s); }
 
-  [[nodiscard]] glm::mat4 coordTransform() const
-  { return m_rendererBase.coordTransform(); }
-
   [[nodiscard]] float opacity() const
   { return m_rendererBase.opacity(); }
 
@@ -65,7 +62,7 @@ protected:
 
   ZBoolParameter m_stayOnTop;
 
-  Z3DPickingManager* m_pickingManager;
+  Z3DPickingManager* m_pickingManager = nullptr;
   bool m_pickingObjectsRegistered;
 };
 

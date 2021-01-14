@@ -21,12 +21,12 @@ enum class Z3DScreenShotType
 
 bool GLVersionGE(int majorVersion, int minorVersion);
 
-void _CheckGLError(const char* file, int line);
+void CheckGLError_Impl(const char* file, int line);
 
 #ifdef ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
 #define CHECK_GL_ERROR
 #else
-#define CHECK_GL_ERROR _CheckGLError(__FILE__, __LINE__);
+#define CHECK_GL_ERROR CheckGLError_Impl(__FILE__, __LINE__);
 #endif
 
 bool checkGLState(GLenum pname, bool value);

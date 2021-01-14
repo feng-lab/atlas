@@ -12,7 +12,7 @@ bool GLVersionGE(int majorVersion, int minorVersion)
   return glbinding::aux::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
 }
 
-void _CheckGLError(const char* file, int line)
+void CheckGLError_Impl(const char* file, int line)
 {
   GLenum err = glGetError();
 

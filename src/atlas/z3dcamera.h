@@ -37,7 +37,7 @@ public:
 
   Z3DCamera();
 
-  const glm::vec3& eye() const
+  [[nodiscard]] const glm::vec3& eye() const
   { return m_eye; }
 
   void setEye(const glm::vec3& eye)
@@ -46,7 +46,7 @@ public:
     updateCamera();
   }
 
-  const glm::vec3& center() const
+  [[nodiscard]] const glm::vec3& center() const
   { return m_center; }
 
   void setCenter(const glm::vec3& center)
@@ -56,7 +56,7 @@ public:
   }
 
   // always return normalized vector
-  const glm::vec3& upVector() const
+  [[nodiscard]] const glm::vec3& upVector() const
   { return m_upVector; }
 
   void setUpVector(const glm::vec3& upVector)
@@ -65,7 +65,7 @@ public:
     updateCamera();
   }
 
-  ProjectionType projectionType() const
+  [[nodiscard]] ProjectionType projectionType() const
   { return m_projectionType; }
 
   void setProjectionType(ProjectionType pt)
@@ -74,13 +74,13 @@ public:
     updateFrustum();
   }
 
-  bool isPerspectiveProjection() const
+  [[nodiscard]] bool isPerspectiveProjection() const
   { return m_projectionType == ProjectionType::Perspective; }
 
-  bool isOrthographicProjection() const
+  [[nodiscard]] bool isOrthographicProjection() const
   { return m_projectionType == ProjectionType::Orthographic; }
 
-  float fieldOfView() const
+  [[nodiscard]] float fieldOfView() const
   { return m_fieldOfView; }
 
   void setFieldOfView(float fov)
@@ -89,7 +89,7 @@ public:
     updateFrustum();
   }
 
-  float aspectRatio() const
+  [[nodiscard]] float aspectRatio() const
   { return m_aspectRatio; }
 
   void setAspectRatio(float ar)
@@ -98,7 +98,7 @@ public:
     updateFrustum();
   }
 
-  float nearDist() const
+  [[nodiscard]] float nearDist() const
   { return m_nearDist; }
 
   void setNearDist(float nd)
@@ -107,7 +107,7 @@ public:
     updateFrustum();
   }
 
-  float farDist() const
+  [[nodiscard]] float farDist() const
   { return m_farDist; }
 
   void setFarDist(float fd)
@@ -116,7 +116,7 @@ public:
     updateFrustum();
   }
 
-  float windowAspectRatio() const
+  [[nodiscard]] float windowAspectRatio() const
   { return m_windowAspectRatio; }
 
   void setWindowAspectRatio(float war)
@@ -125,10 +125,10 @@ public:
     updateFrustum();
   }
 
-  glm::vec2 frustumNearPlaneSize() const
+  [[nodiscard]] glm::vec2 frustumNearPlaneSize() const
   { return glm::vec2(m_right - m_left, m_top - m_bottom); }
 
-  float eyeSeparationAngle() const
+  [[nodiscard]] float eyeSeparationAngle() const
   { return m_eyeSeparationAngle; }
 
   void setEyeSeparationAngle(float angle)
@@ -167,51 +167,51 @@ public:
 
   void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax);
 
-  const glm::mat4& viewMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat4& viewMatrix(Z3DEye eye) const
   { return m_viewMatrices[enumToUnderlyingType(eye)]; }
 
-  const glm::mat4& projectionMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat4& projectionMatrix(Z3DEye eye) const
   { return m_projectionMatrices[enumToUnderlyingType(eye)]; }
 
-  const glm::mat4& inverseViewMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat4& inverseViewMatrix(Z3DEye eye) const
   { return m_inverseViewMatrices[enumToUnderlyingType(eye)]; }
 
-  const glm::mat4& inverseProjectionMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat4& inverseProjectionMatrix(Z3DEye eye) const
   { return m_inverseProjectionMatrices[enumToUnderlyingType(eye)]; }
 
-  const glm::mat3& normalMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat3& normalMatrix(Z3DEye eye) const
   { return m_normalMatrices[enumToUnderlyingType(eye)]; }
 
-  const glm::mat4& projectionViewMatrix(Z3DEye eye) const
+  [[nodiscard]] const glm::mat4& projectionViewMatrix(Z3DEye eye) const
   { return m_projectionViewMatrices[enumToUnderlyingType(eye)]; }
 
   // dist from eye to center
-  float centerDist() const
+  [[nodiscard]] float centerDist() const
   { return m_centerDist; }
 
   // normalized vector from eye to center
-  const glm::vec3& viewVector() const
+  [[nodiscard]] const glm::vec3& viewVector() const
   { return m_viewVector; }
 
   // normalized vector represents right direction relative to the viewer's current orientation
-  const glm::vec3& strafeVector() const
+  [[nodiscard]] const glm::vec3& strafeVector() const
   { return m_strafeVector; }
 
   // frustum
-  float left() const
+  [[nodiscard]] float left() const
   { return m_left; }
 
-  float right() const
+  [[nodiscard]] float right() const
   { return m_right; }
 
-  float bottom() const
+  [[nodiscard]] float bottom() const
   { return m_bottom; }
 
-  float top() const
+  [[nodiscard]] float top() const
   { return m_top; }
 
   // other matrix
-  inline glm::mat3 rotateMatrix(Z3DEye eye = Z3DEye::Mono)
+  [[nodiscard]] inline glm::mat3 rotateMatrix(Z3DEye eye = Z3DEye::Mono) const
   { return glm::mat3(viewMatrix(eye)); }
 
   bool operator==(const Z3DCamera& rhs) const;

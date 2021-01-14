@@ -243,7 +243,7 @@ QWidget* Z3DCameraParameter::actualCreateWidget(QWidget* parent)
   QLayout* lw = camera.createLayout(false);
   //QWidget *widget = new QWidget();
   //widget->setLayout(lw);
-  QGroupBox* groupBox = new QGroupBox("Camera Parameters", parent);
+  auto* groupBox = new QGroupBox("Camera Parameters", parent);
   groupBox->setLayout(lw);
 
   //widget->setParent(parent);
@@ -278,7 +278,7 @@ void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 void Z3DCameraParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
+  const auto* src = static_cast<const Z3DCameraParameter*>(&rhs);
   m_value = src->get();
   updatePara();
   ZParameter::setSameAs(rhs);
@@ -287,7 +287,7 @@ void Z3DCameraParameter::setSameAs(const ZParameter& rhs)
 void Z3DCameraParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  const Z3DCameraParameter* src = static_cast<const Z3DCameraParameter*>(&rhs);
+  const auto* src = static_cast<const Z3DCameraParameter*>(&rhs);
   m_value.setProjectionType(src->get().projectionType());
   m_value.setCamera(src->get().eye(), src->get().center(), src->get().upVector());
   //m_value.setFrustum(src->get().fieldOfView(), m_value.aspectRatio(),

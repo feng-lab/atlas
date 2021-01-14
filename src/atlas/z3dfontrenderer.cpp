@@ -59,8 +59,9 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   QFileInfoList list = fontDir.entryInfoList(filters, QDir::Files | QDir::NoSymLinks);
   for (const auto& fileInfo : list) {
     QFileInfo txtFileInfo(fontDir, fileInfo.completeBaseName() + ".txt");
-    if (!txtFileInfo.exists())
+    if (!txtFileInfo.exists()) {
       continue;
+    }
     auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(),
                                               txtFileInfo.absoluteFilePath());
     if (!sdFont->isEmpty()) {
@@ -138,13 +139,15 @@ QString Z3DFontRenderer::generateHeader()
   //if (m_fontUseSoftEdge.get())
   QString headerSource = "#define USE_SOFTEDGE\n";
   if (m_showFontOutline.get()) {
-    if (m_fontOutlineMode.isSelected("Glow"))
+    if (m_fontOutlineMode.isSelected("Glow")) {
       headerSource += "#define SHOW_GLOW\n";
-    else
+    } else {
       headerSource += "#define SHOW_OUTLINE\n";
+    }
   }
-  if (m_showFontShadow.get())
+  if (m_showFontShadow.get()) {
     headerSource += "#define SHOW_SHADOW\n";
+  }
   return headerSource;
 }
 
@@ -155,8 +158,9 @@ void Z3DFontRenderer::render(Z3DEye eye)
     return;
   }
   if (!m_positionsPt || m_positionsPt->empty()
-      || m_positionsPt->size() != static_cast<size_t>(m_texts.size()))
+      || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
     return;
+  }
 
   prepareFontShaderData(eye);
 
@@ -174,10 +178,12 @@ void Z3DFontRenderer::render(Z3DEye eye)
   shader.bindTexture("tex", font->texture());
   //if (m_fontUseSoftEdge.get())
   shader.setUniform("softedge_scale", m_fontSoftEdgeScale.get());
-  if (m_showFontOutline.get())
+  if (m_showFontOutline.get()) {
     shader.setUniform("outline_color", m_fontOutlineColor.get());
-  if (m_showFontShadow.get())
+  }
+  if (m_showFontShadow.get()) {
     shader.setUniform("shadow_color", m_fontShadowColor.get());
+  }
 
   if (m_hardwareSupportVAO) {
     if (m_dataChanged) {
@@ -266,11 +272,13 @@ void Z3DFontRenderer::renderPicking(Z3DEye)
     return;
   }
   if (!m_pickingColorsPt || m_pickingColorsPt->empty()
-      || m_pickingColorsPt->size() != m_positionsPt->size())
+      || m_pickingColorsPt->size() != m_positionsPt->size()) {
     return;
+  }
   if (!m_positionsPt || m_positionsPt->empty()
-      || m_positionsPt->size() != static_cast<size_t>(m_texts.size()))
+      || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
     return;
+  }
 
 
 }
@@ -286,18 +294,20 @@ void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)
   glm::vec3 rightVector(viewMatrix[0][0], viewMatrix[0][1], viewMatrix[0][2]);
   glm::vec3 upVector(viewMatrix[1][0], viewMatrix[1][1], viewMatrix[1][2]);
   Z3DSDFont* font = m_allFonts[m_allFontNames.associatedData()].get();
-  float scale = m_fontSize.get() / font->maxFontHeight();
+  float scale = m_fontSize.get() / static_cast<float>(font->maxFontHeight());
   GLuint indices[6] = {0, 1, 2, 2, 1, 3};
   GLuint quadIdx = 0;
   for (index_t strIdx = 0; strIdx < m_texts.size(); strIdx++) {
     QString str = m_texts[strIdx];
-    if (str.isEmpty())
+    if (str.isEmpty()) {
       continue;
+    }
     glm::vec4 color;
-    if (!m_colorsPt || static_cast<size_t>(strIdx) >= m_colorsPt->size())
+    if (!m_colorsPt || static_cast<size_t>(strIdx) >= m_colorsPt->size()) {
       color = glm::vec4(0.f, 0.f, 0.f, 1.f);
-    else
+    } else {
       color = (*m_colorsPt)[strIdx];
+    }
     glm::vec3 loc = (*m_positionsPt)[strIdx];
     for (auto charIdx : str) {
       Z3DSDFont::CharInfo charInfo = font->charInfo(charIdx.toLatin1());

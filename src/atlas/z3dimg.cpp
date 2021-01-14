@@ -25,36 +25,30 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
   if (m_isVolumeDownsampled) {
     m_channelPendingUpdates.resize(m_nChannels);
 
-    m_pageTableBlockSize = glm::uvec3(32, 32, 32);
-    m_imageBlockSize = imageBlockSize();
-    m_imageBlockSizePad = imageBlockSizePad();
     auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
-#ifdef Q_OS_MACOS
-    glm::uvec3 imageCacheSize(2048, 1024, 1024); // 2G
-#else
-    glm::uvec3 imageCacheSize(2048, 2048, 2048); // 8G
-#endif
-    glm::uvec3 pageTableCacheSize(256, 256, 256); // 256*256*256*4*4   268MB
-    m_imageBlockReadSize = glm::ivec3(510, 510, 30);
+
+    glm::uvec3 imageCacheSize;
+    glm::uvec3 pageTableCacheSize;
+    // m_imageBlockReadSize = glm::ivec3(510, 510, 30);
     if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
 #else
       imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
 #endif
-      pageTableCacheSize = glm::uvec3(256, 256, 192); // 256*256*192*4*4   192MB
+      pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
       imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
-      pageTableCacheSize = glm::uvec3(256, 256, 64); // 256*256*64*4*4   64MB
+      pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2048) {
       imageCacheSize = glm::uvec3(1024, 1024, 512); // 0.5G
-      pageTableCacheSize = glm::uvec3(256, 256, 32); // 256*256*32*4*4   32MB
+      pageTableCacheSize = glm::uvec3(256, 256, 128); // 256*256*128*4*4   134MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1024) {
       imageCacheSize = glm::uvec3(1024, 1024, 256); // 0.25G
-      pageTableCacheSize = glm::uvec3(128, 128, 64); // 128*128*64*4*4   16MB
+      pageTableCacheSize = glm::uvec3(256, 128, 128); // 256*128*128*4*4   67MB
     } else {
       imageCacheSize = glm::uvec3(1024, 1024, 128); // 0.125G
-      pageTableCacheSize = glm::uvec3(128, 128, 32); // 128*128*32*4*4   8MB
+      pageTableCacheSize = glm::uvec3(128, 128, 128); // 128*128*128*4*4   34MB
     }
     m_imageCacheNumBlocks = imageCacheSize / imageBlockTotalSize;
     m_pageTableCacheNumBlocks = pageTableCacheSize / m_pageTableBlockSize;
