@@ -15,8 +15,8 @@ inline bool isNumber(QChar c)
 int64_t lastInteger(const QString& str)
 {
   auto size = str.size();
-  nim::index_t endNumPos = -1;
-  nim::index_t startNumPos = -1;
+  decltype(size) endNumPos = -1;
+  decltype(size) startNumPos = -1;
   auto index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
@@ -38,8 +38,10 @@ int64_t lastInteger(const QString& str)
     return 0;
 
   auto res = str.mid(startNumPos, endNumPos - startNumPos + 1).toLongLong();
+
   if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
     res = -res;
+
   return res;
 }
 
@@ -65,7 +67,7 @@ QString randomString(index_t minLength, index_t maxLength)
     if (length > 0) {
       res.resize(length);
       std::uniform_int_distribution<int> dist(0, possibleCharacters.size() - 1);
-      for (index_t i = 0; i < length; ++i) {
+      for (decltype(res.size()) i = 0; i < length; ++i) {
         res[i] = possibleCharacters.at(dist(ZRandom::instance().engine()));
       }
     }
@@ -144,8 +146,8 @@ bool lastIntegerLessThan(const QString& s1, const QString& s2)
 QString replaceLastInteger(const QString& str, const QString& replacement)
 {
   auto size = str.size();
-  index_t endNumPos = -1;
-  index_t startNumPos = -1;
+  decltype(size) endNumPos = -1;
+  decltype(size) startNumPos = -1;
   auto index = size - 1;
   while (index >= 0) {
     if (isNumber(str[index])) {
@@ -226,9 +228,9 @@ void removeComment(std::string& line, const std::string& commentStart, bool chec
       line = line.substr(0, idx);
     }
 
-    for (size_t i = 0; i < poses.size(); ++i) {
-      if (poses[i] < line.size())
-        line[poses[i]] = '#';
+    for (auto pose : poses) {
+      if (pose < line.size())
+        line[pose] = '#';
     }
   } else {
     size_t idx = line.find(commentStart);
@@ -240,11 +242,13 @@ void removeComment(std::string& line, const std::string& commentStart, bool chec
 
 void removeComment(QString& line, const QString& commentStart, bool checkSpecialNumber)
 {
+  using index_type = decltype(line.size());
   if (commentStart == "#" && checkSpecialNumber) {
-    std::vector<index_t> poses;
+    std::vector<index_type> poses;
 
     QString str("1.#inf");
-    index_t idx = -1;
+
+    index_type idx = -1;
     do {
       idx = line.indexOf(str, idx + 1, Qt::CaseInsensitive);
       if (idx >= 0) {
