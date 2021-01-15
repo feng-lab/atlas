@@ -82,6 +82,7 @@ message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
 if (PYTHON_VERSION_MAJOR)
   set(module_name _imgpy)
   pybind11_add_module(${module_name} imgpy.cpp)
+  target_compile_definitions(${module_name} PUBLIC ZIMG_USE_BOOST_JSON)
   target_link_libraries(${module_name} PRIVATE condaimg)
   if (APPLE)
     target_compile_options(${module_name} PRIVATE -faligned-allocation)
@@ -122,12 +123,13 @@ if (WIN32)
   install(FILES ${FREEIMAGE_DLLS} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 else (WIN32)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
-  if (UNIX AND NOT APPLE)
-    file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)
-    install(FILES ${gcc_stuff}
-            DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
-            )
-  endif ()
+# this fix will not work if other python module loads the lower version of libstdc++.so first
+#  if (UNIX AND NOT APPLE)
+#    file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)
+#    install(FILES ${gcc_stuff}
+#            DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
+#            )
+#  endif ()
 endif (WIN32)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
         DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory

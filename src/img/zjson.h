@@ -1,18 +1,24 @@
 #pragma once
 
 #include "zexception.h"
+
+// for conda build, BOOST_JSON_STANDALONE is not enabled cause conda has lower version of libstdc++
+// we can remove this once conda libstdc++ upgrades to libstdc++.so.6.0.28
+#if ZIMG_USE_BOOST_JSON
+#include <boost/json.hpp>
+#else
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-W#warnings"
 #define BOOST_JSON_STANDALONE
 #include <boost/json.hpp>
 #pragma GCC diagnostic pop
-namespace json = boost::json;
 #else
 #define BOOST_JSON_STANDALONE
 #include <boost/json.hpp>
-namespace json = boost::json;
 #endif
+#endif
+namespace json = boost::json;
 
 inline QString tag_invoke(const json::value_to_tag<QString>&, const json::value& jv)
 {
