@@ -2090,20 +2090,23 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(fmt_src_dir)
         build_fmt(fmt_src_dir, ext_build_dir())
 
+    if libs['libevent']:
+        le_src_dir = os.path.join(ext_dir(), 'libevent')
+        if update_src:
+            update_git_submodule(le_src_dir)
+        build_libevent(le_src_dir, ext_build_dir())
+
     if libs['folly-deps']:
         bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
         # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
-        le_src_dir = os.path.join(ext_dir(), 'libevent')
         snappy_src_dir = os.path.join(ext_dir(), 'snappy')
         if update_src:
             update_git_submodule(bz2_src_dir)
             # update_git_submodule(jm_src_dir)
-            update_git_submodule(le_src_dir)
             update_git_submodule(snappy_src_dir)
         build_bzip2(bz2_src_dir, ext_build_dir())
         # if is_linux():
         #     build_jemalloc(jm_src_dir, ext_build_dir())
-        build_libevent(le_src_dir, ext_build_dir())
         build_snappy(snappy_src_dir, ext_build_dir())
         #
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
@@ -2329,8 +2332,8 @@ def build_libs(libs: dict, update_src: bool):
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
-                'pybind11', 'cppitertools', 'glm', 'googletest', 'cpuinfo', 'gflags', 'glog',
-                'benchmark', 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'folly-deps',
+                'pybind11', 'cppitertools', 'glm', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
+                'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
                 'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia'
@@ -2353,6 +2356,7 @@ def parse_inputs(argv: list):
                             'suitesparse': ['ceres-solver'],
                             'ceres-solver': ['opencv'],   # only if we need opencv sfm
                             'boost': ['folly'],
+                            'libevent': ['folly'],
                             'folly-deps': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],
                             'lz4': ['vtk', 'folly'],
