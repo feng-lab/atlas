@@ -12,6 +12,12 @@
 #include <vector>
 #include <numeric>
 
+// for conda build, BOOST_JSON_STANDALONE is not enabled cause conda has lower version of libstdc++
+// we can remove this once conda libstdc++ upgrades to libstdc++.so.6.0.28
+#if ZIMG_USE_BOOST_JSON
+#include <boost/utility/string_view.hpp>
+#endif
+
 namespace nim {
 
 template< class T >
@@ -45,6 +51,14 @@ inline QString enumToQString(TEnum e)
   auto str = enumToString(e);
   return QString::fromUtf8(str.data(), str.size());
 }
+
+#if ZIMG_USE_BOOST_JSON
+template<typename TEnum>
+inline TEnum stringToEnum(boost::string_view str)
+{
+  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
+}
+#endif
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
 template<typename TEnum>
