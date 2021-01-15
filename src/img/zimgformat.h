@@ -95,11 +95,11 @@ protected:
   ZImg readRawImg(const QString& filename, const ZImgInfo& imgInfo, const std::vector<size_t>& dimensionStrides,
                   size_t dataOffset, const ZImgRegion& region);
 
-  void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
-                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
+  static void createDefaultSubBlocks(const QString& filename, const std::vector<ZImgInfo>& infos,
+                                     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
 
-  void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
-                            std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
+  static void createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
+                                   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks);
 };
 
 } // namespace nim

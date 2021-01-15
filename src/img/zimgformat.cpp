@@ -11,26 +11,24 @@ ZImgFormat::~ZImgFormat() = default;
 
 bool ZImgFormat::canRead(const QString& filename) const
 {
-  if (!supportRead())
+  if (!supportRead()) {
     return false;
-  QStringList exts = extensions();
-  for (auto& ext : exts) {
-    if (filename.endsWith(QString(".") + ext, Qt::CaseInsensitive))
-      return true;
   }
-  return false;
+  QStringList exts = extensions();
+  return std::any_of(exts.begin(), exts.end(), [&](const QString& ext) {
+    return filename.endsWith(QString(".%1").arg(ext), Qt::CaseInsensitive);
+  });
 }
 
 bool ZImgFormat::canWrite(const QString& filename) const
 {
-  if (!supportWrite())
+  if (!supportWrite()) {
     return false;
-  QStringList exts = extensions();
-  for (auto& ext : exts) {
-    if (filename.endsWith(QString(".") + ext, Qt::CaseInsensitive))
-      return true;
   }
-  return false;
+  auto exts = extensions();
+  return std::any_of(exts.begin(), exts.end(), [&](const QString& ext) {
+    return filename.endsWith(QString(".%1").arg(ext), Qt::CaseInsensitive);
+  });
 }
 
 void ZImgFormat::checkImgBeforeWriting(const QString& filename, const ZImgInfo& /*info*/,
@@ -105,8 +103,9 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-    if (timeStride == 0)
+    if (timeStride == 0) {
       timeStride = imgInfo.timeByteNumber();
+    }
     CHECK(timeStride >= imgInfo.timeByteNumber());
 
     auto tEnd = region.end.t == -1 ? ZImgRegion::value_type(imgInfo.numTimes) : region.end.t;
@@ -260,10 +259,11 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
 
   if (bufImg.numChannels() == 1) {
     CHECK(false);
-    for (size_t t = 0; t < img.numTimes(); ++t)
+    for (size_t t = 0; t < img.numTimes(); ++t) {
       std::memcpy(img.timeData<uint8_t>(t),
                   bufImg.timeData<uint8_t>(t),
                   bufImg.timeByteNumber());
+    }
     return;
   }
 
@@ -333,10 +333,11 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
 
   if (bufImg.numChannels() == 1) {
     CHECK(false);
-    for (size_t t = 0; t < img.numTimes(); ++t)
+    for (size_t t = 0; t < img.numTimes(); ++t) {
       std::memcpy(img.timeData<uint8_t>(t),
                   bufImg.timeData<uint8_t>(t),
                   bufImg.timeByteNumber());
+    }
     return;
   }
 
@@ -572,8 +573,9 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
                                         const std::vector<ZImgInfo>& infos,
                                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  if (!subBlocks)
+  if (!subBlocks) {
     return;
+  }
   subBlocks->resize(infos.size());
   for (size_t s = 0; s < infos.size(); ++s) {
     for (size_t t = 0; t < infos[s].numTimes; ++t) {
@@ -581,7 +583,7 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
         (*subBlocks)[s].emplace_back(std::make_shared<ZImgTileSubBlock>(
           ZImgSource(filename,
                      ZImgRegion(ZVoxelCoordinate(0, 0, z, 0, t),
-                                          ZVoxelCoordinate(infos[s].width, infos[s].height, z + 1, infos[s].numChannels, t + 1)),
+                                ZVoxelCoordinate(infos[s].width, infos[s].height, z + 1, infos[s].numChannels, t + 1)),
                      s)));
       }
     }
@@ -591,8 +593,9 @@ void ZImgFormat::createDefaultSubBlocks(const QString& filename,
 void ZImgFormat::createEmptySubBlocks(const std::vector<ZImgInfo>& infos,
                                       std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  if (!subBlocks)
+  if (!subBlocks) {
     return;
+  }
   subBlocks->resize(infos.size());
 }
 
