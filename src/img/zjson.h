@@ -2,11 +2,6 @@
 
 #include "zexception.h"
 
-// for conda build, BOOST_JSON_STANDALONE is not enabled cause conda has lower version of libstdc++
-// we can remove this once conda libstdc++ upgrades to libstdc++.so.6.0.28
-#if ZIMG_USE_BOOST_JSON
-#include <boost/json.hpp>
-#else
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-W#warnings"
@@ -16,7 +11,6 @@
 #else
 #define BOOST_JSON_STANDALONE
 #include <boost/json.hpp>
-#endif
 #endif
 namespace json = boost::json;
 
