@@ -17,7 +17,7 @@ public:
   void setLineStrip(bool v)
   { m_isLineStrip = v; }
 
-  void setData(std::vector<glm::vec3>* linesInput);
+  virtual void setData(std::vector<glm::vec3>* linesInput);
 
   void setLineWidth(const std::vector<float>& lineWidthArray)
   {

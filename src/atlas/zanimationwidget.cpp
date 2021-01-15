@@ -5,10 +5,8 @@
 #include "zanimationexportwidget.h"
 #include "ztheme.h"
 #include <QHBoxLayout>
-#include <QVBoxLayout>
 #include <QToolButton>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QLabel>
 #include <QAction>
 #include <QTimeLine>

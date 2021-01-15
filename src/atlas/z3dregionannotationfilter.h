@@ -16,7 +16,7 @@ public:
 
   void setData(ZRegionAnnotationPack& rap);
 
-  bool isReady(Z3DEye eye) const override;
+  [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -24,10 +24,10 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
-  bool hasOpaque(Z3DEye /*unused*/) const override
+  [[nodiscard]] bool hasOpaque(Z3DEye /*unused*/) const override
   { return true; }
 
-  bool hasTransparent(Z3DEye /*unused*/) const override
+  [[nodiscard]] bool hasTransparent(Z3DEye /*unused*/) const override
   { return true; }
 
   void setViewport(glm::uvec2 viewport) override;

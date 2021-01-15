@@ -1,6 +1,5 @@
 #include "z3dvolume.h"
 
-#include "z3dshaderprogram.h"
 #include "z3dgpuinfo.h"
 #include "z3dtexture.h"
 #include "zlog.h"

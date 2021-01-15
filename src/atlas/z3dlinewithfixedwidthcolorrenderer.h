@@ -11,7 +11,7 @@ public:
   // default use display list but not lighting in opengl mode
   explicit Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase& base);
 
-  void setData(std::vector<glm::vec3>* linesInput);
+  void setData(std::vector<glm::vec3>* linesInput) override;
 
   ZFloatParameter& lineWidthPara()
   { return m_lineWidth; }
