@@ -1,0 +1,166 @@
+name: linux
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: check envs
+        shell: bash -l {0}
+        run: |
+          g++ --version
+          env
+          cd ~
+          du -h --max-depth=1 . | sort -h
+          df -h
+
+      - name: Cleanup disk
+        uses: curoky/cleanup-disk-action@v2.0
+
+      - name: check envs
+        shell: bash -l {0}
+        run: |
+          df -h
+
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: 'recursive'
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          python-version: 3.8
+          miniconda-version: "latest"
+          activate-environment: test
+
+      - name: install conda packages
+        shell: bash -l {0}
+        run: |
+          conda info
+          conda update --all -y
+          conda install tbb-devel mkl-devel qt numpy python wget anaconda-client conda-build conda-verify
+          conda list
+          conda clean --all -y
+
+#      - uses: actions/cache@v2
+#        id: cache-qt
+#        with:
+#          path: ~/Qt
+#          key: ${{ runner.os }}-qt-2021-01-18
+
+      - name: download qt
+#        if: steps.cache-qt.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          cd ~
+          pwd
+          wget -q https://fenglab.xyz/static/deps/linux/dep-qt-2021-01-18.zip
+          unzip -q dep-qt-2021-01-18.zip
+          rm dep-qt-2021-01-18.zip
+
+#      - uses: actions/cache@v2
+#        id: cache-intel
+#        with:
+#          path: ~/intel
+#          key: ${{ runner.os }}-intel-2021-01-18
+
+      - name: download intel
+#        if: steps.cache-intel.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          cd ~
+          pwd
+          wget -q https://fenglab.xyz/static/deps/linux/dep-intel-2021-01-18.zip
+          unzip -q dep-intel-2021-01-18.zip
+          rm dep-intel-2021-01-18.zip
+
+      - uses: actions/cache@v2
+        id: cache-deps
+        with:
+          path: $GITHUB_WORKSPACE/src/3rdparty/build
+          key: ${{ runner.os }}-deps-2021-01-19
+
+      - name: download deps
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          cd ~
+          pwd
+          wget -q https://fenglab.xyz/static/deps/common/atlas-deps-2021-01-19.zip
+          unzip -q atlas-deps-2021-01-19.zip
+          rm atlas-deps-2021-01-19.zip
+
+      - name: build deps
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        env:
+          ANACONDA_PASSWORD: ${{ secrets.ANACONDA_PASSWORD }}
+        run: |
+          conda info
+          cd $GITHUB_WORKSPACE
+          pwd
+          sudo apt install nasm libgl1-mesa-dev libxkbcommon-x11-0 -y
+          python util/build_ext_libs.py all
+          anaconda login --username fenglab --password "$ANACONDA_PASSWORD"
+          conda config --set anaconda_upload yes
+          conda-build conda-opencv-recipe
+          conda-build zimg-recipe
+
+      - name: build
+        shell: bash -l {0}
+        run: |
+          conda info
+          cd $GITHUB_WORKSPACE
+          pwd
+          python util/build_atlas.py
+
+#      - uses: actions/cache@v2
+#        id: cache-test-data
+#        with:
+#          path: ~/atlas_test_data
+#          key: atlas-test-data-2021-01-18
+
+      - name: download test data
+#        if: steps.cache-test-data.outputs.cache-hit != 'true'
+        shell: bash -l {0}
+        run: |
+          conda info
+          cd ~
+          pwd
+          wget -q https://fenglab.xyz/static/deps/common/atlas-test-data-2021-01-18.zip
+          unzip -q atlas-test-data-2021-01-18.zip
+          rm atlas-test-data-2021-01-18.zip
+
+      - name: test
+        shell: bash -l {0}
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_DEPLOYPATH: ${{ secrets.SSH_DEPLOYPATH }}
+          SSH_KEY_PATH: ${{ github.workspace }}/../private.key
+        run: |
+          conda info
+          cd $GITHUB_WORKSPACE
+          pwd
+          python util/deploy_atlas.py
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ../private.key
+          sudo chmod 600 ../private.key
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cd $GITHUB_WORKSPACE/deploy
+#          rsync -av --delete -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' linux $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/packages/
+#          rsync -av -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/installers/

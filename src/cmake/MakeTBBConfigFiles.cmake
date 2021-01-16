@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.6.1)
 
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.14)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if (WIN32)
@@ -15,35 +15,20 @@ endif ()
 
 # tbb
 include(${CMAKE_CURRENT_LIST_DIR}/tbb/TBBMakeConfig.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
 if (WIN32)
-  # workaround for parentheses in variable name / CMP0053
-  SET(PROGRAMFILESx86 "PROGRAMFILES(x86)")
-  SET(PROGRAMFILES32 "$ENV{${PROGRAMFILESx86}}")
-  IF (NOT PROGRAMFILES32)
-    SET(PROGRAMFILES32 "$ENV{PROGRAMFILES}")
-  ENDIF ()
-  IF (NOT PROGRAMFILES32)
-    SET(PROGRAMFILES32 "C:/Program Files (x86)")
-  ENDIF ()
   FIND_PATH(TBBROOT include/tbb/tbb.h
             DOC "Root of TBB installation"
             HINTS ${TBBROOT}
             PATHS
-            ${PROJECT_SOURCE_DIR}/tbb
-            ${PROJECT_SOURCE_DIR}/../tbb
-            "${PROGRAMFILES32}/IntelSWTools/compilers_and_libraries/windows/tbb"
-            "${PROGRAMFILES32}/Intel/Composer XE/tbb"
-            "${PROGRAMFILES32}/Intel/compilers_and_libraries/windows/tbb"
+            ${INTEL_PATH}/tbb
             )
 else (WIN32)
   FIND_PATH(TBBROOT include/tbb/tbb.h
             DOC "Root of TBB installation"
             HINTS ${TBBROOT}
             PATHS
-            ${PROJECT_SOURCE_DIR}/tbb
-            /opt/intel/composerxe/tbb
-            /opt/intel/compilers_and_libraries/tbb
-            /opt/intel/tbb
+            ${INTEL_PATH}/tbb
             )
 endif (WIN32)
 message(STATUS "TBBROOT: ${TBBROOT}")

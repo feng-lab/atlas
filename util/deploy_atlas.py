@@ -224,35 +224,35 @@ def build_atlas_installer():
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', installer_zip_name, installer_app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-    if sys.platform.startswith('darwin'):
-        shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                     os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', installer_zip_name))
-        target_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static',
-                                     'packages')
-        if os.path.exists(os.path.join(target_folder, suffix)):
-            shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
-        shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
-    elif sys.platform.startswith('linux'):
-        subprocess.run(['scp', installer_zip_name,
-                        'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
-                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        subprocess.run(['rsync', '-av', '--delete', suffix,
-                        'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
-                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
-    else:
-        shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                     os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', installer_zip_name))
-        target_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static', 'packages')
-        if os.path.exists(os.path.join(target_folder, suffix)):
-            shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
-        shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
+    if 'feng' in os.path.expanduser("~"):
+        if sys.platform.startswith('darwin'):
+            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
+                         os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', installer_zip_name))
+            target_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static',
+                                         'packages')
+            if os.path.exists(os.path.join(target_folder, suffix)):
+                shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
+            shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
+        elif sys.platform.startswith('linux'):
+            subprocess.run(['scp', installer_zip_name,
+                            'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            subprocess.run(['rsync', '-av', '--delete', suffix,
+                            'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+            shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
+        else:
+            shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
+                         os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', installer_zip_name))
+            target_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static', 'packages')
+            if os.path.exists(os.path.join(target_folder, suffix)):
+                shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
+            shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
 
 
 def deploy_atlas():
     build_atlas_package()
-    if 'feng' in os.path.expanduser("~"):
-        build_atlas_installer()
+    build_atlas_installer()
 
 
 if __name__ == "__main__":

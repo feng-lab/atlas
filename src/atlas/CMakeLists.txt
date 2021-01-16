@@ -8,11 +8,6 @@ cmake_policy(SET CMP0074 NEW)
 
 # main stuff
 
-if (WIN32)
-  set(ZLIB_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/zlib)
-  find_package(ZLIB)
-endif (WIN32)
-
 # OpenSSL installation directory can be configured by setting OPENSSL_ROOT_DIR
 # We expect to locate OpenSSL using the built-in cmake module as the openssl
 # project itself does not provide installation support in its CMakeLists.txt

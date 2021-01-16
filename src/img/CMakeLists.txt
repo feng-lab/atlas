@@ -377,7 +377,7 @@ endif (WIN32)
 target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTURBO_LIBRARIES}
                       png_static ${JPEGXR_LIBRARIES} ${FREEIMAGE_LIBRARIES} ${CPUINFO_LIBRARIES}
                       hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen Boost::headers
-                      GeometricTools glm::glm range-v3::range-v3
+                      GeometricTools glm::glm
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
                       glog::glog ${_QT_LIBS_})
 

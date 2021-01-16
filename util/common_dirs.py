@@ -27,12 +27,6 @@ def atlas_repository_dir() -> str:
     return res
 
 
-def build_tools_dir() -> str:
-    res = os.path.join(atlas_repository_dir(), 'util', 'build_tools')
-    assert os.path.exists(res)
-    return res
-
-
 def atlas_src_dir() -> str:
     res = os.path.join(atlas_repository_dir(), 'src')
     assert os.path.exists(res)
@@ -54,7 +48,7 @@ def ext_build_dir() -> str:
 
 
 def ext_conda_build_dir() -> str:
-    res = os.path.join(atlas_src_dir(), '3rdparty', 'conda_build')
+    res = os.path.join(ext_build_dir(), 'conda_build')
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
@@ -86,12 +80,18 @@ def resource_dir() -> str:
 
 
 def src_package_dir() -> str:
-    res = os.path.join(os.path.normpath(os.path.join(atlas_repository_dir(), '..')), 'atlas_others')
+    res = os.path.join(os.path.expanduser('~'), 'atlas_deps')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
-            res = os.path.join('Z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_others')
+            res = os.path.join('Z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_deps')
         else:
-            res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_others')
+            res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_deps')
+    assert os.path.exists(res)
+    return res
+
+
+def atlas_test_data_dir() -> str:
+    res = os.path.normpath(os.path.join(src_package_dir(), '..', 'atlas_test_data'))
     assert os.path.exists(res)
     return res
 
@@ -133,6 +133,8 @@ def deploy_target_dir() -> str:
 def qt_install_dir() -> str:
     if sys.platform.startswith('win32'):
         res = os.path.join('C:', os.sep, 'Qt')
+        if not os.path.exists(res):
+            res = os.path.join(os.path.expanduser('~'), 'Qt')
     elif sys.platform.startswith('darwin'):
         res = os.path.join(os.path.expanduser('~'), 'Qt')
     else:
@@ -197,6 +199,8 @@ def vs_install_dir() -> str:
     assert sys.platform.startswith('win32')
 
     vsinstalldir = r'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community'
+    if not os.path.exists(vsinstalldir):
+        vsinstalldir = r'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise'
     assert os.path.exists(vsinstalldir)
 
     return vsinstalldir
@@ -245,6 +249,8 @@ def intel_sw_dir() -> str:
         res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries', 'windows')
     else:
         res = os.path.join(os.sep, 'opt', 'intel')
+    if not os.path.exists(res):
+        res = os.path.join(os.path.expanduser('~'), 'intel')
     assert os.path.exists(res)
     return res
 
@@ -252,8 +258,7 @@ def intel_sw_dir() -> str:
 def tbb_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries',
-                       'windows', 'redist', 'intel64', 'tbb', 'vc14')
+    res = os.path.join(intel_sw_dir(), 'redist', 'intel64', 'tbb', 'vc14')
     assert os.path.exists(res)
     return res
 
@@ -304,6 +309,13 @@ def remove_old_src_folder_with_glob(folder: str):
         raise Exception("Find more than one matching folders with pattern: " + folder)
 
 
+def get_7za_binary() -> str:
+    if is_windows():
+        return os.path.join(atlas_repository_dir(), 'util', '7za.exe')
+    else:
+        return '7za'
+
+
 def get_package_top_level_folder(file: str, folder: str):
     res = ''
     if file.lower().endswith('.zip'):
@@ -316,7 +328,8 @@ def get_package_top_level_folder(file: str, folder: str):
             names = [nm for nm in tf.getnames() if not nm == '.']
             res = os.path.join(folder, os.path.commonpath(names))
     elif file.lower().endswith('.7z'):
-        cp = subprocess.run(['7za', 'l', '-slt', '-sccUTF-8', file], stdout=subprocess.PIPE, encoding='utf-8')
+        cp = subprocess.run([get_7za_binary(), 'l', '-slt', '-sccUTF-8', file],
+                            stdout=subprocess.PIPE, encoding='utf-8')
         started = False
         filenames = []
         for line in cp.stdout.splitlines():
@@ -343,16 +356,11 @@ def unpack_file_to_folder(file: str, folder: str):
         with tarfile.open(file, mode='r|*') as tf:
             tf.extractall(path=folder)
     elif file.lower().endswith('.7z'):
-        if is_windows():
-            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
-                           shell=False, check=True, cwd=curr_dir())
-        else:
-            subprocess.run(['7za', 'x', '-y', '-o' + folder, file],
-                           shell=False, check=True)
+        subprocess.run([get_7za_binary(), 'x', '-y', '-o' + folder, file], shell=False, check=True)
 
 
 def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: str,
-                              tool_folder_glob_name=None, *, target_dir: str = build_tools_dir()) -> str:
+                              tool_folder_glob_name=None, *, target_dir: str = ext_build_dir()) -> str:
     if tool_folder_glob_name is None:
         tool_folder_glob_name = tool_package_glob_name
     package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
@@ -375,17 +383,17 @@ def install_cmake():
 
 # to install new version of ninja, delete existing binary in atlas/src/3rdparty/build/ninja
 def install_ninja():
-    target_dir = build_tools_dir()
+    target_dir = ext_build_dir()
     if os.path.exists(os.path.join(target_dir, 'ninja')) or os.path.exists(os.path.join(target_dir, 'ninja.exe')):
         return
     if is_windows():
         unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-win.zip'), target_dir)
     elif is_linux():
         unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-linux.zip'), target_dir)
-        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IXUSR)
+        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH)
     else:
         unpack_file_to_folder(os.path.join(src_package_dir(), 'ninja-mac.zip'), target_dir)
-        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IXUSR)
+        os.chmod(os.path.join(target_dir, 'ninja'), stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH)
 
 
 def install_ffmpeg():
@@ -411,32 +419,32 @@ def install_ffmpeg():
 
 def get_cmake_binary() -> str:
     if is_windows():
-        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*win*-x64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*win*-x64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     elif is_linux():
-        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*Linux*_64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*Linux*_64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     else:
-        cmake_folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'cmake-*macos*'))
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*macos*'))
         return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
 
 
 def get_ninja_binary() -> str:
     if is_windows():
-        return os.path.join(build_tools_dir(), 'ninja.exe')
+        return os.path.join(ext_build_dir(), 'ninja.exe')
     else:
-        return os.path.join(build_tools_dir(), 'ninja')
+        return os.path.join(ext_build_dir(), 'ninja')
 
 
 def get_ffmpeg_binary() -> str:
     if is_windows():
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*build*'))
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*build*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg*amd64*'))
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*amd64*'))
         return os.path.join(folder, 'ffmpeg')
     else:
-        folder = find_src_package_with_glob(os.path.join(build_tools_dir(), 'ffmpeg'))
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg'))
         return folder
 
 

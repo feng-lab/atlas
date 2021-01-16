@@ -10,7 +10,7 @@ if (BUILD_WITH_CONDA)
   set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/tbb)
 else ()
   # qt
-  include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/QtInfo.cmake)
+  include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
   # tbb
   # set(TBB_DIR ${CMAKE_CURRENT_LIST_DIR})
 endif ()
@@ -29,11 +29,10 @@ if (BUILD_WITH_CONDA)
                PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
   set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
 else ()
+  message(STATUS "INTEL_PATH: ${INTEL_PATH}")
   if (WIN32)
-    set(INTEL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\compiler")
-    set(MKL_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\mkl")
+    set(MKL_PATH "${INTEL_PATH}\\mkl")
   else (WIN32)
-    set(INTEL_PATH /opt/intel)
     set(MKL_PATH ${INTEL_PATH}/mkl)
   endif (WIN32)
   set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
@@ -57,9 +56,8 @@ else ()
 
   # ipp
   if (WIN32)
-    set(IPP_PATH "C:\\Program Files (x86)\\IntelSWTools\\compilers_and_libraries\\windows\\ipp")
+    set(IPP_PATH "${INTEL_PATH}\\ipp")
   else (WIN32)
-    set(INTEL_PATH /opt/intel)
     set(IPP_PATH ${INTEL_PATH}/ipp)
   endif (WIN32)
   set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
@@ -111,7 +109,6 @@ endif (WIN32)
 message(STATUS "CPUINFO_INCLUDE_DIRS: ${CPUINFO_INCLUDE_DIRS}")
 message(STATUS "CPUINFO_LIBRARIES: ${CPUINFO_LIBRARIES}")
 
-#find_package(libjpeg REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libjpeg-turbo NO_DEFAULT_PATH)
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
 if (WIN32)
@@ -133,14 +130,6 @@ print_target_properties(ZLIB::ZLIB)
 include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libpng/libpng16.cmake)
 set(PNG_INCLUDE_DIRS ${PNG_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include/libpng16)
-#if (WIN32)
-#  set(PNG_LIBRARIES ${PNG_LIBRARIES}
-#      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libpng/lib/png-static.lib)
-#else (WIN32)
-#  set(PNG_LIBRARIES ${PNG_LIBRARIES}
-#      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libpng/lib/libpng.a)
-#endif (WIN32)
-#find_package(libpng16 REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/libpng/lib/libpng NO_DEFAULT_PATH)
 message(STATUS "PNG_INCLUDE_DIRS: ${PNG_INCLUDE_DIRS}")
 print_target_properties(png_static)
 
@@ -220,8 +209,7 @@ find_package(gflags REQUIRED
 print_target_properties(gflags)
 print_target_properties(gflags_static)
 find_package(glog REQUIRED
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build
-             NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(glog::glog)
 
 add_library(GeometricTools INTERFACE IMPORTED)
@@ -234,10 +222,10 @@ set_target_properties(glm::glm PROPERTIES
                       INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/glm")
 print_target_properties(glm::glm)
 
-add_library(range-v3::range-v3 INTERFACE IMPORTED)
-set_target_properties(range-v3::range-v3 PROPERTIES
-                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/range-v3/include")
-print_target_properties(range-v3::range-v3)
+#add_library(range-v3::range-v3 INTERFACE IMPORTED)
+#set_target_properties(range-v3::range-v3 PROPERTIES
+#                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/range-v3/include")
+#print_target_properties(range-v3::range-v3)
 
 find_package(HDF5 REQUIRED
              COMPONENTS C CXX static

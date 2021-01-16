@@ -1,0 +1,137 @@
+name: macOS
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+#env:
+  # DEVELOPER_DIR: /Applications/Xcode_12.3.app/Contents/Developer
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: check envs
+        shell: bash -l {0}
+        run: |
+          ls -n /Applications/ | grep Xcode*
+          env
+
+#      - uses: actions/checkout@v2
+#        with:
+#          fetch-depth: 1
+#          submodules: 'recursive'
+#
+#      - uses: conda-incubator/setup-miniconda@v2
+#        with:
+#          auto-update-conda: true
+#          python-version: 3.8
+#          miniconda-version: "latest"
+#          activate-environment: test
+#
+#      - name: install conda packages
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          conda list
+#          conda update --all -y
+#          conda install tbb-devel mkl-devel qt numpy python wget anaconda-client conda-build conda-verify
+#          conda list
+#          conda clean --all -y
+#
+#      - name: download qt
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q https://fenglab.xyz/static/deps/macOS/dep-qt-2021-01-17.zip
+#          unzip -q dep-qt-2021-01-17.zip
+#          rm dep-qt-2021-01-17.zip
+#
+#      - name: download intel
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q https://fenglab.xyz/static/deps/macOS/dep-intel-2021-01-17.zip
+#          unzip -q dep-intel-2021-01-17.zip
+#          rm dep-intel-2021-01-17.zip
+#
+#      - uses: actions/cache@v2
+#          id: cache-deps
+#          with:
+#            path: $GITHUB_WORKSPACE/src/3rdparty/build
+#            key: ${{ runner.os }}-deps-2021-01-19
+#
+#      - name: download deps
+#        if: steps.cache-deps.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q https://fenglab.xyz/static/deps/common/atlas-deps-2021-01-19.zip
+#          unzip -q atlas-deps-2021-01-19.zip
+#          rm atlas-deps-2021-01-19.zip
+#
+#      - name: build deps
+#        if: steps.cache-deps.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          ANACONDA_PASSWORD: ${{ secrets.ANACONDA_PASSWORD }}
+#        run: |
+#          conda info
+#          cd $GITHUB_WORKSPACE
+#          pwd
+#          python util/build_ext_libs.py all
+#          anaconda login --username fenglab --password "$ANACONDA_PASSWORD"
+#          conda config --set anaconda_upload yes
+#          conda-build conda-opencv-recipe
+#          conda-build zimg-recipe
+#
+#      - name: build
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd $GITHUB_WORKSPACE
+#          pwd
+#          python util/build_atlas.py
+#
+#      - name: download test data
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q https://fenglab.xyz/static/deps/common/atlas-test-data-2021-01-18.zip
+#          unzip -q atlas-test-data-2021-01-18.zip
+#          rm atlas-test-data-2021-01-18.zip
+#
+#      - name: test
+#        shell: bash -l {0}
+#        env:
+#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+#          SSH_PORT: ${{ secrets.SSH_PORT }}
+#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+#          SSH_DEPLOYPATH: ${{ secrets.SSH_DEPLOYPATH }}
+#          SSH_KEY_PATH: ${{ github.workspace }}/../private.key
+#        run: |
+#          conda info
+#          cd $GITHUB_WORKSPACE
+#          pwd
+#          python util/deploy_atlas.py
+#          mkdir -p ~/.ssh/
+#          echo "$SSH_PRIVATE_KEY" > ../private.key
+#          sudo chmod 600 ../private.key
+#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+#          cd $GITHUB_WORKSPACE/deploy
+#          rsync -av --delete -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' macOS $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/packages/
+#          rsync -av -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/installers/

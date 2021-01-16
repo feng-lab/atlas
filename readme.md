@@ -1,3 +1,9 @@
+# Atlas
+
+[![macOS](https://github.com/feng-lab/atlas/workflows/macOS/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:macOS)
+[![linux](https://github.com/feng-lab/atlas/workflows/linux/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:linux)
+[![windows](https://github.com/feng-lab/atlas/workflows/windows/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:windows)
+
 ## Installation
 ### macOS:
 * install xcode
@@ -23,7 +29,7 @@
 * install intel oneapi basekit with apt
 
 ### All:
-* `atlas_others` folder and repository folder should be in same directory
+* `atlas_deps` folder and `atlas_test_data` folder should be in home directory
 * get submodules
     ```bash
     git submodule update --init --recursive

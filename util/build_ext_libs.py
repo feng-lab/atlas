@@ -36,15 +36,16 @@ def update_or_clone_git_repository_with_submodules(repository_folder: str, repos
                        shell=False, check=True)
 
 
-def export_git_repository(repository_folder: str, target_folder: str, branch: str = '', tag: str = ''):
-    if not branch:
-        branch = 'master'
-    shutil.rmtree(target_folder, ignore_errors=True)
-    subprocess.run(['git', 'clone', '--shared', '--branch', branch, repository_folder, target_folder],
-                   shell=False, check=True)
-    if tag:
-        subprocess.run(['git', 'checkout', tag], cwd=target_folder, shell=False, check=True)
-    shutil.rmtree(os.path.join(target_folder, '.git'), ignore_errors=False)
+# do not use, might cause error when delete the .git folder
+# def export_git_repository(repository_folder: str, target_folder: str, branch: str = '', tag: str = ''):
+#     if not branch:
+#         branch = 'master'
+#     shutil.rmtree(target_folder, ignore_errors=True)
+#     subprocess.run(['git', 'clone', '--shared', '--branch', branch, repository_folder, target_folder],
+#                    shell=False, check=True)
+#     if tag:
+#         subprocess.run(['git', 'checkout', tag], cwd=target_folder, shell=False, check=True)
+#     shutil.rmtree(os.path.join(target_folder, '.git'), ignore_errors=False)
 
 
 def update_git_submodule(target_folder: str, tag: str = None):
@@ -67,6 +68,8 @@ def cleanup_git_submodule(target_folder: str):
 
 def create_build_dir(src_dir: str):
     build_dir = os.path.normpath(os.path.join(ext_build_dir(), '__' + Path(src_dir).name))
+    if src_dir.endswith('ITK'):
+        build_dir = os.path.normpath(os.path.join(ext_build_dir(), '_I'))  # ITK windows build dir length limit
     shutil.rmtree(build_dir, ignore_errors=True)
     os.mkdir(build_dir)
     return build_dir
@@ -136,20 +139,18 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 
 
 def get_tbb_env():
-    if is_windows():
-        env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
-                                                            'tbbvars.bat'),
-                                               para='intel64 vs2017',
-                                               start_env=get_vcvars_environment())
-    else:
-        if is_linux():
-            env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
-                                                                'tbbvars.sh'), 'intel64')
-        else:
-            env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin',
-                                                                'tbbvars.sh'))
-    if 'TBB_ROOT' not in env:
-        env['TBB_ROOT'] = env['TBBROOT']
+    # if is_windows():
+    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.bat'),
+    #                                            para='intel64 vs2017',
+    #                                            start_env=get_vcvars_environment())
+    # elif is_linux():
+    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.sh'),
+    #                                            para='intel64')
+    # else:
+    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.sh'))
+    env = get_vcvars_environment() if is_windows() else os.environ.copy()
+    env['TBBROOT'] = os.path.join(intel_sw_dir(), 'tbb')
+    env['TBB_ROOT'] = env['TBBROOT']
     return env
 
 
@@ -1061,10 +1062,20 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
 def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'add_subdirectory(blas',
+                                          r'add_subdirectory(lapack'],
+                              to_texts=[r'set(blas',
+                                        r'set(lapack'])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
-        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF'])
+        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         '-DEIGEN_BUILD_DOC:BOOL=OFF',
+                         ])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -1084,6 +1095,7 @@ def build_eigen(src_dir: str, install_dir: str):
         #                          ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
@@ -1091,6 +1103,9 @@ def build_suitesparse(src_dir: str, install_dir: str):
 
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        cmakecmd.extend(['-DINTEL_PATH=' + intel_sw_dir(),
+                         ])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -1698,6 +1713,10 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                        from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
                                        to_texts=[r'set(_packages_path "Lib/site-packages")'])
         else:
+            cmakecmd.extend([
+                '-DMKL_ROOT_DIR=' + os.path.join(intel_sw_dir(), 'mkl'),
+                ])
+
             orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
             bak_file = patch_file(orig_file,
                                   from_texts=[r'macro(mkl_fail)',
@@ -1942,36 +1961,44 @@ def build_libs(libs: dict, update_src: bool):
         if is_windows():
             unpack_tool_to_target_dir(src_package_dir(), 'curl*win*')
 
-    if libs['tbb']:
+    if libs['make-cmake-pathlist']:
+        with open(os.path.join(ext_build_dir(), 'PathList.cmake'), mode='w', encoding='utf-8') as file:
+            file.write('# Set PATH for CMake\n')
+            file.write(f'set(QT_VERSION {qt_ver()})\n')
+            if is_windows():
+                file.write('set(QT_HOST_PATH {0})\n'.format(qt_base_dir().replace("\\", "/")))
+                file.write('set(INTEL_PATH {0})\n'.format(intel_sw_dir().replace("\\", "/")))
+            else:
+                file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
+                file.write(f'set(INTEL_PATH {intel_sw_dir()})\n')
+
         subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
                        cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)
 
+    if libs['tbb']:
+        print('no action')
+
     if libs['qt']:
         print(f'Qt {qt_ver()} in {qt_base_dir()}')
-        with open(os.path.join(ext_build_dir(), 'QtInfo.cmake'), mode='w', encoding='utf-8') as file:
-            file.write('# Set Qt related variables\n')
-            file.write(f'set(QT_VERSION {qt_ver()})\n')
-            if sys.platform.startswith('win32'):
-                file.write('set(QT_HOST_PATH {0})\n'.format(qt_base_dir().replace("\\", "/")))
-                # also need to patch Qt
-                orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
-                bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
-                if not os.path.exists(bak_file):
-                    os.rename(orig_file, bak_file)
-                    with open(bak_file, mode='r', encoding='utf-8') as f:
-                        from_lines = f.readlines()
-                    with open(orig_file, mode='w', encoding='utf-8') as f:
-                        to_lines = []
-                        for line in from_lines:
-                            line = line.replace(
-                                r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
-                                r'#if defined(_MSC_VER) || '
-                                r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
-                            f.write(line)
-                            to_lines.append(line)
-                    print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
-            else:
-                file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
+        if is_windows():
+            # patch Qt, not necessary for qt6
+            orig_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h')
+            bak_file = os.path.join(qt_base_dir(), 'include', 'QtCore', 'qglobal.h.bak')
+            if not os.path.exists(bak_file):
+                os.rename(orig_file, bak_file)
+                with open(bak_file, mode='r', encoding='utf-8') as f:
+                    from_lines = f.readlines()
+                with open(orig_file, mode='w', encoding='utf-8') as f:
+                    to_lines = []
+                    for line in from_lines:
+                        line = line.replace(
+                            r'#if defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14',
+                            r'#if defined(_MSC_VER) || '
+                            r'defined(__cpp_variable_templates) && __cpp_variable_templates >= 201304 // C++14')
+                        f.write(line)
+                        to_lines.append(line)
+                print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
+
         # patch installer framework
         pattern_bytes = b'Mozilla/5.0'
         replace_bytes = b'Mozilla/590'
@@ -2006,7 +2033,8 @@ def build_libs(libs: dict, update_src: bool):
 
     if libs['ffmpeg']:
         install_ffmpeg()
-        shutil.copy2(get_ffmpeg_binary(), ext_build_dir())
+        if is_windows() or is_linux():
+            shutil.copy2(get_ffmpeg_binary(), ext_build_dir())
 
     if libs['boost']:
         package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'boost*'))
@@ -2035,6 +2063,10 @@ def build_libs(libs: dict, update_src: bool):
     if libs['glm']:
         if update_src:
             update_git_submodule(os.path.join(ext_dir(), 'glm'))
+
+    if libs['magic_enum']:
+        if update_src:
+            update_git_submodule(os.path.join(ext_dir(), 'magic_enum'))
 
     if libs['googletest']:
         if update_src:
@@ -2359,12 +2391,12 @@ def build_libs(libs: dict, update_src: bool):
 
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
-                'pybind11', 'cppitertools', 'glm', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
+    lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
+                'pybind11', 'cppitertools', 'glm', 'magic_enum', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia'
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 

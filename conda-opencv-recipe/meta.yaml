@@ -3,7 +3,7 @@ package:
   version: {{ datetime.datetime.today().strftime('%Y.%m.%d.%H') }}
 
 source:
-  path: ../src/3rdparty/conda_build
+  path: ../src/3rdparty/build/conda_build
 
 build:
   number: 0

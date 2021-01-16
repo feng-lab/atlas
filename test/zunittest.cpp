@@ -2,24 +2,24 @@
 
 #include <QDir>
 
-namespace  {
+namespace nim {
 
 QDir getTestDataDir()
 {
 #ifdef _WIN32
-  QDir res("Z:\\Google Drive\\code\\my\\atlas_others\\atlas_test_data");
+  QDir res("Z:\\Google Drive\\code\\my\\atlas_test_data");
   if (!res.exists()) {
-    res = QDir(QDir::homePath() + "\\code\\atlas_others\\atlas_test_data");
+    res = QDir(QDir::homePath() + "\\atlas_test_data");
   }
   return res;
 #elif defined(__APPLE__)
-  QDir res(QDir::homePath() + "/Google Drive/code/my/atlas_others/atlas_test_data");
+  QDir res(QDir::homePath() + "/Google Drive/code/my/atlas_test_data");
   if (!res.exists()) {
-    res = QDir(QDir::homePath() + "/code/atlas_others/atlas_test_data");
+    res = QDir(QDir::homePath() + "/atlas_test_data");
   }
   return res;
 #else
-  QDir res(QDir::homePath() + "/code/atlas_others/atlas_test_data");
+  QDir res(QDir::homePath() + "/atlas_test_data");
   return res;
 #endif
 }
