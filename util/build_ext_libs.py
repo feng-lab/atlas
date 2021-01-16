@@ -210,7 +210,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
                '-DCMAKE_CXX_EXTENSIONS=OFF',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
-               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
+               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}',
+               '-DCMAKE_LIBRARY_ARCHITECTURE=x86_64',
                ]
         if use_clang_cl():
             res.extend(['-DCMAKE_CXX_COMPILER=clang-cl',
@@ -234,7 +235,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
                '-DCMAKE_CXX_EXTENSIONS=' + ('ON' if cpp_extention else 'OFF'),
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
-               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
+               f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}',
+               '-DCMAKE_LIBRARY_ARCHITECTURE=x86_64',
                ]
         if use_ninja:
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
@@ -914,6 +916,7 @@ def build_folly(src_dir: str, install_dir: str):
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file4 = bak_file4 = None
+    orig_file6 = bak_file6 = None
     try:
         if is_mac():
             orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
@@ -985,6 +988,15 @@ def build_folly(src_dir: str, install_dir: str):
                                          'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
                                          ])
 
+        if is_windows():
+            orig_file6 = os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake')
+            bak_file6 = patch_file(orig_file6,
+                                   from_texts=[r'find_library(LIBSODIUM_LIBRARY NAMES sodium)',
+                                               ],
+                                   to_texts=[
+                                       r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
+                                   ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DPYTHON_EXTENSIONS:BOOL=OFF',
@@ -1001,6 +1013,8 @@ def build_folly(src_dir: str, install_dir: str):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
+        if is_windows():
+            os.replace(bak_file6, orig_file6)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
