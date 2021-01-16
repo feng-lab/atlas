@@ -256,6 +256,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_CXX_EXTENSIONS=OFF',
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
+               '-DCMAKE_OSX_ARCHITECTURES=x86_64',
+               '-DCMAKE_LIBRARY_ARCHITECTURE=x86_64',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -938,6 +940,12 @@ def build_folly(src_dir: str, install_dir: str):
                                            r'find_package(Zstd MODULE)',
                                            r'find_package(Snappy MODULE)',
                                            r'find_package(Libsodium)',
+                                           r'find_package(Glog MODULE)',
+                                           r'find_package(LibDwarf)',
+                                           r'find_package(Libiberty)',
+                                           r'find_package(LibAIO)',
+                                           r'find_package(LibUring)',
+                                           r'find_package(LibUnwind)',
                                            ],
                                to_texts=[r'',
                                          r'',
@@ -948,9 +956,15 @@ def build_folly(src_dir: str, install_dir: str):
                                          r'find_package(BZip2 MODULE REQUIRED)',
                                          r'find_package(LibLZMA MODULE REQUIRED)',
                                          r'find_package(LZ4 MODULE REQUIRED)',
-                                         r'find_package(Zstd MODULE REQUIRED)',
-                                         r'find_package(Snappy MODULE REQUIRED)',
-                                         r'find_package(Libsodium REQUIRED)',
+                                         r'find_package(ZSTD MODULE REQUIRED)',
+                                         r'find_package(SNAPPY MODULE REQUIRED)',
+                                         r'find_package(LIBSODIUM MODULE REQUIRED)',
+                                         r'find_package(glog MODULE REQUIRED)',
+                                         r'find_package(LIBDWARF)',
+                                         r'find_package(LIBIBERTY)',
+                                         r'find_package(LIBAIO)',
+                                         r'find_package(LIBURING)',
+                                         r'find_package(LIBUNWIND)',
                                          ])
 
         orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
