@@ -369,7 +369,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -394,7 +394,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
     }
   }
 //  if (!progress->wasCanceled()) {
-//    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+//    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
 //    QString filepath = tmpdir.filePath(filename);
 //    if (checkOverwrite) {
 //      if (tmpdir.exists(filename)) {
@@ -492,7 +492,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -517,7 +517,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
     }
   }
 //  if (!progress->wasCanceled()) {
-//    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+//    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
 //    QString filepath = tmpdir.filePath(filename);
 //    if (checkOverwrite) {
 //      if (tmpdir.exists(filename)) {
@@ -605,7 +605,7 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -630,7 +630,7 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
     }
   }
   if (!progress->wasCanceled()) {
-    QString filename = QString("%1%2.tif").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {

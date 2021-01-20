@@ -396,7 +396,7 @@ bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& name
       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
     //resetCameraClippingRange();
     auto fieldWidth = numDigits(numFrame);
-    auto filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     auto filepath = dir.filePath(filename);
     if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
       res = false;
@@ -433,7 +433,7 @@ bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, c
       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
     //resetCameraClippingRange();
     auto fieldWidth = numDigits(numFrame);
-    auto filename = QString("%1%2.tif").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     auto filepath = dir.filePath(filename);
     if (!takeScreenShot(filepath, sst)) {
       res = false;

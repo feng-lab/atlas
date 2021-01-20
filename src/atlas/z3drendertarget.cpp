@@ -6,7 +6,6 @@
 #include "z3dgpuinfo.h"
 #include "zimg.h"
 #include <QImage>
-#include <QImageWriter>
 #include <memory>
 
 namespace nim {
@@ -386,11 +385,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString& filename)
     glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, colorBuffer.get());
     QImage upsideDownImage(colorBuffer.get(), m_size.x, m_size.y, QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);
-    QImageWriter writer(filename);
-    writer.setCompression(1);
-    if (!writer.write(image)) {
-      LOG(ERROR) << writer.errorString();
-    }
+    ZImg::fromQImage(image).save(filename);
   }
   catch (ZException const& e) {
     release();

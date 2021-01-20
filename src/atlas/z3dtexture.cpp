@@ -5,7 +5,6 @@
 #include "zimg.h"
 #include "zimgformat.h"
 #include <QImage>
-#include <QImageWriter>
 
 namespace nim {
 
@@ -334,11 +333,7 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
     downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
     QImage upsideDownImage(colorBuffer.get(), width(), height(),QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);
-    QImageWriter writer(filename);
-    writer.setCompression(1);
-    if (!writer.write(image)) {
-      LOG(ERROR) << writer.errorString();
-    }
+    ZImg::fromQImage(image).save(filename);
   }
   catch (ZException const& e) {
     LOG(ERROR) << "Exception: " << e.what();

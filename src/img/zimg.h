@@ -9,6 +9,8 @@
 #include "zlog.h"
 #include <QStringList>
 
+class QImage;
+
 namespace nim {
 
 // Macro to call the correct version of typed function
@@ -1737,6 +1739,8 @@ public:
 
   // from alpha pre-multiplied color to normal color, assume last channel is alpha channel
   ZImg& correctPreMultipliedColor();
+
+  static ZImg fromQImage(const QImage& image);
 
 #ifdef _NEUTUBE_
   // only for interface with zstack

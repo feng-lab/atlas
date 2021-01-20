@@ -34,7 +34,7 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
 #endif
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
-            << (QString("%1/%2% 0%3d.tif").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
+            << (QString("%1/%2% 0%3d.png").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
             << "-c:v" << "libx264" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
             << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
   LOG(INFO) << program << " " << arguments.join(" ");

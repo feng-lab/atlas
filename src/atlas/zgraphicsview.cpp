@@ -1,11 +1,10 @@
 #include "zgraphicsview.h"
 
-#include "zlog.h"
+#include "zimg.h"
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QWheelEvent>
 #include <QScrollBar>
-#include <QImageWriter>
 #include <QPinchGesture>
 #include <QPanGesture>
 
@@ -87,37 +86,39 @@ void ZGraphicsView::fitRect(const QRectF& rect)
 
 bool ZGraphicsView::renderToImage(const QString& filename, QString* err)
 {
-  QRect vp = viewport()->rect();
-  QImage img(vp.width(), vp.height(), QImage::Format_ARGB32_Premultiplied);
-  img.fill(0);
-  QPainter painter(&img);
-  painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
-  render(&painter);
-  QImageWriter writer(filename);
-  writer.setCompression(1);
-  if (!writer.write(img)) {
-    if (err)
-      *err = writer.errorString();
+  try {
+    QRect vp = viewport()->rect();
+    QImage img(vp.width(), vp.height(), QImage::Format_ARGB32);
+    img.fill(0);
+    QPainter painter(&img);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
+    render(&painter);
+    ZImg::fromQImage(img).save(filename);
+    return true;
+  }
+  catch (const ZException& e) {
+    *err = QString(e.what());
+    LOG(ERROR) << "Exception: " << e.what();
     return false;
   }
-  return true;
 }
 
 bool ZGraphicsView::renderToImage(const QString& filename, int width, int height, QString* err)
 {
-  QImage img(width, height, QImage::Format_ARGB32_Premultiplied);
-  img.fill(0);
-  QPainter painter(&img);
-  painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
-  render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
-  QImageWriter writer(filename);
-  writer.setCompression(1);
-  if (!writer.write(img)) {
-    if (err)
-      *err = writer.errorString();
+  try {
+    QImage img(width, height, QImage::Format_ARGB32);
+    img.fill(0);
+    QPainter painter(&img);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
+    render(&painter, QRectF(), QRect(), Qt::KeepAspectRatioByExpanding);
+    ZImg::fromQImage(img).save(filename);
+    return true;
+  }
+  catch (const ZException& e) {
+    *err = QString(e.what());
+    LOG(ERROR) << "Exception: " << e.what();
     return false;
   }
-  return true;
 }
 
 void ZGraphicsView::scaleParaChanged()

@@ -428,12 +428,8 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
       QString str = QString("Image %1").arg(i + 1);
       painter.drawText(rect, str);
     }
-    QImageWriter writer(selectionImageOutputName);
-    if (!writer.write(image)) {
-      LOG(ERROR) << writer.errorString();
-    } else {
-      LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
-    }
+    ZImg::fromQImage(image).save(selectionImageOutputName);
+    LOG(INFO) << QString("%1 saved.").arg(selectionImageOutputName);
   }
 }
 
