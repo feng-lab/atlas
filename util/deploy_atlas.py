@@ -39,7 +39,7 @@ def build_atlas_package():
     print('deployTargetDIR:', common_dirs.deploy_target_dir())
     print('qtBaseDIR:', common_dirs.qt_base_dir())
 
-    if sys.platform.startswith('darwin'):
+    if common_dirs.is_mac():
         app_name = 'Atlas.app'
         zip_name = 'atlas-macOS.zip'
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True)
@@ -63,9 +63,9 @@ def build_atlas_package():
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
-    elif sys.platform.startswith('linux'):
+    elif common_dirs.is_linux():
         app_name = "Atlas"
-        zip_name = "atlas-linux.zip"
+        zip_name = "atlas-Linux.zip"
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
         if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
             os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
@@ -84,7 +84,7 @@ def build_atlas_package():
             sys.exit(1)
     else:
         app_name = 'Atlas.exe'
-        zip_name = 'atlas-windows.zip'
+        zip_name = 'atlas-Windows.zip'
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
         if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
             os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
@@ -129,40 +129,40 @@ def build_atlas_package():
 
 
 def build_atlas_installer():
-    if sys.platform.startswith('darwin'):
+    if common_dirs.is_mac():
+        suffix = 'macOS'
         app_name = 'Atlas.app'
         repo_package_name = 'atlas.7z'
         mt_app_name = '.tempMaintenanceTool'
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.app'
-        installer_zip_name = 'AtlasInstaller-macOS.zip'
-        suffix = 'macOS'
-    elif sys.platform.startswith('linux'):
+        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
+    elif common_dirs.is_linux():
+        suffix = 'Linux'
         app_name = 'Atlas.AppDir'
         repo_package_name = 'atlas.7z'
         mt_app_name = '.tempMaintenanceTool'
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller'
-        installer_zip_name = 'AtlasInstaller-linux.zip'
-        suffix = 'linux'
+        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
     else:
+        suffix = 'Windows'
         app_name = 'Atlas'
         repo_package_name = 'atlas.7z'
         mt_app_name = 'tempMaintenanceTool.exe'
         mt_repo_package_name = 'MaintenanceTool.7z'
         installer_base_name = 'AtlasInstaller'
         installer_app_name = 'AtlasInstaller.exe'
-        installer_zip_name = 'AtlasInstaller-windows.zip'
-        suffix = 'windows'
+        installer_zip_name = f'AtlasInstaller-{suffix}.zip'
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), repo_package_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), repo_package_name))
     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=True)
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name))
-    if sys.platform.startswith('darwin'):
+    if common_dirs.is_mac():
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), ignore_errors=True)
     elif os.path.exists(os.path.join(common_dirs.deploy_target_dir(), installer_app_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), installer_app_name))
@@ -175,7 +175,7 @@ def build_atlas_installer():
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), mt_app_name)):
         os.remove(os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
-    if sys.platform.startswith('win'):
+    if common_dirs.is_windows():
         shutil.copy(os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'installerbase.exe'),
                     os.path.join(common_dirs.deploy_target_dir(), mt_app_name))
     else:
@@ -217,7 +217,7 @@ def build_atlas_installer():
                     installer_base_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-    if sys.platform.startswith('win'):
+    if common_dirs.is_windows():
         zipfile.ZipFile(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name), mode='w') \
             .write(os.path.join(common_dirs.deploy_target_dir(), installer_app_name), arcname=installer_app_name)
     else:
@@ -225,7 +225,7 @@ def build_atlas_installer():
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
     if 'feng' in os.path.expanduser("~"):
-        if sys.platform.startswith('darwin'):
+        if common_dirs.is_mac():
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', installer_zip_name))
             target_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static',
@@ -233,7 +233,7 @@ def build_atlas_installer():
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
-        elif sys.platform.startswith('linux'):
+        elif common_dirs.is_linux():
             subprocess.run(['scp', installer_zip_name,
                             'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)

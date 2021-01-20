@@ -2401,7 +2401,7 @@ def parse_inputs(argv: list):
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['botan', 'ospray', 'ants', 'skia']
+    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'conda-zimg']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
@@ -2481,7 +2481,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
             build_all = build_all and libs[lib]
     if build_all:
         shutil.rmtree(ext_build_dir(), ignore_errors=True)
-        shutil.rmtree(ext_conda_build_dir(), ignore_errors=True)
 
     if is_linux():
         libs['curl'] = False

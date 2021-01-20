@@ -1,8 +1,8 @@
 # Atlas
 
 [![macOS](https://github.com/feng-lab/atlas/workflows/macOS/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:macOS)
-[![linux](https://github.com/feng-lab/atlas/workflows/linux/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:linux)
-[![windows](https://github.com/feng-lab/atlas/workflows/windows/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:windows)
+[![Linux](https://github.com/feng-lab/atlas/workflows/Linux/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:Linux)
+[![Windows](https://github.com/feng-lab/atlas/workflows/Windows/badge.svg)](https://github.com/feng-lab/atlas/actions?query=workflow:Windows)
 
 ## Installation
 ### macOS:

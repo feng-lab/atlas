@@ -43,48 +43,57 @@ jobs:
 #          conda list
 #          conda clean --all -y
 #
-#      - name: download qt
+#      - name: download Qt
 #        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
 #        run: |
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q https://fenglab.xyz/static/deps/macOS/dep-qt-2021-01-17.zip
-#          unzip -q dep-qt-2021-01-17.zip
-#          rm dep-qt-2021-01-17.zip
+#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-17.zip
+#          unzip -q dep-Qt-2021-01-17.zip
+#          rm dep-Qt-2021-01-17.zip
 #
 #      - name: download intel
 #        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
 #        run: |
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q https://fenglab.xyz/static/deps/macOS/dep-intel-2021-01-17.zip
+#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-17.zip
 #          unzip -q dep-intel-2021-01-17.zip
 #          rm dep-intel-2021-01-17.zip
+#          cd $GITHUB_WORKSPACE/src/3rdparty
+#          mkdir build
+#          ls -la
 #
 #      - uses: actions/cache@v2
 #          id: cache-deps
 #          with:
 #            path: $GITHUB_WORKSPACE/src/3rdparty/build
-#            key: ${{ runner.os }}-deps-2021-01-19
+#            key: ${{ runner.os }}-deps-2021-01-21
 #
 #      - name: download deps
 #        if: steps.cache-deps.outputs.cache-hit != 'true'
 #        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
 #        run: |
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q https://fenglab.xyz/static/deps/common/atlas-deps-2021-01-19.zip
-#          unzip -q atlas-deps-2021-01-19.zip
-#          rm atlas-deps-2021-01-19.zip
+#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
+#          unzip -q atlas-deps-2021-01-21.zip
+#          rm atlas-deps-2021-01-21.zip
 #
 #      - name: build deps
 #        if: steps.cache-deps.outputs.cache-hit != 'true'
 #        shell: bash -l {0}
 #        env:
-#          $ANACONDA_API_TOKEN: ${{ secrets.$ANACONDA_API_TOKEN }}
+#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
 #        run: |
 #          conda info
 #          cd $GITHUB_WORKSPACE
@@ -92,7 +101,6 @@ jobs:
 #          python util/build_ext_libs.py all
 #          conda config --set anaconda_upload yes
 #          conda-build --token $ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
-#          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
 #
 #      - name: build
 #        shell: bash -l {0}
@@ -104,11 +112,13 @@ jobs:
 #
 #      - name: download test data
 #        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
 #        run: |
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q https://fenglab.xyz/static/deps/common/atlas-test-data-2021-01-18.zip
+#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
 #          unzip -q atlas-test-data-2021-01-18.zip
 #          rm atlas-test-data-2021-01-18.zip
 #
@@ -120,17 +130,33 @@ jobs:
 #          SSH_SERVER: ${{ secrets.SSH_SERVER }}
 #          SSH_PORT: ${{ secrets.SSH_PORT }}
 #          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOYPATH: ${{ secrets.SSH_DEPLOYPATH }}
-#          SSH_KEY_PATH: ${{ github.workspace }}/../private.key
+#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
 #        run: |
 #          conda info
 #          cd $GITHUB_WORKSPACE
 #          pwd
 #          python util/deploy_atlas.py
 #          mkdir -p ~/.ssh/
-#          echo "$SSH_PRIVATE_KEY" > ../private.key
-#          sudo chmod 600 ../private.key
+#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+#          sudo chmod 600 ~/.ssh/private.key
 #          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 #          cd $GITHUB_WORKSPACE/deploy
-#          rsync -av --delete -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' macOS $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/packages/
-#          rsync -av -e 'ssh -p $SSH_PORT -i $SSH_KEY_PATH' AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/installers/
+#          rsync -avv --delete -e 'ssh -p $SSH_PORT -i ~/.ssh/private.key' ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+#          rsync -tvv -e 'ssh -p $SSH_PORT -i ~/.ssh/private.key' AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+#          cd ../src/3rdparty
+#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
+#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
+#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
+#
+#      - name: build and upload conda zimg
+#        shell: bash -l {0}
+#        env:
+#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+#        run: |
+#          conda info
+#          cd $GITHUB_WORKSPACE
+#          pwd
+#          python util/build_ext_libs.py conda-zimg
+#          conda config --set anaconda_upload yes
+#          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe

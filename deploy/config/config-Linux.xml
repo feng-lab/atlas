@@ -5,25 +5,24 @@
     <Title>Atlas Installer</Title>
     <Publisher>fenglab</Publisher>
     <StartMenuDir>fenglab</StartMenuDir>
-    <TargetDir>@ApplicationsDirX64@/fenglab</TargetDir>
+    <TargetDir>/opt/fenglab</TargetDir>
     <ProductUrl>https://fenglab.xyz</ProductUrl>
     <InstallerWindowIcon>atlas</InstallerWindowIcon>
     <InstallerApplicationIcon>atlas</InstallerApplicationIcon>
-    <Logo>atlas.png</Logo>
     <Watermark>watermark.png</Watermark>
-    <RunProgram>@TargetDir@/Atlas/Atlas.exe</RunProgram>
+    <RunProgram>@TargetDir@/Atlas.AppDir/Atlas</RunProgram>
     <RunProgramDescription>Run Atlas now.</RunProgramDescription>
     <MaintenanceToolName>MaintenanceTool</MaintenanceToolName>
     <AllowNonAsciiCharacters>true</AllowNonAsciiCharacters>
 
     <RemoteRepositories>
         <Repository>
-            <Url>https://neutracing.com/static/packages/windows</Url>
+            <Url>https://neutracing.com/static/packages/Linux</Url>
             <Enabled>1</Enabled>
             <DisplayName>repository 1</DisplayName>
         </Repository>
         <Repository>
-            <Url>https://fenglab.xyz/static/packages/windows</Url>
+            <Url>https://fenglab.xyz/static/packages/Linux</Url>
             <Enabled>0</Enabled>
             <DisplayName>repository 2</DisplayName>
         </Repository>
