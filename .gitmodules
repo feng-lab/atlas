@@ -14,10 +14,6 @@
 	path = src/3rdparty/googletest
 	url = https://github.com/google/googletest.git
 	branch = master
-[submodule "src/3rdparty/ceres-solver"]
-	path = src/3rdparty/ceres-solver
-	url = https://github.com/ceres-solver/ceres-solver.git
-	branch = master
 [submodule "src/3rdparty/folly"]
 	path = src/3rdparty/folly
 	url = https://github.com/facebook/folly.git
@@ -105,3 +101,6 @@
 [submodule "src/3rdparty/magic_enum"]
 	path = src/3rdparty/magic_enum
 	url = https://github.com/Neargye/magic_enum.git
+[submodule "src/3rdparty/ceres-solver"]
+	path = src/3rdparty/ceres-solver
+	url = https://github.com/ceres-solver/ceres-solver.git
