@@ -6,10 +6,6 @@
 	path = src/3rdparty/pybind11
 	url = https://github.com/pybind/pybind11.git
 	branch = master
-[submodule "src/3rdparty/cppitertools"]
-	path = src/3rdparty/cppitertools
-	url = https://github.com/ryanhaining/cppitertools.git
-	branch = master
 [submodule "src/3rdparty/glm"]
 	path = src/3rdparty/glm
 	url = https://github.com/g-truc/glm.git
@@ -106,9 +102,6 @@
 	path = src/3rdparty/bzip2
 	url = https://gitlab.com/federicomenaquintero/bzip2.git
 	branch = master
-[submodule "src/3rdparty/range-v3"]
-	path = src/3rdparty/range-v3
-	url = https://github.com/ericniebler/range-v3.git
 [submodule "src/3rdparty/magic_enum"]
 	path = src/3rdparty/magic_enum
 	url = https://github.com/Neargye/magic_enum.git
