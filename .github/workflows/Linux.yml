@@ -39,7 +39,7 @@ jobs:
         shell: bash -l {0}
         run: |
           sudo apt -y update
-          sudo apt -y install nasm wget libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev p7zip-full git zip unzip rsync libfreetype-dev libfontconfig-dev
+          sudo apt -y install nasm wget libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev p7zip-full zip unzip rsync libfreetype-dev libfontconfig-dev
           g++ --version
           env
           cd ~
