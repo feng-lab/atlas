@@ -35,9 +35,11 @@ jobs:
 #          pwd
 #          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" *.xml $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/installers/
 
-      - name: check envs
+      - name: check envs and install packages
         shell: bash -l {0}
         run: |
+          sudo apt -y update
+          sudo apt -y install nasm wget libgl1-mesa-dev libxkbcommon-x11-0 libxrender-dev p7zip-full git zip unzip rsync libfreetype-dev libfontconfig-dev
           g++ --version
           env
           cd ~
@@ -64,7 +66,7 @@ jobs:
         run: |
           conda info
           conda update --all -y
-          conda install tbb-devel mkl-devel qt numpy python wget anaconda-client conda-build conda-verify
+          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
           conda list
           conda clean --all -y
 
@@ -137,8 +139,6 @@ jobs:
           conda info
           cd $GITHUB_WORKSPACE
           pwd
-          sudo apt update -y
-          sudo apt install nasm libgl1-mesa-dev libxkbcommon-x11-0 -y
           python util/build_ext_libs.py all
           conda config --set anaconda_upload yes
           conda-build --token $ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
