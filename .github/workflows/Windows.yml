@@ -12,34 +12,6 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: install some exes
-        shell: pwsh
-        run: |
-          choco install wget zip
-
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-          submodules: 'recursive'
-
-#      - name: test deploy
-#        shell: bash -l {0}
-#        env:
-#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-#        run: |
-#          mkdir -p ~/.ssh/
-#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-#          chmod 600 ~/.ssh/private.key
-#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-#          cd $GITHUB_WORKSPACE/deploy
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $SSH_DEPLOY_PATH/installers/AtlasInstaller-windows.zip"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key *.xml $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-
       - name: check envs
         shell: bash -l {0}
         run: |
@@ -48,173 +20,191 @@ jobs:
           du -h --max-depth=1 . | sort -h
           df -h
 
-      - name: use C
-        shell: bash -l {0}
-        run: |
-          cp -r $GITHUB_WORKSPACE ~/
-          cd ~
-          ls -la
-
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-update-conda: true
-          python-version: 3.8
-          miniconda-version: "latest"
-          activate-environment: test
-
-      - name: install conda packages
-        shell: bash -l {0}
-        run: |
-          conda info
-          conda list
-          conda update --all -y
-          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
-          conda list
-          conda clean --all -y
-
-#      - uses: actions/cache@v2
-#        id: cache-Qt
+#      - name: install some exes
+#        shell: pwsh
+#        run: |
+#          choco install wget zip
+#
+#      - uses: actions/checkout@v2
 #        with:
-#          path: ~/Qt
-#          key: ${{ runner.os }}-Qt-2021-01-18
-
-      - name: download Qt
-#        if: steps.cache-Qt.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
-          unzip -q dep-Qt-2021-01-18.zip
-          rm dep-Qt-2021-01-18.zip
-          ls -la
-
-#      - uses: actions/cache@v2
-#        id: cache-intel
+#          fetch-depth: 1
+#          submodules: 'recursive'
+#
+#      - name: check envs
+#        shell: bash -l {0}
+#        run: |
+#          env
+#          cd ~
+#          du -h --max-depth=1 . | sort -h
+#          df -h
+#
+#      - name: use C
+#        shell: bash -l {0}
+#        run: |
+#          cp -r $GITHUB_WORKSPACE ~/
+#          cd ~
+#          ls -la
+#
+#      - uses: conda-incubator/setup-miniconda@v2
 #        with:
-#          path: ~/intel
-#          key: ${{ runner.os }}-intel-2021-01-18
-
-      - name: download intel
-#        if: steps.cache-intel.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
-          unzip -q dep-intel-2021-01-18.zip
-          rm dep-intel-2021-01-18.zip
-          mv windows intel
-          cd ~/atlas/src/3rdparty
-          mkdir build
-          ls -la
-
-      - uses: actions/cache@v2
-        id: cache-deps
-        with:
-          path: ~/atlas/src/3rdparty/build
-          key: ${{ runner.os }}-deps-2021-01-21
-
-      - name: download deps
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          wget -q $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
-          unzip -q atlas-deps-2021-01-21.zip
-          rm atlas-deps-2021-01-21.zip
-
-      - name: build deps
-        if: steps.cache-deps.outputs.cache-hit != 'true'
-        shell: pwsh
-        env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-        run: |
-          conda info
-          cd ~/atlas
-          python util/build_ext_libs.py all
-          conda config --set anaconda_upload yes
-          conda-build --token $Env:ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
-
-      - name: build
-        shell: bash -l {0}
-        run: |
-          conda info
-          cd ~/atlas
-          pwd
-          python util/build_atlas.py
-
+#          auto-update-conda: true
+#          python-version: 3.8
+#          miniconda-version: "latest"
+#          activate-environment: test
+#
+#      - name: install conda packages
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          conda list
+#          conda update --all -y
+#          conda install tbb-devel mkl-devel qt numpy python anaconda-client conda-build conda-verify
+#          conda list
+#          conda clean --all -y
+#
+##      - uses: actions/cache@v2
+##        id: cache-Qt
+##        with:
+##          path: ~/Qt
+##          key: ${{ runner.os }}-Qt-2021-01-18
+#
+#      - name: download Qt
+##        if: steps.cache-Qt.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
+#          unzip -q dep-Qt-2021-01-18.zip
+#          rm dep-Qt-2021-01-18.zip
+#          ls -la
+#
+##      - uses: actions/cache@v2
+##        id: cache-intel
+##        with:
+##          path: ~/intel
+##          key: ${{ runner.os }}-intel-2021-01-18
+#
+#      - name: download intel
+##        if: steps.cache-intel.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
+#          unzip -q dep-intel-2021-01-18.zip
+#          rm dep-intel-2021-01-18.zip
+#          mv windows intel
+#          cd ~/atlas/src/3rdparty
+#          mkdir build
+#          ls -la
+#
 #      - uses: actions/cache@v2
-#        id: cache-test-data
+#        id: cache-deps
 #        with:
-#          path: ~/atlas_test_data
-#          key: atlas-test-data-2021-01-18
-
-      - name: download test data
-#        if: steps.cache-test-data.outputs.cache-hit != 'true'
-        shell: bash -l {0}
-        env:
-          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
-        run: |
-          conda info
-          cd ~
-          pwd
-          wget -q $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
-          unzip -q atlas-test-data-2021-01-18.zip
-          rm atlas-test-data-2021-01-18.zip
-
-      - name: test
-        shell: bash -l {0}
-        run: |
-          conda info
-          cd ~/atlas
-          pwd
-          python util/deploy_atlas.py
-
-      - name: deploy
-        shell: bash -l {0}
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
-        run: |
-          mkdir -p ~/.ssh/
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-          chmod 600 ~/.ssh/private.key
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          cd ~/atlas/deploy
-          pwd
-          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -rf $SSH_DEPLOY_PATH/packages/${{ runner.os }}"
-          scp -P $SSH_PORT -i ~/.ssh/private.key -r ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
-          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $SSH_DEPLOY_PATH/installers/AtlasInstaller-${{ runner.os }}.zip"
-          scp -P $SSH_PORT -i ~/.ssh/private.key AtlasInstaller-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-          cd ../src/3rdparty
-          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
-          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
-          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
-
-      - name: build and upload conda zimg
-        shell: bash -l {0}
-        env:
-          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
-        run: |
-          conda info
-          cd ~/atlas
-          pwd
-          python util/build_ext_libs.py conda-zimg
-          conda config --set anaconda_upload yes
-          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
+#          path: ~/atlas/src/3rdparty/build
+#          key: ${{ runner.os }}-deps-2021-01-21
+#
+#      - name: download deps
+#        if: steps.cache-deps.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
+#          unzip -q atlas-deps-2021-01-21.zip
+#          rm atlas-deps-2021-01-21.zip
+#
+#      - name: build deps
+#        if: steps.cache-deps.outputs.cache-hit != 'true'
+#        shell: pwsh
+#        env:
+#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+#        run: |
+#          conda info
+#          cd ~/atlas
+#          python util/build_ext_libs.py all
+#          conda config --set anaconda_upload yes
+#          conda-build --token $Env:ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
+#
+#      - name: build
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~/atlas
+#          pwd
+#          python util/build_atlas.py
+#
+##      - uses: actions/cache@v2
+##        id: cache-test-data
+##        with:
+##          path: ~/atlas_test_data
+##          key: atlas-test-data-2021-01-18
+#
+#      - name: download test data
+##        if: steps.cache-test-data.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          CI_DOWNLOAD_SERVER: ${{ secrets.CI_DOWNLOAD_SERVER }}
+#        run: |
+#          conda info
+#          cd ~
+#          pwd
+#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
+#          unzip -q atlas-test-data-2021-01-18.zip
+#          rm atlas-test-data-2021-01-18.zip
+#
+#      - name: test
+#        shell: bash -l {0}
+#        run: |
+#          conda info
+#          cd ~/atlas
+#          pwd
+#          python util/deploy_atlas.py
+#
+#      - name: deploy
+#        shell: bash -l {0}
+#        env:
+#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+#          SSH_PORT: ${{ secrets.SSH_PORT }}
+#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
+#        run: |
+#          mkdir -p ~/.ssh/
+#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
+#          chmod 600 ~/.ssh/private.key
+#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+#          cd ~/atlas/deploy
+#          pwd
+#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -rf $SSH_DEPLOY_PATH/packages/${{ runner.os }}"
+#          scp -P $SSH_PORT -i ~/.ssh/private.key -r ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
+#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $SSH_DEPLOY_PATH/installers/AtlasInstaller-${{ runner.os }}.zip"
+#          scp -P $SSH_PORT -i ~/.ssh/private.key AtlasInstaller-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
+#          cd ../src/3rdparty
+#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
+#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
+#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
+#
+#      - name: build and upload conda zimg
+#        shell: bash -l {0}
+#        env:
+#          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
+#        run: |
+#          conda info
+#          cd ~/atlas
+#          pwd
+#          python util/build_ext_libs.py conda-zimg
+#          conda config --set anaconda_upload yes
+#          conda-build --token $ANACONDA_API_TOKEN --user fenglab zimg-recipe
