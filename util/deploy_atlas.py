@@ -227,7 +227,8 @@ def build_atlas_installer():
     if 'feng' in os.path.expanduser("~"):
         if common_dirs.is_mac():
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                         os.path.join(os.path.expanduser('~'), 'Google Drive', "lab", 'software', installer_zip_name))
+                         os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static',
+                                      'installers', installer_zip_name))
             target_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static',
                                          'packages')
             if os.path.exists(os.path.join(target_folder, suffix)):
@@ -235,7 +236,7 @@ def build_atlas_installer():
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
         elif common_dirs.is_linux():
             subprocess.run(['scp', installer_zip_name,
-                            'feng@labmacpro:"/Users/feng/Google Drive/lab/software/"'],
+                            'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/installers/"'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
             subprocess.run(['rsync', '-av', '--delete', suffix,
                             'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
@@ -243,7 +244,8 @@ def build_atlas_installer():
             shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
         else:
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
-                         os.path.join('Z:', os.sep, 'Google Drive', "lab", 'software', installer_zip_name))
+                         os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static', 'installers',
+                                      installer_zip_name))
             target_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static', 'packages')
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)

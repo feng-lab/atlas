@@ -37,6 +37,7 @@
 * activate a conda env with tbb-devel mkl-devel qt numpy python   
 * run `python3 util/build_ext_libs.py all` to build external libraries and python packages
 * run `python3 util/build_and_deploy_atlas.py` or build CMakeLists.txt
+* see `utils/all.sh` for example
 
 ## C++ Version Defines
 * $Repository_DIR/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)

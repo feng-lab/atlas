@@ -23,7 +23,7 @@ jobs:
 #      - name: install some exes
 #        shell: pwsh
 #        run: |
-#          choco install wget zip
+#          choco install zip
 #
 #      - uses: actions/checkout@v2
 #        with:
@@ -77,7 +77,7 @@ jobs:
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
+#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-Qt-2021-01-18.zip
 #          unzip -q dep-Qt-2021-01-18.zip
 #          rm dep-Qt-2021-01-18.zip
 #          ls -la
@@ -97,7 +97,7 @@ jobs:
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
+#          curl -L -O $CI_DOWNLOAD_SERVER/${{ runner.os }}/dep-intel-2021-01-18.zip
 #          unzip -q dep-intel-2021-01-18.zip
 #          rm dep-intel-2021-01-18.zip
 #          mv windows intel
@@ -120,13 +120,13 @@ jobs:
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
+#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-deps-2021-01-21.zip
 #          unzip -q atlas-deps-2021-01-21.zip
 #          rm atlas-deps-2021-01-21.zip
 #
 #      - name: build deps
 #        if: steps.cache-deps.outputs.cache-hit != 'true'
-#        shell: pwsh
+#        shell: pwsh  # the perl from git bash causes error while building openssl
 #        env:
 #          ANACONDA_API_TOKEN: ${{ secrets.ANACONDA_API_TOKEN }}
 #        run: |
@@ -159,7 +159,7 @@ jobs:
 #          conda info
 #          cd ~
 #          pwd
-#          wget -q $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
+#          curl -L -O $CI_DOWNLOAD_SERVER/common/atlas-test-data-2021-01-18.zip
 #          unzip -q atlas-test-data-2021-01-18.zip
 #          rm atlas-test-data-2021-01-18.zip
 #
