@@ -185,8 +185,16 @@ jobs:
 #          scp -P $SSH_PORT -i ~/.ssh/private.key AtlasInstaller-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
 #
 #      - name: upload build cache
-#        shell: bash -l {0}
 #        if: steps.build-cache-exists.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+#          SSH_PORT: ${{ secrets.SSH_PORT }}
+#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
+#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
 #        run: |
 #          cd ~/atlas/src/3rdparty
 #          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
