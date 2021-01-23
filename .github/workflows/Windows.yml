@@ -85,9 +85,6 @@ jobs:
 #          unzip -q dep-intel-2021-01-18.zip
 #          rm dep-intel-2021-01-18.zip
 #          mv windows intel
-#          cd ~/atlas/src/3rdparty
-#          mkdir build
-#          ls -la
 #
 #      - name: check if build cache exists
 #        shell: bash -l {0}
