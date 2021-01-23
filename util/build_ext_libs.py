@@ -1966,17 +1966,15 @@ def build_libs(libs: dict, update_src: bool):
             file.write('# Set PATH for CMake\n')
             file.write(f'set(QT_VERSION {qt_ver()})\n')
             if is_windows():
-                file.write('set(QT_HOST_PATH {0})\n'.format(qt_base_dir().replace("\\", "/")))
-                file.write('set(INTEL_PATH {0})\n'.format(intel_sw_dir().replace("\\", "/")))
+                file.write('set(QT_HOST_PATH "{0}")\n'.format(qt_base_dir().replace("\\", "/")))
+                file.write('set(INTEL_PATH "{0}")\n'.format(intel_sw_dir().replace("\\", "/")))
             else:
                 file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
                 file.write(f'set(INTEL_PATH {intel_sw_dir()})\n')
 
+    if libs['tbb']:
         subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
                        cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)
-
-    if libs['tbb']:
-        print('no action')
 
     if libs['qt']:
         print(f'Qt {qt_ver()} in {qt_base_dir()}')
