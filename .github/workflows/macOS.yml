@@ -115,6 +115,20 @@ jobs:
 #          conda config --set anaconda_upload yes
 #          conda-build --token $ANACONDA_API_TOKEN --user fenglab conda-opencv-recipe
 #
+#      - name: upload build cache
+#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
+#        shell: bash -l {0}
+#        env:
+#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
+#          SSH_PORT: ${{ secrets.SSH_PORT }}
+#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
+#        run: |
+#          cd $GITHUB_WORKSPACE/src/3rdparty
+#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
+#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
+#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
+#
 #      - name: build
 #        shell: bash -l {0}
 #        run: |
@@ -161,20 +175,6 @@ jobs:
 #          pwd
 #          rsync -avv --delete -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" ${{ runner.os }} $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/packages/
 #          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" AtlasInstaller*.zip $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOY_PATH/installers/
-#
-#      - name: upload build cache
-#        if: steps.build-cache-exists.outputs.cache-hit != 'true'
-#        shell: bash -l {0}
-#        env:
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
-#        run: |
-#          cd $GITHUB_WORKSPACE/src/3rdparty
-#          zip --quiet --recurse-paths --symlinks build-cache-${{ runner.os }}.zip build
-#          ssh -p $SSH_PORT -i ~/.ssh/private.key $SSH_USERNAME@$SSH_SERVER "rm -f $CI_CACHE_PATH/build-cache-${{ runner.os }}.zip"
-#          scp -P $SSH_PORT -i ~/.ssh/private.key build-cache-${{ runner.os }}.zip $SSH_USERNAME@$SSH_SERVER:$CI_CACHE_PATH/
 #
 #      - name: build and upload conda zimg
 #        shell: bash -l {0}
