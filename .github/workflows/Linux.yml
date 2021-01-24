@@ -17,24 +17,6 @@ jobs:
           fetch-depth: 1
           submodules: 'recursive'
 
-#      - name: test deploy
-#        shell: bash -l {0}
-#        env:
-#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-#          SSH_SERVER: ${{ secrets.SSH_SERVER }}
-#          SSH_PORT: ${{ secrets.SSH_PORT }}
-#          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOYPATH: ${{ secrets.SSH_DEPLOYPATH }}
-#        run: |
-#          mkdir -p ~/.ssh/
-#          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
-#          sudo chmod 600 ~/.ssh/private.key
-#          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-#          cd $GITHUB_WORKSPACE/deploy
-#          pwd
-#          rsync -tvv -e "ssh -p $SSH_PORT -i ~/.ssh/private.key" *.xml $SSH_USERNAME@$SSH_SERVER:$SSH_DEPLOYPATH/installers/
-
       - name: check envs and install packages
         shell: bash -l {0}
         run: |
@@ -180,7 +162,6 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
         run: |
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
@@ -195,12 +176,9 @@ jobs:
         if: steps.build-cache-exists.outputs.cache-hit != 'true'
         shell: bash -l {0}
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
           SSH_SERVER: ${{ secrets.SSH_SERVER }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
           CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
         run: |
           cd $GITHUB_WORKSPACE/src/3rdparty

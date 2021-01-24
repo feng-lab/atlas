@@ -152,7 +152,6 @@ jobs:
 #          SSH_PORT: ${{ secrets.SSH_PORT }}
 #          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
 #          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
-#          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
 #        run: |
 #          mkdir -p ~/.ssh/
 #          echo "$SSH_PRIVATE_KEY" > ~/.ssh/private.key
@@ -167,12 +166,9 @@ jobs:
 #        if: steps.build-cache-exists.outputs.cache-hit != 'true'
 #        shell: bash -l {0}
 #        env:
-#          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-#          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
 #          SSH_SERVER: ${{ secrets.SSH_SERVER }}
 #          SSH_PORT: ${{ secrets.SSH_PORT }}
 #          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-#          SSH_DEPLOY_PATH: ${{ secrets.SSH_DEPLOY_PATH }}
 #          CI_CACHE_PATH: ${{ secrets.CI_CACHE_PATH }}
 #        run: |
 #          cd $GITHUB_WORKSPACE/src/3rdparty
