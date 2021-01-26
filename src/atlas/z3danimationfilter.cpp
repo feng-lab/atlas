@@ -68,7 +68,7 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   addParameter(m_viewDirectionColor);
   addParameter(m_cameraDirectionTimeInterval);
 
-  m_triangles.setType(GL_TRIANGLES);
+  m_triangles.setType(ZMesh::Type::TRIANGLES);
   m_trianglesWrapper.push_back(&m_triangles);
 
   m_lineRenderer.setLineWidth(m_lineWidth.get());

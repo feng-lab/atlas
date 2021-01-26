@@ -70,7 +70,7 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   const std::vector<glm::vec3>& normals = mesh.normals();
   const std::vector<glm::vec4>& colors = mesh.colors();
   const std::vector<GLuint>& triangleIndexes = mesh.indices();
-  GLenum type = mesh.type();
+  auto type = toGLType(mesh.type());
 
   vao.bind();
 

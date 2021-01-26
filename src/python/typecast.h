@@ -6,6 +6,7 @@
 #include <pybind11/stl.h>
 #include <QString>
 #include <QStringList>
+#include "zglmutils.h"
 
 namespace py = pybind11;
 
@@ -118,7 +119,17 @@ public:
 #endif
 
 // QList
-template <> struct type_caster<QStringList> : list_caster<QStringList, QString> {};
+template<>
+struct type_caster<QStringList> : list_caster<QStringList, QString> {};
+
+//template<size_t L, typename T, glm::qualifier Q>
+//struct type_caster<glm::vec<L, T, Q>> : array_caster<glm::vec<L, T, Q>, T, false, L> {};
+//
+//template<size_t C, size_t R, typename T, glm::qualifier Q>
+//struct type_caster<glm::mat<C, R, T, Q>> : array_caster<glm::mat<C, R, T, Q>, T, false, C> {};
+//
+//template<typename T, glm::qualifier Q>
+//struct type_caster<glm::tquat<T, Q>> : array_caster<glm::tquat<T, Q>, T, false, 4> {};
 
 } // namespace
 } // namespace

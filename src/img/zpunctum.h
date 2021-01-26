@@ -90,7 +90,7 @@ public:
 
   // merge input punctum into current punctum, if input punctum don't have signal while current punctum has, do nothing
   // after merging, current punctum will have detection score of 1.0
-  void merge(const ZPunctum& other, double conf = 0.95);
+  void mergeWith(const ZPunctum& other, double conf = 0.95);
 
   // use gmm to split this punctum into num puncta, image signal (voxelLocations and voxelIntensities) must exist, otherwise
   // return empty list. depends on image signal, returned list size might be less than num
@@ -204,7 +204,12 @@ public:
   inline void setScore(double s)
   { m_score = s; }
 
-  void translate(double dx, double dy, double dz);
+  inline void translate(double dx, double dy, double dz)
+  {
+    m_x += dx;
+    m_y += dy;
+    m_z += dz;
+  }
 
   // update radius from volSize
   inline void updateRadius()

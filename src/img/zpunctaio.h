@@ -27,19 +27,19 @@ public:
   void save(const ZPuncta& puncta, const QString& filename, QString format) const;
 
 private:
-  void readNimpFile(const QString& filename, ZPuncta& puncta) const;
+  static void readNimpFile(const QString& filename, ZPuncta& puncta) ;
 
-  void writeNimpFile(const ZPuncta& puncta, const QString& filename) const;
+  static void writeNimpFile(const ZPuncta& puncta, const QString& filename) ;
 
-  void readV3DApoFile(const QString& file, ZPuncta& puncta) const;
+  static void readV3DApoFile(const QString& file, ZPuncta& puncta) ;
 
-  void writeV3DApoFile(const ZPuncta& puncta, const QString& file) const;
+  static void writeV3DApoFile(const ZPuncta& puncta, const QString& file) ;
 
-  void readV3DMarkerFile(const QString& file, ZPuncta& puncta) const;
+  static void readV3DMarkerFile(const QString& file, ZPuncta& puncta) ;
 
-  void readMatFile(const QString& file, ZPuncta& puncta) const;
+  static void readMatFile(const QString& file, ZPuncta& puncta) ;
 
-  void writeMatFile(const ZPuncta& puncta, const QString& file) const;
+  static void writeMatFile(const ZPuncta& puncta, const QString& file) ;
 
 private:
   QStringList m_readExts;

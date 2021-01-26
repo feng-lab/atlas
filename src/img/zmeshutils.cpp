@@ -2502,26 +2502,24 @@ void ClipAndContourPolys(
 
 namespace nim {
 
-ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, std::vector<glm::vec4> clipPlanes, double epsilon)
+ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::vec4>& clipPlanes, double epsilon)
 {
   std::vector<glm::dvec3> vertices = mesh.doubleVertices();
   std::vector<glm::uvec3> tris = mesh.triangleIndices();
   std::vector<glm::i64vec3> inputTriangles;
   vtkCCSEdgeLocator* edgeLocator = vtkCCSEdgeLocator::New();
-  for (size_t i = 0; i < tris.size(); ++i)
-    inputTriangles.push_back(glm::i64vec3(tris[i]));
+  for (auto& tri : tris) inputTriangles.emplace_back(tri);
 
   bool clipped = false;
 
-  for (size_t i = 0; i < clipPlanes.size(); ++i) {
+  for (auto& clipPlane : clipPlanes) {
     std::vector<glm::i64vec3> outputTriangles;
-    glm::dvec4 plane = glm::dvec4(clipPlanes[i]);
+    glm::dvec4 plane(clipPlane);
     std::vector<double> vertexDists;
     bool needClip2 = false;
-    for (size_t v = 0; v < vertices.size(); v++) {
-      vertexDists.push_back(-vertexPlaneDistance(vertices[v], plane, 0.0));
-      if (vertexDists[vertexDists.size() - 1] < 0)
-        needClip2 = true;
+    for (auto& vertex : vertices) {
+      vertexDists.push_back(-vertexPlaneDistance(vertex, plane, 0.0));
+      if (vertexDists[vertexDists.size() - 1] < 0) needClip2 = true;
     }
 
     if (needClip2) {
@@ -2536,13 +2534,13 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, std::vector<glm::vec4> cl
   edgeLocator->Delete();
 
   if (clipped) {
-    ZMesh result(GL_TRIANGLES);
+    ZMesh result(ZMesh::Type::TRIANGLES);
     result.setVertices(vertices);
-    std::vector<GLuint> indexes;
-    for (size_t i = 0; i < inputTriangles.size(); ++i) {
-      indexes.push_back(inputTriangles[i].x);
-      indexes.push_back(inputTriangles[i].y);
-      indexes.push_back(inputTriangles[i].z);
+    std::vector<uint32_t> indexes;
+    for (auto& inputTriangle : inputTriangles) {
+      indexes.push_back(inputTriangle.x);
+      indexes.push_back(inputTriangle.y);
+      indexes.push_back(inputTriangle.z);
     }
     result.setIndices(indexes);
 

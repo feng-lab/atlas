@@ -22,6 +22,12 @@ struct SwcNode
   int64_t parentID = -2;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
   int64_t label = -1;
   bool selected = false;
+
+  [[nodiscard]] std::string toString() const
+  {
+    return fmt::format("id:{}, type:{}, xyz:({}, {}, {}), radius:{}, parentID:{}, label:{}",
+                       id, type, x, y, z, radius, parentID, label);
+  }
 };
 
 class ZSwc : public ZTree<SwcNode>
@@ -62,9 +68,9 @@ public:
   static QString toQString(const Iter& pos)
   {
     return isNull(pos) ? QString("(Empty Node)") :
-           QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7")
+           QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7, label:%8")
              .arg(pos->id).arg(pos->type).arg(pos->x).arg(pos->y).arg(pos->z)
-             .arg(pos->radius).arg(parentID(pos));
+             .arg(pos->radius).arg(parentID(pos)).arg(pos->label);
   }
 
   // pos must not be null
@@ -104,6 +110,11 @@ public:
 
   //
   void addLine(const std::vector<glm::dvec3>& line, double radius);
+
+  [[nodiscard]] std::string toString() const
+  {
+    return fmt::format("{} nodes", size());
+  }
 };
 
 } // namespace nim

@@ -247,7 +247,10 @@ set(IMG_SOURCES
     zminimumspanningtree.cpp
     zminimumspanningtree.h zsubrange.h zmkl.h zsaturateoperation.cpp
     zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h
-    zimageavx512.h zimageavx512.cpp)
+    zimageavx512.h zimageavx512.cpp
+    zmesh.h zmesh.cpp
+    zmeshio.h zmeshio.cpp
+    zmeshutils.h zmeshutils.cpp)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -379,6 +382,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       hdf5_cpp-static hdf5-static Ceres::ceres Folly::folly Eigen3::Eigen Boost::headers
                       GeometricTools glm::glm
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
+                      ${VTK_LIBRARIES} assimp::assimp
                       glog::glog ${_QT_LIBS_})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")

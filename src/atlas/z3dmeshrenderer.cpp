@@ -506,7 +506,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
           shader.setUseCustomColorUniform(false);
         }
 
-        GLenum type = (*m_meshPt)[i]->type();
+        auto type = toGLType((*m_meshPt)[i]->type());
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
         const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
         m_VAOs.bind(i);
@@ -530,7 +530,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
         shader.setUseCustomColorUniform(true);
         shader.setCustomColorUniform(m_wireframeColor.get());
 
-        GLenum type = (*m_meshPt)[i]->type();
+        auto type = toGLType((*m_meshPt)[i]->type());
         const std::vector<glm::vec3>& vertices = (*m_meshPt)[i]->vertices();
         const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
         m_VAOs.bind(i);
@@ -579,7 +579,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
       const std::vector<glm::vec3>& normals = (*m_meshPt)[i]->normals();
       const std::vector<glm::vec4>& colors = (*m_meshPt)[i]->colors();
       const std::vector<GLuint>& triangleIndexes = (*m_meshPt)[i]->indices();
-      GLenum type = (*m_meshPt)[i]->type();
+      auto type = toGLType((*m_meshPt)[i]->type());
 
       size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);
@@ -776,7 +776,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
     for (size_t i = 0; i < m_meshPt->size(); ++i) {
       shader.setCustomColorUniform((*m_meshPickingColorsPt)[i]);
 
-      auto type = (*m_meshPt)[i]->type();
+      auto type = toGLType((*m_meshPt)[i]->type());
       const auto& vertices = (*m_meshPt)[i]->vertices();
       const auto& triangleIndexes = (*m_meshPt)[i]->indices();
 
@@ -821,7 +821,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
       const auto& vertices = (*m_meshPt)[i]->vertices();
       const auto& normals = (*m_meshPt)[i]->normals();
       const auto& triangleIndexes = (*m_meshPt)[i]->indices();
-      auto type = (*m_meshPt)[i]->type();
+      auto type = toGLType((*m_meshPt)[i]->type());
 
       size_t bufIdx = 0;
       glEnableVertexAttribArray(attr_vertex);

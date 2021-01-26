@@ -1389,6 +1389,8 @@ def build_assimp(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DASSIMP_BUILD_FRAMEWORK:BOOL=OFF',
                          '-DASSIMP_BUILD_TESTS:BOOL=OFF',
                          '-DASSIMP_BUILD_ZLIB:BOOL=OFF',
                          '-DASSIMP_HUNTER_ENABLED:BOOL=OFF'])

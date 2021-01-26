@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "zglmutils.h"
 #include "zlog.h"
 #include "zbbox.h"
 #include <H5Cpp.h>
@@ -44,8 +44,14 @@ struct ZMeshProperties
 class ZMesh
 {
 public:
-  // one of GL_TRIANGLES, GL_TRIANGLE_STRIP and GL_TRIANGLE_FAN
-  explicit ZMesh(GLenum type = GL_TRIANGLES);
+  enum class Type : unsigned int
+  {
+    TRIANGLES = 0x0004,
+    TRIANGLE_STRIP = 0x0005,
+    TRIANGLE_FAN = 0x0006,
+  };
+
+  explicit ZMesh(Type type = Type::TRIANGLES);
 
   // might throw ZIOException
   explicit ZMesh(const QString& filename);
@@ -86,15 +92,14 @@ public:
 
   [[nodiscard]] ZBBox<glm::dvec3> boundBox(const glm::mat4& transform) const;
 
-  [[nodiscard]] GLenum type() const
+  [[nodiscard]] Type type() const
   { return m_type; }
 
   [[nodiscard]] QString typeAsString() const;
 
-  void setType(GLenum type)
+  void setType(Type type)
   {
     m_type = type;
-    CHECK(m_type == GL_TRIANGLES || m_type == GL_TRIANGLE_FAN || m_type == GL_TRIANGLE_STRIP);
   }
 
   [[nodiscard]] const std::vector<glm::vec3>& vertices() const
@@ -139,10 +144,10 @@ public:
   void setColors(const std::vector<glm::vec4>& colors)
   { m_colors = colors; }
 
-  [[nodiscard]] const std::vector<GLuint>& indices() const
+  [[nodiscard]] const std::vector<uint32_t>& indices() const
   { return m_indices; }
 
-  void setIndices(const std::vector<GLuint>& indices)
+  void setIndices(const std::vector<uint32_t>& indices)
   { m_indices = indices; }
 
   [[nodiscard]] bool hasIndices() const
@@ -285,6 +290,11 @@ public:
 
   void swapXY();
 
+  [[nodiscard]] std::string toString() const
+  {
+    return fmt::format("{} triangles", numTriangles());
+  }
+
 private:
   enum class BooleanOperationType
   {
@@ -304,7 +314,7 @@ private:
 private:
   friend class ZMeshIO;
 
-  GLenum m_type = GL_TRIANGLES;
+  Type m_type = Type::TRIANGLES;
 
   std::vector<glm::vec3> m_vertices;
   std::vector<float> m_1DTextureCoordinates;
@@ -312,7 +322,7 @@ private:
   std::vector<glm::vec3> m_3DTextureCoordinates;
   std::vector<glm::vec3> m_normals;
   std::vector<glm::vec4> m_colors;
-  std::vector<GLuint> m_indices;
+  std::vector<uint32_t> m_indices;
 };
 
 } // namespace nim

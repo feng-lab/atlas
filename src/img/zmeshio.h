@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dgl.h"
+#include "zglmutils.h"
 #include <QStringList>
 #include <vector>
 
@@ -30,7 +30,7 @@ public:
 
 private:
   static void readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                                 std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices);
+                                 std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
 
 private:
   QStringList m_readExts;

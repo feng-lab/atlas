@@ -28,7 +28,7 @@ ZPunctaPack::~ZPunctaPack()
 const QString& ZPunctaPack::info() const
 {
   if (m_info.isEmpty()) {
-    m_info = QString("%1 puncta").arg(m_puncta.size());
+    m_info = QString("%1 puncta").arg(m_puncta.data.size());
   }
   return m_info;
 }
@@ -56,7 +56,7 @@ void ZPunctaPack::setSelectedPuncta(const std::set<const ZPunctum*>& sp)
     return;
   }
   m_selectedPuncta = sp;
-  for (auto& mp : m_puncta) {
+  for (auto& mp : m_puncta.data) {
     mp.setSelected(m_selectedPuncta.find(&mp) != m_selectedPuncta.end());
   }
   emit selectionChanged();
@@ -85,7 +85,7 @@ void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
     if (p && m_selectedPuncta.size() == 1 && m_selectedPuncta.find(p) != m_selectedPuncta.end()) {
       return;
     }
-    for (auto& mp : m_puncta) {
+    for (auto& mp : m_puncta.data) {
       mp.setSelected(&mp == p);
     }
     if (p) {
@@ -100,7 +100,7 @@ void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
 ZBBox<glm::ivec4> ZPunctaPack::boundBox() const
 {
   ZBBox<glm::ivec4> res;
-  for (auto& p : m_puncta) {
+  for (auto& p : m_puncta.data) {
     res.expand(glm::ivec4(p.x() - p.radius(), p.y() - p.radius(), std::floor(p.z()), 0));
     res.expand(glm::ivec4(p.x() + p.radius(), p.y() + p.radius(), std::ceil(p.z()), 0));
   }
@@ -182,7 +182,7 @@ void ZPunctaPack::updateViewRelatedData()
   m_selectedPuncta.clear();
   m_punctumToRow.clear();
   index_t idx = 0;
-  for (const auto& p : m_puncta) {
+  for (const auto& p : m_puncta.data) {
     m_punctaPts.push_back(&p);
     if (p.isSelected()) {
       m_selectedPuncta.insert(&p);

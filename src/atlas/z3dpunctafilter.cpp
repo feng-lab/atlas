@@ -477,7 +477,7 @@ void Z3DPunctaFilter::adjustWidgets()
 
 void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (!m_punctaPack || m_punctaPack->puncta().empty()) {
+  if (!m_punctaPack || m_punctaPack->puncta().data.empty()) {
     return;
   }
 

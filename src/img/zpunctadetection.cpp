@@ -52,9 +52,9 @@ polygon_2d errorEllipseToPolygon(const Eigen::RowVectorXd& m, const Eigen::Matri
   double ev2x = es.eigenvectors()(0, 1);
   double ev2y = es.eigenvectors()(1, 1);
 
-  for (auto i = 0; i < 2 * n + 1; ++i) {
-    coor[i][0] = (std::cos(p) * sqtlmd1 * ev1x + std::sin(p) * sqtlmd2 * ev2x) * k + m(0);
-    coor[i][1] = (std::cos(p) * sqtlmd1 * ev1y + std::sin(p) * sqtlmd2 * ev2y) * k + m(1);
+  for (auto& i : coor) {
+    i[0] = (std::cos(p) * sqtlmd1 * ev1x + std::sin(p) * sqtlmd2 * ev2x) * k + m(0);
+    i[1] = (std::cos(p) * sqtlmd1 * ev1y + std::sin(p) * sqtlmd2 * ev2y) * k + m(1);
     p += step;
   }
   boost::geometry::assign_points(poly, coor);
@@ -478,13 +478,13 @@ void ZPunctaDetection::doWork()
         Eigen::RowVectorXi minLoc = Eigen::RowVectorXi::Zero(3);
         minLoc(0) = rgn.xStart();
         minLoc(1) = rgn.yStart();
-        for (auto& p : detectedSomaPuncta) {
+        for (auto& p : detectedSomaPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
           p.updateFromVoxelsList(m_confRadius);
         }
-        for (auto& p : filteredSomaPuncta) {
+        for (auto& p : filteredSomaPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
@@ -492,18 +492,18 @@ void ZPunctaDetection::doWork()
         }
 
         // only keep puncta with centroid in validRgn
-        detectedSomaPuncta.remove_if([&](const ZPunctum& p) {
+        detectedSomaPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
-        filteredSomaPuncta.remove_if([&](const ZPunctum& p) {
+        filteredSomaPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
         // merge to final result
-        for (const auto& p : detectedSomaPuncta) {
-          m_detectedSomaPuncta.push_back(p);
+        for (const auto& p : detectedSomaPuncta.data) {
+          m_detectedSomaPuncta.data.push_back(p);
         }
-        for (const auto& p : filteredSomaPuncta) {
-          m_filteredSomaPuncta.push_back(p);
+        for (const auto& p : filteredSomaPuncta.data) {
+          m_filteredSomaPuncta.data.push_back(p);
         }
         LOG(INFO) << "End Detect Puncta in Soma";
         LOG(INFO) << "";
@@ -524,13 +524,13 @@ void ZPunctaDetection::doWork()
                    Eigen::RowVectorXi::Zero(3), 0.9 / rgns.size(), 0.1 / rgns.size() + rgni * 1.0 / rgns.size(),
                    0.1 / rgns.size());
 
-        for (auto& p : detectedPuncta) {
+        for (auto& p : detectedPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
           p.updateFromVoxelsList(m_confRadius);
         }
-        for (auto& p : filteredPuncta) {
+        for (auto& p : filteredPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
@@ -538,18 +538,18 @@ void ZPunctaDetection::doWork()
         }
 
         // only keep puncta with centroid in validRgn
-        detectedPuncta.remove_if([&](const ZPunctum& p) {
+        detectedPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
-        filteredPuncta.remove_if([&](const ZPunctum& p) {
+        filteredPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
         // merge to final result
-        for (const auto& p : detectedPuncta) {
-          m_detectedPuncta.push_back(p);
+        for (const auto& p : detectedPuncta.data) {
+          m_detectedPuncta.data.push_back(p);
         }
-        for (const auto& p : filteredPuncta) {
-          m_filteredPuncta.push_back(p);
+        for (const auto& p : filteredPuncta.data) {
+          m_filteredPuncta.data.push_back(p);
         }
       } else {
         ZPuncta detectedPuncta;
@@ -563,13 +563,13 @@ void ZPunctaDetection::doWork()
         Eigen::RowVectorXi minLoc = Eigen::RowVectorXi::Zero(3);
         minLoc(0) = rgn.xStart();
         minLoc(1) = rgn.yStart();
-        for (auto& p : detectedPuncta) {
+        for (auto& p : detectedPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
           p.updateFromVoxelsList(m_confRadius);
         }
-        for (auto& p : filteredPuncta) {
+        for (auto& p : filteredPuncta.data) {
           Eigen::MatrixXi vl = p.voxelLocations();
           vl.rowwise() += minLoc;
           p.setVoxelLocations(vl);
@@ -577,18 +577,18 @@ void ZPunctaDetection::doWork()
         }
 
         // only keep puncta with centroid in validRgn
-        detectedPuncta.remove_if([&](const ZPunctum& p) {
+        detectedPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
-        filteredPuncta.remove_if([&](const ZPunctum& p) {
+        filteredPuncta.data.remove_if([&](const ZPunctum& p) {
           return !(validRgn.xInRegion(std::round(p.x())) && validRgn.yInRegion(std::round(p.y())));
         });
         // merge to final result
-        for (const auto& p : detectedPuncta) {
-          m_detectedPuncta.push_back(p);
+        for (const auto& p : detectedPuncta.data) {
+          m_detectedPuncta.data.push_back(p);
         }
-        for (const auto& p : filteredPuncta) {
-          m_filteredPuncta.push_back(p);
+        for (const auto& p : filteredPuncta.data) {
+          m_filteredPuncta.data.push_back(p);
         }
       }
     }
@@ -637,7 +637,7 @@ void ZPunctaDetection::doWork()
       puncta.save(fn);
     }
     ZPuncta puncta = assignPuncta.getAmbiguousPuncta();
-    if (!puncta.empty()) {
+    if (!puncta.data.empty()) {
       QString fn = getAmbiguousPunctaOutputFileName();
       puncta.save(fn);
     }
@@ -732,7 +732,7 @@ ZPunctaDetection::getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1, const E
   if (v.size() > 1) {
     LOG(ERROR) << "Two Ellipse can not have " << v.size() << " intersection area. Something is wrong.";
   }
-  double overlapArea = 0.0;
+  double overlapArea;
   if (!v.empty()) {
     overlapArea = boost::geometry::area(*(v.begin()));
     return std::max(overlapArea / boost::geometry::area(poly1), overlapArea / boost::geometry::area(poly2));
@@ -794,7 +794,7 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
       punc.updateFromVoxelsList(m_confRadius);
       LOG(INFO) << "    Punctum: " << punc.x() << " " << punc.y() << " " << punc.z() << " "
                 << punc.maxIntensity() << " " << punc.volSize() << " " << punc.meanIntensity();
-      resList.push_back(punc);
+      resList.data.push_back(punc);
     } else {  // go to watershed
       LOG(INFO) << "  Start Watershed Split";
       Eigen::RowVectorXi minLoc;
@@ -816,7 +816,7 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
           punc.updateFromVoxelsList(m_confRadius);
           LOG(INFO) << "      Punctum: " << punc.x() << " " << punc.y() << " " << punc.z() << " "
                     << punc.maxIntensity() << " " << punc.volSize() << " " << punc.meanIntensity();
-          resList.push_back(punc);
+          resList.data.push_back(punc);
         } else { // go to vbgmm
           LOG(INFO) << "    Start VBGMM Split for Watershed Component " << wsObjIdx + 1;
           auto numCenter = getNumCenters(rawimg, pc, t,
@@ -831,7 +831,7 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
             punc.updateFromVoxelsList(m_confRadius);
             LOG(INFO) << "          Punctum: " << punc.x() << " " << punc.y() << " " << punc.z() << " "
                       << punc.maxIntensity() << " " << punc.volSize() << " " << punc.meanIntensity();
-            resList.push_back(punc);
+            resList.data.push_back(punc);
           } else {
             vbgmmSplit(wsObjects[wsObjIdx], wsObjVoxelIntens, numCenter, cropImg, resList,
                        m_confRadius, m_confOverlapArea, m_overlapRateThreshold, minLoc, m_useMultithreading);
@@ -846,16 +846,16 @@ void ZPunctaDetection::detectImpl(const ZImg& rawimg, size_t pc, size_t t,
   CC.clear();
   locmax.clear();
   LOG(INFO) << "";
-  LOG(INFO) << "Detected " << resList.size() << " Puncta.";
+  LOG(INFO) << "Detected " << resList.data.size() << " Puncta.";
 
-  resList.remove_if([&](const ZPunctum& p) {
+  resList.data.remove_if([&](const ZPunctum& p) {
     if (p.volSize() <= 5_uz && p.maxIntensity() < (thre + .1 * saturatedIntensity)) {
-      filteredList.push_back(p);
+      filteredList.data.push_back(p);
       return true;
     }
     return false;
   });
-  LOG(INFO) << "Number of Puncta After Filtering: " << resList.size();
+  LOG(INFO) << "Number of Puncta After Filtering: " << resList.data.size();
   reportProgress(baseWeight + weight * 1.0);
 }
 
@@ -1169,8 +1169,7 @@ std::vector<Eigen::MatrixXi> ZPunctaDetection::watershedSplit(const ZImg& imgIn)
       for (auto& obj : CC.voxelIdxList) {
         std::set<uint32_t> containedLabels;
         std::list<size_t> currentLevelVoxels;
-        for (size_t v = 0; v < obj.size(); ++v) {
-          size_t idx = obj[v];
+        for (auto idx : obj) {
           if (labelData[idx] > 0)
             containedLabels.insert(labelData[idx]);
           else
@@ -1354,7 +1353,7 @@ size_t ZPunctaDetection::getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
 void
 ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::VectorXd& voxelIntens, size_t numCenter,
                              const ZImg& img, ZPuncta& detectedPunctaList, double confRadius,
-                             double confOverlapArea, double overlapRateThreshold, Eigen::RowVectorXi minLoc,
+                             double confOverlapArea, double overlapRateThreshold, const Eigen::RowVectorXi& minLoc,
                              bool useMultitheading)
 {
   Eigen::MatrixXd data = voxelLocs.cast<double>();
@@ -1364,7 +1363,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
     z = data(0, 2);
     data.conservativeResize(Eigen::NoChange, 2);
   }
-  Eigen::VectorXd weight = voxelIntens;
+  const Eigen::VectorXd& weight = voxelIntens;
   Eigen::RowVectorXd dataCentre = ZEigenUtils::featureMean(data, weight);
   Eigen::MatrixXd m = dataCentre.colwise().replicate(numCenter);
 
@@ -1446,7 +1445,7 @@ ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::Vect
       punc.updateFromVoxelsList(confRadius);
       LOG(INFO) << "        Punctum: " << punc.x() << " " << punc.y() << " " << punc.z() << " "
                 << punc.maxIntensity() << " " << punc.volSize() << " " << punc.meanIntensity();
-      detectedPunctaList.push_back(punc);
+      detectedPunctaList.data.push_back(punc);
     }
   }
   if (numTotalVoxels != static_cast<size_t>(voxelIntens.size())) {

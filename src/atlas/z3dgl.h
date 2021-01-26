@@ -2,6 +2,7 @@
 
 #include "zglmutils.h"
 #include "zglobal.h"
+#include "zmesh.h"
 #include <glbinding/gl/gl.h>
 
 namespace nim {
@@ -38,6 +39,8 @@ bool checkGLState(GLenum pname, GLenum value);
 bool checkGLState(GLenum pname, GLfloat value);
 
 bool checkGLState(GLenum pname, const glm::vec4& value);
+
+GLenum toGLType(ZMesh::Type type);
 
 } // namespace nim
 

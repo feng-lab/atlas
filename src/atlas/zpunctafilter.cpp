@@ -344,7 +344,7 @@ void ZPunctaFilter::createPunctumItems()
                       m_regionColor.get().y * 255,
                       m_regionColor.get().z * 255,
                       m_opacity.get() * 255));
-  for (const auto& p : m_punctaPack->puncta()) {
+  for (const auto& p : m_punctaPack->puncta().data) {
     if (!m_view.isMaxZProjView() && std::abs(realZ() - std::round(p.z())) > 1.0) {
       continue;
     }

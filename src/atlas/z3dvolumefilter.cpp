@@ -55,7 +55,7 @@ Z3DVolumeFilter::Z3DVolumeFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_showZSlice2("Show Z Slice 2", false)
   , m_zSlice2Position("Z Slice 2 Position", 0, 0, 1)
   , m_leftMouseButtonPressEvent("Left Mouse Button Pressed", false)
-  , m_2DImageQuad(GL_TRIANGLE_STRIP)
+  , m_2DImageQuad(ZMesh::Type::TRIANGLE_STRIP)
   , m_nChannels(0)
 {
   m_baseBoundBoxRenderer.setEnableMultisample(false);

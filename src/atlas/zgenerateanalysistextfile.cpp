@@ -874,7 +874,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   somaPunctaStream << "# puncta id, x, y, z, volsize, meanIntensity, maxIntensity\n";
 
   size_t idx = 0;
-  for (const auto& p : punctaList) {
+  for (const auto& p : punctaList.data) {
     somaPunctaStream << idx++ << " " << p.x() << " " << p.y() << " " << p.z() << " "
                      << p.volSize() << " " << p.meanIntensity() << " " << p.maxIntensity() << "\n";
   }
@@ -895,7 +895,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
   std::map<const ZPunctum*, double> punctumDistToBranchStart;
   std::map<const ZPunctum*, double> punctumDistToSoma;
   std::map<const ZPunctum*, double> punctumDistToSegmentStart;
-  for (const auto& p : punctaList) {
+  for (const auto& p : punctaList.data) {
     ConstSwcTreeNode tn = getNodeSegOfPunctum(tree, p, branches.size(), nodeToBranchId);
     punctumToNode[&p] = tn;
     if (ZSwc::isNull(tn))
@@ -950,7 +950,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
     "distToBranchStart, distToSoma\n";
 
   idx = 0;
-  for (const auto& p : punctaList) {
+  for (const auto& p : punctaList.data) {
     if (ZSwc::isNull(punctumToNode[&p]))
       continue;
     size_t branchId = nodeToBranchId[punctumToNode[&p]];
@@ -1019,7 +1019,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
       if (j > 0) {
         std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
         for (auto punctum : puncta) {
-          tmpPunc.push_back(*punctum);
+          tmpPunc.data.push_back(*punctum);
           outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                              << punctum->z() << " "
                              << (punctumDistToBranchStart[punctum] / branch.length) << " "
@@ -1124,7 +1124,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
           // should be no puncta for soma
           std::vector<const ZPunctum*> puncta = nodeToPuncta[btn];
           for (auto punctum : puncta) {
-            tmpPunc.push_back(*punctum);
+            tmpPunc.data.push_back(*punctum);
             outPunctaTxtStream << nodeIdx << " " << punctum->x() << " " << punctum->y() << " "
                                << punctum->z() << " "
                                << (punctumDistToSoma[punctum] / length) << " "
@@ -1271,7 +1271,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
         if (j > 0) {
           std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
           for (auto punctum : puncta) {
-            tmpPunc.push_back(*punctum);
+            tmpPunc.data.push_back(*punctum);
             double punctumDistToMTTBranchStart = segmentStartToBranchStartLength + punctumDistToSegmentStart[punctum];
             outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                                << punctum->z() << " "
@@ -1361,7 +1361,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
           if (j > 0) {
             std::vector<const ZPunctum*> puncta = nodeToPuncta[tn];
             for (auto punctum : puncta) {
-              tmpPunc.push_back(*punctum);
+              tmpPunc.data.push_back(*punctum);
               outPunctaTxtStream << j << " " << punctum->x() << " " << punctum->y() << " "
                                  << punctum->z() << " "
                                  << (punctumDistToBranchStart[punctum] / branch.length) << " "

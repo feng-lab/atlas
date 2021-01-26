@@ -68,9 +68,9 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
 
     m_VAO.bind();
     if (triangleIndexes.empty()) {
-      glDrawArrays(m_mesh->type(), 0, vertices.size());
+      glDrawArrays(toGLType(m_mesh->type()), 0, vertices.size());
     } else {
-      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
+      glDrawElements(toGLType(m_mesh->type()), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
     }
     m_VAO.release();
 
@@ -90,12 +90,12 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
     glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (triangleIndexes.empty()) {
-      glDrawArrays(m_mesh->type(), 0, vertices.size());
+      glDrawArrays(toGLType(m_mesh->type()), 0, vertices.size());
     } else {
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
                    GL_STATIC_DRAW);
-      glDrawElements(m_mesh->type(), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
+      glDrawElements(toGLType(m_mesh->type()), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 

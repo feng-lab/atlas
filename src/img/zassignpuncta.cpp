@@ -85,8 +85,8 @@ void ZAssignPuncta::doWork()
     LOG(INFO) << "Voxel Size Z: " << m_imgInfo.voxelSizeZInUm() << " um";
     LOG(INFO) << "Max Distance To Branch: " << m_maxDistToBranch << " um";
     LOG(INFO) << "Ambiguous Factor: " << m_ambiguousFactor;
-    LOG(INFO) << "Number of Puncta: " << m_puncta.size();
-    LOG(INFO) << "Number of Soma Puncta: " << m_somaPuncta.size();
+    LOG(INFO) << "Number of Puncta: " << m_puncta.data.size();
+    LOG(INFO) << "Number of Soma Puncta: " << m_somaPuncta.data.size();
     LOG(INFO) << "Number of Swc Trees: " << m_swcTreeToPuncta.size();
   } else {
     throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
@@ -130,12 +130,12 @@ ZPuncta ZAssignPuncta::getSomaPunctaOfTree(const ZSwc* tree) const
 
 void ZAssignPuncta::separatePuncta()
 {
-  if (m_puncta.empty())
+  if (m_puncta.data.empty())
     reportProgress(1.0);
   std::map<ZSwc::ConstSwcTreeNode, const ZSwc*> nodeToTree;
-  double punctaSize = m_puncta.size();
+  double punctaSize = m_puncta.data.size();
   size_t idx = 1;
-  for (const auto& p : m_puncta) {
+  for (const auto& p : m_puncta.data) {
     LOG(INFO) << "Start Puncta " << idx;
     nodeToTree.clear();
     std::vector<ZSwc::ConstSwcTreeNode> nodes;
@@ -152,7 +152,7 @@ void ZAssignPuncta::separatePuncta()
     }
 
     if (numTreeInRange == 1) {
-      m_swcTreeToPuncta[nodeToTree.begin()->second].push_back(p);
+      m_swcTreeToPuncta[nodeToTree.begin()->second].data.push_back(p);
     } else if (numTreeInRange > 1) {
       bool isAmbiguous = false;
       ZSwc::ConstSwcTreeNode tn = intensityWeightedNearestNode(p.x(), p.y(), p.z(),
@@ -163,9 +163,9 @@ void ZAssignPuncta::separatePuncta()
                      << p.maxIntensity() << " " << p.meanIntensity();
       }
       if (isAmbiguous) {
-        m_ambiguousPuncta.push_back(p);
+        m_ambiguousPuncta.data.push_back(p);
       } else {
-        m_swcTreeToPuncta[nodeToTree[tn]].push_back(p);
+        m_swcTreeToPuncta[nodeToTree[tn]].data.push_back(p);
       }
     }
     reportProgress(0.25 + 0.75 * idx / punctaSize);
@@ -175,11 +175,11 @@ void ZAssignPuncta::separatePuncta()
 
 void ZAssignPuncta::separateSomaPuncta()
 {
-  if (m_somaPuncta.empty())
+  if (m_somaPuncta.data.empty())
     reportProgress(.25);
-  double punctaSize = m_somaPuncta.size();
+  double punctaSize = m_somaPuncta.data.size();
   size_t idx = 1;
-  for (const auto& p : m_somaPuncta) {
+  for (const auto& p : m_somaPuncta.data) {
     LOG(INFO) << "Start Soma Puncta " << idx;
     double min_dist = std::numeric_limits<double>::max();
     const ZSwc* tree = nullptr;
@@ -191,7 +191,7 @@ void ZAssignPuncta::separateSomaPuncta()
       }
     }
     if (tree) {
-      m_swcTreeToSomaPuncta[tree].push_back(p);
+      m_swcTreeToSomaPuncta[tree].data.push_back(p);
     }
     reportProgress(.25 * idx / punctaSize);
     idx++;

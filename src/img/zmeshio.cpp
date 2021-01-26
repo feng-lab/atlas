@@ -134,7 +134,11 @@ ZMeshIO::ZMeshIO()
   importer.GetExtensionList(tmp);
   QString exts = QString::fromStdString(tmp);
   exts.replace("*.", "");
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   m_readExts = exts.split(";", Qt::SkipEmptyParts);
+#else
+  m_readExts = exts.split(";", QString::SkipEmptyParts);
+#endif
   m_readExts.push_back("msh");
   m_readExts.push_back("vtp");
 
@@ -180,7 +184,7 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
 {
   try {
     mesh.clear();
-    mesh.setType(GL_TRIANGLES);
+    mesh.setType(ZMesh::Type::TRIANGLES);
     if (filename.endsWith(".msh", Qt::CaseInsensitive)) {
       readAllenAtlasMesh(filename, mesh.m_normals, mesh.m_vertices, mesh.m_indices);
     } else if (filename.endsWith(".vtp", Qt::CaseInsensitive)) {
@@ -323,7 +327,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
 }
 
 void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                                 std::vector<glm::vec3>& vertices, std::vector<GLuint>& indices)
+                                 std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);

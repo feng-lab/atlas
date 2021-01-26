@@ -9,11 +9,6 @@ ZPuncta::ZPuncta(const QString& filename)
   load(filename);
 }
 
-ZPuncta::ZPuncta(const std::list<nim::ZPunctum>& p)
-{
-  m_d = p;
-}
-
 bool ZPuncta::canReadFile(const QString& filename)
 {
   return ZPunctaIO::instance().canReadFile(filename);

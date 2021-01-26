@@ -98,7 +98,7 @@ void ZPunctaIO::save(const ZPuncta& puncta, const QString& filename, QString for
   }
 }
 
-void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
+void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
 {
   try {
     H5::Exception::dontPrint();
@@ -197,7 +197,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
         p.setVoxelLocations(voxelLocations);
       }
 
-      puncta.push_back(std::move(p));
+      puncta.data.push_back(std::move(p));
     }
   }
   catch (H5::Exception const& e) {
@@ -205,7 +205,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta) const
   }
 }
 
-void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) const
+void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
 {
   try {
     H5::Exception::dontPrint();
@@ -233,7 +233,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
     ver.write(intType, &punctaVer);
 
     int32_t idx = 0;
-    for (const auto& p : puncta) {
+    for (const auto& p : puncta.data) {
       H5::Group punctumGrp = allGrp.createGroup(fmt::format("Punctum{}", idx + 1));
       ++idx;
 
@@ -298,7 +298,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename) co
   }
 }
 
-void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
+void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -383,14 +383,14 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta) const
       }
       using namespace boost::math::double_constants;
       punctum.setRadius(std::pow(three_quarters_pi * punctum.volSize(), 1.0 / 3));
-      puncta.push_back(std::move(punctum));
+      puncta.data.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
     }
   }
 }
 
-void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) const
+void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -406,7 +406,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) cons
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (const auto& pun : puncta) {
+  for (const auto& pun : puncta.data) {
     out << QString("%1,,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17\n").arg(idx + 1).arg(pun.name())
       .arg(pun.comment())
       .arg(pun.z()).arg(pun.x()).arg(pun.y()).arg(pun.maxIntensity()).arg(pun.meanIntensity())
@@ -420,7 +420,7 @@ void ZPunctaIO::writeV3DApoFile(const ZPuncta& puncta, const QString& file) cons
   }
 }
 
-void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
+void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
@@ -480,35 +480,35 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta) const
           throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }
       }
-      puncta.push_back(std::move(punctum));
+      puncta.data.push_back(std::move(punctum));
     } else if (!line.isEmpty()) {
       throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
     }
   }
 }
 
-void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta) const
+void ZPunctaIO::readMatFile(const QString& file, ZPuncta& puncta)
 {
   Eigen::MatrixXd mat = ZEigenUtils::readMatrix(file, "", false, 0, "#");
   mat = ZEigenUtils::removeRowsContainNaNOrInF(mat);
   if (mat.rows() > 0 && mat.cols() == 2) {
     for (Eigen::Index i = 0; i < mat.rows(); ++i) {
-      puncta.emplace_back(mat(i, 0), mat(i, 1), 0.0, 2);
+      puncta.data.emplace_back(mat(i, 0), mat(i, 1), 0.0, 2);
     }
   } else if (mat.rows() > 0 && mat.cols() == 3) {
     for (Eigen::Index i = 0; i < mat.rows(); ++i) {
-      puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), 2);
+      puncta.data.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), 2);
     }
   } else if (mat.rows() > 0 && mat.cols() == 4) {
     for (Eigen::Index i = 0; i < mat.rows(); ++i) {
-      puncta.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
+      puncta.data.emplace_back(mat(i, 0), mat(i, 1), mat(i, 2), mat(i, 3));
     }
   } else {
     throw ZIOException("file is not nx2 or nx3 or nx4 matrix");
   }
 }
 
-void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file) const
+void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file)
 {
   QFile qFile(file);
   if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -522,7 +522,7 @@ void ZPunctaIO::writeMatFile(const ZPuncta& puncta, const QString& file) const
   if (out.status() != QTextStream::Ok) {
     throw ZIOException("Error while writing file.");
   }
-  for (const auto& pun : puncta) {
+  for (const auto& pun : puncta.data) {
     out << QString("%1 %2 %3 %4\n").arg(pun.x()).arg(pun.y()).arg(pun.z()).arg(pun.radius());
     if (out.status() != QTextStream::Ok) {
       throw ZIOException("Error while writing file.");

@@ -73,7 +73,7 @@ void ZPunctum::updateFromVoxelsList(double conf)
   }
 }
 
-void ZPunctum::merge(const ZPunctum& other, double conf)
+void ZPunctum::mergeWith(const ZPunctum& other, double conf)
 {
   if (containsSignal() && !other.containsSignal())
     return;
@@ -124,13 +124,6 @@ std::list<ZPunctum> ZPunctum::split(size_t num, double conf) const
     }
   }
   return res;
-}
-
-void ZPunctum::translate(double dx, double dy, double dz)
-{
-  m_x += dx;
-  m_y += dy;
-  m_z += dz;
 }
 
 } // namespace nim

@@ -51,15 +51,6 @@ protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY
 grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
 set_property(SOURCE ${PROTO_SRCS} ${GRPC_SRCS} PROPERTY SKIP_AUTOGEN ON)
 
-
-find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-message(STATUS "VTK_DIR: ${VTK_DIR}")
-message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
-print_target_properties(VTK::FiltersGeometry)
-print_target_properties(VTK::FiltersSources)
-print_target_properties(VTK::IOXML)
-
 find_package(benchmark REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(benchmark::benchmark)
@@ -67,10 +58,6 @@ print_target_properties(benchmark::benchmark)
 #find_package(HDF5 REQUIRED COMPONENTS C CXX static
 #             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 #message(STATUS "HDF5_INCLUDE_DIR: ${HDF5_INCLUDE_DIR}")
-
-find_package(assimp REQUIRED
-             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-print_target_properties(assimp::assimp)
 
 set(OpenCV_STATIC ON)
 find_package(OpenCV REQUIRED COMPONENTS imgproc core
@@ -310,9 +297,6 @@ set(SOURCES
     z3dshadermanager.h
     zanimationexportwidget.h
     zvideoencoder.h
-    zmesh.h
-    zmeshio.h
-    zmeshutils.h
     zswcfilter.h
     zswcview.h
     zpunctafilter.h
@@ -486,9 +470,6 @@ set(SOURCES
     z3dshadermanager.cpp
     zanimationexportwidget.cpp
     zvideoencoder.cpp
-    zmesh.cpp
-    zmeshio.cpp
-    zmeshutils.cpp
     zswcfilter.cpp
     zswcview.cpp
     zpunctafilter.cpp
@@ -788,10 +769,10 @@ else (WIN32)
   endif ()
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC ${VTK_LIBRARIES} glbinding::glbinding-aux glbinding::glbinding
+target_link_libraries(${APP_NAME} PUBLIC glbinding::glbinding-aux glbinding::glbinding
                       img ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::OpenGLWidgets
-                      assimp::assimp gRPC::grpc++ protobuf::libprotobuf)
+                      gRPC::grpc++ protobuf::libprotobuf)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)

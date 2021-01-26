@@ -283,3 +283,17 @@ else ()
   print_target_properties(Qt6::Gui)
   set(_QT_LIBS_ Qt6::Core Qt6::Gui)
 endif ()
+
+find_package(assimp REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(assimp::assimp)
+
+find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+message(STATUS "VTK_DIR: ${VTK_DIR}")
+message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
+print_target_properties(VTK::FiltersGeometry)
+print_target_properties(VTK::FiltersSources)
+print_target_properties(VTK::IOXML)
+
+

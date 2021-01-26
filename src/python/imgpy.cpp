@@ -11,6 +11,8 @@
 #include "zchromaticshiftcorrection.h"
 #include "zroiutils.h"
 #include "zimgautothreshold.h"
+#include "zswc.h"
+#include "zmesh.h"
 #include <fmt/core.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -574,6 +576,13 @@ PYBIND11_MODULE(_imgpy, m)
     .def_property("score", &ZPunctum::score, &ZPunctum::setScore)
     .def_property("voxelLocations", &ZPunctum::voxelLocations, &ZPunctum::setVoxelLocations)
     .def_property("voxelIntensities", &ZPunctum::voxelIntensities, &ZPunctum::setVoxelIntensities)
+    .def("updateFromVoxelsList", &ZPunctum::updateFromVoxelsList, "conf"_a = 0.95)
+    .def("containsSignal", &ZPunctum::containsSignal)
+    .def("mergeWith", &ZPunctum::mergeWith, "otherPunctum"_a, "conf"_a = 0.95)
+    .def("split", &ZPunctum::split, "num"_a, "conf"_a = 0.95)
+    .def_static("merge", [](const std::list<ZPunctum>& punctumList, double conf) {
+      return ZPunctum::merge(punctumList.begin(), punctumList.end(), conf);
+    }, "punctumList"_a, "conf"_a = 0.95)
     .def("__repr__", [](const ZPunctum& v) {
       return fmt::format("<_imgpy.ZPunctum {}>", v.toString());
     });
@@ -582,9 +591,9 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<>())
     .def(py::init<const std::list<ZPunctum>&>())
     .def(py::init<const QString&>(), "filename"_a)
+    .def_readwrite("data", &ZPuncta::data)
     .def("save", &ZPuncta::save,
          "filename"_a, "format"_a = QString())
-    .def_property_readonly("data", py::overload_cast<>(&ZPuncta::data, py::const_))
     .def("__repr__", [](const ZPuncta& v) {
       return fmt::format("<_imgpy.ZPuncta {}>", v.toString());
     });
@@ -833,6 +842,51 @@ PYBIND11_MODULE(_imgpy, m)
       return fmt::format("<_imgpy.ZImgAutoThreshold>");
     });
 
+  py::class_<SwcNode>(m, "SwcNode")
+    .def(py::init<int64_t, int64_t, double, double, double, double, int64_t>(),
+         "id"_a = -1, "type"_a = -1, "x"_a = 0., "y"_a = 0., "z"_a = 0., "radius"_a = -1., "parentID"_a = -2)
+    .def_readwrite("id", &SwcNode::id)
+    .def_readwrite("type", &SwcNode::type)
+    .def_readwrite("x", &SwcNode::x)
+    .def_readwrite("y", &SwcNode::y)
+    .def_readwrite("z", &SwcNode::z)
+    .def_readwrite("radius", &SwcNode::radius)
+    .def_readwrite("parentID", &SwcNode::parentID)
+    .def_readwrite("label", &SwcNode::label)
+    .def("__repr__", [](const SwcNode& v) {
+      return fmt::format("<_imgpy.SwcNode {}>", v.toString());
+    });
+
+  py::class_<ZSwc>(m, "ZSwc")
+    .def(py::init<>())
+    .def(py::init<const QString&>(), "filename"_a)
+    .def("load", &ZSwc::load, "filename"_a)
+    .def("save", &ZSwc::save, "filename"_a)
+    .def("labelSomaAndOthers", &ZSwc::labelSomaAndOthers,
+         "radiusThre"_a = 0., "somaType"_a = 1, "otherType"_a = 2)
+    .def("resortPyramidal", &ZSwc::resortPyramidal,
+         "basalType"_a = 3, "apicalType"_a = 4, "somaType"_a = 1)
+    .def("resortID", &ZSwc::resortID)
+    .def("__repr__", [](const ZSwc& v) {
+      return fmt::format("<_imgpy.ZSwc {}>", v.toString());
+    });
+
+  py::enum_<ZMesh::Type>(m, "ZMeshType")
+    .value("TRIANGLES", ZMesh::Type::TRIANGLES)
+    .value("TRIANGLE_STRIP", ZMesh::Type::TRIANGLE_STRIP)
+    .value("TRIANGLE_FAN", ZMesh::Type::TRIANGLE_FAN);
+
+  py::class_<ZMesh>(m, "ZMesh")
+    .def(py::init<ZMesh::Type>(), "type"_a = ZMesh::Type::TRIANGLES)
+    .def(py::init<const QString&>(), "filename"_a)
+    .def("load", py::overload_cast<const QString&>(&ZMesh::load),
+      "filename"_a)
+    .def("save", py::overload_cast<const QString&, const std::string&>(&ZMesh::save, py::const_),
+      "filename"_a, "format"_a = std::string())
+    .def_property("type", &ZMesh::type, &ZMesh::setType)
+    .def("__repr__", [](const ZMesh& v) {
+      return fmt::format("<_imgpy.ZMesh {}>", v.toString());
+    });
 
   m.attr("__version__") = GIT_VERSION;
 

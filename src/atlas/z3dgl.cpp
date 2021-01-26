@@ -7,6 +7,10 @@
 
 namespace nim {
 
+static_assert(std::is_same_v<GLuint, uint32_t>, "should fix indices type to whatever GLuint is");
+
+static_assert(std::is_same_v<std::underlying_type_t<GLenum>, uint32_t>, "should fix some type to whatever GLenum is");
+
 bool GLVersionGE(int majorVersion, int minorVersion)
 {
   return glbinding::aux::ContextInfo::version() >= glbinding::Version(majorVersion, minorVersion);
@@ -54,6 +58,11 @@ bool checkGLState(GLenum pname, const glm::vec4& value)
   glm::vec4 v;
   glGetFloatv(pname, &v[0]);
   return (v == value);
+}
+
+GLenum toGLType(ZMesh::Type type)
+{
+  return static_cast<GLenum>(enumToUnderlyingType(type));
 }
 
 } // namespace nim

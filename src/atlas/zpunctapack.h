@@ -131,18 +131,20 @@ public:
       return;
     }
     CHECK(m_addedPuncta.empty());
-    for (auto it = m_punctaPack.puncta().begin(); it != m_punctaPack.puncta().end();) {
+    for (auto it = m_punctaPack.m_puncta.data.begin(); it != m_punctaPack.m_puncta.data.end();) {
       if (m_addedSet.find(&*it) != m_addedSet.end()) {
         auto itCopy = it;
         ++it;
-        m_addedPuncta.splice(m_addedPuncta.end(), m_punctaPack.m_puncta.data(), itCopy);
+        m_addedPuncta.splice(m_addedPuncta.end(), m_punctaPack.m_puncta.data, itCopy);
       } else {
         ++it;
       }
     }
     CHECK(m_addedPuncta.size() == m_addedSet.size()) << m_addedPuncta.size() << " " << m_addedSet.size();
-    m_punctaPack.m_puncta.data().splice(m_punctaPack.m_puncta.data().end(), m_deletedPuncta,
-                                        m_deletedPuncta.begin(), m_deletedPuncta.end());
+    m_punctaPack.m_puncta.data.splice(m_punctaPack.m_puncta.data.end(),
+                                      m_deletedPuncta,
+                                      m_deletedPuncta.begin(),
+                                      m_deletedPuncta.end());
     m_punctaPack.updateViewRelatedData();
     emit m_punctaPack.punctaChanged();
   }
@@ -153,18 +155,18 @@ public:
       return;
     }
     CHECK(m_deletedPuncta.empty());
-    for (auto it = m_punctaPack.puncta().begin(); it != m_punctaPack.puncta().end();) {
+    for (auto it = m_punctaPack.m_puncta.data.begin(); it != m_punctaPack.m_puncta.data.end();) {
       if (m_deletedSet.find(&*it) != m_deletedSet.end()) {
         auto itCopy = it;
         ++it;
-        m_deletedPuncta.splice(m_deletedPuncta.end(), m_punctaPack.m_puncta.data(), itCopy);
+        m_deletedPuncta.splice(m_deletedPuncta.end(), m_punctaPack.m_puncta.data, itCopy);
       } else {
         ++it;
       }
     }
     CHECK(m_deletedPuncta.size() == m_deletedSet.size()) << m_deletedPuncta.size() << " " << m_deletedSet.size();
-    m_punctaPack.m_puncta.data().splice(m_punctaPack.m_puncta.data().end(), m_addedPuncta,
-                                        m_addedPuncta.begin(), m_addedPuncta.end());
+    m_punctaPack.m_puncta.data.splice(m_punctaPack.m_puncta.data.end(), m_addedPuncta,
+                                      m_addedPuncta.begin(), m_addedPuncta.end());
     m_punctaPack.updateViewRelatedData();
     emit m_punctaPack.punctaChanged();
   }
