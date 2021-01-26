@@ -10,6 +10,7 @@
 #include <QMetaEnum>
 #include <QFile>
 #include <QApplication>
+#include <QSettings>
 
 namespace nim {
 
@@ -31,10 +32,14 @@ ZTheme::ZTheme()
 
 void ZTheme::updateTheme()
 {
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS)
   m_currentTheme = qt_mac_applicationIsInDarkMode() ? "dark" : "light";
+#elif defined(Q_OS_WIN)
+  QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                     QSettings::NativeFormat);
+  m_currentTheme = settings.value("AppsUseLightTheme") == 0 ? "dark" : "light";
 #else
-  m_currentTheme = "light";
+  m_currentTheme = "dark";
 #endif
   LOG(INFO) << "Current Theme: " << m_currentTheme;
   loadTheme(QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme));

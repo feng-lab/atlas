@@ -263,12 +263,12 @@ def tbb_redist_dir() -> str:
     return res
 
 
-def assimp_redist_dir() -> str:
-    assert sys.platform.startswith('win32')
-
-    res = os.path.join(ext_build_dir(), 'bin')
-    assert os.path.exists(res)
-    return res
+# def assimp_redist_dir() -> str:
+#     assert sys.platform.startswith('win32')
+#
+#     res = os.path.join(ext_build_dir(), 'bin')
+#     assert os.path.exists(res)
+#     return res
 
 
 def freeimage_redist_dir() -> str:
