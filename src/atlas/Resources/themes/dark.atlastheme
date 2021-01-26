@@ -26,6 +26,7 @@
             "PaletteWindowText": "text",
             "PaletteBase": "normalBackground",
             "PaletteAlternateBase": "alternateBackground",
+            "PaletteButton": "shadowBackground",
             "PaletteBrightText": "ffff0000",
             "PaletteText": "text",
             "PaletteButtonText": "text",
@@ -40,7 +41,8 @@
             "PaletteWindowDisabled": "backgroundColorDisabled",
             "PaletteWindowTextDisabled": "textDisabled",
             "PaletteBaseDisabled": "backgroundColorDisabled",
-            "PaletteTextDisabled": "textDisabled"
+            "PaletteTextDisabled": "textDisabled",
+            "PaletteMid": "ffa0a0a0"
         },
         "Icons": {
             "LoadObjectIcon": ":/icons/folder-add-dark.svg",

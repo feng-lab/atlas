@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QApplication>
 #include <QSettings>
+#include <QStyleFactory>
 
 namespace nim {
 
@@ -35,11 +36,14 @@ void ZTheme::updateTheme()
 #if defined(Q_OS_MACOS)
   m_currentTheme = qt_mac_applicationIsInDarkMode() ? "dark" : "light";
 #elif defined(Q_OS_WIN)
-  QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
-                     QSettings::NativeFormat);
-  m_currentTheme = settings.value("AppsUseLightTheme") == 0 ? "dark" : "light";
+  constexpr char regkey[] = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
+  bool ok;
+  const auto setting = QSettings(regkey, QSettings::NativeFormat).value("AppsUseLightTheme").toInt(&ok);
+  m_currentTheme = (ok && setting == 0) ? "dark" : "light";
+  QApplication::setStyle(QStyleFactory::create("Fusion"));
 #else
   m_currentTheme = "dark";
+  QApplication::setStyle(QStyleFactory::create("Fusion"));
 #endif
   LOG(INFO) << "Current Theme: " << m_currentTheme;
   loadTheme(QString(":Resources/themes/%1.atlastheme").arg(m_currentTheme));

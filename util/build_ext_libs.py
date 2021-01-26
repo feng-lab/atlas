@@ -2385,6 +2385,12 @@ def build_libs(libs: dict, update_src: bool):
         else:
             build_skia(src_dir, ext_build_dir())
 
+    if libs['neuTube']:
+        for suffix in ('macOS', 'Linux', 'Windows'):
+            shutil.copytree(os.path.join(src_package_dir(), 'packages-' + suffix),
+                            os.path.join(ext_build_dir(), 'packages-' + suffix),
+                            dirs_exist_ok=True)
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
@@ -2392,7 +2398,7 @@ def parse_inputs(argv: list):
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia', 'neuTube',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 

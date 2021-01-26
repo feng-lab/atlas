@@ -170,7 +170,7 @@ def build_atlas_installer():
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube')):
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'),
                       ignore_errors=False)
-    shutil.copytree(os.path.join(common_dirs.src_package_dir(), 'packages-' + suffix, 'fenglab.neutube'),
+    shutil.copytree(os.path.join(common_dirs.ext_build_dir(), 'packages-' + suffix, 'fenglab.neutube'),
                     os.path.join(common_dirs.deploy_target_dir(), 'packages', 'fenglab.neutube'))
 
     if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), mt_app_name)):
