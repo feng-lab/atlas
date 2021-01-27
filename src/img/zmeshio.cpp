@@ -10,6 +10,7 @@
 #include <assimp/postprocess.h>
 #include <assimp/material.h>
 #include <QFile>
+#include <QFileInfo>
 #include <memory>
 
 namespace {
@@ -141,6 +142,7 @@ ZMeshIO::ZMeshIO()
 #endif
   m_readExts.push_back("msh");
   m_readExts.push_back("vtp");
+  m_readExts.push_back("precomputed_mesh");
 
   m_readFilter = QString("All Mesh files (*.") + m_readExts.join(" *.") + QString(")");
 
@@ -157,6 +159,12 @@ ZMeshIO::ZMeshIO()
   m_writeFormats.emplace_back("vtp");
   QString filter("VTK Polydata");
   filter += QString(" (*.%1)").arg("vtp");
+  m_writeFilters.push_back(filter);
+
+  m_writeExts.push_back("precomputed_mesh");
+  m_writeFormats.emplace_back("precomputed");
+  filter = QString("Neuroglancer Precomputed");
+  filter += QString(" (*.%1)").arg("precomputed_mesh");
   m_writeFilters.push_back(filter);
 }
 
@@ -189,6 +197,9 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
       readAllenAtlasMesh(filename, mesh.m_normals, mesh.m_vertices, mesh.m_indices);
     } else if (filename.endsWith(".vtp", Qt::CaseInsensitive)) {
       mesh.loadVTP(filename);
+    } else if (filename.endsWith(".precomputed_mesh", Qt::CaseInsensitive)) {
+      readPrecomputed(filename, mesh.m_vertices, mesh.m_indices);
+      mesh.generateNormals();
     } else {
       Assimp::Importer importer;
       importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE,
@@ -296,6 +307,11 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
       return;
     }
 
+    if (format == "precomputed") {
+      writePrecomputed(mesh, filename);
+      return;
+    }
+
     auto sc = std::make_unique<aiScene>();
     sc->mRootNode = new aiNode;
     sc->mRootNode->mName.Set("modelName");
@@ -386,6 +402,51 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
         ++triIdx;
       }
     }
+  }
+}
+
+void ZMeshIO::readPrecomputed(const QString& filename, std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices)
+{
+  auto fileSize = QFileInfo(filename).size();
+  if (fileSize == 0) {
+    LOG(WARNING) << "empty precomputed file " << filename;
+    return;
+  }
+  std::ifstream inputFileStream;
+  openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);
+
+  uint32_t numVertices;
+  readStream(inputFileStream, &numVertices, 4);
+
+  vertices.resize(numVertices);
+  readStream(inputFileStream, vertices.data(), sizeof(glm::vec3) * numVertices);
+
+  auto numIndices = (fileSize - 4 - int64_t(sizeof(glm::vec3) * numVertices)) / 4 / 3 * 3;
+  if (numIndices <= 2) {
+    vertices.clear();
+    indices.clear();
+    LOG(WARNING) << "no triangle in precomputed file " << filename;
+    return;
+  }
+  indices.resize(numIndices);
+  readStream(inputFileStream, indices.data(), 4 * numIndices);
+}
+
+void ZMeshIO::writePrecomputed(const ZMesh& mesh, const QString& filename)
+{
+  std::ofstream outFileStream;
+  openFileStream(outFileStream, filename, std::ios::out | std::ios::binary);
+
+  uint32_t numVertices = mesh.numVertices();
+  writeStream(outFileStream, &numVertices, 4);
+
+  writeStream(outFileStream, mesh.vertices().data(), mesh.numVertices() * sizeof(glm::vec3));
+
+  if (mesh.hasIndices() && mesh.type() == ZMesh::Type::TRIANGLES) {
+    writeStream(outFileStream, mesh.indices().data(), mesh.indices().size() * 4);
+  } else {
+    auto triIndices = mesh.triangleIndices();
+    writeStream(outFileStream, triIndices.data(), triIndices.size() * 4 * 3);
   }
 }
 

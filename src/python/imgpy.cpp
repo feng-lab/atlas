@@ -70,12 +70,8 @@ std::string getFormatDesc(const ZImg& img)
 
 ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 {
-  if (arr.ndim() != 4) {
-    throw ZImgException("Only support 4d array: channel x depth x height x width");
-  }
-  if (arr.size() <= 0) {
-    throw ZImgException("Empty ndarray");
-  }
+  if (arr.ndim() != 4) { throw ZImgException("Only support 4d array: channel x depth x height x width"); }
+  if (arr.size() <= 0) { throw ZImgException("Empty ndarray"); }
   ZImgInfo res = info_in;
   res.numTimes = 1;
   res.numChannels = arr.shape(0);
@@ -115,20 +111,70 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
   return res;
 }
 
-template <class ZImgSubBlockBase = ZImgSubBlock>
-class PyZImgSubBlock : public ZImgSubBlockBase {
+template<class ZImgSubBlockBase = ZImgSubBlock>
+class PyZImgSubBlock : public ZImgSubBlockBase
+{
 public:
   using ZImgSubBlockBase::ZImgSubBlockBase; // Inherit constructors
-  std::shared_ptr<ZImg> read() const override { PYBIND11_OVERLOAD_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, ); }
+  std::shared_ptr<ZImg> read() const override
+  {
+    PYBIND11_OVERLOAD_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, );
+  }
   ZImgInfo readInfo() const override { PYBIND11_OVERLOAD_PURE(ZImgInfo, ZImgSubBlockBase, readInfo, ); }
 };
-template <class ZImgTileSubBlockBase = ZImgTileSubBlock>
-class PyZImgTileSubBlock : public PyZImgSubBlock<ZImgTileSubBlockBase> {
+template<class ZImgTileSubBlockBase = ZImgTileSubBlock>
+class PyZImgTileSubBlock : public PyZImgSubBlock<ZImgTileSubBlockBase>
+{
 public:
   using PyZImgSubBlock<ZImgTileSubBlockBase>::PyZImgSubBlock; // Inherit constructors (via PyA_Tpl's inherited constructors)
-  std::shared_ptr<ZImg> read() const override { PYBIND11_OVERLOAD(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, ); }
+  std::shared_ptr<ZImg> read() const override
+  {
+    PYBIND11_OVERLOAD(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, );
+  }
   ZImgInfo readInfo() const override { PYBIND11_OVERLOAD(ZImgInfo, ZImgTileSubBlockBase, readInfo, ); }
 };
+
+template<size_t L, typename T>
+std::vector<glm::vec<L, T>> arrayToVecVec(const py::array_t<T, py::array::c_style | py::array::forcecast>& array)
+{
+  if (array.ndim() != 2 || array.shape(1) != L) {
+    throw ZException(fmt::format("input array shape does not match output glm::vec{}", L));
+  }
+  std::vector<glm::vec<L, T>> res;
+  if (array.shape(0) > 0) {
+    res.resize(array.shape(0));
+    std::memcpy(res.data(), array.data(), sizeof(T) * L * res.size());
+  }
+  return res;
+}
+
+template<size_t L, typename T>
+py::array_t<T, py::array::c_style | py::array::forcecast> vecVecToArray(const std::vector<glm::vec<L, T>>& v)
+{
+  return v.empty() ? py::array_t<T, py::array::c_style | py::array::forcecast>() :
+    py::array_t<T, py::array::c_style | py::array::forcecast>({v.size(), L}, &v[0].x);
+}
+
+template<typename T>
+std::vector<T> arrayToVector(const py::array_t<T, py::array::c_style | py::array::forcecast>& array)
+{
+  if (array.ndim() != 1) {
+    throw ZException(fmt::format("input array shape does not match output"));
+  }
+  std::vector<T> res;
+  if (array.shape(0) > 0) {
+    res.resize(array.shape(0));
+    std::memcpy(res.data(), array.data(), sizeof(T) * res.size());
+  }
+  return res;
+}
+
+template<typename T>
+py::array_t<T, py::array::c_style | py::array::forcecast> vectorToArray(const std::vector<T>& v)
+{
+  return v.empty() ? py::array_t<T, py::array::c_style | py::array::forcecast>() :
+         py::array_t<T, py::array::c_style | py::array::forcecast>(v.size(), v.data());
+}
 
 }
 
@@ -505,11 +551,25 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::self + py::self)
     .def(py::self += py::self)
     .def(py::self - py::self)
+#ifdef __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-assign-overloaded"
+#endif
     .def(py::self -= py::self)
+#ifdef __clang__
+#pragma GCC diagnostic pop
+#endif
     .def(py::self * py::self)
     .def(py::self *= py::self)
     .def(py::self / py::self)
+#ifdef __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-assign-overloaded"
+#endif
     .def(py::self /= py::self)
+#ifdef __clang__
+#pragma GCC diagnostic pop
+#endif
     .def(py::self + double())
     .def(py::self += double())
     .def(py::self - double())
@@ -884,6 +944,65 @@ PYBIND11_MODULE(_imgpy, m)
     .def("save", py::overload_cast<const QString&, const std::string&>(&ZMesh::save, py::const_),
       "filename"_a, "format"_a = std::string())
     .def_property("type", &ZMesh::type, &ZMesh::setType)
+    .def_static("createPunctaMesh", [](const ZPuncta& puncta, int resolution, const glm::mat4& tfmat) {
+        ZMesh res;
+        ZMesh::createPunctaMesh(puncta, res, resolution, tfmat);
+        return res;
+    }, "puncta"_a, "resolution"_a = 32, "tfmat"_a = glm::mat4(1.f))
+    .def_static("createSwcMesh", [](const ZSwc& swc, int somaType, const glm::mat4& tfmat) {
+        ZMesh rootMesh, somaMesh, neuriteMesh;
+        ZMesh::createSwcMesh(swc, somaType, rootMesh, somaMesh, neuriteMesh, tfmat);
+        return std::make_tuple(rootMesh, somaMesh, neuriteMesh);
+    }, "swc"_a, "somaType"_a = 1, "tfmat"_a = glm::mat4(1.f))
+    .def_property("vertices",
+                  [](const ZMesh& v) {
+                    return vecVecToArray(v.vertices());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setVertices(arrayToVecVec<3>(array));
+                  })
+    .def_property("normals",
+                  [](const ZMesh& v) {
+                    return vecVecToArray(v.normals());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setNormals(arrayToVecVec<3>(array));
+                  })
+    .def_property("colors",
+                  [](const ZMesh& v) {
+                    return vecVecToArray(v.colors());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setColors(arrayToVecVec<4>(array));
+                  })
+    .def_property("indices",
+                  [](const ZMesh& v) {
+                    return vectorToArray(v.indices());
+                  },
+                  [](ZMesh& v, const py::array_t<uint32_t, py::array::c_style | py::array::forcecast>& array) {
+                    v.setIndices(arrayToVector(array));
+                  })
+    .def_property("textureCoordinates1D",
+                  [](const ZMesh& v) {
+                    return vectorToArray(v.textureCoordinates1D());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setTextureCoordinates(arrayToVector(array));
+                  })
+    .def_property("textureCoordinates2D",
+                  [](const ZMesh& v) {
+                    return vecVecToArray(v.textureCoordinates2D());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setTextureCoordinates(arrayToVecVec<2>(array));
+                  })
+    .def_property("textureCoordinates3D",
+                  [](const ZMesh& v) {
+                    return vecVecToArray(v.textureCoordinates3D());
+                  },
+                  [](ZMesh& v, const py::array_t<float, py::array::c_style | py::array::forcecast>& array) {
+                    v.setTextureCoordinates(arrayToVecVec<3>(array));
+                  })
     .def("__repr__", [](const ZMesh& v) {
       return fmt::format("<_imgpy.ZMesh {}>", v.toString());
     });

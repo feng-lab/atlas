@@ -113,6 +113,9 @@ void renameFile(const QString& oldName, const QString& newName)
 std::string readFileIntoString(const QString& filename, std::ios_base::openmode mode)
 {
   std::string res;
+  auto fileSize = QFileInfo(filename).size();
+  if (fileSize == 0) { return res; }
+
   std::ifstream fs;
 #ifdef _MSC_VER
   fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
@@ -122,9 +125,7 @@ std::string readFileIntoString(const QString& filename, std::ios_base::openmode 
   if (!fs.is_open()) {
     throw ZIOException("Can not open file for reading.");
   }
-  fs.seekg(0, std::ios::end);
-  res.resize(fs.tellg());
-  fs.seekg(0, std::ios::beg);
+  res.resize(fileSize);
   fs.read(&res[0], res.size());
   return res;
 }

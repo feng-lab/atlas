@@ -32,6 +32,11 @@ private:
   static void readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
                                  std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
 
+  static void readPrecomputed(const QString& filename,
+                              std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
+
+  static void writePrecomputed(const ZMesh& mesh, const QString& filename);
+
 private:
   QStringList m_readExts;
   QStringList m_writeExts;
