@@ -1941,8 +1941,8 @@ def build_skia(src_dir: str, install_dir: str):
 
 
 def build_libs(libs: dict, update_src: bool):
-    print('extDIR:', ext_dir())
-    print('srcPackageDIR:', src_package_dir())
+    # print('extDIR:', ext_dir())
+    # print('srcPackageDIR:', src_package_dir())
 
     remove_path_contains('miniconda')
     remove_path_contains('anaconda')
