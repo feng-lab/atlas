@@ -5,6 +5,7 @@
 #include "zsaturateoperation.h"
 #include "zregionontology.h"
 #include "zroiutils.h"
+#include "zioutils.h"
 #include <QFile>
 #include <QTransform>
 #include <cmath>

@@ -23,7 +23,7 @@ requirements:
 
   run:
     - python
-    - numpy >=1.18
+    - numpy >=1.19
     - qt >=5.9
     - mkl
     - tbb

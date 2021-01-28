@@ -68,6 +68,46 @@ std::string getFormatDesc(const ZImg& img)
   }
 }
 
+py::dtype getDType(const ZImg& img)
+{
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {
+    switch (img.bytesPerVoxel()) {
+      case 1:
+        return py::dtype::of<uint8_t>();
+      case 2:
+        return py::dtype::of<uint16_t>();
+      case 4:
+        return py::dtype::of<uint32_t>();
+      case 8:
+        return py::dtype::of<uint64_t>();
+      default:
+        throw ZImgException("Incorrect Img Info");
+    }
+  } else if (img.voxelFormat() == VoxelFormat::Float) {
+    switch (img.bytesPerVoxel()) {
+      case 4:
+        return py::dtype::of<float>();
+      case 8:
+        return py::dtype::of<double>();
+      default:
+        throw ZImgException("Incorrect Img Info");
+    }
+  } else {
+    switch (img.bytesPerVoxel()) {
+      case 1:
+        return py::dtype::of<int8_t>();
+      case 2:
+        return py::dtype::of<int16_t>();
+      case 4:
+        return py::dtype::of<int32_t>();
+      case 8:
+        return py::dtype::of<int64_t>();
+      default:
+        throw ZImgException("Incorrect Img Info");
+    }
+  }
+}
+
 ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 {
   if (arr.ndim() != 4) { throw ZImgException("Only support 4d array: channel x depth x height x width"); }
@@ -518,22 +558,16 @@ PYBIND11_MODULE(_imgpy, m)
                   })
     .def_property_readonly("data",
                            [](ZImg& v) {
-                             std::vector<py::buffer_info> bufs;
                              std::vector<py::array> arrs;
                              if (!v.isEmpty()) {
                                auto formatdesc = getFormatDesc(v);
                                for (size_t t = 0; t < v.numTimes(); ++t) {
-                                 bufs.emplace_back(
-                                   v.timeData(t),
-                                   v.info().voxelByteNumber(),
-                                   formatdesc,
-                                   4,
-                                   std::vector<py::size_t>{v.numChannels(), v.depth(), v.height(), v.width()},
-                                   std::vector<py::size_t>{v.info().channelByteNumber(), v.info().planeByteNumber(),
-                                                           v.info().rowByteNumber(), v.info().voxelByteNumber()});
                                  auto capsule = py::capsule(v.timeData(t), [](void*) {});
-                                 arrs.emplace_back(py::dtype(bufs[t]), bufs[t].shape, bufs[t].strides, bufs[t].ptr,
-                                                   capsule);
+                                 // use do nothing capsule so array does not copy or delete data, data still owned by v
+                                 arrs.push_back(py::array(getDType(v),
+                                                          {v.numChannels(), v.depth(), v.height(), v.width()},
+                                                          v.timeData(t),
+                                                          capsule));
                                }
                              }
                              return arrs;
@@ -848,15 +882,15 @@ PYBIND11_MODULE(_imgpy, m)
     });
 
   py::class_<ZROIUtils>(m, "ZROIUtils")
-    .def_static("splineToMask", &ZROIUtils::splineToMask_Python,
+    .def_static("splineToMask", &ZROIUtils::splineToMask,
                 "spline"_a.noconvert())
-    .def_static("rectToMask", &ZROIUtils::rectToMask_Python,
+    .def_static("rectToMask", &ZROIUtils::rectToMask,
                 "rect"_a.noconvert())
-    .def_static("ellipseToMask", &ZROIUtils::ellipseToMask_Python,
+    .def_static("ellipseToMask", &ZROIUtils::ellipseToMask,
                 "ellipse"_a.noconvert())
-    .def_static("polygonToMask", &ZROIUtils::polygonToMask_Python,
+    .def_static("polygonToMask", &ZROIUtils::polygonToMask,
                 "polygon"_a.noconvert())
-    .def_static("shapeToMask", &ZROIUtils::shapeToMask_Python,
+    .def_static("shapeToMask", &ZROIUtils::shapeToMask,
                 "shapes"_a)
     .def("__repr__", [](const ZROIUtils&) {
       return fmt::format("<_imgpy.ZROIUtils>");
