@@ -91,7 +91,7 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMask(const QPainterP
     img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
     for (size_t y = 0; y < img.height(); ++y) {
       for (size_t x = 0; x < img.width(); ++x) {
-        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) >= 128_u8 ? 1_u8 : 0_u8;
+        *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1_u8 : 0_u8;
       }
     }
     img.resize(maxX - minX + 1, maxY - minY + 1, 1);
@@ -126,7 +126,7 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainte
   img = ZImg(ZImgInfo(imageOut.width(), imageOut.height()));
   for (size_t y = 0; y < img.height(); ++y) {
     for (size_t x = 0; x < img.width(); ++x) {
-      *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) >= 128_u8 ? 1_u8 : 0_u8;
+      *img.data<uint8_t>(x, y, 0) = imageOut.pixelIndex(x, y) ? 1_u8 : 0_u8;
     }
   }
   img.resize(maxX - minX + 1, maxY - minY + 1, 1);
