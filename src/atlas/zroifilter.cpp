@@ -83,7 +83,7 @@ ROIGraphicsItem::ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, c
   m_basePos = QPointF(0, 0);
   setPos(m_basePos);
   if (m_regionNode) {
-    QString tooltip = QString("Region: %1 (%2)").arg(m_regionNode->abbreviation).arg(m_regionNode->name);
+    QString tooltip = QString("Region: %1 (%2 %3)").arg(m_regionNode->abbreviation).arg(m_regionNode->id).arg(m_regionNode->name);
     setToolTip(tooltip);
   }
   //todo: uncomment this when we have undo
