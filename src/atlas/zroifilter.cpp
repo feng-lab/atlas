@@ -173,7 +173,7 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   }
   const auto& shapeOps = m_roi.shapeOperations(m_slice, m_id);
   for (const auto& shapeOp : shapeOps) {
-    if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline) {
+    if (shapeOp.type == ROIType::Polygon || shapeOp.type == ROIType::Spline || shapeOp.type == ROIType::Line) {
       QMenu menu;
       auto* addCtrlPointAction = menu.addAction("Add Ctrl Point Here");
 //      QAction* subtractNextSelectedShapeAction = menu.addAction("Subtract Next Selected Shape...");
@@ -188,7 +188,8 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
       }
       auto* selectedAction = menu.exec(event->screenPos());
       if (selectedAction == addCtrlPointAction) {
-        m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
+        //m_roi.sliceAddCtrlPoint(m_slice, event->scenePos(), m_id);
+        m_roi.sliceAddCtrlPoint(m_slice, event->scenePos());
       } else if (toRegionAction && selectedAction == toRegionAction) {
         try {
           ZChooseRegionDialog dlg(m_view.currentRegionAnnotationPack().regionAnnotation(), &m_view.graphicsView());
@@ -1127,8 +1128,9 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
       item->setSelected(false);
     }
   }
-  for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
-    item->setSelected(true);
+  if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end() &&
+      m_sliceToCtrlPtItems[slice].find(shapeID) != m_sliceToCtrlPtItems[slice].end()) {
+    for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) { item->setSelected(true); }
   }
   //LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
 }
@@ -1142,8 +1144,9 @@ void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)
   if (!m_ROI) {
     return;
   }
-  for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
-    item->setSelected(false);
+  if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end() &&
+    m_sliceToCtrlPtItems[slice].find(shapeID) != m_sliceToCtrlPtItems[slice].end()) {
+    for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) { item->setSelected(false); }
   }
 }
 
@@ -1294,8 +1297,8 @@ void ZROIFilter::onRoiChanged(int slice, const std::set<size_t>& newShapes,
   } else {
     if (!deletedShapes.empty()) {
       for (auto shapeID : deletedShapes) {
-        m_sliceToROIItem[slice].erase(shapeID);
-        m_sliceToCtrlPtItems[slice].erase(shapeID);
+        if (m_sliceToROIItem.find(slice) != m_sliceToROIItem.end()) { m_sliceToROIItem[slice].erase(shapeID); }
+        if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end()) { m_sliceToCtrlPtItems[slice].erase(shapeID); }
       }
     }
     if (!changedShapes.empty()) {
@@ -1321,6 +1324,10 @@ void ZROIFilter::onRoiChanged(int slice, const std::set<size_t>& newShapes,
 void ZROIFilter::onRoiMoved(int slice, const std::set<size_t>& changedShapes)
 {
   if (!m_ROI) {
+    return;
+  }
+  if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end() ||
+      m_sliceToCtrlPtItems.find(slice) == m_sliceToCtrlPtItems.end()) {
     return;
   }
   if (changedShapes.empty()) {

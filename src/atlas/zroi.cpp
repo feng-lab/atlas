@@ -295,7 +295,7 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes)
   for (const auto&[id, shapes] : m_idToShapeOperations) {
     for (size_t i = 0; i < shapes.size(); ++i) {
       const auto& shape = shapes[i];
-      if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+      if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline || shape.type == ROIType::Line) {
         const QPolygonF& poly = shape.poly;
         for (int64_t j = 0; j < poly.size() - 1; ++j) {
           double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
@@ -326,7 +326,7 @@ void ZSliceROI::addCtrlPointToShape(const QPointF &pt, size_t shapeID)
   const auto& shapes = m_idToShapeOperations[shapeID];
   for (size_t i = 0; i < shapes.size(); ++i) {
     const auto& shape = shapes[i];
-    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline) {
+    if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline || shape.type == ROIType::Line) {
       const QPolygonF& poly = shape.poly;
       for (index_t j = 0; j < poly.size() - 1; ++j) {
         double dist = (pt - poly[j]).manhattanLength() + (pt - poly[j + 1]).manhattanLength();
@@ -546,7 +546,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           pointsDataspace.getSimpleExtentDims(pointListDim, nullptr);
 
           if (pointListDim[1] != 2 || pointListDim[0] < 2)
-            throw ZIOException("Wrong ROI file contents");
+            throw ZIOException("Wrong ROI file contents2");
 
           QPolygonF poly(pointListDim[0]);
           points.read(poly.data(), doubleType);
@@ -596,9 +596,9 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
               }
               break;
             case ROIType::Line:
-              if (poly.isClosed()) {
-                poly.pop_back();
-              }
+//              if (poly.isClosed()) {
+//                poly.pop_back();
+//              }
               newLine(poly, id);
               break;
             default:

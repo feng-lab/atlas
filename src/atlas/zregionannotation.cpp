@@ -185,6 +185,10 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
       continue;
     }
 
+    if (labels.find(it->id) == labels.end()) {
+      continue;
+    }
+
     bool processMesh = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
     bool processROI = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
 
