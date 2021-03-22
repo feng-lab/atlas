@@ -223,9 +223,9 @@ private:
 
   void takeScreenShot(const QString& filename);
 
-  void mousePressed(QPointF scenePos);
+  void mousePressed(QPointF scenePos, Qt::KeyboardModifiers modifiers);
 
-  void mouseMoved(QPointF scenePos);
+  void mouseMoved(QPointF scenePos, Qt::KeyboardModifiers modifiers);
 
   void mouseReleased(QPointF scenePos);
 

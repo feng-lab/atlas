@@ -257,6 +257,44 @@ void copyITKImgToMemory(const itk::Image<TVoxel, 2>* image, TVoxel* data)
   } \
   }
 
+#define INTEGER_IMG_ITK_3D_TYPED_CALL(function, img, c, t, ...) {                    \
+  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
+    switch (img.bytesPerVoxel()) {                                           \
+    case 1:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint8_t, __VA_ARGS__)      \
+      break;                                                                 \
+    case 2:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint16_t, __VA_ARGS__)     \
+      break;                                                                 \
+    case 4:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint32_t, __VA_ARGS__)     \
+      break;                                                                 \
+    case 8:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint64_t, __VA_ARGS__)     \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  } else if (img.voxelFormat() == VoxelFormat::Signed) {                               \
+    switch (img.bytesPerVoxel()) {                                           \
+    case 1:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int8_t, __VA_ARGS__)       \
+      break;                                                                 \
+    case 2:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int16_t, __VA_ARGS__)      \
+      break;                                                                 \
+    case 4:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int32_t, __VA_ARGS__)      \
+      break;                                                                 \
+    case 8:                                                                  \
+      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int64_t, __VA_ARGS__)      \
+      break;                                                                 \
+    default:                                                                 \
+      break;                                                                 \
+    }                                                                        \
+  }                                                                          \
+}
+
 #define IMG_ITK_TYPED_CALL(function, img, c, t, ...) {                    \
   if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
     switch (img.bytesPerVoxel()) {                                           \

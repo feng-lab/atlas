@@ -1799,6 +1799,24 @@ ZImg ZImg::fromQImage(const QImage& image)
   return res;
 }
 
+template<typename TVoxel>
+double ZImg::sum_Impl() const
+{
+  double res = 0.0;
+  for (size_t t = 0; t < numTimes(); ++t) {
+    auto data = timeData<TVoxel>(t);
+    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+      res += data[v];
+    }
+  }
+  return res;
+}
+
+double ZImg::sum() const
+{
+  IMG_RETURN_TYPED_CALL(sum_Impl, m_info)
+}
+
 void ZImg::clearData()
 {
   if (!m_ownData) {

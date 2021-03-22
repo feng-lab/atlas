@@ -17,7 +17,7 @@ ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSi
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
       IMG_ITK_TYPED_CALL_FIX2NDTYPE(run_Impl, img, c, t, TVoxelOut,
-                                    useVoxelSize, res, c, t);
+                                    useVoxelSize, res, c, t)
     }
   }
 

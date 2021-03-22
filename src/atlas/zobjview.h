@@ -46,9 +46,9 @@ public:
   virtual void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) = 0;
 
   // called if mouse is pressed in a scene pos
-  virtual void mousePressed(const QPointF& scenePos) = 0;
+  virtual void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) = 0;
 
-  virtual void mouseMoved(const QPointF& scenePos) = 0;
+  virtual void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) = 0;
 
   virtual void mouseReleased(const QPointF& scenePos) = 0;
 

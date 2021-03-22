@@ -794,7 +794,7 @@ void ZROIFilter::pasteKeyPressed(int slice, QPointF point, const nim::ZBBox<glm:
   m_ROI->pasteROIToCoord(slice, point, srcBoundBox, hFlip, vFlip);
 }
 
-void ZROIFilter::mousePressed(const QPointF& scenePos)
+void ZROIFilter::mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
 {
   if (isLocked()) {
     return;
@@ -804,7 +804,12 @@ void ZROIFilter::mousePressed(const QPointF& scenePos)
     return;
   }
 
+  if (modifiers != Qt::NoModifier && modifiers != Qt::AltModifier) {
+    return;
+  }
+
   m_hasSelectedItems = false;
+  // m_doSnap = modifiers == Qt::AltModifier;
   if (m_view.isMaxZProjView()) {
     for (auto&[slice, sliceItem] : m_sliceToCtrlPtItems) {
       for (auto&[id, ctrlItems] : sliceItem) {
@@ -841,7 +846,7 @@ void ZROIFilter::mousePressed(const QPointF& scenePos)
   }
 }
 
-void ZROIFilter::mouseMoved(const QPointF& scenePos)
+void ZROIFilter::mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
 {
   if (isLocked()) {
     return;
@@ -864,11 +869,47 @@ void ZROIFilter::mouseMoved(const QPointF& scenePos)
       }
     }
     if (!controlPoints.empty()) {
-      if (trans.isIdentity()) {
-        m_ROI->shiftControlPointsCoords(controlPoints, scenePos - m_startPoint);
+      if (modifiers == Qt::AltModifier) {
+        QPointF coordShift;
+        if (trans.isIdentity()) {
+          coordShift = scenePos - m_startPoint;
+        } else {
+          auto itrans = trans.inverted();
+          coordShift = itrans.map(scenePos) - itrans.map(m_startPoint);
+        }
+        for (auto& cp : controlPoints) {
+          QPointF newPos = m_ROI->controlPointCoord(cp) + coordShift;
+          auto newScenePos = trans.map(newPos);
+          auto itemList = m_view.scene().items(QRectF(newScenePos - QPointF(15., 15.), newScenePos + QPointF(15., 15.)));
+          double minDist = 15.;
+          for (auto item : itemList) {
+            if (item->isSelected() || !item->isVisible() || item->type() != enumToUnderlyingType(GraphicsItemType::ROICtrlPtGraphicsItem)) {
+              continue;
+            }
+            auto* ctlPtItem = dynamic_cast<ROICtrlPtGraphicsItem*>(item);
+            CHECK(ctlPtItem);
+            if (&ctlPtItem->roi() == m_ROI && ctlPtItem->controlPoint().slice == cp.slice &&
+                ctlPtItem->controlPoint().shapeID == cp.shapeID &&
+                ctlPtItem->controlPoint().shapeIndex == cp.shapeIndex) {
+              continue;
+            }
+            auto ctlPtPos = ctlPtItem->roi().controlPointCoord(ctlPtItem->controlPoint());
+            double dist = (ctlPtPos - newPos).manhattanLength();
+            if (dist < minDist) {
+              minDist = dist;
+              newPos = ctlPtPos;
+            }
+          }
+
+          m_ROI->setControlPointCoord(cp, newPos);
+        }
       } else {
-        auto itrans = trans.inverted();
-        m_ROI->shiftControlPointsCoords(controlPoints, itrans.map(scenePos) - itrans.map(m_startPoint));
+        if (trans.isIdentity()) {
+          m_ROI->shiftControlPointsCoords(controlPoints, scenePos - m_startPoint);
+        } else {
+          auto itrans = trans.inverted();
+          m_ROI->shiftControlPointsCoords(controlPoints, itrans.map(scenePos) - itrans.map(m_startPoint));
+        }
       }
       m_startPoint = scenePos;
     }
@@ -888,6 +929,7 @@ void ZROIFilter::mouseReleased(const QPointF& /*scenePos*/)
   if (m_hasSelectedItems) {
     m_ROI->endMoveSelectedControlPointsCommand();
     m_hasSelectedItems = false;
+    // m_doSnap = false;
   }
 }
 

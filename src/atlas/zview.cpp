@@ -587,17 +587,17 @@ void ZView::takeScreenShot(const QString& filename)
   }
 }
 
-void ZView::mousePressed(QPointF scenePos)
+void ZView::mousePressed(QPointF scenePos, Qt::KeyboardModifiers modifiers)
 {
   for (const auto& view : m_objViews) {
-    view->mousePressed(scenePos);
+    view->mousePressed(scenePos, modifiers);
   }
 }
 
-void ZView::mouseMoved(QPointF scenePos)
+void ZView::mouseMoved(QPointF scenePos, Qt::KeyboardModifiers modifiers)
 {
   for (const auto& view : m_objViews) {
-    view->mouseMoved(scenePos);
+    view->mouseMoved(scenePos, modifiers);
   }
 }
 

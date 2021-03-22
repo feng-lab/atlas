@@ -3,6 +3,7 @@
 #include "zglmutils.h"
 #include "zlog.h"
 #include "zbbox.h"
+#include "zimg.h"
 #include <H5Cpp.h>
 #include <vector>
 
@@ -294,6 +295,8 @@ public:
   {
     return fmt::format("{} triangles", numTriangles());
   }
+
+  ZImg toLabelImg(size_t width = 0, size_t height = 0, size_t depth = 0) const;
 
 private:
   enum class BooleanOperationType

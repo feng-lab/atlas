@@ -143,23 +143,23 @@ void ZRegionAnnotationFilter::pasteKeyPressed(int slice, QPointF point, bool hFl
   }
 }
 
-void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos)
+void ZRegionAnnotationFilter::mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
 {
   if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
     return;
   }
   for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->mousePressed(scenePos);
+    idFilter.second->mousePressed(scenePos, modifiers);
   }
 }
 
-void ZRegionAnnotationFilter::mouseMoved(const QPointF& scenePos)
+void ZRegionAnnotationFilter::mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
 {
   if (m_regionAnnotationPack && m_regionAnnotationPack->isLocked()) {
     return;
   }
   for (const auto& idFilter : m_idToROIFilters) {
-    idFilter.second->mouseMoved(scenePos);
+    idFilter.second->mouseMoved(scenePos, modifiers);
   }
 }
 

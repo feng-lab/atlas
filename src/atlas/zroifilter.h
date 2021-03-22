@@ -128,6 +128,9 @@ public:
 
   void setLocked(bool l);
 
+  ZROI& roi()
+  { return m_roi; }
+
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
 protected:
@@ -214,9 +217,9 @@ public:
 
   void pasteKeyPressed(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip, bool vFlip);
 
-  void mousePressed(const QPointF& scenePos) override;
+  void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override;
 
-  void mouseMoved(const QPointF& scenePos) override;
+  void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override;
 
   void mouseReleased(const QPointF& scenePos) override;
 
@@ -301,6 +304,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   bool m_hasSelectedItems = false;
   QPointF m_startPoint;
+  // bool m_doSnap = false;
 
   const RegionNode* m_regionNode = nullptr;
 };

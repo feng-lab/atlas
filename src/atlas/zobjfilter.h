@@ -45,11 +45,17 @@ public:
     Q_UNUSED(vFlip)
   }
 
-  virtual void mousePressed(const QPointF& scenePos)
-  { Q_UNUSED(scenePos) }
+  virtual void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
+  {
+    Q_UNUSED(scenePos)
+    Q_UNUSED(modifiers)
+  }
 
-  virtual void mouseMoved(const QPointF& scenePos)
-  { Q_UNUSED(scenePos) }
+  virtual void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
+  {
+    Q_UNUSED(scenePos)
+    Q_UNUSED(modifiers)
+  }
 
   virtual void mouseReleased(const QPointF& scenePos)
   { Q_UNUSED(scenePos) }

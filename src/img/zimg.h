@@ -1742,6 +1742,8 @@ public:
 
   static ZImg fromQImage(const QImage& image);
 
+  double sum() const;
+
 #ifdef _NEUTUBE_
   // only for interface with zstack
   void releaseTimeData(size_t t) { m_data[t] = nullptr; }
@@ -1767,6 +1769,9 @@ private:
 
   template<typename TVoxel>
   void fillRandom_Impl();
+
+  template<typename TVoxel>
+  double sum_Impl() const;
 
   template<typename TVoxel, typename TVoxelImg>
   void pasteImg_Impl(const ZImg& img, const ZVoxelCoordinate& start);

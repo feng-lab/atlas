@@ -373,9 +373,8 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
     addItem(m_ellipseItem.get());
   } else {
     QGraphicsScene::mousePressEvent(event);
-    if (!selectedItems().empty() &&
-        event->button() == Qt::LeftButton && event->modifiers() == Qt::NoModifier) {
-      emit mousePressed(event->scenePos());
+    if (!selectedItems().empty() && event->button() == Qt::LeftButton) {
+      emit mousePressed(event->scenePos(), event->modifiers());
     }
   }
 }
@@ -592,7 +591,7 @@ void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
   } else {
     QGraphicsScene::mouseMoveEvent(event);
     if (!selectedItems().empty()) {
-      emit mouseMoved(scenePt);
+      emit mouseMoved(scenePt, event->modifiers());
     }
   }
 }

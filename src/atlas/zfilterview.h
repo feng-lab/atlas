@@ -118,11 +118,11 @@ public:
     }
   }
 
-  void mousePressed(const QPointF& scenePos) override
+  void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
-        idFilter.second->mousePressed(scenePos);
+        idFilter.second->mousePressed(scenePos, modifiers);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
@@ -130,11 +130,11 @@ public:
     }
   }
 
-  void mouseMoved(const QPointF& scenePos) override
+  void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override
   {
     for (const auto& idFilter : m_idToFilter) {
       try {
-        idFilter.second->mouseMoved(scenePos);
+        idFilter.second->mouseMoved(scenePos, modifiers);
       }
       catch (const ZException& e) {
         QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());

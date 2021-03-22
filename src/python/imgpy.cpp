@@ -977,6 +977,8 @@ PYBIND11_MODULE(_imgpy, m)
       "filename"_a)
     .def("save", py::overload_cast<const QString&, const std::string&>(&ZMesh::save, py::const_),
       "filename"_a, "format"_a = std::string())
+    .def("toLabelImg", &ZMesh::toLabelImg,
+      "width"_a = 0, "height"_a = 0, "depth"_a = 0)
     .def_property("type", &ZMesh::type, &ZMesh::setType)
     .def_static("createPunctaMesh", [](const ZPuncta& puncta, int resolution, const glm::mat4& tfmat) {
         ZMesh res;

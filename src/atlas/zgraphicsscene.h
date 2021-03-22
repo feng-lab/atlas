@@ -32,9 +32,9 @@ public:
 
 signals:
 
-  void mousePressed(QPointF);
+  void mousePressed(QPointF, Qt::KeyboardModifiers);
 
-  void mouseMoved(QPointF);
+  void mouseMoved(QPointF, Qt::KeyboardModifiers);
 
   void mouseReleased(QPointF);
 

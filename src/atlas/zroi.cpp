@@ -6,6 +6,7 @@
 #include "zregionontology.h"
 #include "zroiutils.h"
 #include "zioutils.h"
+#include "zimginterpolate.h"
 #include <QFile>
 #include <QTransform>
 #include <cmath>
@@ -295,6 +296,7 @@ bool ZSliceROI::addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes)
   for (const auto&[id, shapes] : m_idToShapeOperations) {
     for (size_t i = 0; i < shapes.size(); ++i) {
       const auto& shape = shapes[i];
+      // LOG(INFO) << (shape.type == ROIType::Line);
       if (shape.type == ROIType::Polygon || shape.type == ROIType::Spline || shape.type == ROIType::Line) {
         const QPolygonF& poly = shape.poly;
         for (int64_t j = 0; j < poly.size() - 1; ++j) {
@@ -762,6 +764,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     std::vector<size_t> srcSlices;
     ZImgSignedDistanceMap<> distMap;
     distMap.setInsideIsPositive(false);
+    ZImgInterpolate<> interpolator;
     for (const auto& sliceROI : m_sliceROIs) {
       if (sliceROI.first < 0)
         continue;
@@ -769,11 +772,16 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
       //LOG(INFO) << slice;
       const QPainterPath& path = slicePaintPath(slice, scaleX, scaleY);
       auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
+      if (mask.isEmpty()) { continue; }
+      if (mask.sum() == 0.0) { continue; }
       img.pasteImg(mask, ZVoxelCoordinate(x_start, y_start, slice));
       srcSlices.push_back(slice);
     }
 
     if (doInterpolation) {
+#if 1
+      img = interpolator.run(img);
+#else
       for (size_t i = 1; i < srcSlices.size(); ++i) {
         size_t prevSlice = srcSlices[i - 1];
         size_t nextSlice = srcSlices[i];
@@ -811,6 +819,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
           distMapImgs.erase(distMapImgs.begin());
         }
       }
+#endif
 
       if (keepOnlyInterpolatedSlices) {
         for (auto slice : srcSlices) {

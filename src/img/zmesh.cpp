@@ -21,6 +21,7 @@
 #include <vtkAppendPolyData.h>
 #include <vtkXMLPolyDataReader.h>
 #include <vtkXMLPolyDataWriter.h>
+#include <vtkSelectEnclosedPoints.h>
 #include <boost/math/constants/constants.hpp>
 #include <map>
 
@@ -1413,6 +1414,52 @@ void ZMesh::swapXY()
   m_indices = newIndices;
   m_type = Type::TRIANGLES;
   generateNormals();
+}
+
+ZImg ZMesh::toLabelImg(size_t width, size_t height, size_t depth) const
+{
+  ZImg res;
+  auto bbox = boundBox();
+  if (width == 0) {
+    width = std::max(0.0, std::ceil(bbox.maxCorner.x));
+  }
+  if (height == 0) {
+    height = std::max(0.0, std::ceil(bbox.maxCorner.y));
+  }
+  if (depth == 0) {
+    depth = std::max(0.0, std::ceil(bbox.maxCorner.z));
+  }
+  if (width == 0 || height == 0 || depth == 0) {
+    return res;
+  }
+  res = ZImg(ZImgInfo(width, height, depth));
+
+  vtkSmartPointer<vtkPoints> points =
+    vtkSmartPointer<vtkPoints>::New();
+  for (size_t d = 0; d < depth; ++d) {
+    for (size_t h = 0; h < height; ++h) {
+      for (size_t w = 0; w < width; ++w) {
+        points->InsertNextPoint(w, h, d);
+      }
+    }
+  }
+
+  vtkSmartPointer<vtkPolyData> pointsPolydata =
+    vtkSmartPointer<vtkPolyData>::New();
+  pointsPolydata->SetPoints(points);
+
+  //Points inside test
+  vtkSmartPointer<vtkSelectEnclosedPoints> selectEnclosedPoints =
+    vtkSmartPointer<vtkSelectEnclosedPoints>::New();
+  selectEnclosedPoints->SetInputData(pointsPolydata);
+  selectEnclosedPoints->SetSurfaceData(meshToVtkPolyData(*this));
+  selectEnclosedPoints->Update();
+
+  auto data = res.timeData(0);
+  for (size_t i = 0; i < res.timeVoxelNumber(); ++i) {
+    data[i] = selectEnclosedPoints->IsInside(i);
+  }
+  return res;
 }
 
 void ZMesh::appendTriangle(const ZMesh& mesh, const glm::uvec3& triangle)

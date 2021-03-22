@@ -66,6 +66,61 @@
                                             "parent_structure_id": 688,
                                             "children": [
                                                 {
+                                                    "id": 3159,
+                                                    "acronym": "L1",
+                                                    "name": "Layer1",
+                                                    "color_hex_triplet": "77FD89",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3158,
+                                                    "acronym": "L2&3",
+                                                    "name": "Layer2&3",
+                                                    "color_hex_triplet": "589BFC",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3157,
+                                                    "acronym": "L4",
+                                                    "name": "Layer4",
+                                                    "color_hex_triplet": "979AFC",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3156,
+                                                    "acronym": "L5",
+                                                    "name": "Layer5",
+                                                    "color_hex_triplet": "CF0C06",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
+                                                    "id": 3155,
+                                                    "acronym": "L6",
+                                                    "name": "Layer6",
+                                                    "color_hex_triplet": "066AB0",
+                                                    "graph_order": 5,
+                                                    "st_level": "null",
+                                                    "hemisphere_id": 3,
+                                                    "parent_structure_id": 315,
+                                                    "children": []
+                                                },
+                                                {
                                                     "id": 322,
                                                     "atlas_id": 746,
                                                     "ontology_id": 1,

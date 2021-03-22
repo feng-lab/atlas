@@ -39,9 +39,9 @@ public:
 
   void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip) override;
 
-  void mousePressed(const QPointF& scenePos) override;
+  void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override;
 
-  void mouseMoved(const QPointF& scenePos) override;
+  void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers) override;
 
   void mouseReleased(const QPointF& scenePos) override;
 
