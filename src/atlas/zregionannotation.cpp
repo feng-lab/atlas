@@ -259,7 +259,7 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
 
 void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras,
                                          double scaleX, double scaleY, double scaleZ,
-                                         bool keepOnlyInterpolatedSlices) const
+                                         bool keepOnlyInterpolatedSlices, int interpolationMethod) const
 {
   LOG(INFO) << "Exporting Label Image...";
 
@@ -305,7 +305,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
         LOG(INFO) << "has roi";
         ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
                                                   1.0, 1.0,
-                                                  keepOnlyInterpolatedSlices);
+                                                  keepOnlyInterpolatedSlices, interpolationMethod);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
       }
     }
@@ -338,7 +338,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
         LOG(INFO) << "has roi";
         ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
                                                   scaleX, scaleY,
-                                                  keepOnlyInterpolatedSlices);
+                                                  keepOnlyInterpolatedSlices, interpolationMethod);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
       }
     }
@@ -745,7 +745,23 @@ void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
   QTemporaryDir dir;
   if (dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
-    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, scale, 1.0,true);
+    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, scale, 1.0, true, 0);
+    auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
+    importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
+    cmd->setNewOntology(m_ontology);
+    m_undoStack.push(cmd);
+    //emit modified();
+  } else {
+    throw ZException(QString("can not create temporary file for region interpolation"));
+  }
+}
+
+void ZRegionAnnotation::interpolateRegionAnnotation2(double scale)
+{
+  QTemporaryDir dir;
+  if (dir.isValid()) {
+    QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
+    exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, scale, 1.0, true, 1);
     auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
     importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
     cmd->setNewOntology(m_ontology);

@@ -113,6 +113,18 @@ void ZRegionAnnotationWidget::interpolateRegionAnnotation()
   }
 }
 
+void ZRegionAnnotationWidget::interpolateRegionAnnotation2()
+{
+  bool ok;
+  auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
+  double d = QInputDialog::getDouble(this, tr("Scale ROI before Interpolating"),
+                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
+                                     Qt::WindowFlags(), 1);
+  if (ok) {
+    m_regionAnnotationPack.regionAnnotation().interpolateRegionAnnotation2(d);
+  }
+}
+
 void ZRegionAnnotationWidget::updateMesh()
 {
   ZVec3Parameter ratioPara("Scale", glm::vec3(1.f), glm::vec3(1e-5), glm::vec3(1e10));
@@ -174,6 +186,12 @@ void ZRegionAnnotationWidget::createWidget()
   m_interpolateRegionAnnotationButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_interpolateRegionAnnotationButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(m_interpolateRegionAnnotationButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::interpolateRegionAnnotation);
+
+  m_interpolateRegionAnnotationButton2 = new QPushButton("Interpolate Region Annotations2");
+  m_interpolateRegionAnnotationButton2->setToolTip("Interpolate regions for slices without annotations");
+  m_interpolateRegionAnnotationButton2->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_interpolateRegionAnnotationButton2, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_interpolateRegionAnnotationButton2, &QPushButton::clicked, this, &ZRegionAnnotationWidget::interpolateRegionAnnotation2);
 
   m_update3DMeshFromROIButton = new QPushButton("Update 3D Meshes From Modified ROIs");
   m_update3DMeshFromROIButton->setToolTip("Update 3D meshes with current region contours");

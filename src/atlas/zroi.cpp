@@ -743,7 +743,7 @@ void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
 }
 
 ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpolation, double scaleX, double scaleY,
-                     bool keepOnlyInterpolatedSlices) const
+                     bool keepOnlyInterpolatedSlices, int interpolationMethod) const
 {
   ZImg img;
   const auto& bBox = boundBox();
@@ -779,47 +779,42 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
     }
 
     if (doInterpolation) {
-#if 1
-      img = interpolator.run(img);
-#else
-      for (size_t i = 1; i < srcSlices.size(); ++i) {
-        size_t prevSlice = srcSlices[i - 1];
-        size_t nextSlice = srcSlices[i];
-        if (prevSlice + 1 == nextSlice)
-          continue;
-        if (distMapImgs.find(prevSlice) == distMapImgs.end()) {
-          distMapImgs[prevSlice] = distMap.run<double>(img.createView(prevSlice, 0, 0), false);
-        }
-        if (distMapImgs.find(nextSlice) == distMapImgs.end()) {
-          distMapImgs[nextSlice] = distMap.run<double>(img.createView(nextSlice, 0, 0), false);
-        }
-        auto prevData = distMapImgs[prevSlice].channelData<double>(0);
-        auto nextData = distMapImgs[nextSlice].channelData<double>(0);
-        size_t numSlice = nextSlice - prevSlice - 1;
-        std::vector<uint8_t*> dataPts;
-        std::vector<double> progresses;
-        for (size_t slice = prevSlice + 1; slice < nextSlice; ++slice) {
-          dataPts.push_back(img.planeData<uint8_t>(slice));
-          progresses.push_back(double(slice - prevSlice) / double(nextSlice - prevSlice));
-        }
-        for (size_t idx = 0; idx < img.planeVoxelNumber(); ++idx) {
-          if (prevData[idx] <= 0 && nextData[idx] <= 0) {
-            for (size_t k = 0; k < numSlice; ++k) {
-              dataPts[k][idx] = 1;
-            }
-          } else if (prevData[idx] <= 0 || nextData[idx] <= 0) {
-            for (size_t k = 0; k < numSlice; ++k) {
-              double dst = prevData[idx] + progresses[k] * (nextData[idx] - prevData[idx]);
-              if (dst <= 0)
-                dataPts[k][idx] = 1;
+      if (interpolationMethod == 0)
+      {
+        img = interpolator.run(img);
+      } else {
+        for (size_t i = 1; i < srcSlices.size(); ++i) {
+          size_t prevSlice = srcSlices[i - 1];
+          size_t nextSlice = srcSlices[i];
+          if (prevSlice + 1 == nextSlice) continue;
+          if (distMapImgs.find(prevSlice) == distMapImgs.end()) {
+            distMapImgs[prevSlice] = distMap.run<double>(img.createView(prevSlice, 0, 0), false);
+          }
+          if (distMapImgs.find(nextSlice) == distMapImgs.end()) {
+            distMapImgs[nextSlice] = distMap.run<double>(img.createView(nextSlice, 0, 0), false);
+          }
+          auto prevData = distMapImgs[prevSlice].channelData<double>(0);
+          auto nextData = distMapImgs[nextSlice].channelData<double>(0);
+          size_t numSlice = nextSlice - prevSlice - 1;
+          std::vector<uint8_t*> dataPts;
+          std::vector<double> progresses;
+          for (size_t slice = prevSlice + 1; slice < nextSlice; ++slice) {
+            dataPts.push_back(img.planeData<uint8_t>(slice));
+            progresses.push_back(double(slice - prevSlice) / double(nextSlice - prevSlice));
+          }
+          for (size_t idx = 0; idx < img.planeVoxelNumber(); ++idx) {
+            if (prevData[idx] <= 0 && nextData[idx] <= 0) {
+              for (size_t k = 0; k < numSlice; ++k) { dataPts[k][idx] = 1; }
+            } else if (prevData[idx] <= 0 || nextData[idx] <= 0) {
+              for (size_t k = 0; k < numSlice; ++k) {
+                double dst = prevData[idx] + progresses[k] * (nextData[idx] - prevData[idx]);
+                if (dst <= 0) dataPts[k][idx] = 1;
+              }
             }
           }
-        }
-        if (i > 1) {
-          distMapImgs.erase(distMapImgs.begin());
+          if (i > 1) { distMapImgs.erase(distMapImgs.begin()); }
         }
       }
-#endif
 
       if (keepOnlyInterpolatedSlices) {
         for (auto slice : srcSlices) {

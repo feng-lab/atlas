@@ -182,7 +182,7 @@ public:
   [[nodiscard]] ZImg
   toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true,
             double scaleX = 1.0, double scaleY = 1.0,
-            bool keepOnlyInterpolatedSlices = false) const;
+            bool keepOnlyInterpolatedSlices = false, int intepolationMethod = 0) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   { return m_boundBox; }

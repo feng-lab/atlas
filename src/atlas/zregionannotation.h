@@ -34,7 +34,7 @@ public:
 
   void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras,
                         double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0,
-                        bool keepOnlyInterpolatedSlices = false) const;
+                        bool keepOnlyInterpolatedSlices = false, int interpolationMethod = 0) const;
 
   double getOptimizedScale() const;
 
@@ -94,6 +94,8 @@ public:
 
   // generate region annotations for slices without annotations
   void interpolateRegionAnnotation(double scale = 1.0);
+
+  void interpolateRegionAnnotation2(double scale = 1.0);
 
   // update Mesh after editing contours
   void updateMesh(double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);

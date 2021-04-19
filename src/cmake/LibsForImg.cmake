@@ -288,7 +288,7 @@ find_package(assimp REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(assimp::assimp)
 
-find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML
+find_package(VTK REQUIRED COMPONENTS FiltersGeometry FiltersSources IOXML FiltersModeling
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "VTK_DIR: ${VTK_DIR}")
 message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
