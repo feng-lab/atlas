@@ -441,17 +441,17 @@ def build_boost(src_dir: str, install_dir: str):
                                 ],
                                cwd=src_dir, shell=False, check=True)
 
-        filename = os.path.join(install_dir, 'include', 'boost', 'json', 'detail', 'value_from.hpp')
-        if is_windows():
-            filename = os.path.join(install_dir, 'include', 'boost-1_75', 'boost', 'json', 'detail', 'value_from.hpp')
-        patch_file(filename,
-                   from_texts=[r'! detail::value_constructible<T>::value',
-                               r'#include <boost/json/detail/value_traits.hpp>',
-                               ],
-                   to_texts=[r'! std::is_same<detail::remove_cvref<T>, QString>::value && ! detail::value_constructible<T>::value',
-                             '#include <boost/json/detail/value_traits.hpp>\n'
-                             '#include <QString>\n',
-                             ])
+        # filename = os.path.join(install_dir, 'include', 'boost', 'json', 'detail', 'value_from.hpp')
+        # if is_windows():
+        #     filename = os.path.join(install_dir, 'include', 'boost-1_75', 'boost', 'json', 'detail', 'value_from.hpp')
+        # patch_file(filename,
+        #            from_texts=[r'! detail::value_constructible<T>::value',
+        #                        r'#include <boost/json/detail/value_traits.hpp>',
+        #                        ],
+        #            to_texts=[r'! std::is_same<detail::remove_cvref<T>, QString>::value && ! detail::value_constructible<T>::value',
+        #                      '#include <boost/json/detail/value_traits.hpp>\n'
+        #                      '#include <QString>\n',
+        #                      ])
     finally:
         print('done')
 
@@ -670,6 +670,19 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
+    sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
+    sub_install_dir = ext_build_dir()
+    sub_build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+        cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
+                         '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE',])
+
+        cmakecmd.extend([sub_src_dir])
+        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+    finally:
+        shutil.rmtree(sub_build_dir, ignore_errors=False)
+
     build_dir = create_build_dir(src_dir)
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
@@ -682,7 +695,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
                          '-DgRPC_BENCHMARK_PROVIDER:STRING=package',
-                         '-DgRPC_ABSL_PROVIDER:STRING=module',
+                         '-DgRPC_ABSL_PROVIDER:STRING=package',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
         # if is_windows():
@@ -1609,7 +1622,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKTBB.cmake')
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKTBB.cmake')
         patch_file(orig_file_2,
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',
@@ -1623,7 +1636,7 @@ def build_itk(src_dir: str, install_dir: str):
         # ITKZLIB_INCLUDE_DIRS includes
         # /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
         # which cause conda compilation errors
-        # orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKZLIB.cmake')
+        # orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKZLIB.cmake')
         # patch_file(orig_file_3,
         #            from_texts=[r'set(ITKZLIB_INCLUDE_DIRS',
         #                        ],
