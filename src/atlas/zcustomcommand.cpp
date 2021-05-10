@@ -1864,13 +1864,31 @@ void testLogDataSupport()
   LOG(INFO) << json::value_from(str);
 }
 
+void createEeumIndexImages()
+{
+  ZMainWindow* mainWin = nullptr;
+  for (auto widget : QApplication::topLevelWidgets()) {
+    mainWin = qobject_cast<ZMainWindow*>(widget);
+    if (mainWin)
+      break;
+  }
+
+  for (size_t ti = 0; ti < 180; ++ti) {
+    mainWin->view()->slicePara().set(ti);
+    QApplication::processEvents();
+    auto imgName = QString("/Users/feng/code/eeum/static/static/slice_%1.png").arg(ti);
+    mainWin->view()->takeFixedSizeScreenShot(imgName, 512, 512);
+    QApplication::processEvents();
+  }
+}
+
 }  // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  testLogDataSupport();
+  createEeumIndexImages();
   LOG(INFO) << "done";
 }
 

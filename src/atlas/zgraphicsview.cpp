@@ -13,7 +13,7 @@ namespace nim {
 ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   : QGraphicsView(scene, parent)
   , m_view(parent)
-  , m_scale("Scale", 100, 7, 10000)
+  , m_scale("Scale", 100, 1, 10000)
 {
   setMinimumSize(400, 400);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);

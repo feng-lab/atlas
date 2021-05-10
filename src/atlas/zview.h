@@ -191,6 +191,10 @@ public:
 
   void estimateMontageColumns() const;
 
+  void takeFixedSizeScreenShot(const QString& filename, int width, int height);
+
+  void takeScreenShot(const QString& filename);
+
 signals:
 
   void objViewReady(size_t id);
@@ -218,10 +222,6 @@ private:
   void changeViewStyle();
 
   void changeViewport();
-
-  void takeFixedSizeScreenShot(const QString& filename, int width, int height);
-
-  void takeScreenShot(const QString& filename);
 
   void mousePressed(QPointF scenePos, Qt::KeyboardModifiers modifiers);
 
