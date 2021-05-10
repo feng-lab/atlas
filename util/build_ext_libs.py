@@ -991,7 +991,7 @@ def build_folly(src_dir: str, install_dir: str):
                                            ],
                                to_texts=[
                                    r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
-                                   r'#/std:${MSVC_LANGUAGE_VERSION}',
+                                   r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
                                    ])
 
         orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')

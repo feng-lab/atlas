@@ -374,7 +374,7 @@ def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: 
 
 def install_cmake():
     if is_windows():
-        unpack_tool_to_target_dir(src_package_dir(), 'cmake*win64*')
+        unpack_tool_to_target_dir(src_package_dir(), 'cmake*windows*')
     elif is_linux():
         unpack_tool_to_target_dir(src_package_dir(), 'cmake*Linux*')
     else:
@@ -419,7 +419,7 @@ def install_ffmpeg():
 
 def get_cmake_binary() -> str:
     if is_windows():
-        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*win*-x64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*windows*'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     elif is_linux():
         cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*Linux*_64'))
@@ -438,7 +438,7 @@ def get_ninja_binary() -> str:
 
 def get_ffmpeg_binary() -> str:
     if is_windows():
-        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*build*'))
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*win*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
         folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*amd64*'))
