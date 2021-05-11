@@ -74,7 +74,7 @@ public:
 
   [[nodiscard]] QPointF mapFromScene(QPointF p) const;
 
-signals:
+Q_SIGNALS:
 
   void boundBoxChanged();
 

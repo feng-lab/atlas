@@ -53,7 +53,7 @@ public:
 
   void setCurrentTime(double t);
 
-signals:
+Q_SIGNALS:
 
   void exportButtonToggled(bool);
 

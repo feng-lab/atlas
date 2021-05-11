@@ -28,7 +28,7 @@ public:
 
   void openEditWidget(size_t id);
 
-signals:
+Q_SIGNALS:
 
   void loadScene();
 

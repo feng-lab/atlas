@@ -379,7 +379,7 @@ void Z3DVolumeFilter::enterInteractionMode()
     for (auto port : inputPorts()) {
       port->setExpectedSize(expectedSize / uint32_t(m_interactionDownsample.get()));
     }
-    emit requestUpstreamSizeChange(this);
+    Q_EMIT requestUpstreamSizeChange(this);
 
     // upstream will invalidate the network, but in case there are no upstream
     // do one more invalidation
@@ -404,7 +404,7 @@ void Z3DVolumeFilter::exitInteractionMode()
     for (auto port : inputPorts()) {
       port->setExpectedSize(expectedSize);
     }
-    emit requestUpstreamSizeChange(this);
+    Q_EMIT requestUpstreamSizeChange(this);
 
     // upstream will invalidate the network, but in case there are no upstream
     // do one more invalidation
@@ -514,7 +514,7 @@ void Z3DVolumeFilter::leftMouseButtonPressed(QMouseEvent* e, int w, int h)
       glm::vec3 pos3D = getFirstHit3DPosition(e->x(), e->y(), w, h, success);
 #endif
       if (success) {
-        emit pointInVolumeLeftClicked(e->pos(), glm::ivec3(pos3D));
+        Q_EMIT pointInVolumeLeftClicked(e->pos(), glm::ivec3(pos3D));
         //e->accept();
       }
     }

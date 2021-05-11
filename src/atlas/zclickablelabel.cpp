@@ -44,7 +44,7 @@ bool ZClickableLabel::event(QEvent* event)
 
 void ZClickableLabel::labelClicked()
 {
-  emit clicked();
+  Q_EMIT clicked();
 }
 
 ZClickableColorLabel::ZClickableColorLabel(ZVec4Parameter* color, QWidget* parent, Qt::WindowFlags f)

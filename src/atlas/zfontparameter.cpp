@@ -22,7 +22,7 @@ void ZFontParameter::setValue(const QFont& v)
 
 void ZFontParameter::beforeChange(QFont& value)
 {
-  emit valueWillChange(value);
+  Q_EMIT valueWillChange(value);
 }
 
 QWidget* ZFontParameter::actualCreateWidget(QWidget* parent)

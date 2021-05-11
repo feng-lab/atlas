@@ -20,7 +20,7 @@ void ZSwcView::docSwcsAdded(const std::vector<size_t>& objs)
     connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
     connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
     connect(viewControl, &ZSwcFilter::objVisibleChanged, this, &ZSwcView::onObjVisibleChangedFromView);
-    emit objViewReady(obj);
+    Q_EMIT objViewReady(obj);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -38,7 +38,7 @@ void ZSwcView::docSwcAdded(size_t id)
   connect(viewControl, &ZSwcFilter::objDeselected, this, &ZSwcView::onObjDeselectedFromView);
   connect(viewControl, &ZSwcFilter::objSelected, this, &ZSwcView::onObjSelectedFromView);
   connect(viewControl, &ZSwcFilter::objVisibleChanged, this, &ZSwcView::onObjVisibleChangedFromView);
-  emit objViewReady(id);
+  Q_EMIT objViewReady(id);
 }
 
 } // namespace nim

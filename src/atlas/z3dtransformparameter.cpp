@@ -297,7 +297,7 @@ void Z3DTransformParameter::updateMatrix()
 
     m_value = trans * rot * trans1 * scale;
 
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 

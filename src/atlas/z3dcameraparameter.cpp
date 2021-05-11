@@ -149,14 +149,14 @@ void Z3DCameraParameter::rotate90XZ()
 void Z3DCameraParameter::viewportChanged(const glm::uvec2& viewport)
 {
   m_value.setWindowAspectRatio(static_cast<float>(viewport.x) / viewport.y);
-  emit windowsAspectRatioChanged(static_cast<float>(viewport.x) / viewport.y);
-  emit valueChanged();
+  Q_EMIT windowsAspectRatioChanged(static_cast<float>(viewport.x) / viewport.y);
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::setWindowsAspectRatio(float r)
 {
   m_value.setWindowAspectRatio(r);
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateProjectionType()
@@ -166,7 +166,7 @@ void Z3DCameraParameter::updateProjectionType()
       m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
     else
       m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -174,7 +174,7 @@ void Z3DCameraParameter::updateEye()
 {
   if (m_receiveWidgetSignal) {
     m_value.setEye(m_eye.get());
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -182,7 +182,7 @@ void Z3DCameraParameter::updateCenter()
 {
   if (m_receiveWidgetSignal) {
     m_value.setCenter(m_center.get());
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -190,7 +190,7 @@ void Z3DCameraParameter::updateUpVector()
 {
   if (m_receiveWidgetSignal) {
     m_value.setUpVector(m_upVector.get());
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -198,7 +198,7 @@ void Z3DCameraParameter::updateEyeSeparationAngle()
 {
   if (m_receiveWidgetSignal) {
     m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -206,7 +206,7 @@ void Z3DCameraParameter::updateFieldOfView()
 {
   if (m_receiveWidgetSignal) {
     m_value.setFieldOfView(glm::radians(m_fieldOfView.get()));
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -215,7 +215,7 @@ void Z3DCameraParameter::updateNearDist()
   if (m_receiveWidgetSignal) {
     m_value.setNearDist(m_nearDist.get());
     m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -224,7 +224,7 @@ void Z3DCameraParameter::updateFarDist()
   if (m_receiveWidgetSignal) {
     m_value.setFarDist(m_farDist.get());
     m_nearDist.setRange(1e-10, m_value.farDist());
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -333,7 +333,7 @@ void Z3DCameraParameter::readValue(const json::value& jsonValue)
   m_value.setCamera(m_eye.get(), m_center.get(), m_upVector.get());
   m_value.setFrustum(glm::radians(m_fieldOfView.get()), m_value.aspectRatio(), m_nearDist.get(), m_farDist.get());
   m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 } // namespace nim

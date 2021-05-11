@@ -174,13 +174,13 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
 void Z3DPrimitiveRenderer::invalidateOpenglRenderer()
 {
   if (m_useDisplayList)
-    emit openglRendererInvalid();
+    Q_EMIT openglRendererInvalid();
 }
 
 void Z3DPrimitiveRenderer::invalidateOpenglPickingRenderer()
 {
   if (m_useDisplayList)
-    emit openglPickingRendererInvalid();
+    Q_EMIT openglPickingRendererInvalid();
 }
 #endif
 

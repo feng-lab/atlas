@@ -141,7 +141,7 @@ void ZGraphicsView::checkViewport()
   QRectF rect = getCurrrentlyVisibleRegion();
   if (vp != rect) {
     vp = rect;
-    emit viewportChanged();
+    Q_EMIT viewportChanged();
   }
 }
 

@@ -61,7 +61,7 @@ void ZImgView::docImgsAdded(const std::vector<size_t>& objs)
     connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
     connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
     connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
-    emit objViewReady(id);
+    Q_EMIT objViewReady(id);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -79,7 +79,7 @@ void ZImgView::docImgAdded(size_t id)
   connect(viewControl, &ZImgFilter::objDeselected, this, &ZImgView::onObjDeselectedFromView);
   connect(viewControl, &ZImgFilter::objSelected, this, &ZImgView::onObjSelectedFromView);
   connect(viewControl, &ZImgFilter::objVisibleChanged, this, &ZImgView::onObjVisibleChangedFromView);
-  emit objViewReady(id);
+  Q_EMIT objViewReady(id);
 }
 
 void ZImgView::docImgChanged(size_t id)

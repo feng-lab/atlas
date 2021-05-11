@@ -85,10 +85,10 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 
   if (m_is2D) {
     if (m_useWindowSize.get())
-      emit take2DScreenShot(filepath);
+      Q_EMIT take2DScreenShot(filepath);
     else {
       glm::ivec2 size = m_customSize.get();
-      emit takeFixedSize2DScreenShot(filepath, size.x, size.y);
+      Q_EMIT takeFixedSize2DScreenShot(filepath, size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
@@ -101,10 +101,10 @@ void ZTakeScreenShotWidget::captureButtonPressed()
       sst = Z3DScreenShotType::MonoView;
 
     if (m_useWindowSize.get())
-      emit take3DScreenShot(filepath, sst);
+      Q_EMIT take3DScreenShot(filepath, sst);
     else {
       glm::ivec2 size = m_customSize.get();
-      emit takeFixedSize3DScreenShot(filepath, size.x, size.y, sst);
+      Q_EMIT takeFixedSize3DScreenShot(filepath, size.x, size.y, sst);
     }
   }
 }
@@ -135,10 +135,10 @@ void ZTakeScreenShotWidget::captureSequenceButtonPressed()
     sst = Z3DScreenShotType::MonoView;
 
   if (m_useWindowSize.get())
-    emit takeSeries3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, sst);
+    Q_EMIT takeSeries3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, sst);
   else {
     glm::ivec2 size = m_customSize.get();
-    emit takeSeriesFixedSize3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame,
+    Q_EMIT takeSeriesFixedSize3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame,
                                          size.x, size.y, sst);
   }
 }

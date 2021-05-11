@@ -75,7 +75,7 @@ public:
   glm::ivec2 logicalSize()
   { return glm::ivec2(width(), height()); }
 
-signals:
+Q_SIGNALS:
 
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(int w, int h);
@@ -198,7 +198,7 @@ public:
   glm::uvec2 logicalSize()
   { return glm::uvec2(width(), height()); }
 
-signals:
+Q_SIGNALS:
 
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(size_t w, size_t h);

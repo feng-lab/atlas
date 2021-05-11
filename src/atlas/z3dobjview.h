@@ -54,7 +54,7 @@ public:
   inline Z3DGlobalParameters& globalParas()
   { return m_view.globalParas(); }
 
-signals:
+Q_SIGNALS:
 
   void objViewReady(size_t id);
 

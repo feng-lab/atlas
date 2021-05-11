@@ -34,7 +34,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
       m_view.updateBoundBox();
 
       for (auto id : objs) {
-        emit objViewReady(id);
+        Q_EMIT objViewReady(id);
       }
     }
   }
@@ -67,7 +67,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();
 
-    emit objViewReady(id);
+    Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();

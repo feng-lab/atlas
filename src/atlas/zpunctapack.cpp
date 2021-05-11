@@ -59,7 +59,7 @@ void ZPunctaPack::setSelectedPuncta(const std::set<const ZPunctum*>& sp)
   for (auto& mp : m_puncta.data) {
     mp.setSelected(m_selectedPuncta.find(&mp) != m_selectedPuncta.end());
   }
-  emit selectionChanged();
+  Q_EMIT selectionChanged();
 }
 
 void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
@@ -72,11 +72,11 @@ void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
     if (it == m_selectedPuncta.end()) {
       const_cast<ZPunctum*>(p)->setSelected(true);
       m_selectedPuncta.insert(p);
-      emit selectionChanged();
+      Q_EMIT selectionChanged();
     } else {
       const_cast<ZPunctum*>(p)->setSelected(false);
       m_selectedPuncta.erase(it);
-      emit selectionChanged();
+      Q_EMIT selectionChanged();
     }
   } else {
     if (!p && m_selectedPuncta.empty()) {
@@ -93,7 +93,7 @@ void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
     } else {
       m_selectedPuncta.clear();
     }
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 

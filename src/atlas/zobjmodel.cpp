@@ -289,7 +289,7 @@ void ZObjModel::setObjVisible(size_t id, bool v)
       setData(idx, v ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
 //      auto item = static_cast<ZObjPack*>(idx.internalPointer());
 //      item->setVisible(v);
-      emit dataChanged(idx, idx);
+      Q_EMIT dataChanged(idx, idx);
     }
   }
 }
@@ -317,7 +317,7 @@ void ZObjModel::setObjLocked(size_t id, bool v)
     if (idx.isValid()) {
       auto item = static_cast<ZObjPack*>(idx.internalPointer());
       item->setLocked(v);
-      emit dataChanged(idx, idx);
+      Q_EMIT dataChanged(idx, idx);
     }
   }
 }
@@ -340,38 +340,38 @@ ZObjDoc* ZObjModel::idToDoc(size_t id) const
 
 void ZObjModel::updateObj(size_t id)
 {
-  emit dataChanged(idToIndex(id, 0), idToIndex(id, 4));
+  Q_EMIT dataChanged(idToIndex(id, 0), idToIndex(id, 4));
 }
 
 void ZObjModel::addObj(size_t id, ZObjDoc& doc)
 {
   int row = m_rootItem->children.size();
-  emit beginInsertRows(QModelIndex(), row, row);
+  Q_EMIT beginInsertRows(QModelIndex(), row, row);
   m_rootItem->children.emplace_back(std::make_unique<ZObjPack>(id, &doc));
   m_rootItem->children[row]->parent = m_rootItem.get();
-  emit endInsertRows();
+  Q_EMIT endInsertRows();
 }
 
 void ZObjModel::addObj(const std::shared_ptr<ZObjPack>& obj)
 {
   int row = m_rootItem->children.size();
-  emit beginInsertRows(QModelIndex(), row, row);
+  Q_EMIT beginInsertRows(QModelIndex(), row, row);
   obj->parent = m_rootItem.get();
   m_rootItem->children.push_back(obj);
-  emit endInsertRows();
+  Q_EMIT endInsertRows();
 }
 
 void ZObjModel::removeObj(size_t id)
 {
   for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
     if (m_rootItem->children[i]->m_id == id) {
-      emit beginRemoveRows(QModelIndex(), i, i);
+      Q_EMIT beginRemoveRows(QModelIndex(), i, i);
       if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
         m_viewSettingCurrentItem = nullptr;
         m_doc->sendHideViewSettingSignal();
       }
       m_rootItem->children.erase(m_rootItem->children.begin() + i);
-      emit endRemoveRows();
+      Q_EMIT endRemoveRows();
       return;
     }
   }
@@ -384,13 +384,13 @@ void ZObjModel::removeObjsOfDoc(ZObjDoc* doc)
     cont = false;
     for (size_t i = 0; i < m_rootItem->children.size(); ++i) {
       if (m_rootItem->children[i]->m_objDoc == doc) {
-        emit beginRemoveRows(QModelIndex(), i, i);
+        Q_EMIT beginRemoveRows(QModelIndex(), i, i);
         if (m_rootItem->children[i].get() == m_viewSettingCurrentItem) {
           m_viewSettingCurrentItem = nullptr;
           m_doc->sendHideViewSettingSignal();
         }
         m_rootItem->children.erase(m_rootItem->children.begin() + i);
-        emit endRemoveRows();
+        Q_EMIT endRemoveRows();
         cont = true;
         break;
       }
@@ -452,7 +452,7 @@ void ZObjModel::clicked(const QModelIndex& idxIn)
     } else if (idxIn.column() == LockColumn) {
       auto item = static_cast<ZObjPack*>(idxIn.internalPointer());
       item->setLocked(!item->m_locked);
-      emit dataChanged(idxIn, idxIn);
+      Q_EMIT dataChanged(idxIn, idxIn);
     }
   }
 }
@@ -533,7 +533,7 @@ void ZObjModel::setModelIndexCheckState(const QModelIndex& index, Qt::CheckState
 {
   auto item = static_cast<ZObjPack*>(index.internalPointer());
   item->setVisible(cs == Qt::Checked);
-  emit dataChanged(index, index);
+  Q_EMIT dataChanged(index, index);
 }
 
 Qt::CheckState ZObjModel::getModelIndexCheckState(const QModelIndex& index) const

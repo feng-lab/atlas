@@ -282,7 +282,7 @@ QWidget* ZDoc::createObjEditWidget(size_t id) const
 void ZDoc::updateObjInfo(size_t id)
 {
   m_objModel->updateObj(id);
-  emit objInfoChanged(id);
+  Q_EMIT objInfoChanged(id);
 }
 
 void ZDoc::registerObjDoc(ZObjDoc* objD)
@@ -617,7 +617,7 @@ void ZDoc::onObjAboutToBeRemoved(size_t id, ZObjDoc* doc)
   if (auto us = doc->objUndoStack(id); us) {
     m_undoGroup->removeStack(us);
   }
-  emit objAboutToBeRemoved(id, doc);
+  Q_EMIT objAboutToBeRemoved(id, doc);
 }
 
 void ZDoc::onObjAdded(size_t id, ZObjDoc *doc)

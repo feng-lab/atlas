@@ -195,7 +195,7 @@ public:
 
   void takeScreenShot(const QString& filename);
 
-signals:
+Q_SIGNALS:
 
   void objViewReady(size_t id);
 

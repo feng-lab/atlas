@@ -119,7 +119,7 @@ void ZButtonColumnDelegate::cellEntered(const QModelIndex& index)
 void ZButtonColumnDelegate::buttonClicked()
 {
   if (auto btn = qobject_cast<QPushButton*>(sender())) {
-    emit buttonClickedForUserData(btn->property("user_data"));
+    Q_EMIT buttonClickedForUserData(btn->property("user_data"));
   }
 }
 

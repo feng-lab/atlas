@@ -32,7 +32,7 @@ public:
 
   void buildSpline();
 
-signals:
+Q_SIGNALS:
 
   void interpolationMethodChanged();
 

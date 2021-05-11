@@ -44,7 +44,7 @@ public:
     }
     m_options.push_back(value);
     m_associatedDatas.push_back(T2());
-    emit this->reservedStringSignal1(comboBoxItemString(value));
+    Q_EMIT this->reservedStringSignal1(comboBoxItemString(value));
     if (!m_dataIsValid) {
       select(value);
       m_dataIsValid = true;
@@ -56,7 +56,7 @@ public:
     m_options.clear();
     m_associatedDatas.clear();
     m_dataIsValid = false;
-    emit this->reservedSignal1();
+    Q_EMIT this->reservedSignal1();
   }
 
   void removeOption(const T& value)
@@ -67,12 +67,12 @@ public:
     }
     removeAt(m_options, index);
     removeAt(m_associatedDatas, index);
-    emit this->reservedStringSignal2(comboBoxItemString(value));
+    Q_EMIT this->reservedStringSignal2(comboBoxItemString(value));
     index = indexOf(m_options, this->m_value);
     if (index >= 0) {
-      emit this->reservedIntSignal1(index);
+      Q_EMIT this->reservedIntSignal1(index);
     } else {
-      emit this->reservedIntSignal1(0);
+      Q_EMIT this->reservedIntSignal1(0);
       this->set(m_options[0]);
     }
   }
@@ -129,7 +129,7 @@ public:
     }
     m_options.push_back(value.first);
     m_associatedDatas.push_back(value.second);
-    emit this->reservedStringSignal1(comboBoxItemString(value.first));
+    Q_EMIT this->reservedStringSignal1(comboBoxItemString(value.first));
     if (!m_dataIsValid) {
       select(value.first);
       m_dataIsValid = true;

@@ -22,7 +22,7 @@ void ZRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t>&
     connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
     connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged,
             this, &ZRegionAnnotationView::onObjVisibleChangedFromView);
-    emit objViewReady(obj);
+    Q_EMIT objViewReady(obj);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -41,7 +41,7 @@ void ZRegionAnnotationView::docRegionAnnotationAdded(size_t id)
   connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
   connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged, this,
           &ZRegionAnnotationView::onObjVisibleChangedFromView);
-  emit objViewReady(id);
+  Q_EMIT objViewReady(id);
 }
 
 } // namespace nim

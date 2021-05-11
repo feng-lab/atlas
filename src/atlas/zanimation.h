@@ -107,7 +107,7 @@ public:
 
   void export2DAnimation(const QString& fn, double framePerSecond);
 
-signals:
+Q_SIGNALS:
 
   void durationChanged(double v);
 

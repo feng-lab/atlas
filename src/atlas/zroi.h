@@ -199,7 +199,7 @@ public:
 
   void deleteSliceROI_Impl(int slice)
   {
-    emit roiDeleted(slice);
+    Q_EMIT roiDeleted(slice);
     m_sliceROIs.erase(slice);
   }
 
@@ -479,7 +479,7 @@ public:
 
   void save(H5::Group& allGrp) const;
 
-signals:
+Q_SIGNALS:
 
   void roiChanged(int slice, const std::set<size_t>& newShapes,
                   const std::set<size_t>& deletedShapes,

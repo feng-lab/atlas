@@ -28,7 +28,7 @@ public:
 
   void cellEntered(const QModelIndex& index);
 
-signals:
+Q_SIGNALS:
 
   void buttonClickedForUserData(QVariant ud);
 

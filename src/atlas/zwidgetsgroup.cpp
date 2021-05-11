@@ -255,12 +255,12 @@ void ZWidgetsGroup::sortChildGroups()
 
 void ZWidgetsGroup::emitRequestAdvancedWidgetSignal()
 {
-  emit requestAdvancedWidget(m_groupName);
+  Q_EMIT requestAdvancedWidget(m_groupName);
 }
 
 void ZWidgetsGroup::emitWidgetsGroupChangedSignal()
 {
-  emit widgetsGroupChanged();
+  Q_EMIT widgetsGroupChanged();
 }
 
 } // namespace nim

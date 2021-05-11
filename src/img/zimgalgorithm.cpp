@@ -85,8 +85,8 @@ void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
   if (m_parent) {
     m_parent->subOperationProgressChanged(currentProgress, this);
   } else {
-    emit progressChanged(currentProgress, this);
-    emit progressChanged(currentProgress * 100.);
+    Q_EMIT progressChanged(currentProgress, this);
+    Q_EMIT progressChanged(currentProgress * 100.);
   }
 }
 

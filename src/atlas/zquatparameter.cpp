@@ -57,13 +57,13 @@ void ZQuatParameter::setValue4(double v)
 void ZQuatParameter::beforeChange(glm::quat& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
   if (value[3] != m_value[3])
-    emit value4WillChange(value[3]);
+    Q_EMIT value4WillChange(value[3]);
 }
 
 QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)

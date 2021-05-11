@@ -63,7 +63,7 @@ bool Z3DTransferFunction::operator!=(const Z3DTransferFunction& tf) const
 void Z3DTransferFunction::resetToDefault()
 {
   reset(0., 1., glm::col4(0, 0, 0, 0), glm::col4(255, 255, 255, 255));
-  emit changed();
+  Q_EMIT changed();
 }
 
 Z3DTexture* Z3DTransferFunction::texture() const
@@ -90,7 +90,7 @@ void Z3DTransferFunction::resize(uint32_t width)
 
   if (width != m_dimensions.x) {
     m_dimensions.x = width;
-    emit changed();
+    Q_EMIT changed();
   }
 }
 
@@ -172,7 +172,7 @@ void Z3DTransferFunctionParameter::setVolume(Z3DVolume* volume)
       int max = 1 << bits;
       m_value.resize(max);
     }
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
 }
 
@@ -188,7 +188,7 @@ void Z3DTransferFunctionParameter::setSameAs(const ZParameter& rhs)
   if (m_value != src->get()) {
     m_value = src->get();
     m_value.invalidateTexture();
-    emit valueChanged();
+    Q_EMIT valueChanged();
   }
   ZParameter::setSameAs(rhs);
 }
@@ -234,7 +234,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
     }
   }
   m_value.invalidateTexture();
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 } // namespace nim

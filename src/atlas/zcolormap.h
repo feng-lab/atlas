@@ -319,7 +319,7 @@ public:
 
   void create1DTexture(size_t width = 256) const;
 
-signals:
+Q_SIGNALS:
 
   void changed();
 
@@ -401,7 +401,7 @@ void ZColorMap::reset(const ForwardIterator first, const ForwardIterator last, c
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
   blockSignals(false);
-  emit changed();
+  Q_EMIT changed();
 }
 
 template<class ForwardIterator>
@@ -417,7 +417,7 @@ void ZColorMap::reset(const ForwardIterator first, const ForwardIterator last, c
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
   blockSignals(false);
-  emit changed();
+  Q_EMIT changed();
 }
 
 template<class ForwardIterator>
@@ -433,7 +433,7 @@ void ZColorMap::reset(const ForwardIterator first, const ForwardIterator last, c
   addKey(ZColorMapKey(m_dataMin, minColor));
   addKey(ZColorMapKey(m_dataMax, maxColor));
   blockSignals(false);
-  emit changed();
+  Q_EMIT changed();
 }
 
 

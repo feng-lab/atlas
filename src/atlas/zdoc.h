@@ -205,7 +205,7 @@ public:
 
   void copySelectedObjsPathToClipboard();
 
-signals:
+Q_SIGNALS:
 
   void showViewSetting(size_t id);
 
@@ -228,18 +228,18 @@ protected:
 
   void sendShowViewSettingSignal(size_t id)
   {
-    emit showViewSetting(id);
+    Q_EMIT showViewSetting(id);
     m_viewSettingId = id;
   }
 
   void sendHideViewSettingSignal()
   {
-    emit hideViewSetting();
+    Q_EMIT hideViewSetting();
     m_viewSettingId = 0;
   }
 
   void sendOpenEditWidgetSignal(size_t id)
-  { emit openEditWidget(id); }
+  { Q_EMIT openEditWidget(id); }
 
   void onObjAboutToBeRemoved(size_t id, ZObjDoc* doc);
 

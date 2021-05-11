@@ -38,7 +38,7 @@ public:
     return QObject::connect(this, &ZLogCache::logDataReady, receiver, slot, Qt::DirectConnection);
   }
 
-signals:
+Q_SIGNALS:
   // send the list and valid range [start, end), end is always larger than start
   void logDataReady(const std::deque<LogData>* messages, size_t start, size_t end);
 

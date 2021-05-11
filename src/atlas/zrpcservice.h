@@ -15,11 +15,11 @@ public:
 
   void shutdown();
 
-signals:
+Q_SIGNALS:
 
-public slots:
+public:
 
-private slots:
+private:
   void onRPCThreadStarted();
 
 private:

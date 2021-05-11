@@ -29,7 +29,7 @@ public:
   { return m_scale.get() / 100.; }
 
   inline void setScale(double s)
-  { m_scale.set(s * 100.); emit scaleChanged(currentScale()); }
+  { m_scale.set(s * 100.); Q_EMIT scaleChanged(currentScale()); }
 
   void fitRect(const QRectF& rect);
 
@@ -42,7 +42,7 @@ public:
 
   void checkViewport();
 
-signals:
+Q_SIGNALS:
 
   void scaleChanged(double s);
 

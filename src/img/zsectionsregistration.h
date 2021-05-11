@@ -77,7 +77,7 @@ public:
   void setNumNeighbors(size_t i)
   { m_numNeighbors = i; }
 
-signals:
+Q_SIGNALS:
 
   void resultReady(QString path);
 

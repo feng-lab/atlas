@@ -34,7 +34,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       m_view.updateBoundBox();
 
       for (auto id : objs) {
-        emit objViewReady(id);
+        Q_EMIT objViewReady(id);
       }
     }
   }
@@ -67,7 +67,7 @@ void Z3DImgView::docImgAdded(size_t id)
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();
 
-    emit objViewReady(id);
+    Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();

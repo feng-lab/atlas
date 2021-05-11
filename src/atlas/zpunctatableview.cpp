@@ -80,7 +80,7 @@ void ZPunctaTableView::indexDoubleClicked(const QModelIndex& index)
 
   auto row = m_ratProxyModel->mapToSource(index).row();
   auto p = m_punctaPack.punctaPts()[row];
-  emit m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
+  Q_EMIT m_doc.requestToAdjustViewToPosition(p->x(), p->y(), p->z(), 128);
 }
 
 void ZPunctaTableView::indexActivated(const QModelIndex& index)

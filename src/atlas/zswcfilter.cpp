@@ -567,7 +567,7 @@ void ZSwcFilter::onSwcChanged()
   createSwcNodeItems();
   m_skipSelectionChangedProcessing = false;
 
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void ZSwcFilter::updateSwcNodeColor()

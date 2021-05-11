@@ -15,7 +15,7 @@ public:
 protected:
   void initializeGL() override;
 
-signals:
+Q_SIGNALS:
   void openGLContextInitialized();
 };
 
@@ -29,7 +29,7 @@ public:
 protected:
   void initializeGL() override;
 
-signals:
+Q_SIGNALS:
   void openGLContextInitialized();
 };
 

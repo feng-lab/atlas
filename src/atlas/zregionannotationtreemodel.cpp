@@ -223,10 +223,10 @@ void ZRegionAnnotationTreeModel::clicked(const QModelIndex& /*idxIn*/)
 
   //        m_viewSettingCurrentItem = item;
   //        if (prevIdx.isValid())
-  //          emit dataChanged(prevIdx, prevIdx);
+  //          Q_EMIT dataChanged(prevIdx, prevIdx);
   //        m_regionAnnotation->sendShowViewSettingSignal(item->id);
   //      }
-  //      emit dataChanged(idxIn, idxIn);
+  //      Q_EMIT dataChanged(idxIn, idxIn);
   //    }
   //  }
 }

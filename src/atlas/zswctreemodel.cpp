@@ -197,10 +197,10 @@ void ZSwcTreeModel::clicked(const QModelIndex& /*idxIn*/)
 
   //        m_viewSettingCurrentItem = item;
   //        if (prevIdx.isValid())
-  //          emit dataChanged(prevIdx, prevIdx);
+  //          Q_EMIT dataChanged(prevIdx, prevIdx);
   //        m_regionAnnotation->sendShowViewSettingSignal(item->id);
   //      }
-  //      emit dataChanged(idxIn, idxIn);
+  //      Q_EMIT dataChanged(idxIn, idxIn);
   //    }
   //  }
 }
@@ -212,7 +212,7 @@ void ZSwcTreeModel::doubleClicked(const QModelIndex& index)
   }
 
   auto p = *reinterpret_cast<ZSwc::SwcTreeNode*>(index.internalId());
-  emit m_doc.requestToAdjustViewToPosition(p->x, p->y, p->z, 128);
+  Q_EMIT m_doc.requestToAdjustViewToPosition(p->x, p->y, p->z, 128);
 }
 
 void ZSwcTreeModel::activated(const QModelIndex& /*idxIn*/)

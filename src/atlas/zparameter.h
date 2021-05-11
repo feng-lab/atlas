@@ -1,7 +1,7 @@
 #pragma once
 
 // Base class for all parameters that algorithms or renderers need.
-// A parameter can emit changed() signal while changed. And it has
+// A parameter can Q_EMIT changed() signal while changed. And it has
 // createWidget functions which can be used for UI
 // generation. The changed() signal can be used to change algorithm
 // or renderer behavior dynamicly.
@@ -87,7 +87,7 @@ public:
 
   void updateFromSender();
 
-signals:
+Q_SIGNALS:
 
   void nameChanged(const QString&);
 
@@ -180,7 +180,7 @@ protected:
   // default implement do nothing
   virtual void makeValid(T& value) const;
 
-  // subclass can use this function to emit customized signal before m_value
+  // subclass can use this function to Q_EMIT customized signal before m_value
   // is changed or do other update, input is new value
   virtual void beforeChange(T& value);
 
@@ -220,7 +220,7 @@ void ZSingleValueParameter<T>::set(const T& valueIn)
       QMutexLocker locker(&m_mutex);
       beforeChange(value);
       m_value = value;
-      emit valueChanged();
+      Q_EMIT valueChanged();
       afterChange(value);
     }
   }
@@ -264,7 +264,7 @@ public:
 
   void setValue(bool v);
 
-signals:
+Q_SIGNALS:
 
   void valueWillChange(bool);
 

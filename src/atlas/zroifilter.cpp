@@ -125,7 +125,7 @@ void ROIGraphicsItem::setLocked(bool l)
 //{
 ////  setCursor(Qt::ClosedHandCursor);
 //  if (event->button() == Qt::LeftButton) {
-//    emit m_roi.selectShape(m_slice, m_id, event->modifiers() == Qt::ControlModifier);
+//    Q_EMIT m_roi.selectShape(m_slice, m_id, event->modifiers() == Qt::ControlModifier);
 //  } else {
 //    QGraphicsPathItem::mouseDoubleClickEvent(event);
 //  }
@@ -156,10 +156,10 @@ QVariant ROIGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, c
     auto selected = value.toBool();
     //LOG(INFO) << selected;
     if (!selected) {
-      emit m_roi.deselectShape(m_slice, m_id);
+      Q_EMIT m_roi.deselectShape(m_slice, m_id);
     } else {
       m_view.scene().performROISubtraction(&m_roi, m_slice, m_id);
-      emit m_roi.selectShape(m_slice, m_id, true);
+      Q_EMIT m_roi.selectShape(m_slice, m_id, true);
     }
     return value;
   }
@@ -447,10 +447,10 @@ void ROICtrlPtGraphicsItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* even
   }
   if (event->button() == Qt::LeftButton) {
     if (event->modifiers() == Qt::AltModifier) {
-      emit m_roi.deselectShape(m_controlPoint.slice, m_controlPoint.shapeID);
+      Q_EMIT m_roi.deselectShape(m_controlPoint.slice, m_controlPoint.shapeID);
     } else {
       m_view.scene().performROISubtraction(&m_roi, m_controlPoint.slice, m_controlPoint.shapeID);
-      emit m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
+      Q_EMIT m_roi.selectShape(m_controlPoint.slice, m_controlPoint.shapeID, event->modifiers() == Qt::ControlModifier);
     }
     m_doubleClicked = true;
   } else {

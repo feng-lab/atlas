@@ -30,7 +30,7 @@ public:
 
   void escKeyPressed();
 
-signals:
+Q_SIGNALS:
 
   void mousePressed(QPointF, Qt::KeyboardModifiers);
 

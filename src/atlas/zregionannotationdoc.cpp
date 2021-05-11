@@ -137,9 +137,9 @@ QMenu* ZRegionAnnotationDoc::processObjMenu() const
 void ZRegionAnnotationDoc::removeObj(size_t id)
 {
   auto it = m_idToRegionAnnotationPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToRegionAnnotationPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZRegionAnnotationDoc::objName(size_t id) const
@@ -197,7 +197,7 @@ size_t ZRegionAnnotationDoc::makeAlias(size_t id)
   m_idToRegionAnnotationPacks[aliasId] = m_idToRegionAnnotationPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -373,7 +373,7 @@ size_t ZRegionAnnotationDoc::addRegionAnnotation(ZRegionAnnotation* regionAnnota
   m_idToRegionAnnotationPacks[id] = std::make_shared<ZRegionAnnotationPack>(regionAnnotation, path, id, *this);
   m_doc.registerNewObj(m_idToRegionAnnotationPacks[id]);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   connect(m_idToRegionAnnotationPacks[id].get(), &ZRegionAnnotationPack::undoStackCleanChanged,
           this, &ZRegionAnnotationDoc::setModified);
   return id;

@@ -26,7 +26,7 @@ Q_OBJECT
 public:
   explicit ZClickableLabel(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
-signals:
+Q_SIGNALS:
 
   void clicked();
 
@@ -37,7 +37,7 @@ protected:
 
   virtual bool getTip(const QPoint& p, QRect* r, QString* s) = 0;
 
-  // default implement is emit the signal
+  // default implement is Q_EMIT the signal
   virtual void labelClicked();
 };
 

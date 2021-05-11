@@ -17,21 +17,21 @@ ZEventListenerParameter::listenTo(const QString& actionName, const Qt::MouseButt
                                   QEvent::Type type)
 {
   m_mouseEvents.emplace_back(actionName, buttons, modifiers, type);
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 void ZEventListenerParameter::listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
                                        QEvent::Type type)
 {
   m_keyEvents.emplace_back(actionName, key, modifiers, type);
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 void ZEventListenerParameter::clearAll()
 {
   m_mouseEvents.clear();
   m_keyEvents.clear();
-  emit valueChanged();
+  Q_EMIT valueChanged();
 }
 
 void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
@@ -54,8 +54,8 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
         break;
     }
     if (accept) {
-      emit eventTriggered(e, w, h);
-      emit mouseEventTriggered(mouseEvent, w, h);
+      Q_EMIT eventTriggered(e, w, h);
+      Q_EMIT mouseEventTriggered(mouseEvent, w, h);
 
       if (m_sharing)
         e->ignore();
@@ -71,8 +71,8 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
         break;
     }
     if (accept) {
-      emit eventTriggered(e, w, h);
-      emit wheelEventTriggered(wheelEvent, w, h);
+      Q_EMIT eventTriggered(e, w, h);
+      Q_EMIT wheelEventTriggered(wheelEvent, w, h);
 
       if (m_sharing)
         e->ignore();
@@ -88,8 +88,8 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
         break;
     }
     if (accept) {
-      emit eventTriggered(e, w, h);
-      emit keyEventTriggered(keyEvent, w, h);
+      Q_EMIT eventTriggered(e, w, h);
+      Q_EMIT keyEventTriggered(keyEvent, w, h);
 
       if (m_sharing)
         e->ignore();
@@ -97,8 +97,8 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
   } else if (auto contextMenuEvent = dynamic_cast<QContextMenuEvent*>(e)) {
     bool accept = m_listeningToContextMenuEvent;
     if (accept) {
-      emit eventTriggered(e, w, h);
-      emit contextMenuEventTriggered(contextMenuEvent, w, h);
+      Q_EMIT eventTriggered(e, w, h);
+      Q_EMIT contextMenuEventTriggered(contextMenuEvent, w, h);
 
       if (m_sharing)
         e->ignore();

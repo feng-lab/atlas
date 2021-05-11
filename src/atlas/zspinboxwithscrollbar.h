@@ -22,7 +22,7 @@ public:
 
   void setDataRange(int min, int max);
 
-signals:
+Q_SIGNALS:
 
   void valueChanged(int);
 

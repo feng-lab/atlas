@@ -162,7 +162,7 @@ public:
 
   [[nodiscard]] ZBBox<glm::dvec3> notTransformedBoundBoxAfterClipping() const;
 
-signals:
+Q_SIGNALS:
 
   void boundBoxChanged();
 

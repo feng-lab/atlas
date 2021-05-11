@@ -50,7 +50,7 @@ public:
 
   virtual bool eventFilter(QObject* obj, QEvent* event);
 
-private slots:
+private:
 
   void OnPauseClicked();
 

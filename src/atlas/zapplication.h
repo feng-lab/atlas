@@ -20,7 +20,7 @@ public:
 
   static QString applicationInstallDirPath();
 
-signals:
+Q_SIGNALS:
   void fileOpenRequest(QList<QUrl> urlList);
 };
 

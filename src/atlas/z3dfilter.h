@@ -103,9 +103,9 @@ public:
   inline void invalidateResult()
   { invalidate(State::AllResultInvalid); }
 
-signals:
+Q_SIGNALS:
 
-  // emit this only if resize starts from current filter.
+  // Q_EMIT this only if resize starts from current filter.
   void requestUpstreamSizeChange(Z3DFilter*);
 
 protected:

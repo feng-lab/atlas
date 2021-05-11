@@ -40,7 +40,7 @@ bool ZApplication::event(QEvent* event)
     LOG(INFO) << "Open file: " << openEvent->file();
     QList<QUrl> list;
     list << openEvent->url();
-    emit fileOpenRequest(list);
+    Q_EMIT fileOpenRequest(list);
   }
   return QApplication::event(event);
 }

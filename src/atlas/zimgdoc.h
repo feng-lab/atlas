@@ -64,7 +64,7 @@ public:
 
   [[nodiscard]] bool isAlias(size_t id) const override;
 
-signals:
+Q_SIGNALS:
 
   void imgChanged(size_t id);
 

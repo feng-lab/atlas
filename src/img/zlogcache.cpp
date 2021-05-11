@@ -40,7 +40,7 @@ void ZLogCache::sendLogData()
   auto start = m_unsendLogDataStart;
   m_unsendLogDataStart = m_logDatas.size();
   if (m_unsendLogDataStart > start) {
-    emit logDataReady(&m_logDatas, start, m_unsendLogDataStart);
+    Q_EMIT logDataReady(&m_logDatas, start, m_unsendLogDataStart);
   }
 }
 

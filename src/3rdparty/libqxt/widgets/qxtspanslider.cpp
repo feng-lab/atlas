@@ -102,7 +102,7 @@ void QxtSpanSliderPrivate::handleMousePress(const QPoint& pos, QStyle::SubContro
         offset = pick(pos - sr.topLeft());
         lastPressed = handle;
         p->setSliderDown(true);
-        emit p->sliderPressed(handle);
+        Q_EMIT p->sliderPressed(handle);
     }
     if (control != oldControl)
         p->update(sr);
@@ -205,7 +205,7 @@ void QxtSpanSliderPrivate::triggerAction(QAbstractSlider::SliderAction action, b
         if ((main && mainControl == QxtSpanSlider::UpperHandle) || (!main && altControl == QxtSpanSlider::UpperHandle))
             up = true;
         [[fallthrough]];
-      case QAbstractSlider::SliderNoAction:
+    case QAbstractSlider::SliderNoAction:
         no = true;
         break;
     default:
@@ -482,15 +482,15 @@ void QxtSpanSlider::setSpan(int lower, int upper)
         {
             qxt_d().lower = low;
             qxt_d().lowerPos = low;
-            emit lowerValueChanged(low);
+            Q_EMIT lowerValueChanged(low);
         }
         if (upp != qxt_d().upper)
         {
             qxt_d().upper = upp;
             qxt_d().upperPos = upp;
-            emit upperValueChanged(upp);
+            Q_EMIT upperValueChanged(upp);
         }
-        emit spanChanged(qxt_d().lower, qxt_d().upper);
+        Q_EMIT spanChanged(qxt_d().lower, qxt_d().upper);
         update();
     }
 }
@@ -512,7 +512,7 @@ void QxtSpanSlider::setLowerPosition(int lower)
         if (!hasTracking())
             update();
         if (isSliderDown())
-            emit lowerPositionChanged(lower);
+            Q_EMIT lowerPositionChanged(lower);
         if (hasTracking() && !qxt_d().blockTracking)
         {
             bool main = (qxt_d().mainControl == QxtSpanSlider::LowerHandle);
@@ -538,7 +538,7 @@ void QxtSpanSlider::setUpperPosition(int upper)
         if (!hasTracking())
             update();
         if (isSliderDown())
-            emit upperPositionChanged(upper);
+            Q_EMIT upperPositionChanged(upper);
         if (hasTracking() && !qxt_d().blockTracking)
         {
             bool main = (qxt_d().mainControl == QxtSpanSlider::UpperHandle);

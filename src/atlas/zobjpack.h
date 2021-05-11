@@ -21,7 +21,7 @@ public:
   [[nodiscard]] bool isLocked() const
   { return m_locked; }
 
-signals:
+Q_SIGNALS:
 
   void visibleStateChanged(bool v);
 

@@ -26,7 +26,7 @@ Q_OBJECT
 public:
   explicit ZTimelineAxisView(ZTimelineWidget& parent);
 
-signals:
+Q_SIGNALS:
 
 protected:
   void updateAxisScene();

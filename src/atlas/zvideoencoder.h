@@ -18,7 +18,7 @@ public:
 
   void cancel();
 
-signals:
+Q_SIGNALS:
 
   void error(QString);
 

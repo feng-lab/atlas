@@ -126,9 +126,9 @@ QMenu* ZPunctaDoc::processObjMenu() const
 void ZPunctaDoc::removeObj(size_t id)
 {
   auto it = m_idToPunctaPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToPunctaPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZPunctaDoc::objName(size_t id) const
@@ -186,7 +186,7 @@ size_t ZPunctaDoc::makeAlias(size_t id)
   m_idToPunctaPacks[aliasId] = m_idToPunctaPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -245,7 +245,7 @@ size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
   m_idToPunctaPacks[id] = std::make_shared<ZPunctaPack>(puncta, path, id, *this);
   m_doc.registerNewObj(m_idToPunctaPacks[id]);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   connect(m_idToPunctaPacks[id].get(), &ZPunctaPack::undoStackCleanChanged,
           this, &ZPunctaDoc::setModified);
   return id;

@@ -36,7 +36,7 @@ public:
 
   ZRPCService* rpcService();
 
-private slots:
+private:
 
   void dbThreadStarted();
 

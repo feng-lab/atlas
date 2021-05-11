@@ -135,7 +135,7 @@ void ZTimelineWidget::zoomIn()
   if (m_pixelsPerSecond * 1.1 <= 15000) {
     m_pixelsPerSecond *= 1.1;
     updateEventViewWidth();
-    emit pixelsPerSecondChagned();
+    Q_EMIT pixelsPerSecondChagned();
   }
 }
 
@@ -144,7 +144,7 @@ void ZTimelineWidget::zoomOut()
   if (m_pixelsPerSecond / 1.1 >= 150. / m_animation.duration() / 10) {
     m_pixelsPerSecond /= 1.1;
     updateEventViewWidth();
-    emit pixelsPerSecondChagned();
+    Q_EMIT pixelsPerSecondChagned();
   }
 }
 
@@ -152,7 +152,7 @@ void ZTimelineWidget::expandToFit()
 {
   m_pixelsPerSecond = (m_eventView->width() - 20. - m_eventView->verticalScrollBar()->width()) / m_animation.duration();
   updateEventViewWidth();
-  emit pixelsPerSecondChagned();
+  Q_EMIT pixelsPerSecondChagned();
   m_eventView->horizontalScrollBar()->setValue(0);
 }
 
@@ -161,7 +161,7 @@ void ZTimelineWidget::updateEventViewWidth()
   int wth = std::max(m_eventView->width(), 10 + int(std::ceil((m_animation.duration() + 10) * pixelsPerSecond())));
   if (wth != m_eventViewWidth) {
     m_eventViewWidth = wth;
-    emit eventViewWidthChanged();
+    Q_EMIT eventViewWidthChanged();
   }
 }
 

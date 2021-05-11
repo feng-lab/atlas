@@ -69,7 +69,7 @@ public:
   // render a trianglelist with whatever it contains
   static void renderTriangleList(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader, const ZMesh& mesh);
 
-signals:
+Q_SIGNALS:
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   void openglRendererInvalid();

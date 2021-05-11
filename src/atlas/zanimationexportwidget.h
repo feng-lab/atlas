@@ -34,7 +34,7 @@ public:
 
   QSize sizeHint() const override;
 
-signals:
+Q_SIGNALS:
 
   void
   exportFixedSize3DAnimation(const QString& filename, double framePerSecond, int width, int height,

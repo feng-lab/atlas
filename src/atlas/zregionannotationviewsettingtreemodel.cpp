@@ -105,7 +105,7 @@ bool ZRegionAnnotationViewSettingTreeModel::setData(const QModelIndex& index, co
     } else if (m_idToMeshFilters) {
       m_idToMeshFilters->at(item->id)->setVisible(cs == Qt::Checked);
     }
-    emit dataChanged(index, index);
+    Q_EMIT dataChanged(index, index);
 //    // update child items check state
 //    updateChildCheckState(index, cs);
 //    // update parent items
@@ -265,10 +265,10 @@ void ZRegionAnnotationViewSettingTreeModel::clicked(const QModelIndex& index)
 
   //        m_viewSettingCurrentItem = item;
   //        if (prevIdx.isValid())
-  //          emit dataChanged(prevIdx, prevIdx);
+  //          Q_EMIT dataChanged(prevIdx, prevIdx);
   //        m_regionAnnotation->sendShowViewSettingSignal(item->id);
   //      }
-  //      emit dataChanged(idxIn, idxIn);
+  //      Q_EMIT dataChanged(idxIn, idxIn);
   //    }
   //  }
 }

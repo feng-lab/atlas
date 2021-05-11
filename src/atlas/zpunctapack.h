@@ -76,7 +76,7 @@ protected:
 
   void createContextMenu();
 
-signals:
+Q_SIGNALS:
 
   void selectionChanged();
 
@@ -146,7 +146,7 @@ public:
                                       m_deletedPuncta.begin(),
                                       m_deletedPuncta.end());
     m_punctaPack.updateViewRelatedData();
-    emit m_punctaPack.punctaChanged();
+    Q_EMIT m_punctaPack.punctaChanged();
   }
 
   void redo() override
@@ -168,7 +168,7 @@ public:
     m_punctaPack.m_puncta.data.splice(m_punctaPack.m_puncta.data.end(), m_addedPuncta,
                                       m_addedPuncta.begin(), m_addedPuncta.end());
     m_punctaPack.updateViewRelatedData();
-    emit m_punctaPack.punctaChanged();
+    Q_EMIT m_punctaPack.punctaChanged();
   }
 
 protected:

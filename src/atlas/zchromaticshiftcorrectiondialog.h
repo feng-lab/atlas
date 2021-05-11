@@ -17,7 +17,7 @@ Q_OBJECT
 public:
   explicit ZChromaticShiftCorrectionDialog(QWidget* parent = nullptr);
 
-signals:
+Q_SIGNALS:
   void resultReady(QString path);
 
 protected:

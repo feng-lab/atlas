@@ -121,21 +121,21 @@ public:
 
 //  // show/hide obj with id
 //  void setObjVisible(size_t id, bool v)
-//  { emit objVisibleChanged(id, v); }
+//  { Q_EMIT objVisibleChanged(id, v); }
 //
 //  // lock/unlock obj from editing with id
 //  void setObjLocked(size_t id, bool v)
-//  { emit objLockedChanged(id, v); }
+//  { Q_EMIT objLockedChanged(id, v); }
 
   //
   void sendObjSelectionChangedFromDocSignal(const std::vector<size_t>& selected, const std::vector<size_t>& deselected)
-  { emit selectionChangedFromDoc(selected, deselected); }
+  { Q_EMIT selectionChangedFromDoc(selected, deselected); }
 
   [[nodiscard]] QString lastOpenedObjPath() const;
 
   void setLastOpenedObjPath(const QString& path) const;
 
-signals:
+Q_SIGNALS:
 
   void objAdded(size_t id, ZObjDoc* doc);
 

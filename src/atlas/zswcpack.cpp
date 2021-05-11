@@ -79,7 +79,7 @@ void ZSwcPack::setSelectedNodes(const std::set<ZSwc::SwcTreeNode>& sn)
   for (auto it = m_swc.begin(); it != m_swc.end(); ++it) {
     it->selected = m_selectedNodes.find(it) != m_selectedNodes.end();
   }
-  emit selectionChanged();
+  Q_EMIT selectionChanged();
 }
 
 std::tuple<int, int> ZSwcPack::getParentRowAndRowOfNode(const ZSwc::SwcTreeNode& node) const
@@ -149,7 +149,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
       hasChange = hasChange || ok;
     }
     if (hasChange) {
-      emit selectionChanged();
+      Q_EMIT selectionChanged();
     }
   } else if (append) {
     if (!p) {
@@ -160,12 +160,12 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
       const_cast<ZSwc::SwcTreeNode*>(p)->node->data.selected = true;
       auto ip = m_selectedNodes.insert(*p);
       m_extentedSelectionAnchor = ip.first;
-      emit selectionChanged();
+      Q_EMIT selectionChanged();
     } else {
       const_cast<ZSwc::SwcTreeNode*>(p)->node->data.selected = false;
       m_selectedNodes.erase(pit);
       m_extentedSelectionAnchor = m_selectedNodes.end();
-      emit selectionChanged();
+      Q_EMIT selectionChanged();
     }
   } else {
     if (!p && m_selectedNodes.empty()) {
@@ -187,7 +187,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
       m_selectedNodes.clear();
       m_extentedSelectionAnchor = m_selectedNodes.end();
     }
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -321,7 +321,7 @@ void ZSwcPack::selectCurrentBranch()
     }
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -345,7 +345,7 @@ void ZSwcPack::selectBranchUpstream()
     }
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -368,7 +368,7 @@ void ZSwcPack::selectBranchDownstream()
     }
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -385,7 +385,7 @@ void ZSwcPack::selectUpstream()
     hasChange = hasChange || ok;
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -402,7 +402,7 @@ void ZSwcPack::selectSubtree()
     hasChange = hasChange || ok;
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 
@@ -419,7 +419,7 @@ void ZSwcPack::selectEntireTree()
     hasChange = hasChange || ok;
   }
   if (hasChange) {
-    emit selectionChanged();
+    Q_EMIT selectionChanged();
   }
 }
 

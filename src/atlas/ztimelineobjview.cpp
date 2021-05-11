@@ -32,7 +32,7 @@ void ZTimelineObjView::setScrollEnabled(bool v)
 void ZTimelineObjView::checkScrollBarValue(int v)
 {
   if (m_scrollEnabled) {
-    emit vScrollBarValueChanged(v);
+    Q_EMIT vScrollBarValueChanged(v);
   } else {
     verticalScrollBar()->setValue(0); // how?
   }

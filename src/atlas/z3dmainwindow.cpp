@@ -122,7 +122,7 @@ void Z3DMainWindow::openRecentFile()
   if (auto action = qobject_cast<QAction*>(sender())) {
     QString fn = action->data().toString();
     if (fn.endsWith(".scene", Qt::CaseInsensitive)) {
-      emit loadJsonScene(fn);
+      Q_EMIT loadJsonScene(fn);
     } else {
       m_doc.loadFile(action->data().toString());
     }
@@ -506,7 +506,7 @@ void Z3DMainWindow::setCurrentFile(const QString& fileName)
 void Z3DMainWindow::onViewReady()
 {
   fillDockWindows();
-  emit viewReady(m_view);
+  Q_EMIT viewReady(m_view);
 }
 
 } // namespace nim

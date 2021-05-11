@@ -183,9 +183,9 @@ void ZAnimation::addKeyFrame(double time)
     updateObjAnimation();
   } else if (sorted) {
     buildDisplayPacks();
-    emit keysChanged();
+    Q_EMIT keysChanged();
   } else {
-    emit keysChanged();
+    Q_EMIT keysChanged();
   }
 }
 
@@ -195,7 +195,7 @@ void ZAnimation::setExpanded(size_t id, bool v)
   if (aniObj && aniObj->isExpanded != v && aniObj->boundId != 0) {
     aniObj->isExpanded = v;
     buildDisplayPacks();
-    emit expandChanged();
+    Q_EMIT expandChanged();
   }
 }
 
@@ -205,7 +205,7 @@ void ZAnimation::toogleExpanded(size_t id)
   if (aniObj && aniObj->boundId != 0) {
     aniObj->isExpanded = !aniObj->isExpanded;
     buildDisplayPacks();
-    emit expandChanged();
+    Q_EMIT expandChanged();
   }
 }
 
@@ -215,7 +215,7 @@ void ZAnimation::toogleShowAll(size_t id)
   if (aniObj && aniObj->boundId != 0) {
     aniObj->isShowAll = !aniObj->isShowAll;
     buildDisplayPacks();
-    emit expandChanged();
+    Q_EMIT expandChanged();
   }
 }
 
@@ -251,7 +251,7 @@ void ZAnimation::removeObj(size_t id)
   if (aniObj) {
     m_objList.erase(m_objList.begin() + idx);
     buildDisplayPacks();
-    emit objChanged();
+    Q_EMIT objChanged();
   }
 }
 
@@ -267,7 +267,7 @@ void ZAnimation::removeRedundantKeys()
     }
   }
   blockSignals(false);
-  emit keysChanged();
+  Q_EMIT keysChanged();
 }
 
 void ZAnimation::rebindView()
@@ -294,7 +294,7 @@ void ZAnimation::rebindView()
 
   if (sorted) {
     buildDisplayPacks();
-    emit objViewChanged();
+    Q_EMIT objViewChanged();
   }
 }
 
@@ -677,7 +677,7 @@ void ZAnimation::disableAnimationOf(size_t id)
     }
     aniObj->boundId = 0;
     buildDisplayPacks();
-    emit objViewChanged();
+    Q_EMIT objViewChanged();
   }
 }
 
@@ -693,7 +693,7 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
       CHECK(wg);
       bind(obj->objParaAnimations, wg->getParameterList());
       buildDisplayPacks();
-      emit objViewChanged();
+      Q_EMIT objViewChanged();
       return;
     }
   }
@@ -747,7 +747,7 @@ void ZAnimation::updateObjAnimation()
 
   buildDisplayPacks();
 
-  emit objChanged();
+  Q_EMIT objChanged();
 }
 
 void ZAnimation::buildDisplayPacks()
@@ -1082,7 +1082,7 @@ void ZAnimation::setDurationImpl(double duration)
   duration = std::max(1.0, duration);
   if (m_duration != duration) {
     m_duration = duration;
-    emit durationChanged(m_duration);
+    Q_EMIT durationChanged(m_duration);
   }
 }
 

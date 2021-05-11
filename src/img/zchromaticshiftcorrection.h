@@ -73,7 +73,7 @@ public:
   void setNumScales(size_t i)
   { m_numScales = i; }
 
-signals:
+Q_SIGNALS:
 
   void resultReady(QString path);
 

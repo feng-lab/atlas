@@ -32,12 +32,12 @@ void ZIntParameter::setValue(int v)
 
 void ZIntParameter::beforeChange(int& value)
 {
-  emit valueWillChange(value);
+  Q_EMIT valueWillChange(value);
 }
 
 void ZIntParameter::afterChange(int& value)
 {
-  emit intChanged(value);
+  Q_EMIT intChanged(value);
 }
 
 QWidget* ZIntParameter::actualCreateWidget(QWidget* parent)
@@ -72,7 +72,7 @@ QWidget* ZIntParameter::actualCreateWidget(QWidget* parent)
 
 void ZIntParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 ZDoubleParameter::ZDoubleParameter(const QString& name, QObject* parent)
@@ -95,12 +95,12 @@ void ZDoubleParameter::setValue(double v)
 
 void ZDoubleParameter::beforeChange(double& value)
 {
-  emit valueWillChange(value);
+  Q_EMIT valueWillChange(value);
 }
 
 void ZDoubleParameter::afterChange(double& value)
 {
-  emit doubleChanged(value);
+  Q_EMIT doubleChanged(value);
 }
 
 QWidget* ZDoubleParameter::actualCreateWidget(QWidget* parent)
@@ -129,7 +129,7 @@ QWidget* ZDoubleParameter::actualCreateWidget(QWidget* parent)
 
 void ZDoubleParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 ZFloatParameter::ZFloatParameter(const QString& name, QObject* parent)
@@ -151,12 +151,12 @@ void ZFloatParameter::setValue(double v)
 
 void ZFloatParameter::beforeChange(float& value)
 {
-  emit valueWillChange(value);
+  Q_EMIT valueWillChange(value);
 }
 
 void ZFloatParameter::afterChange(float& value)
 {
-  emit floatChanged(static_cast<double>(value));
+  Q_EMIT floatChanged(static_cast<double>(value));
 }
 
 QWidget* ZFloatParameter::actualCreateWidget(QWidget* parent)
@@ -185,7 +185,7 @@ QWidget* ZFloatParameter::actualCreateWidget(QWidget* parent)
 
 void ZFloatParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 //---------------------------------------------------------------------------------------------------------------
@@ -216,9 +216,9 @@ void ZVec2Parameter::setValue2(double v)
 void ZVec2Parameter::beforeChange(glm::vec2& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
 }
 
 QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
@@ -375,11 +375,11 @@ void ZVec3Parameter::setValue3(double v)
 void ZVec3Parameter::beforeChange(glm::vec3& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
 }
 
 QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
@@ -594,13 +594,13 @@ void ZVec4Parameter::setValue4(double v)
 void ZVec4Parameter::beforeChange(glm::vec4& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
   if (value[3] != m_value[3])
-    emit value4WillChange(value[3]);
+    Q_EMIT value4WillChange(value[3]);
 }
 
 QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
@@ -853,9 +853,9 @@ void ZDVec2Parameter::setValue2(double v)
 void ZDVec2Parameter::beforeChange(glm::dvec2& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
 }
 
 QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
@@ -1012,11 +1012,11 @@ void ZDVec3Parameter::setValue3(double v)
 void ZDVec3Parameter::beforeChange(glm::dvec3& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
 }
 
 QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
@@ -1231,13 +1231,13 @@ void ZDVec4Parameter::setValue4(double v)
 void ZDVec4Parameter::beforeChange(glm::dvec4& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
   if (value[3] != m_value[3])
-    emit value4WillChange(value[3]);
+    Q_EMIT value4WillChange(value[3]);
 }
 
 QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
@@ -1489,9 +1489,9 @@ void ZIVec2Parameter::setValue2(int v)
 void ZIVec2Parameter::beforeChange(glm::ivec2& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
 }
 
 QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
@@ -1644,11 +1644,11 @@ void ZIVec3Parameter::setValue3(int v)
 void ZIVec3Parameter::beforeChange(glm::ivec3& value)
 {
   if (value[0] != m_value[0])
-    emit value1WillChange(value[0]);
+    Q_EMIT value1WillChange(value[0]);
   if (value[1] != m_value[1])
-    emit value2WillChange(value[1]);
+    Q_EMIT value2WillChange(value[1]);
   if (value[2] != m_value[2])
-    emit value3WillChange(value[2]);
+    Q_EMIT value3WillChange(value[2]);
 }
 
 QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
@@ -1846,9 +1846,9 @@ void ZIntSpanParameter::setUpperValue(int v)
 void ZIntSpanParameter::beforeChange(glm::ivec2& value)
 {
   if (value[0] != m_value[0])
-    emit lowerValueWillChange(value[0]);
+    Q_EMIT lowerValueWillChange(value[0]);
   if (value[1] != m_value[1])
-    emit upperValueWillChange(value[1]);
+    Q_EMIT upperValueWillChange(value[1]);
 }
 
 QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
@@ -1932,7 +1932,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
 
 void ZIntSpanParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 ZFloatSpanParameter::ZFloatSpanParameter(const QString& name, QObject* parent)
@@ -1963,9 +1963,9 @@ void ZFloatSpanParameter::setUpperValue(double v)
 void ZFloatSpanParameter::beforeChange(glm::vec2& value)
 {
   if (value[0] != m_value[0])
-    emit lowerValueWillChange(value[0]);
+    Q_EMIT lowerValueWillChange(value[0]);
   if (value[1] != m_value[1])
-    emit upperValueWillChange(value[1]);
+    Q_EMIT upperValueWillChange(value[1]);
 }
 
 QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
@@ -2051,7 +2051,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
 
 void ZFloatSpanParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 
@@ -2082,9 +2082,9 @@ void ZDoubleSpanParameter::setUpperValue(double v)
 void ZDoubleSpanParameter::beforeChange(glm::dvec2& value)
 {
   if (value[0] != m_value[0])
-    emit lowerValueWillChange(value[0]);
+    Q_EMIT lowerValueWillChange(value[0]);
   if (value[1] != m_value[1])
-    emit upperValueWillChange(value[1]);
+    Q_EMIT upperValueWillChange(value[1]);
 }
 
 QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
@@ -2101,7 +2101,7 @@ QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
 
 void ZDoubleSpanParameter::changeRange()
 {
-  emit rangeChanged(m_min, m_max);
+  Q_EMIT rangeChanged(m_min, m_max);
 }
 
 } // namespace nim

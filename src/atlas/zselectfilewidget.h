@@ -63,7 +63,7 @@ public:
   inline QString selectedFilter() const
   { return m_selectedFilter; }
 
-signals:
+Q_SIGNALS:
 
   void changed();
 

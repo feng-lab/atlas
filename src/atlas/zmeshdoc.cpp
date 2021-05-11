@@ -151,9 +151,9 @@ std::vector<QAction*> ZMeshDoc::loadFileActions() const
 void ZMeshDoc::removeObj(size_t id)
 {
   auto it = m_idToMeshPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToMeshPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZMeshDoc::objName(size_t id) const
@@ -211,7 +211,7 @@ size_t ZMeshDoc::makeAlias(size_t id)
   m_idToMeshPacks[aliasId] = m_idToMeshPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -251,7 +251,7 @@ size_t ZMeshDoc::addMesh(ZMesh& mesh, const QString& path)
   m_idToMeshPacks[id] = std::make_shared<MeshPack>(mesh, path);
   m_doc.registerNewObj(id, *this);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   return id;
 }
 

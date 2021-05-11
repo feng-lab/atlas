@@ -62,7 +62,7 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
-signals:
+Q_SIGNALS:
 
   void meshSelected(ZMesh*, bool append);
 

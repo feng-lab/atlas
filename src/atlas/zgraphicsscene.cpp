@@ -374,7 +374,7 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
   } else {
     QGraphicsScene::mousePressEvent(event);
     if (!selectedItems().empty() && event->button() == Qt::LeftButton) {
-      emit mousePressed(event->scenePos(), event->modifiers());
+      Q_EMIT mousePressed(event->scenePos(), event->modifiers());
     }
   }
 }
@@ -522,7 +522,7 @@ void ZGraphicsScene::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
   } else {
     QGraphicsScene::mouseReleaseEvent(event);
     if (!selectedItems().empty() && event->button() == Qt::LeftButton) {
-      emit mouseReleased(event->scenePos());
+      Q_EMIT mouseReleased(event->scenePos());
     }
   }
 }
@@ -591,7 +591,7 @@ void ZGraphicsScene::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
   } else {
     QGraphicsScene::mouseMoveEvent(event);
     if (!selectedItems().empty()) {
-      emit mouseMoved(scenePt, event->modifiers());
+      Q_EMIT mouseMoved(scenePt, event->modifiers());
     }
   }
 }

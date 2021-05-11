@@ -121,7 +121,7 @@ public:
   void setUseMultithreading(bool v)
   { m_useMultithreading = v; }
 
-signals:
+Q_SIGNALS:
 
   void resultReady(QString path);
 

@@ -22,7 +22,7 @@ public:
 
   void setInitialValue();
 
-signals:
+Q_SIGNALS:
 
 protected:
   void accept() override;

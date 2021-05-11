@@ -34,7 +34,7 @@ void ZParameterAnimation::releaseParameter()
 
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
-  emit keyAboutToDelete(key);
+  Q_EMIT keyAboutToDelete(key);
   erase_if(m_keys, [key](const auto& ckey) {
     return ckey.get() == key;
   });
@@ -48,14 +48,14 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
 
   if (m_keys.empty()) {
     m_keys.push_back(std::move(key));
-    emit keysChanged();
+    Q_EMIT keysChanged();
     return;
   }
 
   if (key->time() < m_keys[0]->time()) {
     if (keepRedundant || key->value().jsonValue() != m_keys[0]->value().jsonValue()) {
       m_keys.insert(m_keys.begin(), std::move(key));
-      emit keysChanged();
+      Q_EMIT keysChanged();
       return;
     }
   }
@@ -63,7 +63,7 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
   for (size_t i = 0; i < m_keys.size(); ++i) {
     if (key->time() == m_keys[i]->time()) {
       m_keys[i] = std::move(key);
-      emit keysChanged();
+      Q_EMIT keysChanged();
       return;
     }
     if (key->time() > m_keys[i]->time()) {
@@ -72,14 +72,14 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
           if (keepRedundant || key->value().jsonValue() != m_keys[i]->value().jsonValue() ||
               key->value().jsonValue() != m_keys[i + 1]->value().jsonValue()) {
             m_keys.insert(m_keys.begin() + i + 1, std::move(key));
-            emit keysChanged();
+            Q_EMIT keysChanged();
             return;
           }
         }
       } else {
         if (keepRedundant || key->value().jsonValue() != m_keys[i]->value().jsonValue()) {
           m_keys.push_back(std::move(key));
-          emit keysChanged();
+          Q_EMIT keysChanged();
           return;
         }
       }

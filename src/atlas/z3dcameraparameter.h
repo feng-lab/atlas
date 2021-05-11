@@ -73,7 +73,7 @@ public:
   { m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic"); }
 
   void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0)
-  { m_value.setTileFrustum(left, right, bottom, top); emit valueChanged(); }
+  { m_value.setTileFrustum(left, right, bottom, top); Q_EMIT valueChanged(); }
 
   void flipViewDirection();
   void rotate90X();
@@ -190,7 +190,7 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
-signals:
+Q_SIGNALS:
 
   void windowsAspectRatioChanged(float r);
 
@@ -220,7 +220,7 @@ protected:
   void updateWidget(Z3DCamera& value);
 
   inline void updatePara()
-  { updateWidget(m_value); emit valueChanged(); }
+  { updateWidget(m_value); Q_EMIT valueChanged(); }
 
 private:
   ZStringIntOptionParameter m_projectionType;

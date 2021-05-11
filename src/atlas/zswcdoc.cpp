@@ -117,9 +117,9 @@ std::vector<QAction*> ZSwcDoc::loadFileActions() const
 void ZSwcDoc::removeObj(size_t id)
 {
   auto it = m_idToSwcPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToSwcPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZSwcDoc::objName(size_t id) const
@@ -177,7 +177,7 @@ size_t ZSwcDoc::makeAlias(size_t id)
   m_idToSwcPacks[aliasId] = m_idToSwcPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -224,7 +224,7 @@ size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
   m_idToSwcPacks[id] = std::make_shared<ZSwcPack>(tree, path, id, *this);
   m_doc.registerNewObj(m_idToSwcPacks[id]);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged,
           this, &ZSwcDoc::setModified);
   return id;

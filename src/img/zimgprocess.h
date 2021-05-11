@@ -49,7 +49,7 @@ public:
     return jsonToFormattedString(jo);
   }
 
-signals:
+Q_SIGNALS:
 
   void canceled();
 

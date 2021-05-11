@@ -634,7 +634,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
       glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
-      emit objDeselected();
+      Q_EMIT objDeselected();
       return;
     }
     bool hit = obj == m_swcPack;
@@ -643,7 +643,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
         static_cast<const ZSwc::SwcTreeNode*>(obj)) != m_swcPack->allNodesSet().end();
     }
     if (hit) {
-      emit objSelected(appending);
+      Q_EMIT objSelected(appending);
       e->accept();
     }
     return;
@@ -672,7 +672,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      emit treeNodeSelected(m_pressedSwcTreeNode,
+      Q_EMIT treeNodeSelected(m_pressedSwcTreeNode,
                             e->modifiers() == Qt::ControlModifier,
                             e->modifiers() == Qt::ShiftModifier);
       if (m_pressedSwcTreeNode) {

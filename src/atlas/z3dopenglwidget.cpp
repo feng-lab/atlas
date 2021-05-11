@@ -4,12 +4,12 @@ namespace nim {
 
 void ZOpenGLWidget::initializeGL()
 {
-  emit openGLContextInitialized();
+  Q_EMIT openGLContextInitialized();
 }
 
 void ZOpenGLWindow::initializeGL()
 {
-  emit openGLContextInitialized();
+  Q_EMIT openGLContextInitialized();
 }
 
 } // namespace nim

@@ -25,7 +25,7 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
-signals:
+Q_SIGNALS:
 
   void valueWillChange(QFont);
 

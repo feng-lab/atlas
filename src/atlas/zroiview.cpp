@@ -20,7 +20,7 @@ void ZROIView::docROIsAdded(const std::vector<size_t>& objs)
     connect(viewControl, &ZROIFilter::objDeselected, this, &ZROIView::onObjDeselectedFromView);
     connect(viewControl, &ZROIFilter::objSelected, this, &ZROIView::onObjSelectedFromView);
     connect(viewControl, &ZROIFilter::objVisibleChanged, this, &ZROIView::onObjVisibleChangedFromView);
-    emit objViewReady(obj);
+    Q_EMIT objViewReady(obj);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -38,7 +38,7 @@ void ZROIView::docROIAdded(size_t id)
   connect(viewControl, &ZROIFilter::objDeselected, this, &ZROIView::onObjDeselectedFromView);
   connect(viewControl, &ZROIFilter::objSelected, this, &ZROIView::onObjSelectedFromView);
   connect(viewControl, &ZROIFilter::objVisibleChanged, this, &ZROIView::onObjVisibleChangedFromView);
-  emit objViewReady(id);
+  Q_EMIT objViewReady(id);
 }
 
 } // namespace nim

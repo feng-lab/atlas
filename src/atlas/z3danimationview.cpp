@@ -23,7 +23,7 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
       connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this,
               &Z3DAnimationView::onObjVisibleChangedFromView);
-      emit objViewReady(id);
+      Q_EMIT objViewReady(id);
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
@@ -52,7 +52,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     networkEvaluator().updateNetwork();
     m_view.updateBoundBox();
 
-    emit objViewReady(id);
+    Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();

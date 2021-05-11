@@ -42,7 +42,7 @@ void ZSpanSliderWithSpinBox::lowerValueChangedFromSlider(int l)
   m_lowerSpinBox->setValue(l);
   m_lowerSpinBox->blockSignals(false);
   m_upperSpinBox->setMinimum(l);
-  emit lowerValueChanged(l);
+  Q_EMIT lowerValueChanged(l);
 }
 
 void ZSpanSliderWithSpinBox::upperValueChangedFromSlider(int u)
@@ -51,7 +51,7 @@ void ZSpanSliderWithSpinBox::upperValueChangedFromSlider(int u)
   m_upperSpinBox->setValue(u);
   m_upperSpinBox->blockSignals(false);
   m_lowerSpinBox->setMaximum(u);
-  emit upperValueChanged(u);
+  Q_EMIT upperValueChanged(u);
 }
 
 void ZSpanSliderWithSpinBox::valueChangedFromLowerSpinBox(int l)
@@ -60,7 +60,7 @@ void ZSpanSliderWithSpinBox::valueChangedFromLowerSpinBox(int l)
   m_slider->setLowerValue(l);
   m_slider->blockSignals(false);
   m_upperSpinBox->setMinimum(l);
-  emit lowerValueChanged(l);
+  Q_EMIT lowerValueChanged(l);
 }
 
 void ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox(int u)
@@ -69,7 +69,7 @@ void ZSpanSliderWithSpinBox::valueChangedFromUpperSpinBox(int u)
   m_slider->setUpperValue(u);
   m_slider->blockSignals(false);
   m_lowerSpinBox->setMaximum(u);
-  emit upperValueChanged(u);
+  Q_EMIT upperValueChanged(u);
 }
 
 void
@@ -150,7 +150,7 @@ void ZDoubleSpanSliderWithSpinBox::lowerValueChangedFromSlider(int l)
   m_lowerSpinBox->setValue(m_lowerValue);
   m_lowerSpinBox->blockSignals(false);
   m_upperSpinBox->setMinimum(m_lowerValue);
-  emit lowerValueChanged(m_lowerValue);
+  Q_EMIT lowerValueChanged(m_lowerValue);
 }
 
 void ZDoubleSpanSliderWithSpinBox::upperValueChangedFromSlider(int u)
@@ -160,7 +160,7 @@ void ZDoubleSpanSliderWithSpinBox::upperValueChangedFromSlider(int u)
   m_upperSpinBox->setValue(m_upperValue);
   m_upperSpinBox->blockSignals(false);
   m_lowerSpinBox->setMaximum(m_upperValue);
-  emit upperValueChanged(m_upperValue);
+  Q_EMIT upperValueChanged(m_upperValue);
 }
 
 void ZDoubleSpanSliderWithSpinBox::valueChangedFromLowerSpinBox(double l)
@@ -171,7 +171,7 @@ void ZDoubleSpanSliderWithSpinBox::valueChangedFromLowerSpinBox(double l)
   m_slider->setLowerValue(sliderPos);
   m_slider->blockSignals(false);
   m_upperSpinBox->setMinimum(m_lowerValue);
-  emit lowerValueChanged(m_lowerValue);
+  Q_EMIT lowerValueChanged(m_lowerValue);
 }
 
 void ZDoubleSpanSliderWithSpinBox::valueChangedFromUpperSpinBox(double u)
@@ -182,7 +182,7 @@ void ZDoubleSpanSliderWithSpinBox::valueChangedFromUpperSpinBox(double u)
   m_slider->setUpperValue(sliderPos);
   m_slider->blockSignals(false);
   m_lowerSpinBox->setMaximum(m_upperValue);
-  emit upperValueChanged(m_upperValue);
+  Q_EMIT upperValueChanged(m_upperValue);
 }
 
 void ZDoubleSpanSliderWithSpinBox::createWidget()

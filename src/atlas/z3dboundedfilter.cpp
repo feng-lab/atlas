@@ -565,7 +565,7 @@ void Z3DBoundedFilter::updateAxisAlignedBoundBox()
   makeSelectionGeometries();
   m_handleValid = false;
 
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void Z3DBoundedFilter::updateNotTransformedBoundBox()

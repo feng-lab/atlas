@@ -16,9 +16,9 @@ void ZObjPack::setVisible(bool v)
 {
   if (m_show != v) {
     m_show = v;
-    emit visibleStateChanged(m_show);
+    Q_EMIT visibleStateChanged(m_show);
     if (m_objDoc) {
-      emit m_objDoc->objVisibleChanged(m_id, m_show);
+      Q_EMIT m_objDoc->objVisibleChanged(m_id, m_show);
     }
   }
 }
@@ -27,7 +27,7 @@ void ZObjPack::setLocked(bool v)
 {
   if (m_locked != v) {
     m_locked = v;
-    emit lockedStateChanged(m_locked);
+    Q_EMIT lockedStateChanged(m_locked);
   }
 }
 

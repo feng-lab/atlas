@@ -487,12 +487,12 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
       glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
-      emit objDeselected();
+      Q_EMIT objDeselected();
       return;
     }
     bool hit = contains(m_punctaPack->punctaPts(), static_cast<const ZPunctum*>(obj));
     if (hit) {
-      emit objSelected(appending);
+      Q_EMIT objSelected(appending);
       e->accept();
     }
     return;
@@ -525,7 +525,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      emit punctumSelected(m_pressedPunctum, e->modifiers() == Qt::ControlModifier);
+      Q_EMIT punctumSelected(m_pressedPunctum, e->modifiers() == Qt::ControlModifier);
       if (m_pressedPunctum) {
         e->accept();
       }

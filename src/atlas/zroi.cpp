@@ -836,7 +836,7 @@ ZImg ZROI::toMaskImg(int outWidth, int outHeight, int outDepth, bool doInterpola
 void ZROI::clear()
 {
   for (const auto& sliceROI : m_sliceROIs) {
-    emit roiDeleted(sliceROI.first);
+    Q_EMIT roiDeleted(sliceROI.first);
   }
   m_sliceROIs.clear();
   resetBoundBox();
@@ -1425,11 +1425,11 @@ void ZROI::changeSliceROIs(const std::map<int, ZSliceROI>& sliceROIs, const std:
     return;
   for (auto slice : changedSlices) {
     if (m_sliceROIs.find(slice) != m_sliceROIs.end()) {
-      emit roiDeleted(slice);
+      Q_EMIT roiDeleted(slice);
     }
     if (sliceROIs.find(slice) != sliceROIs.end()) {
       m_sliceROIs[slice] = sliceROIs.at(slice);
-      emit roiChanged(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>());
+      Q_EMIT roiChanged(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>());
     }
   }
   resetBoundBox();
@@ -1552,7 +1552,7 @@ void ZROI::resetBoundBox()
     m_boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1),
                                  sliceROI.first, 0));
   }
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void ZROI::onSliceROIUpdated(int slice, const std::set<size_t>& newShapes,
@@ -1565,14 +1565,14 @@ void ZROI::onSliceROIUpdated(int slice, const std::set<size_t>& newShapes,
     resetBoundBox();
   } else {
     resetBoundBox();
-    emit roiChanged(slice, newShapes, deletedShapes, changedShapes);
+    Q_EMIT roiChanged(slice, newShapes, deletedShapes, changedShapes);
   }
 }
 
 void ZROI::onSliceROIMoved(int slice, const std::set<size_t>& changedShapes)
 {
   resetBoundBox();
-  emit roiMoved(slice, changedShapes);
+  Q_EMIT roiMoved(slice, changedShapes);
 }
 
 void ZROISliceMoveSelectedControlPointsCommand::redo()

@@ -31,7 +31,7 @@ QWidget* ZStringParameter::actualCreateWidget(QWidget* parent)
 
 void ZStringParameter::afterChange(QString& /*unused*/)
 {
-  emit stringChanged(m_value);
+  Q_EMIT stringChanged(m_value);
 }
 
 void ZStringParameter::setSameAs(const ZParameter& rhs)

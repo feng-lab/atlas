@@ -15,7 +15,7 @@ public:
   explicit ZEventListenerParameter(const QString& name, bool sharing = false, QObject* parent = nullptr);
 
   inline void setSharing(bool s)
-  { if (m_sharing != s) { m_sharing = s; emit valueChanged(); }}
+  { if (m_sharing != s) { m_sharing = s; Q_EMIT valueChanged(); }}
 
   [[nodiscard]] inline bool isSharing() const
   { return m_sharing; }
@@ -32,7 +32,7 @@ public:
                 QEvent::Type type = QEvent::KeyPress);
 
   void listenToContextMenuEvent()
-  { if (!m_listeningToContextMenuEvent) { m_listeningToContextMenuEvent = true; emit valueChanged(); } }
+  { if (!m_listeningToContextMenuEvent) { m_listeningToContextMenuEvent = true; Q_EMIT valueChanged(); } }
 
   void clearAll();
 
@@ -50,7 +50,7 @@ public:
 
   void readValue(const json::value& jsonValue) override;
 
-signals:
+Q_SIGNALS:
 
   void eventTriggered(QEvent* e, int w, int h);
 

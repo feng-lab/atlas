@@ -104,7 +104,7 @@ protected:
       value = m_max;
   }
 
-  // inherite this to notify associated widgets about the range change (emit a signal)
+  // inherite this to notify associated widgets about the range change (Q_EMIT a signal)
   virtual void changeRange()
   {}
 
@@ -129,7 +129,7 @@ public:
 
   void setValue(int v);
 
-signals:
+Q_SIGNALS:
 
   void valueWillChange(int);
 
@@ -157,7 +157,7 @@ public:
 
   void setValue(double v);
 
-signals:
+Q_SIGNALS:
 
   void valueWillChange(double);
 
@@ -185,7 +185,7 @@ public:
 
   void setValue(double v);
 
-signals:
+Q_SIGNALS:
 
   void valueWillChange(double);
 
@@ -345,7 +345,7 @@ public:
 
   void setValue2(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -372,7 +372,7 @@ public:
 
   void setValue3(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -403,7 +403,7 @@ public:
 
   void setValue4(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -432,7 +432,7 @@ public:
 
   void setValue2(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -459,7 +459,7 @@ public:
 
   void setValue3(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -490,7 +490,7 @@ public:
 
   void setValue4(double v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(double);
 
@@ -519,7 +519,7 @@ public:
 
   void setValue2(int v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(int);
 
@@ -546,7 +546,7 @@ public:
 
   void setValue3(int v);
 
-signals:
+Q_SIGNALS:
 
   void value1WillChange(int);
 
@@ -719,7 +719,7 @@ protected:
       std::swap(value[0], value[1]);
   }
 
-  // inherite this to notify associated widgets about the range change (emit a signal)
+  // inherite this to notify associated widgets about the range change (Q_EMIT a signal)
   virtual void changeRange()
   {}
 
@@ -751,7 +751,7 @@ public:
 
   void setUpperValue(int v);
 
-signals:
+Q_SIGNALS:
 
   void lowerValueWillChange(int);
 
@@ -780,7 +780,7 @@ public:
 
   void setUpperValue(double v);
 
-signals:
+Q_SIGNALS:
 
   void lowerValueWillChange(double);
 
@@ -809,7 +809,7 @@ public:
 
   void setUpperValue(double v);
 
-signals:
+Q_SIGNALS:
 
   void lowerValueWillChange(double);
 

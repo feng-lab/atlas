@@ -70,7 +70,7 @@ void ZSpinBoxWithSlider::valueChangedFromSlider(int v)
   m_spinBox->blockSignals(true);
   m_spinBox->setValue(v);
   m_spinBox->blockSignals(false);
-  emit valueChanged(v);
+  Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithSlider::valueChangedFromSpinBox(int v)
@@ -78,7 +78,7 @@ void ZSpinBoxWithSlider::valueChangedFromSpinBox(int v)
   m_slider->blockSignals(true);
   m_slider->setValue(v);
   m_slider->blockSignals(false);
-  emit valueChanged(v);
+  Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithSlider::setDataRange(int min, int max)
@@ -133,7 +133,7 @@ void ZDoubleSpinBoxWithSlider::valueChangedFromSlider(int v)
   m_spinBox->blockSignals(true);
   m_spinBox->setValue(m_value);
   m_spinBox->blockSignals(false);
-  emit valueChanged(m_value);
+  Q_EMIT valueChanged(m_value);
 }
 
 void ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox(double v)
@@ -143,7 +143,7 @@ void ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox(double v)
   m_slider->blockSignals(true);
   m_slider->setValue(sliderPos);
   m_slider->blockSignals(false);
-  emit valueChanged(m_value);
+  Q_EMIT valueChanged(m_value);
 }
 
 void ZDoubleSpinBoxWithSlider::setDataRange(double min, double max)

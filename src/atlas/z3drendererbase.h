@@ -241,7 +241,7 @@ public:
   inline const glm::mat4& inverseViewportMatrix() const
   { return m_inverseViewportMatrix; }
 
-signals:
+Q_SIGNALS:
 
   void coordTransformChanged();
 

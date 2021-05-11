@@ -13,7 +13,7 @@ Q_OBJECT
 public:
   explicit ZParameterEditDialog(ZParameter& para, QWidget* parent = nullptr);
 
-signals:
+Q_SIGNALS:
 
 protected:
   void raiseAndActivate();

@@ -17,7 +17,7 @@ Q_OBJECT
 public:
   explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
 
-signals:
+Q_SIGNALS:
 
 protected:
   void createWorker(ZImgProcess*& worker, QString& workerName) override;

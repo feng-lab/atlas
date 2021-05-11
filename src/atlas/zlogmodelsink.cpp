@@ -29,7 +29,7 @@ void ZLogModelSink::addEntry(const LogData& message)
     // Every item changed
     const QModelIndex idx1 = index(0, 0);
     const QModelIndex idx2 = index(m_logDatas.size(), rowCount(QModelIndex()));
-    emit dataChanged(idx1, idx2);
+    Q_EMIT dataChanged(idx1, idx2);
   }
 }
 

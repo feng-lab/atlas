@@ -25,7 +25,7 @@ void ZSpinBoxWithScrollBar::valueChangedFromScrollBar(int v)
   m_spinBox->blockSignals(true);
   m_spinBox->setValue(v);
   m_spinBox->blockSignals(false);
-  emit valueChanged(v);
+  Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithScrollBar::valueChangedFromSpinBox(int v)
@@ -33,7 +33,7 @@ void ZSpinBoxWithScrollBar::valueChangedFromSpinBox(int v)
   m_scrollBar->blockSignals(true);
   m_scrollBar->setValue(v);
   m_scrollBar->blockSignals(false);
-  emit valueChanged(v);
+  Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithScrollBar::setDataRange(int min, int max)

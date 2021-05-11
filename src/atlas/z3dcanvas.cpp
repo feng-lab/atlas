@@ -93,7 +93,7 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* event)
 void Z3DCanvas::resizeEvent(QResizeEvent *event)
 {
   QOpenGLWidget::resizeEvent(event);
-  emit canvasSizeChanged(event->size().width() * devicePixelRatioF(),
+  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(),
                          event->size().height() * devicePixelRatioF());
 }
 
@@ -114,7 +114,7 @@ void Z3DCanvas::dropEvent(QDropEvent *event)
 
 void Z3DCanvas::initializeGL()
 {
-  emit openGLContextInitialized();
+  Q_EMIT openGLContextInitialized();
 }
 
 void Z3DCanvas::resizeGL(int w, int h)
@@ -377,7 +377,7 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   if (m_3dScene)
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
 
-  emit canvasSizeChanged(event->size().width() * devicePixelRatioF(),
+  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(),
                          event->size().height() * devicePixelRatioF());
 }
 

@@ -249,11 +249,11 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   STOP_AND_LOG(bt)
 
   if (createMesh) {
-    emit allMeshChanged();
+    Q_EMIT allMeshChanged();
   }
   if (createROI) {
     updateBoundBox();
-    emit allROIChanged();
+    Q_EMIT allROIChanged();
   }
 }
 
@@ -430,7 +430,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
     binaryImgToROI(binaryImg, roi, scaleX, scaleY);
     if (!it->roi) {
       it->roi = createROI();
-      emit regionROIAdded(it->id, it->roi.get());
+      Q_EMIT regionROIAdded(it->id, it->roi.get());
     }
     it->roi->mergeWith_Impl(roi);
 
@@ -461,7 +461,7 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
     if (it->id == regionID) {
       if (!it->roi) {
         it->roi = createROI();
-        emit regionROIAdded(it->id, it->roi.get());
+        Q_EMIT regionROIAdded(it->id, it->roi.get());
       }
       if (regionID >= 0) {
         it->roi->mergeWith(roi);
@@ -485,7 +485,7 @@ void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
     if (it->id == -1) {
       if (!it->roi) {
         it->roi = createROI();
-        emit regionROIAdded(it->id, it->roi.get());
+        Q_EMIT regionROIAdded(it->id, it->roi.get());
       }
       it->roi->mergeWith(roi);
     }
@@ -499,7 +499,7 @@ void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
 //    if (it->id == regionID) {
 //      if (!it->roi) {
 //        it->roi = createROI();
-//        emit regionROIAdded(it->id, it->roi.get());
+//        Q_EMIT regionROIAdded(it->id, it->roi.get());
 //      }
 //      it->roi->mergeWith(roi, slice, id);
 //
@@ -519,7 +519,7 @@ void ZRegionAnnotation::changeROIRegion(ZROI &roi, int slice, size_t shapeId, in
     if (it->id == regionID) {
       if (!it->roi) {
         it->roi = createROI();
-        emit regionROIAdded(it->id, it->roi.get());
+        Q_EMIT regionROIAdded(it->id, it->roi.get());
       }
       it->roi->mergeWith(roi, slice, shapeId);
       roi.deleteROIShape(slice, shapeId);
@@ -658,8 +658,8 @@ void ZRegionAnnotation::load(const QString& filename)
   }
 
   updateBoundBox();
-  emit allMeshChanged();
-  emit allROIChanged();
+  Q_EMIT allMeshChanged();
+  Q_EMIT allROIChanged();
 }
 
 void ZRegionAnnotation::save(const QString& filename) const
@@ -750,7 +750,7 @@ void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
     importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //emit modified();
+    //Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for region interpolation"));
   }
@@ -766,7 +766,7 @@ void ZRegionAnnotation::interpolateRegionAnnotation2(double scale)
     importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //emit modified();
+    //Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for region interpolation"));
   }
@@ -782,7 +782,7 @@ void ZRegionAnnotation::updateMesh(double scaleX, double scaleY, double scaleZ)
     importLabelImage(fn, FileFormat::Unknown, true, false, 1.0 / scaleX, 1.0 / scaleY, 1.0 / scaleZ);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //emit modified();
+    //Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for mesh updating"));
   }
@@ -812,7 +812,7 @@ void ZRegionAnnotation::updateROI_Impl(const ZTree<RegionNode>& newOntology)
   for (; it != m_ontology.end(); ++it, ++itn) {
     it->roi = itn->roi;
   }
-  emit allROIChanged();
+  Q_EMIT allROIChanged();
 }
 
 void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
@@ -822,7 +822,7 @@ void ZRegionAnnotation::updateMesh_Impl(const ZTree<RegionNode>& newOntology)
   for (; it != m_ontology.end(); ++it, ++itn) {
     it->mesh = itn->mesh;
   }
-  emit allMeshChanged();
+  Q_EMIT allMeshChanged();
 }
 
 void ZRegionAnnotation::transformMesh_Impl(const glm::mat4& trans)
@@ -832,7 +832,7 @@ void ZRegionAnnotation::transformMesh_Impl(const glm::mat4& trans)
       rn.mesh->transformVerticesByMatrix(trans);
     }
   }
-  emit allMeshChanged();
+  Q_EMIT allMeshChanged();
 }
 
 ZTree<RegionNode> ZRegionAnnotation::copyAnnotationTree()
@@ -860,7 +860,7 @@ void ZRegionAnnotation::updateBoundBox()
       m_boundBox.expand(node.roi->boundBox());
     }
   }
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 std::shared_ptr<ZROI> ZRegionAnnotation::createROI()

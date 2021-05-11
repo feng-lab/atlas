@@ -20,7 +20,7 @@ void ZPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
     connect(viewControl, &ZPunctaFilter::objDeselected, this, &ZPunctaView::onObjDeselectedFromView);
     connect(viewControl, &ZPunctaFilter::objSelected, this, &ZPunctaView::onObjSelectedFromView);
     connect(viewControl, &ZPunctaFilter::objVisibleChanged, this, &ZPunctaView::onObjVisibleChangedFromView);
-    emit objViewReady(id);
+    Q_EMIT objViewReady(id);
   }
   if (!objs.empty()) {
     m_view.updateBoundBox();
@@ -38,7 +38,7 @@ void ZPunctaView::docPunctaAdded(size_t id)
   connect(viewControl, &ZPunctaFilter::objDeselected, this, &ZPunctaView::onObjDeselectedFromView);
   connect(viewControl, &ZPunctaFilter::objSelected, this, &ZPunctaView::onObjSelectedFromView);
   connect(viewControl, &ZPunctaFilter::objVisibleChanged, this, &ZPunctaView::onObjVisibleChangedFromView);
-  emit objViewReady(id);
+  Q_EMIT objViewReady(id);
 }
 
 } // namespace nim

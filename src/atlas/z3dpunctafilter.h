@@ -35,7 +35,7 @@ public:
   //bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
   void renderTransparent(Z3DEye eye) override;
 
-signals:
+Q_SIGNALS:
 
   void punctumSelected(const ZPunctum*, bool append);
 

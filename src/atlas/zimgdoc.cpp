@@ -108,9 +108,9 @@ QMenu* ZImgDoc::processObjMenu() const
 void ZImgDoc::removeObj(size_t id)
 {
   auto it = m_idToImgPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToImgPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZImgDoc::objName(size_t id) const
@@ -178,7 +178,7 @@ size_t ZImgDoc::makeAlias(size_t id)
   m_idToImgPacks[aliasId] = m_idToImgPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -264,7 +264,7 @@ size_t ZImgDoc::addImgPack(ZImgPack* imgPack)
   m_idToImgPacks[id] = std::shared_ptr<ZImgPack>(imgPack);
   m_doc.registerNewObj(id, *this);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   return id;
 }
 
@@ -385,7 +385,7 @@ void ZImgDoc::sendChangedSignal(size_t id)
   auto& pack = m_idToImgPacks.at(id);
   for (const auto& idPack : m_idToImgPacks) {
     if (idPack.second == pack)
-      emit imgChanged(id);
+      Q_EMIT imgChanged(id);
   }
 }
 

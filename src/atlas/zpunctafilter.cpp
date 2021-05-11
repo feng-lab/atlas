@@ -388,7 +388,7 @@ void ZPunctaFilter::onPunctaChanged()
   createPunctumItems();
   m_skipSelectionChangedProcessing = false;
 
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void ZPunctaFilter::onSceneItemSelectionChanged()

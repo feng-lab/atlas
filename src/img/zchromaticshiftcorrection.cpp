@@ -62,7 +62,7 @@ void ZChromaticShiftCorrection::doWork()
   } else {
     IMG_TYPED_CALL(alignChannelWithPresetTransform, srcImg.info(), srcImg, m_targetChannel, m_method)
   }
-  emit resultReady(m_resultFilename);
+  Q_EMIT resultReady(m_resultFilename);
   reportProgress(1.0);
 }
 

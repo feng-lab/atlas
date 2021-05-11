@@ -19,7 +19,7 @@ void ZParameter::setName(const QString& name)
 {
   if (name != m_name) {
     m_name = name;
-    emit nameChanged(m_name);
+    Q_EMIT nameChanged(m_name);
   }
 }
 
@@ -112,7 +112,7 @@ void ZParameter::setVisible(bool s)
 {
   if (s != m_isWidgetsVisible) {
     m_isWidgetsVisible = s;
-    emit setWidgetsVisible(m_isWidgetsVisible);
+    Q_EMIT setWidgetsVisible(m_isWidgetsVisible);
   }
 }
 
@@ -120,7 +120,7 @@ void ZParameter::setEnabled(bool s)
 {
   if (s != m_isWidgetsEnabled) {
     m_isWidgetsEnabled = s;
-    emit setWidgetsEnabled(m_isWidgetsEnabled);
+    Q_EMIT setWidgetsEnabled(m_isWidgetsEnabled);
   }
 }
 
@@ -152,12 +152,12 @@ void ZBoolParameter::setValue(bool v)
 
 void ZBoolParameter::beforeChange(bool& value)
 {
-  emit valueWillChange(value);
+  Q_EMIT valueWillChange(value);
 }
 
 void ZBoolParameter::afterChange(bool& /*unused*/)
 {
-  emit boolChanged(m_value);
+  Q_EMIT boolChanged(m_value);
 }
 
 QWidget* ZBoolParameter::actualCreateWidget(QWidget* parent)

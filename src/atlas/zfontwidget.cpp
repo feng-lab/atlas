@@ -44,7 +44,7 @@ void ZFontWidget::setFont(const QFont& font)
     m_font = font;
     m_label->setText(m_font.key());
     setLabelFollowFontSize(m_followFontSize);
-    emit fontChanged(m_font);
+    Q_EMIT fontChanged(m_font);
   }
 }
 

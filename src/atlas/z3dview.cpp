@@ -497,7 +497,7 @@ void Z3DView::init()
 
   connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DView::resetCameraClippingRange);
 
-  emit networkConstructed();
+  Q_EMIT networkConstructed();
 }
 
 void Z3DView::createActions()

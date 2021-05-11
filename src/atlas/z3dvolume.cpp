@@ -234,7 +234,7 @@ void Z3DVolume::setHistogram()
 {
   m_histogram.swap(m_histogramThread->histogram());
   computeHistogramMaxValue();
-  emit histogramFinished();
+  Q_EMIT histogramFinished();
 }
 
 void Z3DVolume::generateTexture() const

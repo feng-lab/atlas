@@ -79,7 +79,7 @@ Q_OBJECT
 public:
   explicit ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent = nullptr);
 
-signals:
+Q_SIGNALS:
 
 private:
   void updateItems();

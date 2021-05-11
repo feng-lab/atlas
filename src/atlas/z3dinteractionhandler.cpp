@@ -40,25 +40,25 @@ void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)
     auto event = dynamic_cast<QMouseEvent*>(e);
     if (event->button() == Qt::LeftButton) {
       LOG(INFO) << "mouse enter interaction";
-      emit enterInteractionMode();
+      Q_EMIT enterInteractionMode();
     }
   } else if (e->type() == QEvent::MouseButtonRelease) {
     auto event = dynamic_cast<QMouseEvent*>(e);
     if (event->button() == Qt::LeftButton && QApplication::keyboardModifiers() == Qt::NoModifier) {
       LOG(INFO) << "mouse exit interaction";
-      emit exitInteractionMode();
+      Q_EMIT exitInteractionMode();
     }
   } else if (e->type() == QEvent::KeyPress) {
     auto event = dynamic_cast<QKeyEvent*>(e);
     if (event->modifiers() != Qt::NoModifier) {
       LOG(INFO) << "key enter interaction";
-      emit enterInteractionMode();
+      Q_EMIT enterInteractionMode();
     }
   } else if (e->type() == QEvent::KeyRelease) {
     auto event = dynamic_cast<QKeyEvent*>(e);
     if (event->modifiers() == Qt::NoModifier && QApplication::mouseButtons() == Qt::NoButton) {
       LOG(INFO) << "key exit interaction";
-      emit exitInteractionMode();
+      Q_EMIT exitInteractionMode();
     }
   }
   for (size_t j = 0; j < m_eventListeners.size() && !e->isAccepted(); ++j) {
@@ -173,7 +173,7 @@ void Z3DTrackballInteractionHandler::rotateEvent(QMouseEvent* e, int w, int h)
     mouseReleaseEvent(e, w, h);
   } else if (e->type() == QEvent::MouseMove) {
     mouseMoveEvent(e, w, h);
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -186,7 +186,7 @@ void Z3DTrackballInteractionHandler::mouseDollyEvent(QMouseEvent* e, int w, int 
     mouseReleaseEvent(e, w, h);
   } else if (e->type() == QEvent::MouseMove) {
     mouseMoveEvent(e, w, h);
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -194,7 +194,7 @@ void Z3DTrackballInteractionHandler::dollyEvent(QWheelEvent* e, int w, int h)
 {
   setState(State::Dolly);
   wheelEvent(e, w, h);
-  emit cameraMoved();
+  Q_EMIT cameraMoved();
 }
 
 void Z3DTrackballInteractionHandler::shiftEvent(QMouseEvent* e, int w, int h)
@@ -206,7 +206,7 @@ void Z3DTrackballInteractionHandler::shiftEvent(QMouseEvent* e, int w, int h)
     mouseReleaseEvent(e, w, h);
   } else if (e->type() == QEvent::MouseMove) {
     mouseMoveEvent(e, w, h);
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -219,7 +219,7 @@ void Z3DTrackballInteractionHandler::mouseRollEvent(QMouseEvent* e, int w, int h
     mouseReleaseEvent(e, w, h);
   } else if (e->type() == QEvent::MouseMove) {
     mouseMoveEvent(e, w, h);
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -227,7 +227,7 @@ void Z3DTrackballInteractionHandler::mouseRollEvent(QMouseEvent* e, int w, int h
 //{
 //  setState(State::Roll);
 //  wheelEvent(e, w, h);
-//  emit cameraMoved();
+//  Q_EMIT cameraMoved();
 //}
 
 void Z3DTrackballInteractionHandler::keyRotateEvent(QKeyEvent* e, int /*unused*/, int /*unused*/)
@@ -248,7 +248,7 @@ void Z3DTrackballInteractionHandler::keyRotateEvent(QKeyEvent* e, int /*unused*/
   }
   if (accepted) {
     e->accept();
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -271,7 +271,7 @@ void Z3DTrackballInteractionHandler::keyShiftEvent(QKeyEvent* e, int w, int h)
   }
   if (accepted) {
     e->accept();
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -288,7 +288,7 @@ void Z3DTrackballInteractionHandler::keyDollyEvent(QKeyEvent* e, int /*unused*/,
   }
   if (accepted) {
     e->accept();
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -304,7 +304,7 @@ void Z3DTrackballInteractionHandler::keyRollEvent(QKeyEvent* e, int /*unused*/, 
   }
   if (accepted) {
     e->accept();
-    emit cameraMoved();
+    Q_EMIT cameraMoved();
   }
 }
 
@@ -411,7 +411,7 @@ void Z3DTrackballInteractionHandler::shift(const glm::ivec2& mouseStart, const g
   glm::vec3 endInWorld = m_camera->get().screenToWorld(glm::vec3(glm::vec2(mouseEnd), centerDepth), viewport);
   glm::vec3 vec = endInWorld - startInWorld;
   if (m_moveObjects) {
-    emit objectsMoved(vec.x, vec.y, vec.z);
+    Q_EMIT objectsMoved(vec.x, vec.y, vec.z);
   } else {
     // camera move in opposite direction
     m_camera->setCamera(m_camera->get().eye() - vec, m_camera->get().center() - vec);

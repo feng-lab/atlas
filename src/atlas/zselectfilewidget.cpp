@@ -96,7 +96,7 @@ void ZSelectFileWidget::setFile(const QString& fn)
   if (m_fileMode != FileMode::OpenMultipleFiles && m_fileMode != FileMode::OpenMultipleFilesWithFilter
       && m_lineEdit->text() != fn) {
     m_lineEdit->setText(fn);
-    emit changed();
+    Q_EMIT changed();
   }
 }
 
@@ -105,7 +105,7 @@ void ZSelectFileWidget::setFiles(const QStringList& fl)
   if (m_fileMode == FileMode::OpenMultipleFiles || m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
     m_multipleFNames = fl;
     m_textEdit->setText(QString("%1").arg(fl.join("\n")));
-    emit changed();
+    Q_EMIT changed();
   }
 }
 
@@ -184,7 +184,7 @@ void ZSelectFileWidget::selectFile()
       m_textEdit->setText(QString("%1").arg(m_multipleFNames.join("\n")));
       if (m_destNames)
         *m_destNames = m_multipleFNames;
-      emit changed();
+      Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::OpenSingleFile) {
     QString fileName = QFileDialog::getOpenFileName(
@@ -195,7 +195,7 @@ void ZSelectFileWidget::selectFile()
       m_lineEdit->setText(fileName);
       if (m_destName)
         *m_destName = fileName;
-      emit changed();
+      Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::SaveFile) {
     QString outputFileName = ZFileUtils::getSaveFileName(
@@ -206,7 +206,7 @@ void ZSelectFileWidget::selectFile()
       m_lineEdit->setText(outputFileName);
       if (m_destName)
         *m_destName = outputFileName;
-      emit changed();
+      Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::Directory) {
     QString dir = QFileDialog::getExistingDirectory(
@@ -216,7 +216,7 @@ void ZSelectFileWidget::selectFile()
       m_lineEdit->setText(dir);
       if (m_destName)
         *m_destName = dir;
-      emit changed();
+      Q_EMIT changed();
     }
   }
 }

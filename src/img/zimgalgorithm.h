@@ -40,7 +40,7 @@ public:
   inline void setTotalSubOperationWeight(double w)
   { m_weight = 1 - w; }
 
-signals:
+Q_SIGNALS:
 
   // progress from 1 to 100, used for QProgressbar
   void progressChanged(int);

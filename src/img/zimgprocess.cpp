@@ -18,11 +18,11 @@ void ZImgProcess::run()
   try {
     LOG(INFO) << "run " << QThread::currentThreadId();
     doWork();
-    emit finished();
+    Q_EMIT finished();
   }
   catch (itk::ProcessAborted const& e) {
     LOG(ERROR) << "Process Aborted by User. " << e.what();
-    emit canceled();
+    Q_EMIT canceled();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
@@ -30,7 +30,7 @@ void ZImgProcess::run()
   }
   catch (itk::ExceptionObject const& excp) {
     LOG(ERROR) << "Caught itk exception: " << excp.what();
-    emit processError(QString(excp.what()));
+    Q_EMIT processError(QString(excp.what()));
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
@@ -38,7 +38,7 @@ void ZImgProcess::run()
   }
   catch (ZProcessAbortException const& e) {
     LOG(ERROR) << "Process Aborted by User. " << e.what();
-    emit canceled();
+    Q_EMIT canceled();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
@@ -46,7 +46,7 @@ void ZImgProcess::run()
   }
   catch (ZException const& e) {
     LOG(ERROR) << "Caught exception: " << e.what();
-    emit processError(e.what());
+    Q_EMIT processError(e.what());
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
       throw;  // notify parent
@@ -66,7 +66,7 @@ void ZImgProcess::runInPython()
   try {
     LOG(INFO) << "run " << QThread::currentThreadId();
     doWork();
-    emit finished();
+    Q_EMIT finished();
   }
   catch (itk::ProcessAborted const& e) {
     LOG(ERROR) << "Process Aborted by User. " << e.what();

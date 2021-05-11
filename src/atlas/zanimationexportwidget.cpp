@@ -56,10 +56,10 @@ void ZAnimationExportWidget::captureButtonPressed()
 
   if (m_is2DAnimation) {
     if (m_useWindowSize.get()) {
-      emit export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get());
+      Q_EMIT export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get());
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+      Q_EMIT exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
                                       size.x, size.y);
     }
   } else {
@@ -73,10 +73,10 @@ void ZAnimationExportWidget::captureButtonPressed()
       sst = Z3DScreenShotType::MonoView;
 
     if (m_useWindowSize.get()) {
-      emit export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(), sst);
+      Q_EMIT export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(), sst);
     } else {
       glm::ivec2 size = m_customSize.get();
-      emit exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+      Q_EMIT exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
                                       size.x, size.y, sst);
     }
   }

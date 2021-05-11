@@ -123,7 +123,7 @@ public:
 
   void setYZView();
 
-signals:
+Q_SIGNALS:
 
   void objViewReady(size_t id);
 

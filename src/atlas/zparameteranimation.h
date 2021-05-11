@@ -44,7 +44,7 @@ public:
   { return m_color; }
 
   inline void setColor(const QColor& c)
-  { if (m_color != c) { m_color = c; emit colorChanged(this); }}
+  { if (m_color != c) { m_color = c; Q_EMIT colorChanged(this); }}
 
   void deleteKey(ZParameterKey* key);
 
@@ -59,10 +59,10 @@ public:
   void sortKeys();
 
   void emitKeyChangedSignal(ZParameterKey* key)
-  { emit keyChanged(key); }
+  { Q_EMIT keyChanged(key); }
 
   void emitKeysChangedSignal()
-  { emit keysChanged(); }
+  { Q_EMIT keysChanged(); }
 
   [[nodiscard]] QString jsonKey() const;
 
@@ -78,7 +78,7 @@ public:
 
   void removeRedundantKeys();
 
-signals:
+Q_SIGNALS:
 
   void colorChanged(ZParameterAnimation* pa);
 

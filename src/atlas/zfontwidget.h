@@ -20,7 +20,7 @@ public:
 
   void setFont(const QFont& font);
 
-signals:
+Q_SIGNALS:
 
   void fontChanged(QFont font);
 

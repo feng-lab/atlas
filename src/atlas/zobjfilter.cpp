@@ -111,12 +111,12 @@ void ZObjFilter::viewPrecedenceChanged()
 
 void ZObjFilter::transformChanged()
 {
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void ZObjFilter::offsetChanged()
 {
-  emit boundBoxChanged();
+  Q_EMIT boundBoxChanged();
 }
 
 void ZObjFilter::bringToFront()

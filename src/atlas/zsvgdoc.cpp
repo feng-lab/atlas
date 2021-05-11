@@ -83,9 +83,9 @@ std::vector<QAction*> ZSvgDoc::loadFileActions() const
 void ZSvgDoc::removeObj(size_t id)
 {
   auto it = m_idToSvgPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToSvgPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString ZSvgDoc::objName(size_t id) const
@@ -138,7 +138,7 @@ size_t ZSvgDoc::makeAlias(size_t id)
   m_idToSvgPacks[aliasId] = m_idToSvgPacks[id];
   m_doc.registerNewObj(aliasId, *this);
 
-  emit objAdded(aliasId, this);
+  Q_EMIT objAdded(aliasId, this);
   return aliasId;
 }
 
@@ -177,7 +177,7 @@ size_t ZSvgDoc::addSvg(std::unique_ptr<QSvgRenderer> svg, const QString& path)
   m_idToSvgPacks[id] = std::make_shared<SvgPack>(std::move(svg), path);
   m_doc.registerNewObj(id, *this);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   return id;
 }
 

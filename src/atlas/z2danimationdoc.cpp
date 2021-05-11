@@ -139,9 +139,9 @@ std::vector<QAction*> Z2DAnimationDoc::loadFileActions() const
 void Z2DAnimationDoc::removeObj(size_t id)
 {
   auto it = m_idToAnimationPacks.find(id);
-  emit objAboutToBeRemoved(it->first, this);
+  Q_EMIT objAboutToBeRemoved(it->first, this);
   m_idToAnimationPacks.erase(it);
-  emit objRemoved(id, this);
+  Q_EMIT objRemoved(id, this);
 }
 
 QString Z2DAnimationDoc::objName(size_t id) const
@@ -265,7 +265,7 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& pat
   m_doc.registerNewObj(id, *this);
   animation->bindView(m_view);
 
-  emit objAdded(id, this);
+  Q_EMIT objAdded(id, this);
   connect(animation, &Z2DAnimation::durationChanged, this, &Z2DAnimationDoc::setModified);
   connect(animation, &Z2DAnimation::keysChanged, this, &Z2DAnimationDoc::setModified);
   connect(animation, &Z2DAnimation::objChanged, this, &Z2DAnimationDoc::setModified);

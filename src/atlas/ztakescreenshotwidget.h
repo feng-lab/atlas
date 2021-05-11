@@ -33,7 +33,7 @@ public:
     if (v) m_captureStereoImage.setVisible(false);
   }
 
-signals:
+Q_SIGNALS:
 
   void takeFixedSize2DScreenShot(const QString& filename, int width, int height);
 

@@ -23,7 +23,7 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
                            const QString& outputFilename)
 {
   if (m_ffmpegProcess->state() != QProcess::NotRunning) {
-    emit error("Encoder is already running.");
+    Q_EMIT error("Encoder is already running.");
     return;
   }
 
@@ -50,7 +50,7 @@ void ZVideoEncoder::cancel()
   m_ffmpegProcess->kill();
   m_ffmpegProcess->waitForFinished();
   blockSignals(false);
-  emit canceled();
+  Q_EMIT canceled();
   m_mutex.unlock();
 }
 
@@ -79,15 +79,15 @@ void ZVideoEncoder::ffmpegError(QProcess::ProcessError err)
     default:
       break;
   }
-  emit error(msg);
+  Q_EMIT error(msg);
 }
 
 void ZVideoEncoder::ffmpegFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
   if (exitStatus == QProcess::NormalExit && exitCode == 0) {
-    emit finished();
+    Q_EMIT finished();
   } else {
-    emit error(m_ffmpegProcess->readAllStandardError());
+    Q_EMIT error(m_ffmpegProcess->readAllStandardError());
   }
 }
 

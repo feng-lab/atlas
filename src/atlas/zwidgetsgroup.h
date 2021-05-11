@@ -80,7 +80,7 @@ public:
 
   void emitWidgetsGroupChangedSignal();
 
-signals:
+Q_SIGNALS:
 
   void requestAdvancedWidget(const QString& name);
 

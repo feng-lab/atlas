@@ -34,7 +34,7 @@ public:
 
   void onEvent(QEvent* e, int w, int h);
 
-signals:
+Q_SIGNALS:
 
   void cameraMoved();
 
@@ -116,7 +116,7 @@ public:
   [[nodiscard]] bool isMovingObjects() const
   { return m_moveObjects; }
 
-signals:
+Q_SIGNALS:
 
   void objectsMoved(double x, double y, double z);
 

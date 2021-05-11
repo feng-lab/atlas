@@ -105,7 +105,7 @@ protected:
 
   void connectSelectedNodes();
 
-signals:
+Q_SIGNALS:
 
   void selectionChanged();
 
@@ -163,7 +163,7 @@ public:
   {
     m_swcPack.m_swc.swap(m_swcBeforeChange);
     m_swcPack.updateViewRelatedData();
-    emit m_swcPack.swcChanged();
+    Q_EMIT m_swcPack.swcChanged();
   }
 
   void redo() override
@@ -174,7 +174,7 @@ public:
       m_firstTimeRedo = false;
     }
     m_swcPack.updateViewRelatedData();
-    emit m_swcPack.swcChanged();
+    Q_EMIT m_swcPack.swcChanged();
   }
 
 protected:

@@ -105,7 +105,7 @@ public:
 
   [[nodiscard]] ZBBox<glm::ivec4> copiedItemBoundBox() const;
 
-signals:
+Q_SIGNALS:
 
   void boundBoxChanged();
 

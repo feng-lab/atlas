@@ -26,7 +26,7 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& 
   addPort(m_rightEyeInport);
 
   setOutputSize(m_canvas.physicalSize());
-  emit requestUpstreamSizeChange(this);
+  Q_EMIT requestUpstreamSizeChange(this);
   connect(&m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DCanvasPainter::onCanvasResized);
 }
 
@@ -74,13 +74,13 @@ bool Z3DCanvasPainter::isValid(Z3DEye /*eye*/) const
 void Z3DCanvasPainter::updateSize()
 {
   setOutputSize(m_canvas.physicalSize());
-  emit requestUpstreamSizeChange(this);
+  Q_EMIT requestUpstreamSizeChange(this);
 }
 
 void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
 {
   setOutputSize(glm::uvec2(w, h));
-  emit requestUpstreamSizeChange(this);
+  Q_EMIT requestUpstreamSizeChange(this);
 }
 
 void Z3DCanvasPainter::invalidate(State inv)
@@ -182,7 +182,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
     setOutputSize(glm::uvec2(width, height));
-    emit requestUpstreamSizeChange(this);
+    Q_EMIT requestUpstreamSizeChange(this);
 
     m_tiledRendering = false;
 
@@ -196,7 +196,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
     m_leftEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
     m_rightEyeInport.setExpectedSize(glm::uvec2(tileSize, tileSize));
     globalCameraPara().viewportChanged(glm::uvec2(width, height));
-    emit requestUpstreamSizeChange(this);
+    Q_EMIT requestUpstreamSizeChange(this);
 
     m_tiledRendering = true;
     if (sst == Z3DScreenShotType::MonoView) {
@@ -277,7 +277,7 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
 
   // reset texture container dimensions from canvas size
   setOutputSize(oldDimensions);
-  emit requestUpstreamSizeChange(this);
+  Q_EMIT requestUpstreamSizeChange(this);
 
   return (m_renderToImageError.isEmpty());
 }

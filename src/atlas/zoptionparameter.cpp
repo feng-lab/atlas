@@ -111,7 +111,7 @@ void ZOptionParameter<T, T2>::beforeChange(T& value)
 {
   auto index = indexOf(m_options, value);
   m_associatedData = m_associatedDatas[index];
-  emit this->reservedIntSignal1(index);
+  Q_EMIT this->reservedIntSignal1(index);
 }
 
 template<class T, class T2>
