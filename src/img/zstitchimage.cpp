@@ -11,6 +11,7 @@
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/global_control.h>
+#include <boost/container_hash/hash.hpp>
 #include <fftw3.h>
 #include <algorithm>
 #include <limits>
@@ -564,7 +565,8 @@ void ZStitchImage::doWork()
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
+    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>,
+      boost::hash<std::pair<size_t, size_t>>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
@@ -938,7 +940,8 @@ void ZStitchImage::doRestitch()
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>> offsets;
+    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>,
+      boost::hash<std::pair<size_t, size_t>>> offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;

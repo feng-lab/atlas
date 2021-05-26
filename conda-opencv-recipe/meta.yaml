@@ -19,7 +19,7 @@ requirements:
 
   run:
     - python x.x
-    - numpy >=1.18
+    - numpy >=1.19
     - mkl
     - tbb
     - libstdcxx-ng # [linux]

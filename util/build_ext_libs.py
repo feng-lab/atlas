@@ -997,9 +997,12 @@ def build_folly(src_dir: str, install_dir: str):
         orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file4 = patch_file(orig_file4,
                                from_texts=[r'project(${PACKAGE_NAME} CXX C)',
+                                           r'${FOLLY_DIR}/experimental/JSONSchemaTester.cpp',
                                            ],
                                to_texts=['project(${PACKAGE_NAME} CXX C)\n'
                                          'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
+                                         '${FOLLY_DIR}/experimental/JSONSchemaTester.cpp\n'
+                                         '${FOLLY_DIR}/portability/Filesystem.cpp\n',
                                          ])
 
         if is_windows():
