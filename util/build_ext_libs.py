@@ -512,6 +512,7 @@ def build_glog(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
+                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          ])
 
         # if is_windows():
@@ -527,13 +528,12 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'logging.h'),
-                   from_texts=[r'#ifndef GOOGLE_GLOG_DLL_DECL',
+        patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'export.h'),
+                   from_texts=[r'#define GOOGLE_GLOG_DLL_DECL_H',
                                ],
-                   to_texts=['#ifndef GOOGLE_GLOG_DLL_DECL\n'
-                             '#define GOOGLE_GLOG_DLL_DECL\n'
-                             '#endif\n'
-                             '#ifndef GOOGLE_GLOG_DLL_DECL\n',
+                   to_texts=['#define GOOGLE_GLOG_DLL_DECL_H\n'
+                             '#define GLOG_STATIC_DEFINE\n'
+                             '#define HAVE_CXX11_ATOMIC\n',
                              ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
