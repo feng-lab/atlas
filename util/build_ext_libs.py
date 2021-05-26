@@ -1825,6 +1825,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_opencv_sfm:BOOL=ON',
             '-DBUILD_opencv_videostab:BOOL=ON',
             '-DBUILD_opencv_xfeatures2d:BOOL=ON',
+            '-DBUILD_opencv_freetype:BOOL=OFF',
 
             '-DCPU_BASELINE=AVX',
         ])

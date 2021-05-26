@@ -245,6 +245,8 @@ def build_atlas_installer():
             out_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static')
             if not os.path.exists(out_folder):
                 out_folder = os.path.join(os.path.expanduser('~'), 'GoogleDrive', "code", 'my', 'proxy', 'static')
+            if not os.path.exists(out_folder):
+                out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')

@@ -17,7 +17,7 @@
 * `brew install unrar p7zip git golang autoconf`
 
 ### Windows:
-* install visual studio, qt (>= 6.0), intel oneapi basekit, python3, git
+* install visual studio, qt (>= 6.0), intel oneapi basekit, python3, git, perl
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
 * install perl: https://www.activestate.com/products/perl/downloads/, add to path
