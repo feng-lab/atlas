@@ -261,7 +261,7 @@ def intel_sw_dir() -> str:
 def tbb_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    res = os.path.join(intel_sw_dir(), 'redist', 'intel64', 'tbb', 'vc14')
+    res = os.path.join(intel_sw_dir(), 'tbb', 'latest', 'redist', 'intel64', 'vc14')
     assert os.path.exists(res)
     return res
 

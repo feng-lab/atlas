@@ -1305,7 +1305,7 @@ def build_jxrlib(src_dir: str, install_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['devenv', 'JXR_vc14.sln', '/Upgrade'],
                            cwd=os.path.join(src_dir, 'jxrencoderdecoder'), shell=True, check=True, env=env)
-            subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp', '/property:Platform=x64',
+            subprocess.run(['MSBuild', 'JXR_vc14.sln', '/target:JXRDecApp:Rebuild', '/property:Platform=x64',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION'],  # like 10.0.16299.0
                             '/property:ForceImportBeforeCppTargets=' + ext_dir() + '\\runtime_md.props',
                             '/property:Configuration=Release', '/maxcpucount'],
@@ -1465,7 +1465,7 @@ def build_freeimage(src_dir: str, install_dir: str):
     try:
         if is_windows():
             env = get_vcvars_environment()
-            subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
+            subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus:Rebuild', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
                             '/property:PlatformToolset=v142',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
@@ -1903,6 +1903,7 @@ def build_conda_zimg(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
     finally:
+        print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
