@@ -50,7 +50,7 @@ def deploy_deps():
                            cwd=os.path.join(common_dirs.qt_install_dir(), '..'),
                            shell=False, check=True)
 
-        dir_name = 'intel'
+        dir_name = 'oneapi'
         zip_name = os.path.join(zip_folder, f'dep-{dir_name}-{datetime.date.today():%Y-%m-%d}.zip')
         file_list = glob.glob(os.path.join(zip_folder, f'dep-{dir_name}-*.zip'))
         if len(file_list) == 0:
@@ -78,14 +78,14 @@ def deploy_deps():
                            cwd=os.path.join(common_dirs.qt_install_dir(), '..'),
                            shell=False, check=True)
 
-        dir_name = 'intel'
-        zip_name = os.path.join(zip_folder, f'dep-{dir_name}-{datetime.date.today():%Y-%m-%d}.zip')
-        file_list = glob.glob(os.path.join(zip_folder, f'dep-{dir_name}-*.zip'))
-        if len(file_list) == 0:
-            upload = True
-            subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, dir_name],
-                           cwd=os.path.join(common_dirs.intel_sw_dir(), '..'),
-                           shell=False, check=True)
+        # dir_name = 'intel'
+        # zip_name = os.path.join(zip_folder, f'dep-{dir_name}-{datetime.date.today():%Y-%m-%d}.zip')
+        # file_list = glob.glob(os.path.join(zip_folder, f'dep-{dir_name}-*.zip'))
+        # if len(file_list) == 0:
+        #     upload = True
+        #     subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, dir_name],
+        #                    cwd=os.path.join(common_dirs.intel_sw_dir(), '..'),
+        #                    shell=False, check=True)
 
         if upload:
             subprocess.run(['rsync', '-av', '--delete', suffix,

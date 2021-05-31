@@ -268,7 +268,7 @@ if (BUILD_WITH_CONDA)
   set(IPP_LIBRARIES "")
 else ()
   target_compile_definitions(${LIBRARY_NAME} PRIVATE ZIMG_USE_IPP)
-  target_include_directories(${LIBRARY_NAME} PRIVATE ${IPP_INCLUDE_DIRS})
+  set(IPP_LIBRARIES IPP::ippi)
 endif ()
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

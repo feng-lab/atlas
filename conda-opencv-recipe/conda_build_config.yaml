@@ -1,6 +1,2 @@
 python:
   - 3.9
-
-# we build for an old version of numpy for forward compatibility
-numpy:
-  - 1.19

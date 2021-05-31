@@ -248,11 +248,12 @@ def vc_OpenMP_redist_dir() -> str:
 
 def intel_sw_dir() -> str:
     if sys.platform.startswith('win32'):
-        res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries', 'windows')
+        # res = os.path.join('C:', os.sep, 'Program Files (x86)', 'IntelSWTools', 'compilers_and_libraries', 'windows')
+        res = os.path.join('C:', os.sep, 'Program Files (x86)', 'Intel', 'oneAPI')
     else:
-        res = os.path.join(os.sep, 'opt', 'intel')
+        res = os.path.join(os.sep, 'opt', 'intel', 'oneapi')
     if not os.path.exists(res):
-        res = os.path.join(os.path.expanduser('~'), 'intel')
+        res = os.path.join(os.path.expanduser('~'), 'oneapi')
     assert os.path.exists(res)
     return res
 

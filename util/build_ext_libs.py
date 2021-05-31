@@ -149,7 +149,7 @@ def get_tbb_env():
     # else:
     #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.sh'))
     env = get_vcvars_environment() if is_windows() else os.environ.copy()
-    env['TBBROOT'] = os.path.join(intel_sw_dir(), 'tbb')
+    env['TBBROOT'] = os.path.join(intel_sw_dir(), 'tbb', 'latest')
     env['TBB_ROOT'] = env['TBBROOT']
     return env
 
@@ -1185,7 +1185,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
 
         env = get_vcvars_environment() if is_windows() else os.environ.copy()
-        env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl')
+        env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl', 'latest')
         build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -1597,7 +1597,7 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_DOXYGEN_HTML:BOOL=OFF',
                          '-DModule_ITKReview:BOOL=ON',
                          '-DModule_ITKTBB:BOOL=ON',
-                         # '-DTBB_DIR:PATH=' + atlas_repository_dir() + '/src/cmake',
+                         '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
                          '-DITK_USE_SYSTEM_DOUBLECONVERSION:BOOL=ON',
                          '-DITK_USE_SYSTEM_EIGEN:BOOL=ON',
                          '-DITK_USE_SYSTEM_HDF5:BOOL=ON',
@@ -1676,7 +1676,9 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
-                         '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB'])
+                         '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB',
+                         '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
+                         ])
 
         # if is_windows():
         #     cmakecmd.extend([
@@ -1732,7 +1734,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                        to_texts=[r'set(_packages_path "Lib/site-packages")'])
         else:
             cmakecmd.extend([
-                '-DMKL_ROOT_DIR=' + os.path.join(intel_sw_dir(), 'mkl'),
+                '-DMKL_ROOT_DIR=' + os.path.join(intel_sw_dir(), 'mkl', 'latest'),
+                '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
                 ])
 
             orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
@@ -1990,10 +1993,6 @@ def build_libs(libs: dict, update_src: bool):
             else:
                 file.write(f'set(QT_HOST_PATH {qt_base_dir()})\n')
                 file.write(f'set(INTEL_PATH {intel_sw_dir()})\n')
-
-    if libs['tbb']:
-        subprocess.run([get_cmake_binary(), '-P', 'MakeTBBConfigFiles.cmake'],
-                       cwd=os.path.join(atlas_repository_dir(), 'src', 'cmake'), shell=False, check=True)
 
     if libs['qt']:
         print(f'Qt {qt_ver()} in {qt_base_dir()}')
@@ -2410,7 +2409,7 @@ def build_libs(libs: dict, update_src: bool):
 
 
 def parse_inputs(argv: list):
-    lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'tbb', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
+    lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
                 'pybind11', 'glm', 'magic_enum', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
@@ -2430,7 +2429,6 @@ def parse_inputs(argv: list):
                             'glog': ['ceres-solver', 'folly', 'opencv'],
                             'benchmark': ['grpc'],
                             'openssl': ['grpc', 'folly'],
-                            'tbb': ['itk', 'opencv', 'vtk'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
                             'ceres-solver': ['opencv'],   # only if we need opencv sfm
