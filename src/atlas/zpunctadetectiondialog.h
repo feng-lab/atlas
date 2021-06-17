@@ -58,6 +58,7 @@ private:
   ZStringIntOptionParameter m_dendriteChannel;
   ZIntParameter m_tubeThreshold;
   ZDoubleParameter m_ambiguousFactor;
+  ZDoubleParameter m_maxDistToBranchInUm;
 };
 
 } // namespace nim

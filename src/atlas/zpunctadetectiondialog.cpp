@@ -27,6 +27,7 @@ ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
   , m_dendriteChannel("Tube Channel")
   , m_tubeThreshold("Tube Threshold", 100, 1, 255)
   , m_ambiguousFactor("Ambiguous Factor", 1.0, 1., 2.)
+  , m_maxDistToBranchInUm("Max Distance (um) between Puncta and SWC for Puncta Assignment", 2.5, 0., 100.)
 {
   init();
 }
@@ -80,6 +81,7 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
     workertmp->setSomaPunctaThreshold(m_somaPunctaThreshold.get());
   if (dendriteChannel >= 0)
     workertmp->setDendriteThreshold(m_tubeThreshold.get());
+  workertmp->setMaxDistToBranchInUm(m_maxDistToBranchInUm.get());
 
   worker = workertmp;
   workerName = "Puncta Detection";
@@ -304,6 +306,9 @@ void ZPunctaDetectionDialog::createParaGroupBox()
 
   glayout->addWidget(m_tubeThreshold.createNameLabel(), 4, 0);
   glayout->addWidget(m_tubeThreshold.createWidget(), 4, 1);
+
+  glayout->addWidget(m_maxDistToBranchInUm.createNameLabel(), 4, 0);
+  glayout->addWidget(m_maxDistToBranchInUm.createWidget(), 4, 1);
 
   //glayout->addWidget(m_ambiguousFactor.createNameLabel(), 5, 0);
   //glayout->addWidget(m_ambiguousFactor.createWidget(), 5, 1);
