@@ -242,24 +242,54 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs, std
   auto readRatio = ratioForScale(scale, scale, 1);
 
 #if 1
-  auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
-  if (tiit != m_rtToTileBoxRTree.end()) {
-    TileBoxType queryBox(TileCornerType(std::floor(viewport.x()), std::floor(viewport.y()), z),
-                         TileCornerType(std::ceil(viewport.right()), std::ceil(viewport.bottom()), z));
-    std::vector<RTreeValueType> queryResult;
-    tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-    imgs.resize(queryResult.size());
-    locs.resize(queryResult.size());
-    scales.resize(queryResult.size(), readRatio[0]);
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, queryResult.size()),
-                      [&](const tbb::blocked_range<size_t>& r) {
-                        for (size_t i = r.begin(); i != r.end(); ++i) {
-                          const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
-                          locs[i] = QPoint(tile.x, tile.y);
-                          imgs[i] = ZImgCache::instance().getOrRead(HashKeyType(this, queryResult[i].second), tile);
-                        }
-                      }
-    );
+  bool finish = false;  // in case of multiple image with pyramidal levels (like czi) concated together to form
+                        // one stack, some z slice might have less pyramidal levels so we can not trust readRatio in such case
+  while (!finish) {
+    auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+    if (tiit != m_rtToTileBoxRTree.end()) {
+      TileBoxType queryBox(TileCornerType(std::floor(viewport.x()), std::floor(viewport.y()), z),
+                           TileCornerType(std::ceil(viewport.right()), std::ceil(viewport.bottom()), z));
+      std::vector<RTreeValueType> queryResult;
+      tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
+      if (!queryResult.empty()) {
+        imgs.resize(queryResult.size());
+        locs.resize(queryResult.size());
+        scales.resize(queryResult.size(), readRatio[0]);
+        tbb::parallel_for(tbb::blocked_range<size_t>(0, queryResult.size()), [&](const tbb::blocked_range<size_t>& r) {
+          for (size_t i = r.begin(); i != r.end(); ++i) {
+            const ZImgSubBlock& tile = *m_allTiles[queryResult[i].second].get();
+            locs[i] = QPoint(tile.x, tile.y);
+            imgs[i] = ZImgCache::instance().getOrRead(HashKeyType(this, queryResult[i].second), tile);
+          }
+        });
+        finish = true;
+      } else {
+        // move to previous readRatio
+        size_t idx = 0;
+        std::array<size_t, 3> lastReadRatio{};
+        finish = true;
+        for (const auto& ratio : m_pyramidalRatios) {
+          if (idx == 0) {
+            lastReadRatio = ratio;
+            ++idx;
+            continue;
+          }
+//          LOG(INFO) << lastReadRatio[0] << lastReadRatio[1] << lastReadRatio[2];
+//          LOG(INFO) << ratio[0] << ratio[1] << ratio[2];
+//          LOG(INFO) << readRatio[0] << readRatio[1] << readRatio[2];
+          if (ratio == readRatio) {
+            readRatio = lastReadRatio;
+            finish = false;
+            break;
+          } else {
+            lastReadRatio = ratio;
+          }
+          ++idx;
+        }
+      }
+    } else {
+      finish = true;
+    }
   }
 #else
   auto tiit = m_rtzToTileIndice.find(std::make_tuple(readRatio, t, mip ? -1 : int(z)));
