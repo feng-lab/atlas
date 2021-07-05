@@ -265,26 +265,16 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs, std
         finish = true;
       } else {
         // move to previous readRatio
-        size_t idx = 0;
-        std::array<size_t, 3> lastReadRatio{};
         finish = true;
-        for (const auto& ratio : m_pyramidalRatios) {
-          if (idx == 0) {
-            lastReadRatio = ratio;
-            ++idx;
-            continue;
-          }
-//          LOG(INFO) << lastReadRatio[0] << lastReadRatio[1] << lastReadRatio[2];
-//          LOG(INFO) << ratio[0] << ratio[1] << ratio[2];
-//          LOG(INFO) << readRatio[0] << readRatio[1] << readRatio[2];
-          if (ratio == readRatio) {
-            readRatio = lastReadRatio;
-            finish = false;
+        for (auto rit = m_pyramidalRatios.rbegin(); rit != m_pyramidalRatios.rend(); ++rit) {
+          if (*rit == readRatio) {
+            ++rit;
+            if (rit != m_pyramidalRatios.rend()) {
+              readRatio = *rit;
+              finish = false;
+            }
             break;
-          } else {
-            lastReadRatio = ratio;
           }
-          ++idx;
         }
       }
     } else {
