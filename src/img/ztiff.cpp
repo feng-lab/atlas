@@ -47,7 +47,7 @@ namespace {
 
 const struct tiftagname
 {
-  uint32 tag;
+  uint32_t tag;
   const char* name;
 } tiftagnames[] = {
   {TIFFTAG_SUBFILETYPE,                "SubfileType"},
@@ -234,7 +234,7 @@ const struct tiftagname
 
 const struct exiftagname
 {
-  uint32 tag;
+  uint32_t tag;
   const char* name;
 } exiftagnames[] = {
   {EXIFTAG_EXPOSURETIME,             "ExposureTime"},
@@ -1583,7 +1583,7 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
 
 size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t height, size_t nChannel, bool invert)
 {
-  uint16 bitspersample;
+  uint16_t bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
   if (bitspersample % 8 == 0) {
     size_t read = TIFFReadEncodedStrip(m_tif.get(), strip, buf, static_cast<tmsize_t>(-1));
@@ -1684,7 +1684,7 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
 
 void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileHeight, size_t tileChannel, bool invert)
 {
-  uint16 bitspersample;
+  uint16_t bitspersample;
   TIFFGetFieldDefaulted(m_tif.get(), TIFFTAG_BITSPERSAMPLE, &bitspersample);
   if (bitspersample % 8 == 0) {
     size_t read = TIFFReadEncodedTile(m_tif.get(), tile, buf, static_cast<tmsize_t>(-1));

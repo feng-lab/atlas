@@ -7,6 +7,12 @@
 #ifndef _TIFFCONF_
 #define _TIFFCONF_
 
+
+#include <stddef.h>
+#include <stdint.h>
+#include <inttypes.h>
+
+
 /* Signed 16-bit type */
 #define TIFF_INT16_T @TIFF_INT16_T@
 
@@ -31,14 +37,8 @@
 /* Unsigned 8-bit type */
 #define TIFF_UINT8_T @TIFF_UINT8_T@
 
-/* Unsigned size type */
-#define TIFF_SIZE_T @TIFF_SIZE_T@
-
 /* Signed size type */
 #define TIFF_SSIZE_T @TIFF_SSIZE_T@
-
-/* Pointer difference type */
-#define TIFF_PTRDIFF_T @TIFF_PTRDIFF_T@
 
 /* Compatibility stuff. */
 
@@ -61,6 +61,9 @@
 
 /* Support JBIG compression (requires JBIG-KIT library) */
 #cmakedefine JBIG_SUPPORT
+
+/* Support LERC compression */
+#cmakedefine LERC_SUPPORT 1
 
 /* Support LogLuv high dynamic range encoding */
 #cmakedefine LOGLUV_SUPPORT 1
