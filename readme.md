@@ -14,6 +14,7 @@
     sudo xcode-select -switch /Applications/Xcode.app`
     ```
 * install qt (>= 6.0), intel oneapi basekit and python3 (recommend miniconda)
+* fix intel oneapi basekit ipp cmake error: add 'set(IPP_ARCH)' to file `oneapi/ipp/latest/lib/cmake/ipp/ipp-config.cmake`
 * `brew install unrar p7zip git golang autoconf`
 
 ### Windows:

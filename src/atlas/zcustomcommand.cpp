@@ -1876,7 +1876,7 @@ void createEeumIndexImages()
   for (size_t ti = 0; ti < 180; ++ti) {
     mainWin->view()->slicePara().set(ti);
     QApplication::processEvents();
-    auto imgName = QString("/Users/feng/code/eeum/static/static/slice_%1.png").arg(ti);
+    auto imgName = QString("/Users/feng/code/eeum/static/slices/slice_%1.png").arg(ti);
     mainWin->view()->takeFixedSizeScreenShot(imgName, 512, 512);
     QApplication::processEvents();
   }

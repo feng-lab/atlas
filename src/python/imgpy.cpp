@@ -420,7 +420,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def(py::init<const QStringList&, Dimension, bool, const ZImgRegion&, size_t, FileFormat, bool, bool>(),
          "filenames"_a, "catDim"_a, "catScenes"_a = true, "region"_a = ZImgRegion(), "scene"_a = 0,
          "format"_a = FileFormat::Unknown,
-         "expandXY"_a = false, "expandWithMaxValue"_a = false)
+         "expandXY"_a = true, "expandWithMaxValue"_a = false)
     .def_readwrite("filenames", &ZImgSource::filenames)
     .def_readwrite("catDim", &ZImgSource::catDim)
     .def_readwrite("region", &ZImgSource::region)
@@ -449,7 +449,7 @@ PYBIND11_MODULE(_imgpy, m)
          "filenames"_a, "catDim"_a, "catScenes"_a, "region"_a = ZImgRegion(), "scene"_a = 0,
          "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1,
          "format"_a = FileFormat::Unknown,
-         "expandXY"_a = false, "expandWithMaxValue"_a = false)
+         "expandXY"_a = true, "expandWithMaxValue"_a = false)
     .def(py::init<const ZImgSource&, size_t, size_t, size_t>(),
          "imgSource"_a, "xRatio"_a = 1, "yRatio"_a = 1, "zRatio"_a = 1)
     .def(py::init<>([](const py::array& arr, const ZImgInfo& info_in) {
@@ -482,7 +482,7 @@ PYBIND11_MODULE(_imgpy, m)
     }, "filename"_a, "format"_a = FileFormat::Unknown)
     .def_static("readImgInfos", [](const QStringList& fileList, Dimension catDim, bool catScenes, FileFormat format, bool expandXY) {
       return ZImg::readImgInfos(fileList, catDim, catScenes, nullptr, format, expandXY);
-    }, "filenames"_a, "catDim"_a, "catScenes"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    }, "filenames"_a, "catDim"_a, "catScenes"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = true)
     .def_static("readImgInfo", [](const ZImgSource& imgSource) {
       return ZImg::readImgInfo(imgSource);
     })
@@ -535,14 +535,14 @@ PYBIND11_MODULE(_imgpy, m)
                     }
                   }
                   return res;
-                }, "filenames"_a, "catDim"_a, "catScenes"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+                }, "filenames"_a, "catDim"_a, "catScenes"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = true)
     .def_static("readSubBlock", [](const QString& filename, size_t scene, size_t blockIndex, FileFormat format) {
       return ZImg::readSubBlock(filename, scene, blockIndex, format);
     }, "filename"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown)
     .def_static("readSubBlock", [](const QStringList& fileList, Dimension catDim, bool catScenes, size_t scene, size_t blockIndex,
                                    FileFormat format, bool expandXY) {
       return ZImg::readSubBlock(fileList, catDim, catScenes, scene, blockIndex, format, expandXY);
-    }, "filenames"_a, "catDim"_a, "catScenes"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = false)
+    }, "filenames"_a, "catDim"_a, "catScenes"_a, "scene"_a, "blockIndex"_a, "format"_a = FileFormat::Unknown, "expandXY"_a = true)
     .def_static("getInternalSubRegions", [](const QString& filename, FileFormat format) {
       return ZImg::getInternalSubRegions(filename, format);
     }, "filename"_a, "format"_a = FileFormat::Unknown)

@@ -700,6 +700,7 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
   }
 
   CHECK(xRatio >= 1 && yRatio >= 1 && zRatio >= 1);
+  // todo: bug here, check if img info is correct
   if (xRatio > 1 || yRatio > 1 || zRatio > 1) {
     img.zoom(1.0 / xRatio, 1.0 / yRatio, 1.0 / zRatio);
   }

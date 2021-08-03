@@ -1444,8 +1444,11 @@ def build_hdf5(src_dir: str, install_dir: str):
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DHDF5_ENABLE_DEPRECATED_SYMBOLS:BOOL=ON',
                          '-DHDF5_ENABLE_Z_LIB_SUPPORT:BOOL=ON',
+                         # '-DHDF5_ENABLE_SZIP_SUPPORT:BOOL=1',
                          '-DHDF5_ENABLE_THREADSAFE:BOOL=OFF',
-                         '-DHDF5_BUILD_EXAMPLES:BOOL=OFF'])
+                         '-DHDF5_BUILD_EXAMPLES:BOOL=OFF',
+                         '-DHDF5_BUILD_CPP_LIB:BOOL=1',
+                         ])
 
         # if is_windows():
         #     cmakecmd.extend(['-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
