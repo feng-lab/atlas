@@ -33,12 +33,12 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_deleteSelectedPunctaEvent("Delete Selected Puncta", true)
   , m_contextMenuEvent("Context Menu", false)
 {
-  addPrivateRenderPort(m_monoEyeOutport);
-  addPrivateRenderPort(m_leftEyeOutport);
-  addPrivateRenderPort(m_rightEyeOutport);
-  addPrivateRenderPort(m_monoEyeOutport2);
-  addPrivateRenderPort(m_leftEyeOutport2);
-  addPrivateRenderPort(m_rightEyeOutport2);
+  //  addPrivateRenderPort(m_monoEyeOutport);
+  //  addPrivateRenderPort(m_leftEyeOutport);
+  //  addPrivateRenderPort(m_rightEyeOutport);
+  //  addPrivateRenderPort(m_monoEyeOutport2);
+  //  addPrivateRenderPort(m_leftEyeOutport2);
+  //  addPrivateRenderPort(m_rightEyeOutport2);
 
   //m_textureCopyRenderer.setDiscardTransparent(true);
 

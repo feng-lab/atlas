@@ -618,6 +618,7 @@ void ZMesh::transformVerticesByMatrix(const glm::mat4& tfmat)
   for (auto& vertex : m_vertices) {
     vertex = glm::applyMatrix(tfmat, vertex);
   }
+  generateNormals();
 }
 
 std::vector<ZMesh> ZMesh::split(size_t numTriangle) const
@@ -1416,7 +1417,7 @@ void ZMesh::swapXY()
   generateNormals();
 }
 
-ZImg ZMesh::toLabelImg(size_t width, size_t height, size_t depth) const
+ZImg ZMesh::toLabelImg(size_t width, size_t height, size_t depth, const glm::mat4& tfmat, double tolerance) const
 {
   ZImg res;
   auto bbox = boundBox();
@@ -1439,7 +1440,8 @@ ZImg ZMesh::toLabelImg(size_t width, size_t height, size_t depth) const
   for (size_t d = 0; d < depth; ++d) {
     for (size_t h = 0; h < height; ++h) {
       for (size_t w = 0; w < width; ++w) {
-        points->InsertNextPoint(w, h, d);
+        auto pt = glm::applyMatrix(tfmat, glm::vec3(w, h, d));
+        points->InsertNextPoint(pt[0],pt[1], pt[2]);
       }
     }
   }
@@ -1452,7 +1454,10 @@ ZImg ZMesh::toLabelImg(size_t width, size_t height, size_t depth) const
   vtkSmartPointer<vtkSelectEnclosedPoints> selectEnclosedPoints =
     vtkSmartPointer<vtkSelectEnclosedPoints>::New();
   selectEnclosedPoints->SetInputData(pointsPolydata);
-  selectEnclosedPoints->SetSurfaceData(meshToVtkPolyData(*this));
+  ZMesh tmpMesh = *this;
+  tmpMesh.transformVerticesByMatrix(tfmat);
+  selectEnclosedPoints->SetSurfaceData(meshToVtkPolyData(tmpMesh));
+  selectEnclosedPoints->SetTolerance(tolerance);
   selectEnclosedPoints->Update();
 
   auto data = res.timeData(0);

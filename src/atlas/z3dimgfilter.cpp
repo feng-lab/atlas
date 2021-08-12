@@ -153,11 +153,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_imageRenderTarget2.isFBOComplete();
 
   // ports
-  addPrivateRenderTarget(m_entryTarget);
-  addPrivateRenderTarget(m_exitTarget);
-  addPrivateRenderTarget(m_layerTarget);
-  addPrivateRenderTarget(m_imageRenderTarget1);
-  addPrivateRenderTarget(m_imageRenderTarget2);
   addPort(m_outport);
   addPort(m_leftEyeOutport);
   addPort(m_rightEyeOutport);
@@ -428,6 +423,7 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
                                         m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                                 : m_opaqueRightEyeOutport;
+  currentOutport.resize(m_outport.size());
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -630,6 +626,9 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
                                         m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                                 : m_opaqueRightEyeOutport;
+  currentOutport.resize(m_outport.size());
+
+  m_layerTarget.resize(currentOutport.size());
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -838,6 +837,13 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
   float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 
+  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
+    m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+
+  m_layerTarget.resize(currentOutport.size());
+  m_imageRenderTarget1.resize(currentOutport.size());
+  m_imageRenderTarget2.resize(currentOutport.size());
+
   if (m_3dImg->is2DData()) { // for 2d image
     ZMesh m_2DImageQuad = ZMesh::createImageSlice(0, glm::vec2(xCoordStart, yCoordStart),
                                                   glm::vec2(xCoordEnd, yCoordEnd),
@@ -913,6 +919,8 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0,
                                     GL_COLOR_ATTACHMENT1
     };
+
+    m_exitTarget.resize(currentOutport.size());
     m_exitTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -924,6 +932,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     CHECK_GL_ERROR
 
     // render front texture
+    m_entryTarget.resize(currentOutport.size());
     m_entryTarget.bind();
     glDrawBuffers(2, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -947,9 +956,6 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
-                                        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();

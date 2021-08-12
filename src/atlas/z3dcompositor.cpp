@@ -286,8 +286,8 @@ void Z3DCompositor::process(Z3DEye eye)
       m_rendererBase.transparencyMethodPara().isSelected("Blend Delayed")) {
     if (!currentInport.isReady()) {  // no volume, only geometrys to render
       if (numNormalFilters == 0 || numOnTopFilters == 0) {
-        if (m_rendererBase.geometriesMultisampleModePara().isSelected(
-          "2x2")) { // render to tempport (twice larger than outport) then copy to outport
+        if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+          // render to tempport (twice larger than outport) then copy to outport
           m_tempPort.resize(currentOutport.size() * 2_u32);
         } else {  // render to tempport then copy to outport
           m_tempPort.resize(currentOutport.size());
@@ -534,8 +534,8 @@ void Z3DCompositor::process(Z3DEye eye)
     }
     numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size() + vFilters.size();
     if (numNormalFilters == 0 || numOnTopFilters == 0) {
-      if (m_rendererBase.geometriesMultisampleModePara().isSelected(
-        "2x2")) { // render to tempport (twice larger than outport) then copy to outport
+      if (m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
+        // render to tempport (twice larger than outport) then copy to outport
         m_tempPort.resize(currentOutport.size() * 2_u32);
       } else {  // render to tempport then copy to outport
         m_tempPort.resize(currentOutport.size());
@@ -623,6 +623,10 @@ void Z3DCompositor::process(Z3DEye eye)
   }
 
   if (!showHandleFilters.empty()) {
+    Z3DRenderOutputPort& finalOutport = (eye == Z3DEye::Mono) ?
+      m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+    m_tempPort4.resize(finalOutport.size());
+
     m_tempPort4.bindTarget();
     m_tempPort4.clearTarget();
     for (auto& showHandleFilter : showHandleFilters) {
@@ -631,8 +635,6 @@ void Z3DCompositor::process(Z3DEye eye)
     }
     m_tempPort4.releaseTarget();
     CHECK_GL_ERROR
-    Z3DRenderOutputPort& finalOutport = (eye == Z3DEye::Mono) ?
-                                        m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
     finalOutport.bindTarget();
     finalOutport.clearTarget();
     m_rendererBase.setViewport(finalOutport.size());
@@ -666,6 +668,7 @@ void Z3DCompositor::process(Z3DEye eye)
   }
 
   // render picking objects
+  m_pickingPort.resize(m_outport.size());
   if (filters.empty() && !showHandleFilters.empty()) {
     pickingManager().bindTarget();
     pickingManager().clearTarget();
@@ -685,6 +688,9 @@ void Z3DCompositor::process(Z3DEye eye)
     }
     pickingManager().releaseTarget();
   } else if (!filters.empty() && !showHandleFilters.empty()) {
+    m_tempPort5.resize(pickingManager().renderTarget().size());
+    m_tempPort4.resize(pickingManager().renderTarget().size());
+
     m_tempPort5.bindTarget();
     m_tempPort5.clearTarget();
     for (auto& showHandleFilter : showHandleFilters) {

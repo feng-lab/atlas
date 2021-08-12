@@ -436,6 +436,7 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
                                         m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                                 : m_opaqueRightEyeOutport;
+  currentOutport.resize(m_outport.size());
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -675,6 +676,9 @@ void Z3DVolumeFilter::renderSlices(Z3DEye eye)
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
                                         m_opaqueOutport : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                                 : m_opaqueRightEyeOutport;
+  currentOutport.resize(m_outport.size());
+
+  m_layerTarget.resize(currentOutport.size());
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -1341,6 +1345,9 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
 
   // enable culling
   glEnable(GL_CULL_FACE);
+
+  m_exitTarget.resize(m_outport.size());
+  m_entryTarget.resize(m_outport.size());
 
   m_rendererBase.setViewport(m_exitTarget.size());
   CHECK_GL_ERROR

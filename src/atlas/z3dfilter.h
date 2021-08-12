@@ -161,6 +161,7 @@ protected:
 
   void addPrivateRenderPort(Z3DRenderOutputPort& port);
 
+  // for backward compat, should not be used anymore
   void addPrivateRenderTarget(Z3DRenderTarget& target);
 
   static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
@@ -191,7 +192,7 @@ protected:
   std::vector<Z3DInputPortBase*> m_inputPorts;
   // output the filter generates.
   std::vector<Z3DOutputPortBase*> m_outputPorts;
-  // private port for intermediate rendering
+  // private port for intermediate rendering, for backward compat, should not be used by subclass
   std::vector<Z3DRenderOutputPort*> m_privateRenderPorts;
   std::vector<Z3DRenderTarget*> m_privateRenderTargets;
 

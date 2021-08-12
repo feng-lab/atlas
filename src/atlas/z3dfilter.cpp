@@ -310,14 +310,14 @@ void Z3DFilter::updateSize()
   }
 
   // 2. update private ports
-  for (auto port : m_privateRenderPorts) {
-    port->resize(maxOutportSize);
-  }
-  for (auto target : m_privateRenderTargets) {
-    target->resize(maxOutportSize);
-  }
+  //  for (auto port : m_privateRenderPorts) {
+  //    port->resize(maxOutportSize);
+  //  }
+  //  for (auto target : m_privateRenderTargets) {
+  //    target->resize(maxOutportSize);
+  //  }
 
-  // 3. update inport expected size
+  // 2. update inport expected size
   for (auto port : m_inputPorts) {
     port->setExpectedSize(maxOutportSize);
   }

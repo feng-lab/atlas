@@ -95,6 +95,7 @@ void Z3DMeshFilter::process(Z3DEye eye)
     Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
                                           m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport
                                                                                    : m_rightEyeOutport;
+    currentOutport.resize(m_outPort.size());
 
     currentOutport.bindTarget();
     currentOutport.clearTarget();
@@ -106,6 +107,8 @@ void Z3DMeshFilter::process(Z3DEye eye)
     Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono) ?
                                            m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2
                                                                                      : m_rightEyeOutport2;
+    currentOutport2.resize(m_outPort.size());
+
     currentOutport2.bindTarget();
     currentOutport2.clearTarget();
     m_rendererBase.setViewport(currentOutport2.size());

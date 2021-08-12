@@ -296,7 +296,9 @@ public:
     return fmt::format("{} triangles", numTriangles());
   }
 
-  ZImg toLabelImg(size_t width = 0, size_t height = 0, size_t depth = 0) const;
+  ZImg toLabelImg(size_t width = 0, size_t height = 0, size_t depth = 0,
+                  const glm::mat4& tfmat = glm::mat4(1.f),
+                  double tolerance = 1e-6) const;
 
 private:
   enum class BooleanOperationType
