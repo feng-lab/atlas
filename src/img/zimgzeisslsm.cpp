@@ -194,12 +194,16 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
         m_lsmImgInfo.bytesPerVoxel = 2;
         m_lsmImgInfo.validBitCount = 12;
         break;
+      case 3:
+        m_lsmImgInfo.voxelFormat = VoxelFormat::Unsigned;
+        m_lsmImgInfo.bytesPerVoxel = 2;
+        break;
       case 5:
         m_lsmImgInfo.voxelFormat = VoxelFormat::Float;
         m_lsmImgInfo.bytesPerVoxel = 4;
         break;
       default:
-        throw ZIOException("lsm data type is not recognized");
+        throw ZIOException(fmt::format("lsm data type {} is not recognized", m_channelDataTypes[0]));
     }
   } else {
     switch (m_lsmInfo.s32DataType) {
