@@ -25,7 +25,7 @@
 
 ### Linux:
 * install qt (>= 6.0), python3
-* `sudo apt install unrar p7zip-full git nasm golang patchelf libxcursor-dev`
+* `sudo apt install zip unrar p7zip-full git nasm golang patchelf libxcursor-dev`
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
 * install intel oneapi basekit with apt
 
