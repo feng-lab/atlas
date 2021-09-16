@@ -425,7 +425,7 @@ def get_cmake_binary() -> str:
         cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*windows*'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     elif is_linux():
-        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*Linux*_64'))
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*linux*_64'))
         return os.path.join(cmake_folder, 'bin', 'cmake')
     else:
         cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*macos*'))
