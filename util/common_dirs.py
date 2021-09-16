@@ -379,7 +379,7 @@ def install_cmake():
     if is_windows():
         unpack_tool_to_target_dir(src_package_dir(), 'cmake*windows*')
     elif is_linux():
-        unpack_tool_to_target_dir(src_package_dir(), 'cmake*Linux*')
+        unpack_tool_to_target_dir(src_package_dir(), 'cmake*linux*')
     else:
         unpack_tool_to_target_dir(src_package_dir(), 'cmake*macos*')
 
