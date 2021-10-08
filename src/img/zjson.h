@@ -91,22 +91,22 @@ inline QString asQString(const json::value& jv)
   return json::value_to<QString>(jv);
 }
 
-// tuple-like types
-template<class T,
-  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
-inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
-{
-  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
-  const auto& ja = jv.as_array();
-  if (ja.size() < n) {
-    throw ZIOException("json array too short");
-  }
-  T res;
-  for (size_t i = 0; i < n; ++i) {
-    res[i] = json::value_to<typename T::value_type>(ja[i]);
-  }
-  return res;
-}
+//// tuple-like types
+//template<class T,
+//  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
+//inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
+//{
+//  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
+//  const auto& ja = jv.as_array();
+//  if (ja.size() < n) {
+//    throw ZIOException("json array too short");
+//  }
+//  T res;
+//  for (size_t i = 0; i < n; ++i) {
+//    res[i] = json::value_to<typename T::value_type>(ja[i]);
+//  }
+//  return res;
+//}
 
 //json::value jv;
 //*JsonValueProxy(jv)["user:config"]["authority"]["router"][0]["users"] = 42;
@@ -190,22 +190,22 @@ inline json::value& JsonValuePath(json::value& jv, Arg0 const& arg0, Arg1 const&
 
 namespace glm {
 
-// tuple-like types
-template<class T,
-  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
-inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
-{
-  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
-  const auto& ja = jv.as_array();
-  if (ja.size() < n) {
-    throw nim::ZIOException("json array too short");
-  }
-  T res;
-  for (size_t i = 0; i < n; ++i) {
-    res[i] = json::value_to<typename T::value_type>(ja[i]);
-  }
-  return res;
-}
+//// tuple-like types
+//template<class T,
+//  typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
+//inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
+//{
+//  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
+//  const auto& ja = jv.as_array();
+//  if (ja.size() < n) {
+//    throw nim::ZIOException("json array too short");
+//  }
+//  T res;
+//  for (size_t i = 0; i < n; ++i) {
+//    res[i] = json::value_to<typename T::value_type>(ja[i]);
+//  }
+//  return res;
+//}
 
 } // namespace glm
 

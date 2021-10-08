@@ -408,7 +408,9 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
   selector->SetInputArrayToProcess(0, 0, 0,
                                    vtkDataObject::FIELD_ASSOCIATION_CELLS,
                                    vtkDataSetAttributes::SCALARS);
-  selector->ThresholdBetween(1, 1);
+  selector->SetThresholdFunction(vtkThreshold::THRESHOLD_BETWEEN);
+  selector->SetLowerThreshold(1);
+  selector->SetUpperThreshold(1);
 
   // Strip the scalars from the output
   vtkSmartPointer<vtkMaskFields> scalarsOff = vtkSmartPointer<vtkMaskFields>::New();

@@ -149,7 +149,7 @@ def qt_compiler_name() -> str:
     if sys.platform.startswith('win32'):
         return 'msvc2019_64'
     elif sys.platform.startswith('darwin'):
-        return 'clang_64'
+        return 'macos'
     else:
         return 'gcc_64'
 

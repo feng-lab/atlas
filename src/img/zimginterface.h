@@ -74,6 +74,14 @@ struct col4
     : r(v), g(v), b(v), a(v)
   {}
 
+  col4(std::initializer_list<value_type> il)
+  {
+    r = il.begin()[0];
+    g = il.begin()[1];
+    b = il.begin()[2];
+    a = il.begin()[3];
+  }
+
   col4(uint8_t r_, uint8_t g_, uint8_t b_, uint8_t a_ = 255_u8)
     : r(r_), g(g_), b(b_), a(a_)
   {}
@@ -260,6 +268,22 @@ constexpr auto&& get(col4&& v) noexcept
 template<std::size_t Index>
 constexpr auto&& get(const col4&& v) noexcept
 { return tuple_like_get_helper<Index, 4>(v); }
+
+template<class T,
+         typename std::enable_if<std::is_same<json::detail::remove_cvref<T>, col4>::value>::type* = nullptr>
+inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
+{
+  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
+  const auto& ja = jv.as_array();
+  if (ja.size() < n) {
+    throw ZIOException("json array too short");
+  }
+  T res;
+  for (size_t i = 0; i < n; ++i) {
+    res[i] = json::value_to<typename T::value_type>(ja[i]);
+  }
+  return res;
+}
 
 } // namespace nim
 

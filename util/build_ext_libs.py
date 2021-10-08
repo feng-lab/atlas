@@ -1137,11 +1137,14 @@ def build_ceres_solver(src_dir: str, install_dir: str):
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file4 = bak_file4 = None
+    orig_file5 = bak_file5 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
-                              from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
-                              to_texts=[r'if (FALSE)'])
+                              from_texts=[r'if (HOMEBREW_EXECUTABLE)',
+                                          r'EIGEN3_FOUND'],
+                              to_texts=[r'if (FALSE)',
+                                        r'Eigen3_FOUND'])
         orig_file1 = os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake')
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)',
@@ -1170,6 +1173,10 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         bak_file4 = patch_file(orig_file4,
                                from_texts=[r' ${LAPACK_LIBRARIES}'],
                                to_texts=[r' '])
+        orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
+        bak_file5 = patch_file(orig_file5,
+                               from_texts=[r'EIGEN3_FOUND'],
+                               to_texts=[r'Eigen3_FOUND'])
 
         os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
 
@@ -1194,6 +1201,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
+        os.replace(bak_file5, orig_file5)
         cleanup_git_submodule(src_dir)
 
 
@@ -1571,10 +1579,15 @@ def build_botan(src_dir: str, install_dir: str):
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    # orig_file = bak_file = None
+    orig_file = bak_file = None
     # orig_file_1 = bak_file_1 = None
     # orig_file4 = bak_file4 = None
     try:
+        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'Expat', 'src', 'expat', 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'${ITK3P_EXPAT_SOURCE_DIR}/expat_config.h'],
+                              to_texts=[r'${ITK3P_EXPAT_BINARY_DIR}/expat_config.h'])
+
         # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
         # bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
         #                       to_texts=['file(GLOB __files "${CMAKE_CURRENT_SOURCE_DIR}/*.h")\n'
@@ -1650,7 +1663,7 @@ def build_itk(src_dir: str, install_dir: str):
         #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        # os.replace(bak_file, orig_file)
+        os.replace(bak_file, orig_file)
         # # os.replace(bak_file4, orig_file4)
         # if is_windows():
         #     os.replace(bak_file_1, orig_file_1)
@@ -2361,7 +2374,7 @@ def build_libs(libs: dict, update_src: bool):
         distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
 
         if is_mac():
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*osx*'))
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*macos*'))
         elif is_linux():
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*linux*'))
         else:

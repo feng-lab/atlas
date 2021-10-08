@@ -25,8 +25,8 @@ def update_pacakge_xml_version(template_file: str, file: str):
 
 def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree = eTree.parse(template_file)
-    tree.find('Version').text = '4.0.1'  # todo: get version and date from qt components.xml
-    tree.find('ReleaseDate').text = '2020-12-10'
+    tree.find('Version').text = '4.1.1'  # todo: get version and date from qt components.xml
+    tree.find('ReleaseDate').text = '2021-05-25'
     # Write back to file
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
