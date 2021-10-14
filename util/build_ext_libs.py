@@ -1672,7 +1672,16 @@ def build_itk(src_dir: str, install_dir: str):
 def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'check_type_size("uint64_t" HAVE_UINT64_T)',
+                                          ],
+                              to_texts=['check_type_size("uint64_t" HAVE_UINT64_T)\n'
+                                        'check_type_size("uintptr_t" HAVE_UINTPTR_T)\n',
+                                        ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard=14)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -1707,6 +1716,7 @@ def build_vtk(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir, env=get_tbb_env())
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool=False):
