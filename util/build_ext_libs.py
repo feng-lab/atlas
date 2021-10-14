@@ -1661,6 +1661,9 @@ def build_itk(src_dir: str, install_dir: str):
         #                        ],
         #            to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
         #                      ])
+
+        shutil.copy2(os.path.join(src_dir, 'CMake', 'ITKInitializeCXXStandard.cmake'),
+                     os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
