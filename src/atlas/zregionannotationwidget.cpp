@@ -177,6 +177,51 @@ void ZRegionAnnotationWidget::exportMeshes()
   }
 }
 
+void ZRegionAnnotationWidget::exportSvgImage()
+{
+  QString fn;
+  ZVec2Parameter ratioPara("Scale", glm::vec2(1.f), glm::vec2(1e-5), glm::vec2(1e10));
+
+  {
+    QDialog dialog(QApplication::activeWindow());
+    auto alllayout = new QVBoxLayout;
+    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Svg Image(s):",
+                                                   tr("Svg File (*.svg)"),
+                                                   ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
+    alllayout->addWidget(outputImageWidget);
+    ratioPara.setNameForEachValue({"X Scale:", "Y Scale:"});
+    ratioPara.setDecimal(6);
+    ratioPara.setStyle("SPINBOX");
+    alllayout->addWidget(ratioPara.createWidget());
+    auto bbox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
+    connect(bbox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(bbox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    alllayout->addWidget(bbox);
+    delete dialog.layout();
+
+    dialog.setLayout(alllayout);
+    dialog.setWindowTitle(tr("Export Region Annotation As Svg Image"));
+
+    if (dialog.exec()) {
+      fn = outputImageWidget->getSelectedSaveFile();
+    } else {
+      return;
+    }
+  }
+
+  if (!fn.isEmpty()) {
+    try {
+      m_regionAnnotationPack.regionAnnotation().exportSvgImage(fn, ratioPara.get().x, ratioPara.get().y);
+      ZSystemInfo::instance().addFileToRecentFileList(fn);
+      ZSystemInfo::instance().setLastOpenedImagePath(fn);
+    }
+    catch (const ZException& e) {
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+                            QString("Can not export svg image:\n%1").arg(e.what()));
+    }
+  }
+}
+
 void ZRegionAnnotationWidget::createWidget()
 {
   auto vlo = new QVBoxLayout;
@@ -216,6 +261,12 @@ void ZRegionAnnotationWidget::createWidget()
   m_export3DMeshes->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_export3DMeshes, 0, Qt::AlignLeft | Qt::AlignVCenter);
   connect(m_export3DMeshes, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportMeshes);
+
+  m_exportSvgImageButton = new QPushButton("Export Svg Image(s)...");
+  m_exportSvgImageButton->setToolTip("Export Region Annotation To Svg Image(s)");
+  m_exportSvgImageButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  vlo->addWidget(m_exportSvgImageButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
+  connect(m_exportSvgImageButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::exportSvgImage);
 
   auto model = new ZRegionAnnotationTreeModel(m_regionAnnotationPack, this);
   auto view = new ZRegionAnnotationTreeView(*model, m_regionAnnotationPack, m_doc, this);

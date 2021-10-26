@@ -8,6 +8,8 @@
 #include "zioutils.h"
 #include <QFile>
 #include <QTemporaryDir>
+#include <QSvgGenerator>
+#include <QPainter>
 
 namespace {
 
@@ -358,6 +360,55 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
     res.save(fn, format, paras);
   }
   LOG(INFO) << "Finish exporting label image";
+}
+
+void ZRegionAnnotation::exportSvgImage(const QString& fn_, double scaleX, double scaleY) const
+{
+  LOG(INFO) << "Exporting Svg Image...";
+
+  QPainter painter;
+  QPen pen;
+  pen.setColor(QColor(0, 0, 0));
+  pen.setWidth(1);
+  for (int z = m_boundBox.minCorner.z; z <= m_boundBox.maxCorner.z; ++z) {
+    QString fn = fn_;
+    QFileInfo fi(fn);
+    if (m_boundBox.maxCorner.z > m_boundBox.minCorner.z) {
+      fn = QString("%1_slice%2.svg").arg(fi.dir().filePath(fi.completeBaseName())).arg(z);
+      LOG(INFO) << fn;
+    }
+    QSvgGenerator generator;
+    generator.setFileName(fn);
+    generator.setSize(
+      QSize(std::ceil(m_boundBox.maxCorner.x * scaleX) + 10,
+            std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
+    generator.setViewBox(
+      QRect(0, 0,
+            std::ceil(m_boundBox.maxCorner.x * scaleX) + 10,
+            std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
+    generator.setTitle(tr("Annotation"));
+
+    painter.begin(&generator);
+    painter.setPen(pen);
+    for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+      LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
+      if (it->roi) {
+        LOG(INFO) << "has roi";
+        for (const auto& [slice, sliceROI] : *(it->roi)) {
+          if (slice != z) {
+            continue;
+          }
+          auto path = sliceROI.paintPath(scaleX, scaleY);
+          painter.setBrush(QBrush(QColor(it->red, it->green, it->blue)));
+          painter.drawPath(path);
+          painter.drawText(path.pointAtPercent(0.25), it->abbreviation);
+        }
+      }
+    }
+    painter.end();
+  }
+
+  LOG(INFO) << "Finish exporting svg image";
 }
 
 double ZRegionAnnotation::getOptimizedScale() const

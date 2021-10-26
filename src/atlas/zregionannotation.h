@@ -36,6 +36,8 @@ public:
                         double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0,
                         bool keepOnlyInterpolatedSlices = false, int interpolationMethod = 0) const;
 
+  void exportSvgImage(const QString& fn, double scaleX = 1.0, double scaleY = 1.0) const;
+
   double getOptimizedScale() const;
 
   void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format,

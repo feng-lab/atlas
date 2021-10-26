@@ -27,6 +27,8 @@ protected:
 
   void exportMeshes();
 
+  void exportSvgImage();
+
 private:
   void createWidget();
 
@@ -42,6 +44,7 @@ private:
   QPushButton* m_transform3DMeshButton = nullptr;
   QPushButton* m_exportLableImageButton = nullptr;
   QPushButton* m_export3DMeshes = nullptr;
+  QPushButton* m_exportSvgImageButton = nullptr;
 };
 
 } // namespace nim

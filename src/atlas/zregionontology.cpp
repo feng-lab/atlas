@@ -121,7 +121,7 @@ void readOntology(const json::object& obj, ZTree<RegionNode>::Iterator& parentIt
 void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v3.json";
+  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {
@@ -136,7 +136,7 @@ void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionN
 {
   ontology.clear();
   //QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
-  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v3.json";
+  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {
