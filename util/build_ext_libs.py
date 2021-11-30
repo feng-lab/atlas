@@ -1828,6 +1828,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DMKL_WITH_OPENMP:BOOL=OFF',
             # '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),  # if on lapack check fails
             '-DWITH_PROTOBUF:BOOL=ON',
+            '-DWITH_QUIRC:BOOL=OFF',
 
             '-DBUILD_SHARED_LIBS:BOOL=OFF',
             '-DBUILD_opencv_apps:BOOL=OFF',
