@@ -241,7 +241,7 @@ print_target_properties(glm::glm)
 
 find_package(HDF5 REQUIRED
              COMPONENTS C CXX static
-             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/share NO_DEFAULT_PATH)
 print_target_properties(hdf5_cpp-static)
 print_target_properties(hdf5-static)
 

@@ -5,11 +5,9 @@
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-W#warnings"
-#define BOOST_JSON_STANDALONE
 #include <boost/json.hpp>
 #pragma GCC diagnostic pop
 #else
-#define BOOST_JSON_STANDALONE
 #include <boost/json.hpp>
 #endif
 namespace json = boost::json;

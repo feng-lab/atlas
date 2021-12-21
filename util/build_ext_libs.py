@@ -1676,6 +1676,8 @@ def build_vtk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
+    bak_file2 = orig_file2 = None
+    bak_file3 = orig_file3 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -1684,6 +1686,33 @@ def build_vtk(src_dir: str, install_dir: str):
                               to_texts=['check_type_size("uint64_t" HAVE_UINT64_T)\n'
                                         'check_type_size("uintptr_t" HAVE_UINTPTR_T)\n',
                                         ])
+
+        orig_file2 = os.path.join(src_dir, 'ThirdParty', 'eigen', 'vtkeigen', 'CMakeLists.txt')
+        bak_file2 = patch_file(orig_file2,
+                               from_texts=[r'-std=c++11',
+                                           r'set(CMAKE_CXX_STANDARD 11)',
+                                           ],
+                               to_texts=[r'-std=c++14',
+                                         r'set(CMAKE_CXX_STANDARD 14)',
+                                         ])
+
+        orig_file3 = os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake')
+        bak_file3 = patch_file(orig_file3,
+                               from_texts=[r'-std=c++11',
+                                           r'set(CMAKE_CXX_STANDARD 11)',
+                                           ],
+                               to_texts=[r'-std=c++14',
+                                         r'set(CMAKE_CXX_STANDARD 14)',
+                                         ])
+
+        orig_file4 = os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt')
+        bak_file4 = patch_file(orig_file4,
+                               from_texts=[r'-std=c++11',
+                                           r'set(CMAKE_CXX_STANDARD 11)',
+                                           ],
+                               to_texts=[r'-std=c++14',
+                                         r'set(CMAKE_CXX_STANDARD 14)',
+                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard=14)
 
@@ -1706,6 +1735,7 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
                          '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB',
                          '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
+                         '-DKWSYS_CXX_STANDARD=14',
                          ])
 
         # if is_windows():
@@ -1720,6 +1750,9 @@ def build_vtk(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file2, orig_file2)
+        os.replace(bak_file3, orig_file3)
+        os.replace(bak_file4, orig_file4)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool=False):
