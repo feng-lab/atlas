@@ -877,7 +877,16 @@ def build_xz(src_dir: str, install_dir: str):
 def build_zstd(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        if is_windows():
+            orig_file = os.path.join(src_dir, 'build', 'cmake', 'lib', 'CMakeLists.txt')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'${LIBRARY_DIR}/decompress/*.S',
+                                              ],
+                                  to_texts=[r'',
+                                            ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF',
                          '-DZSTD_BUILD_SHARED:BOOL=OFF',
@@ -886,6 +895,8 @@ def build_zstd(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        if is_windows():
+            os.replace(bak_file, orig_file)
 
 
 def build_libsodium(src_dir: str, install_dir: str):

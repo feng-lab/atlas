@@ -304,6 +304,9 @@ if (WIN32)
     # target_compile_options(${LIBRARY_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd6386) # Buffer overrun while writing to 'data'.
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd28020)
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6239) #  (<non-zero constant> && <expression>) always evaluates to the result of <expression>. Did you intend to use the bitwise-and operator?
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6336) # Arithmetic operator has precedence over question operator, use parentheses to clarify intent.
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception.  Consider using _malloca instead.
     target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
     target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
   else()
