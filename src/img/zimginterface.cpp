@@ -73,7 +73,7 @@ std::string_view enumToString(TEnum e)
   static_assert(std::is_enum_v<remove_cvref_t<TEnum>>, "Need Enum Type");
   auto res = magic_enum::enum_name(e);
   if (res.empty()) {
-    throw ZIOException(fmt::format("invalid enum value: {}", e));
+    throw ZIOException(fmt::format("invalid enum value: {}", enumToUnderlyingType(e)));
   }
   return res;
 }
@@ -122,7 +122,7 @@ std::string_view enumToString<Compression>(Compression e)
     case Compression::WEBP:
       return "WEBP";
     default:
-      throw ZIOException(fmt::format("invalid Compression: {}", e));
+      throw ZIOException(fmt::format("invalid Compression: {}", enumToUnderlyingType(e)));
   }
 }
 
