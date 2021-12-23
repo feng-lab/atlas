@@ -1652,7 +1652,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKTBB.cmake')
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKTBB.cmake')
         patch_file(orig_file_2,
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',
@@ -1673,8 +1673,8 @@ def build_itk(src_dir: str, install_dir: str):
         #            to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
         #                      ])
 
-        shutil.copy2(os.path.join(src_dir, 'CMake', 'ITKInitializeCXXStandard.cmake'),
-                     os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
+        # shutil.copy2(os.path.join(src_dir, 'CMake', 'ITKInitializeCXXStandard.cmake'),
+        #              os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
