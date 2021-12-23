@@ -1641,7 +1641,7 @@ def build_itk(src_dir: str, install_dir: str):
             cmakecmd.extend([
                 # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
                 # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
-                '-DHDF5_DIR:PATH=' + ext_build_dir() + '/cmake/hdf5',
+                '-DHDF5_DIR:PATH=' + ext_build_dir() + '/share/cmake',
             ])
         # else:
         #     cmakecmd.extend(['-DHDF5_DIR:PATH=' + ext_dir() + '/hdf5/share/cmake/hdf5',
