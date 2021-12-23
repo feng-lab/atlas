@@ -196,6 +196,7 @@ def build_atlas_installer():
                                                         'packages', 'fenglab.maintenance', 'meta', 'package.xml'))
 
     subprocess.run([os.path.join(common_dirs.qt_installer_framework_bin_dir(), 'archivegen'),
+                    '--compression', '0' if common_dirs.is_windows() else '5',
                     repo_package_name, app_name],
                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
