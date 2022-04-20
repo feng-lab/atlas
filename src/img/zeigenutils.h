@@ -9,15 +9,14 @@
 #pragma warning(push, 0)
 #endif
 
-#include <Eigen/Dense>
-
 #ifndef Q_MOC_RUN
+#include <Eigen/Dense>
 
 #include <boost/math/special_functions/digamma.hpp>
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/constants/constants.hpp>
-
 #endif
+
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif

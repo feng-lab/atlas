@@ -3,6 +3,7 @@ import difflib
 import distutils.dir_util
 import json
 import mmap
+import os.path
 from collections import OrderedDict
 from pathlib import Path
 
@@ -854,6 +855,7 @@ def build_xz(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
+    bak_file1 = orig_file1 = None
     try:
         orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
         bak_file = patch_file(orig_file,
@@ -865,6 +867,14 @@ def build_xz(src_dir: str, install_dir: str):
                                         '#ifndef LZMA_API_IMPORT\n',
                                         ])
 
+        orig_file1 = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'src/liblzma/common/stream_encoder_mt.c',
+                                           ],
+                               to_texts=['src/liblzma/common/stream_encoder_mt.c\n'
+                                         'src/liblzma/common/stream_decoder_mt.c',
+                                         ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          src_dir])
@@ -872,6 +882,7 @@ def build_xz(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
 
 
 def build_zstd(src_dir: str, install_dir: str):
@@ -1090,6 +1101,8 @@ def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     orig_file = bak_file = None
+    orig_file_1 = bak_file_1 = None
+    orig_file_2 = bak_file_2 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -1097,6 +1110,26 @@ def build_eigen(src_dir: str, install_dir: str):
                                           r'add_subdirectory(lapack'],
                               to_texts=[r'set(blas',
                                         r'set(lapack'])
+
+        # if is_mac():
+        #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX512',
+        #                                'TrsmUnrolls.inc')
+        #     bak_file_1 = patch_file(orig_file_1,
+        #                             from_texts=[r'std::min(EIGEN_AVX_MAX_NUM_ROW,endN)',
+        #                                         r'std::min(3*EIGEN_AVX_MAX_NUM_ROW, U3)',
+        #                                         r'std::min(3*EIGEN_AVX_MAX_NUM_ROW, U2)'
+        #                                         ],
+        #                             to_texts=[r'std::min<int64_t>(EIGEN_AVX_MAX_NUM_ROW,endN)',
+        #                                       r'std::min<int64_t>(3*EIGEN_AVX_MAX_NUM_ROW, U3)',
+        #                                       r'std::min<int64_t>(3*EIGEN_AVX_MAX_NUM_ROW, U2)',
+        #                                       ])
+        #
+        #     orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'misc', 'lapacke_helpers.h')
+        #     bak_file_2 = patch_file(orig_file_2,
+        #                             from_texts=[r'template<> constexpr char translate_mode<Lower>',
+        #                                         ],
+        #                             to_texts=[r'template<> constexpr const char translate_mode<Lower>',
+        #                                       ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -1106,6 +1139,7 @@ def build_eigen(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
 
         # if is_linux():
         #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
@@ -1123,6 +1157,9 @@ def build_eigen(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        # if is_mac():
+        #     os.replace(bak_file_1, orig_file_1)
+        #     os.replace(bak_file_2, orig_file_2)
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
@@ -1652,7 +1689,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKTBB.cmake')
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKTBB.cmake')
         patch_file(orig_file_2,
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',

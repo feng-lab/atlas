@@ -23,8 +23,10 @@ public:
   ZLogCache& operator=(ZLogCache&&) = delete;      // Move assign
 
   // LogSink interface
-  void send(LogSeverity severity, const char* full_filename, const char* base_filename, int line,
-            const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/, size_t prefix_len) override;
+  void send(LogSeverity severity, const char* full_filename,
+            const char* base_filename, int line,
+            const google::LogMessageTime& logmsgtime, const char* message,
+            size_t message_len, size_t prefix_len) override;
 
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>

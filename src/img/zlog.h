@@ -37,14 +37,14 @@ struct LogData
 {
   LogData(LogSeverity severity, const char* full_filename,
           const char* base_filename, int line_,
-          const ::tm* tm_time,
+          const std::tm& tm,
           const char* msg, size_t message_len, size_t prefix_len)
     : level(severity)
     , fullFilename(full_filename)
     , baseFilename(base_filename)
     , line(line_)
-    , time(QDate(tm_time->tm_year + 1900, tm_time->tm_mon + 1, tm_time->tm_mday),
-           QTime(tm_time->tm_hour, tm_time->tm_min, tm_time->tm_sec))
+    , time(QDate(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday),
+           QTime(tm.tm_hour, tm.tm_min, tm.tm_sec))
     , message(msg, message_len)
     , formatted(QString::fromUtf8(msg - prefix_len, static_cast<int>(message_len + prefix_len)))
   {}

@@ -10,9 +10,10 @@ ZLogCache& ZLogCache::instance()
   return cache;
 }
 
-void ZLogCache::send(LogSeverity severity, const char* full_filename, const char* base_filename,
-                     int line, const tm* tm_time, const char* message, size_t message_len, int32_t /*usecs*/,
-                     size_t prefix_len)
+void ZLogCache::send(LogSeverity severity, const char* full_filename,
+                     const char* base_filename, int line,
+                     const google::LogMessageTime& logmsgtime, const char* message,
+                     size_t message_len, size_t prefix_len)
 {
   QMutexLocker lock(&m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
@@ -22,7 +23,7 @@ void ZLogCache::send(LogSeverity severity, const char* full_filename, const char
     }
   }
   m_logDatas.emplace_back(severity, full_filename, base_filename, line,
-                          tm_time, message, message_len, prefix_len);
+                          logmsgtime.tm(), message, message_len, prefix_len);
 }
 
 ZLogCache::ZLogCache(size_t maxNumItems)
