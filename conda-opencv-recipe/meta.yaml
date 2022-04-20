@@ -14,7 +14,7 @@ requirements:
   host:
     - python x.x
     - numpy
-    - mkl
+    - mkl =2021.4.0
     - tbb
 
   run:

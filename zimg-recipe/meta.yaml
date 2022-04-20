@@ -16,7 +16,7 @@ requirements:
 
   host:
     - qt
-    - mkl-devel
+    - mkl-devel =2021.4.0
     - tbb-devel # [py>=39 or not osx]
     - tbb-devel =2020.2 # [osx and py==38]
     - python x.x
