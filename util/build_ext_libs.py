@@ -985,6 +985,7 @@ def build_folly(src_dir: str, install_dir: str):
                                            r'find_package(LibAIO)' + '' if is_mac() else '_NONONO',
                                            r'find_package(LibUring)' + '' if is_mac() else '_NONONO',
                                            r'find_package(LibUnwind)' + '' if is_mac() else '_NONONO',
+                                           r'set(FOLLY_USE_SYMBOLIZER ON)',
                                            ],
                                to_texts=[r'',
                                          r'',
@@ -1004,6 +1005,7 @@ def build_folly(src_dir: str, install_dir: str):
                                          r'find_package(LIBAIO)',
                                          r'find_package(LIBURING)',
                                          r'find_package(LIBUNWIND)',
+                                         r'set(FOLLY_USE_SYMBOLIZER ON)',
                                          ])
 
         orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
