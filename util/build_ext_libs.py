@@ -1005,7 +1005,7 @@ def build_folly(src_dir: str, install_dir: str):
                                          r'find_package(LIBAIO)',
                                          r'find_package(LIBURING)',
                                          r'find_package(LIBUNWIND)',
-                                         r'set(FOLLY_USE_SYMBOLIZER ON)',
+                                         r'set(FOLLY_USE_SYMBOLIZER OFF)',
                                          ])
 
         orig_file3 = os.path.join(src_dir, 'CMake', 'FollyCompilerMSVC.cmake')
