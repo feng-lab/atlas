@@ -128,9 +128,9 @@ QVariant ZObjModel::headerData(int section, Qt::Orientation orientation,
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
     switch (section) {
       case ShowHideNameColumn:
-        return QString("Name");
+        return QString("(Show/Hide) Name");
       case LockColumn:
-        return QString();
+        return QString("Lock");
       case TypeColumn:
         return QString("Type");
       case InfoColumn:
