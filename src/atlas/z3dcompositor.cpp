@@ -273,6 +273,9 @@ void Z3DCompositor::process(Z3DEye eye)
   size_t numNormalFilters = normalOpaqueFilters.size() + normalTransparentFilters.size();
   size_t numOnTopFilters = onTopOpaqueFilters.size() + onTopTransparentFilters.size();
 
+  if (!showHandleFilters.empty()) {
+    m_tempPort5.resize(m_outport.size());
+  }
   Z3DRenderOutputPort& currentOutport = (!showHandleFilters.empty()) ? m_tempPort5 : (eye == Z3DEye::Mono) ?
                                                                                      m_outport : (eye == Z3DEye::Left)
                                                                                                  ? m_leftEyeOutport

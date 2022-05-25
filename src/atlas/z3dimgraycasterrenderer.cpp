@@ -505,7 +505,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
       LOG(INFO) << "";
       CHECK(m_lastImageRenderTarget->size() == m_layerTarget->size()) << m_lastImageRenderTarget->size();
-      CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size()) << m_lastImageRenderTarget->size();
+      CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size()) << m_lastImageRenderTarget->size()
+                                                                               << " " << m_blockIDsRenderTarget->size();
 
       for (size_t i = 0; i < visibleIdxs.size(); ++i) {
         for (auto repeat = 0; repeat < 10; ++repeat) {

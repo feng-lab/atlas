@@ -841,6 +841,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_outport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
 
   m_layerTarget.resize(currentOutport.size());
+  m_blockIDsRenderTarget.resize(currentOutport.size());
   m_imageRenderTarget1.resize(currentOutport.size());
   m_imageRenderTarget2.resize(currentOutport.size());
 

@@ -3,6 +3,7 @@
 #include "zioutils.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
+#include <boost/endian/conversion.hpp>
 #include <bit>
 
 namespace nim {
@@ -39,21 +40,35 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 
   char endian;
   readStream(inputFileStream, &endian, 1);
+  LOG(INFO) << endian;
 
   uint16_t dataType;
   readStream(inputFileStream, &dataType, 2);
+  if (endian == 'B' || endian == 'b') {
+    boost::endian::endian_reverse_inplace(dataType);
+  }
 
   uint16_t sz_buffer[8];
   uint32_t sz[4];
   readStream(inputFileStream, sz_buffer, 8);
 
   for (auto i = 0; i < 4; ++i) {
-    sz[i] = sz_buffer[i];
+    if (endian == 'B' || endian == 'b') {
+      sz[i] = boost::endian::endian_reverse(sz_buffer[i]);
+    } else {
+      sz[i] = sz_buffer[i];
+    }
   }
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
     readStream(inputFileStream, sz_buffer + 4, 8);
     std::memcpy(sz, sz_buffer, 16);
+    if (endian == 'B' || endian == 'b') {
+      boost::endian::endian_reverse_inplace(sz[0]);
+      boost::endian::endian_reverse_inplace(sz[1]);
+      boost::endian::endian_reverse_inplace(sz[2]);
+      boost::endian::endian_reverse_inplace(sz[3]);
+    }
   }
 
   infos.resize(1);
@@ -69,6 +84,7 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
     infos[0].voxelFormat = VoxelFormat::Unsigned;
   infos[0].createDefaultDescriptions();
 
+  LOG(INFO) << infos[0].toQString();
   createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
@@ -122,22 +138,36 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
 
   char endian;
   readStream(inputFileStream, &endian, 1);
+  LOG(INFO) << endian;
 
   uint16_t dataType;
   readStream(inputFileStream, &dataType, 2);
+  if (endian == 'B' || endian == 'b') {
+    boost::endian::endian_reverse_inplace(dataType);
+  }
 
   uint16_t sz_buffer[8];
   uint32_t sz[4];
   readStream(inputFileStream, sz_buffer, 8);
 
   for (auto i = 0; i < 4; ++i) {
-    sz[i] = sz_buffer[i];
+    if (endian == 'B' || endian == 'b') {
+      sz[i] = boost::endian::endian_reverse(sz_buffer[i]);
+    } else {
+      sz[i] = sz_buffer[i];
+    }
   }
   size_t dataOffset = 35;
 
   if ((sz[0] == 0) || (sz[1] == 0) || (sz[2] == 0) || (sz[3] == 0)) {
     readStream(inputFileStream, sz_buffer + 4, 8);
     std::memcpy(sz, sz_buffer, 16);
+    if (endian == 'B' || endian == 'b') {
+      boost::endian::endian_reverse_inplace(sz[0]);
+      boost::endian::endian_reverse_inplace(sz[1]);
+      boost::endian::endian_reverse_inplace(sz[2]);
+      boost::endian::endian_reverse_inplace(sz[3]);
+    }
     dataOffset += 8;
   }
 
