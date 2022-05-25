@@ -181,6 +181,8 @@ public:
 
   void hideAnimation3DView();
 
+  void deselectAllObjs();
+
   void removeAllObjs();
 
   void showSelectedObjs();

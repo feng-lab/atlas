@@ -343,6 +343,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
     --height;
   }
   m_doc.hideAnimation3DView();
+  m_doc.deselectAllObjs();
   int numFrame = std::ceil(m_duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
@@ -453,6 +454,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
     }
   }
   m_doc.hideAnimation3DView();
+  m_doc.deselectAllObjs();
   Z3DCanvas& canvas = static_cast<Z3DView*>(m_view)->canvas();
   int h = canvas.height();
   if (h % 2 == 1) {

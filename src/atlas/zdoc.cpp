@@ -493,6 +493,13 @@ void ZDoc::hideAnimation3DView()
   }
 }
 
+void ZDoc::deselectAllObjs()
+{
+  for (auto id : selectedObjs()) {
+    setObjSelected(id, false);
+  }
+}
+
 void ZDoc::removeAllObjs()
 {
   auto action = qobject_cast<QAction*>(sender());
