@@ -1009,15 +1009,15 @@ void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
 
 void Z3DImgFilter::updateBlockIDTarget()
 {
-  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
-    glm::uvec2 size = m_layerTarget.size();
-//    uint32_t sizeScale =
-//      std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 10;
-    uint32_t sizeScale = 1;
-    size.x = (size.x + sizeScale - 1) / sizeScale;
-    size.y = (size.y + sizeScale - 1) / sizeScale;
-    m_blockIDsRenderTarget.resize(size);
-  }
+//  if (m_3dImg && m_3dImg->isVolumeDownsampled()) {
+//    glm::uvec2 size = m_layerTarget.size();
+////    uint32_t sizeScale =
+////      std::min(std::min(Z3DImg::imageBlockSize().x, Z3DImg::imageBlockSize().y), Z3DImg::imageBlockSize().z) / 10;
+//    uint32_t sizeScale = 1;
+//    size.x = (size.x + sizeScale - 1) / sizeScale;
+//    size.y = (size.y + sizeScale - 1) / sizeScale;
+//    m_blockIDsRenderTarget.resize(size);
+//  }
 }
 
 //void Z3DImgFilter::invalidateAllFRVolumeSlices()

@@ -619,16 +619,19 @@ public:
   void setRangeKeepIfMinMax(typename T::value_type min, typename T::value_type max)
   {
     if (min <= max && (min != m_min || max != m_max)) {
-      bool keepLowerToMin = m_min == lowerValue();
-      bool keepUpperToMax = m_max == upperValue();
+      // LOG(INFO) << min << " " << max;
+      // LOG(INFO) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
+      auto oldLowerValue = lowerValue();
+      auto oldUpperValue = upperValue();
+      bool keepLowerToMin = m_min == oldLowerValue;
+      bool keepUpperToMax = m_max == oldUpperValue;
       m_min = min;
       m_max = max;
       changeRange();
-      typename T::value_type newLower = keepLowerToMin ? m_min : std::max(m_min, lowerValue());
-      typename T::value_type newUpper = keepUpperToMax ? m_max : std::min(m_max, upperValue());
-      if (keepLowerToMin || keepUpperToMax) {
-        this->set(T(newLower, newUpper));
-      }
+      typename T::value_type newLower = keepLowerToMin ? m_min : std::max(m_min, oldLowerValue);
+      typename T::value_type newUpper = keepUpperToMax ? m_max : std::min(m_max, oldUpperValue);
+      this->set(T(newLower, newUpper));
+      // LOG(INFO) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
     }
   }
 
