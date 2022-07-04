@@ -234,14 +234,14 @@ def build_atlas_installer():
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
-        elif common_dirs.is_linux():
-            subprocess.run(['scp', installer_zip_name,
-                            'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/installers/"'],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-            subprocess.run(['rsync', '-av', '--delete', suffix,
-                            'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-            shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
+        # elif common_dirs.is_linux():
+        #     subprocess.run(['scp', installer_zip_name,
+        #                     'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/installers/"'],
+        #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        #     subprocess.run(['rsync', '-av', '--delete', suffix,
+        #                     'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
+        #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        #     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
         else:
             out_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static')
             if not os.path.exists(out_folder):

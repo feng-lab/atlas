@@ -1214,15 +1214,16 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         bak_file2 = patch_file(orig_file2,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
                                to_texts=[r'if (FALSE)'])
-        orig_file3 = os.path.join(src_dir, 'cmake', 'FindCXSparse.cmake')
-        bak_file3 = patch_file(orig_file3,
-                               from_texts=[r'if (HOMEBREW_EXECUTABLE)'],
-                               to_texts=[r'if (FALSE)'])
         # we build ceres as static lib, so no point to hard link lapack now as we might link to mkl later
         orig_file4 = os.path.join(src_dir, 'internal', 'ceres', 'CMakeLists.txt')
         bak_file4 = patch_file(orig_file4,
-                               from_texts=[r' ${LAPACK_LIBRARIES}'],
-                               to_texts=[r' '])
+                               from_texts=[r' ${LAPACK_LIBRARIES}',
+                                           r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
+                                           ],
+                               to_texts=[r' ',
+                                         'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
+                                         'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
+                                         ])
         orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
         bak_file5 = patch_file(orig_file5,
                                from_texts=[r'EIGEN3_FOUND'],
@@ -1234,6 +1235,8 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
                          '-DSUITESPARSE:BOOL=ON',
+                         '-DACCELERATESPARSE:BOOL=OFF',
+                         '-DEIGENMETIS:BOOL=OFF',
                          '-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_BENCHMARKS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1249,7 +1252,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
         os.replace(bak_file2, orig_file2)
-        os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
         os.replace(bak_file5, orig_file5)
         cleanup_git_submodule(src_dir)
@@ -1691,7 +1693,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKTBB.cmake')
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.2', 'Modules', 'ITKTBB.cmake')
         patch_file(orig_file_2,
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',

@@ -316,6 +316,7 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     qt_qml_dir = qt_base_dir + os.sep + 'qml'
     qt_bin_dir = qt_base_dir + os.sep + 'bin'
     qt_plugin_dir = qt_base_dir + os.sep + 'plugins'
+    qt_lib_dir = qt_base_dir + os.sep + 'lib'
 
     # temporary directory to work in
     tmp_dir = os.path.join(tempfile.gettempdir(), "linuxdeployqt.py.tmp")
@@ -328,6 +329,7 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     info('Qt QML directory: ' + qt_qml_dir)
     info('Qt bin directory: ' + qt_bin_dir)
     info('Qt plugin directory: ' + qt_plugin_dir)
+    info('Qt lib directory: ' + qt_lib_dir)
 
     dependencies = {}
 
