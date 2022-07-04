@@ -651,7 +651,15 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
+    orig_file = bak_file = None  # tmp fix until grpc update protobuf
     try:
+        orig_file = os.path.join(sub_src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>)',
+                                          ],
+                              to_texts=[r'set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)',
+                                        ])
+
         cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
         cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
                          '-Dprotobuf_WITH_ZLIB:BOOL=ON',
@@ -670,6 +678,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                    to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+
 
     sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
     sub_install_dir = ext_build_dir()
@@ -689,6 +699,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
                          '-DgRPC_BUILD_TESTS:BOOL=OFF',
+                         '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF',
                          '-DgRPC_ZLIB_PROVIDER:STRING=package',
                          '-DgRPC_PROTOBUF_PROVIDER=package',
                          '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
