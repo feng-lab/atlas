@@ -1258,6 +1258,15 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         env = get_vcvars_environment() if is_windows() else os.environ.copy()
         env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl', 'latest')
         build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+
+        # on linux, cmake complains about could not find the fake target SuiteSparse::Partition
+        orig_file3 = os.path.join(install_dir, 'lib', 'cmake', 'Ceres', 'CeresTargets.cmake')
+        patch_file(orig_file3,
+                   from_texts=[r';\$<LINK_ONLY:SuiteSparse::Partition>',
+                               ],
+                   to_texts=[r'',
+                             ]
+                             )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
