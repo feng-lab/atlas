@@ -1264,7 +1264,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         patch_file(orig_file3,
                    from_texts=[r';\$<LINK_ONLY:SuiteSparse::Partition>',
                                ],
-                   to_texts=[r'',
+                   to_texts=[r';\$<LINK_ONLY:METIS::METIS>',
                              ]
                              )
     finally:

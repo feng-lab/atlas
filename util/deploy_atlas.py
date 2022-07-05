@@ -234,7 +234,8 @@ def build_atlas_installer():
             if os.path.exists(os.path.join(target_folder, suffix)):
                 shutil.rmtree(os.path.join(target_folder, suffix), ignore_errors=False)
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
-        # elif common_dirs.is_linux():
+        elif common_dirs.is_linux():
+            print()
         #     subprocess.run(['scp', installer_zip_name,
         #                     'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/installers/"'],
         #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
