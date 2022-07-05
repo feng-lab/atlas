@@ -309,4 +309,6 @@ print_target_properties(VTK::FiltersGeometry)
 print_target_properties(VTK::FiltersSources)
 print_target_properties(VTK::IOXML)
 
-
+find_package(Ceres REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(Ceres::ceres)
