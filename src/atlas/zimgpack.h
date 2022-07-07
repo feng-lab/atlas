@@ -150,7 +150,7 @@ public:
 
   // ZImgSliceProvider interface
 public:
-  const ZImgInfo& imgInfo() const override
+  ZImgInfo imgInfo() const override
   { return m_imgInfo; }
 
   ZImg slice(size_t z, size_t t) const override;

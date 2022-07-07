@@ -9,7 +9,9 @@ namespace nim {
 class ZImgBlockProvider
 {
 public:
-  virtual const ZImgInfo& imgInfo() const = 0;
+  virtual ~ZImgBlockProvider() = default;
+
+  virtual ZImgInfo imgInfo() const = 0;
 
   // must have 1
   virtual size_t numBlocks() const = 0;
@@ -18,7 +20,8 @@ public:
 
   virtual ZVoxelCoordinate blockCoord(size_t blockIdx) const = 0;
 
-  virtual ZImg wholeImg() const = 0;
+  // default implementation assumes that blocks do not overlap
+  virtual ZImg wholeImg() const;
 };
 
 } // namespace nim

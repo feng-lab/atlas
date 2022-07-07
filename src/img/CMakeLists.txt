@@ -251,7 +251,7 @@ set(IMG_SOURCES
     zmesh.h zmesh.cpp
     zmeshio.h zmeshio.cpp
     zmeshutils.h zmeshutils.cpp
-    zimginterpolate.h zimginterpolate.cpp)
+    zimginterpolate.h zimginterpolate.cpp zimgblockprovider.cpp)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 

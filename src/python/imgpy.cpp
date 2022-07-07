@@ -5,6 +5,8 @@
 #include "zglobalinit.h"
 #include "zstitchimage.h"
 #include "zimgnccmatch.h"
+#include "zimgblockprovider.h"
+#include "zimgsliceprovider.h"
 #include "zimgmerge.h"
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
@@ -158,9 +160,9 @@ public:
   using ZImgSubBlockBase::ZImgSubBlockBase; // Inherit constructors
   std::shared_ptr<ZImg> read() const override
   {
-    PYBIND11_OVERLOAD_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, );
+    PYBIND11_OVERRIDE_PURE(std::shared_ptr<ZImg>, ZImgSubBlockBase, read, );
   }
-  ZImgInfo readInfo() const override { PYBIND11_OVERLOAD_PURE(ZImgInfo, ZImgSubBlockBase, readInfo, ); }
+  ZImgInfo readInfo() const override { PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgSubBlockBase, readInfo, ); }
 };
 template<class ZImgTileSubBlockBase = ZImgTileSubBlock>
 class PyZImgTileSubBlock : public PyZImgSubBlock<ZImgTileSubBlockBase>
@@ -169,9 +171,66 @@ public:
   using PyZImgSubBlock<ZImgTileSubBlockBase>::PyZImgSubBlock; // Inherit constructors (via PyA_Tpl's inherited constructors)
   std::shared_ptr<ZImg> read() const override
   {
-    PYBIND11_OVERLOAD(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, );
+    PYBIND11_OVERRIDE(std::shared_ptr<ZImg>, ZImgTileSubBlockBase, read, );
   }
-  ZImgInfo readInfo() const override { PYBIND11_OVERLOAD(ZImgInfo, ZImgTileSubBlockBase, readInfo, ); }
+  ZImgInfo readInfo() const override { PYBIND11_OVERRIDE(ZImgInfo, ZImgTileSubBlockBase, readInfo, ); }
+};
+
+class PyZImgSliceProvider : public ZImgSliceProvider {
+public:
+  /* Inherit the constructors */
+  using ZImgSliceProvider::ZImgSliceProvider;
+
+  ZImgInfo imgInfo() const override
+  {
+    PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgSliceProvider, imgInfo, );
+  }
+
+  ZImg slice(size_t z, size_t t) const override
+  {
+    PYBIND11_OVERRIDE_PURE(ZImg, ZImgSliceProvider, slice, z, t);
+  }
+
+  ZImg allSlices(size_t t) const override
+  {
+    PYBIND11_OVERRIDE(ZImg, ZImgSliceProvider, allSlices, t);
+  }
+
+  ZImg wholeImg() const override
+  {
+    PYBIND11_OVERRIDE(ZImg, ZImgSliceProvider, wholeImg, );
+  }
+};
+
+class PyZImgBlockProvider : public ZImgBlockProvider {
+public:
+  /* Inherit the constructors */
+  using ZImgBlockProvider::ZImgBlockProvider;
+
+  ZImgInfo imgInfo() const override
+  {
+    PYBIND11_OVERRIDE_PURE(ZImgInfo, ZImgBlockProvider, imgInfo, );
+  }
+
+  size_t numBlocks() const override
+  {
+    PYBIND11_OVERRIDE_PURE(size_t, ZImgBlockProvider, numBlocks, );
+  }
+
+  ZImg block(size_t blockIdx) const override
+  {
+    PYBIND11_OVERRIDE_PURE(ZImg, ZImgBlockProvider, block, blockIdx);
+  }
+
+  ZVoxelCoordinate blockCoord(size_t blockIdx) const override
+  {
+    PYBIND11_OVERRIDE_PURE(ZVoxelCoordinate, ZImgBlockProvider, blockCoord, blockIdx);
+  }
+
+  ZImg wholeImg() const override
+  {
+    PYBIND11_OVERRIDE(ZImg, ZImgBlockProvider, wholeImg, );
+  }
 };
 
 template<size_t L, typename T>
@@ -910,6 +969,27 @@ PYBIND11_MODULE(_imgpy, m)
          "downsampleCombineMode"_a = ImgMergeMode::Interpolation)
     .def("__repr__", [](const ZImgTileSubBlock&) {
       return fmt::format("<_imgpy.ZImgTileSubBlock>");
+    });
+
+  py::class_<ZImgSliceProvider, PyZImgSliceProvider>(m, "ZImgSliceProvider")
+    .def(py::init<>())
+    .def("imgInfo", &ZImgSliceProvider::imgInfo)
+    .def("slice", &ZImgSliceProvider::slice, "z"_a, "t"_a)
+    .def("allSlices", &ZImgSliceProvider::allSlices, "t"_a)
+    .def("wholeImg", &ZImgSliceProvider::wholeImg)
+    .def("__repr__", [](const ZImgSliceProvider&) {
+      return fmt::format("<_imgpy.ZImgSliceProvider>");
+    });
+
+  py::class_<ZImgBlockProvider, PyZImgBlockProvider>(m, "ZImgBlockProvider")
+    .def(py::init<>())
+    .def("imgInfo", &ZImgBlockProvider::imgInfo)
+    .def("numBlocks", &ZImgBlockProvider::numBlocks)
+    .def("block", &ZImgBlockProvider::block, "blockIdx"_a)
+    .def("blockCoord", &ZImgBlockProvider::blockCoord, "blockIdx"_a)
+    .def("wholeImg", &ZImgBlockProvider::wholeImg)
+    .def("__repr__", [](const ZImgBlockProvider&) {
+      return fmt::format("<_imgpy.ZImgBlockProvider>");
     });
 
   py::class_<ZImgMerge>(m, "ZImgMerge")

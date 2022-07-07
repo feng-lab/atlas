@@ -38,7 +38,7 @@ public:
   void setMergeMode(ImgMergeMode mode = ImgMergeMode::Max)
   { m_mergeMode = mode; }
 
-  [[nodiscard]] const ZImgInfo& imgInfo() const override
+  [[nodiscard]] ZImgInfo imgInfo() const override
   { return m_imgInfo; }
 
 //  ZImg slice(size_t z, size_t t, size_t ratio) const override;

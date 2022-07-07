@@ -970,7 +970,9 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImgSliceProvider& imgSli
             writeImgSliceToH5Grp(zGrp, fmt::format("DownsampledBy{}Data", level), tmpImg, paras);
           }
         }
+        LOG(INFO) << "Finish slice " << z << "/" << imgSliceProvider.imgInfo().depth;
       }
+      LOG(INFO) << "Finish time " << t << "/" << imgSliceProvider.imgInfo().numTimes;
     }
   }
   catch (H5::Exception const& e) {

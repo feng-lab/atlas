@@ -86,7 +86,7 @@ public:
   ZQImagePack toQImagePack(size_t tileWidth = 4096, size_t tileHeight = 4096) const;
 
 private:
-  inline const ZImgInfo& imgInfo() const
+  inline ZImgInfo imgInfo() const
   { return m_imgPack.imgInfo(); }
 
   template<typename TVoxel>
