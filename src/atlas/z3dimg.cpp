@@ -320,8 +320,8 @@ void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_
   shader.bindTexture("image_cache", m_imageCacheTextures[c].get());
 }
 
-bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
-                                                const std::set<uint32_t>& usedBlockIDs,
+bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
+                                                const std::vector<uint32_t>& usedBlockIDs,
                                                 bool silenceExistingWarning)
 {
   auto numBlocksToRead = int(m_imageCacheManager->size()) - int(usedBlockIDs.size());
@@ -366,7 +366,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
   }
 
   auto count = 0;
-  level = 0;
+  // level = 0;
   glm::uvec4 erasedKey;
   auto numAvailablePageCacheBlock = index_t(m_pageTableCacheManager->size()) - index_t(usedPageTableKeys.size());
   CHECK(numAvailablePageCacheBlock >= 0);
@@ -375,6 +375,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missin
       break;
     }
 
+    level = 0;
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }

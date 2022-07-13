@@ -157,8 +157,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
     m_image3DSliceWithColorMapBlockIDsShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
 
     // render block ids
-    std::set<uint32_t> missingBlockIDs;
-    std::set<uint32_t> usedBlockIDs;
+    std::vector<uint32_t> missingBlockIDs;
+    std::vector<uint32_t> usedBlockIDs;
     tbb::concurrent_unordered_set<uint32_t> ccSet;
 
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0
@@ -185,7 +185,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         }
       );
 
-      missingBlockIDs.insert(ccSet.begin(), ccSet.end());
+      ccSet.unsafe_erase(0_u32);
+      missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
       ccSet.clear();
 
 //      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER,
@@ -197,12 +198,10 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 //          ccSet.insert(range.begin(), range.end()); // inserts a sequence
 //        }
 //      );
-//
+//      ccSet.unsafe_erase(0_u32);
 //      usedBlockIDs.insert(ccSet.begin(), ccSet.end());
 //      ccSet.clear();
     }
-    missingBlockIDs.erase(0_u32);
-    // usedBlockIDs.erase(0_u32);
 
     m_image3DSliceWithColorMapBlockIDsShader.release();
     //glFinish();

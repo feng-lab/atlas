@@ -101,14 +101,17 @@ public:
   [[nodiscard]] size_t numLevels() const
   { return m_numLevels; }
 
+  [[nodiscard]] size_t numCachedImages() const
+  { return m_imageCacheManager->size(); }
+
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader) const;
 
   void bindFullResRenderShader(Z3DShaderProgram& shader) const;
 
   void bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
 
-  bool updateAndUploadPageDirectoryCaches(const std::set<uint32_t>& missingBlockIDs,
-                                          const std::set<uint32_t>& usedBlockIDs,
+  bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
+                                          const std::vector<uint32_t>& usedBlockIDs,
                                           bool silenceExistingWarning = true);
 
   void uploadImageCache(size_t channel);
