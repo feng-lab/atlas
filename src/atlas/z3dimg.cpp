@@ -29,7 +29,14 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
 
     glm::uvec3 imageCacheSize;
     // m_imageBlockReadSize = glm::ivec3(510, 510, 30);
-    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
+    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20480) {
+#ifdef Q_OS_MACOS
+      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
+#else
+      imageCacheSize = glm::uvec3(4096, 2048, 2048); // 16G
+#endif
+      m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
 #else
