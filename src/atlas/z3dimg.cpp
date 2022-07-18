@@ -539,6 +539,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                       }
                     }
   );
+  LOG(INFO) << "finish reading " << imgs.size() << " image blocks.";
   bt.pause();
   for (size_t i = 0; i < imgs.size(); ++i) {
     m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
