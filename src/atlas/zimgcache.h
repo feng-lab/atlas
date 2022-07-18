@@ -105,8 +105,7 @@ public:
 
   inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
   {
-    ZSharedCache<ZImgPack::HashKeyType, ZImg>::insert(key, std::move(object),
-                                                      std::max<size_t>(1, object->byteNumber() / 1024 / 1024));
+    ZSharedCache<ZImgPack::HashKeyType, ZImg>::insert(key, std::move(object), object->byteNumber());
   }
 
   // never return nullptr, throw ZException on error

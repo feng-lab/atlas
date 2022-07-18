@@ -11,7 +11,7 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache()
-  : ZSharedCache<ZImgPack::HashKeyType, ZImg>(ZCpuInfo::instance().nPhysicalRAM / 2 / 1024 / 1024)
+  : ZSharedCache<ZImgPack::HashKeyType, ZImg>(ZCpuInfo::instance().nPhysicalRAM / 2)
 {
 }
 

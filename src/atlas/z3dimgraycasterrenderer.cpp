@@ -723,7 +723,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           ccSet.unsafe_erase(0_u32);
           missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
-          if (repeat % 2 == 1 && hasEnoughMissingIDs) {
+          if ((repeat % 2 == 1) && hasEnoughMissingIDs) {
             std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
           } else {
             std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
