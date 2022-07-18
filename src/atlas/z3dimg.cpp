@@ -373,6 +373,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   }
 
   auto count = 0;
+  auto alreadyMapped = 0;
   // level = 0;
   glm::uvec4 erasedKey;
   auto numAvailablePageCacheBlock = index_t(m_pageTableCacheManager->size()) - index_t(usedPageTableKeys.size());
@@ -410,6 +411,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         if (silenceExistingWarning) {
           m_imageCacheManager->touch(pageTableEntryKey);
           m_pageTableCacheManager->touch(pageDirectoryEntryKey);
+          ++alreadyMapped;
           ++count;
         } else {
           LOG(ERROR) << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
@@ -499,7 +501,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
     ++count;
   }
-  LOG(INFO) << "filled " << count << " blocks";
+  LOG(INFO) << "filled " << count << " blocks (" << alreadyMapped << " already mapped)";
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
   //glFinish();
@@ -520,6 +522,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   bt.start();
 
   std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());
+  LOG(INFO) << "reading " << imgs.size() << " image blocks...";
   tbb::parallel_for(tbb::blocked_range<size_t>(0, imgs.size()),
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (auto i = r.begin(); i != r.end(); ++i) {
