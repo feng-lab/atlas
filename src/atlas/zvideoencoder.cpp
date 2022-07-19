@@ -35,7 +35,7 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
             << (QString("%1/%2% 0%3d.png").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
-            << "-c:v" << "libx264" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
+            << "-c:v" << "libx265" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
             << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
   LOG(INFO) << program << " " << arguments.join(" ");
   m_ffmpegProcess->start(program, arguments);

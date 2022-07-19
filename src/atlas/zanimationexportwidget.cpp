@@ -19,7 +19,7 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_captureStereoImage("Stereo", false)
   , m_stereoImageType("Stereo Type")
   , m_useWindowSize("Use Window Size", false)
-  , m_customSize("Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
+  , m_customSize("Custom Image Size", glm::ivec2(3840, 2160), glm::ivec2(128, 128),
                  glm::ivec2(Z3DGpuInfo::instance().maxTextureSize()))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
   , m_is2DAnimation(is2DAni)
