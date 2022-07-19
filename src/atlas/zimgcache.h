@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zimgpack.h"
+#include "zthreadsafescalablecache.h"
 #include <QReadWriteLock>
 #include <boost/functional/hash.hpp>
 #include <list>
@@ -16,8 +17,8 @@ public:
   using KeyValueType = typename std::tuple<KeyType, ValueType, size_t>;
   using ListIteratorType = typename std::list<KeyValueType>::iterator;
 
-  explicit ZSharedCache(size_t maxCost)
-    : m_maxCost(maxCost)
+  explicit ZSharedCache(size_t maxSize)
+    : m_maxSize(maxSize)
   {}
 
   ZSharedCache(ZSharedCache&&) = delete;
@@ -31,32 +32,32 @@ public:
   // thread-safe functions:
 
   // do nothing if object is too big
-  void insert(const KeyType& key, ValueType&& object, size_t cost = 1)
+  void insert(const KeyType& key, ValueType&& object, size_t size = 1)
   {
     QWriteLocker lock(&m_lock);
     // same as remove(key)
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
       auto listIt = it->second;
-      m_totalCost -= std::get<2>(*listIt);
+      m_totalSize -= std::get<2>(*listIt);
       m_cacheItemsList.erase(listIt);
       m_cacheItemsMap.erase(it);
     }
 
-    if (cost > m_maxCost)
+    if (size > m_maxSize)
       return;
-    size_t keepCost = m_maxCost - cost;
+    size_t keepSize = m_maxSize - size;
 
-    while (m_totalCost > keepCost) {
+    while (m_totalSize > keepSize) {
       const auto& back = m_cacheItemsList.back();
       m_cacheItemsMap.erase(std::get<0>(back));
-      m_totalCost -= std::get<2>(back);
+      m_totalSize -= std::get<2>(back);
       m_cacheItemsList.pop_back();
     }
 
-    m_cacheItemsList.emplace_front(key, std::move(object), cost);
+    m_cacheItemsList.emplace_front(key, std::move(object), size);
     m_cacheItemsMap[key] = m_cacheItemsList.begin();
-    m_totalCost += cost;
+    m_totalSize += size;
   }
 
   void remove(const KeyType& key)
@@ -65,7 +66,7 @@ public:
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
       auto listIt = it->second;
-      m_totalCost -= std::get<2>(*listIt);
+      m_totalSize -= std::get<2>(*listIt);
       m_cacheItemsList.erase(listIt);
       m_cacheItemsMap.erase(it);
     }
@@ -91,11 +92,23 @@ private:
   // first item is latest item
   std::list<KeyValueType> m_cacheItemsList;
   std::unordered_map<KeyType, ListIteratorType, boost::hash<KeyType>> m_cacheItemsMap;
-  size_t m_maxCost;
-  size_t m_totalCost = 0;
+  size_t m_maxSize;
+  size_t m_totalSize = 0;
   mutable QReadWriteLock m_lock;
 };
 
+template<typename K>
+struct ZHashCompare
+{
+  static size_t hash( const K& key )
+  {
+    boost::hash<K> hasher;
+    return hasher(key);
+  }
+  static bool equal( const K& key1, const K& key2 ) {return key1 == key2;}
+};
+
+#if 0
 class ZImgCache : public ZSharedCache<ZImgPack::HashKeyType, ZImg>
 {
 public:
@@ -119,6 +132,46 @@ public:
     return res;
   }
 };
+#else
+
+using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ZImgPack::HashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ZImgPack::HashKeyType>>;
+
+class ZImgCache : public ZThreadSafeScalableImageCache
+{
+public:
+  static ZImgCache& instance();
+
+  ZImgCache();
+
+  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
+  {
+    ZThreadSafeScalableImageCache::insert(key, std::move(object), object->byteNumber());
+  }
+
+  // never return nullptr, throw ZException on error
+  inline std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock)
+  {
+    ZThreadSafeScalableImageCache::ConstAccessor ca;
+    if (find(ca, key)) {
+      return *ca;
+    } else {
+      std::shared_ptr<ZImg> res = imgBlock.read();
+      insert(key, std::shared_ptr<ZImg>(res));
+      return res;
+    }
+  }
+
+  inline std::shared_ptr<ZImg> get(const ZImgPack::HashKeyType& key)
+  {
+    ZThreadSafeScalableImageCache::ConstAccessor ca;
+    if (find(ca, key)) {
+      return *ca;
+    } else {
+      return std::shared_ptr<ZImg>();
+    }
+  }
+};
+#endif
 
 }  // namespace nim
 

@@ -155,6 +155,15 @@ else (WIN32)
 endif (WIN32)
 source_group(sys FILES ${SYS_SOURCES})
 
+set(LRUDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/thread-safe-lru)
+set(LRU_HEADERS
+    ${LRUDIR}/hash.h
+    ${LRUDIR}/lru-cache.h
+    ${LRUDIR}/scalable-cache.h
+    ${LRUDIR}/string-key.h
+    )
+source_group(lru FILES ${LRU_HEADERS})
+
 # main srcs
 
 if (WIN32)
@@ -597,7 +606,7 @@ set(SOURCES
     zroipack.cpp
     zroipack.h
     zregionannotationpack.cpp
-    zregionannotationpack.h zswccolorparameters.cpp zswccolorparameters.h)
+    zregionannotationpack.h zswccolorparameters.cpp zswccolorparameters.h zthreadsafelrucache.h zthreadsafescalablecache.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -611,7 +620,7 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(${APP_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
+target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include ${LRUDIR})
 target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
