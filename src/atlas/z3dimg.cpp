@@ -542,7 +542,8 @@ void Z3DImg::uploadImageCache(size_t channel)
                           m_imageBlockSize.x + m_imageBlockSizePad.x,
                           m_imageBlockSize.y + m_imageBlockSizePad.y,
                           m_imageBlockSize.z + m_imageBlockSizePad.z,
-                          0);
+                          0,
+                          true);
                         ccKeySet.insert(keys.begin(), keys.end());
                       }
                     }

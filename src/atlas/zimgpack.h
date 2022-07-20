@@ -148,7 +148,8 @@ public:
                                                            index_t width,
                                                            index_t height,
                                                            index_t depth,
-                                                           size_t t) const;
+                                                           size_t t,
+                                                           bool onlyCollectNotInCacheKeys = false) const;
 
   void preLoadImageCaches(const HashKeyType& keys) const;
 

@@ -558,7 +558,8 @@ std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
                                                                              index_t width,
                                                                              index_t height,
                                                                              index_t depth,
-                                                                             size_t t) const
+                                                                             size_t t,
+                                                                             bool onlyCollectNotInCacheKeys) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
@@ -575,8 +576,17 @@ std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
   if (tiit != m_rtToTileBoxRTree.end()) {
     std::vector<RTreeValueType> queryResult;
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-    for (auto & i : queryResult) {
-      res.insert(HashKeyType(this, i.second));
+    if (onlyCollectNotInCacheKeys) {
+      for (auto& i : queryResult) {
+        HashKeyType key(this, i.second);
+        if (!ZImgCache::instance().get(key)) {
+          res.insert(key);
+        }
+      }
+    } else {
+      for (auto& i : queryResult) {
+        res.insert(HashKeyType(this, i.second));
+      }
     }
   }
   return res;
@@ -585,8 +595,7 @@ std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
 void ZImgPack::preLoadImageCaches(const HashKeyType& key) const
 {
   auto index = std::get<1>(key);
-  const ZImgSubBlock& tile = *m_allTiles[index].get();
-  ZImgCache::instance().getOrRead(HashKeyType(this, index), tile);
+  ZImgCache::instance().insert(HashKeyType(this, index), m_allTiles[index]->read());
 }
 
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const
