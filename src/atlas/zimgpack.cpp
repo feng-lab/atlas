@@ -87,13 +87,6 @@ ZImgPack::ZImgPack(ZImgSource imgSource,
   updateDerivedData();
 }
 
-ZImgPack::~ZImgPack()
-{
-  for (size_t i = 0; i < m_allTiles.size(); ++i) {
-    ZImgCache::instance().remove(HashKeyType(this, i));
-  }
-}
-
 const QString& ZImgPack::sizeInfo() const
 {
   if (m_sizeInfo.isEmpty()) {
@@ -488,9 +481,11 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 }
 
 void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                               ZImg& res) const
+                               ZImg& res, bool assumeInCache) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
+  //ZBenchTimer bt_read(fmt::format("reading and assembling image block"));
+  //bt_read.start();
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
 
   TileBoxType queryBox(TileCornerType(sx * xyRatio,
@@ -515,8 +510,13 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
                              std::round((tile.z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                              -ZVoxelCoordinate::value_type(sc),
                              0);
-      std::shared_ptr<ZImg> imgPtr =
-        ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile);
+      std::shared_ptr<ZImg> imgPtr;
+      if (assumeInCache) {
+        imgPtr = ZImgCache::instance().get(HashKeyType(this, i.second));
+        CHECK(imgPtr);
+      } else {
+        imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile);
+      }
       if (imgPtr->isSameType(tmpRes)) {
         if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
           ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
@@ -530,10 +530,63 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
       }
     }
   }
+  //bt_read.pause();
   if (tmpRes.width() != res.width() || tmpRes.height() != res.height() || tmpRes.depth() != res.depth()) {
     tmpRes.resize(res.width(), res.height(), res.depth());
   }
+  //bt_read.resume();
+
   res.swap(tmpRes);
+  //STOP_AND_LOG(bt_read)
+}
+
+void ZImgPack::stopCacheEviction() const
+{
+  ZImgCache::instance().stopCacheEviction();
+}
+
+void ZImgPack::resumeCacheEviction() const
+{
+  ZImgCache::instance().resumeCacheEviction();
+}
+
+std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(index_t xyRatio,
+                                                                             index_t zRatio,
+                                                                             index_t sx,
+                                                                             index_t sy,
+                                                                             index_t sz,
+                                                                             index_t width,
+                                                                             index_t height,
+                                                                             index_t depth,
+                                                                             size_t t) const
+{
+  CHECK(xyRatio >= 1 && zRatio >= 1);
+  auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+
+  std::set<ZImgPack::HashKeyType> res;
+
+  TileBoxType queryBox(TileCornerType(sx * xyRatio,
+                                      sy * xyRatio,
+                                      sz * zRatio),
+                       TileCornerType((sx + width) * xyRatio - 1,
+                                      (sy + height) * xyRatio - 1,
+                                      (sz + depth) * zRatio - 1));
+  auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+  if (tiit != m_rtToTileBoxRTree.end()) {
+    std::vector<RTreeValueType> queryResult;
+    tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
+    for (auto & i : queryResult) {
+      res.insert(HashKeyType(this, i.second));
+    }
+  }
+  return res;
+}
+
+void ZImgPack::preLoadImageCaches(const HashKeyType& key) const
+{
+  auto index = std::get<1>(key);
+  const ZImgSubBlock& tile = *m_allTiles[index].get();
+  ZImgCache::instance().getOrRead(HashKeyType(this, index), tile);
 }
 
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const

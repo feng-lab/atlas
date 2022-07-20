@@ -7,6 +7,8 @@
 #include <list>
 #include <unordered_map>
 
+#define USE_ZSharedCache
+
 namespace nim {
 
 template<typename KeyType, typename SharedValueType>
@@ -48,7 +50,7 @@ public:
       return;
     size_t keepSize = m_maxSize - size;
 
-    while (m_totalSize > keepSize) {
+    while (m_doCacheEviction && m_totalSize > keepSize) {
       const auto& back = m_cacheItemsList.back();
       m_cacheItemsMap.erase(std::get<0>(back));
       m_totalSize -= std::get<2>(back);
@@ -85,6 +87,16 @@ public:
     }
   }
 
+  void stopCacheEviction() const
+  {
+    m_doCacheEviction = false;
+  }
+
+  void resumeCacheEviction() const
+  {
+    m_doCacheEviction = true;
+  }
+
 protected:
   ~ZSharedCache() = default;
 
@@ -95,20 +107,10 @@ private:
   size_t m_maxSize;
   size_t m_totalSize = 0;
   mutable QReadWriteLock m_lock;
+  mutable bool m_doCacheEviction = true;
 };
 
-template<typename K>
-struct ZHashCompare
-{
-  static size_t hash( const K& key )
-  {
-    boost::hash<K> hasher;
-    return hasher(key);
-  }
-  static bool equal( const K& key1, const K& key2 ) {return key1 == key2;}
-};
-
-#if 0
+#ifdef USE_ZSharedCache
 class ZImgCache : public ZSharedCache<ZImgPack::HashKeyType, ZImg>
 {
 public:
@@ -133,6 +135,17 @@ public:
   }
 };
 #else
+
+template<typename K>
+struct ZHashCompare
+{
+  static size_t hash( const K& key )
+  {
+    boost::hash<K> hasher;
+    return hasher(key);
+  }
+  static bool equal( const K& key1, const K& key2 ) {return key1 == key2;}
+};
 
 using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ZImgPack::HashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ZImgPack::HashKeyType>>;
 

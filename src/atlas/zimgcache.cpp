@@ -4,7 +4,7 @@
 
 namespace nim {
 
-#if 0
+#ifdef USE_ZSharedCache
 ZImgCache& ZImgCache::instance()
 {
   static ZImgCache imgCache;

@@ -45,7 +45,7 @@ public:
                     const ZImgInfo* info = nullptr,
                     const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
 
-  virtual ~ZImgPack();
+  virtual ~ZImgPack() = default;
 
   const QString& sizeInfo() const;
 
@@ -134,7 +134,23 @@ public:
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
   void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                       ZImg& res) const;
+                       ZImg& res, bool assumeInCache = false) const;
+
+  void stopCacheEviction() const;
+
+  void resumeCacheEviction() const;
+
+  std::set<HashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
+                                                           index_t zRatio,
+                                                           index_t sx,
+                                                           index_t sy,
+                                                           index_t sz,
+                                                           index_t width,
+                                                           index_t height,
+                                                           index_t depth,
+                                                           size_t t) const;
+
+  void preLoadImageCaches(const HashKeyType& keys) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const

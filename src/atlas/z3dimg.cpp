@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <tbb/parallel_for.h>
+#include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
 #include <memory>
 
@@ -521,8 +522,49 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
   bt.start();
 
+  m_imgPack.stopCacheEviction();
+  LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
+
+  ZBenchTimer bt_cc(fmt::format("collect reading cache keys for image ch{}", channel));
+  bt_cc.start();
+  tbb::concurrent_unordered_set<ZImgPack::HashKeyType, boost::hash<ZImgPack::HashKeyType>> ccKeySet;
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, m_channelPendingUpdates[channel].size()),
+                    [&](const tbb::blocked_range<size_t>& r) {
+                      for (auto i = r.begin(); i != r.end(); ++i) {
+                        const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
+                        auto keys = m_imgPack.collectCacheKeysForReadRegionToImg(
+                          m_levelScales[blockImagePos.x].x,
+                          m_levelScales[blockImagePos.x].z,
+                          index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                          index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                          index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                          m_imageBlockSize.x + m_imageBlockSizePad.x,
+                          m_imageBlockSize.y + m_imageBlockSizePad.y,
+                          m_imageBlockSize.z + m_imageBlockSizePad.z,
+                          0);
+                        ccKeySet.insert(keys.begin(), keys.end());
+                      }
+                    }
+  );
+  STOP_AND_LOG(bt_cc)
+
+  ZBenchTimer bt_preload(fmt::format("preload cache keys for image ch{}", channel));
+  bt_preload.start();
+  std::vector<ZImgPack::HashKeyType> missingCacheKeys;
+  missingCacheKeys.reserve(ccKeySet.size());
+  missingCacheKeys.insert(missingCacheKeys.end(), ccKeySet.begin(), ccKeySet.end());
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, missingCacheKeys.size()),
+                    [&](const tbb::blocked_range<size_t>& r) {
+                      for (auto i = r.begin(); i != r.end(); ++i) {
+                        m_imgPack.preLoadImageCaches(missingCacheKeys[i]);
+                      }
+                    }
+  );
+  STOP_AND_LOG(bt_preload)
+
+  ZBenchTimer bt_read(fmt::format("reading/assembling image blocks for image ch{}", channel));
+  bt_read.start();
   std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());
-  LOG(INFO) << "reading " << imgs.size() << " image blocks...";
   tbb::parallel_for(tbb::blocked_range<size_t>(0, imgs.size()),
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (auto i = r.begin(); i != r.end(); ++i) {
@@ -535,12 +577,16 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i]);
+                                                  channel, 0, imgs[i], true);
                       }
                     }
   );
-  LOG(INFO) << "finish reading " << imgs.size() << " image blocks.";
-  bt.pause();
+  STOP_AND_LOG(bt_read)
+
+  m_imgPack.resumeCacheEviction();
+
+  ZBenchTimer bt_upload(fmt::format("uploading image blocks to GPU for image ch{}", channel));
+  bt_upload.start();
   for (size_t i = 0; i < imgs.size(); ++i) {
     m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
                                                   m_imageBlockSize + m_imageBlockSizePad, imgs[i].channelData(0));
@@ -548,6 +594,8 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   m_channelPendingUpdates[channel].clear();
   //glFinish();
+  STOP_AND_LOG(bt_upload)
+
   STOP_AND_LOG(bt)
 }
 
