@@ -93,19 +93,6 @@ public:
     }
   }
 
-  // might return empty ptr
-  ValueType getAndTouch(const KeyType& key)
-  {
-    QReadLocker lock(&m_lock);
-    auto it = m_cacheItemsMap.find(key);
-    if (it != m_cacheItemsMap.end()) {
-      m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
-      return std::get<1>(*(it->second));
-    } else {
-      return ValueType();
-    }
-  }
-
   void stopCacheEviction()
   {
     m_doCacheEviction = false;
@@ -146,7 +133,7 @@ public:
   // never return nullptr, throw ZException on error
   inline std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock)
   {
-    std::shared_ptr<ZImg> res = getAndTouch(key);
+    std::shared_ptr<ZImg> res = get(key);
     if (!res) {
       res = imgBlock.read();
       insert(key, std::shared_ptr<ZImg>(res));
