@@ -48,18 +48,12 @@ public:
 
     if (size > m_maxSize)
       return;
-    size_t keepSize = m_maxSize - size;
-
-    while (m_doCacheEviction && m_totalSize > keepSize) {
-      const auto& back = m_cacheItemsList.back();
-      m_cacheItemsMap.erase(std::get<0>(back));
-      m_totalSize -= std::get<2>(back);
-      m_cacheItemsList.pop_back();
-    }
 
     m_cacheItemsList.emplace_front(key, std::move(object), size);
     m_cacheItemsMap[key] = m_cacheItemsList.begin();
     m_totalSize += size;
+
+    evict();
   }
 
   void remove(const KeyType& key)
@@ -71,6 +65,18 @@ public:
       m_totalSize -= std::get<2>(*listIt);
       m_cacheItemsList.erase(listIt);
       m_cacheItemsMap.erase(it);
+    }
+  }
+
+  void evict()
+  {
+    if (m_doCacheEviction) {
+      while (m_totalSize > m_maxSize) {
+        const auto& back = m_cacheItemsList.back();
+        m_cacheItemsMap.erase(std::get<0>(back));
+        m_totalSize -= std::get<2>(back);
+        m_cacheItemsList.pop_back();
+      }
     }
   }
 
@@ -87,14 +93,28 @@ public:
     }
   }
 
-  void stopCacheEviction() const
+  // might return empty ptr
+  ValueType getAndTouch(const KeyType& key)
+  {
+    QReadLocker lock(&m_lock);
+    auto it = m_cacheItemsMap.find(key);
+    if (it != m_cacheItemsMap.end()) {
+      m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
+      return std::get<1>(*(it->second));
+    } else {
+      return ValueType();
+    }
+  }
+
+  void stopCacheEviction()
   {
     m_doCacheEviction = false;
   }
 
-  void resumeCacheEviction() const
+  void resumeCacheEviction()
   {
     m_doCacheEviction = true;
+    evict();
   }
 
 protected:
@@ -126,7 +146,7 @@ public:
   // never return nullptr, throw ZException on error
   inline std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock)
   {
-    std::shared_ptr<ZImg> res = get(key);
+    std::shared_ptr<ZImg> res = getAndTouch(key);
     if (!res) {
       res = imgBlock.read();
       insert(key, std::shared_ptr<ZImg>(res));
