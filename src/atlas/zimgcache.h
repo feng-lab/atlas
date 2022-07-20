@@ -6,6 +6,7 @@
 #include <boost/functional/hash.hpp>
 #include <list>
 #include <unordered_map>
+#include <atomic>
 
 #define USE_ZSharedCache
 
@@ -68,18 +69,6 @@ public:
     }
   }
 
-  void evict()
-  {
-    if (m_doCacheEviction) {
-      while (m_totalSize > m_maxSize) {
-        const auto& back = m_cacheItemsList.back();
-        m_cacheItemsMap.erase(std::get<0>(back));
-        m_totalSize -= std::get<2>(back);
-        m_cacheItemsList.pop_back();
-      }
-    }
-  }
-
   // might return empty ptr
   ValueType get(const KeyType& key) const
   {
@@ -95,26 +84,44 @@ public:
 
   void stopCacheEviction()
   {
-    m_doCacheEviction = false;
+    ++m_cacheEvictionLockCounter;
   }
 
   void resumeCacheEviction()
   {
-    m_doCacheEviction = true;
-    evict();
+    // make sure only 1 thread do the eviction
+    size_t expected = 1;
+    if (m_cacheEvictionLockCounter.compare_exchange_strong(expected, 0)) {
+      evict();
+    } else {
+      CHECK(m_cacheEvictionLockCounter.load() > 0);
+      --m_cacheEvictionLockCounter;
+    }
   }
 
 protected:
   ~ZSharedCache() = default;
+
+  void evict()
+  {
+    if (m_cacheEvictionLockCounter.load() == 0) {
+      while (m_totalSize > m_maxSize) {
+        const auto& back = m_cacheItemsList.back();
+        m_cacheItemsMap.erase(std::get<0>(back));
+        m_totalSize -= std::get<2>(back);
+        m_cacheItemsList.pop_back();
+      }
+    }
+  }
 
 private:
   // first item is latest item
   std::list<KeyValueType> m_cacheItemsList;
   std::unordered_map<KeyType, ListIteratorType, boost::hash<KeyType>> m_cacheItemsMap;
   size_t m_maxSize;
-  size_t m_totalSize = 0;
+  mutable size_t m_totalSize = 0;
   mutable QReadWriteLock m_lock;
-  mutable bool m_doCacheEviction = true;
+  std::atomic<size_t> m_cacheEvictionLockCounter = 0;
 };
 
 #ifdef USE_ZSharedCache
