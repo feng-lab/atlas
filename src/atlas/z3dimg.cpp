@@ -9,6 +9,7 @@
 #include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
+#include <boost/functional/hash.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
