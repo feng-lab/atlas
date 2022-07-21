@@ -266,19 +266,16 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::remove(const TKey& key) {
     return;
   }
 
-  // Acquire the lock, but don't block if it is already held
-  std::unique_lock<ListMutex> lock(m_listMutex, std::try_to_lock);
-  if (lock) {
-    ListNode* node = hashAccessor->second.m_listNode;
-    // The list node may be out of the list if it is in the process of being
-    // inserted or evicted. Doing this check allows us to lock the list for
-    // shorter periods of time.
-    if (node->isInList()) {
-      delink(node);
-      delete node;
-      m_map.erase(hashAccessor);
-    }
-    lock.unlock();
+  std::unique_lock<ListMutex> lock(m_listMutex);
+  ListNode* node = hashAccessor->second.m_listNode;
+  // The list node may be out of the list if it is in the process of being
+  // inserted or evicted. Doing this check allows us to lock the list for
+  // shorter periods of time.
+  if (node->isInList()) {
+    delink(node);
+    m_size.fetch_sub(node->m_size);
+    delete node;
+    m_map.erase(hashAccessor);
   }
 }
 
@@ -392,7 +389,7 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::
     }
     m_size.fetch_sub(moribund->m_size);
     delink(moribund);
-    lock.unlock();
+    //lock.unlock();
 
     HashMapAccessor hashAccessor;
     if (!m_map.find(hashAccessor, moribund->m_key)) {
