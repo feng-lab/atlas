@@ -72,7 +72,7 @@ public:
   // might return empty ptr
   ValueType get(const KeyType& key) const
   {
-    QReadLocker lock(&m_lock);
+    // QReadLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
       //m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);

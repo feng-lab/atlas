@@ -373,7 +373,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
   progress->show();
   int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
   double time = startTime;
-  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
   double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
@@ -514,7 +514,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, dou
   progress->show();
   int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
   double time = startTime;
-  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
   double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
@@ -642,7 +642,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSe
   progress->show();
   int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
   double time = startTime;
-  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
   double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
