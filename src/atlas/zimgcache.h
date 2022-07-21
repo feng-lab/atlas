@@ -8,10 +8,11 @@
 #include <unordered_map>
 #include <atomic>
 
-#define USE_ZSharedCache
+// #define USE_ZSharedCache
 
 namespace nim {
 
+#ifdef USE_ZSharedCache
 template<typename KeyType, typename SharedValueType>
 class ZSharedCache
 {
@@ -72,7 +73,7 @@ public:
   // might return empty ptr
   ValueType get(const KeyType& key) const
   {
-    // QReadLocker lock(&m_lock);
+    QReadLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
       //m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
@@ -82,36 +83,36 @@ public:
     }
   }
 
-  void stopCacheEviction()
-  {
-    ++m_cacheEvictionLockCounter;
-  }
-
-  void resumeCacheEviction()
-  {
-    // make sure only 1 thread do the eviction
-    size_t expected = 1;
-    if (m_cacheEvictionLockCounter.compare_exchange_strong(expected, 0)) {
-      evict();
-    } else {
-      CHECK(m_cacheEvictionLockCounter.load() > 0);
-      --m_cacheEvictionLockCounter;
-    }
-  }
+//  void stopCacheEviction()
+//  {
+//    ++m_cacheEvictionLockCounter;
+//  }
+//
+//  void resumeCacheEviction()
+//  {
+//    // make sure only 1 thread do the eviction
+//    size_t expected = 1;
+//    if (m_cacheEvictionLockCounter.compare_exchange_strong(expected, 0)) {
+//      evict();
+//    } else {
+//      CHECK(m_cacheEvictionLockCounter.load() > 0);
+//      --m_cacheEvictionLockCounter;
+//    }
+//  }
 
 protected:
   ~ZSharedCache() = default;
 
   void evict()
   {
-    if (m_cacheEvictionLockCounter.load() == 0) {
+    //if (m_cacheEvictionLockCounter.load() == 0) {
       while (m_totalSize > m_maxSize) {
         const auto& back = m_cacheItemsList.back();
         m_cacheItemsMap.erase(std::get<0>(back));
         m_totalSize -= std::get<2>(back);
         m_cacheItemsList.pop_back();
       }
-    }
+    //}
   }
 
 private:
@@ -121,10 +122,9 @@ private:
   size_t m_maxSize;
   mutable size_t m_totalSize = 0;
   mutable QReadWriteLock m_lock;
-  std::atomic<size_t> m_cacheEvictionLockCounter = 0;
+  //std::atomic<size_t> m_cacheEvictionLockCounter = 0;
 };
 
-#ifdef USE_ZSharedCache
 class ZImgCache : public ZSharedCache<ZImgPack::HashKeyType, ZImg>
 {
 public:

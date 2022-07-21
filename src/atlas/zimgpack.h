@@ -136,9 +136,9 @@ public:
   void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
                        ZImg& res, bool assumeInCache = false) const;
 
-  void stopCacheEviction() const;
-
-  void resumeCacheEviction() const;
+//  void stopCacheEviction() const;
+//
+//  void resumeCacheEviction() const;
 
   std::set<HashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                            index_t zRatio,

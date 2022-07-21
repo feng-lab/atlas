@@ -523,7 +523,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
   bt.start();
 
-  m_imgPack.stopCacheEviction();
+  //m_imgPack.stopCacheEviction();
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
   ZBenchTimer bt_cc(fmt::format("collect reading cache keys for image ch{}", channel));
@@ -580,13 +580,13 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i], true);
+                                                  channel, 0, imgs[i], false);
                       }
                     }
   );
   STOP_AND_LOG(bt_read)
 
-  m_imgPack.resumeCacheEviction();
+  //m_imgPack.resumeCacheEviction();
 
   ZBenchTimer bt_upload(fmt::format("uploading image blocks to GPU for image ch{}", channel));
   bt_upload.start();

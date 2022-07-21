@@ -540,15 +540,15 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   //STOP_AND_LOG(bt_read)
 }
 
-void ZImgPack::stopCacheEviction() const
-{
-  ZImgCache::instance().stopCacheEviction();
-}
-
-void ZImgPack::resumeCacheEviction() const
-{
-  ZImgCache::instance().resumeCacheEviction();
-}
+//void ZImgPack::stopCacheEviction() const
+//{
+//  ZImgCache::instance().stopCacheEviction();
+//}
+//
+//void ZImgPack::resumeCacheEviction() const
+//{
+//  ZImgCache::instance().resumeCacheEviction();
+//}
 
 std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                              index_t zRatio,

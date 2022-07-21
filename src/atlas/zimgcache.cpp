@@ -23,7 +23,7 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache()
-  : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM / 2)
+  : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM / 2, ZCpuInfo::instance().nLogicalCores)
 {
 }
 #endif
