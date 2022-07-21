@@ -22,6 +22,8 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_customSize("Custom Image Size", glm::ivec2(3840, 2160), glm::ivec2(128, 128),
                  glm::ivec2(Z3DGpuInfo::instance().maxTextureSize()))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
+  , m_startTime("Start", 0.0, 0.0, 99999.0)
+  , m_endTime("End", -1., -1., 99999.0)
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");
@@ -32,6 +34,14 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   m_framePerSecond.setStyle("SPINBOX");
   m_framePerSecond.setDecimal(2);
   m_framePerSecond.setSingleStep(1);
+  m_startTime.setStyle("SPINBOX");
+  m_startTime.setDecimal(3);
+  m_startTime.setSingleStep(.001);
+  m_startTime.setSuffix(" secs");
+  m_endTime.setStyle("SPINBOX");
+  m_endTime.setDecimal(3);
+  m_endTime.setSingleStep(.001);
+  m_endTime.setSuffix(" secs");
   createWidget();
   connect(&m_captureStereoImage, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::adjustWidget);
   connect(&m_useWindowSize, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::updateImageSizeWidget);
@@ -56,11 +66,13 @@ void ZAnimationExportWidget::captureButtonPressed()
 
   if (m_is2DAnimation) {
     if (m_useWindowSize.get()) {
-      Q_EMIT export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get());
+      Q_EMIT export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+                               m_startTime.get(), m_endTime.get());
     } else {
       glm::ivec2 size = m_customSize.get();
       Q_EMIT exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                                      size.x, size.y);
+                                        m_startTime.get(), m_endTime.get(),
+                                        size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
@@ -73,11 +85,12 @@ void ZAnimationExportWidget::captureButtonPressed()
       sst = Z3DScreenShotType::MonoView;
 
     if (m_useWindowSize.get()) {
-      Q_EMIT export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(), sst);
+      Q_EMIT export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
+                               m_startTime.get(), m_endTime.get(), sst);
     } else {
       glm::ivec2 size = m_customSize.get();
       Q_EMIT exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                                      size.x, size.y, sst);
+                                        m_startTime.get(), m_endTime.get(), size.x, size.y, sst);
     }
   }
 }
@@ -90,6 +103,8 @@ void ZAnimationExportWidget::updateImageSizeWidget()
 void ZAnimationExportWidget::adjustWidget()
 {
   m_framePerSecond.setVisible(true);
+  m_startTime.setVisible(true);
+  m_endTime.setVisible(true);
   m_captureButton->setVisible(true);
   m_filenameWidget->setEnabled(true);
   m_stereoImageType.setVisible(m_captureStereoImage.get());
@@ -139,6 +154,22 @@ void ZAnimationExportWidget::createWidget()
   hlo = new QHBoxLayout;
   hlo->addWidget(m_framePerSecond.createNameLabel());
   wg = m_framePerSecond.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  hlo->addWidget(m_startTime.createNameLabel());
+  wg = m_startTime.createWidget();
+  wg->setMinimumWidth(125);
+  wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+  hlo->addWidget(wg);
+  lo->addLayout(hlo);
+
+  hlo = new QHBoxLayout;
+  hlo->addWidget(m_endTime.createNameLabel());
+  wg = m_endTime.createWidget();
   wg->setMinimumWidth(125);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   hlo->addWidget(wg);

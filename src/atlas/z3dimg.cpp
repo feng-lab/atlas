@@ -555,6 +555,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   std::vector<ZImgPack::HashKeyType> missingCacheKeys;
   missingCacheKeys.reserve(ccKeySet.size());
   missingCacheKeys.insert(missingCacheKeys.end(), ccKeySet.begin(), ccKeySet.end());
+  LOG(INFO) << "preloading " << missingCacheKeys.size() << " image pieces...";
   tbb::parallel_for(tbb::blocked_range<size_t>(0, missingCacheKeys.size()),
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (auto i = r.begin(); i != r.end(); ++i) {

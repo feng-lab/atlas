@@ -306,10 +306,24 @@ void ZAnimation::releaseView()
   }
 }
 
-void
-ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond, int width, int height,
-                                       Z3DScreenShotType sst)
+void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
+                                            double startTime, double endTime,
+                                            int width, int height,
+                                            Z3DScreenShotType sst)
 {
+  if (startTime < 0 || startTime >= m_duration) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video start time %1 is not correct").arg(startTime));
+  }
+  if (endTime >= 0 && endTime <= startTime) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video end time %1 is not correct").arg(endTime));
+  }
+  if (endTime < 0 || endTime > m_duration) {
+    endTime = m_duration;
+  }
   CHECK(m_view);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -344,7 +358,9 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   }
   m_doc.hideAnimation3DView();
   m_doc.deselectAllObjs();
-  int numFrame = std::ceil(m_duration * framePerSecond);
+
+  auto duration = endTime - startTime;
+  int numFrame = std::ceil(duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
@@ -355,9 +371,10 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
-  int fieldWidth = numDigits(numFrame);
-  double time = 0;
-  double timeIncrement = m_duration / numFrame;
+  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
+  double time = startTime;
+  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
   auto tempdir = std::make_shared<QTemporaryDir>();
@@ -370,7 +387,7 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -425,8 +442,22 @@ ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
   }
 }
 
-void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3DScreenShotType sst)
+void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
+                                   Z3DScreenShotType sst)
 {
+  if (startTime < 0 || startTime >= m_duration) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video start time %1 is not correct").arg(startTime));
+  }
+  if (endTime >= 0 && endTime <= startTime) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video end time %1 is not correct").arg(endTime));
+  }
+  if (endTime < 0 || endTime > m_duration) {
+    endTime = m_duration;
+  }
   CHECK(m_view);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -469,7 +500,9 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
               << ").";
     canvas.resize(w, h);
   }
-  int numFrame = std::ceil(m_duration * framePerSecond);
+
+  auto duration = endTime - startTime;
+  int numFrame = std::ceil(duration * framePerSecond);
   QString title = "Exporting 3D Animation As Images...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
     title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
@@ -479,9 +512,10 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
   auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->show();
-  int fieldWidth = numDigits(numFrame);
-  double time = 0;
-  double timeIncrement = m_duration / numFrame;
+  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
+  double time = startTime;
+  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
   auto tempdir = std::make_shared<QTemporaryDir>();
@@ -494,7 +528,7 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -549,9 +583,22 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, Z3D
   }
 }
 
-void
-ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond, int width, int height)
+void ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
+                                            int width, int height)
 {
+  if (startTime < 0 || startTime >= m_duration) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video start time %1 is not correct").arg(startTime));
+  }
+  if (endTime >= 0 && endTime <= startTime) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Video end time %1 is not correct").arg(endTime));
+  }
+  if (endTime < 0 || endTime > m_duration) {
+    endTime = m_duration;
+  }
   CHECK(m_view);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -585,15 +632,18 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
     --height;
   }
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
-  int numFrame = std::ceil(m_duration * framePerSecond);
+
+  auto duration = endTime - startTime;
+  int numFrame = std::ceil(duration * framePerSecond);
   QString title = "Exporting 2D Animation As Images...";
   auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
-  int fieldWidth = numDigits(numFrame);
-  double time = 0;
-  double timeIncrement = m_duration / numFrame;
+  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
+  double time = startTime;
+  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
+  double timeIncrement = duration / numFrame;
   bool checkOverwrite = true;
   QString namePrefix = "video";
   auto tempdir = std::make_shared<QTemporaryDir>();
@@ -607,7 +657,7 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (checkOverwrite) {
       if (tmpdir.exists(filename)) {
@@ -662,11 +712,12 @@ ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond,
   }
 }
 
-void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond)
+void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime)
 {
   CHECK(m_view);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
-  exportFixedSize2DAnimation(fn, framePerSecond, canvasPainter.viewportSize().width(),
+  exportFixedSize2DAnimation(fn, framePerSecond, startTime, endTime,
+                             canvasPainter.viewportSize().width(),
                              canvasPainter.viewportSize().height());
 }
 
