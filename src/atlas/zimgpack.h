@@ -134,11 +134,7 @@ public:
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
   void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                       ZImg& res, bool assumeInCache = false) const;
-
-//  void stopCacheEviction() const;
-//
-//  void resumeCacheEviction() const;
+                       ZImg& res) const;
 
   std::set<HashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                            index_t zRatio,

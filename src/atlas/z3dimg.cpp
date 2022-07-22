@@ -37,14 +37,14 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
 #else
       imageCacheSize = glm::uvec3(4096, 2048, 2048); // 16G
 #endif
-      m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
+      m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
 #else
       imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
 #endif
-      m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
+      m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
       imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
       m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
@@ -580,7 +580,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i], false);
+                                                  channel, 0, imgs[i]);
                       }
                     }
   );

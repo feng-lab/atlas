@@ -197,6 +197,12 @@ public:
       return std::shared_ptr<ZImg>();
     }
   }
+
+  inline bool contains(const ZImgPack::HashKeyType& key)
+  {
+    ZThreadSafeScalableImageCache::ConstAccessor ca;
+    return find(ca, key);
+  }
 };
 #endif
 

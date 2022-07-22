@@ -481,7 +481,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 }
 
 void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                               ZImg& res, bool assumeInCache) const
+                               ZImg& res) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   //ZBenchTimer bt_read(fmt::format("reading and assembling image block"));
@@ -511,12 +511,7 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
                              -ZVoxelCoordinate::value_type(sc),
                              0);
       std::shared_ptr<ZImg> imgPtr;
-      if (assumeInCache) {
-        imgPtr = ZImgCache::instance().get(HashKeyType(this, i.second));
-        CHECK(imgPtr);
-      } else {
-        imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile);
-      }
+      imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile);
       if (imgPtr->isSameType(tmpRes)) {
         if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
           ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
@@ -539,16 +534,6 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   res.swap(tmpRes);
   //STOP_AND_LOG(bt_read)
 }
-
-//void ZImgPack::stopCacheEviction() const
-//{
-//  ZImgCache::instance().stopCacheEviction();
-//}
-//
-//void ZImgPack::resumeCacheEviction() const
-//{
-//  ZImgCache::instance().resumeCacheEviction();
-//}
 
 std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                              index_t zRatio,
@@ -579,7 +564,7 @@ std::set<ZImgPack::HashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
     if (onlyCollectNotInCacheKeys) {
       for (auto& i : queryResult) {
         HashKeyType key(this, i.second);
-        if (!ZImgCache::instance().get(key)) {
+        if (!ZImgCache::instance().contains(key)) {
           res.insert(key);
         }
       }
