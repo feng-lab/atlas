@@ -293,15 +293,15 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
   hashAccessor.release();
 
   // Evict if necessary, now that we know the hashmap insertion was successful.
-  size_t size = m_size.load();
+  //size_t size = m_size.load();
   //bool evictionDone = false;
-  if (size >= m_maxSize) {
+  //if (size >= m_maxSize) {
     // The container is at (or over) capacity, so eviction needs to be done.
     // Do not decrement m_size, since that would cause other threads to
     // inappropriately omit eviction during their own inserts.
-    evict();
+    //evict();
     //evictionDone = true;
-  }
+  //}
 
   // Note that we have to update the LRU list before we increment m_size, so
   // that other threads don't attempt to evict list items before they even
@@ -312,7 +312,7 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
 //  if (!evictionDone) {
 //    size = m_size++;
 //  }
-  size = m_size.fetch_add(objSize);
+  auto size = m_size += objSize;
   if (size > m_maxSize) {
     // It is possible for the size to temporarily exceed the maximum if there is
     // a heavy insert() load, once only as the cache fills. In this situation,
@@ -325,8 +325,9 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
     // here at the same time, that could lead to spinning. So we will just evict
     // one extra element per insert() until the overfill is rectified.
     //if (m_size.compare_exchange_strong(size, size - 1)) {
+    if (m_size.load() == size) {
       evict();
-    //}
+    }
   }
   return true;
 }
