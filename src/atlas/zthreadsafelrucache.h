@@ -325,9 +325,9 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
     // here at the same time, that could lead to spinning. So we will just evict
     // one extra element per insert() until the overfill is rectified.
     //if (m_size.compare_exchange_strong(size, size - 1)) {
-    if (m_size.load() == size) {
+    //if (m_size.load() == size) {
       evict();
-    }
+    //}
   }
   return true;
 }
@@ -381,24 +381,29 @@ inline void ZThreadSafeLRUCache<TKey, TValue, THash>::
 template <class TKey, class TValue, class THash>
 void ZThreadSafeLRUCache<TKey, TValue, THash>::
   evict() {
-  std::unique_lock<ListMutex> lock(m_listMutex);
-  while (m_size.load() > m_maxSize) {
-    ListNode* moribund = m_tail.m_prev;
-    if (moribund == &m_head) {
-      // List is empty, can't evict
-      return;
-    }
-    m_size.fetch_sub(moribund->m_size);
-    delink(moribund);
-    //lock.unlock();
+  //std::unique_lock<ListMutex> lock(m_listMutex);
+  // Acquire the lock, but don't block if it is already held
+  std::unique_lock<ListMutex> lock(m_listMutex, std::try_to_lock);
+  if (lock) {
+    while (m_size.load() > m_maxSize) {
+      ListNode* moribund = m_tail.m_prev;
+      if (moribund == &m_head) {
+        // List is empty, can't evict
+        return;
+      }
+      m_size.fetch_sub(moribund->m_size);
+      delink(moribund);
+      // lock.unlock();
 
-    HashMapAccessor hashAccessor;
-    if (!m_map.find(hashAccessor, moribund->m_key)) {
-      // Presumably unreachable
-      return;
+      HashMapAccessor hashAccessor;
+      if (!m_map.find(hashAccessor, moribund->m_key)) {
+        // Presumably unreachable
+        return;
+      }
+      m_map.erase(hashAccessor);
+      delete moribund;
     }
-    m_map.erase(hashAccessor);
-    delete moribund;
+    lock.unlock();
   }
 }
 

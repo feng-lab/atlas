@@ -160,7 +160,7 @@ void ZThreadSafeScalableCache<TKey, TValue, THash>::
 template <class TKey, class TValue, class THash>
 size_t ZThreadSafeScalableCache<TKey, TValue, THash>::
   size() const {
-  size_t size;
+  size_t size = 0;
   for (size_t i = 0; i < m_numShards; i++) {
     size += m_shards[i]->size();
   }

@@ -717,8 +717,14 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
                 ccSet.insert(range.begin(), range.end()); // inserts a sequence
               }
             );
+
+            hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages();
           } else {
             lastRound = !hasEnoughMissingIDs;
+          }
+
+          if (!hasEnoughMissingIDs && numberBlock == ccSet.size()) {
+            lastRound = true;
           }
 
           ccSet.unsafe_erase(0_u32);
