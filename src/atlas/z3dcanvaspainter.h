@@ -33,6 +33,8 @@ public:
 
   bool renderToImage(const QString& filename, int width, int height, Z3DScreenShotType sst, Z3DCompositor& compositor);
 
+  void resetToMatchCanvasSize();
+
   [[nodiscard]] QString renderToImageError() const;
 
 protected:

@@ -17,6 +17,8 @@
 #endif
 
 #include <QSurfaceFormat>
+//#include <QOpenGLContext>
+//#include <QOffscreenSurface>
 #include <QMessageBox>
 #include <QDir>
 #include <QFileInfo>
@@ -62,6 +64,14 @@ int main(int argc, char* argv[])
     gflags::SetVersionString(GIT_VERSION);
     gflags::ParseCommandLineFlags(&argc, &argv, false);
 
+    QSurfaceFormat format;
+#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
+    format.setVersion(3, 2);
+    format.setProfile(QSurfaceFormat::CoreProfile);
+#endif
+    //format.setStereo(true);
+    QSurfaceFormat::setDefaultFormat(format);
+
 #ifdef ATLAS_WITH_TESTS
     if (FLAGS_run_unit_tests || FLAGS_run_benchmarks) {
       QCoreApplication app(argc, argv);
@@ -90,14 +100,6 @@ int main(int argc, char* argv[])
       }
     }
 #endif
-
-    QSurfaceFormat format;
-#if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
-    format.setVersion(3, 2);
-    format.setProfile(QSurfaceFormat::CoreProfile);
-#endif
-    //format.setStereo(true);
-    QSurfaceFormat::setDefaultFormat(format);
 
     QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
 #ifdef Q_OS_LINUX
@@ -147,6 +149,29 @@ int main(int argc, char* argv[])
     nim::ZSystemInfo::instance().logOSInfo();
 
     // ZServiceManager sm;
+
+//    // initialize OpenGL
+//    QOpenGLContext context;
+//    context.setFormat(format);
+//    context.create();
+//    if (!context.isValid()) {
+//      LOG(ERROR) << "Can not create OpenGL context";
+//    }
+//
+//    QOffscreenSurface surface;
+//    surface.setFormat(format);
+//    surface.create();
+//    if(!surface.isValid()) {
+//      LOG(ERROR) << "Can not create OpenGL Offscreen surface";
+//    }
+//    context.makeCurrent(&surface);
+//
+//    if (!ZSystemInfo::instance().initializeGL()) {
+//      QString msg = ZSystemInfo::instance().errorMessage();
+//      msg += ". 3D functions will be disabled.";
+//      QMessageBox::warning(nullptr, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
+//    }
+//    ZSystemInfo::instance().setStereoSupported(context.format().stereo());
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
     auto mainWin = new nim::ZMainWindow(GIT_VERSION);

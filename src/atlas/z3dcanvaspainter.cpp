@@ -26,7 +26,6 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& 
   addPort(m_rightEyeInport);
 
   setOutputSize(m_canvas.physicalSize());
-  Q_EMIT requestUpstreamSizeChange(this);
   connect(&m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DCanvasPainter::onCanvasResized);
 }
 
@@ -74,13 +73,11 @@ bool Z3DCanvasPainter::isValid(Z3DEye /*eye*/) const
 void Z3DCanvasPainter::updateSize()
 {
   setOutputSize(m_canvas.physicalSize());
-  Q_EMIT requestUpstreamSizeChange(this);
 }
 
 void Z3DCanvasPainter::onCanvasResized(size_t w, size_t h)
 {
   setOutputSize(glm::uvec2(w, h));
-  Q_EMIT requestUpstreamSizeChange(this);
 }
 
 void Z3DCanvasPainter::invalidate(State inv)
@@ -166,8 +163,6 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
     QApplication::processEvents();
   }
 
-  glm::uvec2 oldDimensions = m_inport.size();
-
   // render with adjusted viewport size
   // enable render-to-file on next process
   m_renderToImage = true;
@@ -182,7 +177,6 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
     setOutputSize(glm::uvec2(width, height));
-    Q_EMIT requestUpstreamSizeChange(this);
 
     m_tiledRendering = false;
 
@@ -275,11 +269,13 @@ bool Z3DCanvasPainter::renderToImage(const QString& filename, int width, int hei
   m_leftImg.clear();
   m_rightImg.clear();
 
-  // reset texture container dimensions from canvas size
-  setOutputSize(oldDimensions);
-  Q_EMIT requestUpstreamSizeChange(this);
-
   return (m_renderToImageError.isEmpty());
+}
+
+void Z3DCanvasPainter::resetToMatchCanvasSize()
+{
+  // reset texture container dimensions from canvas size
+  setOutputSize(m_canvas.physicalSize());
 }
 
 void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
@@ -354,10 +350,13 @@ void Z3DCanvasPainter::renderInportToImage(Z3DEye eye)
 
 void Z3DCanvasPainter::setOutputSize(const glm::uvec2& size)
 {
-  m_inport.setExpectedSize(size);
-  m_leftEyeInport.setExpectedSize(size);
-  m_rightEyeInport.setExpectedSize(size);
-  globalCameraPara().viewportChanged(size);
+  if (size != m_inport.expectedSize() || size != m_leftEyeInport.expectedSize() || size != m_rightEyeInport.expectedSize()) {
+    m_inport.setExpectedSize(size);
+    m_leftEyeInport.setExpectedSize(size);
+    m_rightEyeInport.setExpectedSize(size);
+    globalCameraPara().viewportChanged(size);
+    Q_EMIT requestUpstreamSizeChange(this);
+  }
 }
 
 const Z3DTexture* Z3DCanvasPainter::imageColorTexture(Z3DEye eye) const

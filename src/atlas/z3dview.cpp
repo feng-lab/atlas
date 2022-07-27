@@ -139,10 +139,10 @@ QWidget* Z3DView::captureWidget() const
           this, &Z3DView::takeScreenShot);
   connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
           this, &Z3DView::takeFixedSizeScreenShot);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
-          this, &Z3DView::takeSeriesScreenShot);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
-          this, &Z3DView::takeFixedSizeSeriesScreenShot);
+//  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
+//          this, &Z3DView::takeSeriesScreenShot);
+//  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
+//          this, &Z3DView::takeFixedSizeSeriesScreenShot);
   //res->setWidget(m_screenShotWidget);
 
   return m_screenShotWidget;
@@ -300,7 +300,24 @@ bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int he
     res = false;
     QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
   }
+  m_canvasPainter->resetToMatchCanvasSize();
   return res;
+}
+
+bool Z3DView::takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
+                                                                   int width, int height, Z3DScreenShotType sst)
+{
+  bool res = true;
+  if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
+    res = false;
+    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
+  }
+  return res;
+}
+
+void Z3DView::resetCanvasPainterSize()
+{
+  m_canvasPainter->resetToMatchCanvasSize();
 }
 
 bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
@@ -371,79 +388,79 @@ void Z3DView::setYZView()
   resetCameraClippingRange();
 }
 
-bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-                                            bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
-{
-  using namespace boost::math::double_constants;
-  QString title = "Capturing Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-    title = "Capturing Half Side-By-Side Stereo Images...";
-  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-    title = "Capturing Full Side-By-Side Stereo Images...";
-  }
-  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-  progress.setWindowModality(Qt::WindowModal);
-  progress.show();
-  double rAngle = two_pi / numFrame;
-  bool res = true;
-  for (auto i = 0; i < numFrame; ++i) {
-    progress.setValue(i);
-    if (progress.wasCanceled())
-      break;
-
-    if (clockWise)
-      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-    else
-      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-    //resetCameraClippingRange();
-    auto fieldWidth = numDigits(numFrame);
-    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    auto filepath = dir.filePath(filename);
-    if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
-      res = false;
-      break;
-    }
-  }
-  progress.setValue(numFrame);
-  return res;
-}
-
-bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-                                   bool clockWise, int numFrame, Z3DScreenShotType sst)
-{
-  using namespace boost::math::double_constants;
-  QString title = "Capturing Images...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-    title = "Capturing Half Side-By-Side Stereo Images...";
-  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-    title = "Capturing Full Side-By-Side Stereo Images...";
-  }
-  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-  progress.setWindowModality(Qt::WindowModal);
-  progress.show();
-  double rAngle = two_pi / numFrame;
-  bool res = true;
-  for (auto i = 0; i < numFrame; ++i) {
-    progress.setValue(i);
-    if (progress.wasCanceled())
-      break;
-
-    if (clockWise)
-      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-    else
-      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-    //resetCameraClippingRange();
-    auto fieldWidth = numDigits(numFrame);
-    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-    auto filepath = dir.filePath(filename);
-    if (!takeScreenShot(filepath, sst)) {
-      res = false;
-      break;
-    }
-  }
-  progress.setValue(numFrame);
-  return res;
-}
+//bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+//                                            bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
+//{
+//  using namespace boost::math::double_constants;
+//  QString title = "Capturing Images...";
+//  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
+//    title = "Capturing Half Side-By-Side Stereo Images...";
+//  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+//    title = "Capturing Full Side-By-Side Stereo Images...";
+//  }
+//  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
+//  progress.setWindowModality(Qt::WindowModal);
+//  progress.show();
+//  double rAngle = two_pi / numFrame;
+//  bool res = true;
+//  for (auto i = 0; i < numFrame; ++i) {
+//    progress.setValue(i);
+//    if (progress.wasCanceled())
+//      break;
+//
+//    if (clockWise)
+//      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//    else
+//      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//    //resetCameraClippingRange();
+//    auto fieldWidth = numDigits(numFrame);
+//    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+//    auto filepath = dir.filePath(filename);
+//    if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
+//      res = false;
+//      break;
+//    }
+//  }
+//  progress.setValue(numFrame);
+//  return res;
+//}
+//
+//bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+//                                   bool clockWise, int numFrame, Z3DScreenShotType sst)
+//{
+//  using namespace boost::math::double_constants;
+//  QString title = "Capturing Images...";
+//  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
+//    title = "Capturing Half Side-By-Side Stereo Images...";
+//  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+//    title = "Capturing Full Side-By-Side Stereo Images...";
+//  }
+//  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
+//  progress.setWindowModality(Qt::WindowModal);
+//  progress.show();
+//  double rAngle = two_pi / numFrame;
+//  bool res = true;
+//  for (auto i = 0; i < numFrame; ++i) {
+//    progress.setValue(i);
+//    if (progress.wasCanceled())
+//      break;
+//
+//    if (clockWise)
+//      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//    else
+//      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//    //resetCameraClippingRange();
+//    auto fieldWidth = numDigits(numFrame);
+//    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+//    auto filepath = dir.filePath(filename);
+//    if (!takeScreenShot(filepath, sst)) {
+//      res = false;
+//      break;
+//    }
+//  }
+//  progress.setValue(numFrame);
+//  return res;
+//}
 
 void Z3DView::init()
 {

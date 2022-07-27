@@ -407,10 +407,11 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
       }
     }
     QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShot(filepath, width, height, sst)) {
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShotWithoutResetCanvasPainterSize(filepath, width, height, sst)) {
       break;
     }
   }
+  dynamic_cast<Z3DView*>(m_view)->resetCanvasPainterSize();
 //  if (!progress->wasCanceled()) {
 //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
 //    QString filepath = tmpdir.filePath(filename);

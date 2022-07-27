@@ -8,7 +8,7 @@
 
 namespace nim {
 
-Z3DInteractionHandler::Z3DInteractionHandler(QString  name, QObject* parent)
+Z3DInteractionHandler::Z3DInteractionHandler(QString name, QObject* parent)
   : QObject(parent)
   , m_name(std::move(name))
   , m_state(State::None)

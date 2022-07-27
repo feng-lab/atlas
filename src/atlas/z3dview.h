@@ -96,6 +96,11 @@ public:
 
   bool takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
+  bool takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
+                                                            int width, int height, Z3DScreenShotType sst);
+
+  void resetCanvasPainterSize();
+
   bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
   std::vector<Z3DObjView*> objViews()

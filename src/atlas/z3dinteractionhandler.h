@@ -10,7 +10,7 @@ class Z3DInteractionHandler : public QObject
 {
 Q_OBJECT
 public:
-  explicit Z3DInteractionHandler(QString  name, QObject* parent = nullptr);
+  explicit Z3DInteractionHandler(QString name, QObject* parent = nullptr);
 
   void setName(const QString& name)
   { m_name = name; }

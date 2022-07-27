@@ -195,17 +195,17 @@ void ZTakeScreenShotWidget::createWidget()
   QLabel* label;
 
   if (!m_is2D) {
-    hlo = new QHBoxLayout;
-    label = m_mode.createNameLabel();
-    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    label->setMinimumWidth(125);
-    //label->setWordWrap(true);
-    hlo->addWidget(label);
-    wg = m_mode.createWidget();
-    wg->setMinimumWidth(175);
-    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-    hlo->addWidget(wg);
-    lo->addLayout(hlo);
+//    hlo = new QHBoxLayout;
+//    label = m_mode.createNameLabel();
+//    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+//    label->setMinimumWidth(125);
+//    //label->setWordWrap(true);
+//    hlo->addWidget(label);
+//    wg = m_mode.createWidget();
+//    wg->setMinimumWidth(175);
+//    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+//    hlo->addWidget(wg);
+//    lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
     label = m_captureStereoImage.createNameLabel();
