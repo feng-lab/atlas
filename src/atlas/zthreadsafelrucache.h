@@ -293,15 +293,15 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
   hashAccessor.release();
 
   // Evict if necessary, now that we know the hashmap insertion was successful.
-  size_t size = m_size.load();
+  //size_t size = m_size.load();
   //bool evictionDone = false;
-  if (size >= m_maxSize) {
+  //if (size >= m_maxSize) {
     // The container is at (or over) capacity, so eviction needs to be done.
     // Do not decrement m_size, since that would cause other threads to
     // inappropriately omit eviction during their own inserts.
-    evict();
+    //evict();
     //evictionDone = true;
-  }
+  //}
 
   // Note that we have to update the LRU list before we increment m_size, so
   // that other threads don't attempt to evict list items before they even
@@ -312,7 +312,7 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::
 //  if (!evictionDone) {
 //    size = m_size++;
 //  }
-  size = m_size.fetch_add(objSize);
+  auto size = m_size.fetch_add(objSize);
   if (size > m_maxSize) {
     // It is possible for the size to temporarily exceed the maximum if there is
     // a heavy insert() load, once only as the cache fills. In this situation,
@@ -380,8 +380,8 @@ inline void ZThreadSafeLRUCache<TKey, TValue, THash>::
 template <class TKey, class TValue, class THash>
 void ZThreadSafeLRUCache<TKey, TValue, THash>::
   evict() {
-  std::unique_lock<ListMutex> lock(m_listMutex);
   while (m_size.load() > m_maxSize) {
+    std::unique_lock<ListMutex> lock(m_listMutex);
     ListNode* moribund = m_tail.m_prev;
     if (moribund == &m_head) {
       // List is empty, can't evict
@@ -389,7 +389,7 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::
     }
     m_size.fetch_sub(moribund->m_size);
     delink(moribund);
-    //lock.unlock();
+    lock.unlock();
 
     HashMapAccessor hashAccessor;
     if (!m_map.find(hashAccessor, moribund->m_key)) {
