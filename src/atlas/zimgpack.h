@@ -149,8 +149,6 @@ public:
 
   void preLoadImageCache(const HashKeyType& keys) const;
 
-  size_t imageCacheSize() const;
-
   // only for non-disk-cached image
   bool isDiskCached() const
   { return m_diskCached; }

@@ -558,11 +558,11 @@ void Z3DImg::uploadImageCache(size_t channel)
   LOG(INFO) << "preloading " << missingCacheKeys.size() << " image pieces...";
   tbb::parallel_for(tbb::blocked_range<size_t>(0, missingCacheKeys.size()),
                     [&](const tbb::blocked_range<size_t>& r) {
-                      for (auto i = r.begin(); i != r.end(); ++i) { m_imgPack.preLoadImageCache(missingCacheKeys[i]);
+                      for (auto i = r.begin(); i != r.end(); ++i) {
+                        m_imgPack.preLoadImageCache(missingCacheKeys[i]);
                       }
                     }
   );
-  LOG(INFO) << "image cache size: " << m_imgPack.imageCacheSize();
   STOP_AND_LOG(bt_preload)
 
   ZBenchTimer bt_read(fmt::format("reading/assembling image blocks for image ch{}", channel));

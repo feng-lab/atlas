@@ -719,6 +719,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             );
 
             hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages();
+            LOG(INFO) << m_img->numCachedImages() << " " << numberBlock << " " << ccSet.size();
           } else {
             lastRound = !hasEnoughMissingIDs;
           }

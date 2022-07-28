@@ -153,12 +153,16 @@ public:
 template<typename K>
 struct ZHashCompare
 {
-  static size_t hash( const K& key )
+  static size_t hash(const K& key)
   {
     boost::hash<K> hasher;
     return hasher(key);
   }
-  static bool equal( const K& key1, const K& key2 ) {return key1 == key2;}
+
+  static bool equal(const K& key1, const K& key2)
+  {
+    return key1 == key2;
+  }
 };
 
 using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ZImgPack::HashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ZImgPack::HashKeyType>>;
@@ -170,9 +174,9 @@ public:
 
   ZImgCache();
 
-  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
+  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg> object)
   {
-    ZThreadSafeScalableImageCache::insert(key, std::move(object), object->byteNumber());
+    ZThreadSafeScalableImageCache::insert(key, object, object->byteNumber());
   }
 
   // never return nullptr, throw ZException on error
@@ -183,7 +187,7 @@ public:
       return *ca;
     } else {
       std::shared_ptr<ZImg> res = imgBlock.read();
-      insert(key, std::shared_ptr<ZImg>(res));
+      insert(key, res);
       return res;
     }
   }
@@ -204,6 +208,7 @@ public:
     return find(ca, key);
   }
 };
+
 #endif
 
 }  // namespace nim

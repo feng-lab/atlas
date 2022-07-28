@@ -583,11 +583,6 @@ void ZImgPack::preLoadImageCache(const HashKeyType& keys) const
   ZImgCache::instance().insert(HashKeyType(this, index), m_allTiles[index]->read());
 }
 
-size_t ZImgPack::imageCacheSize() const
-{
-  return ZImgCache::instance().size();
-}
-
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const
 {
   CHECK(!m_diskCached);
