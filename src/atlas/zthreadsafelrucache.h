@@ -144,13 +144,18 @@ public:
     clear();
   }
 
+  enum class FindStrategy
+  {
+    NoUpdateLRUList, UpdateLRUList, MaybeUpdateLRUList
+  };
+
   /**
    * Find a value by key, and return it by filling the ConstAccessor, which
    * can be default-constructed. Returns true if the element was found, false
    * otherwise. Updates the eviction list, making the element the
    * most-recently used.
    */
-  bool find(ConstAccessor& ac, const TKey& key);
+  bool find(ConstAccessor& ac, const TKey& key, FindStrategy findStrategy = FindStrategy::UpdateLRUList);
 
   void remove(const TKey& key);
 
@@ -251,16 +256,15 @@ ZThreadSafeLRUCache<TKey, TValue, THash>::ZThreadSafeLRUCache(size_t maxSize)
 }
 
 template<class TKey, class TValue, class THash>
-bool ZThreadSafeLRUCache<TKey, TValue, THash>::find(ConstAccessor& ac, const TKey& key)
+bool ZThreadSafeLRUCache<TKey, TValue, THash>::find(ConstAccessor& ac, const TKey& key, FindStrategy findStrategy)
 {
   HashMapConstAccessor& hashAccessor = ac.m_hashAccessor;
   if (!m_map.find(hashAccessor, key)) {
     return false;
   }
 
-  // Acquire the lock, but don't block if it is already held
-  std::unique_lock<ListMutex> lock(m_listMutex, std::try_to_lock);
-  if (lock) {
+  if (findStrategy == FindStrategy::UpdateLRUList) {
+    std::unique_lock<ListMutex> lock(m_listMutex);
     ListNode* node = hashAccessor->second.m_listNode;
     // The list node may be out of the list if it is in the process of being
     // inserted or evicted. Doing this check allows us to lock the list for
@@ -269,7 +273,20 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::find(ConstAccessor& ac, const TKe
       delink(node);
       pushFront(node);
     }
-    lock.unlock();
+  } else if (findStrategy == FindStrategy::MaybeUpdateLRUList) {
+    // Acquire the lock, but don't block if it is already held
+    std::unique_lock<ListMutex> lock(m_listMutex, std::try_to_lock);
+    if (lock) {
+      ListNode* node = hashAccessor->second.m_listNode;
+      // The list node may be out of the list if it is in the process of being
+      // inserted or evicted. Doing this check allows us to lock the list for
+      // shorter periods of time.
+      if (node->isInList()) {
+        delink(node);
+        pushFront(node);
+      }
+      lock.unlock();
+    }
   }
   return true;
 }

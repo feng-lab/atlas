@@ -511,7 +511,8 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
                              -ZVoxelCoordinate::value_type(sc),
                              0);
       std::shared_ptr<ZImg> imgPtr;
-      imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile);
+      imgPtr = ZImgCache::instance().getOrRead(HashKeyType(this, i.second), tile,
+                                               ZImgCache::FindStategy::NoUpdateLRUList);
       if (imgPtr->isSameType(tmpRes)) {
         if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
           ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
