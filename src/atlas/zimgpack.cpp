@@ -481,7 +481,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 }
 
 void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                               ZImg& res) const
+                               ZImg& res, bool useMultithreadingForResize) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   //ZBenchTimer bt_read(fmt::format("reading and assembling image block"));
@@ -528,7 +528,8 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   }
   //bt_read.pause();
   if (tmpRes.width() != res.width() || tmpRes.height() != res.height() || tmpRes.depth() != res.depth()) {
-    tmpRes.resize(res.width(), res.height(), res.depth());
+    tmpRes.resize(res.width(), res.height(), res.depth(), Interpolant::Cubic,
+                  true, false, useMultithreadingForResize);
   }
   //bt_read.resume();
 

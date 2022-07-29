@@ -1215,7 +1215,8 @@ public:
   // the parameter 'antialiasingForNearest' is used (default false); for all other methods, the default is true.
   [[nodiscard]] ZImg resized(size_t desWidth, size_t desHeight, size_t desDepth,
                              Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
-                             bool antialiasingForNearest = false) const;
+                             bool antialiasingForNearest = false,
+                             bool useMultithreading = true) const;
 
   [[nodiscard]] ZImg zoomed(double scaleX, double scaleY, double scaleZ,
                             Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
@@ -1229,7 +1230,8 @@ public:
   // resize zoom this img, will change img memory and make virtual img non-virtual
   ZImg& resize(size_t desWidth, size_t desHeight, size_t desDepth,
                Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
-               bool antialiasingForNearest = false);
+               bool antialiasingForNearest = false,
+               bool useMultithreading = true);
 
   ZImg& zoom(double scaleX, double scaleY, double scaleZ = 1.0,
              Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
@@ -1891,7 +1893,8 @@ private:
   void cast_Impl(ZImg& res) const;
 
   template<typename TVoxel>
-  void resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bool antialiasingForNearest) const;
+  void resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bool antialiasingForNearest,
+                   bool useMultithreading = true) const;
 
   template<typename TVoxel>
   void

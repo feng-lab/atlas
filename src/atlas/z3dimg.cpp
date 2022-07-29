@@ -580,7 +580,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i]);
+                                                  channel, 0, imgs[i], false);
                       }
                     }
   );

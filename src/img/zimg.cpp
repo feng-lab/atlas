@@ -1442,7 +1442,8 @@ ZImg ZImg::castTo(VoxelFormat vf, size_t bytePerVoxel)
 }
 
 ZImg ZImg::resized(size_t desWidth, size_t desHeight, size_t desDepth,
-                   Interpolant interpolant, bool antialiasing, bool antialiasingForNearest) const
+                   Interpolant interpolant, bool antialiasing, bool antialiasingForNearest,
+                   bool useMultithreading) const
 {
   CHECK(desWidth > 0 && desHeight > 0 && desDepth > 0);
 
@@ -1462,7 +1463,7 @@ ZImg ZImg::resized(size_t desWidth, size_t desHeight, size_t desDepth,
   info.depth = desDepth;
 
   res = ZImg(info);
-  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest)
+  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
 
   return res;
 }
@@ -1502,12 +1503,13 @@ ZImg ZImg::blockDownsampled(size_t blockWidth, size_t blockHeight, size_t blockD
 }
 
 ZImg& ZImg::resize(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant,
-                   bool antialiasing, bool antialiasingForNearest)
+                   bool antialiasing, bool antialiasingForNearest, bool useMultithreading)
 {
   if (width() == desWidth && height() == desHeight && depth() == desDepth) {
     return *this;
   }
-  ZImg res = resized(desWidth, desHeight, desDepth, interpolant, antialiasing, antialiasingForNearest);
+  ZImg res = resized(desWidth, desHeight, desDepth, interpolant, antialiasing, antialiasingForNearest,
+                     useMultithreading);
   swap(res);
   return *this;
 }
@@ -2123,7 +2125,8 @@ void ZImg::cast_Impl(ZImg& res) const
 }
 
 template<typename TVoxel>
-void ZImg::resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bool antialiasingForNearest) const
+void ZImg::resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bool antialiasingForNearest,
+                       bool useMultithreading) const
 {
   for (size_t t = 0; t < numTimes(); ++t) {
     for (size_t c = 0; c < numChannels(); ++c) {
@@ -2133,7 +2136,7 @@ void ZImg::resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bo
           //bt.start();
           image2DResize(planeData<TVoxel>(z, c, t), width(), height(),
                         res.planeData<TVoxel>(z, c, t), res.width(), res.height(),
-                        interpolant, antialiasing, antialiasingForNearest);
+                        interpolant, antialiasing, antialiasingForNearest, useMultithreading);
           //bt.stopAndPrint();
           //          bt.reset();
           //          bt.start();
@@ -2145,7 +2148,7 @@ void ZImg::resize_Impl(ZImg& res, Interpolant interpolant, bool antialiasing, bo
       } else {
         image3DResize(channelData<TVoxel>(c, t), width(), height(), depth(),
                       res.channelData<TVoxel>(c, t), res.width(), res.height(), res.depth(),
-                      interpolant, antialiasing, antialiasingForNearest);
+                      interpolant, antialiasing, antialiasingForNearest, useMultithreading);
       }
     }
   }

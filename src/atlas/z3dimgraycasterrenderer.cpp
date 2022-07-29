@@ -719,7 +719,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             );
 
             hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages();
-            LOG(INFO) << m_img->numCachedImages() << " " << numberBlock << " " << ccSet.size();
+            //LOG(INFO) << m_img->numCachedImages() << " " << numberBlock << " " << ccSet.size();
           } else {
             lastRound = !hasEnoughMissingIDs;
           }
@@ -736,7 +736,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           } else {
             std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
           }
-          LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
+          //LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
           STOP_AND_LOG(btcb)
 
           if (!missingBlockIDs.empty()) {
