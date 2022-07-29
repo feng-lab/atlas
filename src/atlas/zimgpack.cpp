@@ -579,7 +579,11 @@ std::set<ImageCacheHashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
 
 void ZImgPack::preLoadImageCache(const ImageCacheHashKeyType& key) const
 {
+#ifdef USE_KeyWithMemoizedHash
   auto index = key.index();
+#else
+  auto index = std::get<1>(key);
+#endif
   ZImgCache::instance().insert(ImageCacheHashKeyType(this, index), m_allTiles[index]->read());
 }
 

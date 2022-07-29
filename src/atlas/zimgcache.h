@@ -10,6 +10,8 @@
 
 // #define USE_ZSharedCache
 
+// #define USE_KeyWithMemoizedHash
+
 namespace nim {
 
 #ifdef USE_ZSharedCache
@@ -150,6 +152,8 @@ public:
 };
 #else
 
+#ifdef USE_KeyWithMemoizedHash
+
 struct ImageCacheHashKeyType
 {
   ImageCacheHashKeyType(const void* p, size_t i)
@@ -218,6 +222,12 @@ private:
   std::shared_ptr<Storage> m_storage;
 };
 
+using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ImageCacheHashKeyType::HashCompare>;
+
+#else
+
+using ImageCacheHashKeyType = std::tuple<const void*, size_t>;
+
 template<typename K>
 struct ZHashCompare
 {
@@ -233,7 +243,9 @@ struct ZHashCompare
   }
 };
 
-using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ImageCacheHashKeyType::HashCompare>;
+using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
+
+#endif
 
 class ZImgCache : public ZThreadSafeScalableImageCache
 {
@@ -289,6 +301,7 @@ public:
 namespace std {
 
 // custom specialization of std::hash can be injected in namespace std
+#ifdef USE_KeyWithMemoizedHash
 template<>
 struct hash<nim::ImageCacheHashKeyType>
 {
@@ -297,6 +310,16 @@ struct hash<nim::ImageCacheHashKeyType>
     return s.hash();
   }
 };
+#else
+template<>
+struct hash<nim::ImageCacheHashKeyType>
+{
+  inline std::size_t operator()(const nim::ImageCacheHashKeyType& s) const noexcept
+  {
+    return boost::hash<std::tuple<const void*, size_t>>{}(s);
+  }
+};
+#endif
 
 } // namespace std
 
