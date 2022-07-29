@@ -528,7 +528,7 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   ZBenchTimer bt_cc(fmt::format("collect reading cache keys for image ch{}", channel));
   bt_cc.start();
-  tbb::concurrent_unordered_set<ZImgPack::HashKeyType, boost::hash<ZImgPack::HashKeyType>> ccKeySet;
+  tbb::concurrent_unordered_set<ImageCacheHashKeyType> ccKeySet;
   tbb::parallel_for(tbb::blocked_range<size_t>(0, m_channelPendingUpdates[channel].size()),
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (auto i = r.begin(); i != r.end(); ++i) {
@@ -552,7 +552,7 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   ZBenchTimer bt_preload(fmt::format("preload cache keys for image ch{}", channel));
   bt_preload.start();
-  std::vector<ZImgPack::HashKeyType> missingCacheKeys;
+  std::vector<ImageCacheHashKeyType> missingCacheKeys;
   missingCacheKeys.reserve(ccKeySet.size());
   missingCacheKeys.insert(missingCacheKeys.end(), ccKeySet.begin(), ccKeySet.end());
   LOG(INFO) << "preloading " << missingCacheKeys.size() << " image pieces...";
@@ -580,7 +580,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i], false);
+                                                  channel, 0, imgs[i]);
                       }
                     }
   );

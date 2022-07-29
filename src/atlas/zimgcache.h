@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zimgpack.h"
+#include "zimg.h"
 #include "zthreadsafescalablecache.h"
 #include <QReadWriteLock>
 #include <boost/functional/hash.hpp>
@@ -150,6 +150,74 @@ public:
 };
 #else
 
+struct ImageCacheHashKeyType
+{
+  ImageCacheHashKeyType(const void* p, size_t i)
+    : m_storage(new Storage(p, i))
+  {
+  }
+
+  ImageCacheHashKeyType()
+  {
+  }
+
+  inline size_t index() const
+  {
+    return std::get<1>(m_storage->m_data);
+  }
+
+  inline size_t hash() const
+  {
+    return m_storage->hash();
+  }
+
+  bool operator==(const ImageCacheHashKeyType& other) const
+  {
+    return m_storage->m_data == other.m_storage->m_data;
+  }
+
+  bool operator<(const ImageCacheHashKeyType& other) const
+  {
+    return m_storage->m_data < other.m_storage->m_data;
+  }
+
+  struct HashCompare
+  {
+    bool equal(const ImageCacheHashKeyType& j, const ImageCacheHashKeyType& k) const
+    {
+      return j == k;
+    }
+
+    size_t hash(const ImageCacheHashKeyType& k) const
+    {
+      return k.hash();
+    }
+  };
+
+private:
+  struct Storage
+  {
+    Storage(const void* p, size_t i)
+      : m_data(p, i)
+    {
+    }
+
+    std::tuple<const void*, size_t> m_data;
+    mutable std::atomic<size_t> m_hash;
+
+    size_t hash() const
+    {
+      size_t h = m_hash.load(std::memory_order_relaxed);
+      if (h == 0) {
+        m_hash.store(boost::hash<std::tuple<const void*, size_t>>{}(m_data), std::memory_order_relaxed);
+      }
+      return h;
+    }
+  };
+
+  std::shared_ptr<Storage> m_storage;
+};
+
 template<typename K>
 struct ZHashCompare
 {
@@ -165,7 +233,7 @@ struct ZHashCompare
   }
 };
 
-using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ZImgPack::HashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ZImgPack::HashKeyType>>;
+using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ImageCacheHashKeyType::HashCompare>;
 
 class ZImgCache : public ZThreadSafeScalableImageCache
 {
@@ -176,13 +244,13 @@ public:
 
   ZImgCache();
 
-  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg> object)
+  inline void insert(const ImageCacheHashKeyType& key, std::shared_ptr<ZImg> object)
   {
     ZThreadSafeScalableImageCache::insert(key, object, object->byteNumber());
   }
 
   // never return nullptr, throw ZException on error
-  inline std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock,
+  inline std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key, const ZImgSubBlock& imgBlock,
                                          FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
@@ -195,7 +263,7 @@ public:
     }
   }
 
-  inline std::shared_ptr<ZImg> get(const ZImgPack::HashKeyType& key,
+  inline std::shared_ptr<ZImg> get(const ImageCacheHashKeyType& key,
                                    FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
@@ -206,7 +274,7 @@ public:
     }
   }
 
-  inline bool contains(const ZImgPack::HashKeyType& key,
+  inline bool contains(const ImageCacheHashKeyType& key,
                        FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
@@ -217,4 +285,18 @@ public:
 #endif
 
 }  // namespace nim
+
+namespace std {
+
+// custom specialization of std::hash can be injected in namespace std
+template<>
+struct hash<nim::ImageCacheHashKeyType>
+{
+  inline std::size_t operator()(const nim::ImageCacheHashKeyType& s) const noexcept
+  {
+    return s.hash();
+  }
+};
+
+} // namespace std
 
