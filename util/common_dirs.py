@@ -200,9 +200,9 @@ def qt_installer_framework_bin_dir() -> str:
 def vs_install_dir() -> str:
     assert sys.platform.startswith('win32')
 
-    vsinstalldir = r'C:\Program Files (x86)\Microsoft Visual Studio\2019\Community'
+    vsinstalldir = r'C:\Program Files\Microsoft Visual Studio\2022\Community'
     if not os.path.exists(vsinstalldir):
-        vsinstalldir = r'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise'
+        vsinstalldir = r'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
     assert os.path.exists(vsinstalldir)
 
     return vsinstalldir
@@ -403,7 +403,7 @@ def install_ffmpeg():
     if is_windows():
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*win*')
     elif is_linux():
-        unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*amd64*')
+        unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*linux*')
     else:
         folder = unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*macOS*')
         if 'feng' in os.path.expanduser("~"):
@@ -444,8 +444,8 @@ def get_ffmpeg_binary() -> str:
         folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*win*'))
         return os.path.join(folder, 'bin', 'ffmpeg.exe')
     elif is_linux():
-        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*amd64*'))
-        return os.path.join(folder, 'ffmpeg')
+        folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg*linux*'))
+        return os.path.join(folder, 'bin', 'ffmpeg')
     else:
         folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg'))
         return folder

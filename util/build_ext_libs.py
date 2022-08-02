@@ -222,7 +222,7 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
         if use_ninja:
             res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()])
         else:
-            res.extend(['-G', 'Visual Studio 16 2019', '-A', 'x64', '-T', 'host=x64'])
+            res.extend(['-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'host=x64'])
         return res
     elif is_linux():
         res = [get_cmake_binary(),  # '-E', 'echo',
@@ -934,7 +934,7 @@ def build_libsodium(src_dir: str, install_dir: str):
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'src', 'libsodium', 'include', 'sodium'),
                                          os.path.join(install_dir, 'include', 'sodium'))
 
-            glob_copy(os.path.join(src_dir, 'bin', 'x64', 'Release', 'v142', 'static', '*.lib'),
+            glob_copy(os.path.join(src_dir, 'bin', 'x64', 'Release', 'v143', 'static', '*.lib'),
                       os.path.join(install_dir, 'lib'))
 
             orig_file = os.path.join(install_dir, 'include', 'sodium', 'export.h')
@@ -1550,7 +1550,7 @@ def build_freeimage(src_dir: str, install_dir: str):
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
                             '/property:Configuration=Release', '/maxcpucount',
-                            '/property:PlatformToolset=v142',
+                            '/property:PlatformToolset=v143',
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
@@ -2003,7 +2003,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
 
         if not conda_build:
             if is_windows():
-                orig_file_2 = os.path.join(install_dir, 'x64', 'vc16', 'staticlib', 'OpenCVModules.cmake')
+                orig_file_2 = os.path.join(install_dir, 'x64', 'vc17', 'staticlib', 'OpenCVModules.cmake')
             else:
                 orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'opencv4', 'OpenCVModules.cmake')
             patch_file(orig_file_2,
