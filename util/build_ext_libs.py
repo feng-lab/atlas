@@ -11,7 +11,7 @@ from common_dirs import *
 
 
 def macos_min_version():
-    return '10.14'
+    return '10.15'
 
 
 def cpp_standard() -> int:
@@ -302,7 +302,8 @@ def build_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja())
                                cwd=build_dir, shell=False, check=True, env=env)
 
 
-def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja(), use_cmake=False):
+def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja(), use_cmake=False,
+                               ninja_para: str='install'):
     if is_windows():
         if env is None:
             env = get_vcvars_environment()
@@ -311,7 +312,7 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=
             subprocess.run([get_cmake_binary(), '--build', '.'],
                            cwd=build_dir, shell=False, check=True, env=env)
         elif use_ninja:
-            subprocess.run([get_ninja_binary(), 'install'],
+            subprocess.run([get_ninja_binary(), ninja_para],
                            cwd=build_dir, shell=False, check=True, env=env)
         else:
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
@@ -329,11 +330,11 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=
         elif use_ninja:
             if env is None:
                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run([get_ninja_binary(), 'install'],
+                subprocess.run([get_ninja_binary(), ninja_para],
                                cwd=build_dir, shell=False, check=True)
             else:
                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run([get_ninja_binary(), 'install'],
+                subprocess.run([get_ninja_binary(), ninja_para],
                                cwd=build_dir, shell=False, check=True, env=env)
         else:
             if env is None:
@@ -2021,6 +2022,27 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             os.replace(bak_file3, orig_file3)
 
 
+def build_llfio(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        cmakecmd.extend(['-DLLFIO_FORCE_NETWORKING_OFF:BOOL=ON',
+                         '-DLLFIO_USE_EXPERIMENTAL_SG14_STATUS_CODE:BOOL=OFF',
+                         '-DLLFIO_FORCE_COROUTINES_OFF:BOOL=ON',
+                         '-DLLFIO_FORCE_CONCEPTS_OFF:BOOL=ON',
+                         '-DLLFIO_FORCE_OPENSSL_OFF:BOOL=ON',
+                         '-DPROJECT_IS_DEPENDENCY:BOOL=ON',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir, ninja_para='install.sl')
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        print()
+
+
 def build_conda_zimg(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -2456,6 +2478,12 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_contrib_dir)
         build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
+    if libs['llfio']:
+        src_dir = os.path.join(ext_dir(), 'llfio')
+        if update_src:
+            update_git_submodule(src_dir)
+        build_llfio(src_dir, ext_build_dir())
+
     # if libs['botan']:
     #     src_dir = os.path.join(ext_dir(), 'botan')
     #     if update_src:
@@ -2552,7 +2580,8 @@ def parse_inputs(argv: list):
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia', 'neuTube',
+                'opencv', 'llfio', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
+                'neuTube',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
