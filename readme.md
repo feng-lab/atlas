@@ -57,6 +57,7 @@
 
 ## Visual Studio Update
 * $Repository_DIR/util/common_dirs.py: 200: def vs_install_dir() -> str ...
+* $Repository_DIR/util/common_dirs.py: change all 'v142' to 'v143'
 * $Repository_DIR/util/build_atlas.py: 19: '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'host=x64'
 * $Repository_DIR/util/build_ext_libs.py: 225: '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'host=x64'
 * $Repository_DIR/util/build_ext_libs.py: change all 'v142' to 'v143'

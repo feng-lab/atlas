@@ -925,6 +925,8 @@ def build_libsodium(src_dir: str, install_dir: str):
     try:
         if is_windows():
             env = get_vcvars_environment()
+            subprocess.run(['devenv', 'libsodium.sln', '/Upgrade'],
+                           cwd=os.path.join(src_dir, 'builds', 'msvc', 'vs2019'), shell=True, check=True, env=env)
             subprocess.run(['MSBuild', 'libsodium.sln', '/target:libsodium', '/property:Platform=x64',
                             '/property:Configuration=StaticRelease', '/maxcpucount'],
                            cwd=os.path.join(src_dir, 'builds', 'msvc', 'vs2019'), shell=True, check=True, env=env)
