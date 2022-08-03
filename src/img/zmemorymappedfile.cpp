@@ -1,6 +1,5 @@
 #include "zmemorymappedfile.h"
 
-#include "zlog.h"
 #include <QFileInfo>
 #include <QDir>
 
@@ -16,17 +15,12 @@ ZMemoryMappedFile::ZMemoryMappedFile(QString filename)
                                       llfio::mapped_file_handle::caching::all,
                                       llfio::mapped_file_handle::flag::disable_prefetching
   );
-  if (mmfResult.has_value()) {
+  if (mmfResult.has_value() && mmfResult.value().is_valid()) {
     m_mappedFileHandle = std::move(mmfResult.value());
     m_mappedFileHandleIsValid = true;
     LOG(INFO) << "created memory mapped file for " << filename;
-  }
-}
-
-void ZMemoryMappedFile::readToBuffer(size_t offset, size_t length, void* buffer)
-{
-  if (m_mappedFileHandleIsValid) {
-    memcpy(buffer, m_mappedFileHandle.address() + offset, length);
+  } else {
+    LOG(ERROR) << "error creating memory mapped file for " << filename << ": " << mmfResult.error().message();
   }
 }
 

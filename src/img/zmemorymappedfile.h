@@ -1,5 +1,6 @@
 #pragma once
 
+#include "zlog.h"
 #include <llfio.hpp>
 #include <QString>
 
@@ -15,9 +16,13 @@ class ZMemoryMappedFile
 public:
   explicit ZMemoryMappedFile(QString filename);
 
-  void readToBuffer(size_t offset, size_t length, void* buffer);
+  inline void readToBuffer(size_t offset, size_t length, void* buffer)
+  {
+    CHECK(m_mappedFileHandleIsValid);
+    memcpy(buffer, m_mappedFileHandle.address() + offset, length);
+  }
 
-  bool isValid() const
+  inline bool isValid() const
   {
     return m_mappedFileHandleIsValid;
   }
