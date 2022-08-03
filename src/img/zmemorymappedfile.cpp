@@ -13,7 +13,7 @@ ZMemoryMappedFile::ZMemoryMappedFile(QString filename)
                                       llfio::mapped_file_handle::mode::read,
                                       llfio::mapped_file_handle::creation::open_existing,
                                       llfio::mapped_file_handle::caching::all,
-                                      llfio::mapped_file_handle::flag::none
+                                      llfio::mapped_file_handle::flag::multiplexable
   );
   if (mmfResult.has_value() && mmfResult.value().is_valid()) {
     m_mappedFileHandle = std::move(mmfResult.value());
