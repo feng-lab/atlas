@@ -550,6 +550,21 @@ void Z3DImg::uploadImageCache(size_t channel)
   );
   STOP_AND_LOG(bt_cc)
 
+  ZBenchTimer bt_preload1(fmt::format("preload cache keys (without insert) for image ch{}", channel));
+  bt_preload1.start();
+  std::vector<ImageCacheHashKeyType> missingCacheKeys1;
+  missingCacheKeys1.reserve(ccKeySet.size());
+  missingCacheKeys1.insert(missingCacheKeys1.end(), ccKeySet.begin(), ccKeySet.end());
+  LOG(INFO) << "preloading " << missingCacheKeys1.size() << " image pieces...";
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, missingCacheKeys1.size()),
+                    [&](const tbb::blocked_range<size_t>& r) {
+                      for (auto i = r.begin(); i != r.end(); ++i) {
+                        m_imgPack.preLoadImageCache(missingCacheKeys1[i], false);
+                      }
+                    }
+  );
+  STOP_AND_LOG(bt_preload1)
+
   ZBenchTimer bt_preload(fmt::format("preload cache keys for image ch{}", channel));
   bt_preload.start();
   std::vector<ImageCacheHashKeyType> missingCacheKeys;
