@@ -44,27 +44,19 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
   return m_img->info();
 }
 
-ZImgPack::ZImgPack(ZImgSource imgSource,
-                   const ZImgInfo* info, const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock)
+ZImgPack::ZImgPack(ZImgSource imgSource)
   : m_imgSource(std::move(imgSource))
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
-  const std::vector<std::shared_ptr<ZImgSubBlock>>* sceneSubBlock = nullptr;
-  std::vector<std::shared_ptr<ZImgSubBlock>> ssb;
-  if (info && subBlock) {
-    m_imgInfo = *info;
-    sceneSubBlock = subBlock;
-  } else {
-    ZImgIO::instance().readInfo(m_imgSource, m_imgInfo, &ssb);
-    sceneSubBlock = &ssb;
-  }
+  std::vector<std::shared_ptr<ZImgSubBlock>> sceneSubBlock;
+  ZImgIO::instance().readInfo(m_imgSource, m_imgInfo, &sceneSubBlock);
   ZImgIO::instance().readMetadata(m_imgSource, m_imgMetaData);
 
   m_minMaxState = MinMaxState::Invalid;
 
   bool hasPyramidal = false;
-  for (const auto & b : *sceneSubBlock) {
+  for (const auto& b: sceneSubBlock) {
     if (b->xRatio > 1) {
       hasPyramidal = true;
       break;
@@ -78,7 +70,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource,
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
   } else if (hasPyramidal || !needScale) {
-    buildFastReadIndex(*sceneSubBlock);
+    buildFastReadIndex(sceneSubBlock);
   } else {
     buildPyramidal();
   }

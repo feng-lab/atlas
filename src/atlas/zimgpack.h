@@ -40,9 +40,7 @@ public:
     Invalid, Partial, Complete
   };
 
-  explicit ZImgPack(ZImgSource imgSource,
-                    const ZImgInfo* info = nullptr,
-                    const std::vector<std::shared_ptr<ZImgSubBlock>>* subBlock = nullptr);
+  explicit ZImgPack(ZImgSource imgSource);
 
   virtual ~ZImgPack() = default;
 

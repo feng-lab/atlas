@@ -2038,6 +2038,9 @@ def build_llfio(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, ninja_para='install.sl')
+        shutil.copytree(os.path.join(build_dir, 'install'),
+                        os.path.join(ext_build_dir()),
+                        dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         print()

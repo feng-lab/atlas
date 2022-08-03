@@ -6,6 +6,7 @@
 #include "zimgblockprovider.h"
 #include "zlog.h"
 #include "zimginfoio.h"
+#include "zmemorymappedfilecache.h"
 #include <QFile>
 #include <QMutexLocker>
 #include <QProcess>
@@ -551,6 +552,7 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName, std::vector<std::string> ti
   m_chunkImgInfo = m_info;
   m_chunkImgInfo.width = chunkWidth;
   m_chunkImgInfo.height = chunkHeight;
+  m_mmf = ZMemoryMappedFileCache::instance().getMemoryMappedFile(m_filename);
 }
 
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
@@ -567,31 +569,57 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
       }
 
       auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
-      std::ifstream inputFileStream;
-      openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
       res = std::make_shared<ZImg>(m_chunkImgInfo);
-      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
-      for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
-        auto& hdf5Tile = m_hdf5Tiles[c];
-        if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
-          continue;
+      if (m_mmf) {
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
+        for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
+          auto& hdf5Tile = m_hdf5Tiles[c];
+          if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
+            continue;
+          }
+          m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, chunkBuf.data());
+          if (hdf5Tile.compressed) {
+            auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
+            //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+            //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+            //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
+            //LOG(INFO) << m_info.toQString();
+            //LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+            //auto decompressedBuf = codec->uncompress(ioBuf.get());
+            //LOG(INFO) << decompressedBuf->length();
+            auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
+            std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+          } else {
+            CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
+            std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
+          }
         }
-        inputFileStream.seekg(hdf5Tile.offset);
-        readStream(inputFileStream, chunkBuf.data(), hdf5Tile.length);
-        if (hdf5Tile.compressed) {
-          auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
-          //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
-          //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
-          //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
-          //LOG(INFO) << m_info.toQString();
-          //LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
-          //auto decompressedBuf = codec->uncompress(ioBuf.get());
-          //LOG(INFO) << decompressedBuf->length();
-          auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
-          std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
-        } else {
-          CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
-          std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
+      } else {
+        std::ifstream inputFileStream;
+        openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
+        for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
+          auto& hdf5Tile = m_hdf5Tiles[c];
+          if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
+            continue;
+          }
+          inputFileStream.seekg(hdf5Tile.offset);
+          readStream(inputFileStream, chunkBuf.data(), hdf5Tile.length);
+          if (hdf5Tile.compressed) {
+            auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
+            //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+            //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+            //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
+            //LOG(INFO) << m_info.toQString();
+            //LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+            //auto decompressedBuf = codec->uncompress(ioBuf.get());
+            //LOG(INFO) << decompressedBuf->length();
+            auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
+            std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+          } else {
+            CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
+            std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
+          }
         }
       }
       if (m_chunkImgInfo.width != m_info.width || m_chunkImgInfo.height != m_info.height) {
@@ -677,6 +705,7 @@ void ZImgHDF5::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
 {
   std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> hdf5Chunks;
   if (subBlocks) {
+    ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
     hdf5Chunks = parseHDF5Chunks(filename);
   }
   try {

@@ -308,3 +308,7 @@ message(STATUS "VTK_LIBRARIES: ${VTK_LIBRARIES}")
 print_target_properties(VTK::FiltersGeometry)
 print_target_properties(VTK::FiltersSources)
 print_target_properties(VTK::IOXML)
+
+find_package(llfio REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(llfio::sl)

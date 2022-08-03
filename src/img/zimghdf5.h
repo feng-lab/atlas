@@ -5,6 +5,8 @@
 
 namespace nim {
 
+class ZMemoryMappedFile;
+
 struct HDF5ChunkInfo {
   size_t offset = 0;
   size_t length = 0;
@@ -38,6 +40,7 @@ protected:
   // std::unique_ptr<folly::io::Codec> m_codec;
   ZImgInfo m_chunkImgInfo;
   bool m_emptyBlock = false;
+  ZMemoryMappedFile* m_mmf = nullptr;
 };
 
 class ZImgHDF5 : public ZImgFormat

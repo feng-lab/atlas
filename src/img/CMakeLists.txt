@@ -251,7 +251,7 @@ set(IMG_SOURCES
     zmesh.h zmesh.cpp
     zmeshio.h zmeshio.cpp
     zmeshutils.h zmeshutils.cpp
-    zimginterpolate.h zimginterpolate.cpp zimgblockprovider.cpp)
+    zimginterpolate.h zimginterpolate.cpp zimgblockprovider.cpp zmemorymappedfile.cpp zmemorymappedfile.h zmemorymappedfilecache.cpp zmemorymappedfilecache.h)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -393,7 +393,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       GeometricTools glm::glm
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
                       ${VTK_LIBRARIES} assimp::assimp
-                      glog::glog ${_QT_LIBS_})
+                      glog::glog llfio::sl ${_QT_LIBS_})
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
