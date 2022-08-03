@@ -580,7 +580,7 @@ void ZImgPack::preLoadImageCache(const ImageCacheHashKeyType& key, bool doInsert
     ZImgCache::instance().insert(ImageCacheHashKeyType(this, index), m_allTiles[index]->read());
   } else {
     auto img = m_allTiles[index]->read();
-    CHECK(img->width() == 512);
+    CHECK(img->width() <= 512);
   }
 }
 
