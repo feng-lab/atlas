@@ -569,19 +569,24 @@ std::set<ImageCacheHashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(ind
   return res;
 }
 
-void ZImgPack::preLoadImageCache(const ImageCacheHashKeyType& key, bool doInsert) const
+void ZImgPack::preloadImageCache(const ImageCacheHashKeyType& key) const
 {
 #ifdef USE_KeyWithMemoizedHash
   auto index = key.index();
 #else
   auto index = std::get<1>(key);
 #endif
-  if (doInsert) {
-    ZImgCache::instance().insert(ImageCacheHashKeyType(this, index), m_allTiles[index]->read());
-  } else {
-    auto img = m_allTiles[index]->read();
-    CHECK(img->width() <= 512);
-  }
+  ZImgCache::instance().insert(ImageCacheHashKeyType(this, index), m_allTiles[index]->read());
+}
+
+void ZImgPack::prefetchImageCache(const ImageCacheHashKeyType& key) const
+{
+#ifdef USE_KeyWithMemoizedHash
+  auto index = key.index();
+#else
+  auto index = std::get<1>(key);
+#endif
+  m_allTiles[index]->prefetch();
 }
 
 const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const

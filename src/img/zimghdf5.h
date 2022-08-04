@@ -28,6 +28,8 @@ public:
 
   void setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfos);
 
+  void prefetch() const override;
+
 protected:
   QString m_filename;
   std::vector<std::string> m_tiles;  // cat in Dimension::C

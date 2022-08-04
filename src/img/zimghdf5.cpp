@@ -683,6 +683,16 @@ void ZImgHDF5SubBlock::setHDF5ChunkInfos(const std::vector<HDF5ChunkInfo>& cinfo
   }
 }
 
+void ZImgHDF5SubBlock::prefetch() const
+{
+  if (m_mmf) {
+    for (const auto& hdf5Tile : m_hdf5Tiles) {
+      if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) { continue; }
+      m_mmf->prefetch(hdf5Tile.offset, hdf5Tile.length);
+    }
+  }
+}
+
 QString ZImgHDF5::shortName() const
 {
   return "HDF5 img";

@@ -444,6 +444,8 @@ public:
 
   [[nodiscard]] virtual ZImgInfo readInfo() const = 0;
 
+  virtual void prefetch() const {}
+
   size_t t;   // start t
   index_t x;   // actual start x regardless of ratio
   index_t y;   // actual start y regardless of ratio
