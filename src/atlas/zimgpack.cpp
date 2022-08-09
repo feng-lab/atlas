@@ -472,7 +472,7 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 }
 
 void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                               ZImg& res) const
+                               const ZImgInfo& resInfo, ZImg& res) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   //ZBenchTimer bt_read(fmt::format("reading and assembling image block"));
@@ -482,48 +482,45 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   TileBoxType queryBox(TileCornerType(sx * xyRatio,
                                       sy * xyRatio,
                                       sz * zRatio),
-                       TileCornerType((sx + static_cast<index_t>(res.width())) * xyRatio - 1,
-                                      (sy + static_cast<index_t>(res.height())) * xyRatio - 1,
-                                      (sz + static_cast<index_t>(res.depth())) * zRatio - 1));
-  auto tmpResInfo = res.info();
-  tmpResInfo.width = std::ceil(res.width() * xyRatio * 1.0 / readRatio[0]);
-  tmpResInfo.height = std::ceil(res.height() * xyRatio * 1.0 / readRatio[1]);
-  tmpResInfo.depth = std::ceil(res.depth() * zRatio * 1.0 / readRatio[2]);
-  ZImg tmpRes(tmpResInfo);
+                       TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                      (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                      (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+  auto tmpResInfo = resInfo;
+  tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+  tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+  tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+  res = ZImg(tmpResInfo);
   auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
   if (tiit != m_rtToTileBoxRTree.end()) {
     std::vector<RTreeValueType> queryResult;
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-    for (auto & i : queryResult) {
+    for (auto& i: queryResult) {
       const ZImgSubBlock& tile = *m_allTiles[i.second].get();
       ZVoxelCoordinate start(std::round((tile.x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                              std::round((tile.y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
                              std::round((tile.z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                              -ZVoxelCoordinate::value_type(sc),
                              0);
-      std::shared_ptr<ZImg> imgPtr;
-      imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), tile,
-                                               ZImgCache::FindStategy::NoUpdateLRUList);
-      if (imgPtr->isSameType(tmpRes)) {
+      auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), tile,
+                                                    ZImgCache::FindStategy::NoUpdateLRUList);
+      if (imgPtr->isSameType(res)) {
         if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
           ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
-          tmpRes.pasteImg(tmp, start);
+          res.pasteImg(tmp, start);
         } else {
-          tmpRes.pasteImg(*imgPtr, start);
+          res.pasteImg(*imgPtr, start);
         }
       } else {
-        ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, tmpRes);
-        tmpRes.pasteImg(tmp, start);
+        ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+        res.pasteImg(tmp, start);
       }
     }
   }
   //bt_read.pause();
-  if (tmpRes.width() != res.width() || tmpRes.height() != res.height() || tmpRes.depth() != res.depth()) {
-    tmpRes.resize(res.width(), res.height(), res.depth());
+  if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
+    res.resize(resInfo.width, resInfo.height, resInfo.depth);
   }
   //bt_read.resume();
-
-  res.swap(tmpRes);
   //STOP_AND_LOG(bt_read)
 }
 

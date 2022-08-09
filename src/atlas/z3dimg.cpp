@@ -587,15 +587,17 @@ void Z3DImg::uploadImageCache(size_t channel)
                     [&](const tbb::blocked_range<size_t>& r) {
                       for (auto i = r.begin(); i != r.end(); ++i) {
                         const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-                        imgs[i] = ZImg(ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
-                                                m_imageBlockSize.y + m_imageBlockSizePad.y,
-                                                m_imageBlockSize.z + m_imageBlockSizePad.z,
-                                                1));
                         m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                                                  channel, 0, imgs[i]);
+                                                  channel,
+                                                  0,
+                                                  ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
+                                                           m_imageBlockSize.y + m_imageBlockSizePad.y,
+                                                           m_imageBlockSize.z + m_imageBlockSizePad.z,
+                                                           1),
+                                                  imgs[i]);
                       }
                     }
   );
