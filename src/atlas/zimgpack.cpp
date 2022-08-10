@@ -533,7 +533,6 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
   tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
   tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  auto ioExecutor = folly::getGlobalIOExecutor();
   return folly::via(cpuExecutor, [=]() {
     auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
     std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
@@ -550,17 +549,18 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
       for (auto& i: queryResult) {
         const ZImgSubBlock* tile = m_allTiles[i.second].get();
         tileFutures.push_back(folly::via(cpuExecutor, [=]() {
-          return std::make_tuple(ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
-                                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
-                                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
-                                                  -ZVoxelCoordinate::value_type(sc),
-                                                  0),
-                                 ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile));
+          return folly::collect(
+            folly::makeFuture(ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                               std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                               std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                               -ZVoxelCoordinate::value_type(sc),
+                                               0)),
+            ZImgCache::instance().getOrReadAsync(ImageCacheHashKeyType(this, i.second), *tile));
         }));
       }
     }
     return folly::collect(tileFutures);
-  }).then([=](const folly::Try<std::vector<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>>& tiles) {
+  }).via(cpuExecutor).then([=](const folly::Try<std::vector<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>>& tiles) {
     ZImg res(tmpResInfo);
     if (tiles.hasValue()) {
       for (const auto& [start, imgPtr]: tiles.value()) {

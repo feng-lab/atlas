@@ -3,6 +3,7 @@
 #include "zimg.h"
 #include "zthreadsafescalablecache.h"
 #include <QReadWriteLock>
+#include <folly/futures/Future.h>
 #include <boost/functional/hash.hpp>
 #include <list>
 #include <unordered_map>
@@ -273,6 +274,28 @@ public:
       insert(key, res);
       return res;
     }
+  }
+
+  // never return nullptr, throw ZException on error
+  inline folly::Future<std::shared_ptr<ZImg>>
+  getOrReadAsync(const ImageCacheHashKeyType& key, const ZImgSubBlock& imgBlock,
+                 FindStategy findStategy = FindStategy::UpdateLRUList)
+  {
+    auto cpuExecutor = folly::getGlobalCPUExecutor();
+    auto ioExecutor = folly::getGlobalIOExecutor();
+    return folly::via(cpuExecutor, [=, &imgBlock]() {
+      ZThreadSafeScalableImageCache::ConstAccessor ca;
+      if (find(ca, key, findStategy)) {
+        return folly::makeFuture(*ca);
+      } else {
+        return folly::via(ioExecutor, [=, &imgBlock]() {
+          return imgBlock.read();
+        }).via(cpuExecutor).then([=](folly::Try<std::shared_ptr<ZImg>> res) {
+          insert(key, res.value());
+          return res.value();
+        });
+      }
+    });
   }
 
   inline std::shared_ptr<ZImg> get(const ImageCacheHashKeyType& key,
