@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include "zimgcache.h"
 #include <QRectF>
+#include <folly/futures/Future.h>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
@@ -132,6 +133,9 @@ public:
 
   void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
                        const ZImgInfo& resInfo, ZImg& res) const;
+
+  folly::Future<ZImg> readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc,
+                                      size_t t, const ZImgInfo& resInfo) const;
 
   std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                      index_t zRatio,

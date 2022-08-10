@@ -571,15 +571,14 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
       auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
       res = std::make_shared<ZImg>(m_chunkImgInfo);
       if (m_mmf) {
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
         for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
           auto& hdf5Tile = m_hdf5Tiles[c];
           if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
             continue;
           }
-          m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, chunkBuf.data());
           if (hdf5Tile.compressed) {
-            auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
+            m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
+            auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
             //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
             //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
             //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
@@ -591,22 +590,21 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
           } else {
             CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
-            std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
+            m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
           }
         }
       } else {
         std::ifstream inputFileStream;
         openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> chunkBuf(res->channelByteNumber());
         for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
           auto& hdf5Tile = m_hdf5Tiles[c];
           if (hdf5Tile.offset == 0 && hdf5Tile.length == 0) {
             continue;
           }
           inputFileStream.seekg(hdf5Tile.offset);
-          readStream(inputFileStream, chunkBuf.data(), hdf5Tile.length);
           if (hdf5Tile.compressed) {
-            auto ioBuf = folly::IOBuf::wrapBuffer(chunkBuf.data(), hdf5Tile.length);
+            readStream(inputFileStream, res->channelData(c), hdf5Tile.length);
+            auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
             //LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
             //LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
             //LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
@@ -618,7 +616,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
           } else {
             CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
-            std::memcpy(res->channelData(c), chunkBuf.data(), res->channelByteNumber());
+            readStream(inputFileStream, res->channelData(c), hdf5Tile.length);
           }
         }
       }
@@ -636,7 +634,6 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
-  // todo: fix hdf5 multithread reading
   static QMutex mutex;
   QMutexLocker lock(&mutex);
   try {

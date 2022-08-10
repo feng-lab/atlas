@@ -523,9 +523,9 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
   bt.start();
 
-  //m_imgPack.stopCacheEviction();
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
+#if 0
   ZBenchTimer bt_cc(fmt::format("collect reading cache keys for image ch{}", channel));
   bt_cc.start();
   tbb::concurrent_unordered_set<ImageCacheHashKeyType> ccKeySet;
@@ -602,8 +602,27 @@ void Z3DImg::uploadImageCache(size_t channel)
                     }
   );
   STOP_AND_LOG(bt_read)
-
-  //m_imgPack.resumeCacheEviction();
+#else
+  ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
+  bt_async.start();
+  std::vector<folly::Future<ZImg>> imgFutures;
+  imgFutures.reserve(m_channelPendingUpdates[channel].size());
+  for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
+    const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
+    imgFutures.push_back(m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
+                                                   index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                                                   index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                                                   index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                                                   channel,
+                                                   0,
+                                                   ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
+                                                            m_imageBlockSize.y + m_imageBlockSizePad.y,
+                                                            m_imageBlockSize.z + m_imageBlockSizePad.z,
+                                                            1)));
+  }
+  auto imgs = folly::collect(imgFutures).wait().value();
+  STOP_AND_LOG(bt_async)
+#endif
 
   ZBenchTimer bt_upload(fmt::format("uploading image blocks to GPU for image ch{}", channel));
   bt_upload.start();

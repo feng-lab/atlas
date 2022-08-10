@@ -413,7 +413,7 @@ inline void ZThreadSafeLRUCache<TKey, TValue, THash>::pushFront(ListNode* node)
 template<class TKey, class TValue, class THash>
 void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
 {
-  while (m_size.load(std::memory_order_relaxed) > m_maxSize) {
+  while (m_size.load(std::memory_order_consume) > m_maxSize) {
     std::unique_lock<ListMutex> lock(m_listMutex);
     ListNode* moribund = m_tail.m_prev;
     if (moribund == &m_head) {

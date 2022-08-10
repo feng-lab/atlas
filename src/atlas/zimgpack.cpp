@@ -478,13 +478,6 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   //ZBenchTimer bt_read(fmt::format("reading and assembling image block"));
   //bt_read.start();
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
-
-  TileBoxType queryBox(TileCornerType(sx * xyRatio,
-                                      sy * xyRatio,
-                                      sz * zRatio),
-                       TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
-                                      (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
-                                      (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
   auto tmpResInfo = resInfo;
   tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
   tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
@@ -493,6 +486,12 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
   if (tiit != m_rtToTileBoxRTree.end()) {
     std::vector<RTreeValueType> queryResult;
+    TileBoxType queryBox(TileCornerType(sx * xyRatio,
+                                        sy * xyRatio,
+                                        sz * zRatio),
+                         TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                        (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                        (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
     tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
     for (auto& i: queryResult) {
       const ZImgSubBlock& tile = *m_allTiles[i.second].get();
@@ -522,6 +521,67 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   }
   //bt_read.resume();
   //STOP_AND_LOG(bt_read)
+}
+
+folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz,
+                                              size_t sc, size_t t, const ZImgInfo& resInfo) const
+{
+  CHECK(xyRatio >= 1 && zRatio >= 1);
+  auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+  auto tmpResInfo = resInfo;
+  tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+  tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+  tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
+  auto ioExecutor = folly::getGlobalIOExecutor();
+  return folly::via(cpuExecutor, [=]() {
+    auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+    std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
+    if (tiit != m_rtToTileBoxRTree.end()) {
+      std::vector<RTreeValueType> queryResult;
+      TileBoxType queryBox(TileCornerType(sx * xyRatio,
+                                          sy * xyRatio,
+                                          sz * zRatio),
+                           TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                          (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                          (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+      tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
+
+      for (auto& i: queryResult) {
+        const ZImgSubBlock* tile = m_allTiles[i.second].get();
+        tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+          return std::make_tuple(ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                                  -ZVoxelCoordinate::value_type(sc),
+                                                  0),
+                                 ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile));
+        }));
+      }
+    }
+    return folly::collect(tileFutures);
+  }).then([=](const folly::Try<std::vector<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>>& tiles) {
+    ZImg res(tmpResInfo);
+    if (tiles.hasValue()) {
+      for (const auto& [start, imgPtr]: tiles.value()) {
+        if (imgPtr->isSameType(res)) {
+          if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+            ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+            res.pasteImg(tmp, start);
+          } else {
+            res.pasteImg(*imgPtr, start);
+          }
+        } else {
+          ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+          res.pasteImg(tmp, start);
+        }
+      }
+      if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
+        res.resize(resInfo.width, resInfo.height, resInfo.depth);
+      }
+    }
+    return res;
+  });
 }
 
 std::set<ImageCacheHashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(index_t xyRatio,
