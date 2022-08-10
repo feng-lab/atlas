@@ -549,6 +549,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
       for (auto& i: queryResult) {
         const ZImgSubBlock* tile = m_allTiles[i.second].get();
         tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+#if 0
           return folly::collect(
             folly::makeFuture(ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                                std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
@@ -556,6 +557,14 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
                                                -ZVoxelCoordinate::value_type(sc),
                                                0)),
             ZImgCache::instance().getOrReadAsync(ImageCacheHashKeyType(this, i.second), *tile));
+#else
+          return std::make_tuple(ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                                  -ZVoxelCoordinate::value_type(sc),
+                                                  0),
+                                 ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile));
+#endif
         }));
       }
     }
