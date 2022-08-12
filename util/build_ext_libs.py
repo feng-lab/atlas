@@ -101,17 +101,20 @@ def glob_remove(files: str):
         print(f'{file} removed')
 
 
-def get_vcvars_environment(remove_conda_from_path: bool = True):
+def get_vcvars_environment(remove_conda_from_path: bool = True,
+                           remove_scoop_from_path: bool = True):
     """
     Returns a dictionary containing the environment variables set up by vcvarsall.bat amd64
     """
 
     vcvars = os.path.normpath(os.path.join(vs_install_dir(), 'VC', 'Auxiliary', 'Build', 'vcvarsall.bat'))
-    return get_enviroment_from_shell_script(vcvars, 'x64', remove_conda_from_path=remove_conda_from_path)
+    return get_enviroment_from_shell_script(vcvars, 'x64', remove_conda_from_path=remove_conda_from_path,
+                                            remove_scoop_from_path=remove_scoop_from_path)
 
 
 def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.environ,
-                                     remove_conda_from_path: bool = True):
+                                     remove_conda_from_path: bool = True,
+                                     remove_scoop_from_path: bool = True):
     python = sys.executable
     if is_windows():
         process = subprocess.Popen(
@@ -134,6 +137,8 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
     if remove_conda_from_path:
         remove_path_contains('miniconda', env)
         remove_path_contains('anaconda', env)
+    if remove_scoop_from_path:
+        remove_path_contains('scoop', env)
     remove_path_contains('mingw', env)
     env['PATH'] += r';C:\Program Files\LLVM\bin'
     return env
@@ -177,8 +182,12 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
     return res
 
 
-def get_env_for_config_make(cpp_standard: int = cpp_standard()):
-    env = get_vcvars_environment() if is_windows() else os.environ.copy()
+def get_env_for_config_make(cpp_standard: int = cpp_standard(),
+                            remove_conda_from_path: bool = True,
+                            remove_scoop_from_path: bool = True
+                            ):
+    env = get_vcvars_environment(remove_conda_from_path=remove_conda_from_path,
+                                 remove_scoop_from_path=remove_scoop_from_path) if is_windows() else os.environ.copy()
     cbf = get_common_build_flags(cpp_standard=cpp_standard)
     if is_mac():
         env['CC'] = cbf['CC']
@@ -591,7 +600,7 @@ def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
             subprocess.run(['make', 'install_sw'],
                            cwd=src_dir, shell=False, check=True, env=env)
         elif is_windows():
-            env = get_env_for_config_make()
+            env = get_env_for_config_make(remove_scoop_from_path=False)
             env['PATH'] = f'{env["PATH"]};{nasm_dir}'
             subprocess.run(['perl', './Configure',
                             'VC-WIN64A',
@@ -2601,7 +2610,7 @@ def parse_inputs(argv: list):
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'llfio', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'llfio', 'conda-zimg', 'skia',
                 'neuTube',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
