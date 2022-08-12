@@ -574,6 +574,7 @@ void Z3DImg::uploadImageCache(size_t channel)
       imgQueue.blockingWrite(std::make_tuple(i, std::move(img.value())));
     });
   }
+  LOG(INFO) << "start uploading image blocks.";
   std::tuple<size_t, ZImg> elem;
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     imgQueue.blockingRead(elem);
