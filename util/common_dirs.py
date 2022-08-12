@@ -7,6 +7,7 @@ import tarfile
 import zipfile
 import stat
 import subprocess
+import errno
 
 
 def use_clang_cl() -> bool:
@@ -449,6 +450,15 @@ def get_ffmpeg_binary() -> str:
     else:
         folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'ffmpeg'))
         return folder
+
+
+def handleRemoveReadonly(func, path, exc):
+  excvalue = exc[1]
+  if func in (os.rmdir, os.unlink, os.remove) and excvalue.errno == errno.EACCES:
+      os.chmod(path, stat.S_IRWXU| stat.S_IRWXG| stat.S_IRWXO) # 0777
+      func(path)
+  else:
+      raise
 
 
 if __name__ == "__main__":
