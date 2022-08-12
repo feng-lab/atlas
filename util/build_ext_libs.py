@@ -909,6 +909,14 @@ def build_zstd(src_dir: str, install_dir: str):
                                               ],
                                   to_texts=[r'',
                                             ])
+        elif is_mac():
+            orig_file = os.path.join(src_dir, 'lib', 'zstd.h')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
+                                              ],
+                                  to_texts=['#define ZSTD_DISABLE_DEPRECATE_WARNINGS\n'
+                                            '#ifdef ZSTD_DISABLE_DEPRECATE_WARNINGS',
+                                            ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DZSTD_USE_STATIC_RUNTIME:BOOL=OFF',
@@ -918,7 +926,7 @@ def build_zstd(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_windows():
+        if is_windows() or is_mac():
             os.replace(bak_file, orig_file)
 
 
@@ -1170,6 +1178,16 @@ def build_eigen(src_dir: str, install_dir: str):
         #                          '{ return _mm256_insertf128_pd (_mm256_castpd128_pd256 (__L), __H, 1); }\n'
         #                          '#endif\n',
         #                          ])
+
+        if is_mac():
+            orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'misc', 'lapacke_helpers.h')
+            bak_file_1 = patch_file(orig_file_1,
+                                    from_texts=[r'template<UpLoType mode> char translate_mode',
+                                                r"template<> constexpr char translate_mode<Upper> = 'U';"
+                                                ],
+                                    to_texts=['namespace{\ntemplate<UpLoType mode> char translate_mode',
+                                              "template<> constexpr char translate_mode<Upper> = 'U';\n}"
+                                              ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
