@@ -953,9 +953,16 @@ ZImg& ZImg::pasteImg(const ZImg& img, const ZVoxelCoordinate& start, bool warnin
 {
   using TCoordinate = ZVoxelCoordinate::value_type;
 
-  if (isEmpty() || img.isEmpty()) {
+  if (isEmpty()) {
     if (warningOn) {
-      LOG(WARNING) << "Trying to paste empty img, abort";
+      LOG(WARNING) << "Trying to paste to empty img, abort";
+    }
+    return *this;
+  }
+
+  if (img.isEmpty()) {
+    if (warningOn) {
+      LOG(WARNING) << "Trying to paste from empty img, abort";
     }
     return *this;
   }

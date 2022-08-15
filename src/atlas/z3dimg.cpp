@@ -556,12 +556,14 @@ void Z3DImg::uploadImageCache(size_t channel)
 #else
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   bt_async.start();
-  folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+  folly::MPMCQueue<size_t> imgQueue(m_channelPendingUpdates[channel].size());
+  std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
+#if 0
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-    auto f = folly::via(cpuExecutor, [=]() {
-      return m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x, m_levelScales[blockImagePos.x].z,
+    auto f = m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x,
+                                       m_levelScales[blockImagePos.x].z,
                                        index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                        index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
                                        index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
@@ -570,18 +572,35 @@ void Z3DImg::uploadImageCache(size_t channel)
                                        ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
                                                 m_imageBlockSize.y + m_imageBlockSizePad.y,
                                                 m_imageBlockSize.z + m_imageBlockSizePad.z,
-                                                1));
-    }).then([=, &imgQueue](folly::Try<ZImg> img) {
-      imgQueue.blockingWrite(std::make_tuple(i, std::move(img.value())));
+                                                1)
+    ).thenValue([=, &imgQueue](ZImg&& img) {
+      imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
     });
+#else
+    const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
+    auto f = m_imgPack.readRegionToImgAsync(m_levelScales[blockImagePos.x].x,
+                                            m_levelScales[blockImagePos.x].z,
+                                            index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                                            index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                                            index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                                            channel,
+                                            0,
+                                            ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
+                                                     m_imageBlockSize.y + m_imageBlockSizePad.y,
+                                                     m_imageBlockSize.z + m_imageBlockSizePad.z,
+                                                     1),
+                                            imgs[i]
+    ).then([=, &imgQueue](auto&&) {
+      imgQueue.blockingWrite(i);
+    });
+#endif
   }
-  LOG(INFO) << "start uploading image blocks.";
-  std::tuple<size_t, ZImg> elem;
+  size_t elem;
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     imgQueue.blockingRead(elem);
-    m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
+    m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][elem].first,
                                                   m_imageBlockSize + m_imageBlockSizePad,
-                                                  std::get<1>(elem).channelData(0));
+                                                  imgs[elem].channelData(0));
   }
   STOP_AND_LOG(bt_async)
 #endif

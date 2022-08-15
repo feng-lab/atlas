@@ -137,6 +137,10 @@ public:
   folly::Future<ZImg> readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc,
                                       size_t t, const ZImgInfo& resInfo) const;
 
+  folly::Future<folly::Unit>
+  readRegionToImgAsync(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc,
+                       size_t t, const ZImgInfo& resInfo, ZImg& res) const;
+
   std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                      index_t zRatio,
                                                                      index_t sx,
