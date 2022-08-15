@@ -601,7 +601,6 @@ void Z3DImg::uploadImageCache(size_t channel)
     m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][elem].first,
                                                   m_imageBlockSize + m_imageBlockSizePad,
                                                   imgs[elem].channelData(0));
-    imgs[elem].clear();
   }
   STOP_AND_LOG(bt_async)
 #endif
