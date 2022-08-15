@@ -556,11 +556,12 @@ void Z3DImg::uploadImageCache(size_t channel)
 #else
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   bt_async.start();
-  folly::MPMCQueue<size_t> imgQueue(m_channelPendingUpdates[channel].size());
-  std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());
+  folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+  //folly::MPMCQueue<size_t> imgQueue(m_channelPendingUpdates[channel].size());
+  //std::vector<ZImg> imgs(m_channelPendingUpdates[channel].size());
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
-#if 0
+#if 1
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
     auto f = m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x,
                                        m_levelScales[blockImagePos.x].z,
@@ -595,12 +596,13 @@ void Z3DImg::uploadImageCache(size_t channel)
     });
 #endif
   }
-  size_t elem;
+  std::tuple<size_t, ZImg> elem;
+  //size_t elem;
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     imgQueue.blockingRead(elem);
-    m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][elem].first,
+    m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
                                                   m_imageBlockSize + m_imageBlockSizePad,
-                                                  imgs[elem].channelData(0));
+                                                  std::get<1>(elem).channelData(0));
   }
   STOP_AND_LOG(bt_async)
 #endif
