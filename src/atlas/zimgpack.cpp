@@ -620,7 +620,7 @@ folly::Future<folly::Unit> ZImgPack::readRegionToImgAsync(index_t xyRatio, index
       tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
     }
     res = ZImg(queryResult.empty() ? resInfo : tmpResInfo);
-    return std::make_tuple(readRatio, queryResult);
+    return std::make_tuple(readRatio, std::move(queryResult));
   }).thenValue([=, &res](auto&& resTuple) {
     auto readRatio = std::get<0>(resTuple);
     const auto& queryResult = std::get<1>(resTuple);
