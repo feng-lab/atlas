@@ -696,7 +696,9 @@ void ZImgPack::preloadImageCache(const ImageCacheHashKeyType& key) const
 #else
   auto index = std::get<1>(key);
 #endif
-  ZImgCache::instance().insert(ImageCacheHashKeyType(this, index), m_allTiles[index]->read());
+  if (!ZImgCache::instance().contains(key, ZImgCache::FindStategy::NoUpdateLRUList)) {
+    ZImgCache::instance().insert(key, m_allTiles[index]->read());
+  }
 }
 
 void ZImgPack::prefetchImageCache(const ImageCacheHashKeyType& key) const

@@ -526,6 +526,59 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
+
+  if (m_channelPendingUpdates[channel].size() >= 1000) {
+    ZBenchTimer bt_cc(fmt::format("collect reading cache keys for image ch{}", channel));
+    bt_cc.start();
+    tbb::concurrent_unordered_set<ImageCacheHashKeyType> ccKeySet;
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, m_channelPendingUpdates[channel].size()),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (auto i = r.begin(); i != r.end(); ++i) {
+                          const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
+                          auto keys = m_imgPack.collectCacheKeysForReadRegionToImg(
+                            m_levelScales[blockImagePos.x].x,
+                            m_levelScales[blockImagePos.x].z,
+                            index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                            index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                            index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                            m_imageBlockSize.x + m_imageBlockSizePad.x,
+                            m_imageBlockSize.y + m_imageBlockSizePad.y,
+                            m_imageBlockSize.z + m_imageBlockSizePad.z,
+                            0,
+                            true);
+                          ccKeySet.insert(keys.begin(), keys.end());
+                        }
+                      }
+    );
+    STOP_AND_LOG(bt_cc)
+
+    ZBenchTimer bt_preload1(fmt::format("prefetch cache keys (without insert) for image ch{}", channel));
+    bt_preload1.start();
+    std::vector<ImageCacheHashKeyType> missingCacheKeys;
+    missingCacheKeys.reserve(ccKeySet.size());
+    missingCacheKeys.insert(missingCacheKeys.end(), ccKeySet.begin(), ccKeySet.end());
+    LOG(INFO) << "prefetching " << missingCacheKeys.size() << " image pieces...";
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, missingCacheKeys.size()),
+                      [&](const tbb::blocked_range<size_t>& r) {
+                        for (auto i = r.begin(); i != r.end(); ++i) {
+                          m_imgPack.prefetchImageCache(missingCacheKeys[i]);
+                        }
+                      }
+    );
+    STOP_AND_LOG(bt_preload1)
+
+    ZBenchTimer bt_preload(fmt::format("preload cache keys for image ch{}", channel));
+    bt_preload.start();
+    LOG(INFO) << "preloading " << missingCacheKeys.size() << " image pieces...";
+    for (const auto& key : ccKeySet) {
+      auto f = folly::via(cpuExecutor, [=]() {
+        m_imgPack.preloadImageCache(key);
+      });
+    }
+    STOP_AND_LOG(bt_preload)
+  }
+
 #if 0
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   bt_async.start();
@@ -557,7 +610,6 @@ void Z3DImg::uploadImageCache(size_t channel)
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   bt_async.start();
   folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
-  auto cpuExecutor = folly::getGlobalCPUExecutor();
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
     auto f = folly::via(cpuExecutor, [=]() {
