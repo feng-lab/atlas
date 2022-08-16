@@ -617,7 +617,8 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
-          auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile);
+          auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile,
+                                                        ZImgCache::FindStategy::MaybeUpdateLRUList);
           if (imgPtr->isSameType(*res)) {
             if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
               ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
