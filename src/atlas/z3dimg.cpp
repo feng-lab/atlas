@@ -560,7 +560,8 @@ void Z3DImg::uploadImageCache(size_t channel)
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-    auto f = m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x,
+    auto f = folly::via(cpuExecutor, [=]() {
+      return m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x,
                                        m_levelScales[blockImagePos.x].z,
                                        index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
                                        index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
@@ -571,7 +572,8 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                 m_imageBlockSize.y + m_imageBlockSizePad.y,
                                                 m_imageBlockSize.z + m_imageBlockSizePad.z,
                                                 1)
-    ).thenValue([=, &imgQueue](ZImg&& img) {
+      );
+    }).thenValue([=, &imgQueue](ZImg&& img) {
       imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
     });
   }

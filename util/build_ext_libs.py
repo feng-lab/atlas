@@ -451,18 +451,6 @@ def build_boost(src_dir: str, install_dir: str):
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True)
-
-        # filename = os.path.join(install_dir, 'include', 'boost', 'json', 'detail', 'value_from.hpp')
-        # if is_windows():
-        #     filename = os.path.join(install_dir, 'include', 'boost-1_75', 'boost', 'json', 'detail', 'value_from.hpp')
-        # patch_file(filename,
-        #            from_texts=[r'! detail::value_constructible<T>::value',
-        #                        r'#include <boost/json/detail/value_traits.hpp>',
-        #                        ],
-        #            to_texts=[r'! std::is_same<detail::remove_cvref<T>, QString>::value && ! detail::value_constructible<T>::value',
-        #                      '#include <boost/json/detail/value_traits.hpp>\n'
-        #                      '#include <QString>\n',
-        #                      ])
     finally:
         print('done')
 
