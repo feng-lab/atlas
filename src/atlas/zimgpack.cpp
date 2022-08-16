@@ -636,7 +636,10 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width, resInfo.height, resInfo.depth);
         }
-        return *res;
+        ZImg rres;
+        rres.swap(*res);
+        delete res;
+        return rres;
       });
     }
     return folly::makeFuture(ZImg(resInfo));
