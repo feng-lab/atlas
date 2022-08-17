@@ -81,18 +81,16 @@ TEST(ZImgRegionalExtrema, max2d1)
     ZImg res(getTestDataDir().filePath("img/im2d1maxres.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgRegionalExtrema<> regionalExtrema;
     ZImg mask = regionalExtrema.regionalMax(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
-    bt.reset();
-    bt.start();
+    bt.resetAndStart();
     ZImgRegionalExtrema<true> regionalExtrema1;
     mask = regionalExtrema1.regionalMax(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
   }
@@ -110,18 +108,16 @@ TEST(ZImgRegionalExtrema, min2d1)
     ZImg res(getTestDataDir().filePath("img/im2d1minres.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgRegionalExtrema<> regionalExtrema;
     ZImg mask = regionalExtrema.regionalMin(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
-    bt.reset();
-    bt.start();
+    bt.resetAndStart();
     ZImgRegionalExtrema<true> regionalExtrema1;
     mask = regionalExtrema1.regionalMin(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
   }
@@ -139,18 +135,16 @@ TEST(ZImgRegionalExtrema, max3d1)
     ZImg res(getTestDataDir().filePath("img/im3d1maxres.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgRegionalExtrema<> regionalExtrema;
     ZImg mask = regionalExtrema.regionalMax(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
-    bt.reset();
-    bt.start();
+    bt.resetAndStart();
     ZImgRegionalExtrema<true> regionalExtrema1;
     mask = regionalExtrema1.regionalMax(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
   }
@@ -168,18 +162,16 @@ TEST(ZImgRegionalExtrema, min3d1)
     ZImg res(getTestDataDir().filePath("img/im3d1minres.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgRegionalExtrema<> regionalExtrema;
     ZImg mask = regionalExtrema.regionalMin(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
 
-    bt.reset();
-    bt.start();
+    bt.resetAndStart();
     ZImgRegionalExtrema<true> regionalExtrema1;
     mask = regionalExtrema1.regionalMin(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_TRUE(res == mask);
   }

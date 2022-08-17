@@ -12,10 +12,9 @@ TEST(ZImgConnectedComponents, text)
     ZImg img(getTestDataDir().filePath("img/text.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgConnectedComponents<> conncomp;
     ConnComp CC = conncomp.run(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_EQ(size_t(8), CC.connectivity);
     ASSERT_EQ(size_t(88), CC.voxelIdxList.size());
@@ -40,11 +39,10 @@ TEST(ZImgConnectedComponents, text)
     ASSERT_EQ(size_t(61095), CC.voxelIdxList[85][7]);
     ASSERT_EQ(size_t(61096), CC.voxelIdxList[85][8]);
 
-    bt.reset();
-    bt.start();
+    bt.resetAndStart();
     ZImgConnectedComponents<true> conncomp1;
     CC = conncomp1.run(img);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
 
     ASSERT_EQ(size_t(8), CC.connectivity);
     ASSERT_EQ(size_t(88), CC.voxelIdxList.size());

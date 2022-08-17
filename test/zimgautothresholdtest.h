@@ -11,11 +11,10 @@ TEST(ZImgAutoThreshold, img0515)
     ZImg img(getTestDataDir().filePath("img/im3d1.tif"));
 
     ZBenchTimer bt;
-    bt.start();
     ZImgAutoThreshold<> autothre;
     int thre = autothre.triangleThre<int>(img, 0);
     ASSERT_EQ(32, thre);
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
   }
   catch (const ZIOException & e) {
     LOG(WARNING) << e.what();

@@ -1,13 +1,16 @@
 #include "zbenchtimer.h"
 
+#include <utility>
+
 #include "zlog.h"
 
 namespace nim {
 
-ZBenchTimer::ZBenchTimer(const std::string& funName)
-  : m_name(funName)
+ZBenchTimer::ZBenchTimer(std::string funName)
+  : m_name(std::move(funName))
 {
   reset();
+  start();
 }
 
 void ZBenchTimer::start()

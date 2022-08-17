@@ -144,7 +144,6 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     LOG(INFO) << "";
     ZBenchTimer bt("render and collect blockids");
-    bt.start();
 
     if (m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
       m_blockIDs.resize(m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);

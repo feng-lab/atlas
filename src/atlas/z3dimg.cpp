@@ -350,7 +350,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   }
 
   ZBenchTimer bt("update page table");
-  bt.start();
 
   std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageTableKeys;
   size_t level = 0;
@@ -522,14 +521,12 @@ void Z3DImg::uploadImageCache(size_t channel)
   }
 
   ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
-  bt.start();
 
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
-  bt_async.start();
   folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
@@ -561,6 +558,7 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   m_channelPendingUpdates[channel].clear();
 
+  LOG(INFO) << "current img cache size: " << ZImgCache::instance().size();
   STOP_AND_LOG(bt)
 }
 

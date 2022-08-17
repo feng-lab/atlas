@@ -253,7 +253,6 @@ void ZImgPng::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   }
 
   createDefaultSubBlocks(filename, infos, subBlocks);
-  //bt.stopAndLog();
 }
 
 void ZImgPng::readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene)
@@ -382,7 +381,6 @@ void ZImgPng::readImg(const QString& filename, ZImg& img, const ZImgRegion& regi
     imgTmp.infoRef().voxelSizeY = 1.0 / png_get_y_pixels_per_meter(png.pngPtr, png.endPtr);
   }
   imgTmp.swap(img);
-  //bt.stopAndLog();
 }
 
 void ZImgPng::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)

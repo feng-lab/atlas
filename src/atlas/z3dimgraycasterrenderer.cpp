@@ -350,7 +350,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
         LOG(INFO) << "";
         ZBenchTimer bt("render and collect blockids");
-        bt.start();
 
         if (m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4 != m_blockIDs.size()) {
           m_blockIDs.resize(m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->numPixels() * 4);
@@ -490,7 +489,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
     }
   } else {  // 3d volume raycasting
     ZBenchTimer bta("all");
-    bta.start();
     if (!m_fastRendering && m_img->isVolumeDownsampled()) {
       float n = m_rendererBase.camera().nearDist();
       float f = m_rendererBase.camera().farDist();
@@ -511,9 +509,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         for (auto repeat = 0; repeat < 100; ++repeat) {
           LOG(INFO) << "repeat " << repeat;
           ZBenchTimer btrb("render blockids");
-          ZBenchTimer btcb("collect blockids");
-          ZBenchTimer btri("render image");
-          btrb.start();
           m_image3DRaycasterBlockIDsShader.bind();
 //          m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP",
 //                                                      1.f / glm::vec2(m_blockIDsRenderTarget->size()));
@@ -559,7 +554,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           //glFinish();
           STOP_AND_LOG(btrb)
 
-          btcb.start();
+          ZBenchTimer btcb("collect blockids");
           // check missed blocks and upload
           std::vector<uint32_t> missingBlockIDs;
           std::vector<uint32_t> usedBlockIDs;
@@ -745,7 +740,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             break;
           }
 
-          btri.start();
+          ZBenchTimer btri("render image");
           // render channels one by one
           m_image3DRaycasterShader.bind();
 

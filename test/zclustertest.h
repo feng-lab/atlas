@@ -110,39 +110,38 @@ TEST(cluster, KMeans)
   ZKMeans<double,double> kmtest0(mat, weight, 3, 10, ZTermCriteria<double>(), ZKMeans<double,double>::InitCentersMethod::KmeansPP,
                                  IterAlgorithmLogLevel::Final);
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest0.run(false), "PP_st_w");
+  BENCH_AND_LOG(bt, 1, 1, kmtest0.run(false), "PP_st_w")
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest0.run(), "pp_mt_w");
+  BENCH_AND_LOG(bt, 1, 1, kmtest0.run(), "pp_mt_w")
 
   ZKMeans<double> kmtest01(mat, 3, 10, ZTermCriteria<double>(), ZKMeans<double>::InitCentersMethod::KmeansPP,
                            IterAlgorithmLogLevel::Final);
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest01.run(false), "pp_st");
+  BENCH_AND_LOG(bt, 1, 1, kmtest01.run(false), "pp_st")
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest01.run(), "pp_mt");
+  BENCH_AND_LOG(bt, 1, 1, kmtest01.run(), "pp_mt")
 
   ZKMeans<double,double> kmtest1(mat, weight, 3, 10, ZTermCriteria<double>(), ZKMeans<double,double>::InitCentersMethod::Random,
                                  IterAlgorithmLogLevel::Final);
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest1.run(false), "rnd_st_w");
+  BENCH_AND_LOG(bt, 1, 1, kmtest1.run(false), "rnd_st_w")
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest1.run(), "rnd_mt_w");
+  BENCH_AND_LOG(bt, 1, 1, kmtest1.run(), "rnd_mt_w")
 
   ZKMeans<double> kmtest11(mat, 3, 10, ZTermCriteria<double>(), ZKMeans<double>::InitCentersMethod::Random,
                            IterAlgorithmLogLevel::Final);
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest11.run(false), "rnd_st");
+  BENCH_AND_LOG(bt, 1, 1, kmtest11.run(false), "rnd_st")
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest11.run(), "rnd_mt");
+  BENCH_AND_LOG(bt, 1, 1, kmtest11.run(), "rnd_mt")
 
   ZKMeans<double,double,ZDistanceManhattan<double>> kmtest2(mat, weight, 3, 10, ZTermCriteria<double>(), ZKMeans<double,double,ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
                                                              IterAlgorithmLogLevel::Final);
-  bt.reset();
-  bt.start();
+  bt.resetAndStart();
   kmtest2.run(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest2.run(), "pp_mt_w_mh");
+  BENCH_AND_LOG(bt, 1, 1, kmtest2.run(), "pp_mt_w_mh")
 
   int a[10] = {1,2,3,4,5,6,7,8,9,0};
   int b[10] = {0,0,0,0,0,0,0,0,1,1};
@@ -153,21 +152,19 @@ TEST(cluster, KMeans)
 
   ZKMeans<double,double,ZDistanceManhattan<double>> kmtest22(mat3, 3, 10, ZTermCriteria<double>(), ZKMeans<double,double,ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
                                                               IterAlgorithmLogLevel::Final);
-  bt.reset();
-  bt.start();
+  bt.resetAndStart();
   kmtest22.run(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest22.run(), "pp_mt_mh");
+  BENCH_AND_LOG(bt, 1, 1, kmtest22.run(), "pp_mt_mh")
 
   ZKMeans<double,double,ZDistanceManhattan<double>> kmtest21(mat, 3, 10, ZTermCriteria<double>(), ZKMeans<double,double,ZDistanceManhattan<double>>::InitCentersMethod::KmeansPP,
                                                               IterAlgorithmLogLevel::Final);
-  bt.reset();
-  bt.start();
+  bt.resetAndStart();
   kmtest21.run(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
-  BENCH_AND_LOG(bt, 1, 1, kmtest21.run(), "pp_mt_mh");
+  BENCH_AND_LOG(bt, 1, 1, kmtest21.run(), "pp_mt_mh")
 
   ZKMeans<double,double> kmtest(mat, weight, 3, 10);
   double bestCompactness = kmtest.run();
@@ -234,10 +231,9 @@ TEST(cluster, GMM)
                  1.97587259934501,	53.6441015733247;
 
   gmmtest.setInitData(centroids);
-  bt.setName("GMM");
-  bt.start();
+  bt.resetAndStart("GMM");
   double loglikhood = gmmtest.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(gmmtest.centroids(), 1e-9));
@@ -254,11 +250,9 @@ TEST(cluster, GMM)
   ZGMM<double,double> gmmtestw(mat, weight, 2, true, ZGMM<double,double>::CovarianceType::Full, ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
   gmmtestw.setInitData(centroids);
 
-  bt.reset();
-  bt.setName("GMM with weight");
-  bt.start();
+  bt.resetAndStart("GMM with weight");
   loglikhood = gmmtestw.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(gmmtestw.centroids(), 1e-9));
@@ -266,11 +260,9 @@ TEST(cluster, GMM)
   ZGMM<double,double> gmmtestr(remat, 2, true, ZGMM<double,double>::CovarianceType::Full, ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
   gmmtestr.setInitData(centroids);
 
-  bt.reset();
-  bt.setName("GMM with repmat");
-  bt.start();
+  bt.resetAndStart("GMM with repmat");
   loglikhood = gmmtestr.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(gmmtestw.centroids(), 1e-9));
@@ -293,7 +285,7 @@ TEST(cluster, VBGMM)
   MatrixXd centroids(6,2);
   std::vector<MatrixXd> covars;
   for (int i=0; i<6; ++i)
-    covars.push_back(MatrixXd(2,2));
+    covars.emplace_back(2,2);
   ZBenchTimer bt;
 
   ZVBGMM<double> vbgmmtest(mat, 6, 10, MatrixXd(0,0), 0.001, ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
@@ -327,18 +319,15 @@ TEST(cluster, VBGMM)
   epCentroids << 1.99140376943641,	53.8135525360848,
                  4.24245952354588,	79.1657025196225;
   vbgmmtest.setInitData(prior, centroids, covars);
-  bt.setName("Multithread version VBGMM");
-  bt.start();
+  bt.resetAndStart("Multithread version VBGMM");
   double loglikhood = vbgmmtest.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtest.centroids(), 1e-9));
 
-  bt.reset();
-  bt.setName("Single Thread version VBGMM");
-  bt.start();
+  bt.resetAndStart("Single Thread version VBGMM");
   loglikhood = vbgmmtest.runEM(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtest.centroids(), 1e-9));
 
@@ -381,38 +370,30 @@ TEST(cluster, VBGMM)
   ZVBGMM<double,double> vbgmmtestw(mat, weight, 6, 10, MatrixXd(0,0), 0.001, ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
   vbgmmtestw.setInitData(prior, centroids, covars);
 
-  bt.reset();
-  bt.setName("Multithread version VBGMM with weight");
-  bt.start();
+  bt.resetAndStart("Multithread version VBGMM with weight");
   loglikhood = vbgmmtestw.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtestw.centroids(), 1e-9));
 
-  bt.reset();
-  bt.setName("Single Thread version VBGMM with weight");
-  bt.start();
+  bt.resetAndStart("Single Thread version VBGMM with weight");
   loglikhood = vbgmmtestw.runEM(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtestw.centroids(), 1e-9));
 
   ZVBGMM<double,double> vbgmmtestr(remat, 6, 10, MatrixXd(0,0), 0.001, ZTermCriteria<double>(200,1e-5), IterAlgorithmLogLevel::Off);
   vbgmmtestr.setInitData(prior, centroids, covars);
 
-  bt.reset();
-  bt.setName("Multithread version VBGMM with repmat");
-  bt.start();
+  bt.resetAndStart("Multithread version VBGMM with repmat");
   loglikhood = vbgmmtestr.runEM();
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtestr.centroids(), 1e-9));
 
-  bt.reset();
-  bt.setName("Single Thread version VBGMM with repmat");
-  bt.start();
+  bt.resetAndStart("Single Thread version VBGMM with repmat");
   loglikhood = vbgmmtestr.runEM(false);
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
   EXPECT_NEAR(epLoglikhood, loglikhood, 1e-5);
   EXPECT_TRUE(epCentroids.isApprox(vbgmmtestr.centroids(), 1e-9));
 }

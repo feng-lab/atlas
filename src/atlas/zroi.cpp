@@ -715,7 +715,6 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
 void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
 {
   ZBenchTimer bt;
-  bt.start();
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {

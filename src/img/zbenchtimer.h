@@ -8,36 +8,35 @@ namespace nim {
 /* usage:
   bench with repeats:
     ZBenchTimer bt;
-    BENCH_AND_LOG(bt,10,5,testFun(),"fun1");
+    BENCH_AND_LOG(bt,10,5,testFun(),"fun1")
   bench without repeats:
     ZBenchTimer bt;
-    bt.start();
     testFun();
-    STOP_AND_LOG(bt);
+    STOP_AND_LOG(bt)
   */
 
 #define BENCH_AND_LOG(TIMER, TRIES, REP, CODE, FUNCNAME) { \
-  TIMER.reset(); \
-  TIMER.setName(FUNCNAME); \
-  for(decltype(TRIES) i=0; i<TRIES; ++i){ \
-    TIMER.start(); \
-    for(decltype(REP) j=0; j<REP; ++j){ \
+  (TIMER).reset(); \
+  (TIMER).setName(FUNCNAME); \
+  for(decltype(TRIES) i=0; i<(TRIES); ++i){ \
+    (TIMER).start(); \
+    for(decltype(REP) j=0; j<(REP); ++j){ \
       CODE; \
     } \
-    TIMER.stop(); \
+    (TIMER).stop(); \
   } \
-  LOG(INFO) << TIMER; \
+  LOG(INFO) << (TIMER); \
 }
 
 #define STOP_AND_LOG(TIMER) { \
-  TIMER.stop(); \
-  LOG(INFO) << TIMER; \
+  (TIMER).stop(); \
+  LOG(INFO) << (TIMER); \
 }
 
 class ZBenchTimer
 {
 public:
-  explicit ZBenchTimer(const std::string& funName = "");
+  explicit ZBenchTimer(std::string funName = "");
 
   inline void reset()
   {
@@ -60,6 +59,12 @@ public:
     start();
   }
 
+  inline void resetAndStart()
+  {
+    reset();
+    start();
+  }
+
   void start();
 
   void stop();
@@ -69,32 +74,31 @@ public:
   void resume();
 
   // elapsed time in seconds
-  inline double time()
+  [[nodiscard]] inline double time() const
   { return m_time; }
 
   // average elapsed time in seconds.
-  inline double average()
+  [[nodiscard]] inline double average() const
   { return m_average; }
 
   // best elapsed time in seconds
-  inline double best()
+  [[nodiscard]] inline double best() const
   { return m_best; }
 
   // total elapsed time in seconds.
-  inline double total()
+  [[nodiscard]] inline double total() const
   { return m_total; }
 
   // elapsed pause time in seconds
-  inline double pauseTime()
+  [[nodiscard]] inline double pauseTime() const
   { return m_pauseTime; }
 
   // total elapsed pause time in seconds.
-  inline double totalPauseTime()
+  [[nodiscard]] inline double totalPauseTime() const
   { return m_totalPauseTime; }
 
   inline void setName(const std::string& str)
   { m_name = str; }
-
 
 protected:
   friend std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);

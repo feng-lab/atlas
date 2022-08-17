@@ -983,14 +983,13 @@ void checkSWC()
 
 void testLogSpeed()
 {
-  ZBenchTimer bt;
   QStringList logList;
   for (auto i = 0; i < 500000; ++i)
     logList << randomString(10, 100);
-  bt.start();
+  ZBenchTimer bt;
   for (const auto& i : logList)
     LOG(INFO) << i;
-  STOP_AND_LOG(bt);
+  STOP_AND_LOG(bt)
 }
 
 void tmp()

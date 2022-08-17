@@ -110,7 +110,7 @@ public:
 private:
   void checkState(const Z3DFilter* p = nullptr);
 
-  void warn(const Z3DFilter* p, const char* message);
+  static void warn(const Z3DFilter* p, const char* message);
 };
 
 // profile each filter and whole network

@@ -123,9 +123,9 @@ ZThreadSafeScalableCache<TKey, TValue, THash>::
 getShard(const TKey& key)
 {
   THash hashObj;
-  //constexpr int shift = std::numeric_limits<size_t>::digits - 16;
-  //size_t h = (hashObj.hash(key) >> shift) % m_numShards;
-  size_t h = (hashObj.hash(key) & 0xFFFF) % m_numShards;
+  constexpr int shift = std::numeric_limits<size_t>::digits - 16;
+  size_t h = (hashObj.hash(key) >> shift) % m_numShards;
+  //size_t h = (hashObj.hash(key) & 0xFFFF) % m_numShards;
   return *m_shards.at(h);
 }
 

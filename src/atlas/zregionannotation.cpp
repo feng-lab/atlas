@@ -118,7 +118,6 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
                                          double scaleX, double scaleY, double scaleZ)
 {
   ZBenchTimer bt;
-  bt.start();
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
@@ -420,7 +419,6 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
                                                                    double scaleX, double scaleY)
 {
   ZBenchTimer bt;
-  bt.start();
 
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(fn, nullptr, format);
   if (infos.size() > 1) {
