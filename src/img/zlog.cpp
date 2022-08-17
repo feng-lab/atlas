@@ -73,7 +73,7 @@ public:
     }
   }
 
-  inline bool isValid() const
+  [[nodiscard]] inline bool isValid() const
   { return m_file.isOpen(); }
 
   // LogSink interface
@@ -98,7 +98,7 @@ public:
     : m_logFunction(std::move(f))
   {}
 
-  inline bool isValid() const
+  [[nodiscard]] inline bool isValid() const
   { return m_logFunction.operator bool(); }
 
   // LogSink interface
@@ -121,7 +121,7 @@ LogSinkPtr createFileLogSink(const QString& filename)
   return res->isValid() ? res : LogSinkPtr();
 }
 
-LogSinkPtr createFunctorLogSink(LogFunction f)
+LogSinkPtr createFunctorLogSink(const LogFunction& f)
 {
   auto res = std::make_shared<FunctionLogSink>(f);
   return res->isValid() ? res : LogSinkPtr();
@@ -139,7 +139,7 @@ QString levelToString(LogSeverity theLevel)
     case google::GLOG_FATAL:
       return QObject::tr("Fatal");
     default:
-      return QString("Unknown");
+      return {"Unknown"};
   }
 }
 

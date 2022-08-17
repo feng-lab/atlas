@@ -63,7 +63,7 @@ using LogFunction = std::function<void(const LogData&)>;
 // might return nullptr
 LogSinkPtr createFileLogSink(const QString& filename);
 
-LogSinkPtr createFunctorLogSink(LogFunction f);
+LogSinkPtr createFunctorLogSink(const LogFunction& f);
 
 inline void addLogSink(LogSink* sink)
 { if (sink) google::AddLogSink(sink); }
