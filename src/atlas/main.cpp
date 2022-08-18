@@ -23,7 +23,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <folly/ScopeGuard.h>
-#include <folly/executors/GlobalExecutor.h>
+#include <folly/init/Init.h>
 #include <gflags/gflags.h>
 #include <iostream>
 #include <thread>
