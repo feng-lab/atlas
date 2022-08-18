@@ -27,7 +27,6 @@ public:
   int32_t nPhysicalCores = 1;
   int32_t nLogicalCores = 1;
   size_t nStdHardwareConcurrency = 1;
-  size_t nFollyGlobalCpuEecutorThreads = 1;
 
   uint64_t nCacheLine = 0;
   uint64_t nL1ICacheSize = 0;

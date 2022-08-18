@@ -8,8 +8,6 @@
 #include <array>
 #include <cstring>
 #include <thread>
-#include <folly/executors//GlobalExecutor.h>
-#include <folly/executors/CPUThreadPoolExecutor.h>
 
 #ifdef _WIN32
 #include "zwindowsheader.h"
@@ -93,7 +91,6 @@ void ZCpuInfo::logCpuInfo() const
   LOG(INFO) << "Number of Cores: " << nPhysicalCores;
   LOG(INFO) << "Number of Threads: " << nLogicalCores;
   LOG(INFO) << "std thread hardware_concurrency: " << nStdHardwareConcurrency;
-  LOG(INFO) << "folly global cpu executor number of threads: " << nFollyGlobalCpuEecutorThreads;
   LOG(INFO) << "Cache Line: " << nCacheLine;
   LOG(INFO) << "L1ICache: " << nL1ICacheSize;
   LOG(INFO) << "L1DCache: " << nL1DCacheSize;
@@ -604,9 +601,6 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   }
 #endif
   nStdHardwareConcurrency = std::thread::hardware_concurrency();
-  if (auto e = dynamic_cast<const folly::CPUThreadPoolExecutor*>(folly::getGlobalCPUExecutor().get()); e) {
-    nFollyGlobalCpuEecutorThreads = e->numThreads();
-  }
 }
 
 } // namespace nim
