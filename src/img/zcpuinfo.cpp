@@ -63,6 +63,13 @@ inline void cpuidex(int32_t cpu_info[4], int32_t info_type, int32_t info_index)
   __cpuid_count(info_type, info_index, cpu_info[0], cpu_info[1], cpu_info[2], cpu_info[3]);
 }
 
+inline uint64_t _xgetbv(uint32_t index)
+{
+  uint32_t eax, edx;
+  __asm__ __volatile__ ("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
+  return (static_cast<uint64_t>(edx) << 32) | eax;
+}
+
 #endif
 
 } // namespace
