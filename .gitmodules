@@ -13,11 +13,11 @@
 [submodule "src/3rdparty/googletest"]
 	path = src/3rdparty/googletest
 	url = https://github.com/google/googletest.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/folly"]
 	path = src/3rdparty/folly
 	url = https://github.com/facebook/folly.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/cpuinfo"]
 	path = src/3rdparty/cpuinfo
 	url = https://github.com/pytorch/cpuinfo.git
@@ -33,7 +33,7 @@
 [submodule "src/3rdparty/benchmark"]
 	path = src/3rdparty/benchmark
 	url = https://github.com/google/benchmark.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/glbinding"]
 	path = src/3rdparty/glbinding
 	url = https://github.com/cginternals/glbinding.git
@@ -85,7 +85,7 @@
 [submodule "src/3rdparty/snappy"]
 	path = src/3rdparty/snappy
 	url = https://github.com/google/snappy.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/xz"]
 	path = src/3rdparty/xz
 	url = https://github.com/xz-mirror/xz.git

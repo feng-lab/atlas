@@ -517,7 +517,7 @@ void ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, inde
   }
   //bt_read.pause();
   if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
-    res.resize(resInfo.width, resInfo.height, resInfo.depth);
+    res.resize(resInfo.width, resInfo.height, resInfo.depth, Interpolant::Cubic, true, false, false);
   }
   //bt_read.resume();
   //STOP_AND_LOG(bt_read)

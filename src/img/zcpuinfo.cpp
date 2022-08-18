@@ -7,6 +7,9 @@
 #include <QThread>
 #include <array>
 #include <cstring>
+#include <thread>
+#include <folly/executors//GlobalExecutor.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 
 #ifdef _WIN32
 #include "zwindowsheader.h"
@@ -62,12 +65,14 @@ inline void cpuidex(int32_t cpu_info[4], int32_t info_type, int32_t info_index)
   __cpuid_count(info_type, info_index, cpu_info[0], cpu_info[1], cpu_info[2], cpu_info[3]);
 }
 
+#ifndef __APPLE__
 inline uint64_t _xgetbv(uint32_t index)
 {
   uint32_t eax, edx;
   __asm__ __volatile__ ("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
   return (static_cast<uint64_t>(edx) << 32) | eax;
 }
+#endif
 
 #endif
 
@@ -96,6 +101,8 @@ void ZCpuInfo::logCpuInfo() const
             << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
   LOG(INFO) << "Number of Cores: " << nPhysicalCores;
   LOG(INFO) << "Number of Threads: " << nLogicalCores;
+  LOG(INFO) << "std thread hardware_concurrency: " << nStdHardwareConcurrency;
+  LOG(INFO) << "folly global cpu executor number of threads: " << nFollyGlobalCpuEecutorThreads;
   LOG(INFO) << "Cache Line: " << nCacheLine;
   LOG(INFO) << "L1ICache: " << nL1ICacheSize;
   LOG(INFO) << "L1DCache: " << nL1DCacheSize;
@@ -605,6 +612,10 @@ void ZCpuInfo::detectCoreAndThreadNumber()
     LOG(ERROR) << lscpu.readAllStandardError();
   }
 #endif
+  nStdHardwareConcurrency = std::thread::hardware_concurrency();
+  if (auto e = dynamic_cast<const folly::CPUThreadPoolExecutor*>(folly::getGlobalCPUExecutor().get()); e) {
+    nFollyGlobalCpuEecutorThreads = e->numThreads();
+  }
 }
 
 } // namespace nim
