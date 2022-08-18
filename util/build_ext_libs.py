@@ -542,7 +542,14 @@ def build_glog(src_dir: str, install_dir: str):
 def build_benchmark(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
+        orig_file = os.path.join(src_dir, 'src', 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'target_compile_definitions(benchmark PRIVATE -DBENCHMARK_STATIC_DEFINE)'],
+                              to_texts=[r'target_compile_definitions(benchmark PUBLIC -DBENCHMARK_STATIC_DEFINE)'],
+                              )
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBENCHMARK_ENABLE_TESTING:BOOL=OFF',
                          '-DBENCHMARK_ENABLE_GTEST_TESTS:BOOL=OFF'])
@@ -556,6 +563,7 @@ def build_benchmark(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_openssl(src_dir: str, install_dir: str, nasm_dir: str):
