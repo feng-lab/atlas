@@ -10,10 +10,9 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <folly/MPMCQueue.h>
-#include <folly/executors/CPUThreadPoolExecutor.h>
+//#include <folly/executors/CPUThreadPoolExecutor.h>
 #include <boost/functional/hash.hpp>
 #include <tbb/parallel_for.h>
-#include <tbb/concurrent_unordered_set.h>
 #include <algorithm>
 #include <memory>
 
