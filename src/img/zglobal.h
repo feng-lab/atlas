@@ -1,6 +1,7 @@
 #pragma once
 
 #include "zexception.h"
+#include <folly/Executor.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -264,5 +265,7 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
   static_assert(Index < N, "Index out of bounds for tuple_like");
   return std::forward<T>(t)[Index];
 }
+
+folly::Executor::KeepAlive<> getGlobalCPUExecutor();
 
 } // namespace nim

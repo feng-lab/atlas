@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <folly/MPMCQueue.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 #include <boost/functional/hash.hpp>
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -524,7 +525,11 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
-  auto cpuExecutor = folly::getGlobalCPUExecutor();
+  auto cpuExecutor = getGlobalCPUExecutor();
+
+//  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
+//    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
+//  }
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
