@@ -281,7 +281,7 @@ public:
   getOrReadAsync(const ImageCacheHashKeyType& key, const ZImgSubBlock& imgBlock,
                  FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    auto cpuExecutor = folly::getGlobalCPUExecutor();
+    auto cpuExecutor = getGlobalCPUExecutor();
     auto ioExecutor = folly::getGlobalIOExecutor();
     return folly::via(cpuExecutor, [=, &imgBlock]() {
       ZThreadSafeScalableImageCache::ConstAccessor ca;
