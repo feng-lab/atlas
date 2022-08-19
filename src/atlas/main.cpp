@@ -25,11 +25,13 @@
 #include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
 #include <iostream>
+#include <thread>
 
 #ifdef ATLAS_WITH_TESTS
 DEFINE_bool(run_unit_tests, false, "run unit tests");
 DEFINE_bool(run_benchmarks, false, "run benchmarks");
 #endif
+DECLARE_uint32(folly_global_cpu_executor_threads);
 
 using namespace nim;
 
@@ -58,6 +60,7 @@ void removeOldLogs(const QDir& dir, index_t numberToKeep = 20)
 int main(int argc, char* argv[])
 {
   try {
+    FLAGS_folly_global_cpu_executor_threads = std::thread::hardware_concurrency() * 2;
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
     gflags::SetUsageMessage(usage);
