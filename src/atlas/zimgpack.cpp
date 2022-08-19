@@ -529,7 +529,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
 #if 0
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
-  auto cpuExecutor = getGlobalCPUExecutor();
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
   return folly::via(cpuExecutor, [=]() {
     auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
     std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
@@ -587,7 +587,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
   });
 #else
   CHECK(xyRatio >= 1 && zRatio >= 1);
-  auto cpuExecutor = getGlobalCPUExecutor();
+  auto cpuExecutor = folly::getGlobalCPUExecutor();
   return folly::via(cpuExecutor, [=, &resInfo]() {
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
     std::vector<RTreeValueType> queryResult;
@@ -611,7 +611,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto& i: queryResult) {
         const ZImgSubBlock* tile = m_allTiles[i.second].get();
-        tileFutures.push_back(folly::via(cpuExecutor, 1).then([=](auto&&) {
+        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
@@ -632,7 +632,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor, 2).then([=, &resInfo](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width, resInfo.height, resInfo.depth);
         }
