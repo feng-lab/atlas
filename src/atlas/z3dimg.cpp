@@ -528,9 +528,13 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
   folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+  ZImgInfo resInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
+                   m_imageBlockSize.y + m_imageBlockSizePad.y,
+                   m_imageBlockSize.z + m_imageBlockSizePad.z,
+                   1);
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
     const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-    auto f = folly::via(cpuExecutor, [=]() {
+    auto f = folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
       return m_imgPack.readRegionToImg(m_levelScales[blockImagePos.x].x,
                                        m_levelScales[blockImagePos.x].z,
                                        index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
@@ -538,13 +542,10 @@ void Z3DImg::uploadImageCache(size_t channel)
                                        index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
                                        channel,
                                        0,
-                                       ZImgInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
-                                                m_imageBlockSize.y + m_imageBlockSizePad.y,
-                                                m_imageBlockSize.z + m_imageBlockSizePad.z,
-                                                1)
-      );
-    }).thenValue([=, &imgQueue](ZImg&& img) {
-      imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
+                                       resInfo
+      ).via(cpuExecutor, 3).thenValue([=, &imgQueue](ZImg&& img) {
+        imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
+      });
     });
   }
   std::tuple<size_t, ZImg> elem;

@@ -588,7 +588,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
 #else
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  return folly::via(cpuExecutor, [=]() {
+  return folly::via(cpuExecutor, [=, &resInfo]() {
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
     std::vector<RTreeValueType> queryResult;
     if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
@@ -611,7 +611,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto& i: queryResult) {
         const ZImgSubBlock* tile = m_allTiles[i.second].get();
-        tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+        tileFutures.push_back(folly::via(cpuExecutor, 1).then([=](auto&&) {
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
@@ -632,7 +632,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio, index_t zRatio, i
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).then([=](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor, 2).then([=, &resInfo](auto&&) {
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width, resInfo.height, resInfo.depth);
         }

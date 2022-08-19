@@ -2,6 +2,9 @@
 
 #include "zcpuinfo.h"
 
+DEFINE_double(atlas_image_cache_memory_proportion, 0.5,
+              "Proportion of RAM that will be used for image cache");
+
 namespace nim {
 
 #ifdef USE_ZSharedCache
@@ -12,7 +15,7 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache()
-  : ZSharedCache<ZImgPack::HashKeyType, ZImg>(ZCpuInfo::instance().nPhysicalRAM / 2)
+  : ZSharedCache<ZImgPack::HashKeyType, ZImg>(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion)
 {
 }
 #else
@@ -23,7 +26,8 @@ ZImgCache& ZImgCache::instance()
 }
 
 ZImgCache::ZImgCache()
-  : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM / 2, ZCpuInfo::instance().nLogicalCores * 4)
+  : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
+                                  ZCpuInfo::instance().nLogicalCores * 4)
 {
 }
 #endif
