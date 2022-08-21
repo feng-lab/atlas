@@ -83,12 +83,12 @@ def resource_dir() -> str:
 def src_package_dir() -> str:
     res = os.path.join(os.path.expanduser('~'), 'atlas_deps')
     if not os.path.exists(res):
-        res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_deps')
+        res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'My Drive', 'code', 'my', 'atlas_deps')
     if not os.path.exists(res):
         if sys.platform.startswith('win'):
-            res = os.path.join('Z:', os.sep, 'Google Drive', 'code', 'my', 'atlas_deps')
+            res = os.path.join('Z:', os.sep, 'Google Drive', 'My Drive', 'code', 'my', 'atlas_deps')
             if not os.path.exists(res):
-                res = os.path.join(os.path.expanduser('~'), 'GoogleDrive', 'code', 'my', 'atlas_deps')
+                res = os.path.join(os.path.expanduser('~'), 'GoogleDrive', 'My Drive', 'code', 'my', 'atlas_deps')
     assert os.path.exists(res)
     return res
 

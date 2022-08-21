@@ -2503,12 +2503,6 @@ def build_libs(libs: dict, update_src: bool):
             update_git_submodule(src_contrib_dir)
         build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
-    if libs['llfio']:
-        src_dir = os.path.join(ext_dir(), 'llfio')
-        if update_src:
-            update_git_submodule(src_dir)
-        build_llfio(src_dir, ext_build_dir())
-
     # if libs['botan']:
     #     src_dir = os.path.join(ext_dir(), 'botan')
     #     if update_src:
@@ -2597,6 +2591,12 @@ def build_libs(libs: dict, update_src: bool):
             shutil.copytree(os.path.join(src_package_dir(), 'packages-' + suffix),
                             os.path.join(ext_build_dir(), 'packages-' + suffix),
                             dirs_exist_ok=True)
+
+    if libs['llfio']:
+        src_dir = os.path.join(ext_dir(), 'llfio')
+        if update_src:
+            update_git_submodule(src_dir)
+        build_llfio(src_dir, ext_build_dir())
 
 
 def parse_inputs(argv: list):

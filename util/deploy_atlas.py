@@ -227,7 +227,7 @@ def build_atlas_installer():
 
     if 'feng' in os.path.expanduser("~"):
         if common_dirs.is_mac():
-            out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static')
+            out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', 'My Drive', "code", 'my', 'proxy', 'static')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')
@@ -237,18 +237,18 @@ def build_atlas_installer():
         elif common_dirs.is_linux():
             print()
         #     subprocess.run(['scp', installer_zip_name,
-        #                     'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/installers/"'],
+        #                     'feng@labmacpro:"/Users/feng/Google Drive/My Drive/code/my/proxy/static/installers/"'],
         #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         #     subprocess.run(['rsync', '-av', '--delete', suffix,
-        #                     'feng@labmacpro:"/Users/feng/Google Drive/code/my/proxy/static/packages/"'],
+        #                     'feng@labmacpro:"/Users/feng/Google Drive/My Drive/code/my/proxy/static/packages/"'],
         #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         #     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
         else:
-            out_folder = os.path.join('Z:', os.sep, 'Google Drive', "code", 'my', 'proxy', 'static')
+            out_folder = os.path.join('Z:', os.sep, 'Google Drive', 'My Drive', "code", 'my', 'proxy', 'static')
             if not os.path.exists(out_folder):
-                out_folder = os.path.join(os.path.expanduser('~'), 'GoogleDrive', "code", 'my', 'proxy', 'static')
+                out_folder = os.path.join(os.path.expanduser('~'), 'GoogleDrive', 'My Drive', "code", 'my', 'proxy', 'static')
             if not os.path.exists(out_folder):
-                out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static')
+                out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', 'My Drive', "code", 'my', 'proxy', 'static')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')
