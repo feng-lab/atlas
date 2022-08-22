@@ -1,21 +1,19 @@
 #include "z2danimationdoc.h"
-
 #include "zanimationwidget.h"
 #include "zexception.h"
 #include "zlog.h"
-#include "zview.h"
 #include "ztheme.h"
+#include "zview.h"
+#include <QApplication>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QSettings>
-#include <QApplication>
 #include <set>
 #include <utility>
 
 namespace nim {
 
-Z2DAnimationDoc::Z2DAnimationDoc(ZDoc& doc)
-  : ZObjDoc(doc)
+Z2DAnimationDoc::Z2DAnimationDoc(ZDoc& doc) : ZObjDoc(doc)
 {
   createActions();
 }
@@ -38,8 +36,9 @@ void Z2DAnimationDoc::createNewAnimation(const QString& name)
 
 bool Z2DAnimationDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToAnimationPacks.at(id);
   if (pack->path.endsWith(".animation2d", Qt::CaseInsensitive)) {
@@ -85,8 +84,9 @@ bool Z2DAnimationDoc::canReadFile(const QString& fileName) const
 size_t Z2DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToAnimationPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path == fileName) {
       return idPack.first;
+    }
   }
   size_t id;
   try {
@@ -111,8 +111,9 @@ size_t Z2DAnimationDoc::loadFile(const json::value& jValue, QString& errorMsg)
       return 0;
     }
     for (const auto& idPack : m_idToAnimationPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first)))
+      if (isSameObj(jValue, jsonValue(idPack.first))) {
         return idPack.first;
+      }
     }
     size_t id;
     QString fileName = asQString(jValue);
@@ -182,12 +183,14 @@ json::value Z2DAnimationDoc::jsonValue(size_t id) const
 bool Z2DAnimationDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -200,11 +203,9 @@ bool Z2DAnimationDoc::isAlias(size_t id) const
 {
   CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
-  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
+  });
 }
 
 QWidget* Z2DAnimationDoc::createObjEditWidget(size_t id)
@@ -224,10 +225,11 @@ void Z2DAnimationDoc::loadAnimation()
   dialog.setWindowTitle("Load 2D Animation File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    // int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read Animation.\n" + errorMsg);
       }
     }
@@ -276,7 +278,9 @@ size_t Z2DAnimationDoc::addAnimation(Z2DAnimation* animation, const QString& pat
 }
 
 Z2DAnimationDoc::AnimationPack::AnimationPack(Z2DAnimation* animation_, const QString& path_, QString name)
-  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(std::move(name))
+  : animation(animation_)
+  , path(QFileInfo(path_).canonicalFilePath())
+  , m_tmpName(std::move(name))
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;
@@ -301,7 +305,8 @@ const QString& Z2DAnimationDoc::AnimationPack::info() const
 
 void Z2DAnimationDoc::createActions()
 {
-  m_loadAnimationsAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 2D Animations..."), this);
+  m_loadAnimationsAction =
+    new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 2D Animations..."), this);
   m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
   connect(m_loadAnimationsAction, &QAction::triggered, this, &Z2DAnimationDoc::loadAnimation);
 }

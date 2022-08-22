@@ -10,7 +10,7 @@ class ZParameterAnimation;
 
 class Z2DAnimation : public ZAnimation
 {
-Q_OBJECT
+  Q_OBJECT
 public:
   explicit Z2DAnimation(ZDoc& doc, QObject* parent = nullptr);
 
@@ -21,7 +21,9 @@ public:
   void save(const QString& fn);
 
   [[nodiscard]] bool is2DAnimation() const override
-  { return true; }
+  {
+    return true;
+  }
 
 protected:
   void bindGlobalParameters() override;
@@ -37,5 +39,3 @@ protected:
 };
 
 } // namespace nim
-
-

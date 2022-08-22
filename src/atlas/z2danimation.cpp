@@ -1,15 +1,13 @@
 #include "z2danimation.h"
-
+#include "zdoc.h"
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "zview.h"
-#include "zdoc.h"
 #include <QApplication>
 
 namespace nim {
 
-Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent)
-  : ZAnimation(doc, parent)
+Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent) : ZAnimation(doc, parent)
 {
   m_sliceAnimation = new ZParameterAnimation("Slice", "Int", QColor(0, 255, 0));
   m_timeAnimation = new ZParameterAnimation("Time", "Int", QColor(0, 255, 0));
@@ -23,8 +21,9 @@ Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent)
 
 void Z2DAnimation::bindView(ZView* v)
 {
-  if (m_view == v)
+  if (m_view == v) {
     return;
+  }
 
   if (v) {
     connect(v, &ZView::objViewReady, this, &Z2DAnimation::tryLinkAnimationWith);

@@ -1,12 +1,12 @@
+#include "../version/version.h"
 #include "zapplication.h"
-#include "zmainwindow.h"
 #include "zcpuinfo.h"
-#include "zsysteminfo.h"
+#include "zexception.h"
 #include "zglobalinit.h"
 #include "zlog.h"
-#include "zexception.h"
+#include "zmainwindow.h"
 #include "zservicemanager.h"
-#include "../version/version.h"
+#include "zsysteminfo.h"
 #include "ztheme.h"
 
 #ifdef ATLAS_WITH_TESTS
@@ -17,15 +17,14 @@
 #endif
 
 #include <QSurfaceFormat>
-//#include <QOpenGLContext>
-//#include <QOffscreenSurface>
-#include <QMessageBox>
+// #include <QOpenGLContext>
+// #include <QOffscreenSurface>
 #include <QDir>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
 #include <iostream>
-#include <thread>
 
 #ifdef ATLAS_WITH_TESTS
 DEFINE_bool(run_unit_tests, false, "run unit tests");
@@ -43,31 +42,17 @@ __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 }
 #endif
 
-void removeOldLogs(const QDir& dir, index_t numberToKeep = 20)
-{
-  QDir ld(dir);
-  ld.cdUp();
-  QStringList filters;
-  filters << "????????""-??????.???_LOG";
-  QFileInfoList list = ld.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks, QDir::Name);
-  for (index_t i = 0; i < list.size() - numberToKeep; ++i) {
-    QDir logDir(list.at(i).absoluteFilePath());
-    logDir.removeRecursively();
-  }
-}
-
 int main(int argc, char* argv[])
 {
   QCoreApplication::setOrganizationName("fenglab");
-  //On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
-  // is preferred over the name. On other platforms, the name is preferred over the domain.
+  // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
+  //  is preferred over the name. On other platforms, the name is preferred over the domain.
 #ifndef Q_OS_MACOS
   QCoreApplication::setOrganizationDomain("fenglab.xyz");
 #endif
   QCoreApplication::setApplicationName("Atlas");
   try {
-    if (QString setting_filename = "user_settings_flagfile.txt";
-        ZSystemInfo::configDir().exists(setting_filename)) {
+    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
       FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
     }
     std::string usage("Atlas is a brain map platform.  Usage:\n");
@@ -81,7 +66,7 @@ int main(int argc, char* argv[])
     format.setVersion(3, 2);
     format.setProfile(QSurfaceFormat::CoreProfile);
 #endif
-    //format.setStereo(true);
+    // format.setStereo(true);
     QSurfaceFormat::setDefaultFormat(format);
 
 #ifdef ATLAS_WITH_TESTS
@@ -101,9 +86,7 @@ int main(int argc, char* argv[])
       QString jarsDIR = QCoreApplication::applicationDirPath() + u"/Resources/jars";
 #endif
       initImgLib(argv[0], resourcesDIR, jdkDIR, jarsDIR, "", false);
-      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-        nim::shutdownImgLib(false);
-      });
+      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() { nim::shutdownImgLib(false); });
       if (FLAGS_run_unit_tests) {
         return ZUnitTest::run();
       }
@@ -131,7 +114,8 @@ int main(int argc, char* argv[])
     nim::ZApplication app(argc, argv);
 
     if (!nim::ZCpuInfo::instance().bAVX) {
-      QMessageBox::critical(nullptr, QCoreApplication::applicationName(),
+      QMessageBox::critical(nullptr,
+                            QCoreApplication::applicationName(),
                             "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
       LOG(ERROR) << "CPU not supported";
       return 1;
@@ -139,15 +123,12 @@ int main(int argc, char* argv[])
 
     // init the logging mechanism
     QDir logDir = nim::ZSystemInfo::logDir();
-    removeOldLogs(logDir);
+    nim::ZSystemInfo::removeOldLogs();
 
     QString jdkDIR = ZApplication::resourcesDirPath() + u"/jdk";
     QString jarsDIR = ZApplication::resourcesDirPath() + u"/jars";
-    initImgLib(argv[0], ZApplication::resourcesDirPath(),
-               jdkDIR, jarsDIR, logDir.filePath("atlas"));
-    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      nim::shutdownImgLib();
-    });
+    initImgLib(argv[0], ZApplication::resourcesDirPath(), jdkDIR, jarsDIR, logDir.filePath("atlas"));
+    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() { nim::shutdownImgLib(); });
 
     if (!FLAGS_flagfile.empty()) {
       LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;
@@ -162,28 +143,28 @@ int main(int argc, char* argv[])
 
     // ZServiceManager sm;
 
-//    // initialize OpenGL
-//    QOpenGLContext context;
-//    context.setFormat(format);
-//    context.create();
-//    if (!context.isValid()) {
-//      LOG(ERROR) << "Can not create OpenGL context";
-//    }
-//
-//    QOffscreenSurface surface;
-//    surface.setFormat(format);
-//    surface.create();
-//    if(!surface.isValid()) {
-//      LOG(ERROR) << "Can not create OpenGL Offscreen surface";
-//    }
-//    context.makeCurrent(&surface);
-//
-//    if (!ZSystemInfo::instance().initializeGL()) {
-//      QString msg = ZSystemInfo::instance().errorMessage();
-//      msg += ". 3D functions will be disabled.";
-//      QMessageBox::warning(nullptr, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
-//    }
-//    ZSystemInfo::instance().setStereoSupported(context.format().stereo());
+    //    // initialize OpenGL
+    //    QOpenGLContext context;
+    //    context.setFormat(format);
+    //    context.create();
+    //    if (!context.isValid()) {
+    //      LOG(ERROR) << "Can not create OpenGL context";
+    //    }
+    //
+    //    QOffscreenSurface surface;
+    //    surface.setFormat(format);
+    //    surface.create();
+    //    if(!surface.isValid()) {
+    //      LOG(ERROR) << "Can not create OpenGL Offscreen surface";
+    //    }
+    //    context.makeCurrent(&surface);
+    //
+    //    if (!ZSystemInfo::instance().initializeGL()) {
+    //      QString msg = ZSystemInfo::instance().errorMessage();
+    //      msg += ". 3D functions will be disabled.";
+    //      QMessageBox::warning(nullptr, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
+    //    }
+    //    ZSystemInfo::instance().setStereoSupported(context.format().stereo());
 
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
     auto mainWin = new nim::ZMainWindow(GIT_VERSION);

@@ -1,13 +1,11 @@
 #include "z3danimation.h"
-
-#include "zcameraparameteranimation.h"
 #include "z3dview.h"
+#include "zcameraparameteranimation.h"
 #include "zdoc.h"
 
 namespace nim {
 
-Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent)
-  : ZAnimation(doc, parent)
+Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent) : ZAnimation(doc, parent)
 {
   m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0, 255, 0));
   m_globalParaAnimations.emplace_back(m_cameraParameterAnimation);
@@ -15,8 +13,9 @@ Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent)
 
 void Z3DAnimation::bindView(Z3DView* v)
 {
-  if (m_view == v)
+  if (m_view == v) {
     return;
+  }
 
   if (v) {
     connect(v, &Z3DView::objViewReady, this, &Z3DAnimation::tryLinkAnimationWith);

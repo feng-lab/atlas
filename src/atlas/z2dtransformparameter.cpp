@@ -1,22 +1,26 @@
 #include "z2dtransformparameter.h"
-
-#include "zwidgetsgroup.h"
 #include "zlog.h"
-#include <QWidget>
+#include "zwidgetsgroup.h"
 #include <QGroupBox>
 #include <QPushButton>
+#include <QWidget>
 
 namespace nim {
 
 Z2DTransformParameter::Z2DTransformParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<glm::dmat3>(name, glm::dmat3(1), parent)
-  , m_scale("Scale", glm::dvec2(1.f), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_scale("Scale",
+            glm::dvec2(1.f),
+            glm::dvec2(std::numeric_limits<double>::lowest()),
             glm::dvec2(std::numeric_limits<double>::max()))
-  , m_translation("Translation", glm::dvec2(0), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_translation("Translation",
+                  glm::dvec2(0),
+                  glm::dvec2(std::numeric_limits<double>::lowest()),
                   glm::dvec2(std::numeric_limits<double>::max()))
-  , m_rotation("Rotation", 0, std::numeric_limits<double>::lowest(),
-               std::numeric_limits<double>::max())
-  , m_center("Rotation Center", glm::dvec2(0.f), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_rotation("Rotation", 0, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max())
+  , m_center("Rotation Center",
+             glm::dvec2(0.f),
+             glm::dvec2(std::numeric_limits<double>::lowest()),
              glm::dvec2(std::numeric_limits<double>::max()))
   , m_receiveWidgetSignal(true)
 {
@@ -50,13 +54,18 @@ Z2DTransformParameter::Z2DTransformParameter(const QString& name, QObject* paren
 
 Z2DTransformParameter::Z2DTransformParameter(const QString& name, const glm::dmat3& value, QObject* parent)
   : ZSingleValueParameter<glm::dmat3>(name, value, parent)
-  , m_scale("Scale", glm::dvec2(1.f), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_scale("Scale",
+            glm::dvec2(1.f),
+            glm::dvec2(std::numeric_limits<double>::lowest()),
             glm::dvec2(std::numeric_limits<double>::max()))
-  , m_translation("Translation", glm::dvec2(0), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_translation("Translation",
+                  glm::dvec2(0),
+                  glm::dvec2(std::numeric_limits<double>::lowest()),
                   glm::dvec2(std::numeric_limits<double>::max()))
-  , m_rotation("Rotation", 0, std::numeric_limits<double>::lowest(),
-               std::numeric_limits<double>::max())
-  , m_center("Rotation Center", glm::dvec2(0.f), glm::dvec2(std::numeric_limits<double>::lowest()),
+  , m_rotation("Rotation", 0, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max())
+  , m_center("Rotation Center",
+             glm::dvec2(0.f),
+             glm::dvec2(std::numeric_limits<double>::lowest()),
              glm::dvec2(std::numeric_limits<double>::max()))
   , m_receiveWidgetSignal(true)
 {
@@ -185,9 +194,10 @@ void Z2DTransformParameter::interpolate(const ZParameter& prev, double progress,
   desPara.m_receiveWidgetSignal = false;
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));
   desPara.setRotation(glm::mix(prevPara.m_rotation.get(), m_rotation.get(), progress));
-  //desPara.setRotation(glm::vec4(glm::mix(prevPara.m_rotation.get().x, m_rotation.get().x, progress), prevPara.m_rotation.get().yzw()));
+  // desPara.setRotation(glm::vec4(glm::mix(prevPara.m_rotation.get().x, m_rotation.get().x, progress),
+  // prevPara.m_rotation.get().yzw()));
   desPara.setTranslation(glm::mix(prevPara.translation(), translation(), progress));
-  //desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
+  // desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
   desPara.setRotationCenter(progress >= 1.0 ? m_center.get() : prevPara.m_center.get());
   desPara.m_receiveWidgetSignal = true;
   desPara.updateMatrix();
@@ -227,13 +237,13 @@ QWidget* Z2DTransformParameter::actualCreateWidget(QWidget* parent)
   transform.addChild(*pb, 2);
 
   QLayout* lw = transform.createLayout(false);
-  //QWidget *widget = new QWidget();
-  //widget->setLayout(lw);
+  // QWidget *widget = new QWidget();
+  // widget->setLayout(lw);
   auto* groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
-  //widget->setParent(parent);
-  //return widget;
+  // widget->setParent(parent);
+  // return widget;
   return groupBox;
 }
 

@@ -7,7 +7,7 @@ namespace nim {
 
 class Z2DAnimationDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
 public:
   explicit Z2DAnimationDoc(ZDoc& doc);
 
@@ -22,10 +22,14 @@ public:
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Animation2D"; }
+  {
+    return "Animation2D";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Animation2Ds"; }
+  {
+    return "Animation2Ds";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -70,20 +74,22 @@ protected:
   size_t addAnimation(Z2DAnimation* animation, const QString& path, const QString& name = "");
 
 private:
-  struct AnimationPack
-  { // animation and its associated data
-    AnimationPack(Z2DAnimation* animation_, const QString& path_, QString  name = "");
+  struct AnimationPack { // animation and its associated data
+    AnimationPack(Z2DAnimation* animation_, const QString& path_, QString name = "");
 
     void updateDerivedData();
 
     const QString& info() const;
 
     inline const QString& name() const
-    { return m_name; }
+    {
+      return m_name;
+    }
 
     inline const QString& tooltip() const
-    { return m_tooltip; }
-
+    {
+      return m_tooltip;
+    }
 
     std::unique_ptr<Z2DAnimation> animation;
     QString path;
@@ -112,5 +118,3 @@ private:
 };
 
 } // namespace nim
-
-

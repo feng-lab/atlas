@@ -12,7 +12,7 @@ class ZCameraParameterAnimation;
 
 class Z3DAnimation : public ZAnimation
 {
-Q_OBJECT
+  Q_OBJECT
 public:
   explicit Z3DAnimation(ZDoc& doc, QObject* parent = nullptr);
 
@@ -23,10 +23,14 @@ public:
   void save(const QString& fn);
 
   [[nodiscard]] const ZCameraParameterAnimation* cameraParameterAnimation() const
-  { return m_cameraParameterAnimation; }
+  {
+    return m_cameraParameterAnimation;
+  }
 
   ZCameraParameterAnimation* cameraParameterAnimation()
-  { return m_cameraParameterAnimation; }
+  {
+    return m_cameraParameterAnimation;
+  }
 
 protected:
   void bindGlobalParameters() override;
@@ -39,4 +43,3 @@ protected:
 };
 
 } // namespace nim
-

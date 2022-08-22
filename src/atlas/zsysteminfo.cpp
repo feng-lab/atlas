@@ -265,6 +265,20 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
   updateRecentFiles();
 }
 
+void ZSystemInfo::removeOldLogs(int numberToKeep)
+{
+  QDir ld = logDir();
+  ld.cdUp();
+  QStringList filters;
+  filters << "????????"
+             "-??????.???_LOG";
+  QFileInfoList list = ld.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks, QDir::Name);
+  for (int i = 0; i < list.size() - numberToKeep; ++i) {
+    QDir logDir(list.at(i).absoluteFilePath());
+    logDir.removeRecursively();
+  }
+}
+
 void ZSystemInfo::updateRecentFiles()
 {
   for (auto widget : QApplication::topLevelWidgets()) {
