@@ -7,7 +7,8 @@ namespace nim {
 
 class Z3DAnimationDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DAnimationDoc(ZDoc& doc);
 
@@ -17,19 +18,26 @@ public:
 
   // return info of animation with id, animation mesh exist, otherwise crash
   Z3DAnimation& animation(size_t id)
-  { return *m_idToAnimationPacks.at(id)->animation; }
+  {
+    return *m_idToAnimationPacks.at(id)->animation;
+  }
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Animation3D"; }
+  {
+    return "Animation3D";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Animation3Ds"; }
+  {
+    return "Animation3Ds";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -76,17 +84,21 @@ protected:
 private:
   struct AnimationPack
   { // animation and its associated data
-    AnimationPack(Z3DAnimation* animation_, const QString& path_, QString  name = "");
+    AnimationPack(Z3DAnimation* animation_, const QString& path_, QString name = "");
 
     void updateDerivedData();
 
     const QString& info() const;
 
     inline const QString& name() const
-    { return m_name; }
+    {
+      return m_name;
+    }
 
     inline const QString& tooltip() const
-    { return m_tooltip; }
+    {
+      return m_tooltip;
+    }
 
     std::unique_ptr<Z3DAnimation> animation;
     QString path;
@@ -96,6 +108,7 @@ private:
     QString m_tmpName;
 
     // derived data
+
   private:
     mutable QString m_info;
     QString m_name;
@@ -115,4 +128,3 @@ private:
 };
 
 } // namespace nim
-

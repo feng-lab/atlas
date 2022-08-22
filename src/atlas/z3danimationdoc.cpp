@@ -14,8 +14,7 @@
 
 namespace nim {
 
-Z3DAnimationDoc::Z3DAnimationDoc(ZDoc& doc)
-  : ZObjDoc(doc)
+Z3DAnimationDoc::Z3DAnimationDoc(ZDoc& doc) : ZObjDoc(doc)
 {
   createActions();
 }
@@ -38,8 +37,9 @@ void Z3DAnimationDoc::createNewAnimation(const QString& name)
 
 bool Z3DAnimationDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToAnimationPacks.at(id);
   if (pack->path.endsWith(".animation3d", Qt::CaseInsensitive)) {
@@ -85,8 +85,9 @@ bool Z3DAnimationDoc::canReadFile(const QString& fileName) const
 size_t Z3DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToAnimationPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path == fileName) {
       return idPack.first;
+    }
   }
   size_t id;
   try {
@@ -111,8 +112,9 @@ size_t Z3DAnimationDoc::loadFile(const json::value& jValue, QString& errorMsg)
       return 0;
     }
     for (const auto& idPack : m_idToAnimationPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first)))
+      if (isSameObj(jValue, jsonValue(idPack.first))) {
         return idPack.first;
+      }
     }
     size_t id;
     QString fileName = asQString(jValue);
@@ -183,12 +185,14 @@ json::value Z3DAnimationDoc::jsonValue(size_t id) const
 bool Z3DAnimationDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -201,11 +205,9 @@ bool Z3DAnimationDoc::isAlias(size_t id) const
 {
   CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
 
-  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
+  });
 }
 
 QWidget* Z3DAnimationDoc::createObjEditWidget(size_t id)
@@ -225,10 +227,11 @@ void Z3DAnimationDoc::loadAnimation()
   dialog.setWindowTitle("Load 3D Animation File");
   if (dialog.exec()) {
     QString errorMsg;
-    //int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    // int fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read Animation.\n" + errorMsg);
       }
     }
@@ -276,8 +279,10 @@ size_t Z3DAnimationDoc::addAnimation(Z3DAnimation* animation, const QString& pat
   return id;
 }
 
-Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QString& path_, QString  name)
-  : animation(animation_), path(QFileInfo(path_).canonicalFilePath()), m_tmpName(std::move(name))
+Z3DAnimationDoc::AnimationPack::AnimationPack(Z3DAnimation* animation_, const QString& path_, QString name)
+  : animation(animation_)
+  , path(QFileInfo(path_).canonicalFilePath())
+  , m_tmpName(std::move(name))
 {
   if (path.isEmpty()) {
     hasUnsavedChange = true;
@@ -302,7 +307,8 @@ const QString& Z3DAnimationDoc::AnimationPack::info() const
 
 void Z3DAnimationDoc::createActions()
 {
-  m_loadAnimationsAction = new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 3D Animations..."), this);
+  m_loadAnimationsAction =
+    new QAction(ZTheme::instance().icon(ZTheme::LoadObjectIcon), tr("&Load 3D Animations..."), this);
   m_loadAnimationsAction->setStatusTip(tr("Load one or more existing Animation files"));
   connect(m_loadAnimationsAction, &QAction::triggered, this, &Z3DAnimationDoc::loadAnimation);
 }

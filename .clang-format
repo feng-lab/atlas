@@ -29,18 +29,22 @@ BraceWrapping:
   AfterEnum: true
   AfterFunction: true
   AfterNamespace: false
+  AfterStruct: true
   AfterUnion: true
+  AfterExternBlock: false
   BeforeCatch: true
   BeforeElse: false
   BeforeLambdaBody: false
+  BeforeWhile: false
   IndentBraces: false
   SplitEmptyFunction: false
-  SplitEmptyRecord: true
+  SplitEmptyRecord: false
   SplitEmptyNamespace: false
 BreakBeforeBinaryOperators: None
+BreakBeforeConceptDeclarations: Always
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializers: BeforeComma
-BreakInheritanceList: BeforeColon
+BreakInheritanceList: BeforeComma
 BreakStringLiterals: false
 ColumnLimit: 120
 CompactNamespaces: false
@@ -48,31 +52,61 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 2
 ContinuationIndentWidth: 2
 Cpp11BracedListStyle: true
+DeriveLineEnding: true
 DerivePointerAlignment: false
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: Always
 ForEachMacros: [ FOR_EACH, FOR_EACH_ENUMERATE, FOR_EACH_KV, FOR_EACH_R, FOR_EACH_RANGE, ]
 FixNamespaceComments: true
 IncludeBlocks: Merge
+IndentAccessModifiers: false
 IndentCaseBlocks: false
 IndentCaseLabels: true
+IndentExternBlock: NoIndent
+IndentGotoLabels: false
 IndentPPDirectives: None
+IndentRequiresClause: true
 IndentWidth: 2
 IndentWrappedFunctionNames: false
 InsertBraces: true
+InsertTrailingCommas: Wrapped
 KeepEmptyLinesAtTheStartOfBlocks: false
+LambdaBodyIndentation: Signature
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
 ObjCSpaceAfterProperty: false
 ObjCSpaceBeforeProtocolList: true
+PackConstructorInitializers: CurrentLine
 PointerAlignment: Left
+QualifierAlignment: Leave
+# QualifierOrder: ['constexpr', 'inline', 'static', 'type', 'const', 'volatile']
+ReferenceAlignment: Pointer
 ReflowComments: true
+RequiresClausePosition: OwnLine
+SeparateDefinitionBlocks: Leave
+ShortNamespaceLines: 1
+SortIncludes: Never
+SortUsingDeclarations: false
 SpaceAfterCStyleCast: false
 SpaceAfterLogicalNot: false
 SpaceAfterTemplateKeyword: false
+SpaceAroundPointerQualifiers: Default
 SpaceBeforeAssignmentOperators: true
+SpaceBeforeCaseColon: false
 SpaceBeforeCpp11BracedList: false
 SpaceBeforeCtorInitializerColon: true
 SpaceBeforeInheritanceColon: true
-SpaceBeforeParens: ControlStatements
+SpaceBeforeParens: Custom
+SpaceBeforeParensOptions:
+  AfterControlStatements: true
+  AfterForeachMacros: true
+  AfterFunctionDeclarationName: false
+  AfterFunctionDefinitionName: false
+  AfterIfMacros: true
+  AfterOverloadedOperator: false
+  AfterRequiresInClause: false
+  AfterRequiresInExpression: false
+  BeforeNonEmptyParentheses: false
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceBeforeSquareBrackets: false
 SpaceInEmptyBlock: false
@@ -85,8 +119,12 @@ SpacesInContainerLiterals: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Latest
+StatementAttributeLikeMacros: [emit]
 StatementMacros: [ Q_UNUSED, IMG_TYPED_CALL, IMG_RETURN_TYPED_CALL, IMGINFO_RETURN_TYPED_CALL,
                    IMG_TYPED_CALL_FIX2NDTYPE, IMG_TYPED_CALL_FIX2ND3RDTYPE, IMG_RETURN_TYPED_CALL_FIX2NDTYPE,
                    IMG_TYPED_CALL_2TYPE, ]
 TabWidth: 8
+TypenameMacros: ['STACK_OF', 'LIST']
+UseCRLF: false
 UseTab: Never
+WhitespaceSensitiveMacros: ['STRINGIZE', 'PP_STRINGIZE']
