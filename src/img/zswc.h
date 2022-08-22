@@ -1,16 +1,27 @@
 #pragma once
 
-#include "ztree.hpp"
 #include "zglmutils.h"
+#include "ztree.hpp"
 
 namespace nim {
 
 // http://research.mssm.edu/cnic/swc.html
-struct SwcNode
-{
-  explicit SwcNode(int64_t id_ = -1, int64_t type_ = -1, double x_ = 0, double y_ = 0, double z_ = 0,
-                   double radius_ = -1, int64_t parentID_ = -2)
-    : id(id_), type(type_), x(x_), y(y_), z(z_), radius(radius_), parentID(parentID_), label(-1)
+struct SwcNode {
+  explicit SwcNode(int64_t id_ = -1,
+                   int64_t type_ = -1,
+                   double x_ = 0,
+                   double y_ = 0,
+                   double z_ = 0,
+                   double radius_ = -1,
+                   int64_t parentID_ = -2)
+    : id(id_)
+    , type(type_)
+    , x(x_)
+    , y(y_)
+    , z(z_)
+    , radius(radius_)
+    , parentID(parentID_)
+    , label(-1)
   {}
 
   int64_t id = -1;
@@ -19,14 +30,21 @@ struct SwcNode
   double y = 0;
   double z = 0;
   double radius = -1;
-  int64_t parentID = -2;   // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
+  int64_t parentID = -2; // after tree change, parentID becomes invalid, use function parentID to get corrent parentID
   int64_t label = -1;
   bool selected = false;
 
   [[nodiscard]] std::string toString() const
   {
     return fmt::format("id:{}, type:{}, xyz:({}, {}, {}), radius:{}, parentID:{}, label:{}",
-                       id, type, x, y, z, radius, parentID, label);
+                       id,
+                       type,
+                       x,
+                       y,
+                       z,
+                       radius,
+                       parentID,
+                       label);
   }
 };
 
@@ -51,7 +69,9 @@ public:
 
   // might throw ZIOException
   explicit ZSwc(const QString& filename)
-  { load(filename); }
+  {
+    load(filename);
+  }
 
   ZSwc(ZSwc&&) = default;
 
@@ -62,21 +82,31 @@ public:
   ZSwc& operator=(const ZSwc&) = default;
 
   inline void swap(ZSwc& other) noexcept
-  { ZTree<SwcNode>::swap(other); }
+  {
+    ZTree<SwcNode>::swap(other);
+  }
 
   template<typename Iter>
   static QString toQString(const Iter& pos)
   {
-    return isNull(pos) ? QString("(Empty Node)") :
-           QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7, label:%8")
-             .arg(pos->id).arg(pos->type).arg(pos->x).arg(pos->y).arg(pos->z)
-             .arg(pos->radius).arg(parentID(pos)).arg(pos->label);
+    return isNull(pos) ? QString("(Empty Node)")
+                       : QString("id:%1, type:%2, x:%3, y:%4, z:%5, radius:%6, parentID:%7, label:%8")
+                           .arg(pos->id)
+                           .arg(pos->type)
+                           .arg(pos->x)
+                           .arg(pos->y)
+                           .arg(pos->z)
+                           .arg(pos->radius)
+                           .arg(parentID(pos))
+                           .arg(pos->label);
   }
 
   // pos must not be null
   template<typename Iter>
   static int64_t parentID(const Iter& pos)
-  { return isNull(parent(pos)) ? -1 : parent(pos)->id; }
+  {
+    return isNull(parent(pos)) ? -1 : parent(pos)->id;
+  }
 
   SwcTreeNode thickestNode();
 
@@ -86,22 +116,32 @@ public:
   void labelSomaAndOthers(double radiusThre = 0, int64_t somaType = SomaType, int64_t otherType = AxonType);
 
   // before calling this, soma nodes type must be somaType and other nodes type must not be somaType
-  void resortPyramidal(int64_t basalType = BasalDendriteType, int64_t apicalType = ApicalDendriteType, int64_t somaType = SomaType);
+  void resortPyramidal(int64_t basalType = BasalDendriteType,
+                       int64_t apicalType = ApicalDendriteType,
+                       int64_t somaType = SomaType);
 
   void resortID();
 
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename)
-  { return filename.endsWith(".swc", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".swc", Qt::CaseInsensitive);
+  }
 
   static bool canWriteFile(const QString& filename)
-  { return filename.endsWith(".swc", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".swc", Qt::CaseInsensitive);
+  }
 
   static QString getQtReadNameFilter()
-  { return QString("SWC files (*.swc)"); }
+  {
+    return {"SWC files (*.swc)"};
+  }
 
   static QString getQtWriteNameFilter()
-  { return QString("SWC files (*.swc)"); }
+  {
+    return {"SWC files (*.swc)"};
+  }
 
   // might throw ZIOException
   void load(const QString& filename);
@@ -118,4 +158,3 @@ public:
 };
 
 } // namespace nim
-

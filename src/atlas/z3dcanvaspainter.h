@@ -1,11 +1,11 @@
 #pragma once
 
 #include "z3dboundedfilter.h"
-#include "z3dtexturecopyrenderer.h"
 #include "z3drenderport.h"
-#include "znumericparameter.h"
-#include "zimg.h"
+#include "z3dtexturecopyrenderer.h"
 #include "zexception.h"
+#include "zimg.h"
+#include "znumericparameter.h"
 
 namespace nim {
 
@@ -15,14 +15,16 @@ class Z3DCompositor;
 
 class Z3DCanvasPainter : public Z3DBoundedFilter
 {
-Q_OBJECT
+  Q_OBJECT
 public:
   explicit Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& canvas, QObject* parent = nullptr);
 
   void invalidate(State inv = State::AllResultInvalid) override;
 
   Z3DCanvas& canvas()
-  { return m_canvas; }
+  {
+    return m_canvas;
+  }
 
   [[nodiscard]] const Z3DTexture* imageColorTexture(Z3DEye eye) const;
 
@@ -72,4 +74,3 @@ private:
 };
 
 } // namespace nim
-

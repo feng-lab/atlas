@@ -630,7 +630,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
     }
   }
   catch (std::exception const& e) {
-    throw ZIOException(QString("read %1 folly:%2").arg(m_filename).arg(e.what()));
+    throw ZIOException(QString("read %1 folly:%2").arg(m_filename, e.what()));
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";

@@ -1,12 +1,11 @@
 #include "zswc.h"
-
+#include "zexception.h"
+#include "zioutils.h"
 #include "zlog.h"
 #include "zstringutils.h"
-#include "zioutils.h"
-#include "zexception.h"
 #include <QFile>
-#include <QTextStream>
 #include <QRegularExpression>
+#include <QTextStream>
 #include <map>
 
 namespace nim {
@@ -62,18 +61,21 @@ void ZSwc::labelSomaAndOthers(double radiusThre, int64_t somaType, int64_t other
 
 void ZSwc::resortPyramidal(int64_t basalType, int64_t apicalType, int64_t somaType)
 {
-  if (empty())
+  if (empty()) {
     return;
+  }
   CHECK(numRoots() == 1);
   SwcTreeNode soma = begin();
-  CHECK(thickestNode() == soma);  // soma must be correct
+  CHECK(thickestNode() == soma); // soma must be correct
   std::vector<SwcTreeNode> somaChildren;
   SwcTreeNode it = begin();
   for (++it; it != end(); ++it) {
-    if (it->type != somaType)
+    if (it->type != somaType) {
       it->type = basalType;
-    if (parent(it)->type == somaType && it->type != somaType)
+    }
+    if (parent(it)->type == somaType && it->type != somaType) {
       somaChildren.push_back(it);
+    }
   }
   for (auto& sch : somaChildren) {
     if (sch->y > soma->y) { // apical
@@ -99,8 +101,9 @@ void ZSwc::load(const QString& filename)
     clear();
 
     QFile qFile(filename);
-    if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text))
+    if (!qFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
       throw ZIOException("Can not read file.");
+    }
 
     std::map<int, SwcNode> nodeMap;
 
@@ -175,7 +178,7 @@ void ZSwc::load(const QString& filename)
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not load swc %1: %2").arg(filename).arg(e.what()));
+    throw ZIOException(QString("Can not load swc %1: %2").arg(filename, e.what()));
   }
 }
 
@@ -183,8 +186,9 @@ void ZSwc::save(const QString& filename) const
 {
   try {
     QFile qFile(filename);
-    if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text))
+    if (!qFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
       throw ZIOException("Can not open file.");
+    }
 
     QTextStream out(&qFile);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
@@ -195,22 +199,29 @@ void ZSwc::save(const QString& filename) const
       throw ZIOException("Error while writing file.");
     }
     for (ConstBreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
-      out << QString("%1 %2 %3 %4 %5 %6 %7\n").arg(it->id).arg(it->type).arg(it->x).arg(it->y).arg(it->z)
-        .arg(it->radius).arg(parentID(it));
+      out << QString("%1 %2 %3 %4 %5 %6 %7\n")
+               .arg(it->id)
+               .arg(it->type)
+               .arg(it->x)
+               .arg(it->y)
+               .arg(it->z)
+               .arg(it->radius)
+               .arg(parentID(it));
       if (out.status() != QTextStream::Ok) {
         throw ZIOException("Error while writing file.");
       }
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not save swc %1: %2").arg(filename).arg(e.what()));
+    throw ZIOException(QString("Can not save swc %1: %2").arg(filename, e.what()));
   }
 }
 
 void ZSwc::addLine(const std::vector<glm::dvec3>& line, double radius)
 {
-  if (line.empty())
+  if (line.empty()) {
     return;
+  }
   SwcNode root(0, 0, line[0].x, line[0].y, line[0].z, radius, -1);
   Iterator it = appendRoot(root);
   for (size_t i = 1; i < line.size(); ++i) {

@@ -8,13 +8,13 @@ namespace nim {
 
 class ZApplication : public QApplication
 {
-Q_OBJECT
+  Q_OBJECT
 public:
   using QApplication::QApplication;
 
   bool notify(QObject* object, QEvent* event) override;
 
-  bool event(QEvent *event) override;
+  bool event(QEvent* event) override;
 
   static QString resourcesDirPath();
 
@@ -25,4 +25,3 @@ Q_SIGNALS:
 };
 
 } // namespace nim
-
