@@ -9,7 +9,7 @@
 #define GOOGLE_STRIP_LOG 0
 
 #include <glog/logging.h>
-#include <fmt/format.h>
+#include <fmt/core.h>
 #include <QDateTime>
 #include <QDebug>
 #include <QPoint>

@@ -1,25 +1,25 @@
 #include "zvideoencoder.h"
-
 #include "zlog.h"
 #include "zsysteminfo.h"
 
 namespace nim {
 
-ZVideoEncoder::ZVideoEncoder(QObject* parent)
-  : QObject(parent)
+ZVideoEncoder::ZVideoEncoder(QObject* parent) : QObject(parent)
 {
   m_ffmpegProcess = new QProcess(this);
-  connect(m_ffmpegProcess, &QProcess::errorOccurred,
-          this, &ZVideoEncoder::ffmpegError);
-  connect(m_ffmpegProcess, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
-          this, &ZVideoEncoder::ffmpegFinished);
-  connect(m_ffmpegProcess, &QProcess::readyReadStandardOutput,
-          this, &ZVideoEncoder::logStandardOutput);
-  connect(m_ffmpegProcess, &QProcess::readyReadStandardError,
-          this, &ZVideoEncoder::logStandardError);
+  connect(m_ffmpegProcess, &QProcess::errorOccurred, this, &ZVideoEncoder::ffmpegError);
+  connect(m_ffmpegProcess,
+          qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
+          this,
+          &ZVideoEncoder::ffmpegFinished);
+  connect(m_ffmpegProcess, &QProcess::readyReadStandardOutput, this, &ZVideoEncoder::logStandardOutput);
+  connect(m_ffmpegProcess, &QProcess::readyReadStandardError, this, &ZVideoEncoder::logStandardError);
 }
 
-void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int fieldWidth, int framesPerSecond,
+void ZVideoEncoder::encode(const QDir& dir,
+                           const QString& namePrefix,
+                           int fieldWidth,
+                           int framesPerSecond,
                            const QString& outputFilename)
 {
   if (m_ffmpegProcess->state() != QProcess::NotRunning) {
@@ -34,8 +34,13 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
 #endif
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
-            << (QString("%1/%2% 0%3d.png").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
-            << "-c:v" << "libx264" << "-crf" << "18" << "-pix_fmt" << "yuv420p"
+            << (QString("%1/%2% 0%3d.png").arg(dir.absolutePath()).arg(namePrefix, fieldWidth).replace("% 0", "%0"))
+            << "-c:v"
+            << "libx264"
+            << "-crf"
+            << "18"
+            << "-pix_fmt"
+            << "yuv420p"
             << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
   LOG(INFO) << program << " " << arguments.join(" ");
   m_ffmpegProcess->start(program, arguments);

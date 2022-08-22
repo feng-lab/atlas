@@ -1,12 +1,10 @@
 #include "zapplication.h"
-
 #include "zexception.h"
 #include "zlog.h"
-#include <QMessageBox>
 #include <QFileOpenEvent>
+#include <QMessageBox>
 
 namespace nim {
-
 
 bool ZApplication::notify(QObject* object, QEvent* event)
 {
@@ -15,17 +13,21 @@ bool ZApplication::notify(QObject* object, QEvent* event)
   }
   catch (const ZException& e) {
     QString err = QString("Uncaught %1 <%2> while sending event %3 to object %4 (%5)")
-      .arg(typeid(e).name()).arg(e.what())
-      .arg(typeid(*event).name())
-      .arg(object->objectName()).arg(object->metaObject()->className());
+                    .arg(typeid(e).name(),
+                         e.what(),
+                         typeid(*event).name(),
+                         object->objectName(),
+                         object->metaObject()->className());
     QMessageBox::critical(activeWindow(), applicationName(), err);
     LOG(FATAL) << err;
   }
   catch (const std::exception& e) {
     QString err = QString("Uncaught %1 <%2> while sending event %3 to object %4 (%5)")
-      .arg(typeid(e).name()).arg(e.what())
-      .arg(typeid(*event).name())
-      .arg(object->objectName()).arg(object->metaObject()->className());
+                    .arg(typeid(e).name(),
+                         e.what(),
+                         typeid(*event).name(),
+                         object->objectName(),
+                         object->metaObject()->className());
     QMessageBox::critical(activeWindow(), applicationName(), err);
     LOG(FATAL) << err;
   }
