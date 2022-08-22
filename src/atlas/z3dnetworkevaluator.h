@@ -3,7 +3,6 @@
 #include "z3dcanvas.h"
 #include "zbenchtimer.h"
 #include <QObject>
-#include <QMutex>
 #ifndef Q_MOC_RUN
 #include <boost/graph/adjacency_list.hpp>
 #endif
@@ -63,7 +62,7 @@ private:
 
   std::vector<std::unique_ptr<Z3DFilterWrapper>> m_filterWrappers;
 
-  QMutex m_mutex;
+  mutable bool m_locked = false;
 
   bool m_processPending;
 

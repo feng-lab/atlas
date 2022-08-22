@@ -6,7 +6,6 @@
 #include "znumericparameter.h"
 #include "zimg.h"
 #include "zexception.h"
-#include <QMutexLocker>
 
 namespace nim {
 
@@ -70,8 +69,6 @@ private:
   int m_tileStartY;
   QString m_renderToImageError;
   Z3DScreenShotType m_renderToImageType;
-
-  QMutex m_mutex;
 };
 
 } // namespace nim

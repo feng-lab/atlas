@@ -14,7 +14,7 @@ namespace llfio = LLFIO_V2_NAMESPACE;
 class ZMemoryMappedFile
 {
 public:
-  explicit ZMemoryMappedFile(QString filename);
+  explicit ZMemoryMappedFile(const QString& filename);
 
   inline void readToBuffer(size_t offset, size_t length, void* buffer) const
   {

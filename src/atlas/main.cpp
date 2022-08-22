@@ -31,6 +31,7 @@
 DEFINE_bool(run_unit_tests, false, "run unit tests");
 DEFINE_bool(run_benchmarks, false, "run benchmarks");
 #endif
+DECLARE_string(flagfile);
 DECLARE_uint32(folly_global_cpu_executor_threads);
 
 using namespace nim;
@@ -48,9 +49,7 @@ void removeOldLogs(const QDir& dir, index_t numberToKeep = 20)
   ld.cdUp();
   QStringList filters;
   filters << "????????""-??????.???_LOG";
-  QFileInfoList list = ld.entryInfoList(filters,
-                                        QDir::Dirs | QDir::NoSymLinks,
-                                        QDir::Name);
+  QFileInfoList list = ld.entryInfoList(filters, QDir::Dirs | QDir::NoSymLinks, QDir::Name);
   for (index_t i = 0; i < list.size() - numberToKeep; ++i) {
     QDir logDir(list.at(i).absoluteFilePath());
     logDir.removeRecursively();
@@ -59,8 +58,18 @@ void removeOldLogs(const QDir& dir, index_t numberToKeep = 20)
 
 int main(int argc, char* argv[])
 {
+  QCoreApplication::setOrganizationName("fenglab");
+  //On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
+  // is preferred over the name. On other platforms, the name is preferred over the domain.
+#ifndef Q_OS_MACOS
+  QCoreApplication::setOrganizationDomain("fenglab.xyz");
+#endif
+  QCoreApplication::setApplicationName("Atlas");
   try {
-    FLAGS_folly_global_cpu_executor_threads = std::thread::hardware_concurrency() * 2;
+    if (QString setting_filename = "user_settings_flagfile.txt";
+        ZSystemInfo::instance().configDir().exists(setting_filename)) {
+      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::instance().configDir().absoluteFilePath(setting_filename)).constData();
+    }
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
     gflags::SetUsageMessage(usage);
@@ -120,13 +129,6 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
     nim::ZApplication app(argc, argv);
-    QCoreApplication::setOrganizationName("fenglab");
-    //On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
-    // is preferred over the name. On other platforms, the name is preferred over the domain.
-#ifndef Q_OS_MACOS
-    QCoreApplication::setOrganizationDomain("fenglab.xyz");
-#endif
-    QCoreApplication::setApplicationName("Atlas");
 
     if (!nim::ZCpuInfo::instance().bAVX) {
       QMessageBox::critical(nullptr, QCoreApplication::applicationName(),
@@ -146,6 +148,11 @@ int main(int argc, char* argv[])
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();
     });
+
+    if (!FLAGS_flagfile.empty()) {
+      LOG(INFO) << "setting file loaded: " << FLAGS_flagfile;
+    }
+    LOG(INFO) << "folly_global_cpu_executor_threads: " << FLAGS_folly_global_cpu_executor_threads;
 
     ZTheme::instance();
 

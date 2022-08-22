@@ -354,6 +354,41 @@ void ZMainWindow::openLogFolder()
   QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().logDir().absolutePath()));
 }
 
+void ZMainWindow::openConfigFolder()
+{
+  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().configDir().absolutePath()));
+}
+
+void ZMainWindow::generateConfigFile()
+{
+  QString fn = "user_settings_flagfile.txt";
+  QDir dir = ZSystemInfo::instance().configDir();
+  if (dir.exists(fn)) {
+    QMessageBox msgBox(QApplication::activeWindow());
+    msgBox.setText(tr("File %1 exists, overwrite?").arg(fn));
+    msgBox.setInformativeText("");
+    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
+    msgBox.setDefaultButton(QMessageBox::Cancel);
+    int ret = msgBox.exec();
+
+    if (ret == QMessageBox::Cancel) {
+      return;
+    }
+    if (!QFile::remove(dir.filePath(fn))) {
+      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+                            QString("Could not replace %1").arg(dir.filePath(fn)));
+      return;
+    }
+  }
+  if (!QFile::copy(ZSystemInfo::instance().resourceDir().absoluteFilePath("settings_flagfile.txt"),
+                   dir.absoluteFilePath(fn))) {
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          QString("Could not copy file to %1").arg(dir.filePath(fn)));
+    return;
+  }
+}
+
 #ifdef ATLAS_WITH_TESTS
 
 void ZMainWindow::runBenchmark()
@@ -612,6 +647,14 @@ void ZMainWindow::createActions()
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
+  m_openConfigFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Config Folder"), this);
+  m_openConfigFolderAction->setStatusTip(tr("Open Config Folder"));
+  connect(m_openConfigFolderAction, &QAction::triggered, this, &ZMainWindow::openConfigFolder);
+
+  m_generateConfigFileAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Generate Config File"), this);
+  m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
+  connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
+
 #ifdef ATLAS_WITH_TESTS
   m_runBenchmarkAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Benchmark"), this);
   m_runBenchmarkAction->setStatusTip(tr("Run Benchmark"));
@@ -695,6 +738,8 @@ void ZMainWindow::createMenus()
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_viewLogAction);
   m_helpMenu->addAction(m_openLogFolderAction);
+  m_helpMenu->addAction(m_openConfigFolderAction);
+  m_helpMenu->addAction(m_generateConfigFileAction);
 #ifdef ATLAS_WITH_TESTS
   m_helpMenu->addAction(m_runBenchmarkAction);
   m_helpMenu->addAction(m_testAction);

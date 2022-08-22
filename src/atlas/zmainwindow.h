@@ -69,6 +69,9 @@ public:
   QAction* openLogFolderAction()
   { return m_openLogFolderAction; }
 
+  QAction* openConfigFolderAction()
+  { return m_openConfigFolderAction; }
+
 protected:
   //void appAboutToQuit();
 
@@ -107,6 +110,10 @@ private:
   static void viewLog();
 
   static void openLogFolder();
+
+  static void openConfigFolder();
+
+  static void generateConfigFile();
 
 #ifdef ATLAS_WITH_TESTS
 
@@ -190,6 +197,8 @@ private:
 
   QAction* m_viewLogAction = nullptr;
   QAction* m_openLogFolderAction = nullptr;
+  QAction* m_openConfigFolderAction = nullptr;
+  QAction* m_generateConfigFileAction = nullptr;
 #ifdef ATLAS_WITH_TESTS
   QAction* m_runBenchmarkAction = nullptr;
   QAction* m_testAction = nullptr;

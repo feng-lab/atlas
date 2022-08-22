@@ -9,12 +9,17 @@
 #include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
-#include <folly/MPMCQueue.h>
-//#include <folly/executors/CPUThreadPoolExecutor.h>
+#include <fmt/chrono.h>
+#include <folly/concurrency/UnboundedQueue.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
 #include <boost/functional/hash.hpp>
 #include <tbb/parallel_for.h>
 #include <algorithm>
+#include <chrono>
 #include <memory>
+
+DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_s, 5,
+              "Interval in seconds for logging folly global executor status during waiting, default is 5");
 
 namespace nim {
 
@@ -525,13 +530,14 @@ void Z3DImg::uploadImageCache(size_t channel)
   LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
+  auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
 
-//  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
+  //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
 //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
 //  }
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
-  folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+  folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
   ZImgInfo resInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
                    m_imageBlockSize.y + m_imageBlockSizePad.y,
                    m_imageBlockSize.z + m_imageBlockSizePad.z,
@@ -548,22 +554,28 @@ void Z3DImg::uploadImageCache(size_t channel)
                                        0,
                                        resInfo
       ).thenValue([=, &imgQueue](ZImg&& img) {
-        imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
+        imgQueue.enqueue(std::make_tuple(i, std::move(img)));
       });
     });
   }
   std::tuple<size_t, ZImg> elem;
+  using namespace std::chrono_literals;
   for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
-    imgQueue.blockingRead(elem);
-    m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
-                                                  m_imageBlockSize + m_imageBlockSizePad,
-                                                  std::get<1>(elem).channelData(0));
+    if (imgQueue.try_dequeue_for(elem, std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s))) {
+      m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
+                                                    m_imageBlockSize + m_imageBlockSizePad,
+                                                    std::get<1>(elem).channelData(0));
+    } else {
+      if (p) {
+        LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
+                                 p->getPendingTaskCount(), p->getTaskQueueSize(), p->getUsedCpuTime());
+      }
+    }
   }
   STOP_AND_LOG(bt_async)
 
   m_channelPendingUpdates[channel].clear();
 
-  LOG(INFO) << "current img cache size: " << ZImgCache::instance().size();
   STOP_AND_LOG(bt)
 }
 

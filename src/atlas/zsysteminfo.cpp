@@ -6,6 +6,7 @@
 #include "z3dcontext.h"
 #include "zmainwindow.h"
 #include "z3dmainwindow.h"
+#include "zapplication.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QStandardPaths>
@@ -208,6 +209,20 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 QDir ZSystemInfo::logDir() const
 {
   static QDir dir = createLogDir();
+  return dir;
+}
+
+QDir ZSystemInfo::configDir() const
+{
+  static QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
+  if (!dir.exists())
+    dir.mkpath(".");
+  return dir;
+}
+
+QDir ZSystemInfo::resourceDir() const
+{
+  static QDir dir(ZApplication::resourcesDirPath());
   return dir;
 }
 

@@ -38,11 +38,13 @@ Z3DNetworkEvaluator::~Z3DNetworkEvaluator()
 
 void Z3DNetworkEvaluator::process(bool stereo)
 {
-  if (!m_mutex.try_lock()) {
+  if (m_locked) {
     LOG(INFO) << "locked. Scheduling.";
     //m_processPending = true;
     return;
   }
+
+  m_locked = true;
 
   // already locked
 
@@ -119,7 +121,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
   }
   CHECK_GL_ERROR
 
-  m_mutex.unlock();
+  m_locked = false;
 
   // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
   if (m_processPending) {

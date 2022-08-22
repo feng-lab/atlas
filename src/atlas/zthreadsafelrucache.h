@@ -345,7 +345,7 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::insert(const TKey& key, const TVa
   //  if (!evictionDone) {
   //    size = m_size++;
   //  }
-  auto size = m_size.fetch_add(objSize, std::memory_order_relaxed);
+  auto size = m_size.fetch_add(objSize, std::memory_order_release);
   if (size > m_maxSize) {
     // It is possible for the size to temporarily exceed the maximum if there is
     // a heavy insert() load, once only as the cache fills. In this situation,
@@ -413,7 +413,7 @@ inline void ZThreadSafeLRUCache<TKey, TValue, THash>::pushFront(ListNode* node)
 template<class TKey, class TValue, class THash>
 void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
 {
-  while (m_size.load(std::memory_order_consume) > m_maxSize) {
+  while (m_size.load(std::memory_order_acquire) > m_maxSize) {
     std::unique_lock<ListMutex> lock(m_listMutex);
     ListNode* moribund = m_tail.m_prev;
     if (moribund == &m_head) {

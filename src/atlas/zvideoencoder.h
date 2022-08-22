@@ -3,7 +3,6 @@
 #include <QObject>
 #include <QProcess>
 #include <QDir>
-#include <QMutexLocker>
 
 namespace nim {
 
@@ -37,8 +36,6 @@ protected:
 
 private:
   QProcess* m_ffmpegProcess;
-
-  QMutex m_mutex;
 };
 
 } // namespace nim

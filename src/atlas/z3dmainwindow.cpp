@@ -303,6 +303,7 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_2dWindow.viewLogAction());
   m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
+  m_helpMenu->addAction(m_2dWindow.openConfigFolderAction());
 }
 
 void Z3DMainWindow::createToolBars()

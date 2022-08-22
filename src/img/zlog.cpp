@@ -9,12 +9,17 @@ void initLogging(const char* argv0, const QString& filename)
 {
   if (filename.isEmpty()) {
     google::SetLogDestination(google::GLOG_INFO, "");
+    google::SetLogDestination(google::GLOG_ERROR, "");
+    google::SetLogDestination(google::GLOG_FATAL, "");
+    google::SetLogDestination(google::GLOG_WARNING, "");
   } else {
-    google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename).constData());
+    google::SetLogDestination(google::GLOG_INFO, QFile::encodeName(filename + "_info_").constData());
+    google::SetLogDestination(google::GLOG_ERROR, QFile::encodeName(filename + "_error_").constData());
+    google::SetLogDestination(google::GLOG_FATAL, QFile::encodeName(filename + "_fatal_").constData());
+    google::SetLogDestination(google::GLOG_WARNING, QFile::encodeName(filename + "_warning_").constData());
   }
-  google::SetLogDestination(google::GLOG_ERROR, "");
-  google::SetLogDestination(google::GLOG_FATAL, "");
-  google::SetLogDestination(google::GLOG_WARNING, "");
+
+  google::SetLogFilenameExtension("_log.txt");
 
   // Set whether log messages go to stderr instead of logfiles
   FLAGS_logtostderr = filename.isEmpty();

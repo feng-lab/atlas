@@ -1,7 +1,7 @@
 #include "zvideoencoder.h"
 
 #include "zlog.h"
-#include "zapplication.h"
+#include "zsysteminfo.h"
 
 namespace nim {
 
@@ -28,9 +28,9 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
   }
 
 #ifdef _WIN32
-  QString program = ZApplication::resourcesDirPath() + QString("/ffmpeg.exe");
+  QString program = ZSystemInfo::instance().resourceDir().absoluteFilePath("ffmpeg.exe");
 #else
-  QString program = ZApplication::resourcesDirPath() + QString("/ffmpeg");
+  QString program = ZSystemInfo::instance().resourceDir().absoluteFilePath("ffmpeg");
 #endif
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
@@ -43,15 +43,11 @@ void ZVideoEncoder::encode(const QDir& dir, const QString& namePrefix, int field
 
 void ZVideoEncoder::cancel()
 {
-  if (!m_mutex.try_lock()) {
-    return;
-  }
   blockSignals(true);
   m_ffmpegProcess->kill();
   m_ffmpegProcess->waitForFinished();
   blockSignals(false);
   Q_EMIT canceled();
-  m_mutex.unlock();
 }
 
 void ZVideoEncoder::ffmpegError(QProcess::ProcessError err)

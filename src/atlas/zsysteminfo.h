@@ -37,6 +37,10 @@ public:
 
   [[nodiscard]] QDir logDir() const;
 
+  [[nodiscard]] QDir configDir() const;
+
+  [[nodiscard]] QDir resourceDir() const;
+
   [[nodiscard]] QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
   { return QString("%1/lastOpenedPath").arg(typeName); }
 
