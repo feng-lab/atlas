@@ -88,7 +88,7 @@ def src_package_dir() -> str:
         if sys.platform.startswith('win'):
             res = os.path.join('Z:', os.sep, 'Google Drive', 'My Drive', 'code', 'my', 'atlas_deps')
             if not os.path.exists(res):
-                res = os.path.join(os.path.expanduser('~'), 'GoogleDrive', 'My Drive', 'code', 'my', 'atlas_deps')
+                res = os.path.join(os.path.expanduser('~'), 'Google Drive', 'code', 'my', 'atlas_deps')
     assert os.path.exists(res)
     return res
 
