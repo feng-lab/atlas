@@ -35,11 +35,11 @@ public:
   // return empty if can not find enough space
   static QString imgCachePath(size_t requiredSpaceInBytes) ;
 
-  [[nodiscard]] QDir logDir() const;
+  [[nodiscard]] static QDir logDir() ;
 
-  [[nodiscard]] QDir configDir() const;
+  [[nodiscard]] static QDir configDir() ;
 
-  [[nodiscard]] QDir resourceDir() const;
+  [[nodiscard]] static QDir resourceDir() ;
 
   [[nodiscard]] QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
   { return QString("%1/lastOpenedPath").arg(typeName); }

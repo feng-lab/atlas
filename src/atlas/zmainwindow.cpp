@@ -341,9 +341,9 @@ void ZMainWindow::viewLog()
   //logDialog.exec();
   QStringList filters;
   filters << "atlas*_log.txt";
-  QFileInfoList list = ZSystemInfo::instance().logDir().entryInfoList(filters,
-                                                                      QDir::Files | QDir::NoSymLinks,
-                                                                      QDir::Name);  // sorted by modification time
+  QFileInfoList list = ZSystemInfo::logDir().entryInfoList(filters,
+                                                           QDir::Files | QDir::NoSymLinks,
+                                                           QDir::Name); // sorted by modification time
   if (!list.isEmpty()) {
     QDesktopServices::openUrl(QUrl::fromLocalFile(list.last().absoluteFilePath()));
   }
@@ -351,18 +351,18 @@ void ZMainWindow::viewLog()
 
 void ZMainWindow::openLogFolder()
 {
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().logDir().absolutePath()));
+  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::logDir().absolutePath()));
 }
 
 void ZMainWindow::openConfigFolder()
 {
-  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::instance().configDir().absolutePath()));
+  QDesktopServices::openUrl(QUrl::fromLocalFile(ZSystemInfo::configDir().absolutePath()));
 }
 
 void ZMainWindow::generateConfigFile()
 {
   QString fn = "user_settings_flagfile.txt";
-  QDir dir = ZSystemInfo::instance().configDir();
+  QDir dir = ZSystemInfo::configDir();
   if (dir.exists(fn)) {
     QMessageBox msgBox(QApplication::activeWindow());
     msgBox.setText(tr("File %1 exists, overwrite?").arg(fn));
@@ -380,7 +380,7 @@ void ZMainWindow::generateConfigFile()
       return;
     }
   }
-  if (!QFile::copy(ZSystemInfo::instance().resourceDir().absoluteFilePath("settings_flagfile.txt"),
+  if (!QFile::copy(ZSystemInfo::resourceDir().absoluteFilePath("settings_flagfile.txt"),
                    dir.absoluteFilePath(fn))) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),

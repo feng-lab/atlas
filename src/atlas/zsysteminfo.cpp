@@ -206,13 +206,13 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
   return folder;
 }
 
-QDir ZSystemInfo::logDir() const
+QDir ZSystemInfo::logDir()
 {
   static QDir dir = createLogDir();
   return dir;
 }
 
-QDir ZSystemInfo::configDir() const
+QDir ZSystemInfo::configDir()
 {
   static QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
   if (!dir.exists())
@@ -220,7 +220,7 @@ QDir ZSystemInfo::configDir() const
   return dir;
 }
 
-QDir ZSystemInfo::resourceDir() const
+QDir ZSystemInfo::resourceDir()
 {
   static QDir dir(ZApplication::resourcesDirPath());
   return dir;

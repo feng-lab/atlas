@@ -67,8 +67,8 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationName("Atlas");
   try {
     if (QString setting_filename = "user_settings_flagfile.txt";
-        ZSystemInfo::instance().configDir().exists(setting_filename)) {
-      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::instance().configDir().absoluteFilePath(setting_filename)).constData();
+        ZSystemInfo::configDir().exists(setting_filename)) {
+      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
     }
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
     }
 
     // init the logging mechanism
-    QDir logDir = nim::ZSystemInfo::instance().logDir();
+    QDir logDir = nim::ZSystemInfo::logDir();
     removeOldLogs(logDir);
 
     QString jdkDIR = ZApplication::resourcesDirPath() + u"/jdk";
@@ -150,7 +150,9 @@ int main(int argc, char* argv[])
     });
 
     if (!FLAGS_flagfile.empty()) {
-      LOG(INFO) << "setting file loaded: " << FLAGS_flagfile;
+      LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;
+    } else {
+      LOG(INFO) << "no user setting file";
     }
     LOG(INFO) << "folly_global_cpu_executor_threads: " << FLAGS_folly_global_cpu_executor_threads;
 
