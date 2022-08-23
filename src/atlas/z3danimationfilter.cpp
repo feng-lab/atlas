@@ -88,12 +88,21 @@ void Z3DAnimationFilter::setData(Z3DAnimation* animation)
   }
   m_animation = animation;
   if (m_animation) {
-    connect(cameraParaAnimation(), &ZCameraParameterAnimation::keysChanged,
-            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
-    connect(cameraParaAnimation(), &ZCameraParameterAnimation::keyChanged,
-            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
-    connect(cameraParaAnimation(), &ZCameraParameterAnimation::interpolationMethodChanged,
-            this, &Z3DAnimationFilter::updateData, Qt::UniqueConnection);
+    connect(cameraParaAnimation(),
+            &ZCameraParameterAnimation::keysChanged,
+            this,
+            &Z3DAnimationFilter::updateData,
+            Qt::UniqueConnection);
+    connect(cameraParaAnimation(),
+            &ZCameraParameterAnimation::keyChanged,
+            this,
+            &Z3DAnimationFilter::updateData,
+            Qt::UniqueConnection);
+    connect(cameraParaAnimation(),
+            &ZCameraParameterAnimation::interpolationMethodChanged,
+            this,
+            &Z3DAnimationFilter::updateData,
+            Qt::UniqueConnection);
   }
   updateData();
 }
@@ -126,33 +135,37 @@ std::shared_ptr<ZWidgetsGroup> Z3DAnimationFilter::widgetsGroup()
 
 void Z3DAnimationFilter::renderOpaque(Z3DEye eye)
 {
-  if (m_showCameraDirection.get())
+  if (m_showCameraDirection.get()) {
     m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
-  else
+  } else {
     m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
+  }
 }
 
 void Z3DAnimationFilter::renderTransparent(Z3DEye eye)
 {
-  if (m_showCameraDirection.get())
+  if (m_showCameraDirection.get()) {
     m_rendererBase.render(eye, m_lineRenderer, m_arrowRenderer, m_triangleListRenderer);
-  else
+  } else {
     m_rendererBase.render(eye, m_lineRenderer, m_triangleListRenderer);
+  }
 }
 
 void Z3DAnimationFilter::renderPicking(Z3DEye /*eye*/)
 {
-  if (!m_pickingObjectsRegistered)
+  if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
+  }
 
-  //m_rendererBase.activateRenderer(m_lineRenderer);
-  //m_rendererBase.renderPicking(eye);
+  // m_rendererBase.activateRenderer(m_lineRenderer);
+  // m_rendererBase.renderPicking(eye);
 }
 
 void Z3DAnimationFilter::prepareData()
 {
-  if (!m_dataIsInvalid)
+  if (!m_dataIsInvalid) {
     return;
+  }
 
   deregisterPickingObjects();
 
@@ -165,13 +178,9 @@ void Z3DAnimationFilter::prepareData()
   m_dataIsInvalid = false;
 }
 
-void Z3DAnimationFilter::registerPickingObjects()
-{
-}
+void Z3DAnimationFilter::registerPickingObjects() {}
 
-void Z3DAnimationFilter::deregisterPickingObjects()
-{
-}
+void Z3DAnimationFilter::deregisterPickingObjects() {}
 
 void Z3DAnimationFilter::updateNotTransformedBoundBoxImpl()
 {
@@ -219,8 +228,9 @@ void Z3DAnimationFilter::prepareColor()
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
         colors.push_back(m_color.get());
-        for (auto j = 0; j < 16; ++j)
+        for (auto j = 0; j < 16; ++j) {
           m_lineColors.push_back(m_color.get());
+        }
       }
     } else if (m_colorMode.isSelected("Colormap Time")) {
       if (keys.size() == 1) {
@@ -228,8 +238,9 @@ void Z3DAnimationFilter::prepareColor()
         colors.push_back(color);
         colors.push_back(color);
         colors.push_back(color);
-        for (auto j = 0; j < 16; ++j)
+        for (auto j = 0; j < 16; ++j) {
           m_lineColors.push_back(color);
+        }
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
         double endTime = std::max(startTime + 0.01, keys[keys.size() - 1]->time());
@@ -238,8 +249,9 @@ void Z3DAnimationFilter::prepareColor()
           colors.push_back(color);
           colors.push_back(color);
           colors.push_back(color);
-          for (auto j = 0; j < 16; ++j)
+          for (auto j = 0; j < 16; ++j) {
             m_lineColors.push_back(color);
+          }
         }
       }
     }
@@ -250,9 +262,7 @@ void Z3DAnimationFilter::prepareColor()
   m_arrowRenderer.setArrowColors(&m_arrowColors);
 }
 
-void Z3DAnimationFilter::setClipPlanes()
-{
-}
+void Z3DAnimationFilter::setClipPlanes() {}
 
 void Z3DAnimationFilter::updateData()
 {
@@ -278,16 +288,18 @@ void Z3DAnimationFilter::updateData()
       double currentKeyTime = keys[i]->time();
       double nextKeyTime = keys[i + 1]->time();
       for (double t = currentKeyTime; t < nextKeyTime; t += m_timeInterval.get()) {
-        if (m_times.empty() || t > m_times[m_times.size() - 1] + 0.0001)  // make sure no overlap
+        if (m_times.empty() || t > m_times[m_times.size() - 1] + 0.0001) { // make sure no overlap
           m_times.push_back(t);
+        }
       }
       for (double t = currentKeyTime + m_cameraDirectionTimeInterval.get(); t < nextKeyTime;
            t += m_cameraDirectionTimeInterval.get()) {
         m_cameraDirectionTimes.push_back(t);
       }
     }
-    if (!keys.empty() && (m_times.empty() || keys[keys.size() - 1]->time() > m_times[m_times.size() - 1] + 0.0001))
+    if (!keys.empty() && (m_times.empty() || keys[keys.size() - 1]->time() > m_times[m_times.size() - 1] + 0.0001)) {
       m_times.push_back(keys[keys.size() - 1]->time());
+    }
 
     if (m_times.size() <= 1) {
       m_times.clear();
@@ -313,8 +325,9 @@ void Z3DAnimationFilter::updateData()
     updateBoundBox();
     auto bbsz = m_axisAlignedBoundBox.size();
     double arrowSize = std::max(bbsz.z, std::max(bbsz.x, bbsz.y)) / 50.;
-    if (arrowSize < 0 || arrowSize > std::numeric_limits<float>::max())
+    if (arrowSize < 0 || arrowSize > std::numeric_limits<float>::max()) {
       arrowSize = 10;
+    }
     m_cameraDirectionSize.set(arrowSize);
     m_cameraSize.set(arrowSize * 2.5);
     for (auto time : m_cameraDirectionTimes) {

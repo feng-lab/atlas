@@ -20,7 +20,8 @@ namespace nim {
 
 class Z3DAnimationFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
@@ -33,12 +34,16 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   bool hasOpaque(Z3DEye /*unused*/) const override
-  { return false; }
+  {
+    return false;
+  }
 
   void renderOpaque(Z3DEye eye) override;
 
   bool hasTransparent(Z3DEye /*unused*/) const override
-  { return true; }
+  {
+    return true;
+  }
 
   void renderTransparent(Z3DEye eye) override;
 
@@ -65,10 +70,14 @@ protected:
 
 private:
   const ZCameraParameterAnimation* cameraParaAnimation() const
-  { return m_animation->cameraParameterAnimation(); }
+  {
+    return m_animation->cameraParameterAnimation();
+  }
 
   ZCameraParameterAnimation* cameraParaAnimation()
-  { return m_animation->cameraParameterAnimation(); }
+  {
+    return m_animation->cameraParameterAnimation();
+  }
 
 private:
   Z3DLineRenderer m_lineRenderer;
@@ -104,4 +113,3 @@ private:
 };
 
 } // namespace nim
-

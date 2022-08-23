@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DAnimationView : public Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

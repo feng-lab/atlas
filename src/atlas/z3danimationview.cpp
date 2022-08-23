@@ -21,7 +21,9 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
-      connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this,
+      connect(viewControl,
+              &Z3DAnimationFilter::objVisibleChanged,
+              this,
               &Z3DAnimationView::onObjVisibleChangedFromView);
       Q_EMIT objViewReady(id);
     }
@@ -32,7 +34,8 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render 3d animation:\n%1").arg(e.what()));
   }
 }
@@ -56,7 +59,8 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render 3d animation:\n%1").arg(e.what()));
   }
 }
