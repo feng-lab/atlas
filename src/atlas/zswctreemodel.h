@@ -13,22 +13,30 @@ class ZDoc;
 
 class ZSwcTreeModel : public QAbstractItemModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum Column
   {
-    IDColumn, TypeColumn, XColumn, YColumn, ZColumn, RadiusColumn, TopologyColumn, ParentIDColumn, LabelColumn, ColumnCount
+    IDColumn,
+    TypeColumn,
+    XColumn,
+    YColumn,
+    ZColumn,
+    RadiusColumn,
+    TopologyColumn,
+    ParentIDColumn,
+    LabelColumn,
+    ColumnCount
   };
 
   explicit ZSwcTreeModel(ZSwcPack& swcPack, ZDoc& doc, QObject* parent = nullptr);
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
-  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
-                                    int role) const override;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
-  [[nodiscard]] QModelIndex index(int row, int column,
-                                  const QModelIndex& parent) const override;
+  [[nodiscard]] QModelIndex index(int row, int column, const QModelIndex& parent) const override;
 
   [[nodiscard]] QModelIndex parent(const QModelIndex& index) const override;
 
@@ -50,5 +58,3 @@ protected:
 };
 
 } // namespace nim
-
-

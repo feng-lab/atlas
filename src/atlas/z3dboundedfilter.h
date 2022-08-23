@@ -13,130 +13,203 @@ namespace nim {
 // own parameter affect bound box
 class Z3DBoundedFilter : public Z3DFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
   void setVisible(bool v)
-  { m_visible.set(v); }
+  {
+    m_visible.set(v);
+  }
 
   [[nodiscard]] bool isVisible() const
-  { return m_visible.get(); }
+  {
+    return m_visible.get();
+  }
 
   void setSelected(bool v);
 
   [[nodiscard]] bool isSelected() const
-  { return m_isSelected; }
+  {
+    return m_isSelected;
+  }
 
   [[nodiscard]] bool isTransformEnabled() const
-  { return m_transformEnabled; }
+  {
+    return m_transformEnabled;
+  }
 
   virtual void setViewport(glm::uvec2 viewport)
-  { m_rendererBase.setViewport(viewport); }
+  {
+    m_rendererBase.setViewport(viewport);
+  }
 
   virtual void setViewport(glm::uvec4 viewport)
-  { m_rendererBase.setViewport(viewport); }
+  {
+    m_rendererBase.setViewport(viewport);
+  }
 
   inline Z3DCamera& camera()
-  { return m_rendererBase.camera(); }
+  {
+    return m_rendererBase.camera();
+  }
 
   inline Z3DCamera& globalCamera()
-  { return m_rendererBase.globalCamera(); }
+  {
+    return m_rendererBase.globalCamera();
+  }
 
   inline Z3DCameraParameter& globalCameraPara()
-  { return m_rendererBase.globalCameraPara(); }
+  {
+    return m_rendererBase.globalCameraPara();
+  }
 
   inline Z3DPickingManager& pickingManager()
-  { return m_rendererBase.globalParas().pickingManager; }
+  {
+    return m_rendererBase.globalParas().pickingManager;
+  }
 
   inline Z3DTrackballInteractionHandler& interactionHandler()
-  { return m_rendererBase.globalParas().interactionHandler; }
+  {
+    return m_rendererBase.globalParas().interactionHandler;
+  }
 
   virtual void setShaderHookType(Z3DRendererBase::ShaderHookType t)
-  { m_rendererBase.setShaderHookType(t); }
+  {
+    m_rendererBase.setShaderHookType(t);
+  }
 
   virtual void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
-  { m_rendererBase.setShaderHookParaDDPDepthBlenderTexture(t); }
+  {
+    m_rendererBase.setShaderHookParaDDPDepthBlenderTexture(t);
+  }
 
   virtual void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
-  { m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t); }
+  {
+    m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t);
+  }
 
   inline Z3DRendererBase::ShaderHookParameter& shaderHookPara()
-  { return m_rendererBase.shaderHookPara(); }
+  {
+    return m_rendererBase.shaderHookPara();
+  }
 
   [[nodiscard]] const ZBBox<glm::dvec3>& axisAlignedBoundBox() const
-  { return m_axisAlignedBoundBox; }
+  {
+    return m_axisAlignedBoundBox;
+  }
 
   [[nodiscard]] const ZBBox<glm::dvec3>& notTransformedBoundBox() const
-  { return m_notTransformedBoundBox; }
+  {
+    return m_notTransformedBoundBox;
+  }
 
   [[nodiscard]] inline glm::mat4 coordTransform() const
-  { return m_rendererBase.coordTransform(); }
+  {
+    return m_rendererBase.coordTransform();
+  }
 
   [[nodiscard]] inline glm::mat4 inverseCoordTransform() const
-  { return m_rendererBase.inverseCoordTransform(); }
+  {
+    return m_rendererBase.inverseCoordTransform();
+  }
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   [[nodiscard]] glm::vec3 physicalLUF() const
-  { return glm::vec3(m_notTransformedBoundBox.minCorner); }
+  {
+    return glm::vec3(m_notTransformedBoundBox.minCorner);
+  }
 
   [[nodiscard]] glm::vec3 physicalRDB() const
-  { return glm::vec3(m_notTransformedBoundBox.maxCorner); }
+  {
+    return glm::vec3(m_notTransformedBoundBox.maxCorner);
+  }
 
   [[nodiscard]] glm::vec3 physicalLDF() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRDF() const
-  { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRUF() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalLUB() const
-  { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalLDB() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRUB() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z);
+  }
 
   // bound voxels in world coordinate
   [[nodiscard]] glm::vec3 worldLUF() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUF()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUF());
+  }
 
   [[nodiscard]] glm::vec3 worldRDB() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDB()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDB());
+  }
 
   [[nodiscard]] glm::vec3 worldLDF() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDF()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDF());
+  }
 
   [[nodiscard]] glm::vec3 worldRDF() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDF()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRDF());
+  }
 
   [[nodiscard]] glm::vec3 worldRUF() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUF()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUF());
+  }
 
   [[nodiscard]] glm::vec3 worldLUB() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUB()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLUB());
+  }
 
   [[nodiscard]] glm::vec3 worldLDB() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDB()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalLDB());
+  }
 
   [[nodiscard]] glm::vec3 worldRUB() const
-  { return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUB()); }
+  {
+    return glm::applyMatrix(m_rendererBase.coordTransform(), physicalRUB());
+  }
 
   [[nodiscard]] virtual bool hasOpaque(Z3DEye) const
-  { return m_rendererBase.opacity() == 1.f; }
+  {
+    return m_rendererBase.opacity() == 1.f;
+  }
 
-  virtual void renderOpaque(Z3DEye)
-  {}
+  virtual void renderOpaque(Z3DEye) {}
 
   [[nodiscard]] virtual bool hasTransparent(Z3DEye) const
-  { return m_rendererBase.opacity() < 1.f; }
+  {
+    return m_rendererBase.opacity() < 1.f;
+  }
 
-  virtual void renderTransparent(Z3DEye)
-  {}
+  virtual void renderTransparent(Z3DEye) {}
 
   void renderHandle(Z3DEye eye);
 
@@ -185,7 +258,9 @@ protected:
   void initializeRotationCenter();
 
   void setTransformEnabled(bool v)
-  { m_transformEnabled = v; }
+  {
+    m_transformEnabled = v;
+  }
 
   void renderBoundBox(Z3DEye eye);
 
@@ -200,16 +275,13 @@ protected:
   // implement these to support bound box
   virtual void updateAxisAlignedBoundBoxImpl();
 
-  virtual void updateNotTransformedBoundBoxImpl()
-  {}
+  virtual void updateNotTransformedBoundBoxImpl() {}
 
   // besides the big selection box, other additional lines can be added through this function
-  virtual void addSelectionLines()
-  {}
+  virtual void addSelectionLines() {}
 
   // for select-and-editing
-  virtual void addEditingSelectionLines()
-  {}
+  virtual void addEditingSelectionLines() {}
 
   // reimplement this if cut range has different behavior
   virtual void expandCutRange();
@@ -230,7 +302,9 @@ private:
   void onSelectionBoundBoxLineWidthChanged();
 
   void invalidateHandle()
-  { m_handleValid = false; }
+  {
+    m_handleValid = false;
+  }
 
   void makeSelectionGeometries();
 
@@ -258,7 +332,7 @@ protected:
   ZStringIntOptionParameter m_boundBoxMode;
   ZIntParameter m_boundBoxLineWidth;
   ZVec4Parameter m_boundBoxLineColor;
-  //Z3DTransferFunctionParameter m_boundBoxLineColor;
+  // Z3DTransferFunctionParameter m_boundBoxLineColor;
   ZIntParameter m_selectionLineWidth;
   ZVec4Parameter m_selectionLineColor;
   ZFloatParameter m_manipulatorSize;
@@ -272,7 +346,7 @@ protected:
   std::vector<glm::vec3> m_axisAlignedBoundBoxLines;
   std::vector<glm::vec4> m_boundBoxLineColors;
 
-  std::vector<glm::vec3> m_selectionLines;  // selection lines for the whole object
+  std::vector<glm::vec3> m_selectionLines; // selection lines for the whole object
   ZMesh m_selectionCornerCubes;
   std::vector<ZMesh*> m_selectionCornerCubesWrapper;
   std::vector<glm::vec4> m_selectionLineColors;
@@ -305,4 +379,3 @@ private:
 };
 
 } // namespace nim
-

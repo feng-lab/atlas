@@ -18,7 +18,8 @@ class ZPunctaDoc;
 
 class ZPunctaPack : public ZObjPack
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPunctaDoc& pd, QObject* parent = nullptr);
 
@@ -29,34 +30,50 @@ public:
   const QString& info() const;
 
   inline const QString& name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline const QString& tooltip() const
-  { return m_tooltip; }
+  {
+    return m_tooltip;
+  }
 
   inline const QString& path() const
-  { return m_path; }
+  {
+    return m_path;
+  }
 
   QUndoStack* undoStack()
-  { return &m_undoStack; }
+  {
+    return &m_undoStack;
+  }
 
   QMenu& contextMenu();
 
   void save(const QString& fileName, const QString& format = "");
 
   inline const std::vector<const ZPunctum*>& punctaPts() const
-  { return m_punctaPts; }
+  {
+    return m_punctaPts;
+  }
 
   inline const std::set<const ZPunctum*>& selectedPuncta() const
-  { return m_selectedPuncta; }
+  {
+    return m_selectedPuncta;
+  }
 
   inline const std::map<const ZPunctum*, int>& punctumToRow() const
-  { return m_punctumToRow; }
+  {
+    return m_punctumToRow;
+  }
 
   void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
   inline const ZPuncta& puncta() const
-  { return m_puncta; }
+  {
+    return m_puncta;
+  }
 
   void onPunctumSelected(const ZPunctum* p, bool append);
 
@@ -71,7 +88,6 @@ public:
   void splitSelectedPunctum();
 
 protected:
-
   void updateViewRelatedData();
 
   void createContextMenu();
@@ -97,6 +113,7 @@ protected:
   QMenu m_contextMenu;
 
   // derived data
+
 private:
   friend class ZPunctaEditCommand;
 
@@ -112,7 +129,8 @@ private:
 class ZPunctaEditCommand : public QUndoCommand
 {
 public:
-  explicit ZPunctaEditCommand(const QString& text, ZPunctaPack& pp,
+  explicit ZPunctaEditCommand(const QString& text,
+                              ZPunctaPack& pp,
                               std::set<const ZPunctum*> deletedPuncta = std::set<const ZPunctum*>(),
                               std::list<ZPunctum> addedPuncta = std::list<ZPunctum>())
     : QUndoCommand(text)
@@ -165,8 +183,10 @@ public:
       }
     }
     CHECK(m_deletedPuncta.size() == m_deletedSet.size()) << m_deletedPuncta.size() << " " << m_deletedSet.size();
-    m_punctaPack.m_puncta.data.splice(m_punctaPack.m_puncta.data.end(), m_addedPuncta,
-                                      m_addedPuncta.begin(), m_addedPuncta.end());
+    m_punctaPack.m_puncta.data.splice(m_punctaPack.m_puncta.data.end(),
+                                      m_addedPuncta,
+                                      m_addedPuncta.begin(),
+                                      m_addedPuncta.end());
     m_punctaPack.updateViewRelatedData();
     Q_EMIT m_punctaPack.punctaChanged();
   }
@@ -180,7 +200,3 @@ protected:
 };
 
 } // namespace nim
-
-
-
-

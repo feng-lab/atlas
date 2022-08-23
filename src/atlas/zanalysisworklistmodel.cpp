@@ -30,7 +30,7 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConver
 
   QList<QStringList> allLines = QtCSV::Reader::readToList(filename, QString(","), QString("\""), encoding);
   if (!allLines.empty()) {
-    for (const auto& list: allLines) {
+    for (const auto& list : allLines) {
       if (list.empty() || list.at(0).startsWith("#")) {
         continue;
       }
@@ -121,7 +121,10 @@ QString ZAnalysisWorklistModel::setSource(const QString& filename, QStringConver
   return res.join("\n");
 }
 
-QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, QChar separator, QStringConverter::Encoding encoding) const
+QString ZAnalysisWorklistModel::toCSV(const QString& filename,
+                                      bool withHeader,
+                                      QChar separator,
+                                      QStringConverter::Encoding encoding) const
 {
   QtCSV::VariantData vd;
   if (withHeader) {
@@ -132,24 +135,21 @@ QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, 
     if (it != m_rowToInput.end()) {
       const ZAnalysisTextFileInput* input = it->second;
       QList<QVariant> values;
-      values << input->imgFilename
-             << input->swcFilename
-             << input->punctaFilename
-             << input->voxelSizeX
-             << input->voxelSizeY
-             << input->voxelSizeZ
-             << input->dendriteChannel
-             << input->axonChannel
-             << input->maxDistToBranch
-             << input->bluenessExtend
-             << input->outputFolder
+      values << input->imgFilename << input->swcFilename << input->punctaFilename << input->voxelSizeX
+             << input->voxelSizeY << input->voxelSizeZ << input->dendriteChannel << input->axonChannel
+             << input->maxDistToBranch << input->bluenessExtend << input->outputFolder
              << (input->doPyramidalFunctionalSeparation ? "yes" : "no")
-             << (input->doPyramidalSubclassSeparation ? "yes" : "no")
-             << input->somaPunctaFilename;
+             << (input->doPyramidalSubclassSeparation ? "yes" : "no") << input->somaPunctaFilename;
       vd.addRow(values);
     }
   }
-  if (!QtCSV::Writer::write(filename, vd, separator, QString(""), QtCSV::Writer::REWRITE, QStringList(), QStringList(),
+  if (!QtCSV::Writer::write(filename,
+                            vd,
+                            separator,
+                            QString(""),
+                            QtCSV::Writer::REWRITE,
+                            QStringList(),
+                            QStringList(),
                             encoding)) {
     return QString("Can not write csv to file (%1).").arg(filename);
   }
@@ -158,24 +158,30 @@ QString ZAnalysisWorklistModel::toCSV(const QString& filename, bool withHeader, 
 
 int ZAnalysisWorklistModel::rowCount(const QModelIndex& parent) const
 {
-  if (parent.row() != -1 && parent.column() != -1) return 0;
+  if (parent.row() != -1 && parent.column() != -1) {
+    return 0;
+  }
   return m_rowCount;
 }
 
 int ZAnalysisWorklistModel::columnCount(const QModelIndex& parent) const
 {
-  if (parent.row() != -1 && parent.column() != -1) return 0;
+  if (parent.row() != -1 && parent.column() != -1) {
+    return 0;
+  }
   return m_header.size();
 }
 
 QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
 {
-  if (index.parent() != QModelIndex()) return QVariant();
+  if (index.parent() != QModelIndex()) {
+    return QVariant();
+  }
   if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
-    if (index.row() < 0 || index.column() < 0 ||
-        m_rowToInput.find(index.row()) == m_rowToInput.end() ||
-        index.column() >= columnCount())
+    if (index.row() < 0 || index.column() < 0 || m_rowToInput.find(index.row()) == m_rowToInput.end() ||
+        index.column() >= columnCount()) {
       return QVariant();
+    }
     std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(index.row());
     const ZAnalysisTextFileInput* input = it->second;
     switch (index.column()) {
@@ -216,11 +222,14 @@ QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
 
 bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& data, int role)
 {
-  if (index.parent() != QModelIndex()) return false;
+  if (index.parent() != QModelIndex()) {
+    return false;
+  }
 
   if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
-    if (index.row() >= rowCount() || index.column() >= columnCount() || index.row() < 0 || index.column() < 0)
+    if (index.row() >= rowCount() || index.column() >= columnCount() || index.row() < 0 || index.column() < 0) {
       return false;
+    }
     ZAnalysisTextFileInput* input;
     if (m_rowToInput.find(index.row()) == m_rowToInput.end()) {
       m_inputs.push_back(ZAnalysisTextFileInput());
@@ -286,10 +295,11 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& d
 QVariant ZAnalysisWorklistModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
   if (section < m_header.count() && orientation == Qt::Horizontal &&
-      (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole))
+      (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole)) {
     return m_header[section];
-  else
+  } else {
     return QAbstractTableModel::headerData(section, orientation, role);
+  }
 }
 
 Qt::ItemFlags ZAnalysisWorklistModel::flags(const QModelIndex& index) const
@@ -300,10 +310,19 @@ Qt::ItemFlags ZAnalysisWorklistModel::flags(const QModelIndex& index) const
 void ZAnalysisWorklistModel::reset()
 {
   m_header.clear();
-  m_header << "# imageName" << "swcName" << "punctaName" << "voxelSizeXInUm" << "voxelSizeYInUm"
-           << "voxelSizeZInUm" << "dendriteChannel" << "axonChannel(can be empty)"
-           << "maxDistToBranch" << "bluenessExtend" << "outputFolder(can be empty)"
-           << "doPyramidalFunctionalSeparation(yes or no)" << "doPyramidalSubclassSeparation(yes or no)"
+  m_header << "# imageName"
+           << "swcName"
+           << "punctaName"
+           << "voxelSizeXInUm"
+           << "voxelSizeYInUm"
+           << "voxelSizeZInUm"
+           << "dendriteChannel"
+           << "axonChannel(can be empty)"
+           << "maxDistToBranch"
+           << "bluenessExtend"
+           << "outputFolder(can be empty)"
+           << "doPyramidalFunctionalSeparation(yes or no)"
+           << "doPyramidalSubclassSeparation(yes or no)"
            << "somaPunctaName";
   m_inputs.clear();
   m_rowToInput.clear();
@@ -322,19 +341,25 @@ Qt::DropActions ZAnalysisWorklistModel::supportedDropActions() const
   return Qt::MoveAction | Qt::CopyAction | Qt::LinkAction;
 }
 
-bool ZAnalysisWorklistModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
-                                          int /*row*/, int /*column*/, const QModelIndex& parent)
+bool ZAnalysisWorklistModel::dropMimeData(const QMimeData* data,
+                                          Qt::DropAction action,
+                                          int /*row*/,
+                                          int /*column*/,
+                                          const QModelIndex& parent)
 {
-  //LOG(INFO) << row << " " << column << " " << action << " " << parent.row() << " " << parent.column();
+  // LOG(INFO) << row << " " << column << " " << action << " " << parent.row() << " " << parent.column();
 
-  if (action == Qt::IgnoreAction)
+  if (action == Qt::IgnoreAction) {
     return true;
+  }
 
-  if (!data->hasUrls())
+  if (!data->hasUrls()) {
     return false;
+  }
 
-  if (parent.column() != 0 && parent.column() != 1 && parent.column() != 2 && parent.column() != 9)
+  if (parent.column() != 0 && parent.column() != 1 && parent.column() != 2 && parent.column() != 9) {
     return false;
+  }
 
   QUrl url = data->urls().at(0);
   QString file = url.toLocalFile();
@@ -350,6 +375,5 @@ bool ZAnalysisWorklistModel::dropMimeData(const QMimeData* data, Qt::DropAction 
 
   return true;
 }
-
 
 } // namespace nim

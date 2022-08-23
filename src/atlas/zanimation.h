@@ -20,7 +20,10 @@ struct ZAnimationDisplayPack
 {
   enum class Type
   {
-    GlobalPara, Object, ObjectPara, ShowAll
+    GlobalPara,
+    Object,
+    ObjectPara,
+    ShowAll
   };
 
   QString name;
@@ -40,7 +43,10 @@ class ZAnimationChangeDurationCommand : public QUndoCommand
 {
 public:
   ZAnimationChangeDurationCommand(ZAnimation* ani, double oldDuraiont, double newDuration)
-    : QUndoCommand(), m_ani(ani), m_oldDuration(oldDuraiont), m_newDuration(newDuration)
+    : QUndoCommand()
+    , m_ani(ani)
+    , m_oldDuration(oldDuraiont)
+    , m_newDuration(newDuration)
   {
     setText("Change Duration");
   }
@@ -57,7 +63,8 @@ private:
 
 class ZAnimation : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZAnimation(ZDoc& doc, QObject* parent = nullptr);
 
@@ -66,13 +73,19 @@ public:
   void addKeyFrame(double time);
 
   inline double duration() const
-  { return m_duration; }
+  {
+    return m_duration;
+  }
 
   const std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList(size_t id) const
-  { return findUniqueId(id)->objParaAnimations; }
+  {
+    return findUniqueId(id)->objParaAnimations;
+  }
 
   const std::vector<ZAnimationDisplayPack>& displayPacks() const
-  { return m_displayPacks; }
+  {
+    return m_displayPacks;
+  }
 
   void setExpanded(size_t id, bool v);
 
@@ -81,10 +94,14 @@ public:
   void toogleShowAll(size_t id);
 
   QUndoStack* undoStack()
-  { return &m_undoStack; }
+  {
+    return &m_undoStack;
+  }
 
   virtual bool is2DAnimation() const
-  { return false; }
+  {
+    return false;
+  }
 
   void setDuration(double duration);
 
@@ -98,15 +115,23 @@ public:
 
   void releaseView();
 
-  void exportFixedSize3DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
-                                  int width, int height,
+  void exportFixedSize3DAnimation(const QString& fn,
+                                  double framePerSecond,
+                                  double startTime,
+                                  double endTime,
+                                  int width,
+                                  int height,
                                   Z3DScreenShotType sst);
 
-  void export3DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
-                         Z3DScreenShotType sst);
+  void
+  export3DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime, Z3DScreenShotType sst);
 
-  void exportFixedSize2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
-                                  int width, int height);
+  void exportFixedSize2DAnimation(const QString& fn,
+                                  double framePerSecond,
+                                  double startTime,
+                                  double endTime,
+                                  int width,
+                                  int height);
 
   void export2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime);
 
@@ -164,7 +189,12 @@ protected:
   struct AnimationObj
   {
     AnimationObj(const QString& type, const json::value& value)
-      : objType(type), objJsonValue(value), isExpanded(false), isShowAll(false), boundId(0), uniqueId(0)
+      : objType(type)
+      , objJsonValue(value)
+      , isExpanded(false)
+      , isShowAll(false)
+      , boundId(0)
+      , uniqueId(0)
     {}
 
     QString objType;
@@ -207,4 +237,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -8,7 +8,8 @@ namespace nim {
 
 class ZROIWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZROIWidget(ZROIPack& roiPack, ZDoc& doc, QWidget* parent = nullptr);
 
@@ -23,4 +24,3 @@ private:
 };
 
 } // namespace nim
-

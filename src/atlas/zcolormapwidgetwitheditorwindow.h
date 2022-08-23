@@ -10,7 +10,8 @@ class ZColorMapEditor;
 
 class ZColorMapWidgetWithEditorWindow : public ZClickableColorMapLabel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZColorMapWidgetWithEditorWindow(ZColorMapParameter* cm, QWidget* parent = nullptr);
 
@@ -19,9 +20,9 @@ protected:
 
   void labelClicked() override;
 
-//  void aboutToBeDestroyed();
-//
-//  void closeEvent(QCloseEvent *event) override;
+  //  void aboutToBeDestroyed();
+  //
+  //  void closeEvent(QCloseEvent *event) override;
 
 private:
   ZColorMapParameter* m_colorMap;
@@ -29,4 +30,3 @@ private:
 };
 
 } // namespace nim
-

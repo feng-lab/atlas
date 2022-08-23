@@ -7,27 +7,35 @@ namespace nim {
 
 class ZRegionAnnotationDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZRegionAnnotationDoc(ZDoc& doc);
 
   // return info of RegionAnnotation with id, assume RegionAnnotation exist, otherwise crash
   ZRegionAnnotationPack& regionAnnotationPack(size_t id)
-  { return *m_idToRegionAnnotationPacks.at(id); }
+  {
+    return *m_idToRegionAnnotationPacks.at(id);
+  }
 
   ZRegionAnnotationPack& currentRegionAnnotationPack();
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "RegionAnnotation"; }
+  {
+    return "RegionAnnotation";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "RegionAnnotations"; }
+  {
+    return "RegionAnnotations";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -94,4 +102,3 @@ private:
 };
 
 } // namespace nim
-

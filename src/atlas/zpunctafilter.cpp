@@ -123,7 +123,8 @@ void ZPunctaGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsIte
 }
 #endif
 
-ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum,
+ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack,
+                                           const ZPunctum& punctum,
                                            QTransform tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
@@ -135,8 +136,8 @@ ZPunctumGraphicsItem::ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunct
 
   m_basePos = m_transform.map(QPointF(m_punctum.x(), m_punctum.y()));
   setPos(m_basePos);
-  QString tooltip = QString("Punctum:(%1,%2,%3,%4)").
-    arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
+  QString tooltip =
+    QString("Punctum:(%1,%2,%3,%4)").arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
   setToolTip(tooltip);
   updateRectSize();
 }
@@ -146,8 +147,8 @@ void ZPunctumGraphicsItem::updateValue()
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_transform.map(QPointF(m_punctum.x(), m_punctum.y()));
   setPos(m_basePos);
-  QString tooltip = QString("Punctum:(%1,%2,%3,%4)").
-    arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
+  QString tooltip =
+    QString("Punctum:(%1,%2,%3,%4)").arg(m_punctum.x()).arg(m_punctum.y()).arg(m_punctum.z()).arg(m_punctum.radius());
   setToolTip(tooltip);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
@@ -220,7 +221,7 @@ void ZPunctaFilter::setData(ZPunctaPack& puncta)
   connect(m_punctaPack, &ZPunctaPack::selectionChanged, this, &ZPunctaFilter::updateItemSelectedState);
   connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &ZPunctaFilter::onPunctaChanged);
   connect(m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &ZPunctaFilter::onLockedStateChanged);
-  //connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
+  // connect(m_puncta, &ZPunctaFilter::boundBoxChanged, this, &ZPunctaFilter::boundBoxChanged);
 }
 
 void ZPunctaFilter::releaseItemsOwnership()
@@ -335,10 +336,7 @@ void ZPunctaFilter::createPunctumItems()
 
   std::vector<std::unique_ptr<ZPunctumGraphicsItem>> items;
   QTransform trans = getQTransform();
-  QPen pen(QColor(m_outlineColor.get().x * 255,
-                  m_outlineColor.get().y * 255,
-                  m_outlineColor.get().z * 255),
-           2);
+  QPen pen(QColor(m_outlineColor.get().x * 255, m_outlineColor.get().y * 255, m_outlineColor.get().z * 255), 2);
   pen.setCosmetic(true);
   QBrush brush(QColor(m_regionColor.get().x * 255,
                       m_regionColor.get().y * 255,
@@ -373,7 +371,7 @@ void ZPunctaFilter::updateItemSelectedState()
   }
   m_skipSelectionChangedProcessing = true;
   // LOG(INFO) << m_puncta->selectedPuncta().size();
-  for (auto&[p, item] : m_punctumToItem) {
+  for (auto& [p, item] : m_punctumToItem) {
     item->setSelected(m_punctaPack->selectedPuncta().find(p) != m_punctaPack->selectedPuncta().end());
   }
   m_skipSelectionChangedProcessing = false;
@@ -442,10 +440,7 @@ void ZPunctaFilter::outlineColorChanged()
   if (!m_punctaPack) {
     return;
   }
-  QPen pen(QColor(m_outlineColor.get().x * 255,
-                  m_outlineColor.get().y * 255,
-                  m_outlineColor.get().z * 255),
-           2);
+  QPen pen(QColor(m_outlineColor.get().x * 255, m_outlineColor.get().y * 255, m_outlineColor.get().z * 255), 2);
   pen.setCosmetic(true);
   for (auto& item : m_puntumItems) {
     item->setPen(pen);

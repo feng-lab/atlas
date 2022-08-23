@@ -16,7 +16,8 @@ namespace {
 struct ChangeValue
 {
   ChangeValue(int64_t from_, int64_t to_)
-    : from(from_), to(to_)
+    : from(from_)
+    , to(to_)
   {}
 
   template<typename TVoxel>
@@ -32,7 +33,8 @@ struct ChangeValue
 struct MarkAsIfOtherEqualsOtherWiseZero
 {
   MarkAsIfOtherEqualsOtherWiseZero(int64_t as_, int64_t equal_)
-    : as(as_), equal(equal_)
+    : as(as_)
+    , equal(equal_)
   {}
 
   template<typename TVoxel, typename TVoxelOther>
@@ -76,8 +78,7 @@ ZRegionAnnotation::ZRegionAnnotation(QObject* parent)
   // regions << "GPe" << "STN" << "SNr" << "STRv" << "STRd" << "GPi" << "SPF" << "grey";
 #endif
   readMouseBrainAtlasOntology(regions, m_ontology);
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZRegionAnnotation::undoStackCleanChanged);
+  connect(&m_undoStack, &QUndoStack::cleanChanged, this, &ZRegionAnnotation::undoStackCleanChanged);
 }
 
 ZRegionAnnotation::ZRegionAnnotation(const QString& filename, QObject* parent)
@@ -95,8 +96,7 @@ ZRegionAnnotation::ZRegionAnnotation(const QString& filename, QObject* parent)
     }
   }
   m_ontology.swap(ontology);
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZRegionAnnotation::undoStackCleanChanged);
+  connect(&m_undoStack, &QUndoStack::cleanChanged, this, &ZRegionAnnotation::undoStackCleanChanged);
 }
 
 ZRegionAnnotation::~ZRegionAnnotation()
@@ -114,8 +114,13 @@ void ZRegionAnnotation::clear()
   updateBoundBox();
 }
 
-void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, bool createMesh, bool createROI,
-                                         double scaleX, double scaleY, double scaleZ)
+void ZRegionAnnotation::importLabelImage(const QString& fn,
+                                         FileFormat format,
+                                         bool createMesh,
+                                         bool createROI,
+                                         double scaleX,
+                                         double scaleY,
+                                         double scaleZ)
 {
   ZBenchTimer bt;
 
@@ -138,10 +143,10 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
-  //LOG(INFO) << origLabelImg.info().toQString();
-//  m_width = origLabelImg.width();
-//  m_height = origLabelImg.height();
-//  m_depth = origLabelImg.depth();
+  // LOG(INFO) << origLabelImg.info().toQString();
+  //  m_width = origLabelImg.width();
+  //  m_height = origLabelImg.height();
+  //  m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
   if (origLabelImg.info().voxelSizeUnit != VoxelSizeUnit::none) {
     m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scaleX;
@@ -193,19 +198,19 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
     bool processMesh = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
     bool processROI = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
 
-    if (!processMesh && ! processROI) {
+    if (!processMesh && !processROI) {
       continue;
     }
 
     // create binary image
     binaryImg.binaryOperation(labelImg, MarkAsIfOtherEqualsOtherWiseZero(1, it->id));
-//    if (it->id == 997) {
-//      for (size_t z = 0; z < binaryImg.depth(); ++z) {
-//        ZImg simg = binaryImg.createView(z, 0, 0);
-//        ZImg fimg = imFill.run(simg);
-//        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
-//      }
-//    }
+    //    if (it->id == 997) {
+    //      for (size_t z = 0; z < binaryImg.depth(); ++z) {
+    //        ZImg simg = binaryImg.createView(z, 0, 0);
+    //        ZImg fimg = imFill.run(simg);
+    //        binaryImg.pasteImg(fimg, ZVoxelCoordinate(0, 0, z));
+    //      }
+    //    }
     if (createMesh && processMesh) {
       // create mesh
       it->mesh = std::make_shared<ZMesh>();
@@ -231,20 +236,20 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
       }
     }
   }
-//  for (auto it = m_ontology.beginRoot(); it != m_ontology.endRoot(); ++it) {
-//#if 1
-//    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
-//        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0) {
-//      m_ontology.eraseChildren(it);
-//    }
-//#else
-//    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
-//        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
-//        it->abbreviation.compare("grey", Qt::CaseInsensitive) == 0) {
-//      m_ontology.eraseChildren(it);
-//    }
-//#endif
-//  }
+  //  for (auto it = m_ontology.beginRoot(); it != m_ontology.endRoot(); ++it) {
+  // #if 1
+  //    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
+  //        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0) {
+  //      m_ontology.eraseChildren(it);
+  //    }
+  // #else
+  //    if (it->abbreviation.compare("STRv", Qt::CaseInsensitive) == 0 ||
+  //        it->abbreviation.compare("STRd", Qt::CaseInsensitive) == 0 ||
+  //        it->abbreviation.compare("grey", Qt::CaseInsensitive) == 0) {
+  //      m_ontology.eraseChildren(it);
+  //    }
+  // #endif
+  //  }
   LOG(INFO) << "Finish importing label image";
 
   STOP_AND_LOG(bt)
@@ -258,9 +263,14 @@ void ZRegionAnnotation::importLabelImage(const QString& fn, FileFormat format, b
   }
 }
 
-void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras,
-                                         double scaleX, double scaleY, double scaleZ,
-                                         bool keepOnlyInterpolatedSlices, int interpolationMethod) const
+void ZRegionAnnotation::exportLabelImage(const QString& fn,
+                                         FileFormat format,
+                                         const ZImgWriteParameters& paras,
+                                         double scaleX,
+                                         double scaleY,
+                                         double scaleZ,
+                                         bool keepOnlyInterpolatedSlices,
+                                         int interpolationMethod) const
 {
   LOG(INFO) << "Exporting Label Image...";
 
@@ -292,8 +302,8 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
       bytePerVoxel = 8;
     }
   }
-  ZImgInfo info(m_boundBox.maxCorner.x + 2, m_boundBox.maxCorner.y + 2, m_boundBox.maxCorner.z + 2,
-                1, 1, bytePerVoxel, vf);
+  ZImgInfo
+    info(m_boundBox.maxCorner.x + 2, m_boundBox.maxCorner.y + 2, m_boundBox.maxCorner.z + 2, 1, 1, bytePerVoxel, vf);
   if (scaleX < 1.0 && scaleY < 1.0 && info.byteNumber() < ZCpuInfo::instance().nPhysicalRAM) {
     info.voxelSizeUnit = VoxelSizeUnit::um;
     info.voxelSizeX = m_voxelSizeX;
@@ -304,30 +314,39 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
       LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
       if (it->roi) {
         LOG(INFO) << "has roi";
-        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
-                                                  1.0, 1.0,
-                                                  keepOnlyInterpolatedSlices, interpolationMethod);
+        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(),
+                                                  res.height(),
+                                                  res.depth(),
+                                                  true,
+                                                  1.0,
+                                                  1.0,
+                                                  keepOnlyInterpolatedSlices,
+                                                  interpolationMethod);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
       }
     }
-//  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-//    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
-//        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
-//      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
-//      if (it->roi) {
-//        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
-//        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
-//      }
-//    }
-//  }
+    //  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+    //    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
+    //        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
+    //      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
+    //      if (it->roi) {
+    //        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+    //        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+    //      }
+    //    }
+    //  }
     if (scaleX != 1.0 || scaleY != 1.0 || scaleZ != 1.0) {
       res.zoom(scaleX, scaleY, scaleZ);
     }
     res.save(fn, format, paras);
   } else {
-    info = ZImgInfo(m_boundBox.maxCorner.x * scaleX + 2, m_boundBox.maxCorner.y * scaleY + 2,
+    info = ZImgInfo(m_boundBox.maxCorner.x * scaleX + 2,
+                    m_boundBox.maxCorner.y * scaleY + 2,
                     m_boundBox.maxCorner.z + 2,
-                    1, 1, bytePerVoxel, vf);
+                    1,
+                    1,
+                    bytePerVoxel,
+                    vf);
     info.voxelSizeUnit = VoxelSizeUnit::um;
     info.voxelSizeX = std::ceil(m_voxelSizeX / scaleX);
     info.voxelSizeY = std::ceil(m_voxelSizeY / scaleY);
@@ -337,22 +356,27 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn, FileFormat format, c
       LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
       if (it->roi) {
         LOG(INFO) << "has roi";
-        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), true,
-                                                  scaleX, scaleY,
-                                                  keepOnlyInterpolatedSlices, interpolationMethod);
+        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(),
+                                                  res.height(),
+                                                  res.depth(),
+                                                  true,
+                                                  scaleX,
+                                                  scaleY,
+                                                  keepOnlyInterpolatedSlices,
+                                                  interpolationMethod);
         res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
       }
     }
-//  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-//    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
-//        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
-//      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
-//      if (it->roi) {
-//        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
-//        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
-//      }
-//    }
-//  }
+    //  for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
+    //    if (it->abbreviation.compare("GPe", Qt::CaseInsensitive) == 0 ||
+    //        it->abbreviation.compare("STN", Qt::CaseInsensitive) == 0) {
+    //      LOG(INFO) << "Post Processing Region " << it->abbreviation << " " << it->id << "...";
+    //      if (it->roi) {
+    //        ZImg regionBinaryImg = it->roi->toMaskImg(res.width(), res.height(), res.depth(), false);
+    //        res.binaryOperation(regionBinaryImg, CopyAsIfOtherIsNotZero(it->id));
+    //      }
+    //    }
+    //  }
     if (scaleZ != 1.0) {
       res.zoom(1.0, 1.0, scaleZ);
     }
@@ -379,12 +403,9 @@ void ZRegionAnnotation::exportSvgImage(const QString& fn_, double scaleX, double
     QSvgGenerator generator;
     generator.setFileName(fn);
     generator.setSize(
-      QSize(std::ceil(m_boundBox.maxCorner.x * scaleX) + 10,
-            std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
+      QSize(std::ceil(m_boundBox.maxCorner.x * scaleX) + 10, std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
     generator.setViewBox(
-      QRect(0, 0,
-            std::ceil(m_boundBox.maxCorner.x * scaleX) + 10,
-            std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
+      QRect(0, 0, std::ceil(m_boundBox.maxCorner.x * scaleX) + 10, std::ceil(m_boundBox.maxCorner.y * scaleY) + 10));
     generator.setTitle(tr("Annotation"));
 
     painter.begin(&generator);
@@ -415,8 +436,10 @@ double ZRegionAnnotation::getOptimizedScale() const
   return std::min(1.0, std::min(2000. / m_boundBox.maxCorner.x, 2000. / m_boundBox.maxCorner.y));
 }
 
-void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format,
-                                                                   double scaleX, double scaleY)
+void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString& fn,
+                                                                   FileFormat format,
+                                                                   double scaleX,
+                                                                   double scaleY)
 {
   ZBenchTimer bt;
 
@@ -439,10 +462,10 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
   }
 
   ZImg origLabelImg(fn, ZImgRegion(), 0, 1, 1, 1, format);
-  //LOG(INFO) << origLabelImg.info().toQString();
-//  m_width = origLabelImg.width();
-//  m_height = origLabelImg.height();
-//  m_depth = origLabelImg.depth();
+  // LOG(INFO) << origLabelImg.info().toQString();
+  //  m_width = origLabelImg.width();
+  //  m_height = origLabelImg.height();
+  //  m_depth = origLabelImg.depth();
   // todo: ask user if voxel size not exist
   m_voxelSizeX = origLabelImg.info().voxelSizeXInUm() * scaleX;
   m_voxelSizeY = origLabelImg.info().voxelSizeYInUm() * scaleY;
@@ -542,22 +565,22 @@ void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
   m_undoStack.endMacro();
 }
 
-//void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
+// void ZRegionAnnotation::mergeROIToRegion(const ZROI &roi, int slice, size_t id, int64_t regionID)
 //{
-//  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-//    if (it->id == regionID) {
-//      if (!it->roi) {
-//        it->roi = createROI();
-//        Q_EMIT regionROIAdded(it->id, it->roi.get());
-//      }
-//      it->roi->mergeWith(roi, slice, id);
+//   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
+//     if (it->id == regionID) {
+//       if (!it->roi) {
+//         it->roi = createROI();
+//         Q_EMIT regionROIAdded(it->id, it->roi.get());
+//       }
+//       it->roi->mergeWith(roi, slice, id);
 //
-//      return;
-//    }
-//  }
-//}
+//       return;
+//     }
+//   }
+// }
 
-void ZRegionAnnotation::changeROIRegion(ZROI &roi, int slice, size_t shapeId, int64_t regionID)
+void ZRegionAnnotation::changeROIRegion(ZROI& roi, int slice, size_t shapeId, int64_t regionID)
 {
   for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
     if (it->id == regionID && it->roi.get() == &roi) {
@@ -627,9 +650,9 @@ void ZRegionAnnotation::load(const QString& filename)
     int regionAnnotationVer;
     ver.read(intType, &regionAnnotationVer);
 
-//    allGrp.openAttribute("Width").read(intType, &m_width);
-//    allGrp.openAttribute("Height").read(intType, &m_height);
-//    allGrp.openAttribute("Depth").read(intType, &m_depth);
+    //    allGrp.openAttribute("Width").read(intType, &m_width);
+    //    allGrp.openAttribute("Height").read(intType, &m_height);
+    //    allGrp.openAttribute("Depth").read(intType, &m_depth);
     allGrp.openAttribute("VoxelSizeXInUM").read(doubleType, &m_voxelSizeX);
     allGrp.openAttribute("VoxelSizeYInUM").read(doubleType, &m_voxelSizeY);
     allGrp.openAttribute("VoxelSizeZInUM").read(doubleType, &m_voxelSizeZ);
@@ -733,9 +756,9 @@ void ZRegionAnnotation::save(const QString& filename) const
     int regionAnnotationVer = 100;
     ver.write(intType, &regionAnnotationVer);
 
-//    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
-//    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
-//    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
+    //    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
+    //    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
+    //    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
     allGrp.createAttribute("VoxelSizeXInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeX);
     allGrp.createAttribute("VoxelSizeYInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeY);
     allGrp.createAttribute("VoxelSizeZInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeZ);
@@ -799,7 +822,7 @@ void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
     importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //Q_EMIT modified();
+    // Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for region interpolation"));
   }
@@ -815,7 +838,7 @@ void ZRegionAnnotation::interpolateRegionAnnotation2(double scale)
     importLabelImageForSlicesWithoutAnnotation(fn, FileFormat::Unknown, 1.0 / scale, 1.0 / scale);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //Q_EMIT modified();
+    // Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for region interpolation"));
   }
@@ -831,7 +854,7 @@ void ZRegionAnnotation::updateMesh(double scaleX, double scaleY, double scaleZ)
     importLabelImage(fn, FileFormat::Unknown, true, false, 1.0 / scaleX, 1.0 / scaleY, 1.0 / scaleZ);
     cmd->setNewOntology(m_ontology);
     m_undoStack.push(cmd);
-    //Q_EMIT modified();
+    // Q_EMIT modified();
   } else {
     throw ZException(QString("can not create temporary file for mesh updating"));
   }

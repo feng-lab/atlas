@@ -11,6 +11,7 @@ class ZParameterAnimation;
 class Z2DAnimation : public ZAnimation
 {
   Q_OBJECT
+
 public:
   explicit Z2DAnimation(ZDoc& doc, QObject* parent = nullptr);
 

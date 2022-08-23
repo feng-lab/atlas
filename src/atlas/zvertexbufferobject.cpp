@@ -25,8 +25,9 @@ void ZVertexBufferObject::release(GLenum target)
 
 void ZVertexBufferObject::resize(GLsizei n)
 {
-  if (n == GLsizei(m_arrays.size()))
+  if (n == GLsizei(m_arrays.size())) {
     return;
+  }
   glDeleteBuffers(m_arrays.size(), m_arrays.data());
   m_arrays.resize(std::max(GLsizei(0), n), 0);
   glGenBuffers(m_arrays.size(), m_arrays.data());

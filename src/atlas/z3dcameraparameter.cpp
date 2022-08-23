@@ -10,9 +10,13 @@ namespace nim {
 Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<Z3DCamera>(name, parent)
   , m_projectionType("Projection Type")
-  , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_eye("Eye Position",
+          m_value.eye(),
+          glm::vec3(std::numeric_limits<float>::lowest()),
           glm::vec3(std::numeric_limits<float>::max()))
-  , m_center("Center Position", m_value.center(), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_center("Center Position",
+             m_value.center(),
+             glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_upVector("Up Vector", m_value.upVector(), glm::vec3(-1.f), glm::vec3(1.f))
   , m_eyeSeparationAngle("Eye Separation Angle", glm::degrees(m_value.eyeSeparationAngle()), 1.f, 80.f)
@@ -22,21 +26,22 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
   , m_receiveWidgetSignal(true)
 {
   m_projectionType.addOptions("Perspective", "Orthographic");
-  if (m_value.isPerspectiveProjection())
+  if (m_value.isPerspectiveProjection()) {
     m_projectionType.select("Perspective");
-  else
+  } else {
     m_projectionType.select("Orthographic");
+  }
   connect(&m_projectionType, &ZStringIntOptionParameter::valueChanged, this, &Z3DCameraParameter::updateProjectionType);
 
   m_eye.setSingleStep(1e-10);
   m_eye.setDecimal(10);
-  //m_eye.setWidgetOrientation(Qt::Horizontal);
+  // m_eye.setWidgetOrientation(Qt::Horizontal);
   m_eye.setStyle("SPINBOX");
   connect(&m_eye, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateEye);
 
   m_center.setSingleStep(1e-10);
   m_center.setDecimal(10);
-  //m_center.setWidgetOrientation(Qt::Horizontal);
+  // m_center.setWidgetOrientation(Qt::Horizontal);
   m_center.setStyle("SPINBOX");
   connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateCenter);
 
@@ -69,9 +74,13 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
 Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& value, QObject* parent)
   : ZSingleValueParameter<Z3DCamera>(name, value, parent)
   , m_projectionType("Projection Type")
-  , m_eye("Eye Position", m_value.eye(), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_eye("Eye Position",
+          m_value.eye(),
+          glm::vec3(std::numeric_limits<float>::lowest()),
           glm::vec3(std::numeric_limits<float>::max()))
-  , m_center("Center Position", m_value.center(), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_center("Center Position",
+             m_value.center(),
+             glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_upVector("Up Vector", m_value.upVector(), glm::vec3(-1.f), glm::vec3(1.f))
   , m_eyeSeparationAngle("Eye Separation Angle", glm::degrees(m_value.eyeSeparationAngle()), 1.f, 80.f)
@@ -81,21 +90,22 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& val
   , m_receiveWidgetSignal(true)
 {
   m_projectionType.addOptions("Perspective", "Orthographic");
-  if (m_value.isPerspectiveProjection())
+  if (m_value.isPerspectiveProjection()) {
     m_projectionType.select("Perspective");
-  else
+  } else {
     m_projectionType.select("Orthographic");
+  }
   connect(&m_projectionType, &ZStringIntOptionParameter::valueChanged, this, &Z3DCameraParameter::updateProjectionType);
 
   m_eye.setSingleStep(1e-10);
   m_eye.setDecimal(10);
-  //m_eye.setWidgetOrientation(Qt::Horizontal);
+  // m_eye.setWidgetOrientation(Qt::Horizontal);
   m_eye.setStyle("SPINBOX");
   connect(&m_eye, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateEye);
 
   m_center.setSingleStep(1e-10);
   m_center.setDecimal(10);
-  //m_center.setWidgetOrientation(Qt::Horizontal);
+  // m_center.setWidgetOrientation(Qt::Horizontal);
   m_center.setStyle("SPINBOX");
   connect(&m_center, &ZVec3Parameter::valueChanged, this, &Z3DCameraParameter::updateCenter);
 
@@ -136,7 +146,7 @@ void Z3DCameraParameter::flipViewDirection()
 
 void Z3DCameraParameter::rotate90X()
 {
-//  azimuth(glm::radians(90.f));
+  //  azimuth(glm::radians(90.f));
   rotate(glm::radians(90.f), glm::vec3(1, 0, 0));
 }
 
@@ -162,10 +172,11 @@ void Z3DCameraParameter::setWindowsAspectRatio(float r)
 void Z3DCameraParameter::updateProjectionType()
 {
   if (m_receiveWidgetSignal) {
-    if (m_projectionType.isSelected("Perspective"))
+    if (m_projectionType.isSelected("Perspective")) {
       m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
-    else
+    } else {
       m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
+    }
     Q_EMIT valueChanged();
   }
 }
@@ -241,13 +252,13 @@ QWidget* Z3DCameraParameter::actualCreateWidget(QWidget* parent)
   camera.addChild(m_farDist, 1);
 
   QLayout* lw = camera.createLayout(false);
-  //QWidget *widget = new QWidget();
-  //widget->setLayout(lw);
+  // QWidget *widget = new QWidget();
+  // widget->setLayout(lw);
   auto* groupBox = new QGroupBox("Camera Parameters", parent);
   groupBox->setLayout(lw);
 
-  //widget->setParent(parent);
-  //return widget;
+  // widget->setParent(parent);
+  // return widget;
   return groupBox;
 }
 
@@ -262,10 +273,11 @@ void Z3DCameraParameter::updateWidget(Z3DCamera& value)
   m_eye.set(value.eye());
   m_center.set(value.center());
   m_upVector.set(value.upVector());
-  if (value.isPerspectiveProjection())
+  if (value.isPerspectiveProjection()) {
     m_projectionType.select("Perspective");
-  else
+  } else {
     m_projectionType.select("Orthographic");
+  }
   m_eyeSeparationAngle.set(glm::degrees(value.eyeSeparationAngle()));
   m_fieldOfView.set(glm::degrees(value.fieldOfView()));
   m_nearDist.set(value.nearDist());
@@ -290,8 +302,8 @@ void Z3DCameraParameter::setValueSameAs(const ZParameter& rhs)
   const auto* src = static_cast<const Z3DCameraParameter*>(&rhs);
   m_value.setProjectionType(src->get().projectionType());
   m_value.setCamera(src->get().eye(), src->get().center(), src->get().upVector());
-  //m_value.setFrustum(src->get().fieldOfView(), m_value.aspectRatio(),
-  //                   src->get().nearDist(), src->get().farDist());
+  // m_value.setFrustum(src->get().fieldOfView(), m_value.aspectRatio(),
+  //                    src->get().nearDist(), src->get().farDist());
   m_value.setEyeSeparationAngle(src->get().eyeSeparationAngle());
   updatePara();
 }
@@ -305,8 +317,8 @@ json::value Z3DCameraParameter::jsonValue() const
   m_upVector.write(obj);
   m_eyeSeparationAngle.write(obj);
   m_fieldOfView.write(obj);
-  //m_nearDist.write(obj);
-  //m_farDist.write(obj);
+  // m_nearDist.write(obj);
+  // m_farDist.write(obj);
   return obj;
 }
 
@@ -321,15 +333,16 @@ void Z3DCameraParameter::readValue(const json::value& jsonValue)
     m_upVector.read(obj);
     m_eyeSeparationAngle.read(obj);
     m_fieldOfView.read(obj);
-    //m_nearDist.read(obj);
-    //m_farDist.read(obj);
+    // m_nearDist.read(obj);
+    // m_farDist.read(obj);
   }
   m_receiveWidgetSignal = true;
 
-  if (m_projectionType.isSelected("Perspective"))
+  if (m_projectionType.isSelected("Perspective")) {
     m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
-  else
+  } else {
     m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
+  }
   m_value.setCamera(m_eye.get(), m_center.get(), m_upVector.get());
   m_value.setFrustum(glm::radians(m_fieldOfView.get()), m_value.aspectRatio(), m_nearDist.get(), m_farDist.get());
   m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));

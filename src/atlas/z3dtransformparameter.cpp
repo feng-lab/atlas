@@ -8,7 +8,7 @@
 
 namespace {
 
-#if 0   //not used for now
+#if 0 // not used for now
 /**
  * @brief Determine whether this matrix represents an affine transform or not.
  * @return true if this matrix is an affine transform, false if not.
@@ -116,19 +116,27 @@ void decompose(const glm::mat4& m, glm::vec3& translation, glm::vec3& scale, glm
 }
 #endif
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
 Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<glm::mat4>(name, glm::mat4(1.f), parent)
-  , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_scale("Scale",
+            glm::vec3(1.f),
+            glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
-  , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_translation("Translation",
+                  glm::vec3(0.f),
+                  glm::vec3(std::numeric_limits<float>::lowest()),
                   glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0, 0, 1, 0), glm::vec4(std::numeric_limits<float>::lowest()),
+  , m_rotation("Rotation",
+               glm::vec4(0, 0, 1, 0),
+               glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
-  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_center("Rotation Center",
+             glm::vec3(0.f),
+             glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_receiveWidgetSignal(true)
 {
@@ -164,13 +172,21 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* paren
 
 Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat4& value, QObject* parent)
   : ZSingleValueParameter<glm::mat4>(name, value, parent)
-  , m_scale("Scale", glm::vec3(1.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_scale("Scale",
+            glm::vec3(1.f),
+            glm::vec3(std::numeric_limits<float>::lowest()),
             glm::vec3(std::numeric_limits<float>::max()))
-  , m_translation("Translation", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_translation("Translation",
+                  glm::vec3(0.f),
+                  glm::vec3(std::numeric_limits<float>::lowest()),
                   glm::vec3(std::numeric_limits<float>::max()))
-  , m_rotation("Rotation", glm::vec4(0, 0, 1, 0), glm::vec4(std::numeric_limits<float>::lowest()),
+  , m_rotation("Rotation",
+               glm::vec4(0, 0, 1, 0),
+               glm::vec4(std::numeric_limits<float>::lowest()),
                glm::vec4(std::numeric_limits<float>::max()))
-  , m_center("Rotation Center", glm::vec3(0.f), glm::vec3(std::numeric_limits<float>::lowest()),
+  , m_center("Rotation Center",
+             glm::vec3(0.f),
+             glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
   , m_receiveWidgetSignal(true)
 {
@@ -206,10 +222,11 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat
 
 glm::quat Z3DTransformParameter::rotation() const
 {
-  if (glm::length(m_rotation.get().yzw()) > 0)
+  if (glm::length(m_rotation.get().yzw()) > 0) {
     return glm::angleAxis(glm::radians(m_rotation.get().x), glm::normalize(m_rotation.get().yzw()));
-  else
+  } else {
     return glm::quat();
+  }
 }
 
 void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang)
@@ -253,10 +270,8 @@ void Z3DTransformParameter::setValueSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
-  if (m_scale.get() != src.m_scale.get() ||
-    m_translation.get() != src.m_translation.get() ||
-    m_rotation.get() != src.m_rotation.get() ||
-    m_center.get() != src.m_center.get()) {
+  if (m_scale.get() != src.m_scale.get() || m_translation.get() != src.m_translation.get() ||
+      m_rotation.get() != src.m_rotation.get() || m_center.get() != src.m_center.get()) {
     m_receiveWidgetSignal = false;
     m_scale.set(src.m_scale.get());
     m_translation.set(src.m_translation.get());
@@ -279,9 +294,10 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
   } else {
     desPara.setRotation(glm::mix(prevPara.rotation(), rotation(), float(progress)));
   }
-  //desPara.setRotation(glm::vec4(glm::mix(prevPara.m_rotation.get().x, m_rotation.get().x, progress), prevPara.m_rotation.get().yzw()));
+  // desPara.setRotation(glm::vec4(glm::mix(prevPara.m_rotation.get().x, m_rotation.get().x, progress),
+  // prevPara.m_rotation.get().yzw()));
   desPara.setTranslation(glm::mix(prevPara.translation(), translation(), progress));
-  //desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
+  // desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
   desPara.setRotationCenter(progress >= 1.0 ? m_center.get() : prevPara.m_center.get());
   desPara.m_receiveWidgetSignal = true;
   desPara.updateMatrix();
@@ -321,13 +337,13 @@ QWidget* Z3DTransformParameter::actualCreateWidget(QWidget* parent)
   transform.addChild(*pb, 2);
 
   QLayout* lw = transform.createLayout(false);
-  //QWidget *widget = new QWidget();
-  //widget->setLayout(lw);
+  // QWidget *widget = new QWidget();
+  // widget->setLayout(lw);
   auto groupBox = new QGroupBox("Transform Parameters", parent);
   groupBox->setLayout(lw);
 
-  //widget->setParent(parent);
-  //return widget;
+  // widget->setParent(parent);
+  // return widget;
   return groupBox;
 }
 

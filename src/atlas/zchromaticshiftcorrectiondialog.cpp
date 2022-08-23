@@ -58,10 +58,12 @@ void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QS
 
   auto* workertmp = new ZChromaticShiftCorrection(m_inputImagesFileWidget->getSelectedOpenFile(),
                                                   m_outputStackWidget->getSelectedSaveFile());
-  if (refChannel >= 0)
+  if (refChannel >= 0) {
     workertmp->setReferenceChannel(refChannel);
-  if (targetChannel >= 0)
+  }
+  if (targetChannel >= 0) {
     workertmp->setTargetChannel(targetChannel);
+  }
   workertmp->setMethod(m_method.associatedData());
   workertmp->setRemoveBackground(m_removeBackground.get());
   workertmp->setRemoveHighForeground(m_removeHighForeground.get());
@@ -94,8 +96,9 @@ void ZChromaticShiftCorrectionDialog::adjustWidget()
 void ZChromaticShiftCorrectionDialog::inputImagesChanged()
 {
   QString fn = m_inputImagesFileWidget->getSelectedOpenFile();
-  if (fn.isEmpty())
+  if (fn.isEmpty()) {
     return;
+  }
 
   QFileInfo fi(fn);
   QString logFn = fi.path() + "/" + fi.baseName() + "_chromatic_shift_correction_log.txt";
@@ -112,7 +115,9 @@ void ZChromaticShiftCorrectionDialog::inputImagesChanged()
     channelNumber = info[0].numChannels;
   }
   catch (const ZIOException& e) {
-    QMessageBox::critical(this, QApplication::applicationName(), QString("Can not parse input image:\n%1").arg(e.what()));
+    QMessageBox::critical(this,
+                          QApplication::applicationName(),
+                          QString("Can not parse input image:\n%1").arg(e.what()));
     return;
   }
 
@@ -137,8 +142,7 @@ void ZChromaticShiftCorrectionDialog::init()
                               std::make_pair<QString, QString>("Use 63x_4z Preset", "63x_4z"));
   m_method.select("Signal Matching");
 
-  m_metric.addOptions("Normalized Cross-Correlation",
-                      "Normalized Mutual Information");
+  m_metric.addOptions("Normalized Cross-Correlation", "Normalized Mutual Information");
   m_metric.select("Normalized Cross-Correlation");
 
   m_transform.addOptions("Translation", "Rigid");
@@ -172,7 +176,9 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
                                                   tr("Images (*.nim *.tif *.tiff *.v3draw *.lsm *.jpg *.png)"),
                                                   ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImagesFileWidget);
-  connect(m_inputImagesFileWidget, &ZSelectFileWidget::changed, this,
+  connect(m_inputImagesFileWidget,
+          &ZSelectFileWidget::changed,
+          this,
           &ZChromaticShiftCorrectionDialog::inputImagesChanged);
 
   //  hlayout = new QHBoxLayout;
@@ -180,12 +186,14 @@ void ZChromaticShiftCorrectionDialog::createIOGroupBox()
   //  hlayout->addWidget(m_openLoadedStack.createWidget());
   //  alllayout->addLayout(hlayout);
 
-  m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
+  m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                              "Output Aligned Image:",
                                               tr("Stack (*.nim)"),
                                               ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputStackWidget);
 
-  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
+  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                "Output Log File:",
                                                 tr("Log (*.txt)"),
                                                 ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
@@ -212,24 +220,24 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   hlayout = new QHBoxLayout;
   hlayout->addWidget(m_targetChannel.createNameLabel());
   hlayout->addWidget(m_targetChannel.createWidget());
-  //hlayout->addStretch(1);
+  // hlayout->addStretch(1);
   alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
   hlayout->addWidget(m_referenceChannel.createNameLabel());
   hlayout->addWidget(m_referenceChannel.createWidget());
-  //hlayout->addStretch(1);
+  // hlayout->addStretch(1);
   alllayout->addLayout(hlayout);
 
-//  hlayout = new QHBoxLayout;
-//  hlayout->addWidget(m_removeBackground.createNameLabel());
-//  hlayout->addWidget(m_removeBackground.createWidget());
-//  alllayout->addLayout(hlayout);
-//
-//  hlayout = new QHBoxLayout;
-//  hlayout->addWidget(m_removeHighForeground.createNameLabel());
-//  hlayout->addWidget(m_removeHighForeground.createWidget());
-//  alllayout->addLayout(hlayout);
+  //  hlayout = new QHBoxLayout;
+  //  hlayout->addWidget(m_removeBackground.createNameLabel());
+  //  hlayout->addWidget(m_removeBackground.createWidget());
+  //  alllayout->addLayout(hlayout);
+  //
+  //  hlayout = new QHBoxLayout;
+  //  hlayout->addWidget(m_removeHighForeground.createNameLabel());
+  //  hlayout->addWidget(m_removeHighForeground.createWidget());
+  //  alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
   m_numScales.setStyle("SPINBOX");
@@ -237,10 +245,10 @@ void ZChromaticShiftCorrectionDialog::createParaGroupBox()
   hlayout->addWidget(m_numScales.createWidget());
   alllayout->addLayout(hlayout);
 
-//  hlayout = new QHBoxLayout;
-//  hlayout->addWidget(m_brightBackground.createNameLabel());
-//  hlayout->addWidget(m_brightBackground.createWidget());
-//  alllayout->addLayout(hlayout);
+  //  hlayout = new QHBoxLayout;
+  //  hlayout->addWidget(m_brightBackground.createNameLabel());
+  //  hlayout->addWidget(m_brightBackground.createWidget());
+  //  alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
   hlayout->addWidget(m_metric.createNameLabel());
@@ -289,5 +297,3 @@ Usage:
 }
 
 } // namespace nim
-
-

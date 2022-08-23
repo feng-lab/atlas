@@ -8,23 +8,32 @@ namespace nim {
 
 class Z3DInteractionHandler : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DInteractionHandler(QString name, QObject* parent = nullptr);
 
   void setName(const QString& name)
-  { m_name = name; }
+  {
+    m_name = name;
+  }
 
   [[nodiscard]] inline QString name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   // Default to 1.0. Set it to a different value to emphasize or de-emphasize the action triggered by
   // mouse wheel motion.
   void setMouseWheelMotionFactor(float f)
-  { m_mouseWheelMotionFactor = f; }
+  {
+    m_mouseWheelMotionFactor = f;
+  }
 
   [[nodiscard]] float mouseWheelMotionFactor() const
-  { return m_mouseWheelMotionFactor; }
+  {
+    return m_mouseWheelMotionFactor;
+  }
 
   void setEnabled(bool enabled);
 
@@ -54,10 +63,14 @@ protected:
   };
 
   void setState(State state)
-  { m_state = state; }
+  {
+    m_state = state;
+  }
 
   void addEventListener(ZEventListenerParameter* eventListener)
-  { m_eventListeners.emplace_back(eventListener); }
+  {
+    m_eventListeners.emplace_back(eventListener);
+  }
 
 protected:
   QString m_name;
@@ -71,50 +84,75 @@ class Z3DCameraParameter;
 
 class Z3DTrackballInteractionHandler : public Z3DInteractionHandler
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DTrackballInteractionHandler(const QString& name, Z3DCameraParameter* camera, QObject* parent = nullptr);
 
   [[nodiscard]] Z3DCameraParameter* camera() const
-  { return m_camera; }
+  {
+    return m_camera;
+  }
 
   void setCamera(Z3DCameraParameter* camera)
-  { m_camera = camera; }
+  {
+    m_camera = camera;
+  }
 
   // dolly in on wheel up and out on wheel down when true (default), otherwise when false
   void setMouseWheelUpDollyIn(bool b)
-  { m_mouseWheelUpDollyIn = b; }
+  {
+    m_mouseWheelUpDollyIn = b;
+  }
 
   // roll left on wheel up and right on wheel down when true (default), otherwise when false
   void setMouseWheelUpRollLeft(bool b)
-  { m_mouseWheelUpRollLeft = b; }
+  {
+    m_mouseWheelUpRollLeft = b;
+  }
 
   // more sensitive (bigger motion) at bigger mouse motion factor
   void setMouseMotionFactor(float f)
-  { m_mouseMotionFactor = f; }
+  {
+    m_mouseMotionFactor = f;
+  }
 
   [[nodiscard]] float mouseMotionFactor() const
-  { return m_mouseMotionFactor; }
+  {
+    return m_mouseMotionFactor;
+  }
 
   // angle per key press
   void setKeyPressAngle(float angle)
-  { m_keyPressAngle = angle; }
+  {
+    m_keyPressAngle = angle;
+  }
 
   [[nodiscard]] float keyPressAngle() const
-  { return m_keyPressAngle; }
+  {
+    return m_keyPressAngle;
+  }
 
   // distance per key press in pixels
   void setKeyPressDistance(int d)
-  { m_keyPressDistance = d; }
+  {
+    m_keyPressDistance = d;
+  }
 
   [[nodiscard]] int keyPressDistance() const
-  { return m_keyPressDistance; }
+  {
+    return m_keyPressDistance;
+  }
 
   void setMoveObjects(bool v)
-  { m_moveObjects = v; }
+  {
+    m_moveObjects = v;
+  }
 
   [[nodiscard]] bool isMovingObjects() const
-  { return m_moveObjects; }
+  {
+    return m_moveObjects;
+  }
 
 Q_SIGNALS:
 
@@ -189,4 +227,3 @@ protected:
 };
 
 } // namespace nim
-

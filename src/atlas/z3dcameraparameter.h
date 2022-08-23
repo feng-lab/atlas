@@ -9,7 +9,8 @@ namespace nim {
 
 class Z3DCameraParameter : public ZSingleValueParameter<Z3DCamera>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DCameraParameter(const QString& name, QObject* parent = nullptr);
 
@@ -70,10 +71,15 @@ public:
   }
 
   inline void setProjectionType(Z3DCamera::ProjectionType pt)
-  { m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic"); }
+  {
+    m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic");
+  }
 
   void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0)
-  { m_value.setTileFrustum(left, right, bottom, top); Q_EMIT valueChanged(); }
+  {
+    m_value.setTileFrustum(left, right, bottom, top);
+    Q_EMIT valueChanged();
+  }
 
   void flipViewDirection();
   void rotate90X();
@@ -86,7 +92,12 @@ public:
     updatePara();
   }
 
-  inline void resetCamera(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax,
+  inline void resetCamera(double xmin,
+                          double xmax,
+                          double ymin,
+                          double ymax,
+                          double zmin,
+                          double zmax,
                           Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(xmin, xmax, ymin, ymax, zmin, zmax, options);
@@ -99,8 +110,7 @@ public:
     updatePara();
   }
 
-  inline void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax,
-                                      double zmin, double zmax)
+  inline void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax)
   {
     m_value.resetCameraNearFarPlane(xmin, xmax, ymin, ymax, zmin, zmax);
     updatePara();
@@ -181,6 +191,7 @@ public:
   void viewportChanged(const glm::uvec2& viewport);
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 
@@ -220,7 +231,10 @@ protected:
   void updateWidget(Z3DCamera& value);
 
   inline void updatePara()
-  { updateWidget(m_value); Q_EMIT valueChanged(); }
+  {
+    updateWidget(m_value);
+    Q_EMIT valueChanged();
+  }
 
 private:
   ZStringIntOptionParameter m_projectionType;
@@ -235,4 +249,3 @@ private:
 };
 
 } // namespace nim
-

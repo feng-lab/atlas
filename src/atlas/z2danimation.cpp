@@ -7,7 +7,8 @@
 
 namespace nim {
 
-Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent) : ZAnimation(doc, parent)
+Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent)
+  : ZAnimation(doc, parent)
 {
   m_sliceAnimation = new ZParameterAnimation("Slice", "Int", QColor(0, 255, 0));
   m_timeAnimation = new ZParameterAnimation("Time", "Int", QColor(0, 255, 0));

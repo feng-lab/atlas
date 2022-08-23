@@ -16,6 +16,7 @@ class Z3DCompositor;
 class Z3DCanvasPainter : public Z3DBoundedFilter
 {
   Q_OBJECT
+
 public:
   explicit Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& canvas, QObject* parent = nullptr);
 

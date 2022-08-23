@@ -6,11 +6,10 @@ namespace nim {
 
 class ZDockWidget : public QDockWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZDockWidget(const QString& title, QWidget* parent = nullptr,
-                       Qt::WindowFlags flags = Qt::WindowFlags());
+  explicit ZDockWidget(const QString& title, QWidget* parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags());
 };
 
 } // namespace nim
-

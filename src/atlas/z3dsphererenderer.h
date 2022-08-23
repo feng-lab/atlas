@@ -6,19 +6,23 @@ namespace nim {
 
 class Z3DSphereRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // default use display list and lighting for opengl mode
   explicit Z3DSphereRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(std::vector<glm::vec4>* pointAndRadiusInput, std::vector<glm::vec4>* specularAndShininessInput = nullptr);
+  void setData(std::vector<glm::vec4>* pointAndRadiusInput,
+               std::vector<glm::vec4>* specularAndShininessInput = nullptr);
 
   void setDataColors(std::vector<glm::vec4>* pointColorsInput);
 
   void setDataPickingColors(std::vector<glm::vec4>* pointPickingColorsInput = nullptr);
 
   ZBoolParameter& useDynamicMaterialPara()
-  { return m_useDynamicMaterial; }
+  {
+    return m_useDynamicMaterial;
+  }
 
 protected:
   void compile() override;
@@ -50,8 +54,8 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  //std::vector<GLuint> m_VBOs;
-  //std::vector<GLuint> m_pickingVBOs;
+  // std::vector<GLuint> m_VBOs;
+  // std::vector<GLuint> m_pickingVBOs;
   ZVertexArrayObject m_VAOs;
   ZVertexArrayObject m_pickingVAOs;
   std::vector<ZVertexBufferObject> m_VBOs;
@@ -62,4 +66,3 @@ private:
 };
 
 } // namespace nim
-

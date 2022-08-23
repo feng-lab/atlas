@@ -22,8 +22,9 @@ ZClickableLabel::ZClickableLabel(QWidget* parent, Qt::WindowFlags f)
 
 void ZClickableLabel::mousePressEvent(QMouseEvent* ev)
 {
-  if (ev->button() == Qt::LeftButton)
+  if (ev->button() == Qt::LeftButton) {
     labelClicked();
+  }
 }
 
 bool ZClickableLabel::event(QEvent* event)
@@ -33,8 +34,7 @@ bool ZClickableLabel::event(QEvent* event)
     QRect tipRect;
     QString tipText;
     if (getTip(helpEvent->pos(), &tipRect, &tipText)) {
-      QToolTip::showText(
-        helpEvent->globalPos(), tipText, this, tipRect);
+      QToolTip::showText(helpEvent->globalPos(), tipText, this, tipRect);
     } else {
       QToolTip::hideText();
     }
@@ -94,8 +94,9 @@ QSize ZClickableColorLabel::minimumSizeHint() const
 
 bool ZClickableColorLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
-  if (!m_vec4Color && !m_vec3Color && !m_dvec4Color && !m_dvec3Color)
+  if (!m_vec4Color && !m_vec3Color && !m_dvec4Color && !m_dvec3Color) {
     return false;
+  }
 
   if (contentsRect().contains(p)) {
     *r = contentsRect();
@@ -139,14 +140,18 @@ QColor ZClickableColorLabel::toQColor()
 
 void ZClickableColorLabel::fromQColor(const QColor& col)
 {
-  if (m_vec4Color)
+  if (m_vec4Color) {
     m_vec4Color->set(glm::vec4(col.redF(), col.greenF(), col.blueF(), m_vec4Color->get().a));
-  if (m_vec3Color)
+  }
+  if (m_vec3Color) {
     m_vec3Color->set(glm::vec3(col.redF(), col.greenF(), col.blueF()));
-  if (m_dvec4Color)
+  }
+  if (m_dvec4Color) {
     m_dvec4Color->set(glm::dvec4(col.redF(), col.greenF(), col.blueF(), m_dvec4Color->get().a));
-  if (m_dvec3Color)
+  }
+  if (m_dvec3Color) {
     m_dvec3Color->set(glm::dvec3(col.redF(), col.greenF(), col.blueF()));
+  }
 }
 
 ZClickableColorMapLabel::ZClickableColorMapLabel(ZColorMapParameter* colorMap, QWidget* parent, Qt::WindowFlags f)
@@ -178,14 +183,14 @@ QSize ZClickableColorMapLabel::minimumSizeHint() const
 
 bool ZClickableColorMapLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
-  if (!m_colorMap)
+  if (!m_colorMap) {
     return false;
+  }
 
   if (contentsRect().contains(p)) {
-    r->setCoords(p.x(), contentsRect().top(),
-                 p.x(), contentsRect().bottom());
-    QColor color = m_colorMap->get().fractionMappedQColor(
-      (p.x() * 1. - contentsRect().left()) / contentsRect().width());
+    r->setCoords(p.x(), contentsRect().top(), p.x(), contentsRect().bottom());
+    QColor color =
+      m_colorMap->get().fractionMappedQColor((p.x() * 1. - contentsRect().left()) / contentsRect().width());
     *s = color.name();
     return true;
   }
@@ -194,12 +199,15 @@ bool ZClickableColorMapLabel::getTip(const QPoint& p, QRect* r, QString* s)
 }
 
 ZClickableTransferFunctionLabel::ZClickableTransferFunctionLabel(Z3DTransferFunctionParameter* transferFunc,
-                                                                 QWidget* parent, Qt::WindowFlags f)
+                                                                 QWidget* parent,
+                                                                 Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
   , m_transferFunction(transferFunc)
 {
-  connect(m_transferFunction, &Z3DTransferFunctionParameter::valueChanged,
-          this, qOverload<>(&ZClickableTransferFunctionLabel::update));
+  connect(m_transferFunction,
+          &Z3DTransferFunctionParameter::valueChanged,
+          this,
+          qOverload<>(&ZClickableTransferFunctionLabel::update));
 }
 
 void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
@@ -212,19 +220,27 @@ void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
   auto width = height;
   for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top(),
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top(),
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
     } else {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top(),
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top(),
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
     }
   }
 
@@ -233,12 +249,10 @@ void ZClickableTransferFunctionLabel::paintEvent(QPaintEvent* /*e*/)
       double fraction = (x * 1. - contentsRect().left()) / contentsRect().width();
       QColor color = m_transferFunction->get().mappedQColor(fraction);
       painter.setPen(color);
-      painter.drawLine(x, contentsRect().top(),
-                       x, contentsRect().top() + 0.5 * contentsRect().height());
+      painter.drawLine(x, contentsRect().top(), x, contentsRect().top() + 0.5 * contentsRect().height());
       color.setAlpha(255);
       painter.setPen(color);
-      painter.drawLine(x, contentsRect().top() + 0.5 * contentsRect().height(),
-                       x, contentsRect().bottom());
+      painter.drawLine(x, contentsRect().top() + 0.5 * contentsRect().height(), x, contentsRect().bottom());
     }
   }
 }
@@ -250,14 +264,14 @@ QSize ZClickableTransferFunctionLabel::minimumSizeHint() const
 
 bool ZClickableTransferFunctionLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
-  if (!m_transferFunction)
+  if (!m_transferFunction) {
     return false;
+  }
 
   if (contentsRect().contains(p)) {
-    r->setCoords(p.x(), contentsRect().top(),
-                 p.x(), contentsRect().bottom());
-    QColor color = m_transferFunction->get().fractionMappedQColor(
-      (p.x() * 1. - contentsRect().left()) / contentsRect().width());
+    r->setCoords(p.x(), contentsRect().top(), p.x(), contentsRect().bottom());
+    QColor color =
+      m_transferFunction->get().fractionMappedQColor((p.x() * 1. - contentsRect().left()) / contentsRect().width());
     *s = color.name();
     return true;
   }
@@ -265,12 +279,10 @@ bool ZClickableTransferFunctionLabel::getTip(const QPoint& p, QRect* r, QString*
   return false;
 }
 
-ZRegionViewSettingLabel::ZRegionViewSettingLabel(ZROIFilter* roiFilter,
-                                                 QWidget* parent, Qt::WindowFlags f)
+ZRegionViewSettingLabel::ZRegionViewSettingLabel(ZROIFilter* roiFilter, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
   , m_roiFilter(roiFilter)
-{
-}
+{}
 
 void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
 {
@@ -282,19 +294,27 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   auto width = height;
   for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.1 * 5 * height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.3 * 5 * height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + 0.1 * 5 * height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + 0.3 * 5 * height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
     } else {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.1 * 5 * height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + 0.3 * 5 * height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + 0.1 * 5 * height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + 0.3 * 5 * height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
     }
   }
 
@@ -302,14 +322,8 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
     auto outlineColor = m_roiFilter->outlineColor();
     auto regionColor = m_roiFilter->regionColor();
     auto opacity = m_roiFilter->opacity();
-    auto outlineQColor = QColor(outlineColor.x * 255,
-                                outlineColor.y * 255,
-                                outlineColor.z * 255,
-                                255);
-    auto regionQColor = QColor(regionColor.x * 255,
-                               regionColor.y * 255,
-                               regionColor.z * 255,
-                               opacity * 255);
+    auto outlineQColor = QColor(outlineColor.x * 255, outlineColor.y * 255, outlineColor.z * 255, 255);
+    auto regionQColor = QColor(regionColor.x * 255, regionColor.y * 255, regionColor.z * 255, opacity * 255);
     QColor regionSolidQColor = regionQColor;
     regionSolidQColor.setAlpha(255);
     for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
@@ -318,17 +332,19 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
         painter.drawLine(x, contentsRect().top(), x, contentsRect().bottom());
       } else {
         painter.setPen(regionQColor);
-        painter.drawLine(x, contentsRect().top() + 0.1 * contentsRect().height(),
-                         x, contentsRect().top() + 0.5 * contentsRect().height());
+        painter.drawLine(x,
+                         contentsRect().top() + 0.1 * contentsRect().height(),
+                         x,
+                         contentsRect().top() + 0.5 * contentsRect().height());
         painter.setPen(regionSolidQColor);
-        painter.drawLine(x, contentsRect().top() + 0.5 * contentsRect().height(),
-                         x, contentsRect().top() + 0.9 * contentsRect().height());
+        painter.drawLine(x,
+                         contentsRect().top() + 0.5 * contentsRect().height(),
+                         x,
+                         contentsRect().top() + 0.9 * contentsRect().height());
 
         painter.setPen(outlineQColor);
-        painter.drawLine(x, contentsRect().top(),
-                         x, contentsRect().top() + 0.1 * contentsRect().height());
-        painter.drawLine(x, contentsRect().top() + 0.9 * contentsRect().height(),
-                         x, contentsRect().bottom());
+        painter.drawLine(x, contentsRect().top(), x, contentsRect().top() + 0.1 * contentsRect().height());
+        painter.drawLine(x, contentsRect().top() + 0.9 * contentsRect().height(), x, contentsRect().bottom());
       }
     }
   }
@@ -336,21 +352,16 @@ void ZRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
 
 bool ZRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
-  if (!m_roiFilter)
+  if (!m_roiFilter) {
     return false;
+  }
 
   if (contentsRect().contains(p)) {
     auto outlineColor = m_roiFilter->outlineColor();
     auto regionColor = m_roiFilter->regionColor();
     auto opacity = m_roiFilter->opacity();
-    auto outlineQColor = QColor(outlineColor.x * 255,
-                                outlineColor.y * 255,
-                                outlineColor.z * 255,
-                                255);
-    auto regionQColor = QColor(regionColor.x * 255,
-                               regionColor.y * 255,
-                               regionColor.z * 255,
-                               opacity * 255);
+    auto outlineQColor = QColor(outlineColor.x * 255, outlineColor.y * 255, outlineColor.z * 255, 255);
+    auto regionQColor = QColor(regionColor.x * 255, regionColor.y * 255, regionColor.z * 255, opacity * 255);
     *r = contentsRect();
     *s = QString("Outline Color: %1, Region Color: %2").arg(outlineQColor.name()).arg(regionQColor.name());
     return true;
@@ -359,12 +370,10 @@ bool ZRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
   return false;
 }
 
-Z3DRegionViewSettingLabel::Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter,
-                                                     QWidget* parent, Qt::WindowFlags f)
+Z3DRegionViewSettingLabel::Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter, QWidget* parent, Qt::WindowFlags f)
   : ZClickableLabel(parent, f)
   , m_meshFilter(meshFilter)
-{
-}
+{}
 
 void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
 {
@@ -376,54 +385,61 @@ void Z3DRegionViewSettingLabel::paintEvent(QPaintEvent* /*e*/)
   auto width = height;
   for (auto i = 0; i < (contentsRect().width() + width - 1) / width; ++i) {
     if (i % 2 == 0) {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top(),
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top(),
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
     } else {
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top(),
-               std::min(contentsRect().width() - i * width - 1, width), height), color1);
-      painter.fillRect(
-        QRectF(contentsRect().left() + i * width, contentsRect().top() + height,
-               std::min(contentsRect().width() - i * width - 1, width), height), color2);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top(),
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color1);
+      painter.fillRect(QRectF(contentsRect().left() + i * width,
+                              contentsRect().top() + height,
+                              std::min(contentsRect().width() - i * width - 1, width),
+                              height),
+                       color2);
     }
   }
 
   if (m_meshFilter) {
     auto meshColor = m_meshFilter->meshColor();
     auto opacity = m_meshFilter->opacity();
-    auto meshQColor = QColor(meshColor.x * 255,
-                             meshColor.y * 255,
-                             meshColor.z * 255,
-                             opacity * 255);
+    auto meshQColor = QColor(meshColor.x * 255, meshColor.y * 255, meshColor.z * 255, opacity * 255);
     QColor meshSolidQColor = meshQColor;
     meshSolidQColor.setAlpha(255);
     for (auto x = contentsRect().left(); x <= contentsRect().right(); ++x) {
       painter.setPen(meshQColor);
-      painter.drawLine(x, contentsRect().top() + 0.0 * contentsRect().height(),
-                       x, contentsRect().top() + 0.5 * contentsRect().height());
+      painter.drawLine(x,
+                       contentsRect().top() + 0.0 * contentsRect().height(),
+                       x,
+                       contentsRect().top() + 0.5 * contentsRect().height());
       painter.setPen(meshSolidQColor);
-      painter.drawLine(x, contentsRect().top() + 0.5 * contentsRect().height(),
-                       x, contentsRect().top() + 1.0 * contentsRect().height());
+      painter.drawLine(x,
+                       contentsRect().top() + 0.5 * contentsRect().height(),
+                       x,
+                       contentsRect().top() + 1.0 * contentsRect().height());
     }
   }
 }
 
 bool Z3DRegionViewSettingLabel::getTip(const QPoint& p, QRect* r, QString* s)
 {
-  if (!m_meshFilter)
+  if (!m_meshFilter) {
     return false;
+  }
 
   if (contentsRect().contains(p)) {
     auto meshColor = m_meshFilter->meshColor();
     auto opacity = m_meshFilter->opacity();
-    auto meshQColor = QColor(meshColor.x * 255,
-                             meshColor.y * 255,
-                             meshColor.z * 255,
-                             opacity * 255);
+    auto meshQColor = QColor(meshColor.x * 255, meshColor.y * 255, meshColor.z * 255, opacity * 255);
     *r = contentsRect();
     *s = QString("Mesh Color: %2").arg(meshQColor.name());
     return true;

@@ -14,7 +14,9 @@ public:
   };
 
   [[nodiscard]] int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
   explicit ZGraphicsItemGroup(QGraphicsItem* parent = nullptr);
 

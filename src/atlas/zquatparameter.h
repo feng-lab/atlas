@@ -6,7 +6,8 @@ namespace nim {
 
 class ZQuatParameter : public ZNumericVectorParameter<glm::quat>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZQuatParameter(const QString& name, QObject* parent = nullptr);
 
@@ -36,6 +37,4 @@ protected:
   QWidget* actualCreateWidget(QWidget* parent) override;
 };
 
-
 } // namespace nim
-

@@ -15,7 +15,8 @@ namespace nim {
 
 class ZAnalysisWorklistModel : public QAbstractTableModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZAnalysisWorklistModel(QObject* parent = nullptr);
 
@@ -23,7 +24,9 @@ public:
 
   QString setSource(const QString& filename, QStringConverter::Encoding encoding = QStringConverter::Utf8);
 
-  [[nodiscard]] QString toCSV(const QString& filename, bool withHeader = true, QChar separator = ',',
+  [[nodiscard]] QString toCSV(const QString& filename,
+                              bool withHeader = true,
+                              QChar separator = ',',
                               QStringConverter::Encoding encoding = QStringConverter::Utf8) const;
 
   [[nodiscard]] int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -34,20 +37,24 @@ public:
 
   bool setData(const QModelIndex& index, const QVariant& data, int role = Qt::EditRole) override;
 
-  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+  [[nodiscard]] QVariant
+  headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
   [[nodiscard]] Qt::ItemFlags flags(const QModelIndex& index) const override;
 
   void reset();
 
   [[nodiscard]] const std::vector<ZAnalysisTextFileInput>& worklist() const
-  { return m_inputs; }
+  {
+    return m_inputs;
+  }
 
   [[nodiscard]] QStringList mimeTypes() const override;
 
   [[nodiscard]] Qt::DropActions supportedDropActions() const override;
 
-  bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
+  bool
+  dropMimeData(const QMimeData* data, Qt::DropAction action, int row, int column, const QModelIndex& parent) override;
 
 protected:
   QStringList m_header;
@@ -57,4 +64,3 @@ protected:
 };
 
 } // namespace nim
-

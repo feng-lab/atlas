@@ -15,9 +15,11 @@ namespace nim {
 
 class ZTimelineKeyEditDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation, ZParameterKey& paraKey,
+  explicit ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation,
+                                  ZParameterKey& paraKey,
                                   QWidget* parent = nullptr);
 
   void setInitialValue();
@@ -48,4 +50,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -12,11 +12,14 @@ class ZParameter;
 
 class ZWidgetsGroup : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum class Type
   {
-    Group, Widget, Parameter
+    Group,
+    Widget,
+    Parameter
   };
 
   explicit ZWidgetsGroup(QWidget& widget, int visibleLevel);
@@ -26,13 +29,19 @@ public:
   explicit ZWidgetsGroup(ZParameter& parameter, int visibleLevel);
 
   inline bool isGroup() const
-  { return m_type == Type::Group; }
+  {
+    return m_type == Type::Group;
+  }
 
   inline QString getGroupName() const
-  { return m_groupName; }
+  {
+    return m_groupName;
+  }
 
   inline void setGroupName(const QString& name)
-  { m_groupName = name; }
+  {
+    m_groupName = name;
+  }
 
   std::vector<ZParameter*> getParameterList();
 
@@ -53,22 +62,34 @@ public:
   void protectWidgetChildren();
 
   inline int visibleLevel() const
-  { return m_visibleLevel; }
+  {
+    return m_visibleLevel;
+  }
 
   inline void setVisibleLevel(int v)
-  { m_visibleLevel = v; }
+  {
+    m_visibleLevel = v;
+  }
 
   inline void setBasicAdvancedCutoff(int v)
-  { m_cutOffbetweenBasicAndAdvancedLevel = v; }
+  {
+    m_cutOffbetweenBasicAndAdvancedLevel = v;
+  }
 
   inline int basicAdvancedCutoff() const
-  { return m_cutOffbetweenBasicAndAdvancedLevel; }
+  {
+    return m_cutOffbetweenBasicAndAdvancedLevel;
+  }
 
   void setVisible(bool visible)
-  { m_isVisible = visible; }
+  {
+    m_isVisible = visible;
+  }
 
   inline bool isVisible()
-  { return m_isVisible; }
+  {
+    return m_isVisible;
+  }
 
   QWidget* createWidget(bool createBasic = true, bool scroll = true, QLabel* label = nullptr, bool noStretch = false);
 
@@ -102,4 +123,3 @@ private:
 };
 
 } // namespace nim
-

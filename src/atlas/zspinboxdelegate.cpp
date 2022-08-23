@@ -4,14 +4,13 @@
 
 namespace nim {
 
-ZSpinBoxDelegate::ZSpinBoxDelegate(QObject *parent)
+ZSpinBoxDelegate::ZSpinBoxDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
-{
-}
+{}
 
 QWidget* ZSpinBoxDelegate::createEditor(QWidget* parent,
-                                        const QStyleOptionViewItem&/* option */,
-                                        const QModelIndex&/* index */) const
+                                        const QStyleOptionViewItem& /* option */,
+                                        const QModelIndex& /* index */) const
 {
   auto* editor = new QSpinBox(parent);
   editor->setFrame(false);
@@ -21,8 +20,7 @@ QWidget* ZSpinBoxDelegate::createEditor(QWidget* parent,
   return editor;
 }
 
-void ZSpinBoxDelegate::setEditorData(QWidget* editor,
-                                     const QModelIndex& index) const
+void ZSpinBoxDelegate::setEditorData(QWidget* editor, const QModelIndex& index) const
 {
   int value = index.model()->data(index, Qt::EditRole).toInt();
 
@@ -30,8 +28,7 @@ void ZSpinBoxDelegate::setEditorData(QWidget* editor,
   spinBox->setValue(value);
 }
 
-void ZSpinBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
-                                    const QModelIndex& index) const
+void ZSpinBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const
 {
   auto* spinBox = static_cast<QSpinBox*>(editor);
   spinBox->interpretText();
@@ -41,7 +38,8 @@ void ZSpinBoxDelegate::setModelData(QWidget* editor, QAbstractItemModel* model,
 }
 
 void ZSpinBoxDelegate::updateEditorGeometry(QWidget* editor,
-                                            const QStyleOptionViewItem& option, const QModelIndex&/* index */) const
+                                            const QStyleOptionViewItem& option,
+                                            const QModelIndex& /* index */) const
 {
   editor->setGeometry(option.rect);
 }

@@ -14,30 +14,40 @@ class Z3DGeometryFilter : public Z3DBoundedFilter
 public:
   explicit Z3DGeometryFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
-  virtual void renderPicking(Z3DEye /*unused*/)
-  {}
+  virtual void renderPicking(Z3DEye /*unused*/) {}
 
   [[nodiscard]] bool isStayOnTop() const
-  { return m_stayOnTop.get(); }
+  {
+    return m_stayOnTop.get();
+  }
 
   void setStayOnTop(bool s)
-  { m_stayOnTop.set(s); }
+  {
+    m_stayOnTop.set(s);
+  }
 
   [[nodiscard]] float opacity() const
-  { return m_rendererBase.opacity(); }
+  {
+    return m_rendererBase.opacity();
+  }
 
   void setOpacity(float v)
-  { m_rendererBase.setOpacity(v); }
+  {
+    m_rendererBase.setOpacity(v);
+  }
 
   [[nodiscard]] float sizeScale() const
-  { return m_rendererBase.sizeScale(); }
+  {
+    return m_rendererBase.sizeScale();
+  }
 
   void setSizeScale(float s)
-  { m_rendererBase.setSizeScale(s); }
+  {
+    m_rendererBase.setSizeScale(s);
+  }
 
 protected:
-  void process(Z3DEye /*eye*/) override
-  {}
+  void process(Z3DEye /*eye*/) override {}
 
   // once processed, should be valid for both stereo view and mono view
   void setValid(Z3DEye eye) override
@@ -49,13 +59,11 @@ protected:
   // functions for picking, use these two function and m_pickingObjectsRegistered to control picking
   // note: input Z3DPickingManager might be nullptr
   // after deregister, m_pickingObjectsRegistered should be false;
-  virtual void deregisterPickingObjects()
-  {}
+  virtual void deregisterPickingObjects() {}
 
   // after register, m_pickingObjectsRegistered should be true and data picking color should be set
   // for renderers
-  virtual void registerPickingObjects()
-  {}
+  virtual void registerPickingObjects() {}
 
 protected:
   Z3DFilterOutputPort<Z3DGeometryFilter> m_outPort;
@@ -67,4 +75,3 @@ protected:
 };
 
 } // namespace nim
-

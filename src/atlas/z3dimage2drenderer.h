@@ -13,7 +13,8 @@ class Z3DVolume;
 // use colormap of each volume to composite final image
 class Z3DImage2DRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DImage2DRenderer(Z3DRendererBase& rendererBase);
 
@@ -22,12 +23,16 @@ public:
                    const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
 
   void setLayerTarget(Z3DRenderTarget* layerTarget)
-  { m_layerTarget = layerTarget; }
+  {
+    m_layerTarget = layerTarget;
+  }
 
   // quad contains corner vertex and 2d texture coordinates
   // clear
   void clearQuads()
-  { m_quads.clear(); }
+  {
+    m_quads.clear();
+  }
 
   // add quad
   void addQuad(const ZMesh& quad);
@@ -46,7 +51,7 @@ protected:
   void render(Z3DEye eye) override;
 
 protected:
-  //Z3DShaderProgram m_image2DShader;
+  // Z3DShaderProgram m_image2DShader;
   Z3DShaderProgram m_scImage2DShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
@@ -62,4 +67,3 @@ private:
 };
 
 } // namespace nim
-

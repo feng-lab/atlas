@@ -7,7 +7,7 @@ namespace nim {
 ZLogWidget::ZLogWidget(bool receiveOldMessages, QWidget* parent)
   : QPlainTextEdit(parent)
 {
-  //setCenterOnScroll(true);
+  // setCenterOnScroll(true);
   m_normalFormat = currentCharFormat();
   m_errorFormat = m_normalFormat;
   m_errorFormat.setForeground(QBrush(QColor(176, 0, 0)));
@@ -50,4 +50,3 @@ void ZLogWidget::writeLogData(const std::deque<LogData>* messages, size_t start,
 }
 
 } // namespace nim
-

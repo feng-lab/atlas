@@ -40,18 +40,28 @@ class ZDVec4Parameter;
 
 class ZStringIntOptionParameter;
 
-class ZView : public QWidget, public ZViewSettingInterface
+class ZView
+  : public QWidget
+  , public ZViewSettingInterface
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum class State
   {
-    Normal, ROIRect, ROIEllipse, ROIPolygon, ROISpline, ROICut
+    Normal,
+    ROIRect,
+    ROIEllipse,
+    ROIPolygon,
+    ROISpline,
+    ROICut
   };
 
   enum class ViewStyle
   {
-    Normal, MIP, Montage
+    Normal,
+    MIP,
+    Montage
   };
 
   explicit ZView(ZDoc& doc, QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Widget);
@@ -59,43 +69,65 @@ public:
   ~ZView() override;
 
   inline QAction* copyAction()
-  { return m_copyAction; }
+  {
+    return m_copyAction;
+  }
 
   inline QAction* pasteAction()
-  { return m_pasteAction; }
+  {
+    return m_pasteAction;
+  }
 
   inline QAction* zoomInAction()
-  { return m_zoomInAction; }
+  {
+    return m_zoomInAction;
+  }
 
   inline QAction* zoomOutAction()
-  { return m_zoomOutAction; }
+  {
+    return m_zoomOutAction;
+  }
 
   QWidget* createScaleWidget(QWidget* parent);
 
   inline QAction* normalViewAction()
-  { return m_normalViewAction; }
+  {
+    return m_normalViewAction;
+  }
 
   inline QAction* maxZProjViewAction()
-  { return m_maxZProjViewAction; }
+  {
+    return m_maxZProjViewAction;
+  }
 
   inline QAction* montageViewAction()
-  { return m_montageViewAction; }
+  {
+    return m_montageViewAction;
+  }
 
   inline QAction* fitIntoWindowAction()
-  { return m_fitIntoWindowAction; }
+  {
+    return m_fitIntoWindowAction;
+  }
 
   inline QAction* scrollHandDragAction()
-  { return m_scrollHandDragAction; }
+  {
+    return m_scrollHandDragAction;
+  }
 
   inline QAction* rubberBandDragAction()
-  { return m_rubberBandDragAction; }
+  {
+    return m_rubberBandDragAction;
+  }
 
   QToolButton* createROIToolButton(QWidget* parent);
 
   QWidget* createROIModeWidget(QWidget* parent);
 
   inline bool isMaxZProjView() const
-  { return currentViewStyle() == ViewStyle::MIP; }
+  {
+    return currentViewStyle() == ViewStyle::MIP;
+  }
 
   int currentSlice() const;
 
@@ -110,13 +142,19 @@ public:
   std::pair<int, int> currentSliceRange() const;
 
   ZIntParameter& slicePara()
-  { return *m_imgSlice; }
+  {
+    return *m_imgSlice;
+  }
 
   ZIntParameter& timePara()
-  { return *m_imgTime; }
+  {
+    return *m_imgTime;
+  }
 
   ZStringIntOptionParameter& viewStylePara()
-  { return *m_viewStyle; }
+  {
+    return *m_viewStyle;
+  }
 
   ZDVec4Parameter& viewportPara()
   {
@@ -125,16 +163,24 @@ public:
   }
 
   inline ZGraphicsScene& scene()
-  { return *m_scene; }
+  {
+    return *m_scene;
+  }
 
   inline const ZGraphicsScene& scene() const
-  { return *m_scene; }
+  {
+    return *m_scene;
+  }
 
   inline ZGraphicsView& graphicsView()
-  { return *m_view; }
+  {
+    return *m_view;
+  }
 
   inline const ZGraphicsView& graphicsView() const
-  { return *m_view; }
+  {
+    return *m_view;
+  }
 
   ZROIPack& roiPack(size_t id);
 
@@ -296,4 +342,3 @@ private:
 };
 
 } // namespace nim
-

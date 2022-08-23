@@ -200,8 +200,9 @@ QRectF ZSwcSkeletonGraphicsItem::boundingRect() const
 
 void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget* widget)
 {
-  if (m_t != 0)
+  if (m_t != 0) {
     return;
+  }
 
   if (m_selected) {
     // LOG(INFO) << "here";
@@ -225,12 +226,13 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
   // drawLines to widget directly is very slow, don't know why
   if (widget && (m_mip || m_showSkeleton)) {
     m_skeletonColor.setAlpha(m_opacity * 0.5 * 255);
-    double devicePixelRatio = (widget->window() && widget->window()->windowHandle()) ?
-                              widget->window()->windowHandle()->devicePixelRatio() : 1.0;
+    double devicePixelRatio = (widget->window() && widget->window()->windowHandle())
+                                ? widget->window()->windowHandle()->devicePixelRatio()
+                                : 1.0;
     QPixmap buffer(widget->width() * devicePixelRatio, widget->height() * devicePixelRatio);
     buffer.fill(QColor(0, 0, 0, 0));
     QPainter pnt(&buffer);
-    //pnt.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+    // pnt.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     pnt.setTransform(painter->combinedTransform());
     pnt.setPen(QPen(m_skeletonColor, 0));
     pnt.drawLines(m_lines);
@@ -245,7 +247,8 @@ void ZSwcSkeletonGraphicsItem::paint(QPainter* painter, const QStyleOptionGraphi
   }
 }
 
-ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode,
+ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack,
+                                           const ZSwc::SwcTreeNode& swcNode,
                                            const QTransform& tfm,
                                            QGraphicsItem* parent)
   : QGraphicsEllipseItem(parent)
@@ -257,8 +260,8 @@ ZSwcNodeGraphicsItem::ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTre
 
   m_basePos = m_transform.map(QPointF(m_swcNode->x, m_swcNode->y));
   setPos(m_basePos);
-  QString tooltip = QString("Swc Node:(%1,%2,%3,%4)").
-    arg(m_swcNode->x).arg(m_swcNode->y).arg(m_swcNode->z).arg(m_swcNode->radius);
+  QString tooltip =
+    QString("Swc Node:(%1,%2,%3,%4)").arg(m_swcNode->x).arg(m_swcNode->y).arg(m_swcNode->z).arg(m_swcNode->radius);
   setToolTip(tooltip);
   updateRectSize();
 }
@@ -268,8 +271,8 @@ void ZSwcNodeGraphicsItem::updateValue()
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, false);
   m_basePos = m_transform.map(QPointF(m_swcNode->x, m_swcNode->y));
   setPos(m_basePos);
-  QString tooltip = QString("Swc Node:(%1,%2,%3,%4)").
-    arg(m_swcNode->x).arg(m_swcNode->y).arg(m_swcNode->z).arg(m_swcNode->radius);
+  QString tooltip =
+    QString("Swc Node:(%1,%2,%3,%4)").arg(m_swcNode->x).arg(m_swcNode->y).arg(m_swcNode->z).arg(m_swcNode->radius);
   setToolTip(tooltip);
   setFlag(QGraphicsItem::ItemSendsGeometryChanges, true);
 }
@@ -325,7 +328,10 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   m_viewPrecedencePara.blockSignals(false);
   addParameter(&m_opacity);
 
-  connect(&m_swcColorParameters.colorMode, &ZStringIntOptionParameter::valueChanged, this, &ZSwcFilter::updateSwcNodeColor);
+  connect(&m_swcColorParameters.colorMode,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &ZSwcFilter::updateSwcNodeColor);
   addParameter(&m_swcColorParameters.colorMode);
 
   connect(&m_swcColorParameters.swcTreeColor, &ZVec4Parameter::valueChanged, this, &ZSwcFilter::updateSwcNodeColor);
@@ -347,7 +353,10 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   }
 
   addParameter(&m_swcColorParameters.colorMapBranchType);
-  connect(&m_swcColorParameters.colorMapBranchType, &ZColorMapParameter::valueChanged, this, &ZSwcFilter::updateSwcNodeColor);
+  connect(&m_swcColorParameters.colorMapBranchType,
+          &ZColorMapParameter::valueChanged,
+          this,
+          &ZSwcFilter::updateSwcNodeColor);
 
   connect(&view.scene(), &ZGraphicsScene::selectionChanged, this, &ZSwcFilter::onSceneItemSelectionChanged);
 }
@@ -488,9 +497,8 @@ void ZSwcFilter::createSwcSkeletonItem()
   m_item = std::make_unique<ZSwcSkeletonGraphicsItem>(*m_swcPack);
   m_item->setZValue(m_viewPrecedencePara.get());
   m_item->setShowSkeleton(m_showSkeleton.get());
-  m_item->setSkeletonColor(QColor(m_skeletonColor.get().x * 255,
-                                  m_skeletonColor.get().y * 255,
-                                  m_skeletonColor.get().z * 255));
+  m_item->setSkeletonColor(
+    QColor(m_skeletonColor.get().x * 255, m_skeletonColor.get().y * 255, m_skeletonColor.get().z * 255));
   m_item->setSizeScale(m_sizeScale.get());
   m_item->setOpacity(m_opacity.get());
   m_item->setTransform(getQTransform());
@@ -520,15 +528,9 @@ void ZSwcFilter::createSwcNodeItems()
     auto item = new ZSwcNodeGraphicsItem(*m_swcPack, p, trans);
     item->setZValue(m_viewPrecedencePara.get());
     auto color = m_swcColorParameters.colorOfNode(p);
-    QPen pen(QColor(color.x * 255,
-                    color.y * 255,
-                    color.z * 255),
-             2);
+    QPen pen(QColor(color.x * 255, color.y * 255, color.z * 255), 2);
     pen.setCosmetic(true);
-    QBrush brush(QColor(color.x * 255,
-                        color.y * 255,
-                        color.z * 255,
-                        m_opacity.get() * 255));
+    QBrush brush(QColor(color.x * 255, color.y * 255, color.z * 255, m_opacity.get() * 255));
     item->setBrush(brush);
     item->setPen(pen);
     item->setLocked(m_swcPack->isLocked());
@@ -550,7 +552,7 @@ void ZSwcFilter::updateItemSelectedState()
     return;
   }
   m_skipSelectionChangedProcessing = true;
-  for (auto&[p, item] : m_swcNodeToItem) {
+  for (auto& [p, item] : m_swcNodeToItem) {
     item->setSelected(m_swcPack->selectedNodes().find(p) != m_swcPack->selectedNodes().end());
   }
   m_skipSelectionChangedProcessing = false;
@@ -628,9 +630,8 @@ void ZSwcFilter::showSkeletonChanged()
 
 void ZSwcFilter::skeletonColorChanged()
 {
-  m_item->setSkeletonColor(QColor(m_skeletonColor.get().x * 255,
-                                  m_skeletonColor.get().y * 255,
-                                  m_skeletonColor.get().z * 255));
+  m_item->setSkeletonColor(
+    QColor(m_skeletonColor.get().x * 255, m_skeletonColor.get().y * 255, m_skeletonColor.get().z * 255));
 }
 
 void ZSwcFilter::sizeScaleChanged()

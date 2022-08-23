@@ -18,13 +18,15 @@ class ZMainWindow;
 
 class Z3DMainWindow : public QMainWindow
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false,
-                         QWidget* parent = nullptr);
+  explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false, QWidget* parent = nullptr);
 
   Z3DView* view()
-  { return m_view; }
+  {
+    return m_view;
+  }
 
   void openEditWidget(size_t id);
 
@@ -54,7 +56,7 @@ private:
 
   void openRecentFile();
 
-  void activateWindowIfNot();  //mac bug?
+  void activateWindowIfNot(); // mac bug?
 
   void changeBackground();
 
@@ -145,4 +147,3 @@ private:
 };
 
 } // namespace nim
-

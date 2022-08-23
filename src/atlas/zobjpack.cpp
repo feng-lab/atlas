@@ -9,8 +9,7 @@ ZObjPack::ZObjPack(size_t id, ZObjDoc* objDoc, QObject* parent)
   : QObject(parent)
   , m_id(id)
   , m_objDoc(objDoc)
-{
-}
+{}
 
 void ZObjPack::setVisible(bool v)
 {
@@ -44,4 +43,3 @@ int ZObjPack::row() const
 }
 
 } // namespace nim
-

@@ -5,13 +5,13 @@
 #include "zlog.h"
 #include "zroiutils.h"
 #include "zapplication.h"
-//#include <CGAL/Surface_mesh_default_triangulation_3.h>
-//#include <CGAL/Surface_mesh_default_criteria_3.h>
-//#include <CGAL/Complex_2_in_triangulation_3.h>
-//#include <CGAL/make_surface_mesh.h>
-//#include <CGAL/Gray_level_image_3.h>
-//#include <CGAL/Implicit_surface_3.h>
-//#include <CGAL/exceptions.h>
+// #include <CGAL/Surface_mesh_default_triangulation_3.h>
+// #include <CGAL/Surface_mesh_default_criteria_3.h>
+// #include <CGAL/Complex_2_in_triangulation_3.h>
+// #include <CGAL/make_surface_mesh.h>
+// #include <CGAL/Gray_level_image_3.h>
+// #include <CGAL/Implicit_surface_3.h>
+// #include <CGAL/exceptions.h>
 #include <opencv2/imgproc.hpp>
 #include <vtkDiscreteMarchingCubes.h>
 #include <vtkDiscreteFlyingEdges3D.h>
@@ -32,8 +32,10 @@
 
 namespace nim {
 
-void readOntology(const json::object& obj, ZTree<RegionNode>::Iterator& parentIt,
-                  const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
+void readOntology(const json::object& obj,
+                  ZTree<RegionNode>::Iterator& parentIt,
+                  const QStringList& regionAbbrevs,
+                  ZTree<RegionNode>& ontology)
 {
   RegionNode node;
   const json::array* children = nullptr;
@@ -135,7 +137,7 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  //QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
+  // QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
   QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
@@ -405,9 +407,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
 
   vtkSmartPointer<vtkThreshold> selector = vtkSmartPointer<vtkThreshold>::New();
   selector->SetInputConnection(smoother->GetOutputPort());
-  selector->SetInputArrayToProcess(0, 0, 0,
-                                   vtkDataObject::FIELD_ASSOCIATION_CELLS,
-                                   vtkDataSetAttributes::SCALARS);
+  selector->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, vtkDataSetAttributes::SCALARS);
   selector->SetThresholdFunction(vtkThreshold::THRESHOLD_BETWEEN);
   selector->SetLowerThreshold(1);
   selector->SetUpperThreshold(1);
@@ -415,10 +415,8 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
   // Strip the scalars from the output
   vtkSmartPointer<vtkMaskFields> scalarsOff = vtkSmartPointer<vtkMaskFields>::New();
   scalarsOff->SetInputConnection(selector->GetOutputPort());
-  scalarsOff->CopyAttributeOff(vtkMaskFields::POINT_DATA,
-                               vtkDataSetAttributes::SCALARS);
-  scalarsOff->CopyAttributeOff(vtkMaskFields::CELL_DATA,
-                               vtkDataSetAttributes::SCALARS);
+  scalarsOff->CopyAttributeOff(vtkMaskFields::POINT_DATA, vtkDataSetAttributes::SCALARS);
+  scalarsOff->CopyAttributeOff(vtkMaskFields::CELL_DATA, vtkDataSetAttributes::SCALARS);
 
   vtkSmartPointer<vtkGeometryFilter> geometry = vtkSmartPointer<vtkGeometryFilter>::New();
   geometry->SetInputConnection(scalarsOff->GetOutputPort());
@@ -460,12 +458,12 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
   //  }
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
-  //std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
-  //CHECK(vertices.size() == normals.size());
+  // std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
+  // CHECK(vertices.size() == normals.size());
   std::vector<uint32_t> indices;
   for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
-    //pointsNormals->GetTuple(id, &normals[id][0]);
+    // pointsNormals->GetTuple(id, &normals[id][0]);
   }
   vtkIdType npts;
   const vtkIdType* pts;
@@ -487,7 +485,7 @@ void binaryImgToMesh(const ZImg& img, ZMesh& msh, double scaleX, double scaleY, 
   }
   msh.setVertices(vertices);
   msh.setIndices(indices);
-  //msh.setNormals(normals);
+  // msh.setNormals(normals);
   msh.generateNormals();
 }
 
@@ -508,8 +506,9 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
     int64_t max;
     ZImg simg = img.extractPlane(s, 0, 0);
     simg.computeMinMax(min, max);
-    if (max == 0)
+    if (max == 0) {
       continue;
+    }
 
     try {
       cv::Mat mat(simg.height(), simg.width(), CV_8UC1, simg.channelData(0));
@@ -547,7 +546,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
 
       for (auto rit = contoursTree.cbeginRoot(); rit != contoursTree.cendRoot(); ++rit) {
         for (auto it = contoursTree.cbeginBreadthFirst(rit); it != contoursTree.cendBreadthFirst(rit); ++it) {
-          //LOG(INFO) << it->index << " " << contours[it->index].size();
+          // LOG(INFO) << it->index << " " << contours[it->index].size();
           size_t c = it->index;
 
           if (contours[c].size() < 3) {

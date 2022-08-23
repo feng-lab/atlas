@@ -16,10 +16,11 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_rightEyeOutport2("RightEyeImage2", this)
   , m_sphereRenderer(m_rendererBase)
   , m_colorMode("Color Mode")
-  , m_singleColorForAllPuncta("Puncta Color", glm::vec4(ZRandom::instance().randReal<float>(),
-                                                        ZRandom::instance().randReal<float>(),
-                                                        ZRandom::instance().randReal<float>(),
-                                                        1.f))
+  , m_singleColorForAllPuncta("Puncta Color",
+                              glm::vec4(ZRandom::instance().randReal<float>(),
+                                        ZRandom::instance().randReal<float>(),
+                                        ZRandom::instance().randReal<float>(),
+                                        1.f))
   , m_colorMapScore("Score Color Map", -1., 1., QColor(255, 255, 0), QColor(0, 0, 255))
   , m_colorMapMeanIntensity("Mean Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
   , m_colorMapMaxIntensity("Max Intensity Color Map", 0., 1., QColor(255, 0, 0), QColor(0, 0, 0))
@@ -40,7 +41,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   //  addPrivateRenderPort(m_leftEyeOutport2);
   //  addPrivateRenderPort(m_rightEyeOutport2);
 
-  //m_textureCopyRenderer.setDiscardTransparent(true);
+  // m_textureCopyRenderer.setDiscardTransparent(true);
 
   m_singleColorForAllPuncta.setStyle("COLOR");
   connect(&m_singleColorForAllPuncta, &ZVec4Parameter::valueChanged, this, &Z3DPunctaFilter::prepareColor);
@@ -79,28 +80,29 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
 
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
-  m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton,
-                                Qt::NoModifier, QEvent::MouseButtonDblClick);
-  m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton,
-                                Qt::ControlModifier, QEvent::MouseButtonDblClick);
+  m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonDblClick);
+  m_selectPunctumEvent.listenTo("select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonDblClick);
   m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
-  m_selectPunctumEvent.listenTo("append select punctum", Qt::LeftButton, Qt::ControlModifier,
+  m_selectPunctumEvent.listenTo("append select punctum",
+                                Qt::LeftButton,
+                                Qt::ControlModifier,
                                 QEvent::MouseButtonRelease);
-  connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered,
-          this, &Z3DPunctaFilter::selectPuncta);
+  connect(&m_selectPunctumEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DPunctaFilter::selectPuncta);
   addEventListener(m_selectPunctumEvent);
 
-  m_deleteSelectedPunctaEvent.listenTo("delete", Qt::Key_Delete, Qt::NoModifier,
-                                       QEvent::KeyPress);
-  m_deleteSelectedPunctaEvent.listenTo("backspace", Qt::Key_Backspace, Qt::NoModifier,
-                                       QEvent::KeyPress);
-  connect(&m_deleteSelectedPunctaEvent, &ZEventListenerParameter::keyEventTriggered,
-          this, &Z3DPunctaFilter::deleteSelectedPuncta);
+  m_deleteSelectedPunctaEvent.listenTo("delete", Qt::Key_Delete, Qt::NoModifier, QEvent::KeyPress);
+  m_deleteSelectedPunctaEvent.listenTo("backspace", Qt::Key_Backspace, Qt::NoModifier, QEvent::KeyPress);
+  connect(&m_deleteSelectedPunctaEvent,
+          &ZEventListenerParameter::keyEventTriggered,
+          this,
+          &Z3DPunctaFilter::deleteSelectedPuncta);
   addEventListener(m_deleteSelectedPunctaEvent);
 
   m_contextMenuEvent.listenToContextMenuEvent();
-  connect(&m_contextMenuEvent, &ZEventListenerParameter::contextMenuEventTriggered,
-          this, &Z3DPunctaFilter::contextMenuEvent);
+  connect(&m_contextMenuEvent,
+          &ZEventListenerParameter::contextMenuEventTriggered,
+          this,
+          &Z3DPunctaFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
 
   adjustWidgets();
@@ -183,16 +185,16 @@ bool Z3DPunctaFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_visible.get() && m_punctaPack;
 }
 
-//namespace {
+// namespace {
 
-//bool compareParameterName(const ZParameter *p1, const ZParameter *p2)
+// bool compareParameterName(const ZParameter *p1, const ZParameter *p2)
 //{
-//  QString n1 = p1->getName().mid(7); // "Source "
-//  QString n2 = p2->getName().mid(7);
-//  n1.remove(n1.size()-6, 6); //" Color"
-//  n2.remove(n2.size()-6, 6);
-//  return n1.toInt() < n2.toInt();
-//}
+//   QString n1 = p1->getName().mid(7); // "Source "
+//   QString n2 = p2->getName().mid(7);
+//   n1.remove(n1.size()-6, 6); //" Color"
+//   n2.remove(n2.size()-6, 6);
+//   return n1.toInt() < n2.toInt();
+// }
 
 //}
 
@@ -295,7 +297,9 @@ void Z3DPunctaFilter::registerPickingObjects()
     m_pointPickingColors.clear();
     for (auto punctum : m_punctaPack->punctaPts()) {
       glm::col4 pickingColor = pickingManager().colorOfObject(punctum);
-      glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
+      glm::vec4 fPickingColor(pickingColor[0] / 255.f,
+                              pickingColor[1] / 255.f,
+                              pickingColor[2] / 255.f,
                               pickingColor[3] / 255.f);
       m_pointPickingColors.push_back(fPickingColor);
     }
@@ -331,8 +335,7 @@ void Z3DPunctaFilter::prepareData()
     if (m_useSameSizeForAllPuncta.get()) {
       m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), 2.f);
     } else {
-      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(),
-                                    punctum->radius());
+      m_pointAndRadius.emplace_back(punctum->x(), punctum->y(), punctum->z(), punctum->radius());
     }
     m_specularAndShininess.emplace_back(punctum->maxIntensity() / 255.f,
                                         punctum->maxIntensity() / 255.f,
@@ -372,7 +375,7 @@ void Z3DPunctaFilter::updateData()
     minMaxInten = std::min(minMaxInten, p->maxIntensity());
     maxMaxInten = std::max(maxMaxInten, p->maxIntensity());
   }
-  //todo: set correct range for colormap
+  // todo: set correct range for colormap
 
   m_dataIsInvalid = true;
   invalidateResult();
@@ -428,8 +431,10 @@ void Z3DPunctaFilter::prepareColor()
 
   if (m_colorMode.isSelected("Original Point Color")) {
     for (auto punctum : m_punctaPack->punctaPts()) {
-      glm::vec4 color(punctum->color().redF(), punctum->color().greenF(),
-                      punctum->color().blueF(), punctum->color().alphaF());
+      glm::vec4 color(punctum->color().redF(),
+                      punctum->color().greenF(),
+                      punctum->color().blueF(),
+                      punctum->color().alphaF());
       m_pointColors.push_back(color);
     }
   } else if (m_colorMode.isSelected("Random Color")) {
@@ -483,8 +488,7 @@ void Z3DPunctaFilter::selectPuncta(QMouseEvent* e, int /*w*/, int /*h*/)
 
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(
-      glm::ivec2(e->position().x(), e->position().y()));
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
@@ -583,4 +587,3 @@ void Z3DPunctaFilter::deleteSelectedPuncta()
 }
 
 } // namespace nim
-

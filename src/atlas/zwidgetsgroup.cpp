@@ -28,23 +28,20 @@ ZWidgetsGroup::ZWidgetsGroup(QWidget& widget, int visibleLevel)
   , m_groupName("This is not a group")
   , m_widget(&widget)
   , m_visibleLevel(visibleLevel)
-{
-}
+{}
 
 ZWidgetsGroup::ZWidgetsGroup(QString groupName, int visibleLevel)
   : m_type(Type::Group)
   , m_groupName(std::move(groupName))
   , m_visibleLevel(visibleLevel)
-{
-}
+{}
 
 ZWidgetsGroup::ZWidgetsGroup(ZParameter& parameter, int visibleLevel)
   : m_type(Type::Parameter)
   , m_groupName("This is not a group")
   , m_parameter(&parameter)
   , m_visibleLevel(visibleLevel)
-{
-}
+{}
 
 std::vector<ZParameter*> ZWidgetsGroup::getParameterList()
 {
@@ -165,7 +162,7 @@ QWidget* ZWidgetsGroup::createWidget(bool createBasic, bool scroll, QLabel* labe
     sa->setFrameShape(QFrame::NoFrame);
     sa->setContentsMargins(0, 0, 0, 0);
 
-    //sa->setVisible(isVisible());
+    // sa->setVisible(isVisible());
 
     return sa;
   } else {
@@ -183,9 +180,8 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
     }
     case Type::Parameter: {
       auto hbl = new QHBoxLayout;
-      if (qobject_cast<Z3DCameraParameter*>(m_parameter) ||
-        qobject_cast<Z3DTransformParameter*>(m_parameter) ||
-        qobject_cast<Z2DTransformParameter*>(m_parameter)) {
+      if (qobject_cast<Z3DCameraParameter*>(m_parameter) || qobject_cast<Z3DTransformParameter*>(m_parameter) ||
+          qobject_cast<Z2DTransformParameter*>(m_parameter)) {
         QWidget* wg = m_parameter->createWidget();
         hbl->addWidget(wg);
         return hbl;
@@ -204,19 +200,22 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
     }
     default: /*case GROUP:*/ {
       auto vbl = new QVBoxLayout;
-      if (!m_isSorted)
+      if (!m_isSorted) {
         sortChildGroups();
+      }
       if (createBasic) {
         size_t i;
-        for (i = 0; i < m_childGroups.size() &&
-                    m_childGroups[i]->m_visibleLevel <= m_cutOffbetweenBasicAndAdvancedLevel; ++i) {
+        for (i = 0;
+             i < m_childGroups.size() && m_childGroups[i]->m_visibleLevel <= m_cutOffbetweenBasicAndAdvancedLevel;
+             ++i) {
           QLayout* lw = m_childGroups[i]->createLayout(true);
           if (m_childGroups[i]->isGroup()) {
             auto groupBox = new QGroupBox(m_childGroups[i]->getGroupName());
             groupBox->setLayout(lw);
             vbl->addWidget(groupBox);
-          } else
+          } else {
             vbl->addLayout(lw);
+          }
         }
         if (i < m_childGroups.size()) {
           auto pb = new QPushButton("Advanced...");

@@ -17,10 +17,14 @@ public:
   explicit ZOptionParameter(const QString& name, QObject* parent = nullptr, QString prefix = "", QString suffix = "");
 
   [[nodiscard]] inline QString prefix() const
-  { return m_prefix; }
+  {
+    return m_prefix;
+  }
 
   [[nodiscard]] inline QString suffix() const
-  { return m_suffix; }
+  {
+    return m_suffix;
+  }
 
   void select(const T& value);
 
@@ -29,13 +33,19 @@ public:
   [[nodiscard]] bool isSelected(const T& value) const;
 
   [[nodiscard]] bool isEmpty() const
-  { return m_options.empty(); }
+  {
+    return m_options.empty();
+  }
 
   [[nodiscard]] bool hasOption(const T& value) const
-  { return contains(m_options, value); }
+  {
+    return contains(m_options, value);
+  }
 
   [[nodiscard]] inline T2 associatedData() const
-  { return m_associatedData; }
+  {
+    return m_associatedData;
+  }
 
   void addOption(const T& value)
   {
@@ -101,22 +111,27 @@ public:
     addOptions(op2, op3, op4, op5);
   }
 
-  inline void addOptions(const T& op1, const T& op2, const T& op3, const T& op4, const T& op5,
-                         const T& op6)
+  inline void addOptions(const T& op1, const T& op2, const T& op3, const T& op4, const T& op5, const T& op6)
   {
     addOption(op1);
     addOptions(op2, op3, op4, op5, op6);
   }
 
-  inline void addOptions(const T& op1, const T& op2, const T& op3, const T& op4, const T& op5,
-                         const T& op6, const T& op7)
+  inline void
+  addOptions(const T& op1, const T& op2, const T& op3, const T& op4, const T& op5, const T& op6, const T& op7)
   {
     addOption(op1);
     addOptions(op2, op3, op4, op5, op6, op7);
   }
 
-  inline void addOptions(const T& op1, const T& op2, const T& op3, const T& op4, const T& op5,
-                         const T& op6, const T& op7, const T& op8)
+  inline void addOptions(const T& op1,
+                         const T& op2,
+                         const T& op3,
+                         const T& op4,
+                         const T& op5,
+                         const T& op6,
+                         const T& op7,
+                         const T& op8)
   {
     addOption(op1);
     addOptions(op2, op3, op4, op5, op6, op7, op8);
@@ -148,46 +163,56 @@ public:
     addOptionsWithData(op2, op3);
   }
 
-  inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
-                     const std::pair<T, T2>& op4)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1,
+                                 const std::pair<T, T2>& op2,
+                                 const std::pair<T, T2>& op3,
+                                 const std::pair<T, T2>& op4)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4);
   }
 
-  inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
-                     const std::pair<T, T2>& op4,
-                     const std::pair<T, T2>& op5)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1,
+                                 const std::pair<T, T2>& op2,
+                                 const std::pair<T, T2>& op3,
+                                 const std::pair<T, T2>& op4,
+                                 const std::pair<T, T2>& op5)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5);
   }
 
-  inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
-                     const std::pair<T, T2>& op4,
-                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1,
+                                 const std::pair<T, T2>& op2,
+                                 const std::pair<T, T2>& op3,
+                                 const std::pair<T, T2>& op4,
+                                 const std::pair<T, T2>& op5,
+                                 const std::pair<T, T2>& op6)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6);
   }
 
-  inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
-                     const std::pair<T, T2>& op4,
-                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1,
+                                 const std::pair<T, T2>& op2,
+                                 const std::pair<T, T2>& op3,
+                                 const std::pair<T, T2>& op4,
+                                 const std::pair<T, T2>& op5,
+                                 const std::pair<T, T2>& op6,
+                                 const std::pair<T, T2>& op7)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7);
   }
 
-  inline void
-  addOptionsWithData(const std::pair<T, T2>& op1, const std::pair<T, T2>& op2, const std::pair<T, T2>& op3,
-                     const std::pair<T, T2>& op4,
-                     const std::pair<T, T2>& op5, const std::pair<T, T2>& op6, const std::pair<T, T2>& op7,
-                     const std::pair<T, T2>& op8)
+  inline void addOptionsWithData(const std::pair<T, T2>& op1,
+                                 const std::pair<T, T2>& op2,
+                                 const std::pair<T, T2>& op3,
+                                 const std::pair<T, T2>& op4,
+                                 const std::pair<T, T2>& op5,
+                                 const std::pair<T, T2>& op6,
+                                 const std::pair<T, T2>& op7,
+                                 const std::pair<T, T2>& op8)
   {
     addOptionWithData(op1);
     addOptionsWithData(op2, op3, op4, op5, op6, op7, op8);
@@ -196,7 +221,9 @@ public:
   void setSameAs(const ZParameter& rhs) override;
 
   [[nodiscard]] bool supportInterpolation() const override
-  { return false; }
+  {
+    return false;
+  }
 
   [[nodiscard]] json::value jsonValue() const override;
 
@@ -227,27 +254,35 @@ private:
 
 class ZStringIntOptionParameter : public ZOptionParameter<QString, int>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZStringIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+  explicit ZStringIntOptionParameter(const QString& name,
+                                     QObject* parent = nullptr,
+                                     const QString& prefix = "",
                                      const QString& suffix = "");
 };
 
 class ZStringStringOptionParameter : public ZOptionParameter<QString, QString>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZStringStringOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+  explicit ZStringStringOptionParameter(const QString& name,
+                                        QObject* parent = nullptr,
+                                        const QString& prefix = "",
                                         const QString& suffix = "");
 };
 
 class ZIntIntOptionParameter : public ZOptionParameter<int, int>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZIntIntOptionParameter(const QString& name, QObject* parent = nullptr, const QString& prefix = "",
+  explicit ZIntIntOptionParameter(const QString& name,
+                                  QObject* parent = nullptr,
+                                  const QString& prefix = "",
                                   const QString& suffix = "");
 };
 
 } // namespace nim
-

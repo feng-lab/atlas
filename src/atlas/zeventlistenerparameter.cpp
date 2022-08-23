@@ -8,19 +8,20 @@ namespace nim {
 ZEventListenerParameter::ZEventListenerParameter(const QString& name, bool sharing, QObject* parent)
   : ZParameter(name, parent)
   , m_sharing(sharing)
-{
-}
+{}
 
-void
-ZEventListenerParameter::listenTo(const QString& actionName, const Qt::MouseButtons& buttons,
-                                  const Qt::KeyboardModifiers& modifiers,
-                                  QEvent::Type type)
+void ZEventListenerParameter::listenTo(const QString& actionName,
+                                       const Qt::MouseButtons& buttons,
+                                       const Qt::KeyboardModifiers& modifiers,
+                                       QEvent::Type type)
 {
   m_mouseEvents.emplace_back(actionName, buttons, modifiers, type);
   Q_EMIT valueChanged();
 }
 
-void ZEventListenerParameter::listenTo(const QString& actionName, Qt::Key key, const Qt::KeyboardModifiers& modifiers,
+void ZEventListenerParameter::listenTo(const QString& actionName,
+                                       Qt::Key key,
+                                       const Qt::KeyboardModifiers& modifiers,
                                        QEvent::Type type)
 {
   m_keyEvents.emplace_back(actionName, key, modifiers, type);
@@ -36,29 +37,33 @@ void ZEventListenerParameter::clearAll()
 
 void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
 {
-  if (!m_isWidgetsEnabled)
+  if (!m_isWidgetsEnabled) {
     return;
+  }
 
   if (auto mouseEvent = dynamic_cast<QMouseEvent*>(e)) {
     bool accept = false;
-    //LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
+    // LOG(INFO) << mouseEvent->modifiers() << " " << mouseEvent->button() << " " << mouseEvent->buttons();
     for (const auto& me : m_mouseEvents) {
       accept = true;
       accept &= (mouseEvent->modifiers() == me.modifiers);
       accept &= (mouseEvent->type() == me.type);
-      if (mouseEvent->type() == QEvent::MouseMove)
+      if (mouseEvent->type() == QEvent::MouseMove) {
         accept &= ((mouseEvent->buttons() == me.buttons));
-      else
+      } else {
         accept &= ((mouseEvent->button() == me.buttons));
-      if (accept)
+      }
+      if (accept) {
         break;
+      }
     }
     if (accept) {
       Q_EMIT eventTriggered(e, w, h);
       Q_EMIT mouseEventTriggered(mouseEvent, w, h);
 
-      if (m_sharing)
+      if (m_sharing) {
         e->ignore();
+      }
     }
   } else if (auto wheelEvent = dynamic_cast<QWheelEvent*>(e)) {
     bool accept = false;
@@ -67,15 +72,17 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
       accept &= (wheelEvent->modifiers() == me.modifiers);
       accept &= (wheelEvent->type() == me.type);
       accept &= ((wheelEvent->buttons() == me.buttons));
-      if (accept)
+      if (accept) {
         break;
+      }
     }
     if (accept) {
       Q_EMIT eventTriggered(e, w, h);
       Q_EMIT wheelEventTriggered(wheelEvent, w, h);
 
-      if (m_sharing)
+      if (m_sharing) {
         e->ignore();
+      }
     }
   } else if (auto keyEvent = dynamic_cast<QKeyEvent*>(e)) {
     bool accept = false;
@@ -84,15 +91,17 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
       accept &= (keyEvent->modifiers() == ke.modifiers);
       accept &= (keyEvent->type() == ke.type);
       accept &= (keyEvent->key() == ke.key);
-      if (accept)
+      if (accept) {
         break;
+      }
     }
     if (accept) {
       Q_EMIT eventTriggered(e, w, h);
       Q_EMIT keyEventTriggered(keyEvent, w, h);
 
-      if (m_sharing)
+      if (m_sharing) {
         e->ignore();
+      }
     }
   } else if (auto contextMenuEvent = dynamic_cast<QContextMenuEvent*>(e)) {
     bool accept = m_listeningToContextMenuEvent;
@@ -100,8 +109,9 @@ void ZEventListenerParameter::sendEvent(QEvent* e, int w, int h)
       Q_EMIT eventTriggered(e, w, h);
       Q_EMIT contextMenuEventTriggered(contextMenuEvent, w, h);
 
-      if (m_sharing)
+      if (m_sharing) {
         e->ignore();
+      }
     }
   }
 }
@@ -137,8 +147,6 @@ json::value ZEventListenerParameter::jsonValue() const
   return "";
 }
 
-void ZEventListenerParameter::readValue(const json::value& /*value*/)
-{
-}
+void ZEventListenerParameter::readValue(const json::value& /*value*/) {}
 
 } // namespace nim

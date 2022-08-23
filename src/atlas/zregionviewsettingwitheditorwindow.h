@@ -8,7 +8,8 @@ class ZROIFilter;
 
 class ZRegionViewSettingWithEditorWindow : public ZRegionViewSettingLabel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZRegionViewSettingWithEditorWindow(ZROIFilter* rf, QWidget* parent = nullptr);
 
@@ -23,4 +24,3 @@ private:
 };
 
 } // namespace nim
-

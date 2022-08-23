@@ -38,24 +38,28 @@ struct indexed_access<QRectF, C, D>
 {
   static inline double get(const QRectF& qr)
   {
-    return C == min_corner && D == 0 ? qr.x()
-                                     : C == min_corner && D == 1 ? qr.y()
-                                                                 : C == max_corner && D == 0 ? qr.x() + qr.width()
-                                                                                             : C == max_corner && D == 1
-                                                                                               ? qr.y() + qr.height()
-                                                                                               : 0;
+    return C == min_corner && D == 0   ? qr.x()
+           : C == min_corner && D == 1 ? qr.y()
+           : C == max_corner && D == 0 ? qr.x() + qr.width()
+           : C == max_corner && D == 1 ? qr.y() + qr.height()
+                                       : 0;
   }
 
   static inline void set(QRectF& qr, const double& value)
   {
-    if (C == min_corner && D == 0) qr.setX(value);
-    else if (C == min_corner && D == 1) qr.setY(value);
-    else if (C == max_corner && D == 0) qr.setWidth(value - qr.x());
-    else if (C == max_corner && D == 1) qr.setHeight(value - qr.y());
+    if (C == min_corner && D == 0) {
+      qr.setX(value);
+    } else if (C == min_corner && D == 1) {
+      qr.setY(value);
+    } else if (C == max_corner && D == 0) {
+      qr.setWidth(value - qr.x());
+    } else if (C == max_corner && D == 1) {
+      qr.setHeight(value - qr.y());
+    }
   }
 };
 
-}
+} // namespace boost::geometry::traits
 
 #if 0
 // ----------------------------------------------------------------------------------
@@ -97,4 +101,3 @@ struct access<nim::ZVoxelCoordinate, I>
 
 }}}
 #endif
-

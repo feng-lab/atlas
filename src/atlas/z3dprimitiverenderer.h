@@ -12,14 +12,17 @@ class ZMesh;
 
 class Z3DPrimitiveRenderer : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase);
 
   virtual ~Z3DPrimitiveRenderer();
 
   inline QString className() const
-  { return metaObject()->className(); }
+  {
+    return metaObject()->className();
+  }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // for opengl mode only, if set, display list will be build in opengl mode.
@@ -27,39 +30,54 @@ public:
   // not necessary if number of objects is small (can be rendered in a few opengl calls)
   // default is false, subclass should call this function if needed
   void setUseDisplayList(bool v)
-  { m_useDisplayList = v; }
+  {
+    m_useDisplayList = v;
+  }
 
   inline bool useDisplayList()
-  { return m_useDisplayList; }
+  {
+    return m_useDisplayList;
+  }
 #endif
 
   // If set, lighting will be enabled.
   // default is true, subclass should call this function if needed
   void setNeedLighting(bool v)
-  { m_needLighting = v; }
+  {
+    m_needLighting = v;
+  }
 
   inline bool needLighting()
-  { return m_needLighting; }
+  {
+    return m_needLighting;
+  }
 
-  //sometimes z scale transfrom is not appropriate, for example: bound box. we need to disable it and
-  // precalc the correct location. Default is true
+  // sometimes z scale transfrom is not appropriate, for example: bound box. we need to disable it and
+  //  precalc the correct location. Default is true
   void setFollowCoordTransform(bool v)
-  { m_followCoordTransform = v; }
+  {
+    m_followCoordTransform = v;
+  }
 
   //
   void setFollowOpacity(bool v)
-  { m_followOpacity = v; }
+  {
+    m_followOpacity = v;
+  }
 
   //
   void setFollowSizeScale(bool v)
-  { m_followSizeScale = v; }
+  {
+    m_followSizeScale = v;
+  }
 
   inline glm::mat4 coordTransform() const
   {
-    if (m_followCoordTransform)
+    if (m_followCoordTransform) {
       return m_rendererBase.coordTransform();
-    else
+    } else {
       return glm::mat4(1.f);
+    }
   }
 
   // commonly used render functions
@@ -97,8 +115,7 @@ protected:
 
   virtual void render(Z3DEye) = 0;
 
-  virtual void renderPicking(Z3DEye /*unused*/)
-  {}
+  virtual void renderPicking(Z3DEye /*unused*/) {}
 
 protected:
   Z3DRendererBase& m_rendererBase;
@@ -114,4 +131,3 @@ protected:
 };
 
 } // namespace nim
-

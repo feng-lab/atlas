@@ -17,10 +17,14 @@ class ZRegionAnnotationDoc;
 
 class ZRegionAnnotationPack : public ZObjPack
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  ZRegionAnnotationPack(ZRegionAnnotation* ra, const QString& path,
-                        size_t id, ZRegionAnnotationDoc& pd, QObject* parent = nullptr);
+  ZRegionAnnotationPack(ZRegionAnnotation* ra,
+                        const QString& path,
+                        size_t id,
+                        ZRegionAnnotationDoc& pd,
+                        QObject* parent = nullptr);
 
   ~ZRegionAnnotationPack() override;
 
@@ -29,16 +33,24 @@ public:
   const QString& info() const;
 
   inline const QString& name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline const QString& tooltip() const
-  { return m_tooltip; }
+  {
+    return m_tooltip;
+  }
 
   inline const QString& path() const
-  { return m_path; }
+  {
+    return m_path;
+  }
 
   QUndoStack* undoStack()
-  { return m_regionAnnotation->undoStack(); }
+  {
+    return m_regionAnnotation->undoStack();
+  }
 
   QMenu& contextMenu();
 
@@ -47,26 +59,35 @@ public:
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
   inline const ZRegionAnnotation& regionAnnotation() const
-  { return *m_regionAnnotation; }
+  {
+    return *m_regionAnnotation;
+  }
 
   inline ZRegionAnnotation& regionAnnotation()
-  { return *m_regionAnnotation; }
+  {
+    return *m_regionAnnotation;
+  }
 
   ZBBox<glm::ivec4> boundBox() const
-  { return m_regionAnnotation->boundBox(); }
+  {
+    return m_regionAnnotation->boundBox();
+  }
 
   void setCurrentRegionID(int64_t id)
-  { m_currentRegionID = id; }
+  {
+    m_currentRegionID = id;
+  }
 
   int64_t currentRegionID() const
-  { return m_currentRegionID; }
+  {
+    return m_currentRegionID;
+  }
 
   void mergeROIToCurrentRegion(const ZROI& roi);
 
   void mergeLineROI(const ZROI& roi);
 
 protected:
-
   void updatePtsAndSelectedPuncta();
 
   void createContextMenu();
@@ -88,6 +109,7 @@ protected:
   QMenu m_contextMenu;
 
   // derived data
+
 private:
   mutable QString m_info;
   QString m_name;
@@ -97,7 +119,3 @@ private:
 };
 
 } // namespace nim
-
-
-
-

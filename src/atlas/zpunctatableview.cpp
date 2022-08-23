@@ -36,20 +36,15 @@ ZPunctaTableView::ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& pun
   setSelectionBehavior(QTableView::SelectRows);
 
   setAlternatingRowColors(true);
-  //QPalette p = palette();
-  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  //setPalette(p);
+  // QPalette p = palette();
+  // p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  // setPalette(p);
 
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
-          this, &ZPunctaTableView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
-          this, &ZPunctaTableView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
-          this, &ZPunctaTableView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
-          this, &ZPunctaTableView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
-          this, &ZPunctaTableView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZPunctaTableView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZPunctaTableView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset, this, &ZPunctaTableView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZPunctaTableView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged, this, &ZPunctaTableView::adaptColumns);
   adaptColumns();
 
   onPunctaSelectionChanged();
@@ -177,9 +172,6 @@ void ZPunctaTableView::onPunctaChanged()
   onPunctaSelectionChanged();
 }
 
-void ZPunctaTableView::onLockedStateChanged(bool)
-{
-}
+void ZPunctaTableView::onLockedStateChanged(bool) {}
 
 } // namespace nim
-

@@ -46,11 +46,11 @@ void ZSystemInfo::logOSInfo() const
   LOG(INFO) << "OS: " << QSysInfo::prettyProductName();
   LOG(INFO) << "Kernel: " << QSysInfo::kernelType() + " " + QSysInfo::kernelVersion();
   LOG(INFO) << "Build ABI: " << QSysInfo::buildAbi();
-  //LOG(INFO) << "Build CPU: " << QSysInfo::buildCpuArchitecture();
+  // LOG(INFO) << "Build CPU: " << QSysInfo::buildCpuArchitecture();
   LOG(INFO) << "Current CPU: " << QSysInfo::currentCpuArchitecture();
   LOG(INFO) << "Machine Host Name: " << QSysInfo::machineHostName();
-  //LOG(INFO) << "Product Type: " << QSysInfo::productType();
-  //LOG(INFO) << "Product Version: " << QSysInfo::productVersion();
+  // LOG(INFO) << "Product Type: " << QSysInfo::productType();
+  // LOG(INFO) << "Product Version: " << QSysInfo::productVersion();
 
 #ifdef ATLAS_WITH_TESTS
   // time
@@ -76,14 +76,11 @@ bool ZSystemInfo::initializeGL()
     return false;
   }
 
-  glbinding::initialize([](const char* name) {
-    return Z3DContext().getProcAddress(name);
-  });
+  glbinding::initialize([](const char* name) { return Z3DContext().getProcAddress(name); });
   Z3DGpuInfo::instance().logGpuInfo();
 #if defined(ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
-  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
-                                   glbinding::CallbackMask::ParametersAndReturnValue |
-                                   glbinding::CallbackMask::Unresolved,
+  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After | glbinding::CallbackMask::ParametersAndReturnValue |
+                                     glbinding::CallbackMask::Unresolved,
                                    {"glGetError"});
   glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
     GLenum error = glGetError();
@@ -93,8 +90,9 @@ bool ZSystemInfo::initializeGL()
       os << call.function->name() << "(";
       for (size_t i = 0; i < call.parameters.size(); ++i) {
         os << call.parameters[i].get();
-        if (i + 1 < call.parameters.size())
+        if (i + 1 < call.parameters.size()) {
           os << ", ";
+        }
       }
       os << ")";
 
@@ -106,17 +104,17 @@ bool ZSystemInfo::initializeGL()
     }
   });
 #elif 0
-  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
-                                   glbinding::CallbackMask::ParametersAndReturnValue |
-                                   glbinding::CallbackMask::Unresolved,
+  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After | glbinding::CallbackMask::ParametersAndReturnValue |
+                                     glbinding::CallbackMask::Unresolved,
                                    {"glGetError"});
   glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
     std::cout << call.function->name() << "(";
 
     for (size_t i = 0; i < call.parameters.size(); ++i) {
       std::cout << call.parameters[i]->asString();
-      if (i < call.parameters.size() - 1)
+      if (i < call.parameters.size() - 1) {
         std::cout << ", ";
+      }
     }
 
     std::cout << ")";
@@ -128,8 +126,9 @@ bool ZSystemInfo::initializeGL()
     std::cout << "\n";
 
     GLenum error = glGetError();
-    if (error != GL_NO_ERROR)
+    if (error != GL_NO_ERROR) {
       std::cout << "OpenGL error: " << glbinding::Meta::getString(error) << "\n";
+    }
 
     std::cout.flush();
   });
@@ -139,9 +138,8 @@ bool ZSystemInfo::initializeGL()
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
-  glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-    LOG(INFO) << "Switching to OpenGL context " << handle;
-  });
+  glbinding::addContextSwitchCallback(
+    [](glbinding::ContextHandle handle) { LOG(INFO) << "Switching to OpenGL context " << handle; });
   if (Z3DGpuInfo::instance().isSupported()) {
     m_glInitialized = true;
     return m_glInitialized;
@@ -166,31 +164,35 @@ QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 {
   QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
   QDir dir(folder);
-  if (!dir.exists())
+  if (!dir.exists()) {
     dir.mkpath(".");
+  }
   QStorageInfo volumeInfo(folder);
-  //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
+  // LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
   if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
-      static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
+      static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
     folder.clear();
+  }
 
   if (folder.isEmpty()) {
     folder = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     QDir dir1(folder);
-    if (!dir1.exists())
+    if (!dir1.exists()) {
       dir1.mkpath(".");
+    }
     volumeInfo = QStorageInfo(folder);
-    //LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
+    // LOG(INFO) << folder << " " << volumeInfo.bytesAvailable();
     if (!volumeInfo.isValid() || !volumeInfo.isReady() || volumeInfo.isReadOnly() ||
-        static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes)
+        static_cast<size_t>(volumeInfo.bytesAvailable()) < requiredSpaceInBytes) {
       folder.clear();
+    }
   }
 
   // try other volumes
   if (folder.isEmpty()) {
     auto vols = QStorageInfo::mountedVolumes();
     for (auto& vol : vols) {
-      //LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
+      // LOG(INFO) << vols[i].bytesAvailable() << " " << vols[i].rootPath();
       if (!vol.isRoot() && vol.isValid() && vol.isReady() && !vol.isReadOnly() &&
           static_cast<size_t>(vol.bytesAvailable()) >= requiredSpaceInBytes) {
         folder = vol.rootPath();
@@ -215,8 +217,9 @@ QDir ZSystemInfo::logDir()
 QDir ZSystemInfo::configDir()
 {
   static QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
-  if (!dir.exists())
+  if (!dir.exists()) {
     dir.mkpath(".");
+  }
   return dir;
 }
 
@@ -242,8 +245,9 @@ QString ZSystemInfo::lastOpenedObjPath(const QString& typeName) const
 
 void ZSystemInfo::setLastOpenedObjPath(const QString& typeName, const QString& path) const
 {
-  if (path.isEmpty())
+  if (path.isEmpty()) {
     return;
+  }
   auto fi = QFileInfo(path);
   QSettings settings;
   settings.setValue(lastOpenedObjPathQSettingLocation(typeName), fi.canonicalPath());
@@ -254,12 +258,14 @@ void ZSystemInfo::addFileToRecentFileList(const QString& fileName) const
   QSettings settings;
   QStringList files = settings.value("recentFileList").toStringList();
   QString fn = QFileInfo(fileName).canonicalFilePath();
-  if (fn.isEmpty())
+  if (fn.isEmpty()) {
     return;
+  }
   files.removeAll(fn);
   files.prepend(fn);
-  while (files.size() > maxNumRecentFiles())
+  while (files.size() > maxNumRecentFiles()) {
     files.removeLast();
+  }
 
   settings.setValue("recentFileList", files);
   updateRecentFiles();
@@ -282,8 +288,9 @@ void ZSystemInfo::removeOldLogs(int numberToKeep)
 void ZSystemInfo::updateRecentFiles()
 {
   for (auto widget : QApplication::topLevelWidgets()) {
-    if (auto mainWin = qobject_cast<ZMainWindow*>(widget))
+    if (auto mainWin = qobject_cast<ZMainWindow*>(widget)) {
       mainWin->updateRecentFileActions();
+    }
   }
 }
 
@@ -291,12 +298,16 @@ void ZSystemInfo::detectOS()
 {
 #if defined(Q_OS_DARWIN) || defined(Q_OS_WIN)
   auto current = QOperatingSystemVersion::current();
-  m_osString = QString("%1 %2.%3.%4").
-    arg(current.name()).arg(current.majorVersion()).arg(current.minorVersion()).arg(current.microVersion());
+  m_osString = QString("%1 %2.%3.%4")
+                 .arg(current.name())
+                 .arg(current.majorVersion())
+                 .arg(current.minorVersion())
+                 .arg(current.microVersion());
 #else
   utsname name;
-  if (uname(&name) != 0)
+  if (uname(&name) != 0) {
     return; // command not successful
+  }
 
   m_osString = QString("%1 %2 %3 %4").arg(name.sysname).arg(name.release).arg(name.version).arg(name.machine);
 
@@ -306,8 +317,9 @@ void ZSystemInfo::detectOS()
 QDir ZSystemInfo::createLogDir()
 {
   QDir dir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation));
-  if (!dir.exists())
+  if (!dir.exists()) {
     dir.mkpath(".");
+  }
   QString logFolderName = "Logs";
 #ifdef __APPLE__
   QDir osxLogDir = dir;
@@ -318,10 +330,12 @@ QDir ZSystemInfo::createLogDir()
   }
 #endif
   logFolderName += QString("/%1_LOG").arg(QDateTime::currentDateTime().toString("yyyyMMdd-hhmmss.zzz"));
-  if (!dir.mkpath(logFolderName))
+  if (!dir.mkpath(logFolderName)) {
     dir.remove(logFolderName);
-  if (dir.mkpath(logFolderName))
+  }
+  if (dir.mkpath(logFolderName)) {
     return QDir(dir.absoluteFilePath(logFolderName));
+  }
 
   return dir;
 }

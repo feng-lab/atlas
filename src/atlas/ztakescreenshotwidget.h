@@ -20,7 +20,8 @@ class ZSelectFileWidget;
 
 class ZTakeScreenShotWidget : public QScrollArea
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZTakeScreenShotWidget(bool is2D = false, bool group = false, QWidget* parent = nullptr);
 
@@ -30,7 +31,9 @@ public:
   void setCaptureStereoImage(bool v)
   {
     m_captureStereoImage.set(v);
-    if (v) m_captureStereoImage.setVisible(false);
+    if (v) {
+      m_captureStereoImage.setVisible(false);
+    }
   }
 
 Q_SIGNALS:
@@ -43,11 +46,21 @@ Q_SIGNALS:
 
   void take3DScreenShot(const QString& filename, Z3DScreenShotType sst);
 
-  void takeSeriesFixedSize3DScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
-                                       bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst);
+  void takeSeriesFixedSize3DScreenShot(const QDir& dir,
+                                       const QString& namePrefix,
+                                       glm::vec3 axis,
+                                       bool clockWise,
+                                       int numFrame,
+                                       int width,
+                                       int height,
+                                       Z3DScreenShotType sst);
 
-  void takeSeries3DScreenShot(const QDir& dir, const QString& namePrefix, glm::vec3 axis,
-                              bool clockWise, int numFrame, Z3DScreenShotType sst);
+  void takeSeries3DScreenShot(const QDir& dir,
+                              const QString& namePrefix,
+                              glm::vec3 axis,
+                              bool clockWise,
+                              int numFrame,
+                              Z3DScreenShotType sst);
 
 protected:
   void captureButtonPressed();
@@ -96,4 +109,3 @@ private:
 };
 
 } // namespace nim
-

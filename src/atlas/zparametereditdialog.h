@@ -9,7 +9,8 @@ namespace nim {
 
 class ZParameterEditDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZParameterEditDialog(ZParameter& para, QWidget* parent = nullptr);
 
@@ -25,5 +26,3 @@ protected:
 };
 
 } // namespace nim
-
-

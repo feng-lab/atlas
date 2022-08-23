@@ -32,14 +32,14 @@ void ZParameterEditDialog::raiseAndActivate()
 
 void ZParameterEditDialog::addWidget(QLabel* label, QWidget* wg, QGridLayout* lo)
 {
-  //QHBoxLayout *hbl = new QHBoxLayout;
+  // QHBoxLayout *hbl = new QHBoxLayout;
   label->setMinimumWidth(125);
   label->setWordWrap(true);
-  //hbl->addWidget(label);
+  // hbl->addWidget(label);
   wg->setMinimumWidth(175);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-  //hbl->addWidget(wg);
-  //return hbl;
+  // hbl->addWidget(wg);
+  // return hbl;
   int row = lo->rowCount() + 1;
   lo->addWidget(label, row, 0);
   lo->addWidget(wg, row, 1);

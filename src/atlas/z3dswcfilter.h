@@ -19,11 +19,15 @@ namespace nim {
 
 class Z3DSwcFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum class InteractionMode
   {
-    Select, AddSwcNode, ConnectSwcNode, SmartExtendSwcNode
+    Select,
+    AddSwcNode,
+    ConnectSwcNode,
+    SmartExtendSwcNode
   };
 
   explicit Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
@@ -35,21 +39,31 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   bool isNodeRendering() const
-  { return m_renderingPrimitive.isSelected("Sphere"); }
+  {
+    return m_renderingPrimitive.isSelected("Sphere");
+  }
 
   void setInteractionMode(InteractionMode mode)
-  { m_interactionMode = mode; }
+  {
+    m_interactionMode = mode;
+  }
 
   inline InteractionMode interactionMode()
-  { return m_interactionMode; }
+  {
+    return m_interactionMode;
+  }
 
   bool hasOpaque(Z3DEye /*unused*/) const override
-  { return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line"); }
+  {
+    return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line");
+  }
 
   void renderOpaque(Z3DEye eye) override;
 
   bool hasTransparent(Z3DEye /*unused*/) const override
-  { return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line"); }
+  {
+    return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line");
+  }
 
   void renderTransparent(Z3DEye eye) override;
 
@@ -84,15 +98,15 @@ protected:
 
   void updateData();
 
-  //get bounding box of swc tree in world coordinate
+  // get bounding box of swc tree in world coordinate
   void treeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
-  //get bounding box of swc tree node in world coordinate
+  // get bounding box of swc tree node in world coordinate
   void treeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
   void notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& result) const;
 
-  //void updateAxisAlignedBoundBoxImpl() override;
+  // void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
 
   void addSelectionLines() override;
@@ -102,8 +116,7 @@ protected:
   void notTransformedTreeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const;
 
 private:
-  static glm::dvec3 projectPointOnRay(
-    const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
+  static glm::dvec3 projectPointOnRay(const glm::dvec3& pt, const glm::dvec3& v1, const glm::dvec3& v2);
 
   void addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc::ConstSwcTreeNode>& nodePair,
                        std::vector<glm::vec3>& lines);
@@ -151,4 +164,3 @@ private:
 };
 
 } // namespace nim
-

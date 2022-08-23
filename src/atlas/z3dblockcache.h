@@ -21,8 +21,9 @@ public:
     , m_numBlocks(numBlocks)
     , m_invalidKey(invalidKey)
   {
-    CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 &&
-           m_blockSize.x > 0 && m_blockSize.y > 0 && m_blockSize.z > 0) << blockSize << numBlocks;
+    CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 && m_blockSize.x > 0 && m_blockSize.y > 0 &&
+          m_blockSize.z > 0)
+      << blockSize << numBlocks;
 
     m_size = m_numBlocks.x * m_numBlocks.y * m_numBlocks.z;
     for (uint32_t z = 0; z < m_numBlocks.z; ++z) {
@@ -106,5 +107,3 @@ private:
 };
 
 } // namespace nim
-
-

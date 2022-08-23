@@ -19,7 +19,9 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_captureStereoImage("Stereo", false)
   , m_stereoImageType("Stereo Type")
   , m_useWindowSize("Use Window Size", false)
-  , m_customSize("Custom Image Size", glm::ivec2(3840, 2160), glm::ivec2(128, 128),
+  , m_customSize("Custom Image Size",
+                 glm::ivec2(3840, 2160),
+                 glm::ivec2(128, 128),
                  glm::ivec2(Z3DGpuInfo::instance().maxTextureSize()))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
   , m_startTime("Start", 0.0, 0.0, 99999.0)
@@ -66,31 +68,46 @@ void ZAnimationExportWidget::captureButtonPressed()
 
   if (m_is2DAnimation) {
     if (m_useWindowSize.get()) {
-      Q_EMIT export2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                               m_startTime.get(), m_endTime.get());
+      Q_EMIT export2DAnimation(m_filenameWidget->getSelectedSaveFile(),
+                               m_framePerSecond.get(),
+                               m_startTime.get(),
+                               m_endTime.get());
     } else {
       glm::ivec2 size = m_customSize.get();
-      Q_EMIT exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                                        m_startTime.get(), m_endTime.get(),
-                                        size.x, size.y);
+      Q_EMIT exportFixedSize2DAnimation(m_filenameWidget->getSelectedSaveFile(),
+                                        m_framePerSecond.get(),
+                                        m_startTime.get(),
+                                        m_endTime.get(),
+                                        size.x,
+                                        size.y);
     }
   } else {
     Z3DScreenShotType sst;
     if (m_captureStereoImage.get()) {
-      if (m_stereoImageType.isSelected("Half Side-By-Side"))
+      if (m_stereoImageType.isSelected("Half Side-By-Side")) {
         sst = Z3DScreenShotType::HalfSideBySideStereoView;
-      else
+      } else {
         sst = Z3DScreenShotType::FullSideBySideStereoView;
-    } else
+      }
+    } else {
       sst = Z3DScreenShotType::MonoView;
+    }
 
     if (m_useWindowSize.get()) {
-      Q_EMIT export3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                               m_startTime.get(), m_endTime.get(), sst);
+      Q_EMIT export3DAnimation(m_filenameWidget->getSelectedSaveFile(),
+                               m_framePerSecond.get(),
+                               m_startTime.get(),
+                               m_endTime.get(),
+                               sst);
     } else {
       glm::ivec2 size = m_customSize.get();
-      Q_EMIT exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(), m_framePerSecond.get(),
-                                        m_startTime.get(), m_endTime.get(), size.x, size.y, sst);
+      Q_EMIT exportFixedSize3DAnimation(m_filenameWidget->getSelectedSaveFile(),
+                                        m_framePerSecond.get(),
+                                        m_startTime.get(),
+                                        m_endTime.get(),
+                                        size.x,
+                                        size.y,
+                                        sst);
     }
   }
 }
@@ -181,13 +198,15 @@ void ZAnimationExportWidget::createWidget()
   int right;
   int bottom;
   hlo->getContentsMargins(&left, &top, &right, &bottom);
-  //hlo->setContentsMargins(left+20, top, right, bottom);
+  // hlo->setContentsMargins(left+20, top, right, bottom);
 
-  m_filenameWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "filename:",
+  m_filenameWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                           "filename:",
                                            tr("Video File (*.mp4 *.mov)"),
                                            QString("Animation/exportPath"),
                                            QString(),
-                                           QBoxLayout::LeftToRight, this);
+                                           QBoxLayout::LeftToRight,
+                                           this);
   hlo->addWidget(m_filenameWidget);
   lo->addLayout(hlo);
 

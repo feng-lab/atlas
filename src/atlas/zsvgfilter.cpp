@@ -30,8 +30,8 @@ void ZSvgFilter::setData(QSvgRenderer& svg)
   m_item->setOpacity(m_opacity.get());
   m_item->setTransform(getQTransform());
   m_item->setVisible((realZ() == 0 || m_view.isMaxZProjView()) && realT() == 0 && m_visible.get());
-  //if (svg.animated())
-    //connect(m_item->renderer(), &QSvgRenderer::repaintNeeded, [this](){ m_item->update(); });
+  // if (svg.animated())
+  // connect(m_item->renderer(), &QSvgRenderer::repaintNeeded, [this](){ m_item->update(); });
   m_view.scene().addItem(m_item.get());
 }
 

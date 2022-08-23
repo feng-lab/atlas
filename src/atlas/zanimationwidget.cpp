@@ -176,8 +176,9 @@ void ZAnimationWidget::keyPressEvent(QKeyEvent* event)
       break;
     case Qt::Key_Backspace:
     case Qt::Key_Delete:
-      if (event->modifiers() == Qt::NoModifier)
+      if (event->modifiers() == Qt::NoModifier) {
         m_timelineWidget->removeSelectedKeys();
+      }
       break;
     default:
       break;
@@ -198,9 +199,9 @@ void ZAnimationWidget::createWidget()
   m_gotoStartButton->setToolTip("Return to Start");
   hlo->addWidget(m_gotoStartButton);
 
-  //m_rewindButton = new QToolButton(this);
-  //m_rewindButton->setIcon(ZTheme::instance().icon(ZTheme::RewindIcon));
-  //hlo->addWidget(m_rewindButton);
+  // m_rewindButton = new QToolButton(this);
+  // m_rewindButton->setIcon(ZTheme::instance().icon(ZTheme::RewindIcon));
+  // hlo->addWidget(m_rewindButton);
 
   m_reversePlayButton = new QToolButton(this);
   m_reversePlayButton->setIcon(ZTheme::instance().icon(ZTheme::ReversePlayIcon));
@@ -214,9 +215,9 @@ void ZAnimationWidget::createWidget()
   m_playButton->setToolTip("Play/Pause");
   hlo->addWidget(m_playButton);
 
-  //m_fastForwardButton = new QToolButton(this);
-  //m_fastForwardButton->setIcon(ZTheme::instance().icon(ZTheme::FastForwardIcon));
-  //hlo->addWidget(m_fastForwardButton);
+  // m_fastForwardButton = new QToolButton(this);
+  // m_fastForwardButton->setIcon(ZTheme::instance().icon(ZTheme::FastForwardIcon));
+  // hlo->addWidget(m_fastForwardButton);
 
   m_gotoEndButton = new QToolButton(this);
   m_gotoEndButton->setIcon(ZTheme::instance().icon(ZTheme::GoToEndIcon));
@@ -257,15 +258,17 @@ void ZAnimationWidget::createWidget()
   m_exportWidget->setVisible(false);
   connect(m_timelineWidget, &ZTimelineWidget::exportButtonToggled, m_exportWidget, &ZAnimationExportWidget::setVisible);
   if (m_animation.is2DAnimation()) {
-    connect(m_exportWidget, &ZAnimationExportWidget::exportFixedSize2DAnimation,
-            &m_animation, &ZAnimation::exportFixedSize2DAnimation);
-    connect(m_exportWidget, &ZAnimationExportWidget::export2DAnimation,
-            &m_animation, &ZAnimation::export2DAnimation);
+    connect(m_exportWidget,
+            &ZAnimationExportWidget::exportFixedSize2DAnimation,
+            &m_animation,
+            &ZAnimation::exportFixedSize2DAnimation);
+    connect(m_exportWidget, &ZAnimationExportWidget::export2DAnimation, &m_animation, &ZAnimation::export2DAnimation);
   } else {
-    connect(m_exportWidget, &ZAnimationExportWidget::exportFixedSize3DAnimation,
-            &m_animation, &ZAnimation::exportFixedSize3DAnimation);
-    connect(m_exportWidget, &ZAnimationExportWidget::export3DAnimation,
-            &m_animation, &ZAnimation::export3DAnimation);
+    connect(m_exportWidget,
+            &ZAnimationExportWidget::exportFixedSize3DAnimation,
+            &m_animation,
+            &ZAnimation::exportFixedSize3DAnimation);
+    connect(m_exportWidget, &ZAnimationExportWidget::export3DAnimation, &m_animation, &ZAnimation::export3DAnimation);
   }
 
   hlo = new QHBoxLayout;

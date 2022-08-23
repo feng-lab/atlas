@@ -11,8 +11,7 @@ class ZImgVoxelColormap
 public:
   ZImgVoxelColormap()
     : m_min(0)
-  {
-  }
+  {}
 
   inline void setRange(TVoxel minData, TVoxel maxData)
   {
@@ -58,24 +57,37 @@ class ZQImagePack
   std::vector<QImage> m_qimages;
   std::vector<QPoint> m_locations;
   std::vector<double> m_scales;
+
 public:
   inline size_t numImages() const
-  { return m_qimages.size(); }
+  {
+    return m_qimages.size();
+  }
 
   inline QImage& image(size_t n)
-  { return m_qimages[n]; }
+  {
+    return m_qimages[n];
+  }
 
   inline QPoint& location(size_t n)
-  { return m_locations[n]; }
+  {
+    return m_locations[n];
+  }
 
   inline const QImage& image(size_t n) const
-  { return m_qimages[n]; }
+  {
+    return m_qimages[n];
+  }
 
   inline const QPoint& location(size_t n) const
-  { return m_locations[n]; }
+  {
+    return m_locations[n];
+  }
 
   inline double scale(size_t n) const
-  { return m_scales[n]; }
+  {
+    return m_scales[n];
+  }
 
   inline void addImage(const QImage& image, const QPoint& loc, double scale = 1.0)
   {
@@ -86,5 +98,3 @@ public:
 };
 
 } // namespace nim
-
-

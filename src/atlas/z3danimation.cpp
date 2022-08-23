@@ -5,7 +5,8 @@
 
 namespace nim {
 
-Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent) : ZAnimation(doc, parent)
+Z3DAnimation::Z3DAnimation(ZDoc& doc, QObject* parent)
+  : ZAnimation(doc, parent)
 {
   m_cameraParameterAnimation = new ZCameraParameterAnimation("Camera", QColor(0, 255, 0));
   m_globalParaAnimations.emplace_back(m_cameraParameterAnimation);

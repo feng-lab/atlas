@@ -21,71 +21,107 @@ class Z3DShaderProgram;
 // might throw exception
 class Z3DImg : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // Z3DVolume will take ownership of the img
   Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = nullptr);
 
   [[nodiscard]] const ZImgPack& imgPack() const
-  { return m_imgPack; }
+  {
+    return m_imgPack;
+  }
 
   [[nodiscard]] bool is2DData() const
-  { return m_imgPack.imgInfo().depth == 1; }
+  {
+    return m_imgPack.imgInfo().depth == 1;
+  }
 
   [[nodiscard]] bool is3DData() const
-  { return m_imgPack.imgInfo().depth > 1; }
+  {
+    return m_imgPack.imgInfo().depth > 1;
+  }
 
   [[nodiscard]] double minIntensity() const
-  { return m_imgPack.minIntensity(); }
+  {
+    return m_imgPack.minIntensity();
+  }
 
   [[nodiscard]] double maxsIntensity() const
-  { return m_imgPack.maxIntensity(); }
+  {
+    return m_imgPack.maxIntensity();
+  }
 
   [[nodiscard]] glm::uvec3 dimensions() const
-  { return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth); }
+  {
+    return glm::uvec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth);
+  }
 
   [[nodiscard]] size_t numChannels() const
-  { return m_nChannels; }
+  {
+    return m_nChannels;
+  }
 
   [[nodiscard]] col4 channelColor(size_t c) const
-  { return m_imgPack.imgInfo().channelColors[c]; }
+  {
+    return m_imgPack.imgInfo().channelColors[c];
+  }
 
   [[nodiscard]] bool isVolumeDownsampled() const
-  { return m_isVolumeDownsampled; }
+  {
+    return m_isVolumeDownsampled;
+  }
 
   [[nodiscard]] const std::vector<std::unique_ptr<Z3DVolume>>& volumes() const
-  { return m_volumes; }
+  {
+    return m_volumes;
+  }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   [[nodiscard]] QString samplerType() const;
 
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   [[nodiscard]] glm::vec3 physicalLUF() const
-  { return glm::vec3(0, 0, 0); }
+  {
+    return glm::vec3(0, 0, 0);
+  }
 
   [[nodiscard]] glm::vec3 physicalRDB() const
-  { return glm::max(glm::vec3(1, 1, 1),
-                    glm::vec3(m_imgPack.imgInfo().width - 1,
-                              m_imgPack.imgInfo().height - 1,
-                              m_imgPack.imgInfo().depth - 1)); }
+  {
+    return glm::max(
+      glm::vec3(1, 1, 1),
+      glm::vec3(m_imgPack.imgInfo().width - 1, m_imgPack.imgInfo().height - 1, m_imgPack.imgInfo().depth - 1));
+  }
 
   [[nodiscard]] glm::vec3 physicalLDF() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRDF() const
-  { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRUF() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalLUB() const
-  { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalLDB() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z);
+  }
 
   [[nodiscard]] glm::vec3 physicalRUB() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z);
+  }
 
   std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
 
@@ -94,15 +130,21 @@ public:
   std::vector<std::unique_ptr<Z3DVolume>> makeZSliceVolume(size_t z);
 
   [[nodiscard]] ZBBox<glm::dvec3> physicalBoundBox() const
-  { return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB())); }
+  {
+    return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB()));
+  }
 
   void setScale(const glm::vec3& scale);
 
   [[nodiscard]] size_t numLevels() const
-  { return m_numLevels; }
+  {
+    return m_numLevels;
+  }
 
   [[nodiscard]] size_t numCachedImages() const
-  { return m_imageCacheManager->size(); }
+  {
+    return m_imageCacheManager->size();
+  }
 
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader) const;
 
@@ -128,7 +170,7 @@ protected:
   glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  const int m_unmappedFlag = 0;  // 1 - 32*32*32(32768) means number of blocks mapped
+  const int m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
   const int m_emptyFlag = 40000;
 
   std::vector<glm::uvec4> m_pageDirectory;
@@ -154,14 +196,14 @@ protected:
   std::vector<float> m_voxelWorldSizes;
 
 private:
-  //std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
+  // std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;
   const ZImgPack& m_imgPack;
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
-  std::vector<std::vector<std::pair<glm::uvec3, glm::uvec4>>> m_channelPendingUpdates;  // block cache pos and block image pos
+  std::vector<std::vector<std::pair<glm::uvec3, glm::uvec4>>>
+    m_channelPendingUpdates; // block cache pos and block image pos
 };
 
 } // namespace nim
-

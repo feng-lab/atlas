@@ -31,9 +31,11 @@ class Z3DShaderProgram;
 
 class ZVertexArrayObject;
 
-class Z3DFilter : public QObject, public Z3DCanvasEventListener
+class Z3DFilter
+  : public QObject
+  , public Z3DCanvasEventListener
 {
-Q_OBJECT
+  Q_OBJECT
 
   friend class Z3DNetworkEvaluator;
 
@@ -53,20 +55,30 @@ public:
   explicit Z3DFilter(QObject* parent = nullptr);
 
   [[nodiscard]] QString className() const
-  { return metaObject()->className(); }
+  {
+    return metaObject()->className();
+  }
 
   void setName(const QString& name)
-  { m_name = name; }
+  {
+    m_name = name;
+  }
 
   [[nodiscard]] QString name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   // returns all parameters
   [[nodiscard]] const std::vector<ZParameter*>& parameters() const
-  { return m_parameters; }
+  {
+    return m_parameters;
+  }
 
   std::vector<ZParameter*>& parameters()
-  { return m_parameters; }
+  {
+    return m_parameters;
+  }
 
   // returns first parameter with the given name. return nullptr if not found
   [[nodiscard]] ZParameter* parameter(const QString& name) const;
@@ -80,18 +92,26 @@ public:
 
   // return all inputports or outputports as vector
   [[nodiscard]] const std::vector<Z3DInputPortBase*>& inputPorts() const
-  { return m_inputPorts; }
+  {
+    return m_inputPorts;
+  }
 
   [[nodiscard]] const std::vector<Z3DOutputPortBase*>& outputPorts() const
-  { return m_outputPorts; }
+  {
+    return m_outputPorts;
+  }
 
   void onEvent(QEvent* e, int w, int h) override;
 
   [[nodiscard]] const std::vector<ZEventListenerParameter*>& eventListeners() const
-  { return m_eventListeners; }
+  {
+    return m_eventListeners;
+  }
 
   [[nodiscard]] const std::vector<Z3DInteractionHandler*>& interactionHandlers() const
-  { return m_interactionHandlers; }
+  {
+    return m_interactionHandlers;
+  }
 
   // removes all port connections
   void disconnectAllPorts();
@@ -101,7 +121,9 @@ public:
   void write(json::object& json) const;
 
   inline void invalidateResult()
-  { invalidate(State::AllResultInvalid); }
+  {
+    invalidate(State::AllResultInvalid);
+  }
 
 Q_SIGNALS:
 
@@ -149,11 +171,9 @@ protected:
   // react to interaction
   void addInteractionHandler(Z3DInteractionHandler& handler);
 
-  virtual void enterInteractionMode()
-  {}
+  virtual void enterInteractionMode() {}
 
-  virtual void exitInteractionMode()
-  {}
+  virtual void exitInteractionMode() {}
 
   [[nodiscard]] bool isInInteractionMode() const;
 
@@ -206,4 +226,3 @@ protected:
 DECLARE_OPERATORS_FOR_ENUM(Z3DFilter::State)
 
 } // namespace nim
-

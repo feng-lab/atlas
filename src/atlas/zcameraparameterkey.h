@@ -20,49 +20,79 @@ public:
   ZCameraParameterKey(const ZCameraParameterKey& key);
 
   inline Z3DCameraParameter* para()
-  { return static_cast<Z3DCameraParameter*>(m_value.get()); }
+  {
+    return static_cast<Z3DCameraParameter*>(m_value.get());
+  }
 
   [[nodiscard]] inline glm::vec3 eye() const
-  { return static_cast<Z3DCameraParameter*>(m_value.get())->get().eye(); }
+  {
+    return static_cast<Z3DCameraParameter*>(m_value.get())->get().eye();
+  }
 
   [[nodiscard]] inline glm::quat rot() const
-  { return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono)); }
+  {
+    return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono));
+  }
 
   [[nodiscard]] float posTension() const
-  { return m_posTension; }
+  {
+    return m_posTension;
+  }
 
   void setPosTension(float v)
-  { m_posTension = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_posTension = std::min(std::max(v, -1.f), 1.f);
+  }
 
   [[nodiscard]] float posContinuity() const
-  { return m_posContinuity; }
+  {
+    return m_posContinuity;
+  }
 
   void setPosContinuity(float v)
-  { m_posContinuity = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_posContinuity = std::min(std::max(v, -1.f), 1.f);
+  }
 
   [[nodiscard]] float posBias() const
-  { return m_posBias; }
+  {
+    return m_posBias;
+  }
 
   void setPosBias(float v)
-  { m_posBias = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_posBias = std::min(std::max(v, -1.f), 1.f);
+  }
 
   [[nodiscard]] float rotTension() const
-  { return m_rotTension; }
+  {
+    return m_rotTension;
+  }
 
   void setRotTension(float v)
-  { m_rotTension = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_rotTension = std::min(std::max(v, -1.f), 1.f);
+  }
 
   [[nodiscard]] float rotContinuity() const
-  { return m_rotContinuity; }
+  {
+    return m_rotContinuity;
+  }
 
   void setRotContinuity(float v)
-  { m_rotContinuity = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_rotContinuity = std::min(std::max(v, -1.f), 1.f);
+  }
 
   [[nodiscard]] float rotBias() const
-  { return m_rotBias; }
+  {
+    return m_rotBias;
+  }
 
   void setRotBias(float v)
-  { m_rotBias = std::min(std::max(v, -1.f), 1.f); }
+  {
+    m_rotBias = std::min(std::max(v, -1.f), 1.f);
+  }
 
   bool readValue(const json::value& value) override;
 
@@ -78,4 +108,3 @@ protected:
 };
 
 } // namespace nim
-

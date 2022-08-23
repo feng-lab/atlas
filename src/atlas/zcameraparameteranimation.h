@@ -14,7 +14,8 @@ namespace nim {
 
 class ZCameraParameterAnimation : public ZParameterAnimation
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZCameraParameterAnimation(const QString& name,
                                      const QColor& color = QColor(ZRandom::instance().randInt(255),
@@ -23,7 +24,9 @@ public:
                                      QObject* parent = nullptr);
 
   ZStringIntOptionParameter& interpolationMethodPara()
-  { return m_interpolationMethod; }
+  {
+    return m_interpolationMethod;
+  }
 
   // create a new key based on current view
   [[nodiscard]] std::unique_ptr<ZParameterKey> createKey(double secs) const override;
@@ -108,10 +111,14 @@ protected:
     void invertIntegral(float fS, size_t& riI, float& rfU);
 
     [[nodiscard]] float startTime() const
-    { return keys[0]->time(); }
+    {
+      return keys[0]->time();
+    }
 
     [[nodiscard]] float endTime() const
-    { return keys[keys.size() - 1]->time(); }
+    {
+      return keys[keys.size() - 1]->time();
+    }
 
     void swap(SplineRange& rhs) noexcept;
 
@@ -129,5 +136,4 @@ protected:
   ZStringIntOptionParameter m_interpolationMethod;
 };
 
-}  // namespace nim
-
+} // namespace nim

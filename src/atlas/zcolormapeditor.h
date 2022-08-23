@@ -16,7 +16,8 @@ class ZColorMapParameter;
 
 class ZColorMapWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZColorMapWidget(ZColorMapParameter* colorMap, QWidget* parent = nullptr);
 
@@ -76,7 +77,8 @@ private:
 
 class ZColorMapEditor : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZColorMapEditor(ZColorMapParameter* colorMap, QWidget* parent = nullptr);
 
@@ -108,4 +110,3 @@ private:
 };
 
 } // namespace nim
-

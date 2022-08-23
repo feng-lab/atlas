@@ -14,12 +14,15 @@ class ZRegionAnnotation;
 
 class ZChooseRegionDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZChooseRegionDialog(const ZRegionAnnotation& ra, QWidget* parent = nullptr);
 
   [[nodiscard]] size_t selectedID() const
-  { return m_selectedID; }
+  {
+    return m_selectedID;
+  }
 
 protected:
   void createWidget();
@@ -37,6 +40,3 @@ private:
 };
 
 } // namespace nim
-
-
-

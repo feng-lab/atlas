@@ -8,8 +8,7 @@ namespace nim {
 ZPunctaTableModel::ZPunctaTableModel(ZPunctaPack& p, QObject* parent)
   : QAbstractTableModel(parent)
   , m_puncta(p)
-{
-}
+{}
 
 QVariant ZPunctaTableModel::data(const QModelIndex& index, int role) const
 {
@@ -49,8 +48,7 @@ QVariant ZPunctaTableModel::data(const QModelIndex& index, int role) const
   return QVariant();
 }
 
-QVariant ZPunctaTableModel::headerData(int section, Qt::Orientation orientation,
-                                       int role) const
+QVariant ZPunctaTableModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
     switch (section) {
@@ -139,9 +137,7 @@ void ZPunctaTableModel::clicked(const QModelIndex& /*idxIn*/)
   //  }
 }
 
-void ZPunctaTableModel::doubleClicked(const QModelIndex& /*unused*/)
-{
-}
+void ZPunctaTableModel::doubleClicked(const QModelIndex& /*unused*/) {}
 
 void ZPunctaTableModel::activated(const QModelIndex& /*idxIn*/)
 {
@@ -159,4 +155,3 @@ void ZPunctaTableModel::updateModel()
 }
 
 } // namespace nim
-

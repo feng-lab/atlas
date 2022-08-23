@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DRegionAnnotationFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
@@ -25,10 +26,14 @@ public:
   void renderTransparent(Z3DEye eye) override;
 
   [[nodiscard]] bool hasOpaque(Z3DEye /*unused*/) const override
-  { return true; }
+  {
+    return true;
+  }
 
   [[nodiscard]] bool hasTransparent(Z3DEye /*unused*/) const override
-  { return true; }
+  {
+    return true;
+  }
 
   void setViewport(glm::uvec2 viewport) override;
 
@@ -51,7 +56,7 @@ protected:
 
   void deregisterPickingObjects() override;
 
-  //void updateAxisAlignedBoundBoxImpl() override;
+  // void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
 
   void showAllRegions();
@@ -75,4 +80,3 @@ private:
 };
 
 } // namespace nim
-

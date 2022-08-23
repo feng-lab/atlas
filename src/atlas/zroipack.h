@@ -17,7 +17,8 @@ class ZROIDoc;
 
 class ZROIPack : public ZObjPack
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZROIPack(ZROI* roi, const QString& path, size_t id, ZROIDoc& pd, QObject* parent = nullptr);
 
@@ -28,22 +29,34 @@ public:
   const QString& info() const;
 
   inline const QString& name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline const QString& tooltip() const
-  { return m_tooltip; }
+  {
+    return m_tooltip;
+  }
 
   inline const QString& path() const
-  { return m_path; }
+  {
+    return m_path;
+  }
 
   QUndoStack* undoStack()
-  { return m_roi->undoStack(); }
+  {
+    return m_roi->undoStack();
+  }
 
   void setHasUnsavedChange(bool v)
-  { m_hasUnsavedChange = v; }
+  {
+    m_hasUnsavedChange = v;
+  }
 
   bool hasUnsavedChange() const
-  { return m_hasUnsavedChange; }
+  {
+    return m_hasUnsavedChange;
+  }
 
   QMenu& contextMenu();
 
@@ -52,16 +65,21 @@ public:
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
   inline const ZROI& roi() const
-  { return *m_roi; }
+  {
+    return *m_roi;
+  }
 
   inline ZROI& roi()
-  { return *m_roi; }
+  {
+    return *m_roi;
+  }
 
   ZBBox<glm::ivec4> boundBox() const
-  { return m_roi->boundBox(); }
+  {
+    return m_roi->boundBox();
+  }
 
 protected:
-
   void updatePtsAndSelectedPuncta();
 
   void createContextMenu();
@@ -84,6 +102,7 @@ protected:
   QMenu m_contextMenu;
 
   // derived data
+
 private:
   mutable QString m_info;
   QString m_name;
@@ -91,5 +110,3 @@ private:
 };
 
 } // namespace nim
-
-

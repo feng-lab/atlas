@@ -17,17 +17,24 @@ class ZDoc;
 
 class ZChooseObjDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection, QWidget* parent = nullptr);
 
   ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWidget* parent = nullptr);
 
   [[nodiscard]] size_t selectedID() const
-  { CHECK(!m_multipleSelection); return m_selectedIDs.empty() ? 0 : m_selectedIDs[0]; }
+  {
+    CHECK(!m_multipleSelection);
+    return m_selectedIDs.empty() ? 0 : m_selectedIDs[0];
+  }
 
   [[nodiscard]] const std::vector<size_t>& selectedIDs() const
-  { CHECK(m_multipleSelection); return m_selectedIDs; }
+  {
+    CHECK(m_multipleSelection);
+    return m_selectedIDs;
+  }
 
 protected:
   void createWidget();
@@ -48,4 +55,3 @@ private:
 };
 
 } // namespace nim
-

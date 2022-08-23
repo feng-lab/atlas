@@ -12,9 +12,15 @@ namespace nim {
 struct ZAnalysisTextFileInput
 {
   ZAnalysisTextFileInput()
-    : voxelSizeX(-1), voxelSizeY(-1), voxelSizeZ(-1)
-    , dendriteChannel(-1), axonChannel(-1), maxDistToBranch(2.5), bluenessExtend(2.5)
-    , doPyramidalFunctionalSeparation(false), doPyramidalSubclassSeparation(false)
+    : voxelSizeX(-1)
+    , voxelSizeY(-1)
+    , voxelSizeZ(-1)
+    , dendriteChannel(-1)
+    , axonChannel(-1)
+    , maxDistToBranch(2.5)
+    , bluenessExtend(2.5)
+    , doPyramidalFunctionalSeparation(false)
+    , doPyramidalSubclassSeparation(false)
   {}
 
   QString imgFilename;
@@ -22,9 +28,9 @@ struct ZAnalysisTextFileInput
   QString punctaFilename;
 
   // image info
-  double voxelSizeX;   // in um
-  double voxelSizeY;   // in um
-  double voxelSizeZ;   // in um
+  double voxelSizeX; // in um
+  double voxelSizeY; // in um
+  double voxelSizeZ; // in um
 
   int dendriteChannel;
   int axonChannel;
@@ -42,6 +48,7 @@ class ZGenerateAnalysisTextFile
 {
   using SwcTreeNode = ZSwc::Iterator;
   using ConstSwcTreeNode = ZSwc::ConstIterator;
+
 public:
   ZGenerateAnalysisTextFile() = default;
 
@@ -53,13 +60,19 @@ public:
 
   // must set if img file don't contain resolution
   void setVoxelSizeXInUm(double x)
-  { m_input.voxelSizeX = x; }
+  {
+    m_input.voxelSizeX = x;
+  }
 
   void setVoxelSizeYInUm(double y)
-  { m_input.voxelSizeY = y; }
+  {
+    m_input.voxelSizeY = y;
+  }
 
   void setVoxelSizeZInUm(double z)
-  { m_input.voxelSizeZ = z; }
+  {
+    m_input.voxelSizeZ = z;
+  }
 
   void setVoxelSizeInUm(double x, double y, double z)
   {
@@ -70,33 +83,47 @@ public:
 
   // must set
   void setDendriteChannel(size_t c)
-  { m_input.dendriteChannel = c; }
+  {
+    m_input.dendriteChannel = c;
+  }
 
   // optional, if set, will calculate blueness
   void setAxonChannel(size_t c)
-  { m_input.axonChannel = c; }
+  {
+    m_input.axonChannel = c;
+  }
 
   // default is 2.5um, valid range of puncta
   // puncta within this distance to branch are considered as belong to
   // this dendrite branch
   void setMaxDistToBranchInUm(double d)
-  { m_input.maxDistToBranch = d; }
+  {
+    m_input.maxDistToBranch = d;
+  }
 
   // extend branch diameter to calculate blueness, default is 2.5um
   void setBluenessExtend(double d)
-  { m_input.bluenessExtend = d; }
+  {
+    m_input.bluenessExtend = d;
+  }
 
   // optional, default create a subfolder with same name as swc in swc file folder
   void setOutputFolder(const QString& folder)
-  { m_input.outputFolder = folder.trimmed(); }
+  {
+    m_input.outputFolder = folder.trimmed();
+  }
 
   // also do pyramidal functional branch analysis, default is false, swc will be converted to pyramidal
   void setDoPyramidalFunctionalSeparation(bool v)
-  { m_input.doPyramidalFunctionalSeparation = v; }
+  {
+    m_input.doPyramidalFunctionalSeparation = v;
+  }
 
   // also do pyramidal subclass branch analysis, default is false, swc will be converted to pyramidal
   void setDoPyramidalSubclassSeparation(bool v)
-  { m_input.doPyramidalSubclassSeparation = v; }
+  {
+    m_input.doPyramidalSubclassSeparation = v;
+  }
 
   void generate(const QString& imgFilename, const QString& swcFilename, const QString& punctaFilename);
 
@@ -115,28 +142,35 @@ protected:
 
   void getLayerFeature(const ZSwc& tree, const ZSwc& layerTree, std::map<ConstSwcTreeNode, size_t>& nodeToLayer) const;
 
-  void getSubclassFeature(const ZSwc& tree, const ZSwc& subclassTree,
+  void getSubclassFeature(const ZSwc& tree,
+                          const ZSwc& subclassTree,
                           std::map<ConstSwcTreeNode, size_t>& nodeToSubclass) const;
 
-  void writeFeatureSwc(const ZSwc& tree, const std::map<ConstSwcTreeNode, double>& nodeToFeature,
+  void writeFeatureSwc(const ZSwc& tree,
+                       const std::map<ConstSwcTreeNode, double>& nodeToFeature,
                        const QString& outSwcName) const;
 
   // return point to swc segment distance in um
-  double pointFrustumConeDist(double x, double y, double z,
-                              const ConstSwcTreeNode& start, const ConstSwcTreeNode& end,
+  double pointFrustumConeDist(double x,
+                              double y,
+                              double z,
+                              const ConstSwcTreeNode& start,
+                              const ConstSwcTreeNode& end,
                               double* frac = nullptr) const;
 
   double pointSphereDist(double x, double y, double z, const ConstSwcTreeNode& tn) const;
 
   double punctaFrustumConeDist(const ZPunctum& punctum,
-                               const ConstSwcTreeNode& start, const ConstSwcTreeNode& end,
+                               const ConstSwcTreeNode& start,
+                               const ConstSwcTreeNode& end,
                                double* frac = nullptr) const;
 
   double treeNodeDist(const ConstSwcTreeNode& tn, const ConstSwcTreeNode& ptn) const;
 
   bool inputSwcIsPyramidal() const;
 
-  void mergeSoma(ZSwc& tree, std::map<ConstSwcTreeNode, double>& nodeToBlueness,
+  void mergeSoma(ZSwc& tree,
+                 std::map<ConstSwcTreeNode, double>& nodeToBlueness,
                  std::map<ConstSwcTreeNode, size_t>& nodeToLayer) const;
 
   void removeSmallLeafBranch(ZSwc& tree, int numNodeThre, double lengthThre) const; // lengthThre in um
@@ -146,11 +180,12 @@ protected:
   struct Branch
   {
     Branch()
-      : id(0), length(0.0)
+      : id(0)
+      , length(0.0)
     {}
 
     size_t id;
-    double length;  // in um
+    double length; // in um
     std::vector<ConstSwcTreeNode> nodes;
   };
 
@@ -164,18 +199,21 @@ protected:
                      std::vector<Branch>& branches) const;
 
   // punctum belongs to returned tree node and its parent
-  ConstSwcTreeNode getNodeSegOfPunctum(const ZSwc& tree, const ZPunctum& punctum, size_t numBranches,
+  ConstSwcTreeNode getNodeSegOfPunctum(const ZSwc& tree,
+                                       const ZPunctum& punctum,
+                                       size_t numBranches,
                                        const std::map<ConstSwcTreeNode, size_t>& nodeToBranchId) const;
 
-  ConstSwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
-                                                const std::vector<ConstSwcTreeNode>& nodes) const;
+  ConstSwcTreeNode
+  intensityWeightedNearestNode(double x, double y, double z, const std::vector<ConstSwcTreeNode>& nodes) const;
 
   ConstSwcTreeNode nearestNode(double x, double y, double z, const std::vector<ConstSwcTreeNode>& nodes) const;
 
   // go to subfolder, create if neccessary
   QDir getSubDir(const QString& subFoldername) const;
 
-  void generateAnalysisFiles(const ZSwc& tree, const std::map<ConstSwcTreeNode, double>& nodeToBlueness,
+  void generateAnalysisFiles(const ZSwc& tree,
+                             const std::map<ConstSwcTreeNode, double>& nodeToBlueness,
                              const std::map<ConstSwcTreeNode, size_t>& nodeToLayer,
                              const std::map<ConstSwcTreeNode, size_t>& nodeToSubclass) const;
 
@@ -189,4 +227,3 @@ private:
 };
 
 } // namespace nim
-

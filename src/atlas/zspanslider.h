@@ -8,10 +8,16 @@ namespace nim {
 
 class ZSpanSliderWithSpinBox : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZSpanSliderWithSpinBox(int lowerValue, int upperValue, int min, int max, int singleStep = 1,
-                                  bool tracking = true, QWidget* parent = nullptr);
+  explicit ZSpanSliderWithSpinBox(int lowerValue,
+                                  int upperValue,
+                                  int min,
+                                  int max,
+                                  int singleStep = 1,
+                                  bool tracking = true,
+                                  QWidget* parent = nullptr);
 
   void setLowerValue(int lower);
 
@@ -26,8 +32,7 @@ Q_SIGNALS:
   void upperValueChanged(int upper);
 
 private:
-  void createWidget(int lowerValue, int upperValue, int min, int max, int singleStep,
-                    bool tracking);
+  void createWidget(int lowerValue, int upperValue, int min, int max, int singleStep, bool tracking);
 
   void lowerValueChangedFromSlider(int l);
 
@@ -45,11 +50,17 @@ private:
 
 class ZDoubleSpanSliderWithSpinBox : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZDoubleSpanSliderWithSpinBox(double lowerValue, double upperValue, double min, double max,
+  explicit ZDoubleSpanSliderWithSpinBox(double lowerValue,
+                                        double upperValue,
+                                        double min,
+                                        double max,
                                         double singleStep = .01,
-                                        int decimal = 3, bool tracking = true, QWidget* parent = nullptr);
+                                        int decimal = 3,
+                                        bool tracking = true,
+                                        QWidget* parent = nullptr);
 
   void setLowerValue(double lower);
 
@@ -89,4 +100,3 @@ private:
 };
 
 } // namespace nim
-

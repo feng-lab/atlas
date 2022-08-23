@@ -17,9 +17,13 @@
 
 namespace nim {
 
-ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height, double voxelSizeXInUm,
-                                                   double viewScale, double transformScale,
-                                                   const QRectF& viewPort, const glm::vec3& color,
+ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length,
+                                                   double height,
+                                                   double voxelSizeXInUm,
+                                                   double viewScale,
+                                                   double transformScale,
+                                                   const QRectF& viewPort,
+                                                   const glm::vec3& color,
                                                    QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_lengthInUm(length)
@@ -30,8 +34,7 @@ ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height,
   , m_viewPort(viewPort)
   , m_viewPortPos(.8, .8)
 {
-  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
-           QGraphicsItem::ItemIsSelectable);
+  setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
 
   setToolTip(QString("length: %1 µm (voxel size: %2 µm)").arg(m_lengthInUm).arg(m_voxelSizeXInUm));
   setColor(color);
@@ -43,18 +46,18 @@ ZImgScaleBarGraphicsItem::ZImgScaleBarGraphicsItem(double length, double height,
 QVariant ZImgScaleBarGraphicsItem::itemChange(QGraphicsItem::GraphicsItemChange change, const QVariant& value)
 {
   if (change == ItemPositionChange && scene()) {
-    //LOG(INFO) << value.toPointF();
+    // LOG(INFO) << value.toPointF();
     QPointF newPos = value.toPointF();
-    //LOG(INFO) << mapFromScene(newPos);
-    //auto vp = mapRectFromScene(m_viewPort);
-    //LOG(INFO) << m_viewPort.topLeft() << m_viewPort.bottomRight() << vp.topLeft() << vp.bottomRight();
+    // LOG(INFO) << mapFromScene(newPos);
+    // auto vp = mapRectFromScene(m_viewPort);
+    // LOG(INFO) << m_viewPort.topLeft() << m_viewPort.bottomRight() << vp.topLeft() << vp.bottomRight();
     newPos = QPointF(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())),
                      qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
-//    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
-//    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
+    //    newPos.setX(qMin(m_viewPort.right(), qMax(newPos.x(), m_viewPort.left())));
+    //    newPos.setY(qMin(m_viewPort.bottom(), qMax(newPos.y(), m_viewPort.top())));
     m_viewPortPos.x = (newPos.x() - m_viewPort.left()) / m_viewPort.width();
     m_viewPortPos.y = (newPos.y() - m_viewPort.top()) / m_viewPort.height();
-    //LOG(INFO) << newPos;
+    // LOG(INFO) << newPos;
     return newPos;
   }
   return QGraphicsRectItem::itemChange(change, value);
@@ -142,7 +145,8 @@ void ZImgFilter::setData(ZImgPack& pack)
     m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(
       QString("%1 Display Range").arg(m_imgPack->imgInfo().displayChannelName(c)),
       dr,
-      m_imgPack->rangeMin(), m_imgPack->rangeMax()));
+      m_imgPack->rangeMin(),
+      m_imgPack->rangeMax()));
     if (m_imgPack->imgInfo().voxelFormat != VoxelFormat::Float) {
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setDecimal(0);
       m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setSingleStep(1);
@@ -152,14 +156,21 @@ void ZImgFilter::setData(ZImgPack& pack)
                                        glm::vec3(m_imgPack->imgInfo().channelColors[c].r / 255.,
                                                  m_imgPack->imgInfo().channelColors[c].g / 255.,
                                                  m_imgPack->imgInfo().channelColors[c].b / 255.),
-                                       glm::vec3(0.f), glm::vec3(1.f)));
+                                       glm::vec3(0.f),
+                                       glm::vec3(1.f)));
     m_channelColorParas[c]->setStyle("COLOR");
-    connect(m_channelVisibleParas[c].get(), &ZBoolParameter::boolChanged, m_doubleChannelRangeParas[c].get(),
+    connect(m_channelVisibleParas[c].get(),
+            &ZBoolParameter::boolChanged,
+            m_doubleChannelRangeParas[c].get(),
             &ZDoubleSpanParameter::setEnabled);
-    connect(m_channelVisibleParas[c].get(), &ZBoolParameter::boolChanged, m_channelColorParas[c].get(),
+    connect(m_channelVisibleParas[c].get(),
+            &ZBoolParameter::boolChanged,
+            m_channelColorParas[c].get(),
             &ZVec3Parameter::setEnabled);
     connect(m_channelVisibleParas[c].get(), &ZBoolParameter::valueChanged, this, &ZImgFilter::channelVisibleChanged);
-    connect(m_doubleChannelRangeParas[c].get(), &ZDoubleSpanParameter::valueChanged, this,
+    connect(m_doubleChannelRangeParas[c].get(),
+            &ZDoubleSpanParameter::valueChanged,
+            this,
             &ZImgFilter::channelRangeChanged);
     connect(m_channelColorParas[c].get(), &ZVec3Parameter::valueChanged, this, &ZImgFilter::channelColorChanged);
 
@@ -187,7 +198,7 @@ void ZImgFilter::setData(ZImgPack& pack)
   for (size_t c = 0; c < m_imgPack->imgInfo().numChannels; ++c) {
     m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
     m_display->setChannelColor(c, m_imgPack->imgInfo().channelColors[c]);
-    //m_display->setAlpha(m_opacity.get());
+    // m_display->setAlpha(m_opacity.get());
 
     addParameter(m_channelVisibleParas[c].get());
     addParameter(m_channelColorParas[c].get());
@@ -237,8 +248,8 @@ void ZImgFilter::setNormalView(int z, int t)
   bool isVisibleBefore = m_isVisible;
   auto logicalZ = realZ(z);
   auto logicalT = realT(t);
-  m_sliceValid = logicalT >= 0 && logicalT < int(m_imgPack->imgInfo().numTimes) &&
-                 logicalZ >= 0 && logicalZ < int(m_imgPack->imgInfo().depth);
+  m_sliceValid = logicalT >= 0 && logicalT < int(m_imgPack->imgInfo().numTimes) && logicalZ >= 0 &&
+                 logicalZ < int(m_imgPack->imgInfo().depth);
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 
   m_display->setSlice(logicalZ);
@@ -427,8 +438,9 @@ void ZImgFilter::channelVisibleChanged()
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelVisibleParas.size(); ++c) {
-      if (m_channelVisibleParas[c].get() == para)
+      if (m_channelVisibleParas[c].get() == para) {
         break;
+      }
     }
     if (m_channelVisibleParas[c]->get()) {
       m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
@@ -454,10 +466,11 @@ void ZImgFilter::channelRangeChanged()
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_doubleChannelRangeParas.size(); ++c) {
-      if (m_doubleChannelRangeParas[c].get() == para)
+      if (m_doubleChannelRangeParas[c].get() == para) {
         break;
+      }
     }
-    if (m_channelVisibleParas[c]->get()) {  // only redraw if this channel is visible
+    if (m_channelVisibleParas[c]->get()) { // only redraw if this channel is visible
       m_display->showChannel(c, getLowerChannelRange(c), getUpperChannelRange(c));
       m_displayValid = false;
     }
@@ -475,10 +488,11 @@ void ZImgFilter::channelColorChanged()
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelColorParas.size(); ++c) {
-      if (m_channelColorParas[c].get() == para)
+      if (m_channelColorParas[c].get() == para) {
         break;
+      }
     }
-    if (m_channelVisibleParas[c]->get()) {  // only redraw if this channel is visible
+    if (m_channelVisibleParas[c]->get()) { // only redraw if this channel is visible
       col4 col(para->get().r * 255, para->get().g * 255, para->get().b * 255);
       m_display->setChannelColor(c, col);
       m_displayValid = false;
@@ -495,21 +509,21 @@ void ZImgFilter::channelColorChanged()
 
 void ZImgFilter::opacityChanged()
 {
-  //for (const auto& item : m_imgItems) {
-  //  item->setOpacity(m_opacity.get());
-  //}
+  // for (const auto& item : m_imgItems) {
+  //   item->setOpacity(m_opacity.get());
+  // }
   if (m_item) {
     m_item->setOpacity(m_opacity.get());
   }
-//  m_display->setAlpha(m_opacity.get());
-//  if (m_maxZProjDisplay)
-//    m_maxZProjDisplay->setAlpha(m_opacity.get());
-//  m_displayValid = false;
-//  if (!m_isVisible) {
-//    destroyImgItems(); // will create new one next time
-//  } else {
-//    updateImgItems();
-//  }
+  //  m_display->setAlpha(m_opacity.get());
+  //  if (m_maxZProjDisplay)
+  //    m_maxZProjDisplay->setAlpha(m_opacity.get());
+  //  m_displayValid = false;
+  //  if (!m_isVisible) {
+  //    destroyImgItems(); // will create new one next time
+  //  } else {
+  //    updateImgItems();
+  //  }
 }
 
 void ZImgFilter::mipRangeChanged()
@@ -540,9 +554,9 @@ void ZImgFilter::visibleChanged()
 
 void ZImgFilter::hideImgItems()
 {
-  //for (size_t i = 0; i < m_imgItems.size(); ++i) {
-  //  m_imgItems[i]->setVisible(false);
-  //}
+  // for (size_t i = 0; i < m_imgItems.size(); ++i) {
+  //   m_imgItems[i]->setVisible(false);
+  // }
   if (m_item) {
     m_item->setVisible(false);
   }
@@ -558,12 +572,11 @@ void ZImgFilter::updateImgItems()
 {
   CHECK(m_isVisible);
 
-  //LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
-  if (!m_imgItems.empty() && m_displayValid &&
-      m_lastMIP == m_view.isMaxZProjView() && m_lastSlice == m_view.currentSlice() &&
-      m_lastTime == m_view.currentTime()) {
-    //LOG(INFO) << "0";
-    // pixmap is same, we only need to show it
+  // LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
+  if (!m_imgItems.empty() && m_displayValid && m_lastMIP == m_view.isMaxZProjView() &&
+      m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
+    // LOG(INFO) << "0";
+    //  pixmap is same, we only need to show it
     if (m_item && !m_item->isVisible()) {
       m_item->setVisible(true);
     }
@@ -579,7 +592,7 @@ void ZImgFilter::updateImgItems()
     const ZQImagePack& qImagePack = m_display->toQImagePack();
     for (size_t i = 0; i < qImagePack.numImages(); ++i) {
       m_imgItems.push_back(new QGraphicsPixmapItem(QPixmap::fromImage(qImagePack.image(i))));
-      //m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
+      // m_imgItems[i]->setFlag(QGraphicsItem::ItemIsSelectable, true);
       m_imgItems[i]->setScale(qImagePack.scale(i));
       m_imgItems[i]->setPos(QPointF(qImagePack.location(i)));
       m_imgItems[i]->setOpacity(m_opacity.get());
@@ -611,9 +624,13 @@ double ZImgFilter::getUpperChannelRange(size_t c) const
 void ZImgFilter::viewportChanged()
 {
   QRectF vp = mapFromSceneRect(m_view.currentViewport());
-  if (m_imgPack->needUpdate(vp, m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y),
-                            m_lastViewport, m_lastScale,
-                            realT(), realZ(), m_view.isMaxZProjView())) {
+  if (m_imgPack->needUpdate(vp,
+                            m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y),
+                            m_lastViewport,
+                            m_lastScale,
+                            realT(),
+                            realZ(),
+                            m_view.isMaxZProjView())) {
     if (!m_isVisible) {
       destroyImgItems(); // will create new one next time
     } else {
@@ -621,8 +638,9 @@ void ZImgFilter::viewportChanged()
       updateImgItems();
     }
   }
-  if (m_scaleBarItem)
+  if (m_scaleBarItem) {
     m_scaleBarItem->setViewPort(m_view.currentViewport());
+  }
 }
 
 void ZImgFilter::flipHorizontally()

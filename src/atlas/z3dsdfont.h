@@ -10,11 +10,28 @@ class Z3DSDFont
 public:
   struct CharInfo
   {
-    explicit CharInfo(int id_ = 0, int x_ = 0, int y_ = 0, int width_ = 0, int height_ = 0,
-                      float xoffset_ = 0.f, float yoffset_ = 0.f,
-                      float xadvance_ = 0.f, int page_ = 0, int chnl_ = 0, int texWidth = 1, int texHeight = 1)
-      : id(id_), x(x_), y(y_), width(width_), height(height_), xoffset(xoffset_), yoffset(yoffset_)
-      , xadvance(xadvance_), page(page_), chnl(chnl_)
+    explicit CharInfo(int id_ = 0,
+                      int x_ = 0,
+                      int y_ = 0,
+                      int width_ = 0,
+                      int height_ = 0,
+                      float xoffset_ = 0.f,
+                      float yoffset_ = 0.f,
+                      float xadvance_ = 0.f,
+                      int page_ = 0,
+                      int chnl_ = 0,
+                      int texWidth = 1,
+                      int texHeight = 1)
+      : id(id_)
+      , x(x_)
+      , y(y_)
+      , width(width_)
+      , height(height_)
+      , xoffset(xoffset_)
+      , yoffset(yoffset_)
+      , xadvance(xadvance_)
+      , page(page_)
+      , chnl(chnl_)
     {
       sMin = static_cast<float>(x) / static_cast<float>(texWidth);
       tMin = static_cast<float>(y + height) / static_cast<float>(texHeight);
@@ -43,13 +60,19 @@ public:
   Z3DSDFont(QString imageFileName, QString txtFileName);
 
   [[nodiscard]] inline QString fontName() const
-  { return m_fontName; }
+  {
+    return m_fontName;
+  }
 
   [[nodiscard]] inline int maxFontHeight() const
-  { return m_maxFontHeight; }
+  {
+    return m_maxFontHeight;
+  }
 
   [[nodiscard]] bool isEmpty() const
-  { return m_isEmpty; }
+  {
+    return m_isEmpty;
+  }
 
   [[nodiscard]] CharInfo charInfo(int id) const;
 
@@ -68,7 +91,7 @@ private:
   QString m_txtFileName;
 
   QString m_fontName;
-  bool m_isEmpty;   //if load image or txt failed, the font is empty
+  bool m_isEmpty; // if load image or txt failed, the font is empty
   std::vector<CharInfo> m_charInfos;
   int m_maxFontHeight;
 
@@ -76,4 +99,3 @@ private:
 };
 
 } // namespace nim
-

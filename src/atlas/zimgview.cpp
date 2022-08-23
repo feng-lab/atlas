@@ -19,16 +19,17 @@ QString ZImgView::infoOfPos(double x, double y)
   try {
     for (const auto& idFilter : m_idToFilter) {
       const ZImgFilter* viewControl = idFilter.second.get();
-      if (!viewControl->isVisible())
+      if (!viewControl->isVisible()) {
         continue;
+      }
       size_t id = idFilter.first;
       const ZImgPack& imgPack = m_doc.imgPack(id);
       QPointF p = idFilter.second->mapFromScene(QPointF(x, y));
       index_t lx = p.x();
       index_t ly = p.y();
-      if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width &&
-          ly >= 0 && static_cast<size_t>(ly) < imgPack.imgInfo().height) {
-        auto lz = m_view.isMaxZProjView() ? 0: viewControl->imgSlice();
+      if (lx >= 0 && static_cast<size_t>(lx) < imgPack.imgInfo().width && ly >= 0 &&
+          static_cast<size_t>(ly) < imgPack.imgInfo().height) {
+        auto lz = m_view.isMaxZProjView() ? 0 : viewControl->imgSlice();
         auto lt = viewControl->imgTime();
         info += imgPack.sizeInfo();
         if (imgPack.imgInfo().numTimes == 1) {
@@ -36,15 +37,22 @@ QString ZImgView::infoOfPos(double x, double y)
         } else {
           info += QString(" Coord: (%1,%2,%3,%4)").arg(lx).arg(ly).arg(lz).arg(lt);
         }
-        info += QString(" Intensity: (%1").arg(imgPack.displayValue(lx, ly, lz, 0, lt, m_view.isMaxZProjView()), 0, 'g',
-                                               QLocale::FloatingPointShortest);
-        for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c)
-          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()), 0, 'g',
+        info += QString(" Intensity: (%1")
+                  .arg(imgPack.displayValue(lx, ly, lz, 0, lt, m_view.isMaxZProjView()),
+                       0,
+                       'g',
+                       QLocale::FloatingPointShortest);
+        for (size_t c = 1; c < imgPack.imgInfo().numChannels; ++c) {
+          info += QString(",%1").arg(imgPack.displayValue(lx, ly, lz, c, lt, m_view.isMaxZProjView()),
+                                     0,
+                                     'g',
                                      QLocale::FloatingPointShortest);
+        }
         info += ")      ";
       }
     }
-  } catch (const ZException& e) {
+  }
+  catch (const ZException& e) {
     QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), e.what());
   }
   return info;

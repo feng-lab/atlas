@@ -29,8 +29,9 @@ void ZImgDoc::setImgChannelColor(size_t id, size_t c, col4 col)
 
 bool ZImgDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToImgPacks.at(id);
   if (!pack->isSequence() && ZImg::fileExtensionWriteSupported(pack->paths()[0])) {
@@ -186,11 +187,9 @@ bool ZImgDoc::isAlias(size_t id) const
 {
   CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
 
-  return std::any_of(m_idToImgPacks.begin(), m_idToImgPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToImgPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToImgPacks.begin(), m_idToImgPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToImgPacks.at(id);
+  });
 }
 
 void ZImgDoc::loadImg()
@@ -209,7 +208,8 @@ void ZImgDoc::loadImg()
     auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadImg(dialog.selectedFiles().at(i), formats[fmtIdx], errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read image.\n" + errorMsg);
       }
     }
@@ -221,12 +221,14 @@ void ZImgDoc::importImgSequence()
   ZLoadImageSequenceDialog dlg("Load Sequence Images", QApplication::activeWindow());
   if (dlg.exec() == QDialog::Accepted) {
     QStringList files = dlg.selectedFiles();
-    if (files.empty())
+    if (files.empty()) {
       return;
+    }
 
     QString errorMsg;
-    if (!loadImg(files, dlg.alongDimension(), dlg.catScences(),FileFormat::Unknown, errorMsg)) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+    if (!loadImg(files, dlg.alongDimension(), dlg.catScences(), FileFormat::Unknown, errorMsg)) {
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             "Can not load image sequence.\n" + errorMsg);
     }
   }
@@ -235,24 +237,27 @@ void ZImgDoc::importImgSequence()
 void ZImgDoc::stitchImgs()
 {
   ZStitchImageDialog stitchImageDialog(QApplication::activeWindow());
-  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady,
-          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
+  connect(&stitchImageDialog, &ZStitchImageDialog::resultReady, &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
   stitchImageDialog.exec();
 }
 
 void ZImgDoc::alignSections()
 {
   ZSectionsRegistrationDialog alignSectionsDialog(QApplication::activeWindow());
-  connect(&alignSectionsDialog, &ZSectionsRegistrationDialog::resultReady,
-          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
+  connect(&alignSectionsDialog,
+          &ZSectionsRegistrationDialog::resultReady,
+          &m_doc,
+          qOverload<const QString&>(&ZDoc::loadFile));
   alignSectionsDialog.exec();
 }
 
 void ZImgDoc::correctChromaticShift()
 {
   ZChromaticShiftCorrectionDialog chromaticShiftCorrectionDialog(QApplication::activeWindow());
-  connect(&chromaticShiftCorrectionDialog, &ZChromaticShiftCorrectionDialog::resultReady,
-          &m_doc, qOverload<const QString&>(&ZDoc::loadFile));
+  connect(&chromaticShiftCorrectionDialog,
+          &ZChromaticShiftCorrectionDialog::resultReady,
+          &m_doc,
+          qOverload<const QString&>(&ZDoc::loadFile));
   chromaticShiftCorrectionDialog.exec();
 }
 
@@ -275,8 +280,9 @@ size_t ZImgDoc::loadImg(const QString& fileName, FileFormat format, QString& err
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
       id = loadImg(fileName, s, format, errorMsg);
-      if (!id)
+      if (!id) {
         return 0;
+      }
     }
     return id;
   }
@@ -291,8 +297,9 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
   try {
     ZImgSource imgSource(fileName, ZImgRegion(), scene, format);
     for (const auto& idPack : m_idToImgPacks) {
-      if (idPack.second->imgSource() == imgSource)
+      if (idPack.second->imgSource() == imgSource) {
         return idPack.first;
+      }
     }
 
     size_t id = addImgPack(new ZImgPack(imgSource));
@@ -307,15 +314,17 @@ size_t ZImgDoc::loadImg(const QString& fileName, size_t scene, FileFormat format
   }
 }
 
-size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg)
+size_t
+ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg)
 {
   try {
     std::vector<ZImgInfo> infos = ZImg::readImgInfos(files, catDim, catScenes, nullptr, format, true);
     size_t id = 0;
     for (size_t s = 0; s < infos.size(); ++s) {
       id = loadImg(files, catDim, catScenes, s, format, errorMsg);
-      if (!id)
+      if (!id) {
         return 0;
+      }
     }
     return id;
   }
@@ -325,13 +334,19 @@ size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScen
   }
 }
 
-size_t ZImgDoc::loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg)
+size_t ZImgDoc::loadImg(const QStringList& files,
+                        Dimension catDim,
+                        bool catScenes,
+                        size_t scene,
+                        FileFormat format,
+                        QString& errorMsg)
 {
   try {
     ZImgSource imgSource(files, catDim, catScenes, ZImgRegion(), scene, format);
     for (const auto& idPack : m_idToImgPacks) {
-      if (idPack.second->imgSource() == imgSource)
+      if (idPack.second->imgSource() == imgSource) {
         return idPack.first;
+      }
     }
 
     size_t id = addImgPack(new ZImgPack(imgSource));
@@ -350,8 +365,9 @@ size_t ZImgDoc::loadImg(const ZImgSource& imgSource, QString& errorMsg)
 {
   try {
     for (const auto& idPack : m_idToImgPacks) {
-      if (idPack.second->imgSource() == imgSource)
+      if (idPack.second->imgSource() == imgSource) {
         return idPack.first;
+      }
     }
 
     size_t id = addImgPack(new ZImgPack(imgSource));
@@ -362,7 +378,8 @@ size_t ZImgDoc::loadImg(const ZImgSource& imgSource, QString& errorMsg)
   }
   catch (const ZException& e) {
     errorMsg = QString("Can not read image source start from %1: %2")
-      .arg((!imgSource.filenames.empty()) ? imgSource.filenames[0] : "").arg(e.what());
+                 .arg((!imgSource.filenames.empty()) ? imgSource.filenames[0] : "")
+                 .arg(e.what());
     return 0;
   }
 }
@@ -373,8 +390,9 @@ void ZImgDoc::sendChangedSignal(size_t id)
 
   auto& pack = m_idToImgPacks.at(id);
   for (const auto& idPack : m_idToImgPacks) {
-    if (idPack.second == pack)
+    if (idPack.second == pack) {
       Q_EMIT imgChanged(id);
+    }
   }
 }
 
@@ -401,8 +419,11 @@ void ZImgDoc::createActions()
   connect(m_correctChromaticShiftAction, &QAction::triggered, this, &ZImgDoc::correctChromaticShift);
 }
 
-bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format,
-                      const ZImgWriteParameters& paras, QString& errorMsg)
+bool ZImgDoc::saveImg(ZImgPack* pack,
+                      const QString& fileName,
+                      FileFormat format,
+                      const ZImgWriteParameters& paras,
+                      QString& errorMsg)
 {
   try {
     pack->save(fileName, format, paras);
@@ -420,8 +441,9 @@ bool ZImgDoc::saveImg(ZImgPack* pack, const QString& fileName, FileFormat format
 void ZImgDoc::packInfoUpdated(ZImgPack* pack)
 {
   for (const auto& idPack : m_idToImgPacks) {
-    if (idPack.second.get() == pack)
+    if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
   }
 }
 

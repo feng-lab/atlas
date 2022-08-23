@@ -12,11 +12,17 @@ class ZSpinBox;
 
 class ZSpinBoxWithScrollBar : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZSpinBoxWithScrollBar(int value, int min, int max, int step = 1,
-                                 bool tracking = true, const QString& prefix = "",
-                                 const QString& suffix = "", QWidget* parent = nullptr);
+  explicit ZSpinBoxWithScrollBar(int value,
+                                 int min,
+                                 int max,
+                                 int step = 1,
+                                 bool tracking = true,
+                                 const QString& prefix = "",
+                                 const QString& suffix = "",
+                                 QWidget* parent = nullptr);
 
   void setValue(int v);
 
@@ -27,8 +33,7 @@ Q_SIGNALS:
   void valueChanged(int);
 
 protected:
-  void createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
-                    const QString& suffix);
+  void createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix, const QString& suffix);
 
 private:
   void valueChangedFromScrollBar(int v);
@@ -42,4 +47,3 @@ private:
 };
 
 } // namespace nim
-

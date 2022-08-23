@@ -8,14 +8,17 @@ namespace nim {
 
 class Z3DLineRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // default use display list but not lighing in opengl mode
   explicit Z3DLineRenderer(Z3DRendererBase& rendererBase);
 
   // default false, must call before setData and setDataColor and setDataPickingColors
   void setLineStrip(bool v)
-  { m_isLineStrip = v; }
+  {
+    m_isLineStrip = v;
+  }
 
   virtual void setData(std::vector<glm::vec3>* linesInput);
 
@@ -34,7 +37,9 @@ public:
 
   // default true since glLineWidth only support 1 pixel width line from now on
   inline void setUseSmoothLine(bool v)
-  { m_useSmoothLine = v; }
+  {
+    m_useSmoothLine = v;
+  }
 
   inline void setLineWidth(float v)
   {
@@ -72,28 +77,30 @@ protected:
 
   void renderPicking(Z3DEye eye) override;
 
-  //void enableLineSmooth();
-  //void disableLineSmooth();
+  // void enableLineSmooth();
+  // void disableLineSmooth();
 
 private:
   void updateLineWidth()
   {
-    if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2"))
+    if (m_enableMultisample && m_rendererBase.geometriesMultisampleModePara().isSelected("2x2")) {
       m_lineWidth = (m_srcLineWidth - 0.9f) * 2.f;
-    else
+    } else {
       m_lineWidth = m_srcLineWidth - 0.9f;
+    }
 
     m_lineWidth *= m_rendererBase.globalParas().devicePixelRatio.get();
   }
 
   Z3DShaderGroup& currentShaderGrp()
   {
-    if (m_useGeomLineShader && m_useSmoothLine)
+    if (m_useGeomLineShader && m_useSmoothLine) {
       return m_smoothLineShaderGrp;
-    else if (m_useSmoothLine)
+    } else if (m_useSmoothLine) {
       return m_smoothLineShaderGrp1;
-    else
+    } else {
       return m_lineShaderGrp;
+    }
   }
 
 protected:
@@ -149,4 +156,3 @@ private:
 };
 
 } // namespace nim
-

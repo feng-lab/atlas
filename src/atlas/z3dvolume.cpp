@@ -7,8 +7,11 @@
 
 namespace nim {
 
-Z3DVolume::Z3DVolume(nim::ZImg& img, const glm::vec3& spacing,
-                     const glm::vec3& offset, const glm::mat4& transformation, QObject* parent)
+Z3DVolume::Z3DVolume(nim::ZImg& img,
+                     const glm::vec3& spacing,
+                     const glm::vec3& offset,
+                     const glm::mat4& transformation,
+                     QObject* parent)
   : QObject(parent)
   , m_histogramMaxValue(-1)
   , m_volColor(1.f, 1.f, 1.f)
@@ -39,8 +42,9 @@ int Z3DVolume::bitsStored() const
     return m_img.validBitCount() ? m_img.validBitCount() : 8;
   } else if (m_img.isType<uint16_t>()) {
     return m_img.validBitCount() ? m_img.validBitCount() : 16;
-  } else if (m_img.isType<float>())
+  } else if (m_img.isType<float>()) {
     return 32;
+  }
   return 0;
 }
 
@@ -51,28 +55,32 @@ size_t Z3DVolume::numVoxels() const
 
 QString Z3DVolume::samplerType() const
 {
-  if (m_dimensions.z > 1)
+  if (m_dimensions.z > 1) {
     return "sampler3D";
-  if (m_dimensions.y > 1 && m_dimensions.x > 1)
+  }
+  if (m_dimensions.y > 1 && m_dimensions.x > 1) {
     return "sampler2D";
+  }
 
   return "sampler1D";
 }
 
 double Z3DVolume::floatMinValue() const
 {
-  if (bitsStored() <= 16)
+  if (bitsStored() <= 16) {
     return m_minValue / ((1 << bitsStored()) - 1);
+  }
 
-  return minValue();   // already float image
+  return minValue(); // already float image
 }
 
 double Z3DVolume::floatMaxValue() const
 {
-  if (bitsStored() <= 16)
+  if (bitsStored() <= 16) {
     return m_maxValue / ((1 << bitsStored()) - 1);
+  }
 
-  return maxValue();   // already float image
+  return maxValue(); // already float image
 }
 
 double Z3DVolume::value(int x, int y, int z) const
@@ -87,8 +95,9 @@ double Z3DVolume::value(size_t index) const
 
 void Z3DVolume::asyncGenerateHistogram()
 {
-  if (hasHistogram() || m_histogramThread)
+  if (hasHistogram() || m_histogramThread) {
     return;
+  }
   m_histogramThread.reset(new Z3DVolumeHistogramThread(this));
   connect(m_histogramThread.get(), &Z3DVolumeHistogramThread::finished, this, &Z3DVolume::setHistogram);
   m_histogramThread->start();
@@ -104,10 +113,11 @@ size_t Z3DVolume::histogramBinCount() const
 
 size_t Z3DVolume::histogramValue(size_t index) const
 {
-  if (index < m_histogram.size())
+  if (index < m_histogram.size()) {
     return m_histogram[index];
-  else
+  } else {
     return 0;
+  }
 }
 
 size_t Z3DVolume::histogramValue(double fraction) const
@@ -168,8 +178,9 @@ ZBBox<glm::dvec3> Z3DVolume::worldBoundBox() const
 void Z3DVolume::setPhysicalToWorldMatrix(const glm::mat4& transformationMatrix)
 {
   m_transformationMatrix = transformationMatrix;
-  if (m_transformationMatrix != glm::mat4(1.0))
+  if (m_transformationMatrix != glm::mat4(1.0)) {
     m_hasTransformMatrix = true;
+  }
 }
 
 glm::mat4 Z3DVolume::voxelToWorldMatrix() const
@@ -240,9 +251,11 @@ void Z3DVolume::setHistogram()
 void Z3DVolume::generateTexture() const
 {
   if (dimensions().x == 0 || dimensions().y == 0 || dimensions().z == 0) {
-    QString message = QString(
-      "OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
-      .arg(m_img.width()).arg(m_img.height()).arg(m_img.depth());
+    QString message =
+      QString("OpenGL volumes must have a size greater than 0 in all dimensions. Actual size: (%1, %2, %3)")
+        .arg(m_img.width())
+        .arg(m_img.height())
+        .arg(m_img.depth());
     LOG(ERROR) << message;
     return;
   }
@@ -283,8 +296,7 @@ void Z3DVolume::computeHistogramMaxValue()
 Z3DVolumeHistogramThread::Z3DVolumeHistogramThread(Z3DVolume* volume, QObject* parent)
   : QThread(parent)
   , m_volume(volume)
-{
-}
+{}
 
 void Z3DVolumeHistogramThread::run()
 {
@@ -300,8 +312,9 @@ void Z3DVolume::translate(double dx, double dy, double dz)
   m_transformationMatrix[3][1] += dy;
   m_transformationMatrix[3][2] += dz;
 
-  if (m_transformationMatrix != glm::mat4(1.0))
+  if (m_transformationMatrix != glm::mat4(1.0)) {
     m_hasTransformMatrix = true;
+  }
 }
 
 } // namespace nim

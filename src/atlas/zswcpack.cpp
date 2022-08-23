@@ -17,8 +17,7 @@ ZSwcPack::ZSwcPack(ZSwc swc, const QString& path, size_t id, ZSwcDoc& doc, QObje
   updateDerivedData();
   updateViewRelatedData();
   createContextMenu();
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZSwcPack::undoStackCleanChanged);
+  connect(&m_undoStack, &QUndoStack::cleanChanged, this, &ZSwcPack::undoStackCleanChanged);
 }
 
 ZSwcPack::~ZSwcPack()
@@ -49,7 +48,7 @@ QMenu& ZSwcPack::contextMenu()
   return m_contextMenu;
 }
 
-void ZSwcPack::save(const QString &fileName)
+void ZSwcPack::save(const QString& fileName)
 {
   m_swc.resortID();
   m_swc.save(fileName);
@@ -303,7 +302,7 @@ void ZSwcPack::selectCurrentBranch()
   bool hasChange = false;
   for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode);) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
     ++it;
     if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
@@ -313,7 +312,7 @@ void ZSwcPack::selectCurrentBranch()
   if (!ZSwc::isBranchNode(startNode)) {
     for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
       it->selected = true;
-      const auto&[ignore, ok] = m_selectedNodes.insert(it);
+      const auto& [ignore, ok] = m_selectedNodes.insert(it);
       hasChange = hasChange || ok;
       if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
         break;
@@ -337,7 +336,7 @@ void ZSwcPack::selectBranchUpstream()
   bool hasChange = false;
   for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode);) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
     ++it;
     if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
@@ -361,7 +360,7 @@ void ZSwcPack::selectBranchDownstream()
   bool hasChange = false;
   for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
     if (ZSwc::isBranchNode(it) || ZSwc::isRoot(it)) {
       break;
@@ -381,7 +380,7 @@ void ZSwcPack::selectUpstream()
   bool hasChange = false;
   for (auto it = m_swc.beginAncestor(startNode); it != m_swc.endAncestor(startNode); ++it) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
   }
   if (hasChange) {
@@ -398,7 +397,7 @@ void ZSwcPack::selectSubtree()
   bool hasChange = false;
   for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
   }
   if (hasChange) {
@@ -415,7 +414,7 @@ void ZSwcPack::selectEntireTree()
   bool hasChange = false;
   for (auto it = m_swc.begin(startNode); it != m_swc.end(startNode); ++it) {
     it->selected = true;
-    const auto&[ignore, ok] = m_selectedNodes.insert(it);
+    const auto& [ignore, ok] = m_selectedNodes.insert(it);
     hasChange = hasChange || ok;
   }
   if (hasChange) {
@@ -432,8 +431,8 @@ void ZSwcPack::deleteSelectedNodes()
   for (auto p : m_selectedNodes) {
     m_swc.erase(p);
   }
-  m_undoStack.push(new ZSwcEditCommand(QString("Deleted Selected %1 Nodes").arg(m_selectedNodes.size()),
-                                       *this, swcBeforeChange));
+  m_undoStack.push(
+    new ZSwcEditCommand(QString("Deleted Selected %1 Nodes").arg(m_selectedNodes.size()), *this, swcBeforeChange));
 }
 
 void ZSwcPack::setSelectedNodeAsRoot()
@@ -443,8 +442,7 @@ void ZSwcPack::setSelectedNodeAsRoot()
   }
   ZSwc swcBeforeChange = m_swc;
   m_swc.setAsRoot(*m_selectedNodes.begin());
-  m_undoStack.push(new ZSwcEditCommand(QString("Set Selected Node As Root"),
-                                       *this, swcBeforeChange));
+  m_undoStack.push(new ZSwcEditCommand(QString("Set Selected Node As Root"), *this, swcBeforeChange));
 }
 
 void ZSwcPack::breakSelectedNodes()
@@ -477,8 +475,8 @@ void ZSwcPack::breakSelectedNodes()
   if (!hasChange) {
     return;
   }
-  m_undoStack.push(new ZSwcEditCommand(QString("Break Selected %1 Nodes").arg(m_selectedNodes.size()),
-                                       *this, swcBeforeChange));
+  m_undoStack.push(
+    new ZSwcEditCommand(QString("Break Selected %1 Nodes").arg(m_selectedNodes.size()), *this, swcBeforeChange));
 }
 
 void ZSwcPack::connectSelectedNodes()
@@ -499,10 +497,8 @@ void ZSwcPack::connectSelectedNodes()
       double weight = -1e4;
       if (!ZSwc::inSameTree(node1, node2)) {
         hasChange = true;
-        weight = glm::length(glm::dvec3(node1->x, node1->y, node1->z) -
-                             glm::dvec3(node2->x, node2->y, node2->z)) -
-                               node1->radius -
-                               node2->radius;
+        weight = glm::length(glm::dvec3(node1->x, node1->y, node1->z) - glm::dvec3(node2->x, node2->y, node2->z)) -
+                 node1->radius - node2->radius;
       }
       mst.addEdge(i, j, weight);
     }
@@ -527,10 +523,8 @@ void ZSwcPack::connectSelectedNodes()
       m_swc.appendChild(node2, node1);
     }
   }
-  m_undoStack.push(new ZSwcEditCommand(QString("Connect Selected %1 Nodes").arg(m_selectedNodes.size()),
-                                       *this, swcBeforeChange));
+  m_undoStack.push(
+    new ZSwcEditCommand(QString("Connect Selected %1 Nodes").arg(m_selectedNodes.size()), *this, swcBeforeChange));
 }
 
 } // namespace nim
-
-

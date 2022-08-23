@@ -9,7 +9,8 @@ class Z3DTransferFunctionEditor;
 
 class Z3DTransferFunctionWidgetWithEditorWindow : public ZClickableTransferFunctionLabel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DTransferFunctionWidgetWithEditorWindow(Z3DTransferFunctionParameter* tf, QWidget* parent = nullptr);
 
@@ -24,4 +25,3 @@ private:
 };
 
 } // namespace nim
-

@@ -13,8 +13,10 @@
 
 namespace nim {
 
-ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotationPack& rap,
-                                                     ZDoc& doc, QWidget* parent)
+ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel,
+                                                     ZRegionAnnotationPack& rap,
+                                                     ZDoc& doc,
+                                                     QWidget* parent)
   : QTreeView(parent)
   , m_ratModel(objModel)
   , m_regionAnnotationPack(rap)
@@ -39,9 +41,9 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   setMinimumWidth(400);
 
   setAlternatingRowColors(true);
-  //QPalette p = palette();
-  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  //setPalette(p);
+  // QPalette p = palette();
+  // p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  // setPalette(p);
 
   createContextMenu();
 
@@ -51,22 +53,18 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
   setItemDelegateForColumn(4, delegate);
   setItemDelegateForColumn(5, delegate);
   connect(this, &ZRegionAnnotationTreeView::entered, delegate, &ZButtonColumnDelegate::cellEntered);
-  connect(delegate, &ZButtonColumnDelegate::buttonClickedForUserData, this,
+  connect(delegate,
+          &ZButtonColumnDelegate::buttonClickedForUserData,
+          this,
           &ZRegionAnnotationTreeView::buttonClickedForUserData);
 
-  connect(this, &ZRegionAnnotationTreeView::expanded,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(this, &ZRegionAnnotationTreeView::expanded, this, &ZRegionAnnotationTreeView::adaptColumns);
 
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
-          this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset, this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZRegionAnnotationTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged, this, &ZRegionAnnotationTreeView::adaptColumns);
   adaptColumns();
 
   header()->setStretchLastSection(false);
@@ -74,9 +72,9 @@ ZRegionAnnotationTreeView::ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel&
 
 void ZRegionAnnotationTreeView::contextMenu(const QPoint& /*pos*/)
 {
-//  if (m_doc->numSelectedObjs() > 0) {
-//    m_contextMenu->popup(mapToGlobal(pos));
-//  }
+  //  if (m_doc->numSelectedObjs() > 0) {
+  //    m_contextMenu->popup(mapToGlobal(pos));
+  //  }
 }
 
 void ZRegionAnnotationTreeView::indexClicked(const QModelIndex& index)
@@ -121,16 +119,19 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
       QMessageBox::critical(this, QApplication::applicationName(), tr("No ROI to merge, try creating some ROI first"));
       return;
     }
-    size_t objID = m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID),
-                                                         this);
-    if (objID)
+    size_t objID =
+      m_doc.roiDoc().chooseOneObjWithWidget(QString("Choose ROI to merge into region %1").arg(regionID), this);
+    if (objID) {
       m_regionAnnotationPack.regionAnnotation().mergeROIToRegion(m_doc.roiDoc().roiPack(objID).roi(), regionID);
+    }
   } else if (action == 2) {
     if (m_regionAnnotationPack.regionAnnotation().roiOfRegion(regionID)) {
       m_doc.roiDoc().askToSave(*m_regionAnnotationPack.regionAnnotation().roiOfRegion(regionID),
                                QString("Export ROI of Region %1").arg(regionID));
     } else {
-      QMessageBox::critical(this, QApplication::applicationName(), tr("Region %1 is empty and contains no roi").arg(regionID));
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
+                            tr("Region %1 is empty and contains no roi").arg(regionID));
       return;
     }
   } else if (action == 3) {
@@ -138,15 +139,15 @@ void ZRegionAnnotationTreeView::buttonClickedForUserData(const QVariant& ud)
       m_doc.meshDoc().askToSave(*m_regionAnnotationPack.regionAnnotation().meshOfRegion(regionID),
                                 QString("Export Mesh of Region %1").arg(regionID));
     } else {
-      QMessageBox::critical(this, QApplication::applicationName(), tr("Region %1 is empty or contains no mesh").arg(regionID));
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
+                            tr("Region %1 is empty or contains no mesh").arg(regionID));
       return;
     }
   }
 }
 
-void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* /*e*/)
-{
-}
+void ZRegionAnnotationTreeView::keyPressEvent(QKeyEvent* /*e*/) {}
 
 void ZRegionAnnotationTreeView::selectionChanged(const QItemSelection& selected, const QItemSelection& deselected)
 {
@@ -162,9 +163,6 @@ void ZRegionAnnotationTreeView::selectionChanged(const QItemSelection& selected,
   }
 }
 
-void ZRegionAnnotationTreeView::createContextMenu()
-{
-}
+void ZRegionAnnotationTreeView::createContextMenu() {}
 
 } // namespace nim
-

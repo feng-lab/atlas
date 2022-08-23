@@ -7,7 +7,8 @@ namespace nim {
 
 class ZRPCService : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZRPCService(QObject* parent = nullptr);
 
@@ -28,5 +29,3 @@ private:
 };
 
 } // namespace nim
-
-

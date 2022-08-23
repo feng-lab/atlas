@@ -7,7 +7,8 @@ namespace nim {
 
 class Z3DTextureBlendRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // supported modes:
   // "DepthTest", "FirstOnTop", "SecondOnTop"
@@ -16,19 +17,29 @@ public:
   explicit Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, const QString& mode = "DepthTestBlending");
 
   void setColorTexture1(const Z3DTexture* colorTex)
-  { m_colorTexture1 = colorTex; }
+  {
+    m_colorTexture1 = colorTex;
+  }
 
   void setDepthTexture1(const Z3DTexture* depthTex)
-  { m_depthTexture1 = depthTex; }
+  {
+    m_depthTexture1 = depthTex;
+  }
 
   void setColorTexture2(const Z3DTexture* colorTex)
-  { m_colorTexture2 = colorTex; }
+  {
+    m_colorTexture2 = colorTex;
+  }
 
   void setDepthTexture2(const Z3DTexture* depthTex)
-  { m_depthTexture2 = depthTex; }
+  {
+    m_depthTexture2 = depthTex;
+  }
 
   ZStringStringOptionParameter& blendModePara()
-  { return m_blendMode; }
+  {
+    return m_blendMode;
+  }
 
 protected:
   void compile() override;
@@ -50,4 +61,3 @@ protected:
 };
 
 } // namespace nim
-

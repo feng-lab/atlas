@@ -25,30 +25,40 @@ Z3DConeRenderer::Z3DConeRenderer(Z3DRendererBase& rendererBase)
   setUseDisplayList(true);
 #endif
 
-  m_coneCapStyle.addOptionsWithData(std::make_pair<QString, QString>("Flat Caps", "FLAT_CAPS"),
-    //std::make_pair<QString,QString>("Round Caps", "ROUND_CAPS"),
-                                    std::make_pair<QString, QString>("No Caps", "NO_CAPS"),
-    //std::make_pair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
-                                    std::make_pair<QString, QString>("Flat Base Round Top",
-                                                                     "FLAT_BASE_CAP_ROUND_TOP_CAP"));
+  m_coneCapStyle.addOptionsWithData(
+    std::make_pair<QString, QString>("Flat Caps", "FLAT_CAPS"),
+    // std::make_pair<QString,QString>("Round Caps", "ROUND_CAPS"),
+    std::make_pair<QString, QString>("No Caps", "NO_CAPS"),
+    // std::make_pair<QString,QString>("Round Base Flat Top", "ROUND_BASE_CAP_FLAT_TOP_CAP"),
+    std::make_pair<QString, QString>("Flat Base Round Top", "FLAT_BASE_CAP_ROUND_TOP_CAP"));
   m_coneCapStyle.select("Flat Caps");
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this,
+  connect(&m_coneCapStyle,
+          &ZStringStringOptionParameter::valueChanged,
+          this,
           &Z3DConeRenderer::invalidateOpenglRenderer);
-  connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this,
+  connect(&m_coneCapStyle,
+          &ZStringStringOptionParameter::valueChanged,
+          this,
           &Z3DConeRenderer::invalidateOpenglPickingRenderer);
   connect(&m_coneCapStyle, &ZStringStringOptionParameter::valueChanged, this, &Z3DConeRenderer::compile);
-  connect(&m_cylinderSubdivisionAroundZ, &ZIntParameter::valueChanged, this,
+  connect(&m_cylinderSubdivisionAroundZ,
+          &ZIntParameter::valueChanged,
+          this,
           &Z3DConeRenderer::invalidateOpenglRenderer);
   connect(&m_cylinderSubdivisionAlongZ, &ZIntParameter::valueChanged, this, &Z3DConeRenderer::invalidateOpenglRenderer);
 #endif
 
   QStringList allshaders;
   if (m_useConeShader2) {
-    allshaders << "cone_2.vert" << "cone_func_2.frag" << "lighting2.frag";
+    allshaders << "cone_2.vert"
+               << "cone_func_2.frag"
+               << "lighting2.frag";
   } else {
-    allshaders << "cone.vert" << "cone_func.frag" << "lighting2.frag";
+    allshaders << "cone.vert"
+               << "cone_func.frag"
+               << "lighting2.frag";
   }
   m_coneShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_coneShaderGrp.addAllSupportedPostShaders();
@@ -78,10 +88,10 @@ void Z3DConeRenderer::setData(std::vector<glm::vec4>* baseAndBaseRadius, std::ve
       quadIdx++;
     }
     size_t rightUpSize = m_allFlags.size();
-    float cornerFlags[4] = {0 << 4 | 0,      // (0, 0) left down
-                            1 << 4 | 0,      // (1, 0) right down
-                            0 << 4 | 1,      // (0, 1) left up
-                            1 << 4 | 1};     // (1, 1) right up
+    float cornerFlags[4] = {0 << 4 | 0, // (0, 0) left down
+                            1 << 4 | 0, // (1, 0) right down
+                            0 << 4 | 1, // (0, 1) left up
+                            1 << 4 | 1}; // (1, 1) right up
 
     if (rightUpSize > m_baseAndBaseRadius.size()) {
       m_allFlags.resize(m_baseAndBaseRadius.size());
@@ -188,20 +198,21 @@ QString Z3DConeRenderer::generateHeader()
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DConeRenderer::renderUsingOpengl()
 {
-  if (m_baseAndBaseRadius.empty())
+  if (m_baseAndBaseRadius.empty()) {
     return;
+  }
   appendDefaultColors();
 
   GLUquadricObj* quadric = gluNewQuadric();
   auto dup = m_useConeShader2 ? 4 : 8;
-  for (size_t i=0; i<m_baseAndBaseRadius.size(); i+=dup) {
+  for (size_t i = 0; i < m_baseAndBaseRadius.size(); i += dup) {
     glColor4fv(glm::value_ptr(glm::vec4(m_coneBaseColors[i].rgb(), m_coneBaseColors[i].a * opacity())));
     glm::vec3 bottomPos = m_baseAndBaseRadius[i].xyz();
     glm::vec3 topPos = m_axisAndTopRadius[i].xyz();
     topPos += bottomPos;
-    //bottomPos *= getCoordTransform();
+    // bottomPos *= getCoordTransform();
     bottomPos = glm::applyMatrix(coordTransform(), bottomPos);
-    //topPos *= getCoordTransform();
+    // topPos *= getCoordTransform();
     topPos = glm::applyMatrix(coordTransform(), topPos);
 
     glMatrixMode(GL_MODELVIEW);
@@ -211,31 +222,39 @@ void Z3DConeRenderer::renderUsingOpengl()
     glm::vec3 A, B;
     C = glm::normalize(C);
     glm::getOrthogonalVectors(C, A, B);
-    glm::mat4 m(glm::vec4(A, 0.f),
-                glm::vec4(B, 0.f),
-                glm::vec4(C, 0.f),
-                glm::vec4(bottomPos, 1.f));
+    glm::mat4 m(glm::vec4(A, 0.f), glm::vec4(B, 0.f), glm::vec4(C, 0.f), glm::vec4(bottomPos, 1.f));
     glMultMatrixf(&m[0][0]);
 
-    gluCylinder(quadric, sizeScale()*m_baseAndBaseRadius[i].w, sizeScale()*m_axisAndTopRadius[i].w, height,
-                m_cylinderSubdivisionAroundZ.get(), m_cylinderSubdivisionAlongZ.get());
+    gluCylinder(quadric,
+                sizeScale() * m_baseAndBaseRadius[i].w,
+                sizeScale() * m_axisAndTopRadius[i].w,
+                height,
+                m_cylinderSubdivisionAroundZ.get(),
+                m_cylinderSubdivisionAlongZ.get());
 
     if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
-      gluSphere(quadric, sizeScale()*m_baseAndBaseRadius[i].w, m_cylinderSubdivisionAroundZ.get(), m_cylinderSubdivisionAroundZ.get());
+      gluSphere(quadric,
+                sizeScale() * m_baseAndBaseRadius[i].w,
+                m_cylinderSubdivisionAroundZ.get(),
+                m_cylinderSubdivisionAroundZ.get());
     } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
       gluQuadricOrientation(quadric, GLU_INSIDE);
-      gluDisk(quadric, 0.0, sizeScale()*m_baseAndBaseRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_baseAndBaseRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
       gluQuadricOrientation(quadric, GLU_OUTSIDE);
     }
 
     if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
       glTranslatef(0, 0, height);
-      if (!m_sameColorForBaseAndTop)
+      if (!m_sameColorForBaseAndTop) {
         glColor4fv(glm::value_ptr(glm::vec4(m_coneTopColors[i].rgb(), m_coneTopColors[i].a * opacity())));
-      gluSphere(quadric, sizeScale()*m_axisAndTopRadius[i].w, m_cylinderSubdivisionAroundZ.get(), m_cylinderSubdivisionAroundZ.get());
+      }
+      gluSphere(quadric,
+                sizeScale() * m_axisAndTopRadius[i].w,
+                m_cylinderSubdivisionAroundZ.get(),
+                m_cylinderSubdivisionAroundZ.get());
     } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
       glTranslatef(0, 0, height);
-      gluDisk(quadric, 0.0, sizeScale()*m_axisAndTopRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_axisAndTopRadius[i].w, m_cylinderSubdivisionAroundZ.get(), 1);
     }
 
     glMatrixMode(GL_MODELVIEW);
@@ -246,21 +265,23 @@ void Z3DConeRenderer::renderUsingOpengl()
 
 void Z3DConeRenderer::renderPickingUsingOpengl()
 {
-  if (m_baseAndBaseRadius.empty())
+  if (m_baseAndBaseRadius.empty()) {
     return;
-  if (m_conePickingColors.empty() || m_conePickingColors.size() != m_baseAndBaseRadius.size())
+  }
+  if (m_conePickingColors.empty() || m_conePickingColors.size() != m_baseAndBaseRadius.size()) {
     return;
+  }
 
   GLUquadricObj* quadric = gluNewQuadric();
   auto dup = m_useConeShader2 ? 4 : 8;
-  for (size_t i=0; i<m_baseAndBaseRadius.size(); i+=dup) {
+  for (size_t i = 0; i < m_baseAndBaseRadius.size(); i += dup) {
     glColor4fv(glm::value_ptr(m_conePickingColors[i]));
     glm::vec3 bottomPos = m_baseAndBaseRadius[i].xyz();
     glm::vec3 topPos = m_axisAndTopRadius[i].xyz();
     topPos += bottomPos;
-    //bottomPos *= getCoordTransform();
+    // bottomPos *= getCoordTransform();
     bottomPos = glm::applyMatrix(coordTransform(), bottomPos);
-    //topPos *= getCoordTransform();
+    // topPos *= getCoordTransform();
     topPos = glm::applyMatrix(coordTransform(), topPos);
 
     glMatrixMode(GL_MODELVIEW);
@@ -270,29 +291,30 @@ void Z3DConeRenderer::renderPickingUsingOpengl()
     glm::vec3 A, B;
     C = glm::normalize(C);
     glm::getOrthogonalVectors(C, A, B);
-    glm::mat4 m(glm::vec4(A, 0.f),
-                glm::vec4(B, 0.f),
-                glm::vec4(C, 0.f),
-                glm::vec4(bottomPos, 1.f));
+    glm::mat4 m(glm::vec4(A, 0.f), glm::vec4(B, 0.f), glm::vec4(C, 0.f), glm::vec4(bottomPos, 1.f));
     glMultMatrixf(&m[0][0]);
 
-    gluCylinder(quadric, sizeScale()*m_baseAndBaseRadius[i].w, sizeScale()*m_axisAndTopRadius[i].w, height,
-                m_cylinderSubdivisionAroundZ.get(), m_cylinderSubdivisionAlongZ.get());
+    gluCylinder(quadric,
+                sizeScale() * m_baseAndBaseRadius[i].w,
+                sizeScale() * m_axisAndTopRadius[i].w,
+                height,
+                m_cylinderSubdivisionAroundZ.get(),
+                m_cylinderSubdivisionAlongZ.get());
 
     if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
-      gluSphere(quadric, sizeScale()*m_baseAndBaseRadius[i].w, 12, 12);
+      gluSphere(quadric, sizeScale() * m_baseAndBaseRadius[i].w, 12, 12);
     } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
       gluQuadricOrientation(quadric, GLU_INSIDE);
-      gluDisk(quadric, 0.0, sizeScale()*m_baseAndBaseRadius[i].w, 12, 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_baseAndBaseRadius[i].w, 12, 1);
       gluQuadricOrientation(quadric, GLU_OUTSIDE);
     }
 
     if (m_coneCapStyle.isSelected("Round Caps") || m_coneCapStyle.isSelected("Flat Base Round Top")) {
       glTranslatef(0, 0, height);
-      gluSphere(quadric, sizeScale()*m_axisAndTopRadius[i].w, 12, 12);
+      gluSphere(quadric, sizeScale() * m_axisAndTopRadius[i].w, 12, 12);
     } else if (m_coneCapStyle.isSelected("Flat Caps") || m_coneCapStyle.isSelected("Round Base Flat Top")) {
       glTranslatef(0, 0, height);
-      gluDisk(quadric, 0.0, sizeScale()*m_axisAndTopRadius[i].w, 12, 1);
+      gluDisk(quadric, 0.0, sizeScale() * m_axisAndTopRadius[i].w, 12, 1);
     }
 
     glMatrixMode(GL_MODELVIEW);
@@ -327,13 +349,17 @@ void Z3DConeRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_origin);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat),
+                   m_baseAndBaseRadius.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_axis);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_axisAndTopRadius.size() * 4 * sizeof(GLfloat),
+                   m_axisAndTopRadius.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -344,7 +370,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_colors);
       m_VBOs.bind(GL_ARRAY_BUFFER, 3);
-      glBufferData(GL_ARRAY_BUFFER, m_coneBaseColors.size() * 4 * sizeof(GLfloat), m_coneBaseColors.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_coneBaseColors.size() * 4 * sizeof(GLfloat),
+                   m_coneBaseColors.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -354,7 +382,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
       } else {
         glEnableVertexAttribArray(attr_colors2);
         m_VBOs.bind(GL_ARRAY_BUFFER, 4);
-        glBufferData(GL_ARRAY_BUFFER, m_coneTopColors.size() * 4 * sizeof(GLfloat), m_coneTopColors.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_coneTopColors.size() * 4 * sizeof(GLfloat),
+                     m_coneTopColors.data(),
                      GL_STATIC_DRAW);
         glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
       }
@@ -383,7 +413,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_origin);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat),
+                   m_baseAndBaseRadius.data(),
                    GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_origin, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -391,7 +423,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_axis);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
     if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_axisAndTopRadius.size() * 4 * sizeof(GLfloat),
+                   m_axisAndTopRadius.data(),
                    GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_axis, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -406,7 +440,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
     glEnableVertexAttribArray(attr_colors);
     m_VBOs.bind(GL_ARRAY_BUFFER, 3);
     if (m_dataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_coneBaseColors.size() * 4 * sizeof(GLfloat), m_coneBaseColors.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_coneBaseColors.size() * 4 * sizeof(GLfloat),
+                   m_coneBaseColors.data(),
                    GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -418,7 +454,9 @@ void Z3DConeRenderer::render(Z3DEye eye)
       glEnableVertexAttribArray(attr_colors2);
       m_VBOs.bind(GL_ARRAY_BUFFER, 4);
       if (m_dataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_coneTopColors.size() * 4 * sizeof(GLfloat), m_coneTopColors.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_coneTopColors.size() * 4 * sizeof(GLfloat),
+                     m_coneTopColors.data(),
                      GL_STATIC_DRAW);
       }
       glVertexAttribPointer(attr_colors2, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
@@ -475,7 +513,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_origin);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
-        glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat),
+                     m_baseAndBaseRadius.data(),
                      GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 0);
@@ -485,7 +525,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_axis);
       if (m_dataChanged) {
         m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
-        glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_axisAndTopRadius.size() * 4 * sizeof(GLfloat),
+                     m_axisAndTopRadius.data(),
                      GL_STATIC_DRAW);
       } else {
         m_VBOs.bind(GL_ARRAY_BUFFER, 1);
@@ -503,7 +545,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_colors);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
-      glBufferData(GL_ARRAY_BUFFER, m_conePickingColors.size() * 4 * sizeof(GLfloat), m_conePickingColors.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_conePickingColors.size() * 4 * sizeof(GLfloat),
+                   m_conePickingColors.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -539,7 +583,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
       if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat), m_baseAndBaseRadius.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_baseAndBaseRadius.size() * 4 * sizeof(GLfloat),
+                     m_baseAndBaseRadius.data(),
                      GL_STATIC_DRAW);
       }
     } else {
@@ -551,7 +597,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
       if (m_pickingDataChanged) {
-        glBufferData(GL_ARRAY_BUFFER, m_axisAndTopRadius.size() * 4 * sizeof(GLfloat), m_axisAndTopRadius.data(),
+        glBufferData(GL_ARRAY_BUFFER,
+                     m_axisAndTopRadius.size() * 4 * sizeof(GLfloat),
+                     m_axisAndTopRadius.data(),
                      GL_STATIC_DRAW);
       }
     } else {
@@ -573,7 +621,9 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
     glEnableVertexAttribArray(attr_colors);
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 3);
     if (m_pickingDataChanged) {
-      glBufferData(GL_ARRAY_BUFFER, m_conePickingColors.size() * 4 * sizeof(GLfloat), m_conePickingColors.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_conePickingColors.size() * 4 * sizeof(GLfloat),
+                   m_conePickingColors.data(),
                    GL_STATIC_DRAW);
     }
     glVertexAttribPointer(attr_colors, 4, GL_FLOAT, GL_FALSE, 0, nullptr);

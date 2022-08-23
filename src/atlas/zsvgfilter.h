@@ -14,7 +14,8 @@ class ZWidgetsGroup;
 
 class ZSvgFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSvgFilter(ZView& view);
 
@@ -60,4 +61,3 @@ private:
 };
 
 } // namespace nim
-

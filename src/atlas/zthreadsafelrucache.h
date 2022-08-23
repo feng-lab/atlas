@@ -34,7 +34,7 @@ namespace nim {
  * TBB::CHM. So if that is a possibility for your workload,
  * ZThreadSafeScalableCache is recommended instead.
  */
-template<class TKey, class TValue, class THash = tbb::tbb_hash_compare <TKey>>
+template<class TKey, class TValue, class THash = tbb::tbb_hash_compare<TKey>>
 class ZThreadSafeLRUCache
 {
   /**
@@ -47,13 +47,17 @@ class ZThreadSafeLRUCache
    */
   struct ListNode
   {
-    ListNode() : m_prev(OutOfListMarker), m_next(nullptr)
-    {
-    }
+    ListNode()
+      : m_prev(OutOfListMarker)
+      , m_next(nullptr)
+    {}
 
-    ListNode(const TKey& key, size_t size) : m_key(key), m_size(size), m_prev(OutOfListMarker), m_next(nullptr)
-    {
-    }
+    ListNode(const TKey& key, size_t size)
+      : m_key(key)
+      , m_size(size)
+      , m_prev(OutOfListMarker)
+      , m_next(nullptr)
+    {}
 
     TKey m_key;
     size_t m_size;
@@ -74,19 +78,20 @@ class ZThreadSafeLRUCache
    */
   struct HashMapValue
   {
-    HashMapValue() : m_listNode(nullptr)
-    {
-    }
+    HashMapValue()
+      : m_listNode(nullptr)
+    {}
 
-    HashMapValue(const TValue& value, ListNode* node) : m_value(value), m_listNode(node)
-    {
-    }
+    HashMapValue(const TValue& value, ListNode* node)
+      : m_value(value)
+      , m_listNode(node)
+    {}
 
     TValue m_value;
     ListNode* m_listNode;
   };
 
-  typedef tbb::concurrent_hash_map <TKey, HashMapValue, THash> HashMap;
+  typedef tbb::concurrent_hash_map<TKey, HashMapValue, THash> HashMap;
   typedef typename HashMap::const_accessor HashMapConstAccessor;
   typedef typename HashMap::accessor HashMapAccessor;
   typedef typename HashMap::value_type HashMapValuePair;
@@ -100,9 +105,7 @@ public:
    */
   struct ConstAccessor
   {
-    ConstAccessor()
-    {
-    }
+    ConstAccessor() {}
 
     const TValue& operator*() const
     {
@@ -146,7 +149,9 @@ public:
 
   enum class FindStrategy
   {
-    NoUpdateLRUList, UpdateLRUList, MaybeUpdateLRUList
+    NoUpdateLRUList,
+    UpdateLRUList,
+    MaybeUpdateLRUList
   };
 
   /**
@@ -242,7 +247,7 @@ private:
 
 template<class TKey, class TValue, class THash>
 typename ZThreadSafeLRUCache<TKey, TValue, THash>::ListNode* const
-  ZThreadSafeLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode * ) - 1;
+  ZThreadSafeLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode*)-1;
 
 template<class TKey, class TValue, class THash>
 ZThreadSafeLRUCache<TKey, TValue, THash>::ZThreadSafeLRUCache(size_t maxSize)

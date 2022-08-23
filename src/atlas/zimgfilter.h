@@ -23,10 +23,16 @@ public:
   };
 
   [[nodiscard]] int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  explicit ZImgScaleBarGraphicsItem(double lengthInUm, double height, double voxelSizeXInUm,
-                                    double viewScale, double transformScale, const QRectF& viewPort,
+  explicit ZImgScaleBarGraphicsItem(double lengthInUm,
+                                    double height,
+                                    double voxelSizeXInUm,
+                                    double viewScale,
+                                    double transformScale,
+                                    const QRectF& viewPort,
                                     const glm::vec3& color,
                                     QGraphicsItem* parent = nullptr);
 
@@ -86,7 +92,8 @@ private:
 
 class ZImgFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZImgFilter(ZView& view);
 
@@ -107,7 +114,9 @@ public:
   void setMaxZProjView(int t) override;
 
   [[nodiscard]] bool isVisible() const override
-  { return m_isVisible; }
+  {
+    return m_isVisible;
+  }
 
   [[nodiscard]] ZBBox<glm::ivec4> boundBox() const;
 
@@ -200,4 +209,3 @@ private:
 };
 
 } // namespace nim
-

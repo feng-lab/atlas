@@ -15,13 +15,15 @@ class Z3DTexture;
 // only support 1d transfer function now
 class Z3DTransferFunction : public ZColorMap
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit Z3DTransferFunction(double min = 0.0, double max = 1.0, const glm::col4& minColor = glm::col4(0, 0, 0, 0),
+  explicit Z3DTransferFunction(double min = 0.0,
+                               double max = 1.0,
+                               const glm::col4& minColor = glm::col4(0, 0, 0, 0),
                                const glm::col4& maxColor = glm::col4(255, 255, 255, 255),
                                uint32_t width = 256,
                                QObject* parent = nullptr);
-
 
   Z3DTransferFunction(const Z3DTransferFunction& tf);
 
@@ -44,7 +46,9 @@ public:
   QString samplerType() const;
 
   inline glm::uvec3 textureDimensions() const
-  { return m_dimensions; }
+  {
+    return m_dimensions;
+  }
 
   // Returns the texture of the transfer function.
   Z3DTexture* texture() const;
@@ -73,17 +77,25 @@ protected:
 
 class Z3DTransferFunctionParameter : public ZSingleValueParameter<Z3DTransferFunction>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DTransferFunctionParameter(const QString& name, QObject* parent = nullptr);
 
-  Z3DTransferFunctionParameter(const QString& name, double min, double max, const glm::col4& minColor,
-                               const glm::col4& maxColor, int width, QObject* parent = nullptr);
+  Z3DTransferFunctionParameter(const QString& name,
+                               double min,
+                               double max,
+                               const glm::col4& minColor,
+                               const glm::col4& maxColor,
+                               int width,
+                               QObject* parent = nullptr);
 
   void setVolume(Z3DVolume* volume);
 
   [[nodiscard]] inline Z3DVolume* volume() const
-  { return m_volume; }
+  {
+    return m_volume;
+  }
 
   void setMinMaxIntensity(double minInten, double maxInten)
   {
@@ -93,17 +105,24 @@ public:
   }
 
   [[nodiscard]] double minIntensity() const
-  { return m_minIntensity != std::numeric_limits<double>::lowest() ? m_minIntensity : m_value.domainMin(); }
+  {
+    return m_minIntensity != std::numeric_limits<double>::lowest() ? m_minIntensity : m_value.domainMin();
+  }
 
   [[nodiscard]] double maxIntensity() const
-  { return m_maxIntensity != std::numeric_limits<double>::lowest() ? m_maxIntensity : m_value.domainMax(); }
+  {
+    return m_maxIntensity != std::numeric_limits<double>::lowest() ? m_maxIntensity : m_value.domainMax();
+  }
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 
   [[nodiscard]] bool supportInterpolation() const override
-  { return false; }
+  {
+    return false;
+  }
 
   [[nodiscard]] json::value jsonValue() const override;
 
@@ -119,4 +138,3 @@ protected:
 };
 
 } // namespace nim
-

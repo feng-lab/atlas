@@ -14,7 +14,8 @@ class Z3DImg;
 // transfer functions
 class Z3DVolumeRaycasterRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DVolumeRaycasterRenderer(Z3DRendererBase& rendererBase);
 
@@ -23,7 +24,9 @@ public:
   void setChannels(const Z3DImg& img);
 
   void setLayerTarget(Z3DRenderTarget* layerTarget)
-  { m_layerTarget = layerTarget; }
+  {
+    m_layerTarget = layerTarget;
+  }
 
   // quad or entryexit texture should be set before rendering
 
@@ -34,7 +37,9 @@ public:
   // DO NOT call this function for 3d Raycaster
   // clear
   void clearQuads()
-  { m_quads.clear(); }
+  {
+    m_quads.clear();
+  }
 
   // add quad
   void addQuad(const ZMesh& quad);
@@ -52,31 +57,46 @@ public:
   bool hasVisibleRendering() const;
 
   QString compositeMode() const
-  { return m_compositingMode.get(); }
+  {
+    return m_compositingMode.get();
+  }
 
   ZStringIntOptionParameter& compositingModePara()
-  { return m_compositingMode; }
+  {
+    return m_compositingMode;
+  }
 
   ZFloatParameter& samplingRatePara()
-  { return m_samplingRate; }
+  {
+    return m_samplingRate;
+  }
 
   ZFloatParameter& isoValuePara()
-  { return m_isoValue; }
+  {
+    return m_isoValue;
+  }
 
   ZFloatParameter& localMIPThresholdPara()
-  { return m_localMIPThreshold; }
+  {
+    return m_localMIPThreshold;
+  }
 
   const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
-  { return m_channelVisibleParas; }
+  {
+    return m_channelVisibleParas;
+  }
 
   const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
-  { return m_transferFuncParas; }
+  {
+    return m_transferFuncParas;
+  }
 
   const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
-  { return m_texFilterModeParas; }
+  {
+    return m_texFilterModeParas;
+  }
 
 protected:
-
   void adjustWidgets();
 
   void bindVolumesAndTransferFuncs(Z3DShaderProgram& shader);
@@ -91,9 +111,9 @@ protected:
 
   void renderPicking(Z3DEye) override;
 
-//  Z3DShaderProgram m_raycasterShader;
-//  Z3DShaderProgram m_2dImageShader;
-//  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
+  //  Z3DShaderProgram m_raycasterShader;
+  //  Z3DShaderProgram m_2dImageShader;
+  //  Z3DShaderProgram m_volumeSliceWithTransferfunShader;
 
   // single channel version
   Z3DShaderProgram m_scRaycasterShader;
@@ -102,8 +122,8 @@ protected:
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
 
-  ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
-  ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled
+  ZFloatParameter m_samplingRate; // Sampling rate of the raycasting, specified relative to the size of one voxel
+  ZFloatParameter m_isoValue; // The used isovalue, when isosurface raycasting is enabled
   ZFloatParameter m_localMIPThreshold;
 
   ZStringIntOptionParameter m_compositingMode;
@@ -130,9 +150,8 @@ private:
   const Z3DTexture* m_exitEyeCoordTexture;
 
   bool m_opaque;
-  double m_alpha; //only takes effect when m_opaque is true
+  double m_alpha; // only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
 };
 
 } // namespace nim
-

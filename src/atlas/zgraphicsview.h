@@ -13,7 +13,8 @@ namespace nim {
 
 class ZGraphicsView : public QGraphicsView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZGraphicsView(QGraphicsScene* scene, ZView* parent);
 
@@ -26,15 +27,22 @@ public:
 
   // do not use other scale functions because we need to sync scale with our widget
   inline double currentScale() const
-  { return m_scale.get() / 100.; }
+  {
+    return m_scale.get() / 100.;
+  }
 
   inline void setScale(double s)
-  { m_scale.set(s * 100.); Q_EMIT scaleChanged(currentScale()); }
+  {
+    m_scale.set(s * 100.);
+    Q_EMIT scaleChanged(currentScale());
+  }
 
   void fitRect(const QRectF& rect);
 
   QSize viewportSize() const
-  { return viewport()->size(); }
+  {
+    return viewport()->size();
+  }
 
   bool renderToImage(const QString& filename, QString* err = nullptr);
 
@@ -57,10 +65,10 @@ protected:
 
   void wheelEvent(QWheelEvent* event) override;
 
-  bool event(QEvent *event) override;
+  bool event(QEvent* event) override;
 
 private:
-  bool gestureEvent(QGestureEvent *event);
+  bool gestureEvent(QGestureEvent* event);
   void panTriggered(QPanGesture*);
   void pinchTriggered(QPinchGesture*);
 
@@ -72,4 +80,3 @@ private:
 };
 
 } // namespace nim
-

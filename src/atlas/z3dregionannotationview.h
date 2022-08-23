@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DRegionAnnotationView : public Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DView& view);
 
@@ -19,5 +20,3 @@ private:
 };
 
 } // namespace nim
-
-

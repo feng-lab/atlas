@@ -87,9 +87,13 @@ public:
   };
 
   int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  ZPunctumGraphicsItem(ZPunctaPack& punctaPack, const ZPunctum& punctum, QTransform  tfm,
+  ZPunctumGraphicsItem(ZPunctaPack& punctaPack,
+                       const ZPunctum& punctum,
+                       QTransform tfm,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -97,7 +101,10 @@ public:
   void updateRectSize();
 
   inline void setTransform_(const QTransform& tfm)
-  { m_transform = tfm; updateValue(); }
+  {
+    m_transform = tfm;
+    updateValue();
+  }
 
   inline void setUseSameSize(bool v)
   {
@@ -135,7 +142,8 @@ private:
 
 class ZPunctaFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZPunctaFilter(ZView& view);
 
@@ -212,4 +220,3 @@ private:
 };
 
 } // namespace nim
-

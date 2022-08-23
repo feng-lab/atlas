@@ -21,18 +21,19 @@
 
 namespace nim {
 
-EventBoundRectItem::EventBoundRectItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+EventBoundRectItem::EventBoundRectItem(const ZAnimationDisplayPack& pack,
+                                       ZTimelineWidget& timeline,
                                        QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
-{
-}
+{}
 
 void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
 {
-  if (m_displayPack.type == ZAnimationDisplayPack::Type::Object)
+  if (m_displayPack.type == ZAnimationDisplayPack::Type::Object) {
     return;
+  }
   QPointF pos = event->scenePos();
   double time = m_timeline.xToTime(pos.x());
   QMenu menu;
@@ -45,9 +46,11 @@ void EventBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   }
 }
 
-ParameterKeysItem::ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation& paraAnimation,
+ParameterKeysItem::ParameterKeysItem(ZParameterKey& paraKey,
+                                     ZParameterAnimation& paraAnimation,
                                      const ZAnimationDisplayPack& pack,
-                                     ZTimelineWidget& timeline, QGraphicsItem* parent)
+                                     ZTimelineWidget& timeline,
+                                     QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_paraKey(paraKey)
   , m_paraAnimation(paraAnimation)
@@ -55,8 +58,7 @@ ParameterKeysItem::ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation
   , m_timeline(timeline)
 {
   if (m_paraAnimation.boundParameter()) {
-    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable |
-             QGraphicsItem::ItemIsSelectable);
+    setFlags(QGraphicsItem::ItemSendsGeometryChanges | QGraphicsItem::ItemIsMovable | QGraphicsItem::ItemIsSelectable);
   } else {
     setFlags(QGraphicsItem::ItemIsSelectable);
   }
@@ -117,8 +119,9 @@ void ParameterKeysItem::hoverEnterEvent(QGraphicsSceneHoverEvent* /*event*/)
 void ParameterKeysItem::mouseDoubleClickEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
   if (m_paraAnimation.boundParameter()) {
-    if (!m_editDialog)
+    if (!m_editDialog) {
       m_editDialog.reset(new ZTimelineKeyEditDialog(m_paraAnimation, m_paraKey, &m_timeline));
+    }
     m_editDialog->setInitialValue();
     m_editDialog->showNormal();
     m_editDialog->raise();
@@ -185,10 +188,8 @@ ZTimelineEventScene::ZTimelineEventScene(ZTimelineWidget& timeline, ZTimelineEve
   connect(&m_timeline, &ZTimelineWidget::pixelsPerSecondChagned, this, &ZTimelineEventScene::moveCurrentTime);
   connect(&m_timeline, &ZTimelineWidget::currentTimeChanged, this, &ZTimelineEventScene::moveCurrentTime);
   connect(&m_timeline.animation(), &ZAnimation::keyChanged, this, &ZTimelineEventScene::updateKey);
-  connect(&m_timeline.animation(), &ZAnimation::keyAboutToDelete,
-          this, &ZTimelineEventScene::deleteKeyItem);
-  connect(&m_timeline.animation(), &ZAnimation::colorChanged,
-          this, &ZTimelineEventScene::updateParameterAnimation);
+  connect(&m_timeline.animation(), &ZAnimation::keyAboutToDelete, this, &ZTimelineEventScene::deleteKeyItem);
+  connect(&m_timeline.animation(), &ZAnimation::colorChanged, this, &ZTimelineEventScene::updateParameterAnimation);
 }
 
 void ZTimelineEventScene::updateKey(ZParameterKey* paraKey)
@@ -217,11 +218,11 @@ void ZTimelineEventScene::updateParameterAnimation(ZParameterAnimation* pa)
 
 void ZTimelineEventScene::updateItems()
 {
-  //ZBenchTimer bt;
-  //bt.start();
+  // ZBenchTimer bt;
+  // bt.start();
   const auto& dps = m_timeline.animation().displayPacks();
   int height = (dps.size() + 2) * m_timeline.rowHeight() -
-               m_view->horizontalScrollBar()->height();  // leave space for horizonal scrollbar
+               m_view->horizontalScrollBar()->height(); // leave space for horizonal scrollbar
   setSceneRect(0, 0, m_timeline.eventViewWidth() - m_view->verticalScrollBar()->width(), height);
   this->clear();
   m_itemToDisplayPack.clear();
@@ -279,8 +280,8 @@ void ZTimelineEventScene::updateItems()
   m_currentTimeItem->setLine(0, 0, 0, dps.size() * m_timeline.rowHeight());
   m_currentTimeItem->setPos(m_timeline.timeToX(m_timeline.currentTime()), 0);
   addItem(m_currentTimeItem);
-  //bt.stop();
-  //LOG(INFO) << bt;
+  // bt.stop();
+  // LOG(INFO) << bt;
 }
 
 void ZTimelineEventScene::removeSelectedKeys()
@@ -369,26 +370,46 @@ void ZTimelineEventScene::contextMenuEvent(QGraphicsSceneContextMenuEvent* event
       bool ok = false;
       double time = 0.0;
       if (selectedAction == setKeysTimeAction) {
-        time = QInputDialog::getDouble(m_view, tr("Set Time of Selected Keys"),
-                                       tr("Set Time:"), 0.0, 0.0, m_timeline.animation().duration(), 3,
+        time = QInputDialog::getDouble(m_view,
+                                       tr("Set Time of Selected Keys"),
+                                       tr("Set Time:"),
+                                       0.0,
+                                       0.0,
+                                       m_timeline.animation().duration(),
+                                       3,
                                        &ok);
       } else if (selectedAction == addKeysTimeAction) {
-        time = QInputDialog::getDouble(m_view, tr("Add Time to Selected Keys"),
-                                       tr("Add Time:"), 0.0, 0.0, 2147483647., 3,
+        time = QInputDialog::getDouble(m_view,
+                                       tr("Add Time to Selected Keys"),
+                                       tr("Add Time:"),
+                                       0.0,
+                                       0.0,
+                                       2147483647.,
+                                       3,
                                        &ok);
       } else if (selectedAction == subtractKeysTimeAction) {
-        time = QInputDialog::getDouble(m_view, tr("Subtract Time to Selected Keys"),
-                                       tr("Subtract Time:"), 0.0, 0.0, 2147483647., 3,
+        time = QInputDialog::getDouble(m_view,
+                                       tr("Subtract Time to Selected Keys"),
+                                       tr("Subtract Time:"),
+                                       0.0,
+                                       0.0,
+                                       2147483647.,
+                                       3,
                                        &ok);
       } else if (selectedAction == scaleKeysTimeAction) {
-        time = QInputDialog::getDouble(m_view, tr("Scale Time of Selected Keys"),
-                                       tr("Scale Time:"), 1., 0.001, 2147483647., 3,
+        time = QInputDialog::getDouble(m_view,
+                                       tr("Scale Time of Selected Keys"),
+                                       tr("Scale Time:"),
+                                       1.,
+                                       0.001,
+                                       2147483647.,
+                                       3,
                                        &ok);
       } else {
         LOG(FATAL) << "wrong selected action";
       }
       if (ok) {
-        //LOG(INFO) << time;
+        // LOG(INFO) << time;
         std::set<ZParameterKey*> keys;
         std::set<ZParameterAnimation*> anis;
         for (auto itm : allSelectedItems) {

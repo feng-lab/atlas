@@ -10,7 +10,7 @@ struct LogData;
 class ZLogWidget : public QPlainTextEdit
 {
 public:
-  explicit ZLogWidget(bool receiveOldMessages = false, QWidget *parent = nullptr);
+  explicit ZLogWidget(bool receiveOldMessages = false, QWidget* parent = nullptr);
 
 private:
   void writeLogData(const std::deque<LogData>* messages, size_t start, size_t end);
@@ -21,7 +21,3 @@ private:
 };
 
 } // namespace nim
-
-
-
-

@@ -6,7 +6,8 @@ namespace nim {
 
 class Z3DConeRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // default use display list and lighting in opengl mode
   // Round cap style might have bug. It only works when we are dealing with cylinder with slightly different radius.
@@ -22,7 +23,9 @@ public:
   void setDataPickingColors(std::vector<glm::vec4>* conePickingColors = nullptr);
 
   ZStringStringOptionParameter& coneCapStylePara()
-  { return m_coneCapStyle; }
+  {
+    return m_coneCapStyle;
+  }
 
 protected:
   void compile() override;
@@ -69,4 +72,3 @@ private:
 };
 
 } // namespace nim
-

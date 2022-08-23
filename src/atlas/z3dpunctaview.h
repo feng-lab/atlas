@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DPunctaView : public Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

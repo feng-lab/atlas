@@ -5,7 +5,7 @@ class QOpenGLContextGroup;
 
 namespace nim {
 
-using ProcAddress = void(*)();
+using ProcAddress = void (*)();
 
 class Z3DContext
 {
@@ -50,4 +50,3 @@ private:
 };
 
 } // namespace nim
-

@@ -20,8 +20,9 @@ ZPunctaDoc::ZPunctaDoc(ZDoc& doc)
 
 bool ZPunctaDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToPunctaPacks.at(id);
   if (ZPuncta::canWriteFile(pack->path())) {
@@ -69,8 +70,9 @@ bool ZPunctaDoc::canReadFile(const QString& fileName) const
 size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToPunctaPacks) {
-    if (idPack.second->path() == fileName)
+    if (idPack.second->path() == fileName) {
       return idPack.first;
+    }
   }
   try {
     size_t id = addPuncta(ZPuncta(fileName), fileName);
@@ -92,8 +94,9 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
       return 0;
     }
     for (const auto& idPack : m_idToPunctaPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first)))
+      if (isSameObj(jValue, jsonValue(idPack.first))) {
         return idPack.first;
+      }
     }
     QString fileName = asQString(jValue);
 
@@ -169,12 +172,14 @@ json::value ZPunctaDoc::jsonValue(size_t id) const
 bool ZPunctaDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -194,11 +199,9 @@ bool ZPunctaDoc::isAlias(size_t id) const
 {
   CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
 
-  return std::any_of(m_idToPunctaPacks.begin(), m_idToPunctaPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToPunctaPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToPunctaPacks.begin(), m_idToPunctaPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToPunctaPacks.at(id);
+  });
 }
 
 QWidget* ZPunctaDoc::createObjEditWidget(size_t id)
@@ -217,10 +220,11 @@ void ZPunctaDoc::loadPuncta()
   dialog.setWindowTitle("Load Puncta File");
   if (dialog.exec()) {
     QString errorMsg;
-    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read puncta.\n" + errorMsg);
       }
     }
@@ -246,8 +250,7 @@ size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
   m_doc.registerNewObj(m_idToPunctaPacks[id]);
 
   Q_EMIT objAdded(id, this);
-  connect(m_idToPunctaPacks[id].get(), &ZPunctaPack::undoStackCleanChanged,
-          this, &ZPunctaDoc::setModified);
+  connect(m_idToPunctaPacks[id].get(), &ZPunctaPack::undoStackCleanChanged, this, &ZPunctaDoc::setModified);
   return id;
 }
 
@@ -297,8 +300,9 @@ bool ZPunctaDoc::savePuncta(ZPunctaPack* pack, const QString& fileName, QString&
 void ZPunctaDoc::packInfoUpdated(ZPunctaPack* pack)
 {
   for (const auto& idPack : m_idToPunctaPacks) {
-    if (idPack.second.get() == pack)
+    if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
   }
 }
 

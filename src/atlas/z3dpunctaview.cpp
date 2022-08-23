@@ -37,7 +37,8 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render puncta:\n%1").arg(e.what()));
   }
 }
@@ -65,10 +66,10 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render puncta:\n%1").arg(e.what()));
   }
 }
 
 } // namespace nim
-

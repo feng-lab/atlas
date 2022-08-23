@@ -7,13 +7,11 @@ namespace nim {
 
 ZStringParameter::ZStringParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<QString>(name, parent)
-{
-}
+{}
 
 ZStringParameter::ZStringParameter(const QString& name, const QString& str, QObject* parent)
   : ZSingleValueParameter<QString>(name, str, parent)
-{
-}
+{}
 
 void ZStringParameter::setContent(const QString& str)
 {

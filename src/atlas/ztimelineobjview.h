@@ -9,7 +9,8 @@ namespace nim {
 
 class ZTimelineObjView : public QGraphicsView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZTimelineObjView(ZTimelineWidget& parent);
 
@@ -30,4 +31,3 @@ private:
 };
 
 } // namespace nim
-

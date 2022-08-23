@@ -17,7 +17,8 @@ protected:
 
 class ZComboBox : public QComboBox
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZComboBox(QWidget* parent = nullptr);
 
@@ -36,4 +37,3 @@ protected:
 };
 
 } // namespace nim
-

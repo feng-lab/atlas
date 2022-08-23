@@ -8,29 +8,39 @@ namespace nim {
 
 class ZImgDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZImgDoc(ZDoc& doc);
 
   inline ZImgPack& imgPack(size_t id)
-  { return *m_idToImgPacks.at(id); }
+  {
+    return *m_idToImgPacks.at(id);
+  }
 
   [[nodiscard]] inline const ZImgPack& imgPack(size_t id) const
-  { return *m_idToImgPacks.at(id); }
+  {
+    return *m_idToImgPacks.at(id);
+  }
 
   void setImgChannelColor(size_t id, size_t c, col4 col);
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Image"; }
+  {
+    return "Image";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Images"; }
+  {
+    return "Images";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -89,7 +99,12 @@ protected:
 
   size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg);
 
-  size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, size_t scene, FileFormat format, QString& errorMsg);
+  size_t loadImg(const QStringList& files,
+                 Dimension catDim,
+                 bool catScenes,
+                 size_t scene,
+                 FileFormat format,
+                 QString& errorMsg);
 
   size_t loadImg(const ZImgSource& imgSource, QString& errorMsg);
 
@@ -98,8 +113,11 @@ protected:
 private:
   void createActions();
 
-  bool saveImg(ZImgPack* pack, const QString& fileName, FileFormat format,
-               const ZImgWriteParameters& paras, QString& errorMsg);
+  bool saveImg(ZImgPack* pack,
+               const QString& fileName,
+               FileFormat format,
+               const ZImgWriteParameters& paras,
+               QString& errorMsg);
 
   // notify obj manager about the update
   void packInfoUpdated(ZImgPack* pack);
@@ -116,4 +134,3 @@ private:
 };
 
 } // namespace nim
-

@@ -29,14 +29,12 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setSelectionBehavior(QAbstractItemView::SelectItems);
   setContextMenuPolicy(Qt::CustomContextMenu);
   sortByColumn(ZObjModel::TypeColumn, Qt::AscendingOrder);
-  setStyleSheet(
-    QString("QTreeView::indicator:unchecked {image: url(%1);}"
-            "QTreeView::indicator:checked {image: url(%2);}"
-            "QTreeView::indicator:indeterminate {image: url(%3);}")
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
-      .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon))
-  );
+  setStyleSheet(QString("QTreeView::indicator:unchecked {image: url(%1);}"
+                        "QTreeView::indicator:checked {image: url(%2);}"
+                        "QTreeView::indicator:indeterminate {image: url(%3);}")
+                  .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
+                  .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
+                  .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon)));
 
   connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);
   connect(this, &ZObjWidget::clicked, this, &ZObjWidget::indexClicked);
@@ -47,9 +45,9 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setMinimumHeight(250);
 
   setAlternatingRowColors(true);
-  //QPalette p = palette();
-  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  //setPalette(p);
+  // QPalette p = palette();
+  // p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  // setPalette(p);
 
   createContextMenu();
 
@@ -60,16 +58,11 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   connect(this, &ZObjWidget::entered, delegate, &ZStyledItemDelegate::cellEntered);
 #endif
 
-  connect(m_objProxyModel, &QSortFilterProxyModel::rowsInserted,
-          this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::rowsRemoved,
-          this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::modelReset,
-          this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::layoutChanged,
-          this, &ZObjWidget::adaptColumns);
-  connect(m_objProxyModel, &QSortFilterProxyModel::dataChanged,
-          this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::modelReset, this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZObjWidget::adaptColumns);
+  connect(m_objProxyModel, &QSortFilterProxyModel::dataChanged, this, &ZObjWidget::adaptColumns);
   adaptColumns();
 }
 
@@ -97,12 +90,12 @@ void ZObjWidget::indexActivated(const QModelIndex& index)
 
 void ZObjWidget::adaptColumns()
 {
-  //header()->resizeSection(0, 20);
+  // header()->resizeSection(0, 20);
   resizeColumnToContents(ZObjModel::ShowHideNameColumn);
   resizeColumnToContents(ZObjModel::LockColumn);
   // resizeColumnToContents(ZObjModel::NameColumn);
   resizeColumnToContents(ZObjModel::TypeColumn);
-  //resizeColumnToContents(ZObjModel::ShowHideColumn);
+  // resizeColumnToContents(ZObjModel::ShowHideColumn);
 }
 
 void ZObjWidget::keyPressEvent(QKeyEvent* e)

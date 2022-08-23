@@ -41,7 +41,8 @@ class ZObjPack;
 
 class ZDoc : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDoc(QObject* parent = nullptr);
 
@@ -92,24 +93,36 @@ public:
   std::vector<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
 
   inline QUndoGroup* undoGroup()
-  { return m_undoGroup; }
+  {
+    return m_undoGroup;
+  }
 
   void activateEmptyUndoStack();
 
   inline QAction* undoAction()
-  { return m_undoAction; }
+  {
+    return m_undoAction;
+  }
 
   inline QAction* redoAction()
-  { return m_redoAction; }
+  {
+    return m_redoAction;
+  }
 
   inline QAction* make2DAnimationAction()
-  { return m_make2DAnimationAction; }
+  {
+    return m_make2DAnimationAction;
+  }
 
   inline QAction* make3DAnimationAction()
-  { return m_make3DAnimationAction; }
+  {
+    return m_make3DAnimationAction;
+  }
 
   inline QAction* changeAnimationSettingAction()
-  { return m_changeAnimationSettingAction; }
+  {
+    return m_changeAnimationSettingAction;
+  }
 
   [[nodiscard]] std::vector<QAction*> fileActions() const;
 
@@ -128,7 +141,9 @@ public:
 
   // get a unique id for new object
   inline size_t getNewObjId()
-  { return m_nextObjId++; }
+  {
+    return m_nextObjId++;
+  }
 
   // let doc know objD has a new obj with id
   void registerNewObj(size_t id, ZObjDoc& objD);
@@ -162,22 +177,34 @@ public:
   static void setLastOpenedFilePath(const QString& path);
 
   ZImgDoc& imgDoc()
-  { return *m_imgDoc; }
+  {
+    return *m_imgDoc;
+  }
 
   Z3DAnimationDoc& animation3DDoc()
-  { return *m_animation3DDoc; }
+  {
+    return *m_animation3DDoc;
+  }
 
   Z2DAnimationDoc& animation2DDoc()
-  { return *m_animation2DDoc; }
+  {
+    return *m_animation2DDoc;
+  }
 
   ZROIDoc& roiDoc()
-  { return *m_roiDoc; }
+  {
+    return *m_roiDoc;
+  }
 
   ZMeshDoc& meshDoc()
-  { return *m_meshDoc; }
+  {
+    return *m_meshDoc;
+  }
 
   ZRegionAnnotationDoc& regionAnnotationDoc()
-  { return *m_regionAnnotationDoc; }
+  {
+    return *m_regionAnnotationDoc;
+  }
 
   void hideAnimation3DView();
 
@@ -241,7 +268,9 @@ protected:
   }
 
   void sendOpenEditWidgetSignal(size_t id)
-  { Q_EMIT openEditWidget(id); }
+  {
+    Q_EMIT openEditWidget(id);
+  }
 
   void onObjAboutToBeRemoved(size_t id, ZObjDoc* doc);
 
@@ -289,4 +318,3 @@ private:
 };
 
 } // namespace nim
-

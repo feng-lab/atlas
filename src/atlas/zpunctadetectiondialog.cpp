@@ -19,8 +19,7 @@ namespace nim {
 ZPunctaDetectionDialog::ZPunctaDetectionDialog(QWidget* parent)
   : ZImgProcessDialog(parent)
   , m_useCurrentActiveImage("Use Current Active Image", false)
-  , m_voxelSize("Voxel Size (um)", glm::dvec3(.0, .0, .0), glm::dvec3(.0, .0, .0),
-                glm::dvec3(1e6, 1e6, 1e6))
+  , m_voxelSize("Voxel Size (um)", glm::dvec3(.0, .0, .0), glm::dvec3(.0, .0, .0), glm::dvec3(1e6, 1e6, 1e6))
   , m_punctaChannel("Puncta Channel", nullptr, "Ch")
   , m_punctaThreshold("Puncta Threshold (-1 means auto detect)", -1, -1, 255)
   , m_somaPunctaThreshold("Soma Puncta Threshold (-1 means auto detect)", -1, -1, 255)
@@ -68,19 +67,24 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
 
   auto workertmp = new ZPunctaDetection(m_inputImageFileWidget->getSelectedOpenFile(), imgInfo, punctaChannel);
   workertmp->setAmbiguousFactor(m_ambiguousFactor.get());
-  if (dendriteChannel >= 0)
+  if (dendriteChannel >= 0) {
     workertmp->setDendriteChannel(dendriteChannel);
+  }
   workertmp->setSwcFiles(m_inputSwcFilesWidget->getSelectedMultipleOpenFiles());
   workertmp->setLogFile(m_outputLogFileWidget->getSelectedSaveFile());
   workertmp->setResultPunctaFilename(m_outputPunctaFileWidget->getSelectedSaveFile());
-  if (dendriteChannel >= 0)
+  if (dendriteChannel >= 0) {
     workertmp->setResultSomaPunctaFilename(m_outputSomaPunctaFileWidget->getSelectedSaveFile());
-  if (m_punctaThreshold.get() != -1)
+  }
+  if (m_punctaThreshold.get() != -1) {
     workertmp->setPunctaThreshold(m_punctaThreshold.get());
-  if (m_somaPunctaThreshold.get() != -1)
+  }
+  if (m_somaPunctaThreshold.get() != -1) {
     workertmp->setSomaPunctaThreshold(m_somaPunctaThreshold.get());
-  if (dendriteChannel >= 0)
+  }
+  if (dendriteChannel >= 0) {
     workertmp->setDendriteThreshold(m_tubeThreshold.get());
+  }
   workertmp->setMaxDistToBranchInUm(m_maxDistToBranchInUm.get());
 
   worker = workertmp;
@@ -103,15 +107,16 @@ void ZPunctaDetectionDialog::inputImageChanged()
     try {
       ZImgInfo info = ZImg::readImgInfos(fn).at(0);
       if (info.voxelSizeUnit != VoxelSizeUnit::none) {
-        updateInterface(fn, info.numChannels, info.voxelSizeXInUm(),
-                        info.voxelSizeYInUm(), info.voxelSizeZInUm());
+        updateInterface(fn, info.numChannels, info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm());
       } else {
         updateInterface(fn, info.numChannels, 0, 0, 0);
       }
     }
     catch (const ZIOException& e) {
       updateInterface(fn, 0, 0, 0, 0);
-      QMessageBox::critical(this, QApplication::applicationName(), QString("Can not read input image:\n%1").arg(e.what()));
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
+                            QString("Can not read input image:\n%1").arg(e.what()));
     }
   } else {
     updateInterface(fn, 0, 0, 0, 0);
@@ -120,22 +125,19 @@ void ZPunctaDetectionDialog::inputImageChanged()
 
 void ZPunctaDetectionDialog::detectLSMResolution()
 {
-  QString fileName = QFileDialog::getOpenFileName(this, "choose LSM file", "",
-                                                  tr("LSM file (*.lsm)"));
+  QString fileName = QFileDialog::getOpenFileName(this, "choose LSM file", "", tr("LSM file (*.lsm)"));
   if (!fileName.isEmpty()) {
     try {
       ZImgInfo info = ZImg::readImgInfos(fileName).at(0);
       if (info.voxelSizeUnit != VoxelSizeUnit::none) {
-        m_voxelSize.set(glm::dvec3(info.voxelSizeXInUm(),
-                                   info.voxelSizeYInUm(),
-                                   info.voxelSizeZInUm()));
+        m_voxelSize.set(glm::dvec3(info.voxelSizeXInUm(), info.voxelSizeYInUm(), info.voxelSizeZInUm()));
       } else {
-        QMessageBox::critical(this, QApplication::applicationName(),
-                              "File does not contain resolution information");
+        QMessageBox::critical(this, QApplication::applicationName(), "File does not contain resolution information");
       }
     }
     catch (const ZException& e) {
-      QMessageBox::critical(this, QApplication::applicationName(),
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
                             QString("Can not detect resolution from lsm file:\n%1").arg(e.what()));
     }
   }
@@ -188,7 +190,9 @@ void ZPunctaDetectionDialog::init()
   adjustInputImageWidget();
 
   m_tubeThreshold.setVisible(false);
-  connect(&m_dendriteChannel, &ZStringIntOptionParameter::valueChanged, this,
+  connect(&m_dendriteChannel,
+          &ZStringIntOptionParameter::valueChanged,
+          this,
           &ZPunctaDetectionDialog::dendriteChannelChanged);
 
   auto mainLayout = new QVBoxLayout;
@@ -209,30 +213,34 @@ void ZPunctaDetectionDialog::createIOGroupBox()
   QStringList filters;
   std::vector<FileFormat> formats;
   ZImg::getQtReadNameFilter(filters, formats);
-  m_inputImageFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile, "Input Image:",
+  m_inputImageFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenSingleFile,
+                                                 "Input Image:",
                                                  filters[0],
                                                  ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_inputImageFileWidget);
   connect(m_inputImageFileWidget, &ZSelectFileWidget::changed, this, &ZPunctaDetectionDialog::inputImageChanged);
 
-  m_inputSwcFilesWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFiles, "Input Swcs:",
+  m_inputSwcFilesWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::OpenMultipleFiles,
+                                                "Input Swcs:",
                                                 tr("Swcs (*.swc)"),
                                                 ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Swc"));
   alllayout->addWidget(m_inputSwcFilesWidget);
 
-  m_outputPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output All Puncta File:",
+  m_outputPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                   "Output All Puncta File:",
                                                    tr("Nimp (*.nimp)"),
                                                    ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
   alllayout->addWidget(m_outputPunctaFileWidget);
 
-  m_outputSomaPunctaFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
-                                                       "Output All Soma Puncta File:",
-                                                       tr("Nimp (*.nimp)"),
-                                                       ZSystemInfo::instance().lastOpenedObjPathQSettingLocation(
-                                                         "Puncta"));
+  m_outputSomaPunctaFileWidget =
+    new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                          "Output All Soma Puncta File:",
+                          tr("Nimp (*.nimp)"),
+                          ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Puncta"));
   alllayout->addWidget(m_outputSomaPunctaFileWidget);
 
-  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
+  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                "Output Log File:",
                                                 tr("Log (*.txt)"),
                                                 ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
@@ -310,8 +318,8 @@ void ZPunctaDetectionDialog::createParaGroupBox()
   glayout->addWidget(m_maxDistToBranchInUm.createNameLabel(), 4, 0);
   glayout->addWidget(m_maxDistToBranchInUm.createWidget(), 4, 1);
 
-  //glayout->addWidget(m_ambiguousFactor.createNameLabel(), 5, 0);
-  //glayout->addWidget(m_ambiguousFactor.createWidget(), 5, 1);
+  // glayout->addWidget(m_ambiguousFactor.createNameLabel(), 5, 0);
+  // glayout->addWidget(m_ambiguousFactor.createWidget(), 5, 1);
   alllayout->addLayout(glayout);
 #endif
 

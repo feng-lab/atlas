@@ -44,8 +44,10 @@ Z3DView::Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent)
 
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DView::init);
 
-  connect(&m_doc, &ZDoc::requestToAdjustViewToPosition,
-          this, qOverload<double, double, double, double>(&Z3DView::cameraFocusesOn));
+  connect(&m_doc,
+          &ZDoc::requestToAdjustViewToPosition,
+          this,
+          qOverload<double, double, double, double>(&Z3DView::cameraFocusesOn));
 }
 
 Z3DView::~Z3DView()
@@ -67,10 +69,11 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   } else if (id == 3) {
     return m_globalParas->widgetsGroup(false);
   } else {
-    for (auto & m_3dObjView : m_3dObjViews) {
+    for (auto& m_3dObjView : m_3dObjViews) {
       std::shared_ptr<ZWidgetsGroup> wg = m_3dObjView->viewSettingWidgetsGroupOf(id);
-      if (wg)
+      if (wg) {
         return wg;
+      }
     }
   }
   return std::shared_ptr<ZWidgetsGroup>();
@@ -83,18 +86,19 @@ QWidget* Z3DView::globalParasWidget()
 
 QWidget* Z3DView::captureWidget() const
 {
-  //auto res = new QScrollArea();
+  // auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot,
-          this, &Z3DView::takeScreenShot);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
-          this, &Z3DView::takeFixedSizeScreenShot);
-//  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
-//          this, &Z3DView::takeSeriesScreenShot);
-//  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
-//          this, &Z3DView::takeFixedSizeSeriesScreenShot);
-  //res->setWidget(m_screenShotWidget);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, this, &Z3DView::takeScreenShot);
+  connect(m_screenShotWidget,
+          &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
+          this,
+          &Z3DView::takeFixedSizeScreenShot);
+  //  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
+  //          this, &Z3DView::takeSeriesScreenShot);
+  //  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
+  //          this, &Z3DView::takeFixedSizeSeriesScreenShot);
+  // res->setWidget(m_screenShotWidget);
 
   return m_screenShotWidget;
 }
@@ -116,8 +120,8 @@ QWidget* Z3DView::helpWidget()
   edt->appendPlainText("zoom/dolly:");
   edt->appendPlainText("    1) command/control key + mouse wheel scroll");
   edt->appendPlainText("    2) command/control key + =(+)/- key");
-  //edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
-  //edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
+  // edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
+  // edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
   edt->appendPlainText("rotate:");
   edt->appendPlainText("    1) [(optional) command/control key] + mouse drag");
   edt->appendPlainText("    2) command/control key + Left/Right/Up/Down key");
@@ -135,7 +139,7 @@ QWidget* Z3DView::helpWidget()
 void Z3DView::updateBoundBox()
 {
   m_boundBox.reset();
-  for (auto & m_3dObjView : m_3dObjViews) {
+  for (auto& m_3dObjView : m_3dObjViews) {
     m_boundBox.expand(m_3dObjView->boundBox());
   }
   if (m_boundBox.empty()) {
@@ -161,18 +165,17 @@ void Z3DView::updateBoundBox()
 
   m_globalParas->zCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.z) - 1,
                                            std::ceil(m_boundBox.maxCorner.z) + 1);
-
 }
 
 void Z3DView::read(size_t id, const json::object& json)
 {
-  for (auto & m_3dObjView : m_3dObjViews) {
+  for (auto& m_3dObjView : m_3dObjViews) {
     if (m_3dObjView->hasObj(id)) {
       if (asQString(json.at("ViewObjType")) == m_3dObjView->doc().typeName()) {
         m_3dObjView->read(id, json);
       } else {
-        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType"))
-                     << " dones't match object type " << m_3dObjView->doc().typeName() << ". abort.";
+        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType")) << " dones't match object type "
+                     << m_3dObjView->doc().typeName() << ". abort.";
       }
       return;
     }
@@ -215,13 +218,13 @@ void Z3DView::write(json::object& json) const
 void Z3DView::zoomIn()
 {
   camera().dolly(1.1);
-  //resetCameraClippingRange();
+  // resetCameraClippingRange();
 }
 
 void Z3DView::zoomOut()
 {
   camera().dolly(0.9);
-  //resetCameraClippingRange();
+  // resetCameraClippingRange();
 }
 
 void Z3DView::resetCamera()
@@ -256,7 +259,9 @@ bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int he
 }
 
 bool Z3DView::takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
-                                                                   int width, int height, Z3DScreenShotType sst)
+                                                                   int width,
+                                                                   int height,
+                                                                   Z3DScreenShotType sst)
 {
   bool res = true;
   if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
@@ -339,79 +344,80 @@ void Z3DView::setYZView()
   resetCameraClippingRange();
 }
 
-//bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-//                                            bool clockWise, int numFrame, int width, int height, Z3DScreenShotType sst)
+// bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+//                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType
+//                                             sst)
 //{
-//  using namespace boost::math::double_constants;
-//  QString title = "Capturing Images...";
-//  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-//    title = "Capturing Half Side-By-Side Stereo Images...";
-//  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-//    title = "Capturing Full Side-By-Side Stereo Images...";
-//  }
-//  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-//  progress.setWindowModality(Qt::WindowModal);
-//  progress.show();
-//  double rAngle = two_pi / numFrame;
-//  bool res = true;
-//  for (auto i = 0; i < numFrame; ++i) {
-//    progress.setValue(i);
-//    if (progress.wasCanceled())
-//      break;
+//   using namespace boost::math::double_constants;
+//   QString title = "Capturing Images...";
+//   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
+//     title = "Capturing Half Side-By-Side Stereo Images...";
+//   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+//     title = "Capturing Full Side-By-Side Stereo Images...";
+//   }
+//   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
+//   progress.setWindowModality(Qt::WindowModal);
+//   progress.show();
+//   double rAngle = two_pi / numFrame;
+//   bool res = true;
+//   for (auto i = 0; i < numFrame; ++i) {
+//     progress.setValue(i);
+//     if (progress.wasCanceled())
+//       break;
 //
-//    if (clockWise)
-//      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//    else
-//      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//    //resetCameraClippingRange();
-//    auto fieldWidth = numDigits(numFrame);
-//    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-//    auto filepath = dir.filePath(filename);
-//    if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
-//      res = false;
-//      break;
-//    }
-//  }
-//  progress.setValue(numFrame);
-//  return res;
-//}
+//     if (clockWise)
+//       camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//     else
+//       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//     //resetCameraClippingRange();
+//     auto fieldWidth = numDigits(numFrame);
+//     auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+//     auto filepath = dir.filePath(filename);
+//     if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
+//       res = false;
+//       break;
+//     }
+//   }
+//   progress.setValue(numFrame);
+//   return res;
+// }
 //
-//bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-//                                   bool clockWise, int numFrame, Z3DScreenShotType sst)
+// bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+//                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
 //{
-//  using namespace boost::math::double_constants;
-//  QString title = "Capturing Images...";
-//  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-//    title = "Capturing Half Side-By-Side Stereo Images...";
-//  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-//    title = "Capturing Full Side-By-Side Stereo Images...";
-//  }
-//  QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-//  progress.setWindowModality(Qt::WindowModal);
-//  progress.show();
-//  double rAngle = two_pi / numFrame;
-//  bool res = true;
-//  for (auto i = 0; i < numFrame; ++i) {
-//    progress.setValue(i);
-//    if (progress.wasCanceled())
-//      break;
+//   using namespace boost::math::double_constants;
+//   QString title = "Capturing Images...";
+//   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
+//     title = "Capturing Half Side-By-Side Stereo Images...";
+//   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+//     title = "Capturing Full Side-By-Side Stereo Images...";
+//   }
+//   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
+//   progress.setWindowModality(Qt::WindowModal);
+//   progress.show();
+//   double rAngle = two_pi / numFrame;
+//   bool res = true;
+//   for (auto i = 0; i < numFrame; ++i) {
+//     progress.setValue(i);
+//     if (progress.wasCanceled())
+//       break;
 //
-//    if (clockWise)
-//      camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//    else
-//      camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//    //resetCameraClippingRange();
-//    auto fieldWidth = numDigits(numFrame);
-//    auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-//    auto filepath = dir.filePath(filename);
-//    if (!takeScreenShot(filepath, sst)) {
-//      res = false;
-//      break;
-//    }
-//  }
-//  progress.setValue(numFrame);
-//  return res;
-//}
+//     if (clockWise)
+//       camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//     else
+//       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
+//     //resetCameraClippingRange();
+//     auto fieldWidth = numDigits(numFrame);
+//     auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+//     auto filepath = dir.filePath(filename);
+//     if (!takeScreenShot(filepath, sst)) {
+//       res = false;
+//       break;
+//     }
+//   }
+//   progress.setValue(numFrame);
+//   return res;
+// }
 
 void Z3DView::init()
 {
@@ -430,7 +436,7 @@ void Z3DView::init()
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_canvasPainter);
 
-  //packages
+  // packages
   for (auto objDoc : m_doc.objDocs()) {
     if (auto imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       auto imgView = new Z3DImgView(*imgDoc, *this);

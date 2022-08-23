@@ -13,7 +13,8 @@ class Z3DView;
 
 class Z3DCameraControlWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DView& view, QWidget* parent = nullptr);
 
@@ -65,4 +66,3 @@ private:
 };
 
 } // namespace nim
-

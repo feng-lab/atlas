@@ -48,7 +48,11 @@ void ZServiceManager::init()
   QObject::connect(m_dbThread, &QThread::finished, this, &ZServiceManager::dbThreadFinished, Qt::DirectConnection);
   QObject::connect(m_pushThread, &QThread::finished, this, &ZServiceManager::pushThreadFinished, Qt::DirectConnection);
   QObject::connect(m_rpcThread, &QThread::finished, this, &ZServiceManager::rpcThreadFinished, Qt::DirectConnection);
-  QObject::connect(m_logicThread, &QThread::finished, this, &ZServiceManager::logicThreadFinished, Qt::DirectConnection);
+  QObject::connect(m_logicThread,
+                   &QThread::finished,
+                   this,
+                   &ZServiceManager::logicThreadFinished,
+                   Qt::DirectConnection);
   m_ioThread->start();
   m_dbThread->start();
   m_pushThread->start();
@@ -217,9 +221,8 @@ bool ZServiceManager::isCurrentOn(ZServiceManager::ThreadType p)
   }
 
   if (p == ZServiceManager::EXTERNAL) {
-    if (cur != m_uiThread && cur != m_dbThread
-        && cur != m_ioThread && cur != m_pushThread
-        && cur != m_rpcThread && cur != m_logicThread) {
+    if (cur != m_uiThread && cur != m_dbThread && cur != m_ioThread && cur != m_pushThread && cur != m_rpcThread &&
+        cur != m_logicThread) {
       return true;
     }
   }

@@ -10,7 +10,8 @@ class ZRPCService;
 
 class ZServiceManager : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZServiceManager(QObject* parent = nullptr);
 
@@ -37,7 +38,6 @@ public:
   ZRPCService* rpcService();
 
 private:
-
   void dbThreadStarted();
 
   void ioThreadStarted();
@@ -82,5 +82,3 @@ private:
 extern ZServiceManager* g_sm;
 
 } // namespace nim
-
-

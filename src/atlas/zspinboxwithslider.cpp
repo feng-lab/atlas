@@ -10,8 +10,7 @@ namespace nim {
 
 ZSliderEventFilter::ZSliderEventFilter(QObject* parent)
   : QObject(parent)
-{
-}
+{}
 
 bool ZSliderEventFilter::eventFilter(QObject* obj, QEvent* event)
 {
@@ -37,8 +36,7 @@ ZSlider2::ZSlider2(QWidget* parent)
 
 ZSlider2::ZSlider2(Qt::Orientation ori, QWidget* parent)
   : QSlider(ori, parent)
-{
-}
+{}
 
 void ZSlider2::focusInEvent(QFocusEvent* e)
 {
@@ -52,8 +50,14 @@ void ZSlider2::focusOutEvent(QFocusEvent* e)
   setFocusPolicy(Qt::StrongFocus);
 }
 
-ZSpinBoxWithSlider::ZSpinBoxWithSlider(int value, int min, int max, int step, bool tracking,
-                                       const QString& prefix, const QString& suffix, QWidget* parent)
+ZSpinBoxWithSlider::ZSpinBoxWithSlider(int value,
+                                       int min,
+                                       int max,
+                                       int step,
+                                       bool tracking,
+                                       const QString& prefix,
+                                       const QString& suffix,
+                                       QWidget* parent)
   : QWidget(parent)
 {
   createWidget(value, min, max, step, tracking, prefix, suffix);
@@ -87,7 +91,12 @@ void ZSpinBoxWithSlider::setDataRange(int min, int max)
   m_spinBox->setRange(min, max);
 }
 
-void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
+void ZSpinBoxWithSlider::createWidget(int value,
+                                      int min,
+                                      int max,
+                                      int step,
+                                      bool tracking,
+                                      const QString& prefix,
                                       const QString& suffix)
 {
   m_slider = new ZSlider2();
@@ -109,16 +118,29 @@ void ZSpinBoxWithSlider::createWidget(int value, int min, int max, int step, boo
   connect(m_spinBox, qOverload<int>(&ZSpinBox::valueChanged), this, &ZSpinBoxWithSlider::valueChangedFromSpinBox);
 }
 
-ZDoubleSpinBoxWithSlider::ZDoubleSpinBoxWithSlider(double value, double min, double max, double step,
-                                                   int decimal, bool tracking, const QString& prefix,
-                                                   const QString& suffix, QWidget* parent)
-  : QWidget(parent), m_value(value), m_min(min), m_max(max), m_step(step), m_decimal(decimal), m_tracking(tracking)
+ZDoubleSpinBoxWithSlider::ZDoubleSpinBoxWithSlider(double value,
+                                                   double min,
+                                                   double max,
+                                                   double step,
+                                                   int decimal,
+                                                   bool tracking,
+                                                   const QString& prefix,
+                                                   const QString& suffix,
+                                                   QWidget* parent)
+  : QWidget(parent)
+  , m_value(value)
+  , m_min(min)
+  , m_max(max)
+  , m_step(step)
+  , m_decimal(decimal)
+  , m_tracking(tracking)
 {
   double sliderMaxValue = (m_max - m_min) / m_step;
-  if (sliderMaxValue > std::numeric_limits<int>::max())
+  if (sliderMaxValue > std::numeric_limits<int>::max()) {
     m_sliderMaxValue = std::numeric_limits<int>::max();
-  else
+  } else {
     m_sliderMaxValue = static_cast<int>(sliderMaxValue);
+  }
   createWidget(prefix, suffix);
 }
 
@@ -151,16 +173,16 @@ void ZDoubleSpinBoxWithSlider::setDataRange(double min, double max)
   m_min = min;
   m_max = max;
   double sliderMaxValue = (m_max - m_min) / m_step;
-  if (sliderMaxValue > std::numeric_limits<int>::max())
+  if (sliderMaxValue > std::numeric_limits<int>::max()) {
     m_sliderMaxValue = std::numeric_limits<int>::max();
-  else
+  } else {
     m_sliderMaxValue = static_cast<int>(sliderMaxValue);
+  }
   m_slider->setRange(0, m_sliderMaxValue);
   m_spinBox->setRange(m_min, m_max);
 }
 
-void ZDoubleSpinBoxWithSlider::createWidget(const QString& prefix,
-                                            const QString& suffix)
+void ZDoubleSpinBoxWithSlider::createWidget(const QString& prefix, const QString& suffix)
 {
   m_slider = new ZSlider2();
   m_slider->setRange(0, m_sliderMaxValue);
@@ -179,7 +201,9 @@ void ZDoubleSpinBoxWithSlider::createWidget(const QString& prefix,
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
   connect(m_slider, &ZSlider2::valueChanged, this, &ZDoubleSpinBoxWithSlider::valueChangedFromSlider);
-  connect(m_spinBox, qOverload<double>(&ZDoubleSpinBox::valueChanged), this,
+  connect(m_spinBox,
+          qOverload<double>(&ZDoubleSpinBox::valueChanged),
+          this,
           &ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox);
 }
 

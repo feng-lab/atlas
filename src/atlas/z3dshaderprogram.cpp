@@ -23,8 +23,9 @@ Z3DShaderProgram::~Z3DShaderProgram()
 
 void Z3DShaderProgram::addShader(Z3DShader& shader)
 {
-  if (contains(m_shaders, &shader))
+  if (contains(m_shaders, &shader)) {
     return;
+  }
   if (m_context != shader.context()) {
     throw ZGLException(
       "Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
@@ -95,8 +96,9 @@ void Z3DShaderProgram::link()
 
 void Z3DShaderProgram::bind()
 {
-  if (!m_linked)
+  if (!m_linked) {
     link();
+  }
   m_textureUnitManager.reset();
   m_locToTextureUnit.clear();
   glUseProgram(m_id);
@@ -144,8 +146,9 @@ void Z3DShaderProgram::bindFragDataLocationForce(GLuint colorNumber, const QStri
 
 void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture)
 {
-  if (!texture)
+  if (!texture) {
     return;
+  }
 
   auto loc = uniformLocation(name);
   if (loc != -1) {
@@ -170,8 +173,9 @@ void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* textur
 
 void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture, GLint minFilter, GLint magFilter)
 {
-  if (!texture)
+  if (!texture) {
     return;
+  }
 
   auto loc = uniformLocation(name);
   if (loc != -1) {
@@ -218,8 +222,11 @@ void Z3DShaderProgram::bindTexture(const QString& name, GLenum target, GLuint te
   }
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QString& geomFilename,
-                                          const QString& fragFilename, const QString& header, const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename,
+                                          const QString& geomFilename,
+                                          const QString& fragFilename,
+                                          const QString& header,
+                                          const QString& geomHeader)
 {
   removeAllShaders();
   addShader(Z3DShaderManager::instance().shader(vertFilename, header, m_context));
@@ -232,19 +239,23 @@ void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QSt
   m_shaderFiles << vertFilename << fragFilename << geomFilename;
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename, const QString& fragFilename,
-                                          const QString& header, const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceFile(const QString& vertFilename,
+                                          const QString& fragFilename,
+                                          const QString& header,
+                                          const QString& geomHeader)
 {
   loadFromSourceFile(vertFilename, "", fragFilename, header, geomHeader);
 }
 
-void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, const QString& header,
+void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames,
+                                          const QString& header,
                                           const QString& geomHeader)
 {
   removeAllShaders();
   for (const auto& shaderFilename : shaderFilenames) {
-    if (shaderFilename.isEmpty())
+    if (shaderFilename.isEmpty()) {
       continue;
+    }
     if (shaderFilename.endsWith(".geom", Qt::CaseInsensitive)) {
       addShader(Z3DShaderManager::instance().shader(shaderFilename, geomHeader, m_context));
     } else {
@@ -255,8 +266,11 @@ void Z3DShaderProgram::loadFromSourceFile(const QStringList& shaderFilenames, co
   m_shaderFiles = shaderFilenames;
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QStringList& geomSrcs,
-                                          const QStringList& fragSrcs, const QString& header, const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs,
+                                          const QStringList& geomSrcs,
+                                          const QStringList& fragSrcs,
+                                          const QString& header,
+                                          const QString& geomHeader)
 {
   removeAllShaders();
   for (const auto& i : vertSrcs) {
@@ -277,8 +291,10 @@ void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QSt
   link();
 }
 
-void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs, const QStringList& fragSrcs,
-                                          const QString& header, const QString& geomHeader)
+void Z3DShaderProgram::loadFromSourceCode(const QStringList& vertSrcs,
+                                          const QStringList& fragSrcs,
+                                          const QString& header,
+                                          const QString& geomHeader)
 {
   loadFromSourceCode(vertSrcs, QStringList(), fragSrcs, header, geomHeader);
 }
@@ -312,45 +328,47 @@ int Z3DShaderProgram::attributeLocation(const QString& name) const
   return -1;
 }
 
-//void Z3DShaderProgram::setUniformValue(GLint loc, bool value)
+// void Z3DShaderProgram::setUniformValue(GLint loc, bool value)
 //{
-//  setUniformValue(loc, static_cast<GLint>(value));
-//}
+//   setUniformValue(loc, static_cast<GLint>(value));
+// }
 
-//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2)
+// void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2)
 //{
-//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2));
-//}
+//   setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2));
+// }
 
-//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3)
+// void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3)
 //{
-//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
-//}
+//   setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
+// }
 
-//void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3, bool v4)
+// void Z3DShaderProgram::setUniformValue(GLint loc, bool v1, bool v2, bool v3, bool v4)
 //{
-//  setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3), static_cast<GLint>(v4));
-//}
+//   setUniformValue(loc, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3),
+//   static_cast<GLint>(v4));
+// }
 
-//void Z3DShaderProgram::setUniformValue(const QString &name, bool value)
+// void Z3DShaderProgram::setUniformValue(const QString &name, bool value)
 //{
-//  setUniformValue(name, static_cast<GLint>(value));
-//}
+//   setUniformValue(name, static_cast<GLint>(value));
+// }
 
-//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2)
+// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2)
 //{
-//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2));
-//}
+//   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2));
+// }
 
-//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3)
+// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3)
 //{
-//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
-//}
+//   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3));
+// }
 
-//void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3, bool v4)
+// void Z3DShaderProgram::setUniformValue(const QString &name, bool v1, bool v2, bool v3, bool v4)
 //{
-//  setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3), static_cast<GLint>(v4));
-//}
+//   setUniformValue(name, static_cast<GLint>(v1), static_cast<GLint>(v2), static_cast<GLint>(v3),
+//   static_cast<GLint>(v4));
+// }
 
 void Z3DShaderProgram::storeUniformLocations()
 {
@@ -365,8 +383,9 @@ void Z3DShaderProgram::storeUniformLocations()
     glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetUniformLocation(programId(), name.data());
     QString nm(name.data());
-    if (nm.endsWith("[0]"))
+    if (nm.endsWith("[0]")) {
       nm.chop(3);
+    }
     m_uniforms.insert_or_assign(nm, u);
   }
 

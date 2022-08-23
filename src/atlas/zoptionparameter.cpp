@@ -9,9 +9,9 @@ namespace nim {
 template<class T, class T2>
 ZOptionParameter<T, T2>::ZOptionParameter(const QString& name, QObject* parent, QString prefix, QString suffix)
   : ZSingleValueParameter<T>(name, parent)
-  , m_prefix(std::move(prefix)), m_suffix(std::move(suffix))
-{
-}
+  , m_prefix(std::move(prefix))
+  , m_suffix(std::move(suffix))
+{}
 
 template<class T, class T2>
 void ZOptionParameter<T, T2>::select(const T& value)
@@ -166,33 +166,31 @@ void ZOptionParameter<T, T2>::forceSetValueSameAs(const ZParameter& rhs)
   }
 }
 
-template
-class ZOptionParameter<QString, int>;
+template class ZOptionParameter<QString, int>;
 
-template
-class ZOptionParameter<int, int>;
+template class ZOptionParameter<int, int>;
 
-template
-class ZOptionParameter<QString, QString>;
+template class ZOptionParameter<QString, QString>;
 
-ZStringIntOptionParameter::ZStringIntOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+ZStringIntOptionParameter::ZStringIntOptionParameter(const QString& name,
+                                                     QObject* parent,
+                                                     const QString& prefix,
                                                      const QString& suffix)
   : ZOptionParameter<QString, int>(name, parent, prefix, suffix)
-{
-}
+{}
 
-
-ZStringStringOptionParameter::ZStringStringOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+ZStringStringOptionParameter::ZStringStringOptionParameter(const QString& name,
+                                                           QObject* parent,
+                                                           const QString& prefix,
                                                            const QString& suffix)
   : ZOptionParameter<QString, QString>(name, parent, prefix, suffix)
-{
-}
+{}
 
-
-ZIntIntOptionParameter::ZIntIntOptionParameter(const QString& name, QObject* parent, const QString& prefix,
+ZIntIntOptionParameter::ZIntIntOptionParameter(const QString& name,
+                                               QObject* parent,
+                                               const QString& prefix,
                                                const QString& suffix)
   : ZOptionParameter<int, int>(name, parent, prefix, suffix)
-{
-}
+{}
 
 } // namespace nim

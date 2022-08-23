@@ -15,7 +15,8 @@ public:
   explicit Z3DRenderTarget(GLint internalColorFormat = GLint(GL_RGBA16),
                            GLint internalDepthFormat = GLint(GL_DEPTH_COMPONENT24),
                            glm::uvec2 size = glm::uvec2(32, 32),
-                           bool multisample = false, int sample = 4);
+                           bool multisample = false,
+                           int sample = 4);
 
   // empty fbo with no attachment
   explicit Z3DRenderTarget(glm::uvec2 size);
@@ -34,18 +35,23 @@ public:
 
   void clear() const;
 
-  //Returns the OpenGL framebuffer object handle for this framebuffer object (returned by the glGenFrameBuffers() function).
-  // returned fbo should only be used for read if multisample is used
+  // Returns the OpenGL framebuffer object handle for this framebuffer object (returned by the glGenFrameBuffers()
+  // function).
+  //  returned fbo should only be used for read if multisample is used
   [[nodiscard]] GLuint handle() const;
 
   // might crash
   [[nodiscard]] const Z3DTexture* attachment(GLenum attachment) const
-  { return m_attachments.at(attachment); }
+  {
+    return m_attachments.at(attachment);
+  }
 
   Z3DTexture* attachment(GLenum attachment)
-  { return m_attachments.at(attachment); }
+  {
+    return m_attachments.at(attachment);
+  }
 
-  //Get the color at position pos. This method will bind the RenderTarget!
+  // Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(const glm::ivec2& pos);
 
   glm::col4 colorAtPos(const glm::ivec2& pos);
@@ -53,7 +59,9 @@ public:
   GLfloat depthAtPos(const glm::ivec2& pos);
 
   [[nodiscard]] glm::uvec2 size() const
-  { return m_size; }
+  {
+    return m_size;
+  }
 
   bool resize(const glm::uvec2& newsize);
 
@@ -107,4 +115,3 @@ protected:
 };
 
 } // namespace nim
-

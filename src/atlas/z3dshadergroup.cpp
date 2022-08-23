@@ -11,10 +11,11 @@ Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase& rendererBase)
   , m_geometryInputType(GL_LINES_ADJACENCY)
   , m_geometryOutputType(GL_TRIANGLE_STRIP)
   , m_geometryOutputVertexCount(24)
-{
-}
+{}
 
-void Z3DShaderGroup::init(const QStringList& shaderFiles, const QString& header, const QString& geomHeader,
+void Z3DShaderGroup::init(const QStringList& shaderFiles,
+                          const QString& header,
+                          const QString& geomHeader,
                           const QStringList& normalShaderFiles)
 {
   m_shaderFiles = shaderFiles;
@@ -96,8 +97,8 @@ void Z3DShaderGroup::bind()
   } else if (m_base.shaderHookType() == Z3DRendererBase::ShaderHookType::WeightedBlendedInit) {
     float n = m_base.camera().nearDist();
     float f = m_base.camera().farDist();
-    //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
-    // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
+    // http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
+    //  zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
     float a = f * n / (f - n);
     float b = 0.5f * (f + n) / (f - n) + 0.5f;
     get().setUniform("ze_to_zw_b", b);
@@ -169,7 +170,7 @@ void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram* shader)
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
 }
 
-//#define USE_RECT_TEX
+// #define USE_RECT_TEX
 
 void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader)
 {
@@ -199,7 +200,7 @@ void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
 }
 
-void Z3DShaderGroup::buildWeightedBlendedShader(Z3DShaderProgram *shader)
+void Z3DShaderGroup::buildWeightedBlendedShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "wblended_init.frag";

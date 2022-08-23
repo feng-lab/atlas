@@ -11,7 +11,7 @@ namespace nim {
 
 #ifdef ATLAS_USE_OPENGLWIDGET
 
-Z3DCanvas::Z3DCanvas(const QString &title, int width, int height, QWidget* parent, Qt::WindowFlags f)
+Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QOpenGLWidget(parent, f)
 {
   setWindowTitle(title);
@@ -59,12 +59,12 @@ void Z3DCanvas::mousePressEvent(QMouseEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::mouseReleaseEvent (QMouseEvent* e)
+void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 {
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::mouseMoveEvent(QMouseEvent*  e)
+void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
   broadcastEvent(e, width(), height());
 }
@@ -90,24 +90,23 @@ void Z3DCanvas::keyReleaseEvent(QKeyEvent* event)
   broadcastEvent(event, width(), height());
 }
 
-void Z3DCanvas::resizeEvent(QResizeEvent *event)
+void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
   QOpenGLWidget::resizeEvent(event);
-  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(),
-                         event->size().height() * devicePixelRatioF());
+  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(), event->size().height() * devicePixelRatioF());
 }
 
-void Z3DCanvas::paintEvent(QPaintEvent *event)
+void Z3DCanvas::paintEvent(QPaintEvent* event)
 {
   QOpenGLWidget::paintEvent(event);
 }
 
-void Z3DCanvas::dragEnterEvent(QDragEnterEvent *event)
+void Z3DCanvas::dragEnterEvent(QDragEnterEvent* event)
 {
   event->ignore();
 }
 
-void Z3DCanvas::dropEvent(QDropEvent *event)
+void Z3DCanvas::dropEvent(QDropEvent* event)
 {
   event->ignore();
 }
@@ -189,7 +188,7 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator *n)
+void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator* n)
 {
   m_networkEvaluator = n;
 }
@@ -199,19 +198,21 @@ void Z3DCanvas::setFakeStereoOnce()
   m_fakeStereoOnce = true;
 }
 
-void Z3DCanvas::addEventListenerToBack(Z3DCanvasEventListener *e)
+void Z3DCanvas::addEventListenerToBack(Z3DCanvasEventListener* e)
 {
-  if (e)
+  if (e) {
     m_listeners.push_back(e);
+  }
 }
 
-void Z3DCanvas::addEventListenerToFront(Z3DCanvasEventListener *e)
+void Z3DCanvas::addEventListenerToFront(Z3DCanvasEventListener* e)
 {
-  if (e)
+  if (e) {
     m_listeners.push_front(e);
+  }
 }
 
-void Z3DCanvas::removeEventListener(Z3DCanvasEventListener *e)
+void Z3DCanvas::removeEventListener(Z3DCanvasEventListener* e)
 {
   std::deque<Z3DCanvasEventListener*>::iterator pos;
   pos = std::find(m_listeners.begin(), m_listeners.end(), e);
@@ -226,18 +227,18 @@ void Z3DCanvas::clearEventListeners()
   m_listeners.clear();
 }
 
-void Z3DCanvas::broadcastEvent(QEvent *e, int w, int h)
+void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
 {
   getGLFocus();
   for (auto listener : m_listeners) {
     listener->onEvent(e, w, h);
-    if (e->isAccepted())
+    if (e->isAccepted()) {
       break;
+    }
   }
 }
 
 #else
-
 
 Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* parent, Qt::WindowFlags f)
   : QGraphicsView(parent)
@@ -374,11 +375,11 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
   getGLFocus();
   QGraphicsView::resizeEvent(event);
-  if (m_3dScene)
+  if (m_3dScene) {
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
+  }
 
-  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(),
-                         event->size().height() * devicePixelRatioF());
+  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(), event->size().height() * devicePixelRatioF());
 }
 
 void Z3DCanvas::paintEvent(QPaintEvent* event)
@@ -450,7 +451,7 @@ void Z3DCanvas::timerEvent(QTimerEvent* e)
   broadcastEvent(e, width(), height());
 }
 
-void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator *n)
+void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator* n)
 {
   m_3dScene->setNetworkEvaluator(n);
 }
@@ -475,8 +476,9 @@ void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
   getGLFocus();
   for (auto listener : m_listeners) {
     listener->onEvent(e, w, h);
-    if (e->isAccepted())
+    if (e->isAccepted()) {
       break;
+    }
   }
 }
 

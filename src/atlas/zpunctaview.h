@@ -8,7 +8,8 @@ namespace nim {
 
 class ZPunctaView : public ZFilterView<ZPunctaDoc, ZPunctaFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZPunctaView(ZPunctaDoc& doc, ZView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

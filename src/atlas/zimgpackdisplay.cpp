@@ -49,8 +49,9 @@ void ZImgPackDisplay::showChannel(size_t ch, double minData, double maxData)
 void ZImgPackDisplay::hideChannel(size_t ch)
 {
   auto it = m_channels.find(ch);
-  if (it != m_channels.end())
+  if (it != m_channels.end()) {
     m_channels.erase(it);
+  }
 }
 
 void ZImgPackDisplay::showAllChannels(double minData, double maxData)
@@ -93,8 +94,9 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
   }
 
   ZQImagePack resV;
-  if (m_channels.empty())
+  if (m_channels.empty()) {
     return resV;
+  }
 
   try {
     std::vector<std::shared_ptr<ZImg>> imgs;
@@ -133,7 +135,8 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
     }
   }
   catch (const ZException& e) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
                           QString("img error: %1").arg(e.what()));
   }
 
@@ -141,7 +144,9 @@ ZQImagePack ZImgPackDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) c
 }
 
 template<typename TVoxel>
-void ZImgPackDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+void ZImgPackDisplay::setQImageDataBlockCM(const ZImg* img,
+                                           QImage* qim,
+                                           const tbb::blocked_range<size_t>& rowRange,
                                            const std::vector<size_t>* channels,
                                            const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
@@ -164,10 +169,11 @@ void ZImgPackDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const t
 }
 
 template<typename TVoxel>
-void
-ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
-                                               const std::vector<size_t>* channels,
-                                               const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
+void ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img,
+                                                    QImage* qim,
+                                                    const tbb::blocked_range<size_t>& rowRange,
+                                                    const std::vector<size_t>* channels,
+                                                    const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
   for (size_t c = 0; c < channels->size(); ++c) {
@@ -184,10 +190,11 @@ ZImgPackDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, con
       }
       // multiply alpha channel (which contains global alpha)
       float a = (*colormaps)[c].color(*(imgDatas[c])++).a / 255.f;
-      qimData[j] = qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
-                         static_cast<int>(col.g * a + .5f),
-                         static_cast<int>(col.b * a + .5f),
-                         static_cast<int>(col.a * a + .5f));
+      qimData[j] =
+        qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
+              static_cast<int>(col.g * a + .5f),
+              static_cast<int>(col.b * a + .5f),
+              static_cast<int>(col.a * a + .5f));
     }
   }
 }
@@ -229,7 +236,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
       colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
     } else {
       col4 maxCol(m_channelColors.at(ch));
-      if (alphaChannelIdx < 0) {  // no alpha channel, encode global alpha into colormap
+      if (alphaChannelIdx < 0) { // no alpha channel, encode global alpha into colormap
         maxCol.r = static_cast<uint8_t>(m_alpha * maxCol.r + 0.5);
         maxCol.g = static_cast<uint8_t>(m_alpha * maxCol.g + 0.5);
         maxCol.b = static_cast<uint8_t>(m_alpha * maxCol.b + 0.5);
@@ -239,7 +246,7 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
           colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
         }
         colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
-      } else {  // has alpha channel, skip global alpha as it is already encoded in alpha channel's colormap
+      } else { // has alpha channel, skip global alpha as it is already encoded in alpha channel's colormap
         maxCol.a = 255;
         TVoxel v = minimum;
         for (; v < maximum; ++v) {
@@ -251,21 +258,21 @@ void ZImgPackDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
     idx++;
   }
 
-  if (alphaChannelIdx < 0 || m_channels.size() == 1) {  // no alpha channel or only alpha channel
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      [&](const tbb::blocked_range<size_t>& range) {
-                        setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
-                      });
+  if (alphaChannelIdx < 0 || m_channels.size() == 1) { // no alpha channel or only alpha channel
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   } else {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      [&](const tbb::blocked_range<size_t>& range) {
-                        setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
-                      });
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   }
 }
 
 template<typename TVoxel>
-void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+void ZImgPackDisplay::setQImageDataBlock(const ZImg* img,
+                                         QImage* qim,
+                                         const tbb::blocked_range<size_t>& rowRange,
                                          const std::vector<size_t>* channels) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
@@ -283,8 +290,9 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
     chCol[c].g = static_cast<uint8_t>(m_alpha * chCol[c].g + 0.5);
     chCol[c].b = static_cast<uint8_t>(m_alpha * chCol[c].b + 0.5);
     chCol[c].a = static_cast<uint8_t>(m_alpha * 255 + 0.5);
-    if (imgInfo().isAlphaChannel(ch))
+    if (imgInfo().isAlphaChannel(ch)) {
       alphaChannelIdx = c;
+    }
   }
   if (alphaChannelIdx < 0) {
     for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
@@ -328,10 +336,11 @@ void ZImgPackDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb
           // multiply alpha channel
           double a = (*(imgDatas[c])++ - chMinValue[c]) / (chMaxValue[c] - chMinValue[c]);
           a = a < 0.0 ? 0.0 : a > 1.0 ? 1.0 : a;
-          qimData[j] = qRgba(static_cast<int>(col.r * a + .5), // not correct for some edge cases but faster than std::round
-                             static_cast<int>(col.g * a + .5),
-                             static_cast<int>(col.b * a + .5),
-                             static_cast<int>(col.a * a + .5));
+          qimData[j] =
+            qRgba(static_cast<int>(col.r * a + .5), // not correct for some edge cases but faster than std::round
+                  static_cast<int>(col.g * a + .5),
+                  static_cast<int>(col.b * a + .5),
+                  static_cast<int>(col.a * a + .5));
         }
       }
     }
@@ -347,16 +356,16 @@ void ZImgPackDisplay::setQImageData(const ZImg& img, QImage& qim) const
     channels[idx++] = chRange.first;
   }
 
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                    [&](const tbb::blocked_range<size_t>& range) {
-                      setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
-                    });
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+    setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
+  });
 }
 
 void ZImgPackDisplay::fillQImage(const ZImg& img, QImage& qim) const
 {
-  if (m_channels.empty())
+  if (m_channels.empty()) {
     return;
+  }
   size_t bytesPerVoxel = img.bytesPerVoxel();
   VoxelFormat vf = img.voxelFormat();
   if (vf == VoxelFormat::Float) {
@@ -408,4 +417,3 @@ void ZImgPackDisplay::fillQImage(const ZImg& img, QImage& qim) const
 }
 
 } // namespace nim
-

@@ -54,13 +54,14 @@ QRectF DiagramTextItem::boundingRect() const
 }
 
 ExpandArrowSvgItem::ExpandArrowSvgItem(const QString& filename,
-                                       const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+                                       const ZAnimationDisplayPack& pack,
+                                       ZTimelineWidget& timeline,
                                        QGraphicsItem* parent)
   : QGraphicsSvgItem(filename, parent)
   , m_displayPack(pack)
   , m_timeline(timeline)
 {
-  //setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
+  // setShapeMode(QGraphicsPixmapItem::BoundingRectShape);
 }
 
 void ExpandArrowSvgItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
@@ -103,7 +104,8 @@ void ObjBoundRectItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
   }
 }
 
-ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplayPack& pack,
+                                                         ZTimelineWidget& timeline,
                                                          QGraphicsItem* parent)
   : QGraphicsRectItem(parent)
   , m_displayPack(pack)
@@ -115,8 +117,7 @@ ParameterAnimationColorItem::ParameterAnimationColorItem(const ZAnimationDisplay
 
 void ParameterAnimationColorItem::mousePressEvent(QGraphicsSceneMouseEvent* /*event*/)
 {
-  QColor newColor = QColorDialog::getColor(m_displayPack.paraAnimation->color(), &m_timeline,
-                                           "New Color");
+  QColor newColor = QColorDialog::getColor(m_displayPack.paraAnimation->color(), &m_timeline, "New Color");
   if (newColor.isValid()) {
     m_displayPack.paraAnimation->setColor(newColor);
     setBrush(QBrush(m_displayPack.paraAnimation->color()));
@@ -135,10 +136,10 @@ ZTimelineObjScene::ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent)
 
 void ZTimelineObjScene::updateItems()
 {
-  //ZBenchTimer bt;
-  //bt.start();
+  // ZBenchTimer bt;
+  // bt.start();
   const auto& dps = m_timeline.animation().displayPacks();
-  int height = (dps.size() + 2) * m_timeline.rowHeight();  // leave space for horizonal scrollbar
+  int height = (dps.size() + 2) * m_timeline.rowHeight(); // leave space for horizonal scrollbar
   setSceneRect(0, 0, m_timeline.objViewWidth(), height);
   this->clear();
   m_itemToDisplayPack.clear();
@@ -163,13 +164,13 @@ void ZTimelineObjScene::updateItems()
       rect->setPos(0, pack.row * m_timeline.rowHeight());
       new DiagramTextItem(pack, rect, Qt::AlignVCenter | Qt::AlignLeft);
       if (pack.expanded) {
-        ExpandArrowSvgItem* arrow = new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowDownIcon),
-                                                           pack, m_timeline, rect);
+        ExpandArrowSvgItem* arrow =
+          new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowDownIcon), pack, m_timeline, rect);
         arrow->setPos(rect->rect().right() - 8 - arrow->boundingRect().width(),
                       (m_timeline.rowHeight() - arrow->boundingRect().height()) / 2.);
       } else {
-        ExpandArrowSvgItem* arrow = new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowRightIcon),
-                                                           pack, m_timeline, rect);
+        ExpandArrowSvgItem* arrow =
+          new ExpandArrowSvgItem(ZTheme::instance().iconFile(ZTheme::ArrowRightIcon), pack, m_timeline, rect);
         arrow->setPos(rect->rect().right() - 8 - arrow->boundingRect().width(),
                       (m_timeline.rowHeight() - arrow->boundingRect().height()) / 2.);
       }
@@ -198,8 +199,8 @@ void ZTimelineObjScene::updateItems()
     }
   }
 
-  //bt.stop();
-  //LOG(INFO) << bt;
+  // bt.stop();
+  // LOG(INFO) << bt;
 }
 
 } // namespace nim

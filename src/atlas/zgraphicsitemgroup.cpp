@@ -8,7 +8,7 @@ namespace nim {
 ZGraphicsItemGroup::ZGraphicsItemGroup(QGraphicsItem* parent)
   : QGraphicsItemGroup(parent)
 {
-  //setFlag(QGraphicsItem::ItemIsSelectable, true);
+  // setFlag(QGraphicsItem::ItemIsSelectable, true);
 }
 
 /*!
@@ -17,16 +17,18 @@ ZGraphicsItemGroup::ZGraphicsItemGroup(QGraphicsItem* parent)
     NOTE: This function is a duplicate of qt_graphicsItem_highlightSelected() in
           qgraphicssvgitem.cpp!
 */
-static void qt_graphicsItem_highlightSelected(
-  QGraphicsItem* item, QPainter* painter, const QStyleOptionGraphicsItem* option)
+static void
+qt_graphicsItem_highlightSelected(QGraphicsItem* item, QPainter* painter, const QStyleOptionGraphicsItem* option)
 {
   const QRectF murect = painter->transform().mapRect(QRectF(0, 0, 1, 1));
-  if (qFuzzyIsNull(qMax(murect.width(), murect.height())))
+  if (qFuzzyIsNull(qMax(murect.width(), murect.height()))) {
     return;
+  }
 
   const QRectF mbrect = painter->transform().mapRect(item->boundingRect());
-  if (qMin(mbrect.width(), mbrect.height()) < qreal(1.0))
+  if (qMin(mbrect.width(), mbrect.height()) < qreal(1.0)) {
     return;
+  }
 
   qreal itemPenWidth;
   switch (item->type()) {
@@ -72,9 +74,9 @@ static void qt_graphicsItem_highlightSelected(
 
 void ZGraphicsItemGroup::paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* /*widget*/)
 {
-  if (option->state & QStyle::State_Selected)
+  if (option->state & QStyle::State_Selected) {
     qt_graphicsItem_highlightSelected(this, painter, option);
+  }
 }
 
 } // namespace nim
-

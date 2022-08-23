@@ -51,8 +51,9 @@ public:
       m_cacheItemsMap.erase(it);
     }
 
-    if (size > m_maxSize)
+    if (size > m_maxSize) {
       return;
+    }
 
     m_cacheItemsList.emplace_front(key, std::move(object), size);
     m_cacheItemsMap[key] = m_cacheItemsList.begin();
@@ -79,42 +80,42 @@ public:
     QReadLocker lock(&m_lock);
     auto it = m_cacheItemsMap.find(key);
     if (it != m_cacheItemsMap.end()) {
-      //m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
+      // m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it->second);
       return std::get<1>(*(it->second));
     } else {
       return ValueType();
     }
   }
 
-//  void stopCacheEviction()
-//  {
-//    ++m_cacheEvictionLockCounter;
-//  }
-//
-//  void resumeCacheEviction()
-//  {
-//    // make sure only 1 thread do the eviction
-//    size_t expected = 1;
-//    if (m_cacheEvictionLockCounter.compare_exchange_strong(expected, 0)) {
-//      evict();
-//    } else {
-//      CHECK(m_cacheEvictionLockCounter.load() > 0);
-//      --m_cacheEvictionLockCounter;
-//    }
-//  }
+  //  void stopCacheEviction()
+  //  {
+  //    ++m_cacheEvictionLockCounter;
+  //  }
+  //
+  //  void resumeCacheEviction()
+  //  {
+  //    // make sure only 1 thread do the eviction
+  //    size_t expected = 1;
+  //    if (m_cacheEvictionLockCounter.compare_exchange_strong(expected, 0)) {
+  //      evict();
+  //    } else {
+  //      CHECK(m_cacheEvictionLockCounter.load() > 0);
+  //      --m_cacheEvictionLockCounter;
+  //    }
+  //  }
 
 protected:
   ~ZSharedCache() = default;
 
   void evict()
   {
-    //if (m_cacheEvictionLockCounter.load() == 0) {
-      while (m_totalSize > m_maxSize) {
-        const auto& back = m_cacheItemsList.back();
-        m_cacheItemsMap.erase(std::get<0>(back));
-        m_totalSize -= std::get<2>(back);
-        m_cacheItemsList.pop_back();
-      }
+    // if (m_cacheEvictionLockCounter.load() == 0) {
+    while (m_totalSize > m_maxSize) {
+      const auto& back = m_cacheItemsList.back();
+      m_cacheItemsMap.erase(std::get<0>(back));
+      m_totalSize -= std::get<2>(back);
+      m_cacheItemsList.pop_back();
+    }
     //}
   }
 
@@ -125,7 +126,7 @@ private:
   size_t m_maxSize;
   mutable size_t m_totalSize = 0;
   mutable QReadWriteLock m_lock;
-  //std::atomic<size_t> m_cacheEvictionLockCounter = 0;
+  // std::atomic<size_t> m_cacheEvictionLockCounter = 0;
 };
 
 class ZImgCache : public ZSharedCache<ZImgPack::HashKeyType, ZImg>
@@ -159,12 +160,9 @@ struct ImageCacheHashKeyType
 {
   ImageCacheHashKeyType(const void* p, size_t i)
     : m_storage(new Storage(p, i))
-  {
-  }
+  {}
 
-  ImageCacheHashKeyType()
-  {
-  }
+  ImageCacheHashKeyType() {}
 
   inline size_t index() const
   {
@@ -204,8 +202,7 @@ private:
   {
     Storage(const void* p, size_t i)
       : m_data(p, i)
-    {
-    }
+    {}
 
     std::tuple<const void*, size_t> m_data;
     mutable std::atomic<size_t> m_hash;
@@ -223,7 +220,8 @@ private:
   std::shared_ptr<Storage> m_storage;
 };
 
-using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ImageCacheHashKeyType::HashCompare>;
+using ZThreadSafeScalableImageCache =
+  ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ImageCacheHashKeyType::HashCompare>;
 
 #else
 
@@ -244,7 +242,8 @@ struct ZHashCompare
   }
 };
 
-using ZThreadSafeScalableImageCache = ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
+using ZThreadSafeScalableImageCache =
+  ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
 
 #endif
 
@@ -263,7 +262,8 @@ public:
   }
 
   // never return nullptr, throw ZException on error
-  inline std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key, const ZImgSubBlock& imgBlock,
+  inline std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key,
+                                         const ZImgSubBlock& imgBlock,
                                          FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
@@ -277,9 +277,9 @@ public:
   }
 
   // never return nullptr, throw ZException on error
-  inline folly::Future<std::shared_ptr<ZImg>>
-  getOrReadAsync(const ImageCacheHashKeyType& key, const ZImgSubBlock& imgBlock,
-                 FindStategy findStategy = FindStategy::UpdateLRUList)
+  inline folly::Future<std::shared_ptr<ZImg>> getOrReadAsync(const ImageCacheHashKeyType& key,
+                                                             const ZImgSubBlock& imgBlock,
+                                                             FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     auto cpuExecutor = getGlobalCPUExecutor();
     auto ioExecutor = folly::getGlobalIOExecutor();
@@ -288,12 +288,12 @@ public:
       if (find(ca, key, findStategy)) {
         return folly::makeFuture(*ca);
       } else {
-        return folly::via(ioExecutor, [&imgBlock]() {
-          return imgBlock.read();
-        }).via(cpuExecutor).then([=](folly::Try<std::shared_ptr<ZImg>> res) {
-          insert(key, res.value());
-          return res.value();
-        });
+        return folly::via(ioExecutor, [&imgBlock]() { return imgBlock.read(); })
+          .via(cpuExecutor)
+          .then([=](folly::Try<std::shared_ptr<ZImg>> res) {
+            insert(key, res.value());
+            return res.value();
+          });
       }
     });
   }
@@ -309,8 +309,7 @@ public:
     }
   }
 
-  inline bool contains(const ImageCacheHashKeyType& key,
-                       FindStategy findStategy = FindStategy::UpdateLRUList)
+  inline bool contains(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
     return find(ca, key, findStategy);
@@ -319,7 +318,7 @@ public:
 
 #endif
 
-}  // namespace nim
+} // namespace nim
 
 namespace std {
 
@@ -345,4 +344,3 @@ struct hash<nim::ImageCacheHashKeyType>
 #endif
 
 } // namespace std
-

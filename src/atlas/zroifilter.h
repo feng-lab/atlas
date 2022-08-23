@@ -28,14 +28,15 @@ public:
   };
 
   [[nodiscard]] int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
   SliceROIGraphicsItem(ZROI& roi, int slice, QGraphicsItem* parent = nullptr);
 
   void updateValue();
 
 protected:
-
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
 private:
@@ -54,13 +55,21 @@ public:
   };
 
   [[nodiscard]] int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  ROIGraphicsItem(ZROI& roi, int slice, size_t id, ZView& view, const RegionNode* regionNode = nullptr,
+  ROIGraphicsItem(ZROI& roi,
+                  int slice,
+                  size_t id,
+                  ZView& view,
+                  const RegionNode* regionNode = nullptr,
                   QGraphicsItem* parent = nullptr);
 
   void setHighlightOnHover(bool v)
-  { setAcceptHoverEvents(v); }
+  {
+    setAcceptHoverEvents(v);
+  }
 
   void updateValue();
 
@@ -68,7 +77,7 @@ public:
 
   void setLocked(bool l);
 
-  void setBrush_(const QBrush &brush)
+  void setBrush_(const QBrush& brush)
   {
     if (m_roi.shapeOperations(m_slice, m_id).front().type != ROIType::Line) {
       setBrush(brush);
@@ -76,10 +85,10 @@ public:
   }
 
 protected:
-  //void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
+  // void mouseDoubleClickEvent(QGraphicsSceneMouseEvent* event) override;
 
   // void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
-//
+  //
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
 
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
@@ -108,10 +117,16 @@ public:
   };
 
   int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  ROICtrlPtGraphicsItem(ZROI& roi, const ZROIControlPoint& controlPoint, const QTransform& tfm, ZView& view,
-                        double viewScale = 1., const RegionNode* regionNode = nullptr,
+  ROICtrlPtGraphicsItem(ZROI& roi,
+                        const ZROIControlPoint& controlPoint,
+                        const QTransform& tfm,
+                        ZView& view,
+                        double viewScale = 1.,
+                        const RegionNode* regionNode = nullptr,
                         QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -121,15 +136,22 @@ public:
   void setViewScale(double s);
 
   void setTransform_(const QTransform& tfm)
-  { m_transform = tfm; updateValue(); }
+  {
+    m_transform = tfm;
+    updateValue();
+  }
 
   ZROIControlPoint controlPoint() const
-  { return m_controlPoint; }
+  {
+    return m_controlPoint;
+  }
 
   void setLocked(bool l);
 
   ZROI& roi()
-  { return m_roi; }
+  {
+    return m_roi;
+  }
 
   // void paint(QPainter* painter, const QStyleOptionGraphicsItem* option, QWidget* widget = nullptr) override;
 
@@ -138,7 +160,7 @@ protected:
 
   void contextMenuEvent(QGraphicsSceneContextMenuEvent* event) override;
 
-//  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
+  //  void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
   void mouseReleaseEvent(QGraphicsSceneMouseEvent* event) override;
 
@@ -162,7 +184,8 @@ private:
 
 class ZROIFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZROIFilter(ZView& view, const RegionNode* regionNode = nullptr);
 
@@ -187,19 +210,29 @@ public:
   void setMaxZProjView(int t) override;
 
   void setOutlineColor(const glm::vec3& col)
-  { m_outlineColor.set(col); }
+  {
+    m_outlineColor.set(col);
+  }
 
   void setRegionColor(const glm::vec3& col)
-  { m_regionColor.set(col); }
+  {
+    m_regionColor.set(col);
+  }
 
   [[nodiscard]] glm::vec3 outlineColor() const
-  { return m_outlineColor.get(); }
+  {
+    return m_outlineColor.get();
+  }
 
   [[nodiscard]] glm::vec3 regionColor() const
-  { return m_regionColor.get(); }
+  {
+    return m_regionColor.get();
+  }
 
   [[nodiscard]] double opacity() const
-  { return m_opacity.get(); }
+  {
+    return m_opacity.get();
+  }
 
   [[nodiscard]] QString regionName() const;
 
@@ -228,22 +261,34 @@ public:
   void rotateCounterclockwise(double x, double y) override;
 
   ZIntParameter& viewPrecedencePara()
-  { return m_viewPrecedencePara; }
+  {
+    return m_viewPrecedencePara;
+  }
 
   Z2DTransformParameter& transformPara()
-  { return m_transform; }
+  {
+    return m_transform;
+  }
 
   ZDVec2Parameter& offsetPara()
-  { return m_offsetPara; }
+  {
+    return m_offsetPara;
+  }
 
   ZBoolParameter& showControlPointsPara()
-  { return m_showControlPoints; }
+  {
+    return m_showControlPoints;
+  }
 
   ZBoolParameter& fixedControlPointsSizePara()
-  { return m_fixedControlPointsSize; }
+  {
+    return m_fixedControlPointsSize;
+  }
 
   ZBoolParameter& highlightRegionOnMouseHoverPara()
-  { return m_highlightRegionOnMouseHover; }
+  {
+    return m_highlightRegionOnMouseHover;
+  }
 
 protected:
   void viewPrecedenceChanged() override;
@@ -275,7 +320,8 @@ private:
 
   void highlightRegionOnMouseHoverChanged();
 
-  void onRoiChanged(int slice, const std::set<size_t>& newShapes,
+  void onRoiChanged(int slice,
+                    const std::set<size_t>& newShapes,
                     const std::set<size_t>& deletedShapes,
                     const std::set<size_t>& changedShapes);
 
@@ -310,4 +356,3 @@ private:
 };
 
 } // namespace nim
-

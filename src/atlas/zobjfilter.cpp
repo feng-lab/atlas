@@ -8,11 +8,13 @@ namespace nim {
 ZObjFilter::ZObjFilter(ZView& view)
   : m_view(view)
   , m_visible("Visible", true)
-  , m_viewPrecedencePara(QString("View Precedence"), 0,
+  , m_viewPrecedencePara(QString("View Precedence"),
+                         0,
                          std::numeric_limits<int>::min(),
                          std::numeric_limits<int>::max())
   , m_transform(QString("Transform"))
-  , m_offsetPara(QString("Offset"), glm::dvec2(0),
+  , m_offsetPara(QString("Offset"),
+                 glm::dvec2(0),
                  glm::dvec2(std::numeric_limits<int>::min()),
                  glm::dvec2(std::numeric_limits<int>::max()))
 {
@@ -52,8 +54,9 @@ QPointF ZObjFilter::mapFromScene(QPointF p) const
   bool invertible = false;
   QTransform itrans = getQTransform().inverted(&invertible);
 
-  if (!invertible)
+  if (!invertible) {
     LOG(WARNING) << "Can not map from scene rect, transform matrix is not invertible.";
+  }
   return itrans.map(p);
 }
 
@@ -70,15 +73,18 @@ void ZObjFilter::removeParameter(ZParameter* para)
 
 void ZObjFilter::updateBoundBoxWithOffsetPara(ZBBox<glm::ivec4>& boundBox) const
 {
-  QRectF rect(boundBox.minCorner.x, boundBox.minCorner.y,
+  QRectF rect(boundBox.minCorner.x,
+              boundBox.minCorner.y,
               boundBox.maxCorner.x - boundBox.minCorner.x,
               boundBox.maxCorner.y - boundBox.minCorner.y);
   QTransform trans = getQTransform();
   QRectF mappedRect = trans.mapRect(rect);
-  boundBox.setMinCorner(glm::ivec4(std::floor(mappedRect.left()), std::floor(mappedRect.top()),
+  boundBox.setMinCorner(glm::ivec4(std::floor(mappedRect.left()),
+                                   std::floor(mappedRect.top()),
                                    m_offsetPara.get().x + boundBox.minCorner.z,
                                    m_offsetPara.get().y + boundBox.minCorner.w));
-  boundBox.setMaxCorner(glm::ivec4(std::ceil(mappedRect.right()), std::ceil(mappedRect.bottom()),
+  boundBox.setMaxCorner(glm::ivec4(std::ceil(mappedRect.right()),
+                                   std::ceil(mappedRect.bottom()),
                                    m_offsetPara.get().x + boundBox.maxCorner.z,
                                    m_offsetPara.get().y + boundBox.maxCorner.w));
 }
@@ -100,14 +106,13 @@ QRectF ZObjFilter::mapFromSceneRect(const QRectF& rect) const
   bool invertible = false;
   QTransform itrans = getQTransform().inverted(&invertible);
 
-  if (!invertible)
+  if (!invertible) {
     LOG(WARNING) << "Can not map from scene rect, transform matrix is not invertible.";
+  }
   return itrans.mapRect(rect);
 }
 
-void ZObjFilter::viewPrecedenceChanged()
-{
-}
+void ZObjFilter::viewPrecedenceChanged() {}
 
 void ZObjFilter::transformChanged()
 {

@@ -103,7 +103,8 @@ private:
 
 template<class TKey, class TValue, class THash>
 ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t maxSize, size_t numShards)
-  : m_maxSize(maxSize), m_numShards(numShards)
+  : m_maxSize(maxSize)
+  , m_numShards(numShards)
 {
   if (m_numShards == 0) {
     m_numShards = std::thread::hardware_concurrency();
@@ -119,40 +120,37 @@ ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t m
 
 template<class TKey, class TValue, class THash>
 typename ZThreadSafeScalableCache<TKey, TValue, THash>::Shard&
-ZThreadSafeScalableCache<TKey, TValue, THash>::
-getShard(const TKey& key)
+ZThreadSafeScalableCache<TKey, TValue, THash>::getShard(const TKey& key)
 {
   THash hashObj;
   constexpr int shift = std::numeric_limits<size_t>::digits - 16;
   size_t h = (hashObj.hash(key) >> shift) % m_numShards;
-  //size_t h = (hashObj.hash(key) & 0xFFFF) % m_numShards;
+  // size_t h = (hashObj.hash(key) & 0xFFFF) % m_numShards;
   return *m_shards.at(h);
 }
 
 template<class TKey, class TValue, class THash>
-bool ZThreadSafeScalableCache<TKey, TValue, THash>::
-find(ConstAccessor& ac, const TKey& key, typename Shard::FindStrategy findStategy)
+bool ZThreadSafeScalableCache<TKey, TValue, THash>::find(ConstAccessor& ac,
+                                                         const TKey& key,
+                                                         typename Shard::FindStrategy findStategy)
 {
   return getShard(key).find(ac, key, findStategy);
 }
 
 template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::
-remove(const TKey& key)
+void ZThreadSafeScalableCache<TKey, TValue, THash>::remove(const TKey& key)
 {
   return getShard(key).remove(key);
 }
 
 template<class TKey, class TValue, class THash>
-bool ZThreadSafeScalableCache<TKey, TValue, THash>::
-insert(const TKey& key, const TValue& value, size_t objSize)
+bool ZThreadSafeScalableCache<TKey, TValue, THash>::insert(const TKey& key, const TValue& value, size_t objSize)
 {
   return getShard(key).insert(key, value, objSize);
 }
 
 template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::
-clear()
+void ZThreadSafeScalableCache<TKey, TValue, THash>::clear()
 {
   for (size_t i = 0; i < m_numShards; i++) {
     m_shards[i]->clear();
@@ -160,8 +158,7 @@ clear()
 }
 
 template<class TKey, class TValue, class THash>
-void ZThreadSafeScalableCache<TKey, TValue, THash>::
-snapshotKeys(std::vector<TKey>& keys)
+void ZThreadSafeScalableCache<TKey, TValue, THash>::snapshotKeys(std::vector<TKey>& keys)
 {
   for (size_t i = 0; i < m_numShards; i++) {
     m_shards[i]->snapshotKeys(keys);
@@ -169,8 +166,7 @@ snapshotKeys(std::vector<TKey>& keys)
 }
 
 template<class TKey, class TValue, class THash>
-size_t ZThreadSafeScalableCache<TKey, TValue, THash>::
-size() const
+size_t ZThreadSafeScalableCache<TKey, TValue, THash>::size() const
 {
   size_t size = 0;
   for (size_t i = 0; i < m_numShards; i++) {

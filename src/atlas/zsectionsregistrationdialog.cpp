@@ -55,8 +55,9 @@ void ZSectionsRegistrationDialog::createWorker(nim::ZImgProcess*& worker, QStrin
   auto workertmp = new ZSectionsRegistration(m_inputImagesFileWidget->getSelectedMultipleOpenFiles(),
                                              m_outputStackWidget->getSelectedSaveFile(),
                                              m_referenceImageIndex.get());
-  if (refChannel >= 0)
+  if (refChannel >= 0) {
     workertmp->setReferenceChannel(refChannel);
+  }
   workertmp->setRemoveBackground(m_removeBackground.get());
   workertmp->setRemoveHighForeground(m_removeHighForeground.get());
   workertmp->setAllowFlip(m_allowFlip.get());
@@ -84,8 +85,9 @@ void ZSectionsRegistrationDialog::adjustInputImageWidget()
 void ZSectionsRegistrationDialog::inputImagesChanged()
 {
   QStringList fns = m_inputImagesFileWidget->getSelectedMultipleOpenFiles();
-  if (fns.empty())
+  if (fns.empty()) {
     return;
+  }
 
   QString fn = fns[0];
   QFileInfo fi(fn);
@@ -105,7 +107,9 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
     numFrames = info[0].depth;
   }
   catch (const ZIOException& e) {
-    QMessageBox::critical(this, QApplication::applicationName(), QString("Can not parse input image:\n%1").arg(e.what()));
+    QMessageBox::critical(this,
+                          QApplication::applicationName(),
+                          QString("Can not parse input image:\n%1").arg(e.what()));
     return;
   }
 
@@ -121,7 +125,8 @@ void ZSectionsRegistrationDialog::inputImagesChanged()
 
 void ZSectionsRegistrationDialog::init()
 {
-  m_metric.addOptions("Mean Differences", "Mean Squared Differences",
+  m_metric.addOptions("Mean Differences",
+                      "Mean Squared Differences",
                       "Log Absolute Differences",
                       "Normalized Cross-Correlation",
                       "Normalized Mutual Information");
@@ -166,12 +171,14 @@ void ZSectionsRegistrationDialog::createIOGroupBox()
 
   adjustInputImageWidget();
 
-  m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Aligned Image:",
+  m_outputStackWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                              "Output Aligned Image:",
                                               tr("Stack (*.nim)"),
                                               ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputStackWidget);
 
-  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Log File:",
+  m_outputLogFileWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                "Output Log File:",
                                                 tr("Log (*.txt)"),
                                                 ZSystemInfo::instance().lastOpenedObjPathQSettingLocation("Image"));
   alllayout->addWidget(m_outputLogFileWidget);
@@ -193,7 +200,7 @@ void ZSectionsRegistrationDialog::createParaGroupBox()
   auto hlayout = new QHBoxLayout;
   hlayout->addWidget(m_referenceChannel.createNameLabel());
   hlayout->addWidget(m_referenceChannel.createWidget());
-  //hlayout->addStretch(1);
+  // hlayout->addStretch(1);
   alllayout->addLayout(hlayout);
 
   hlayout = new QHBoxLayout;
@@ -253,4 +260,3 @@ void ZSectionsRegistrationDialog::createParaGroupBox()
 }
 
 } // namespace nim
-

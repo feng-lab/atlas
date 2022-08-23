@@ -15,8 +15,7 @@ namespace nim {
 ZObjDoc::ZObjDoc(ZDoc& doc)
   : QObject(&doc)
   , m_doc(doc)
-{
-}
+{}
 
 void ZObjDoc::showObjInGraphicalShell(size_t id) const
 {
@@ -39,21 +38,24 @@ size_t ZObjDoc::chooseOneObjWithWidget(const QString& title, QWidget* parent) co
 
 QString ZObjDoc::objNameWithModifiedMarker(size_t id) const
 {
-  if (objHasUnsavedChange(id))
+  if (objHasUnsavedChange(id)) {
     return QString("%1*").arg(objName(id));
+  }
 
   return objName(id);
 }
 
 QString ZObjDoc::objNameWithModifiedMarkerAndID(size_t id) const
 {
-  if (objHasUnsavedChange(id))
+  if (objHasUnsavedChange(id)) {
     return QString("%1* (id: %2)").arg(objName(id)).arg(id);
+  }
 
   return QString("%1 (id: %2)").arg(objName(id)).arg(id);
 }
 
-std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json::value>>& docKeyValueList, QString& err)
+std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json::value>>& docKeyValueList,
+                                       QString& err)
 {
   std::map<size_t, size_t> idmap;
   auto allObjs = objs();
@@ -82,7 +84,7 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
 
   while (!idToJsonValue.empty()) {
     auto it = idToJsonValue.begin();
-    json::value jv = it->second;  // copy
+    json::value jv = it->second; // copy
     // LOG(INFO) << jv;
     std::set<size_t> ids; // collect all ids that are pointing to jv
     ids.insert(it->first);
@@ -106,9 +108,9 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
 
     if (existingIds.empty()) {
       QString errMsg;
-      //LOG(INFO) << jv;
+      // LOG(INFO) << jv;
       size_t id = loadFile(jv, errMsg);
-      //LOG(INFO) << jv << errMsg;
+      // LOG(INFO) << jv << errMsg;
       if (id == 0) {
         err += QString("%1\n").arg(errMsg);
         continue;
@@ -119,8 +121,9 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
     if (ids.size() > existingIds.size()) {
       size_t firstId = *existingIds.begin();
       size_t num = ids.size() - existingIds.size();
-      for (size_t i = 0; i < num; ++i)
+      for (size_t i = 0; i < num; ++i) {
         existingIds.insert(makeAlias(firstId));
+      }
     }
     auto it1 = ids.begin();
     auto it2 = existingIds.begin();

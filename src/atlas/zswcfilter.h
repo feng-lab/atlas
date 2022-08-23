@@ -95,13 +95,18 @@ public:
   };
 
   [[nodiscard]] int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
   explicit ZSwcSkeletonGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent = nullptr);
 
   // item is not selectable (otherwise it will be hard to select swc nodes), we just fake some visual clue here
   inline void setSelected_(bool v)
-  { m_selected = v; update(); }
+  {
+    m_selected = v;
+    update();
+  }
 
   void setShowSkeleton(bool v)
   {
@@ -115,11 +120,11 @@ public:
     update();
   }
 
-//  void setOpacity(double v)
-//  {
-//    m_opacity = v;
-//    update();
-//  }
+  //  void setOpacity(double v)
+  //  {
+  //    m_opacity = v;
+  //    update();
+  //  }
 
   void setSizeScale(double sizeScale)
   {
@@ -147,6 +152,7 @@ public:
   }
 
   // QGraphicsItem interface
+
 public:
   [[nodiscard]] QRectF boundingRect() const override;
 
@@ -174,9 +180,13 @@ public:
   };
 
   int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  ZSwcNodeGraphicsItem(ZSwcPack& swcPack, const ZSwc::SwcTreeNode& swcNode, const QTransform& tfm,
+  ZSwcNodeGraphicsItem(ZSwcPack& swcPack,
+                       const ZSwc::SwcTreeNode& swcNode,
+                       const QTransform& tfm,
                        QGraphicsItem* parent = nullptr);
 
   void updateValue();
@@ -184,7 +194,10 @@ public:
   void updateRectSize();
 
   inline void setTransform_(const QTransform& tfm)
-  { m_transform = tfm; updateValue(); }
+  {
+    m_transform = tfm;
+    updateValue();
+  }
 
   inline void setSizeScale(double sizeScale)
   {
@@ -213,7 +226,8 @@ private:
 
 class ZSwcFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSwcFilter(ZView& view);
 
@@ -291,4 +305,3 @@ private:
 };
 
 } // namespace nim
-

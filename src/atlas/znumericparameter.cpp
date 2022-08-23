@@ -54,15 +54,15 @@ QWidget* ZIntParameter::actualCreateWidget(QWidget* parent)
     connect(this, &ZIntParameter::rangeChanged, sb, &ZSpinBox::setRange);
     return sb;
   } else if (m_style == "SPINBOXWITHSCROLLBAR") {
-    ZSpinBoxWithScrollBar* sbws = new ZSpinBoxWithScrollBar(m_value, m_min, m_max, m_step, m_tracking, m_prefix,
-                                                            m_suffix, parent);
+    ZSpinBoxWithScrollBar* sbws =
+      new ZSpinBoxWithScrollBar(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZSpinBoxWithScrollBar::valueChanged, this, &ZIntParameter::setValue);
     connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithScrollBar::setValue);
     connect(this, &ZIntParameter::rangeChanged, sbws, &ZSpinBoxWithScrollBar::setDataRange);
     return sbws;
   } else {
-    ZSpinBoxWithSlider* sbws = new ZSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix,
-                                                      parent);
+    ZSpinBoxWithSlider* sbws =
+      new ZSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZSpinBoxWithSlider::valueChanged, this, &ZIntParameter::setValue);
     connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithSlider::setValue);
     connect(this, &ZIntParameter::rangeChanged, sbws, &ZSpinBoxWithSlider::setDataRange);
@@ -76,7 +76,10 @@ void ZIntParameter::changeRange()
 }
 
 ZDoubleParameter::ZDoubleParameter(const QString& name, QObject* parent)
-  : ZNumericParameter<double>(name, 0.0, std::numeric_limits<double>::lowest(), std::numeric_limits<double>::max(),
+  : ZNumericParameter<double>(name,
+                              0.0,
+                              std::numeric_limits<double>::lowest(),
+                              std::numeric_limits<double>::max(),
                               parent)
 {
   addStyle("SPINBOX");
@@ -118,8 +121,8 @@ QWidget* ZDoubleParameter::actualCreateWidget(QWidget* parent)
     connect(this, &ZDoubleParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
-    ZDoubleSpinBoxWithSlider* sbws = new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step,
-                                                                  m_decimal, m_tracking, m_prefix, m_suffix, parent);
+    ZDoubleSpinBoxWithSlider* sbws =
+      new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_decimal, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDoubleParameter::setValue);
     connect(this, &ZDoubleParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValue);
     connect(this, &ZDoubleParameter::rangeChanged, sbws, &ZDoubleSpinBoxWithSlider::setDataRange);
@@ -174,8 +177,8 @@ QWidget* ZFloatParameter::actualCreateWidget(QWidget* parent)
     connect(this, &ZFloatParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
-    ZDoubleSpinBoxWithSlider* sbws = new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step,
-                                                                  m_decimal, m_tracking, m_prefix, m_suffix, parent);
+    ZDoubleSpinBoxWithSlider* sbws =
+      new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_decimal, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZFloatParameter::setValue);
     connect(this, &ZFloatParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValue);
     connect(this, &ZFloatParameter::rangeChanged, sbws, &ZDoubleSpinBoxWithSlider::setDataRange);
@@ -191,8 +194,11 @@ void ZFloatParameter::changeRange()
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec2Parameter::ZVec2Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::vec2>(name, glm::vec2(0.0), glm::vec2(std::numeric_limits<float>::lowest()),
-                                       glm::vec2(std::numeric_limits<float>::max()), parent)
+  : ZNumericVectorParameter<glm::vec2>(name,
+                                       glm::vec2(0.0),
+                                       glm::vec2(std::numeric_limits<float>::lowest()),
+                                       glm::vec2(std::numeric_limits<float>::max()),
+                                       parent)
 {
   addStyle("SPINBOX");
 }
@@ -215,24 +221,28 @@ void ZVec2Parameter::setValue2(double v)
 
 void ZVec2Parameter::beforeChange(glm::vec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
+  }
 }
 
 QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
 {
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -291,8 +301,15 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec2Parameter::setValue1);
       connect(this, &ZVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -313,8 +330,15 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec2Parameter::setValue2);
       connect(this, &ZVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -343,8 +367,11 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec3Parameter::ZVec3Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::vec3>(name, glm::vec3(0.0), glm::vec3(std::numeric_limits<float>::lowest()),
-                                       glm::vec3(std::numeric_limits<float>::max()), parent)
+  : ZNumericVectorParameter<glm::vec3>(name,
+                                       glm::vec3(0.0),
+                                       glm::vec3(std::numeric_limits<float>::lowest()),
+                                       glm::vec3(std::numeric_limits<float>::max()),
+                                       parent)
 {
   addStyle("SPINBOX");
   addStyle("COLOR");
@@ -374,12 +401,15 @@ void ZVec3Parameter::setValue3(double v)
 
 void ZVec3Parameter::beforeChange(glm::vec3& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
-  if (value[2] != m_value[2])
+  }
+  if (value[2] != m_value[2]) {
     Q_EMIT value3WillChange(value[2]);
+  }
 }
 
 QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
@@ -389,15 +419,17 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
   }
 
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -483,8 +515,15 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue1);
       connect(this, &ZVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -505,8 +544,15 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue2);
       connect(this, &ZVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -527,8 +573,15 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2],
+                                                                     m_min[2],
+                                                                     m_max[2],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue3);
       connect(this, &ZVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
@@ -557,8 +610,11 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZVec4Parameter::ZVec4Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::vec4>(name, glm::vec4(0.0), glm::vec4(std::numeric_limits<float>::lowest()),
-                                       glm::vec4(std::numeric_limits<float>::max()), parent)
+  : ZNumericVectorParameter<glm::vec4>(name,
+                                       glm::vec4(0.0),
+                                       glm::vec4(std::numeric_limits<float>::lowest()),
+                                       glm::vec4(std::numeric_limits<float>::max()),
+                                       parent)
 {
   addStyle("SPINBOX");
   addStyle("COLOR");
@@ -593,14 +649,18 @@ void ZVec4Parameter::setValue4(double v)
 
 void ZVec4Parameter::beforeChange(glm::vec4& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
-  if (value[2] != m_value[2])
+  }
+  if (value[2] != m_value[2]) {
     Q_EMIT value3WillChange(value[2]);
-  if (value[3] != m_value[3])
+  }
+  if (value[3] != m_value[3]) {
     Q_EMIT value4WillChange(value[3]);
+  }
 }
 
 QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
@@ -610,15 +670,17 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
   }
 
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -731,8 +793,15 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue1);
       connect(this, &ZVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -753,8 +822,15 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue2);
       connect(this, &ZVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -775,8 +851,15 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2],
+                                                                     m_min[2],
+                                                                     m_max[2],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue3);
       connect(this, &ZVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
@@ -797,8 +880,15 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3], m_min[3], m_max[3], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3],
+                                                                     m_min[3],
+                                                                     m_max[3],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue4);
       connect(this, &ZVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(3).isEmpty()) {
@@ -824,12 +914,14 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
   return w;
 }
 
-
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec2Parameter::ZDVec2Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::dvec2>(name, glm::dvec2(0.0), glm::dvec2(std::numeric_limits<double>::lowest()),
-                                        glm::dvec2(std::numeric_limits<double>::max()), parent)
+  : ZNumericVectorParameter<glm::dvec2>(name,
+                                        glm::dvec2(0.0),
+                                        glm::dvec2(std::numeric_limits<double>::lowest()),
+                                        glm::dvec2(std::numeric_limits<double>::max()),
+                                        parent)
 {
   addStyle("SPINBOX");
 }
@@ -852,24 +944,28 @@ void ZDVec2Parameter::setValue2(double v)
 
 void ZDVec2Parameter::beforeChange(glm::dvec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
+  }
 }
 
 QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
 {
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -928,8 +1024,15 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec2Parameter::setValue1);
       connect(this, &ZDVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -950,8 +1053,15 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec2Parameter::setValue2);
       connect(this, &ZDVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -980,8 +1090,11 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec3Parameter::ZDVec3Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::dvec3>(name, glm::dvec3(0.0), glm::dvec3(std::numeric_limits<double>::lowest()),
-                                        glm::dvec3(std::numeric_limits<double>::max()), parent)
+  : ZNumericVectorParameter<glm::dvec3>(name,
+                                        glm::dvec3(0.0),
+                                        glm::dvec3(std::numeric_limits<double>::lowest()),
+                                        glm::dvec3(std::numeric_limits<double>::max()),
+                                        parent)
 {
   addStyle("SPINBOX");
   addStyle("COLOR");
@@ -1011,12 +1124,15 @@ void ZDVec3Parameter::setValue3(double v)
 
 void ZDVec3Parameter::beforeChange(glm::dvec3& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
-  if (value[2] != m_value[2])
+  }
+  if (value[2] != m_value[2]) {
     Q_EMIT value3WillChange(value[2]);
+  }
 }
 
 QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
@@ -1026,15 +1142,17 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
   }
 
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -1120,8 +1238,15 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue1);
       connect(this, &ZDVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -1142,8 +1267,15 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue2);
       connect(this, &ZDVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -1164,8 +1296,15 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2],
+                                                                     m_min[2],
+                                                                     m_max[2],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue3);
       connect(this, &ZDVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
@@ -1194,8 +1333,11 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
 //---------------------------------------------------------------------------------------------------------------
 
 ZDVec4Parameter::ZDVec4Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::dvec4>(name, glm::dvec4(0.0), glm::dvec4(std::numeric_limits<double>::lowest()),
-                                        glm::dvec4(std::numeric_limits<double>::max()), parent)
+  : ZNumericVectorParameter<glm::dvec4>(name,
+                                        glm::dvec4(0.0),
+                                        glm::dvec4(std::numeric_limits<double>::lowest()),
+                                        glm::dvec4(std::numeric_limits<double>::max()),
+                                        parent)
 {
   addStyle("SPINBOX");
   addStyle("COLOR");
@@ -1230,14 +1372,18 @@ void ZDVec4Parameter::setValue4(double v)
 
 void ZDVec4Parameter::beforeChange(glm::dvec4& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
-  if (value[2] != m_value[2])
+  }
+  if (value[2] != m_value[2]) {
     Q_EMIT value3WillChange(value[2]);
-  if (value[3] != m_value[3])
+  }
+  if (value[3] != m_value[3]) {
     Q_EMIT value4WillChange(value[3]);
+  }
 }
 
 QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
@@ -1247,15 +1393,17 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
   }
 
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -1368,8 +1516,15 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws1 = new ZDoubleSpinBoxWithSlider(m_value[0],
+                                                                     m_min[0],
+                                                                     m_max[0],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue1);
       connect(this, &ZDVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -1390,8 +1545,15 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws2 = new ZDoubleSpinBoxWithSlider(m_value[1],
+                                                                     m_min[1],
+                                                                     m_max[1],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue2);
       connect(this, &ZDVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -1412,8 +1574,15 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws3 = new ZDoubleSpinBoxWithSlider(m_value[2],
+                                                                     m_min[2],
+                                                                     m_max[2],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue3);
       connect(this, &ZDVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
@@ -1434,8 +1603,15 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZDoubleSpinBoxWithSlider* sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3], m_min[3], m_max[3], m_step,
-                                                                     m_decimal, m_tracking, m_prefix, m_suffix, parent);
+      ZDoubleSpinBoxWithSlider* sbws4 = new ZDoubleSpinBoxWithSlider(m_value[3],
+                                                                     m_min[3],
+                                                                     m_max[3],
+                                                                     m_step,
+                                                                     m_decimal,
+                                                                     m_tracking,
+                                                                     m_prefix,
+                                                                     m_suffix,
+                                                                     parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue4);
       connect(this, &ZDVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(3).isEmpty()) {
@@ -1464,8 +1640,11 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
 //-------------------------------------------------------------------------------------------------
 
 ZIVec2Parameter::ZIVec2Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::ivec2>(name, glm::ivec2(0), glm::ivec2(std::numeric_limits<int>::min()),
-                                        glm::ivec2(std::numeric_limits<int>::max()), parent)
+  : ZNumericVectorParameter<glm::ivec2>(name,
+                                        glm::ivec2(0),
+                                        glm::ivec2(std::numeric_limits<int>::min()),
+                                        glm::ivec2(std::numeric_limits<int>::max()),
+                                        parent)
 {
   addStyle("SPINBOX");
 }
@@ -1488,24 +1667,28 @@ void ZIVec2Parameter::setValue2(int v)
 
 void ZIVec2Parameter::beforeChange(glm::ivec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
+  }
 }
 
 QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
 {
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -1562,8 +1745,8 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZSpinBoxWithSlider* sbws1 = new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                         m_tracking, m_prefix, m_suffix, parent);
+      ZSpinBoxWithSlider* sbws1 =
+        new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws1, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec2Parameter::setValue1);
       connect(this, &ZIVec2Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -1584,8 +1767,8 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBoxWithSlider* sbws2 = new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                         m_tracking, m_prefix, m_suffix, parent);
+      ZSpinBoxWithSlider* sbws2 =
+        new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws2, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec2Parameter::setValue2);
       connect(this, &ZIVec2Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -1614,8 +1797,11 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
 //-------------------------------------------------------------------------------------------------
 
 ZIVec3Parameter::ZIVec3Parameter(const QString& name, QObject* parent)
-  : ZNumericVectorParameter<glm::ivec3>(name, glm::ivec3(0), glm::ivec3(std::numeric_limits<int>::min()),
-                                        glm::ivec3(std::numeric_limits<int>::max()), parent)
+  : ZNumericVectorParameter<glm::ivec3>(name,
+                                        glm::ivec3(0),
+                                        glm::ivec3(std::numeric_limits<int>::min()),
+                                        glm::ivec3(std::numeric_limits<int>::max()),
+                                        parent)
 {
   addStyle("SPINBOX");
 }
@@ -1643,26 +1829,31 @@ void ZIVec3Parameter::setValue3(int v)
 
 void ZIVec3Parameter::beforeChange(glm::ivec3& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT value1WillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT value2WillChange(value[1]);
-  if (value[2] != m_value[2])
+  }
+  if (value[2] != m_value[2]) {
     Q_EMIT value3WillChange(value[2]);
+  }
 }
 
 QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
 {
   QWidget* w;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     w = new QWidget(parent);
-  else
+  } else {
     w = new QGroupBox(m_groupBoxName, parent);
+  }
   QBoxLayout* lo;
-  if (m_widgetOrientation == Qt::Horizontal)
+  if (m_widgetOrientation == Qt::Horizontal) {
     lo = new QHBoxLayout();
-  else
+  } else {
     lo = new QVBoxLayout();
+  }
 
   if (m_style == "SPINBOX") {
     {
@@ -1745,8 +1936,8 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
     }
   } else {
     {
-      ZSpinBoxWithSlider* sbws1 = new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step,
-                                                         m_tracking, m_prefix, m_suffix, parent);
+      ZSpinBoxWithSlider* sbws1 =
+        new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws1, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue1);
       connect(this, &ZIVec3Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(0).isEmpty()) {
@@ -1767,8 +1958,8 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBoxWithSlider* sbws2 = new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step,
-                                                         m_tracking, m_prefix, m_suffix, parent);
+      ZSpinBoxWithSlider* sbws2 =
+        new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws2, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue2);
       connect(this, &ZIVec3Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(1).isEmpty()) {
@@ -1789,8 +1980,8 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       }
     }
     {
-      ZSpinBoxWithSlider* sbws3 = new ZSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step,
-                                                         m_tracking, m_prefix, m_suffix, parent);
+      ZSpinBoxWithSlider* sbws3 =
+        new ZSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws3, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue3);
       connect(this, &ZIVec3Parameter::value3WillChange, sbws3, &ZSpinBoxWithSlider::setValue);
       if (m_nameOfEachValue.at(2).isEmpty()) {
@@ -1819,8 +2010,11 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
 //-------------------------------------------------------------------------------------------------
 
 ZIntSpanParameter::ZIntSpanParameter(const QString& name, QObject* parent)
-  : ZNumericSpanParameter<glm::ivec2>(name, glm::ivec2(0, 0), std::numeric_limits<int>::min(),
-                                      std::numeric_limits<int>::max(), parent)
+  : ZNumericSpanParameter<glm::ivec2>(name,
+                                      glm::ivec2(0, 0),
+                                      std::numeric_limits<int>::min(),
+                                      std::numeric_limits<int>::max(),
+                                      parent)
 {
   addStyle("SPINBOX");
 }
@@ -1833,37 +2027,43 @@ ZIntSpanParameter::ZIntSpanParameter(const QString& name, glm::ivec2 value, int 
 
 void ZIntSpanParameter::setLowerValue(int v)
 {
-  if (v <= m_value[1])
+  if (v <= m_value[1]) {
     set(glm::ivec2(v, m_value[1]));
+  }
 }
 
 void ZIntSpanParameter::setUpperValue(int v)
 {
-  if (v >= m_value[0])
+  if (v >= m_value[0]) {
     set(glm::ivec2(m_value[0], v));
+  }
 }
 
 void ZIntSpanParameter::beforeChange(glm::ivec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT upperValueWillChange(value[1]);
+  }
 }
 
 QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
 {
   if (m_style == "SPINBOX") {
     QWidget* w;
-    if (m_widgetOrientation == Qt::Horizontal)
+    if (m_widgetOrientation == Qt::Horizontal) {
       w = new QWidget(parent);
-    else
+    } else {
       w = new QGroupBox(m_groupBoxName, parent);
+    }
     QBoxLayout* lo;
-    if (m_widgetOrientation == Qt::Horizontal)
+    if (m_widgetOrientation == Qt::Horizontal) {
       lo = new QHBoxLayout();
-    else
+    } else {
       lo = new QVBoxLayout();
+    }
 
     auto sb1 = new ZSpinBox();
     sb1->setRange(m_min, m_value[1]);
@@ -1919,8 +2119,8 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     w->setLayout(lo);
     return w;
   } else {
-    ZSpanSliderWithSpinBox* spanSlider = new ZSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step,
-                                                                    m_tracking, parent);
+    ZSpanSliderWithSpinBox* spanSlider =
+      new ZSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_tracking, parent);
     connect(spanSlider, &ZSpanSliderWithSpinBox::lowerValueChanged, this, &ZIntSpanParameter::setLowerValue);
     connect(spanSlider, &ZSpanSliderWithSpinBox::upperValueChanged, this, &ZIntSpanParameter::setUpperValue);
     connect(this, &ZIntSpanParameter::lowerValueWillChange, spanSlider, &ZSpanSliderWithSpinBox::setLowerValue);
@@ -1936,8 +2136,11 @@ void ZIntSpanParameter::changeRange()
 }
 
 ZFloatSpanParameter::ZFloatSpanParameter(const QString& name, QObject* parent)
-  : ZNumericSpanParameter<glm::vec2>(name, glm::vec2(0.f, 0.f), std::numeric_limits<float>::lowest(),
-                                     std::numeric_limits<float>::max(), parent)
+  : ZNumericSpanParameter<glm::vec2>(name,
+                                     glm::vec2(0.f, 0.f),
+                                     std::numeric_limits<float>::lowest(),
+                                     std::numeric_limits<float>::max(),
+                                     parent)
 {
   addStyle("SPINBOX");
 }
@@ -1950,37 +2153,43 @@ ZFloatSpanParameter::ZFloatSpanParameter(const QString& name, glm::vec2 value, f
 
 void ZFloatSpanParameter::setLowerValue(double v)
 {
-  if (static_cast<float>(v) <= m_value[1])
+  if (static_cast<float>(v) <= m_value[1]) {
     set(glm::vec2(static_cast<float>(v), m_value[1]));
+  }
 }
 
 void ZFloatSpanParameter::setUpperValue(double v)
 {
-  if (static_cast<float>(v) >= m_value[0])
+  if (static_cast<float>(v) >= m_value[0]) {
     set(glm::vec2(m_value[0], static_cast<float>(v)));
+  }
 }
 
 void ZFloatSpanParameter::beforeChange(glm::vec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT upperValueWillChange(value[1]);
+  }
 }
 
 QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
 {
   if (m_style == "SPINBOX") {
     QWidget* w;
-    if (m_widgetOrientation == Qt::Horizontal)
+    if (m_widgetOrientation == Qt::Horizontal) {
       w = new QWidget(parent);
-    else
+    } else {
       w = new QGroupBox(m_groupBoxName, parent);
+    }
     QBoxLayout* lo;
-    if (m_widgetOrientation == Qt::Horizontal)
+    if (m_widgetOrientation == Qt::Horizontal) {
       lo = new QHBoxLayout();
-    else
+    } else {
       lo = new QVBoxLayout();
+    }
 
     auto sb1 = new ZDoubleSpinBox();
     sb1->setRange(m_min, m_value[1]);
@@ -2038,8 +2247,8 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
     w->setLayout(lo);
     return w;
   } else {
-    ZDoubleSpanSliderWithSpinBox* spanSlider = new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max,
-                                                                                m_step, m_decimal, m_tracking, parent);
+    ZDoubleSpanSliderWithSpinBox* spanSlider =
+      new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_decimal, m_tracking, parent);
     connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::lowerValueChanged, this, &ZFloatSpanParameter::setLowerValue);
     connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::upperValueChanged, this, &ZFloatSpanParameter::setUpperValue);
     connect(this, &ZFloatSpanParameter::lowerValueWillChange, spanSlider, &ZDoubleSpanSliderWithSpinBox::setLowerValue);
@@ -2054,43 +2263,50 @@ void ZFloatSpanParameter::changeRange()
   Q_EMIT rangeChanged(m_min, m_max);
 }
 
-
 ZDoubleSpanParameter::ZDoubleSpanParameter(const QString& name, QObject* parent)
-  : ZNumericSpanParameter<glm::dvec2>(name, glm::dvec2(0.0, 0.0), std::numeric_limits<double>::lowest(),
-                                      std::numeric_limits<double>::max(), parent)
-{
-}
+  : ZNumericSpanParameter<glm::dvec2>(name,
+                                      glm::dvec2(0.0, 0.0),
+                                      std::numeric_limits<double>::lowest(),
+                                      std::numeric_limits<double>::max(),
+                                      parent)
+{}
 
-ZDoubleSpanParameter::ZDoubleSpanParameter(const QString& name, glm::dvec2 value, double min, double max,
+ZDoubleSpanParameter::ZDoubleSpanParameter(const QString& name,
+                                           glm::dvec2 value,
+                                           double min,
+                                           double max,
                                            QObject* parent)
   : ZNumericSpanParameter<glm::dvec2>(name, value, min, max, parent)
-{
-}
+{}
 
 void ZDoubleSpanParameter::setLowerValue(double v)
 {
-  if (v <= m_value[1])
+  if (v <= m_value[1]) {
     set(glm::dvec2(v, m_value[1]));
+  }
 }
 
 void ZDoubleSpanParameter::setUpperValue(double v)
 {
-  if (v >= m_value[0])
+  if (v >= m_value[0]) {
     set(glm::dvec2(m_value[0], v));
+  }
 }
 
 void ZDoubleSpanParameter::beforeChange(glm::dvec2& value)
 {
-  if (value[0] != m_value[0])
+  if (value[0] != m_value[0]) {
     Q_EMIT lowerValueWillChange(value[0]);
-  if (value[1] != m_value[1])
+  }
+  if (value[1] != m_value[1]) {
     Q_EMIT upperValueWillChange(value[1]);
+  }
 }
 
 QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
 {
-  ZDoubleSpanSliderWithSpinBox* spanSlider = new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max,
-                                                                              m_step, m_decimal, m_tracking, parent);
+  ZDoubleSpanSliderWithSpinBox* spanSlider =
+    new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_decimal, m_tracking, parent);
   connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::lowerValueChanged, this, &ZDoubleSpanParameter::setLowerValue);
   connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::upperValueChanged, this, &ZDoubleSpanParameter::setUpperValue);
   connect(this, &ZDoubleSpanParameter::lowerValueWillChange, spanSlider, &ZDoubleSpanSliderWithSpinBox::setLowerValue);

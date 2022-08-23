@@ -7,8 +7,14 @@
 
 namespace nim {
 
-ZSpinBoxWithScrollBar::ZSpinBoxWithScrollBar(int value, int min, int max, int step, bool tracking,
-                                             const QString& prefix, const QString& suffix, QWidget* parent)
+ZSpinBoxWithScrollBar::ZSpinBoxWithScrollBar(int value,
+                                             int min,
+                                             int max,
+                                             int step,
+                                             bool tracking,
+                                             const QString& prefix,
+                                             const QString& suffix,
+                                             QWidget* parent)
   : QWidget(parent)
 {
   createWidget(value, min, max, step, tracking, prefix, suffix);
@@ -43,7 +49,12 @@ void ZSpinBoxWithScrollBar::setDataRange(int min, int max)
   m_spinBox->setRange(min, max);
 }
 
-void ZSpinBoxWithScrollBar::createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
+void ZSpinBoxWithScrollBar::createWidget(int value,
+                                         int min,
+                                         int max,
+                                         int step,
+                                         bool tracking,
+                                         const QString& prefix,
                                          const QString& suffix)
 {
   m_scrollBar = new QScrollBar(Qt::Horizontal, this);

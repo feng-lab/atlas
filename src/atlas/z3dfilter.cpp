@@ -16,8 +16,7 @@ Z3DFilter::Z3DFilter(QObject* parent)
   : QObject(parent)
   , m_state(State::AllResultInvalid)
   , m_invalidationVisited(false)
-{
-}
+{}
 
 ZParameter* Z3DFilter::parameter(const QString& name) const
 {
@@ -74,8 +73,8 @@ void Z3DFilter::onEvent(QEvent* e, int w, int h)
 {
   e->ignore();
 
-  //LOG(WARNING) << e << " " << className();
-  // propagate to interaction handlers
+  // LOG(WARNING) << e << " " << className();
+  //  propagate to interaction handlers
   for (size_t i = 0; i < m_interactionHandlers.size() && !e->isAccepted(); ++i) {
     m_interactionHandlers[i]->onEvent(e, w, h);
   }
@@ -226,7 +225,6 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
 {
   if (interactionMode) {
     if (m_interactionModeSources.find(source) == m_interactionModeSources.end()) {
-
       m_interactionModeSources.insert(source);
 
       if (m_interactionModeSources.size() == 1) {
@@ -235,7 +233,6 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
     }
   } else {
     if (m_interactionModeSources.find(source) != m_interactionModeSources.end()) {
-
       m_interactionModeSources.erase(source);
 
       if (m_interactionModeSources.empty()) {
@@ -270,10 +267,18 @@ void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderP
 
   vao.bind();
 
-  const GLfloat vertices[] = {-1.f, 1.f, 0.f, //top left corner
-                              -1.f, -1.f, 0.f, //bottom left corner
-                              1.f, 1.f, 0.f, //top right corner
-                              1.f, -1.f, 0.f}; // bottom right rocner
+  const GLfloat vertices[] = {-1.f,
+                              1.f,
+                              0.f, // top left corner
+                              -1.f,
+                              -1.f,
+                              0.f, // bottom left corner
+                              1.f,
+                              1.f,
+                              0.f, // top right corner
+                              1.f,
+                              -1.f,
+                              0.f}; // bottom right rocner
   auto attr_vertex = shader.vertexAttributeLocation();
 
   GLuint bufObjects[1];

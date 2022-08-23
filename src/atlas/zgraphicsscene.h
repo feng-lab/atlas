@@ -10,11 +10,14 @@ class ZROI;
 
 class ZGraphicsScene : public QGraphicsScene
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum class ROIAction
   {
-    New, Add, Subtract
+    New,
+    Add,
+    Subtract
   };
 
   explicit ZGraphicsScene(ZView* view);
@@ -26,7 +29,9 @@ public:
   void performROISubtraction(const ZROI* roi, int slice, size_t shapeID);
 
   QPointF lastPressedPoint()
-  { return m_lastPressedPt; }
+  {
+    return m_lastPressedPt;
+  }
 
   void escKeyPressed();
 
@@ -39,7 +44,7 @@ Q_SIGNALS:
   void mouseReleased(QPointF);
 
 protected:
-  void contextMenuEvent(QGraphicsSceneContextMenuEvent *contextMenuEvent) override;
+  void contextMenuEvent(QGraphicsSceneContextMenuEvent* contextMenuEvent) override;
 
   void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
 
@@ -50,7 +55,9 @@ protected:
   void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
 
   [[nodiscard]] static inline bool isScenePtOverlap(const QPointF& p1, const QPointF& p2)
-  { return p1 == p2 || p1.toPoint() == p2.toPoint(); }
+  {
+    return p1 == p2 || p1.toPoint() == p2.toPoint();
+  }
 
 private:
   ZView* m_view;
@@ -76,4 +83,3 @@ private:
 };
 
 } // namespace nim
-

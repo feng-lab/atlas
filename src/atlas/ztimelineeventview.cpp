@@ -17,5 +17,3 @@ ZTimelineEventView::ZTimelineEventView(ZTimelineWidget& parent)
 }
 
 } // namespace nim
-
-

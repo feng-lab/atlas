@@ -21,11 +21,17 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
 
       viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
-      connect(viewControl, &Z3DRegionAnnotationFilter::objDeselected, this,
+      connect(viewControl,
+              &Z3DRegionAnnotationFilter::objDeselected,
+              this,
               &Z3DRegionAnnotationView::onObjDeselectedFromView);
-      connect(viewControl, &Z3DRegionAnnotationFilter::objSelected, this,
+      connect(viewControl,
+              &Z3DRegionAnnotationFilter::objSelected,
+              this,
               &Z3DRegionAnnotationView::onObjSelectedFromView);
-      connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this,
+      connect(viewControl,
+              &Z3DRegionAnnotationFilter::objVisibleChanged,
+              this,
               &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
       canvas().addEventListenerToBack(*viewControl);
     }
@@ -40,7 +46,8 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
   }
 }
@@ -56,11 +63,17 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
 
     viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
-    connect(viewControl, &Z3DRegionAnnotationFilter::objDeselected, this,
+    connect(viewControl,
+            &Z3DRegionAnnotationFilter::objDeselected,
+            this,
             &Z3DRegionAnnotationView::onObjDeselectedFromView);
-    connect(viewControl, &Z3DRegionAnnotationFilter::objSelected, this,
+    connect(viewControl,
+            &Z3DRegionAnnotationFilter::objSelected,
+            this,
             &Z3DRegionAnnotationView::onObjSelectedFromView);
-    connect(viewControl, &Z3DRegionAnnotationFilter::objVisibleChanged, this,
+    connect(viewControl,
+            &Z3DRegionAnnotationFilter::objVisibleChanged,
+            this,
             &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
     canvas().addEventListenerToBack(*viewControl);
 
@@ -71,10 +84,10 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(), QApplication::applicationName(),
+    QMessageBox::critical(&m_view.canvas(),
+                          QApplication::applicationName(),
                           QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
   }
 }
 
 } // namespace nim
-

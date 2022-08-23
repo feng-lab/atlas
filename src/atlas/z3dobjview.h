@@ -13,12 +13,15 @@ namespace nim {
 
 class Z3DObjView : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DObjView(Z3DView& view);
 
   [[nodiscard]] const ZBBox<glm::dvec3>& boundBox() const
-  { return m_boundBox; }
+  {
+    return m_boundBox;
+  }
 
   [[nodiscard]] virtual const ZObjDoc& doc() const = 0;
 
@@ -37,22 +40,34 @@ public:
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
   inline Z3DCameraParameter& camera()
-  { return m_view.camera(); }
+  {
+    return m_view.camera();
+  }
 
   inline Z3DTrackballInteractionHandler& interactionHandler()
-  { return m_view.interactionHandler(); }
+  {
+    return m_view.interactionHandler();
+  }
 
   inline Z3DCanvas& canvas()
-  { return m_view.canvas(); }
+  {
+    return m_view.canvas();
+  }
 
   inline Z3DCompositor& compositor()
-  { return m_view.compositor(); }
+  {
+    return m_view.compositor();
+  }
 
   inline Z3DNetworkEvaluator& networkEvaluator()
-  { return m_view.networkEvaluator(); }
+  {
+    return m_view.networkEvaluator();
+  }
 
   inline Z3DGlobalParameters& globalParas()
-  { return m_view.globalParas(); }
+  {
+    return m_view.globalParas();
+  }
 
 Q_SIGNALS:
 
@@ -74,10 +89,14 @@ protected:
   virtual void onObjVisibleChangedFromView(bool v) = 0;
 
   inline void resetBoundBox()
-  { m_boundBox.reset(); }
+  {
+    m_boundBox.reset();
+  }
 
   inline void expandBoundBox(const ZBBox<glm::dvec3>& boundBox)
-  { m_boundBox.expand(boundBox); }
+  {
+    m_boundBox.expand(boundBox);
+  }
 
 protected:
   Z3DView& m_view;
@@ -85,4 +104,3 @@ protected:
 };
 
 } // namespace nim
-

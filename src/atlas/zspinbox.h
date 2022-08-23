@@ -17,7 +17,8 @@ protected:
 
 class ZSpinBox : public QSpinBox
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSpinBox(QWidget* parent = nullptr);
 
@@ -31,10 +32,10 @@ protected:
   void focusOutEvent(QFocusEvent* e) override;
 };
 
-
 class ZDoubleSpinBox : public QDoubleSpinBox
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDoubleSpinBox(QWidget* parent = nullptr);
 
@@ -49,4 +50,3 @@ protected:
 };
 
 } // namespace nim
-

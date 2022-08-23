@@ -12,7 +12,6 @@
 
 namespace nim {
 
-
 class ZLogFilterProxyModel : public QSortFilterProxyModel
 {
 public:
@@ -20,8 +19,7 @@ public:
     : QSortFilterProxyModel(parent)
     , mLevel(level)
     , mLastVisibleRow(0)
-  {
-  }
+  {}
 
   [[nodiscard]] LogSeverity level() const
   {
@@ -83,9 +81,9 @@ ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
   connect(mUi->toolButtonCopy, SIGNAL(clicked()), SLOT(OnCopyClicked()));
   connect(mUi->comboBoxLevel, SIGNAL(currentIndexChanged(int)), SLOT(OnLevelChanged(int)));
   connect(mUi->checkBoxAutoScroll, SIGNAL(toggled(bool)), SLOT(OnAutoScrollChanged(bool)));
-  connect(mModelDestination, SIGNAL(rowsInserted(
-                                      const QModelIndex&, int, int)), SLOT(ModelRowsInserted(
-                                                                             const QModelIndex&, int, int)));
+  connect(mModelDestination,
+          SIGNAL(rowsInserted(const QModelIndex&, int, int)),
+          SLOT(ModelRowsInserted(const QModelIndex&, int, int)));
 
   // Install the sort / filter model
   mProxyModel = new ZLogFilterProxyModel(InfoLevel, this);
@@ -104,7 +102,8 @@ ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
   mUi->tableViewMessages->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
 #else
   mUi->tableViewMessages->horizontalHeader()->setResizeMode(ZLogModelSink::TimeColumn, QHeaderView::ResizeToContents);
-  mUi->tableViewMessages->horizontalHeader()->setResizeMode(ZLogModelSink::LevelNameColumn, QHeaderView::ResizeToContents);
+  mUi->tableViewMessages->horizontalHeader()->setResizeMode(ZLogModelSink::LevelNameColumn,
+                                                            QHeaderView::ResizeToContents);
   mUi->tableViewMessages->horizontalHeader()->setResizeMode(ZLogModelSink::MessageColumn, QHeaderView::Stretch);
   mUi->tableViewMessages->verticalHeader()->setResizeMode(QHeaderView::ResizeToContents);
 #endif
@@ -140,8 +139,8 @@ bool ZLogDialog::eventFilter(QObject* obj, QEvent* event)
 
 void ZLogDialog::OnPauseClicked()
 {
-  mUi->toolButtonPause->setIcon(mIsPaused ?
-                                ZTheme::instance().icon(ZTheme::PauseIcon) : ZTheme::instance().icon(ZTheme::PlayIcon));
+  mUi->toolButtonPause->setIcon(mIsPaused ? ZTheme::instance().icon(ZTheme::PauseIcon)
+                                          : ZTheme::instance().icon(ZTheme::PlayIcon));
   mUi->toolButtonPause->setText(mIsPaused ? tr("&Pause") : tr("&Resume"));
 
   mIsPaused = !mIsPaused;

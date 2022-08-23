@@ -72,8 +72,9 @@ void ZObjEditWidget::removeObjEditWidgetOfObj(size_t id)
 
 void ZObjEditWidget::closeTab(int index)
 {
-  if (index == 0)
+  if (index == 0) {
     return;
+  }
   QWidget* wgt = widget(index);
   removeTab(index);
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {

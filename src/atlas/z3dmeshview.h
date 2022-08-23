@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DMeshView : public Z3DFilterView<ZMeshDoc, Z3DMeshFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DMeshView(ZMeshDoc& doc, Z3DView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

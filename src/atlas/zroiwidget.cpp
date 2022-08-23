@@ -24,5 +24,3 @@ void ZROIWidget::createWidget()
 }
 
 } // namespace nim
-
-

@@ -17,7 +17,8 @@ namespace nim {
 
 class ZSelectFileWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum class FileMode
   {
@@ -30,7 +31,8 @@ public:
 
   // if set, last opened dir will be retrieved from QSetting, and if QSetting is empty, alternativeDir will be used
   // first parameter can be an empty string, then second parameter will be used to init startDir
-  explicit ZSelectFileWidget(FileMode mode, const QString& guiname = QString(),
+  explicit ZSelectFileWidget(FileMode mode,
+                             const QString& guiname = QString(),
                              const QString& filter = QString(),
                              const QString& startDirQSettingLocation = QString(),
                              const QString& alternativeStartDir = QString(),
@@ -43,7 +45,7 @@ public:
   void setDestination(QStringList* namelist);
 
   // for multiple files sorting in open_multiple_files mode
-  void setCompareFunc(bool (* lessThan)(const QString&, const QString&));
+  void setCompareFunc(bool (*lessThan)(const QString&, const QString&));
 
   QString getSelectedOpenFile();
 
@@ -58,10 +60,14 @@ public:
   void setFiles(const QStringList& fl);
 
   inline void setSelectedFilter(const QString& f)
-  { m_selectedFilter = f; }
+  {
+    m_selectedFilter = f;
+  }
 
   inline QString selectedFilter() const
-  { return m_selectedFilter; }
+  {
+    return m_selectedFilter;
+  }
 
 Q_SIGNALS:
 
@@ -88,7 +94,7 @@ private:
   QString* m_destName = NULL;
   QStringList* m_destNames = nullptr;
 
-  bool (* m_lessThan)(const QString&, const QString&) = nullptr;
+  bool (*m_lessThan)(const QString&, const QString&) = nullptr;
 
   QStringList m_multipleFNames;
 
@@ -105,4 +111,3 @@ private:
 };
 
 } // namespace nim
-

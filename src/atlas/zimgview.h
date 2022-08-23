@@ -8,11 +8,13 @@ namespace nim {
 
 class ZImgView : public ZFilterView<ZImgDoc, ZImgFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZImgView(ZImgDoc& doc, ZView& view);
 
   // ZObjView interface
+
 public:
   QString infoOfPos(double x, double y) override;
 
@@ -25,4 +27,3 @@ private:
 };
 
 } // namespace nim
-

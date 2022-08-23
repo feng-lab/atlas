@@ -10,9 +10,9 @@ namespace nim {
 Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
   : m_rendererBase(rendererBase)
   , m_needLighting(true)
-  #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   , m_useDisplayList(false)
-  #endif
+#endif
   , m_followCoordTransform(true)
   , m_followOpacity(true)
   , m_followSizeScale(true)
@@ -28,15 +28,24 @@ Z3DPrimitiveRenderer::~Z3DPrimitiveRenderer()
 
 void Z3DPrimitiveRenderer::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
-  if (!shader.isLinked())
+  if (!shader.isLinked()) {
     return;
+  }
 
   vao.bind();
 
-  const GLfloat vertices[] = {-1.f, 1.f, 0.f, //top left corner
-                              -1.f, -1.f, 0.f, //bottom left corner
-                              1.f, 1.f, 0.f, //top right corner
-                              1.f, -1.f, 0.f}; // bottom right rocner
+  const GLfloat vertices[] = {-1.f,
+                              1.f,
+                              0.f, // top left corner
+                              -1.f,
+                              -1.f,
+                              0.f, // bottom left corner
+                              1.f,
+                              1.f,
+                              0.f, // top right corner
+                              1.f,
+                              -1.f,
+                              0.f}; // bottom right rocner
   auto attr_vertex = shader.vertexAttributeLocation();
 
   GLuint bufObjects[1];
@@ -57,11 +66,13 @@ void Z3DPrimitiveRenderer::renderScreenQuad(const ZVertexArrayObject& vao, const
   vao.release();
 }
 
-void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader,
+void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao,
+                                              const Z3DShaderProgram& shader,
                                               const ZMesh& mesh)
 {
-  if (mesh.empty() || !shader.isLinked())
+  if (mesh.empty() || !shader.isLinked()) {
     return;
+  }
 
   const std::vector<glm::vec3>& vertices = mesh.vertices();
   const std::vector<float>& textureCoordinates1D = mesh.textureCoordinates1D();
@@ -81,19 +92,25 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   auto attr_normal = shader.normalAttributeLocation();
   auto attr_color = shader.colorAttributeLocation();
 
-  GLsizei bufObjectsSize = 1;  // vertex
-  if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty())
+  GLsizei bufObjectsSize = 1; // vertex
+  if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
     bufObjectsSize++;
-  if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty())
+  }
+  if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
     bufObjectsSize++;
-  if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty())
+  }
+  if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
     bufObjectsSize++;
-  if (attr_normal != -1 && !normals.empty())
+  }
+  if (attr_normal != -1 && !normals.empty()) {
     bufObjectsSize++;
-  if (attr_color != -1 && !colors.empty())
+  }
+  if (attr_color != -1 && !colors.empty()) {
     bufObjectsSize++;
-  if (!triangleIndexes.empty())
+  }
+  if (!triangleIndexes.empty()) {
     bufObjectsSize++;
+  }
 
   std::vector<GLuint> bufObjects(bufObjectsSize);
   glGenBuffers(bufObjectsSize, bufObjects.data());
@@ -107,7 +124,9 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
     glEnableVertexAttribArray(attr_1dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates1D.size() * 1 * sizeof(GLfloat), textureCoordinates1D.data(),
+    glBufferData(GL_ARRAY_BUFFER,
+                 textureCoordinates1D.size() * 1 * sizeof(GLfloat),
+                 textureCoordinates1D.data(),
                  GL_STATIC_DRAW);
     glVertexAttribPointer(attr_1dTexCoord0, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
   }
@@ -115,7 +134,9 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
     glEnableVertexAttribArray(attr_2dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates2D.size() * 2 * sizeof(GLfloat), textureCoordinates2D.data(),
+    glBufferData(GL_ARRAY_BUFFER,
+                 textureCoordinates2D.size() * 2 * sizeof(GLfloat),
+                 textureCoordinates2D.data(),
                  GL_STATIC_DRAW);
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
   }
@@ -123,7 +144,9 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
     glEnableVertexAttribArray(attr_3dTexCoord0);
     glBindBuffer(GL_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ARRAY_BUFFER, textureCoordinates3D.size() * 3 * sizeof(GLfloat), textureCoordinates3D.data(),
+    glBufferData(GL_ARRAY_BUFFER,
+                 textureCoordinates3D.size() * 3 * sizeof(GLfloat),
+                 textureCoordinates3D.data(),
                  GL_STATIC_DRAW);
     glVertexAttribPointer(attr_3dTexCoord0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
   }
@@ -146,7 +169,9 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
     glDrawArrays(type, 0, vertices.size());
   } else {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufObjects[bufIdx++]);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 triangleIndexes.size() * sizeof(GLuint),
+                 triangleIndexes.data(),
                  GL_STATIC_DRAW);
     glDrawElements(type, triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -156,16 +181,21 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
   glDeleteBuffers(bufObjectsSize, bufObjects.data());
 
   glDisableVertexAttribArray(attr_vertex);
-  if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty())
+  if (attr_1dTexCoord0 != -1 && !textureCoordinates1D.empty()) {
     glDisableVertexAttribArray(attr_1dTexCoord0);
-  if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty())
+  }
+  if (attr_2dTexCoord0 != -1 && !textureCoordinates2D.empty()) {
     glDisableVertexAttribArray(attr_2dTexCoord0);
-  if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty())
+  }
+  if (attr_3dTexCoord0 != -1 && !textureCoordinates3D.empty()) {
     glDisableVertexAttribArray(attr_3dTexCoord0);
-  if (attr_normal != -1 && !normals.empty())
+  }
+  if (attr_normal != -1 && !normals.empty()) {
     glDisableVertexAttribArray(attr_normal);
-  if (attr_color != -1 && !colors.empty())
+  }
+  if (attr_color != -1 && !colors.empty()) {
     glDisableVertexAttribArray(attr_color);
+  }
 
   vao.release();
 }
@@ -173,35 +203,42 @@ void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao, con
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DPrimitiveRenderer::invalidateOpenglRenderer()
 {
-  if (m_useDisplayList)
+  if (m_useDisplayList) {
     Q_EMIT openglRendererInvalid();
+  }
 }
 
 void Z3DPrimitiveRenderer::invalidateOpenglPickingRenderer()
 {
-  if (m_useDisplayList)
+  if (m_useDisplayList) {
     Q_EMIT openglPickingRendererInvalid();
+  }
 }
 #endif
 
 void Z3DPrimitiveRenderer::setShaderParameters(Z3DShaderProgram& shader) const
 {
   shader.setLightingEnabledUniform(m_needLighting);
-  if (!m_followCoordTransform)
+  if (!m_followCoordTransform) {
     shader.setPosTransformUniform(glm::mat4(1.f));
-  if (!m_followOpacity)
+  }
+  if (!m_followOpacity) {
     shader.setAlphaUniform(1.f);
-  if (!m_followSizeScale)
+  }
+  if (!m_followSizeScale) {
     shader.setSizeScaleUniform(1.f);
+  }
 }
 
 void Z3DPrimitiveRenderer::setPickingShaderParameters(Z3DShaderProgram& shader) const
 {
   shader.setLightingEnabledUniform(false);
-  if (!m_followCoordTransform)
+  if (!m_followCoordTransform) {
     shader.setPosTransformUniform(glm::mat4(1.f));
-  if (!m_followSizeScale)
+  }
+  if (!m_followSizeScale) {
     shader.setSizeScaleUniform(1.f);
+  }
 }
 
 } // namespace nim

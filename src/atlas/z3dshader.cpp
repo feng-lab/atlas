@@ -46,15 +46,8 @@ void Z3DShader::compileSourceCode(const char* source)
     m_compiled = (value != 0);
 
     if (!m_compiled) {
-      const char* types[] = {
-        "Fragment",
-        "Vertex",
-        "Geometry",
-        "Tessellation Control",
-        "Tessellation Evaluation",
-        "Compute",
-        ""
-      };
+      const char* types[] =
+        {"Fragment", "Vertex", "Geometry", "Tessellation Control", "Tessellation Evaluation", "Compute", ""};
       const char* type;
       switch (m_type) {
         case Z3DShader::Type::Fragment:
@@ -98,8 +91,8 @@ void Z3DShader::compileSourceCode(const char* source)
         sourceCodeBuffer.resize(sourceCodeLength);
         glGetShaderSource(m_id, sourceCodeLength, &temp, sourceCodeBuffer.data());
       }
-      QString log = QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(
-        logBuffer.empty() ? "failed" : logBuffer.data());
+      QString log =
+        QString("Z3DShader::compileSourceCode(%1): %2").arg(type).arg(logBuffer.empty() ? "failed" : logBuffer.data());
       // Dump the source code if we got it
       if (!sourceCodeBuffer.empty()) {
         log += QString("\n*** source code ***\n");
@@ -121,12 +114,14 @@ void Z3DShader::compileSourceCode(const QString& source)
 std::string Z3DShader::sourceCode() const
 {
   std::string res;
-  if (!m_id)
+  if (!m_id) {
     return res;
+  }
   GLint size = 0;
   glGetShaderiv(m_id, GL_SHADER_SOURCE_LENGTH, &size);
-  if (size <= 0)
+  if (size <= 0) {
     return res;
+  }
   GLsizei len = 0;
   res.resize(size);
   glGetShaderSource(m_id, size, &len, res.data());

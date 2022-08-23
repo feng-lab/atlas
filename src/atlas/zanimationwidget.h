@@ -21,7 +21,8 @@ class ZAnimationExportWidget;
 
 class ZAnimationWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZAnimationWidget(ZAnimation& ani, QWidget* parent = nullptr);
 
@@ -73,4 +74,3 @@ private:
 };
 
 } // namespace nim
-

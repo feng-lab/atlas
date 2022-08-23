@@ -28,7 +28,7 @@ QSize ZComboBox::minimumSizeHint() const
 
 void ZComboBox::addItemSlot(const QString& text)
 {
-  //LOG(INFO) << text;
+  // LOG(INFO) << text;
   addItem(text);
 }
 
@@ -49,8 +49,7 @@ void ZComboBox::focusOutEvent(QFocusEvent* /*e*/)
 
 ZComboBoxEventFilter::ZComboBoxEventFilter(QObject* parent)
   : QObject(parent)
-{
-}
+{}
 
 bool ZComboBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {

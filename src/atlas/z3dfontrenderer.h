@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DFontRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DFontRenderer(Z3DRendererBase& rendererBase);
 
@@ -19,31 +20,49 @@ public:
   void setDataPickingColors(std::vector<glm::vec4>* pickingColors = nullptr);
 
   ZStringIntOptionParameter& allFontNamesPara()
-  { return m_allFontNames; }
+  {
+    return m_allFontNames;
+  }
 
   ZFontParameter& fontPara()
-  { return m_font; }
+  {
+    return m_font;
+  }
 
   ZFloatParameter& fontSizePara()
-  { return m_fontSize; }
+  {
+    return m_fontSize;
+  }
 
   ZFloatParameter& fontSoftEdgeScalePara()
-  { return m_fontSoftEdgeScale; }
+  {
+    return m_fontSoftEdgeScale;
+  }
 
   ZBoolParameter& showFontOutlinePara()
-  { return m_showFontOutline; }
+  {
+    return m_showFontOutline;
+  }
 
   ZStringIntOptionParameter& fontOutlineModePara()
-  { return m_fontOutlineMode; }
+  {
+    return m_fontOutlineMode;
+  }
 
   ZVec4Parameter& fontOutlineColorPara()
-  { return m_fontOutlineColor; }
+  {
+    return m_fontOutlineColor;
+  }
 
   ZBoolParameter& showFontShadowPara()
-  { return m_showFontShadow; }
+  {
+    return m_showFontShadow;
+  }
 
   ZVec4Parameter& fontShadowColorPara()
-  { return m_fontShadowColor; }
+  {
+    return m_fontShadowColor;
+  }
 
 protected:
   void adjustWidgets();
@@ -63,9 +82,9 @@ protected:
 protected:
   Z3DShaderGroup m_fontShaderGrp;
 
-  ZStringIntOptionParameter m_allFontNames;  // font name and index into m_allFonts
+  ZStringIntOptionParameter m_allFontNames; // font name and index into m_allFonts
   ZFontParameter m_font;
-  ZFloatParameter m_fontSize;   //font size in world coordinate
+  ZFloatParameter m_fontSize; // font size in world coordinate
   ZBoolParameter m_fontUseSoftEdge;
   ZFloatParameter m_fontSoftEdgeScale;
   ZBoolParameter m_showFontOutline;
@@ -95,4 +114,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -8,8 +8,7 @@ const char* const ZLogModelSink::Type = "window";
 
 ZLogModelSink::ZLogModelSink(size_t max_items)
   : m_maxItems(max_items)
-{
-}
+{}
 
 void ZLogModelSink::addEntry(const LogData& message)
 {
@@ -62,8 +61,9 @@ int ZLogModelSink::rowCount(const QModelIndex& /*parent*/) const
 
 QVariant ZLogModelSink::data(const QModelIndex& index, int role) const
 {
-  if (!index.isValid())
+  if (!index.isValid()) {
     return QVariant();
+  }
 
   if (role == Qt::DisplayRole) {
     QReadLocker lock(&m_messagesLock);

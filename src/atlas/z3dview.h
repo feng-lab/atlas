@@ -26,9 +26,12 @@ class Z3DNetworkEvaluator;
 
 class Z3DMainWindow;
 
-class Z3DView : public QObject, public ZViewSettingInterface
+class Z3DView
+  : public QObject
+  , public ZViewSettingInterface
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent = nullptr);
 
@@ -37,42 +40,66 @@ public:
   [[nodiscard]] const ZDoc& doc() const;
 
   inline QAction* zoomInAction()
-  { return m_zoomInAction; }
+  {
+    return m_zoomInAction;
+  }
 
   inline QAction* zoomOutAction()
-  { return m_zoomOutAction; }
+  {
+    return m_zoomOutAction;
+  }
 
   inline QAction* resetCameraAction()
-  { return m_resetCameraAction; }
+  {
+    return m_resetCameraAction;
+  }
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
   Z3DCameraParameter& camera()
-  { return m_globalParas->camera; }
+  {
+    return m_globalParas->camera;
+  }
 
   [[nodiscard]] const Z3DCameraParameter& camera() const
-  { return m_globalParas->camera; }
+  {
+    return m_globalParas->camera;
+  }
 
   Z3DTrackballInteractionHandler& interactionHandler()
-  { return m_globalParas->interactionHandler; }
+  {
+    return m_globalParas->interactionHandler;
+  }
 
   inline Z3DCanvas& canvas()
-  { return *m_canvas; }
+  {
+    return *m_canvas;
+  }
 
   [[nodiscard]] inline const Z3DCanvas& canvas() const
-  { return *m_canvas; }
+  {
+    return *m_canvas;
+  }
 
   inline Z3DCanvasPainter& canvasPainter()
-  { return *m_canvasPainter; }
+  {
+    return *m_canvasPainter;
+  }
 
   inline Z3DCompositor& compositor()
-  { return *m_compositor; }
+  {
+    return *m_compositor;
+  }
 
   inline Z3DNetworkEvaluator& networkEvaluator()
-  { return *m_networkEvaluator; }
+  {
+    return *m_networkEvaluator;
+  }
 
   inline Z3DGlobalParameters& globalParas()
-  { return *m_globalParas; }
+  {
+    return *m_globalParas;
+  }
 
   QWidget* globalParasWidget();
 
@@ -97,32 +124,44 @@ public:
   bool takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
   bool takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
-                                                            int width, int height, Z3DScreenShotType sst);
+                                                            int width,
+                                                            int height,
+                                                            Z3DScreenShotType sst);
 
   void resetCanvasPainterSize();
 
   bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
   std::vector<Z3DObjView*> objViews()
-  { return m_3dObjViews; }
+  {
+    return m_3dObjViews;
+  }
 
   [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObjs(const std::vector<size_t>& ids) const;
 
   [[nodiscard]] ZBBox<glm::dvec3> boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const;
 
   void cameraFocusesOn(double x, double y, double z, double radius = 64)
-  { m_globalParas->cameraFocusesOn(x, y, z, radius); }
+  {
+    m_globalParas->cameraFocusesOn(x, y, z, radius);
+  }
 
   void cameraFocusesOn(const ZBBox<glm::dvec3>& bound, double minRadius = 64)
-  { m_globalParas->cameraFocusesOn(bound, minRadius); }
+  {
+    m_globalParas->cameraFocusesOn(bound, minRadius);
+  }
 
   void cameraPointsTo(double x, double y, double z)
-  { m_globalParas->cameraPointsTo(x, y, z); }
+  {
+    m_globalParas->cameraPointsTo(x, y, z);
+  }
 
   void cameraPointsTo(const ZBBox<glm::dvec3>& bound)
-  { m_globalParas->cameraPointsTo(bound); }
+  {
+    m_globalParas->cameraPointsTo(bound);
+  }
 
-  void flipView(); //Look from the oppsite side
+  void flipView(); // Look from the oppsite side
 
   void setXZView();
 
@@ -139,17 +178,26 @@ private:
 
   void zoomOut();
 
-  void resetCamera();  // set up camera based on visible objects in scene, original position
+  void resetCamera(); // set up camera based on visible objects in scene, original position
   void resetCameraCenter();
 
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
 
-  bool takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-                                     bool clockWise, int numFrame, int width, int height,
+  bool takeFixedSizeSeriesScreenShot(const QDir& dir,
+                                     const QString& namePrefix,
+                                     const glm::vec3& axis,
+                                     bool clockWise,
+                                     int numFrame,
+                                     int width,
+                                     int height,
                                      Z3DScreenShotType sst);
 
-  bool takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-                            bool clockWise, int numFrame, Z3DScreenShotType sst);
+  bool takeSeriesScreenShot(const QDir& dir,
+                            const QString& namePrefix,
+                            const glm::vec3& axis,
+                            bool clockWise,
+                            int numFrame,
+                            Z3DScreenShotType sst);
 
   void init();
 
@@ -180,4 +228,3 @@ private:
 };
 
 } // namespace nim
-

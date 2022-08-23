@@ -13,7 +13,8 @@ class ZImg;
 
 class ZPunctaDetectionDialog : public ZImgProcessDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
 
@@ -62,4 +63,3 @@ private:
 };
 
 } // namespace nim
-

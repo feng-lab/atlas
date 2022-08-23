@@ -11,7 +11,7 @@ qreal myEasingFunction(qreal progress)
   return progress >= 1. ? 1.0 : 0.0;
 }
 
-}
+} // namespace
 
 namespace nim {
 
@@ -52,10 +52,11 @@ ZParameterKey::~ZParameterKey() = default;
 
 void ZParameterKey::setValue(const ZParameter& v)
 {
-  if (m_value->type().endsWith("Option"))
+  if (m_value->type().endsWith("Option")) {
     m_value->forceSetValueSameAs(v);
-  else
+  } else {
     m_value->setValueSameAs(v);
+  }
 }
 
 QString ZParameterKey::type() const
@@ -65,8 +66,9 @@ QString ZParameterKey::type() const
 
 void ZParameterKey::setType(const QString& t)
 {
-  if (m_type->isSelected(t))
+  if (m_type->isSelected(t)) {
     return;
+  }
 
   m_type->select(t);
   updateEasingCurve();
@@ -92,7 +94,7 @@ void ZParameterKey::interpolate(const ZParameterKey& prev, double time, ZParamet
   CHECK(m_value->isSameType(prev.value()));
   CHECK(m_value->isSameType(dest));
 
-  if (m_time - prev.time() < 0.0001) {  // less than 0.0001s, pointless, just use prev value
+  if (m_time - prev.time() < 0.0001) { // less than 0.0001s, pointless, just use prev value
     dest.setValueSameAs(prev.value());
     return;
   }
@@ -112,9 +114,7 @@ bool ZParameterKey::readValue(const json::value& value)
     return false;
   }
   const auto& obj = value.as_object();
-  if (!obj.contains("time") ||
-      !obj.contains("type") ||
-      !obj.contains("value")) {
+  if (!obj.contains("time") || !obj.contains("type") || !obj.contains("value")) {
     LOG(WARNING) << "Invalid key " << jsonToFormattedQString(obj) << " time, type and value are required field.";
     return false;
   }
@@ -149,17 +149,50 @@ void ZParameterKey::setDefaultType()
     enum Type
     { // how to interpolate between this key and previous key
       Linear = 0,
-      InQuad, OutQuad, InOutQuad, OutInQuad,
-      InCubic, OutCubic, InOutCubic, OutInCubic,
-      InQuart, OutQuart, InOutQuart, OutInQuart,
-      InQuint, OutQuint, InOutQuint, OutInQuint,
-      InSine, OutSine, InOutSine, OutInSine,
-      InExpo, OutExpo, InOutExpo, OutInExpo,
-      InCirc, OutCirc, InOutCirc, OutInCirc,
-      InElastic, OutElastic, InOutElastic, OutInElastic,
-      InBack, OutBack, InOutBack, OutInBack,
-      InBounce, OutBounce, InOutBounce, OutInBounce,
-      InCurve, OutCurve, SineCurve, CosineCurve,
+      InQuad,
+      OutQuad,
+      InOutQuad,
+      OutInQuad,
+      InCubic,
+      OutCubic,
+      InOutCubic,
+      OutInCubic,
+      InQuart,
+      OutQuart,
+      InOutQuart,
+      OutInQuart,
+      InQuint,
+      OutQuint,
+      InOutQuint,
+      OutInQuint,
+      InSine,
+      OutSine,
+      InOutSine,
+      OutInSine,
+      InExpo,
+      OutExpo,
+      InOutExpo,
+      OutInExpo,
+      InCirc,
+      OutCirc,
+      InOutCirc,
+      OutInCirc,
+      InElastic,
+      OutElastic,
+      InOutElastic,
+      OutInElastic,
+      InBack,
+      OutBack,
+      InOutBack,
+      OutInBack,
+      InBounce,
+      OutBounce,
+      InOutBounce,
+      OutInBounce,
+      InCurve,
+      OutCurve,
+      SineCurve,
+      CosineCurve,
       Switch
     };
     m_type->addOptionWithData(std::make_pair<QString, int>("Linear", QEasingCurve::Linear));
@@ -204,6 +237,5 @@ void ZParameterKey::setDefaultType()
     setType("Linear");
   }
 }
-
 
 } // namespace nim

@@ -7,12 +7,14 @@ namespace nim {
 class Z3DTexture
 {
 public:
-  Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uvec3& dimension,
-             GLenum dataFormat, GLenum dataType);
+  Z3DTexture(GLenum textureTarget,
+             GLint internalFormat,
+             const glm::uvec3& dimension,
+             GLenum dataFormat,
+             GLenum dataType);
 
   // derive teture target as 1D, 2D or 3D
-  Z3DTexture(GLint internalFormat, const glm::uvec3& dimension,
-             GLenum dataFormat, GLenum dataType);
+  Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum dataFormat, GLenum dataType);
 
   ~Z3DTexture();
 
@@ -29,16 +31,24 @@ public:
 
   // changes made by the following four functions will take effect after next call of uploadImage()
   void setDimension(const glm::uvec3& dimension)
-  { m_dimension = dimension; }
+  {
+    m_dimension = dimension;
+  }
 
   void setInternalFormat(GLint internalformat)
-  { m_internalFormat = internalformat; }
+  {
+    m_internalFormat = internalformat;
+  }
 
   void setDataFormat(GLenum format)
-  { m_dataFormat = format; }
+  {
+    m_dataFormat = format;
+  }
 
   void setDataType(GLenum dataType)
-  { m_dataType = dataType; }
+  {
+    m_dataType = dataType;
+  }
 
   // Input data must match current dataFormat and dataType.
   void uploadImage(const GLvoid* data = nullptr) const;
@@ -47,37 +57,59 @@ public:
   void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
 
   void bind() const
-  { glBindTexture(m_textureTarget, m_id); }
+  {
+    glBindTexture(m_textureTarget, m_id);
+  }
 
   [[nodiscard]] GLuint id() const
-  { return m_id; }
+  {
+    return m_id;
+  }
 
   [[nodiscard]] GLenum textureTarget() const
-  { return m_textureTarget; }
+  {
+    return m_textureTarget;
+  }
 
   [[nodiscard]] glm::uvec3 dimension() const
-  { return m_dimension; }
+  {
+    return m_dimension;
+  }
 
   [[nodiscard]] size_t width() const
-  { return m_dimension.x; }
+  {
+    return m_dimension.x;
+  }
 
   [[nodiscard]] size_t height() const
-  { return m_dimension.y; }
+  {
+    return m_dimension.y;
+  }
 
   [[nodiscard]] size_t depth() const
-  { return m_dimension.z; }
+  {
+    return m_dimension.z;
+  }
 
   [[nodiscard]] size_t numPixels() const
-  { return m_dimension.x * m_dimension.y * m_dimension.z; }
+  {
+    return m_dimension.x * m_dimension.y * m_dimension.z;
+  }
 
   [[nodiscard]] GLenum dataFormat() const
-  { return m_dataFormat; }
+  {
+    return m_dataFormat;
+  }
 
   [[nodiscard]] GLenum dataType() const
-  { return m_dataType; }
+  {
+    return m_dataType;
+  }
 
   [[nodiscard]] GLint internalFormat() const
-  { return m_internalFormat; }
+  {
+    return m_internalFormat;
+  }
 
   // calculates the bytes per pixel from dataFormat and dataType
   static size_t bypePerPixel(GLenum dataFormat, GLenum dataType);
@@ -89,7 +121,9 @@ public:
   void downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const;
 
   [[nodiscard]] size_t textureSizeOnGPU() const
-  { return bypePerPixel(m_internalFormat) * numPixels(); }
+  {
+    return bypePerPixel(m_internalFormat) * numPixels();
+  }
 
   void saveAsColorImage(const QString& filename) const;
 
@@ -141,20 +175,23 @@ public:
   void activateCurrentUnit();
 
   [[nodiscard]] GLint currentUnitNumber() const
-  { return m_currentUnitNumber; }
+  {
+    return m_currentUnitNumber;
+  }
 
   [[nodiscard]] GLenum currentUnitEnum() const;
 
   // clear assigned unit
   void reset()
-  { m_currentUnitNumber = -1; }
+  {
+    m_currentUnitNumber = -1;
+  }
 
   static GLint activeTextureUnit();
 
 protected:
-  int m_maxTextureUnits;   // total number of available units
+  int m_maxTextureUnits; // total number of available units
   GLint m_currentUnitNumber;
 };
 
 } // namespace nim
-

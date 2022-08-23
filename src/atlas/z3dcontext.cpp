@@ -40,8 +40,6 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
   return m_context->getProcAddress(name);
 }
 
-
-
 Z3DContextGroup::Z3DContextGroup()
   : m_contextGroup(QOpenGLContext::currentContext()->shareGroup())
 {

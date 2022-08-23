@@ -28,10 +28,11 @@ void ZImgDisplay::showChannel(size_t ch, double minData, double maxData)
   CHECK(minData <= maxData);
 
   if (minData == maxData) {
-    if (minData > imgInfo().dataRangeMin<double>())
+    if (minData > imgInfo().dataRangeMin<double>()) {
       minData = imgInfo().dataRangeMin<double>();
-    else
+    } else {
       maxData = minData + 1.;
+    }
   }
 
   if (ch < imgInfo().numChannels) {
@@ -42,8 +43,9 @@ void ZImgDisplay::showChannel(size_t ch, double minData, double maxData)
 void ZImgDisplay::hideChannel(size_t ch)
 {
   auto it = m_channels.find(ch);
-  if (it != m_channels.end())
+  if (it != m_channels.end()) {
     m_channels.erase(it);
+  }
 }
 
 void ZImgDisplay::showAllChannels(double minData, double maxData)
@@ -53,10 +55,11 @@ void ZImgDisplay::showAllChannels(double minData, double maxData)
   m_channels.clear();
 
   if (minData == maxData) {
-    if (minData > imgInfo().dataRangeMin<double>())
+    if (minData > imgInfo().dataRangeMin<double>()) {
       minData = imgInfo().dataRangeMin<double>();
-    else
+    } else {
       maxData = minData + 1.;
+    }
   }
 
   for (size_t i = 0; i < imgInfo().numChannels; ++i) {
@@ -86,8 +89,9 @@ QImage ZImgDisplay::toQImage() const
 ZQImagePack ZImgDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
 {
   ZQImagePack resV;
-  if (m_channels.empty())
+  if (m_channels.empty()) {
     return resV;
+  }
 
   if (m_img.width() <= tileWidth && m_img.height() <= tileHeight) {
     QImage res(m_img.width(), m_img.height(), QImage::Format_ARGB32_Premultiplied);
@@ -108,8 +112,8 @@ ZQImagePack ZImgDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
         size_t endX = std::min(m_img.width(), startX + tileWidth + 1);
         size_t startY = y * tileHeight;
         size_t endY = std::min(m_img.height(), startY + tileHeight + 1);
-        ZImg croped = m_img.crop(ZImgRegion(startX, endX, startY, endY, zBackup, zBackup + 1,
-                                            0, -1, tBackup, tBackup + 1));
+        ZImg croped =
+          m_img.crop(ZImgRegion(startX, endX, startY, endY, zBackup, zBackup + 1, 0, -1, tBackup, tBackup + 1));
         QImage res(croped.width(), croped.height(), QImage::Format_ARGB32_Premultiplied);
         fillQImage(croped, res);
         resV.addImage(res, QPoint(startX, startY));
@@ -123,7 +127,9 @@ ZQImagePack ZImgDisplay::toQImagePack(size_t tileWidth, size_t tileHeight) const
 }
 
 template<typename TVoxel>
-void ZImgDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+void ZImgDisplay::setQImageDataBlockCM(const ZImg* img,
+                                       QImage* qim,
+                                       const tbb::blocked_range<size_t>& rowRange,
                                        const std::vector<size_t>* channels,
                                        const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
@@ -146,10 +152,11 @@ void ZImgDisplay::setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::
 }
 
 template<typename TVoxel>
-void
-ZImgDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
-                                           const std::vector<size_t>* channels,
-                                           const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
+void ZImgDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img,
+                                                QImage* qim,
+                                                const tbb::blocked_range<size_t>& rowRange,
+                                                const std::vector<size_t>* channels,
+                                                const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
   for (size_t c = 0; c < channels->size(); ++c) {
@@ -166,10 +173,11 @@ ZImgDisplay::setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, const t
       }
       // multiply alpha channel (which contains global alpha)
       float a = (*colormaps)[c].color(*(imgDatas[c])++).a / 255.f;
-      qimData[j] = qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
-                         static_cast<int>(col.g * a + .5f),
-                         static_cast<int>(col.b * a + .5f),
-                         static_cast<int>(col.a * a + .5f));
+      qimData[j] =
+        qRgba(static_cast<int>(col.r * a + .5f), // not correct for some edge cases but faster than std::round
+              static_cast<int>(col.g * a + .5f),
+              static_cast<int>(col.b * a + .5f),
+              static_cast<int>(col.a * a + .5f));
     }
   }
 }
@@ -211,7 +219,7 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
       colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
     } else {
       col4 maxCol(m_channelColors.at(ch));
-      if (alphaChannelIdx < 0) {  // no alpha channel, encode global alpha into colormap
+      if (alphaChannelIdx < 0) { // no alpha channel, encode global alpha into colormap
         maxCol.r = static_cast<uint8_t>(m_alpha * maxCol.r + 0.5);
         maxCol.g = static_cast<uint8_t>(m_alpha * maxCol.g + 0.5);
         maxCol.b = static_cast<uint8_t>(m_alpha * maxCol.b + 0.5);
@@ -221,7 +229,7 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
           colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
         }
         colormaps[idx].color(v) = scaleDownColorRGB(maxCol, (v - minValue) / (maxValue - minValue));
-      } else {  // has alpha channel, skip global alpha as it is already encoded in alpha channel's colormap
+      } else { // has alpha channel, skip global alpha as it is already encoded in alpha channel's colormap
         maxCol.a = 255;
         TVoxel v = minimum;
         for (; v < maximum; ++v) {
@@ -233,21 +241,21 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
     idx++;
   }
 
-  if (alphaChannelIdx < 0 || m_channels.size() == 1) {  // no alpha channel or only alpha channel
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      [&](const tbb::blocked_range<size_t>& range) {
-                        setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
-                      });
+  if (alphaChannelIdx < 0 || m_channels.size() == 1) { // no alpha channel or only alpha channel
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCM<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   } else {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                      [&](const tbb::blocked_range<size_t>& range) {
-                        setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
-                      });
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+      setQImageDataBlockCMMultAlpha<TVoxel>(&img, &qim, range, &channels, &colormaps);
+    });
   }
 }
 
 template<typename TVoxel>
-void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+void ZImgDisplay::setQImageDataBlock(const ZImg* img,
+                                     QImage* qim,
+                                     const tbb::blocked_range<size_t>& rowRange,
                                      const std::vector<size_t>* channels) const
 {
   std::vector<const TVoxel*> imgDatas(channels->size());
@@ -265,8 +273,9 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
     chCol[c].g = static_cast<uint8_t>(m_alpha * chCol[c].g + 0.5);
     chCol[c].b = static_cast<uint8_t>(m_alpha * chCol[c].b + 0.5);
     chCol[c].a = static_cast<uint8_t>(m_alpha * 255 + 0.5);
-    if (imgInfo().isAlphaChannel(ch))
+    if (imgInfo().isAlphaChannel(ch)) {
       alphaChannelIdx = c;
+    }
   }
   if (alphaChannelIdx < 0) {
     for (size_t i = rowRange.begin(); i != rowRange.end(); ++i) {
@@ -310,10 +319,11 @@ void ZImgDisplay::setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::bl
           // multiply alpha channel
           double a = (*(imgDatas[c])++ - chMinValue[c]) / (chMaxValue[c] - chMinValue[c]);
           a = a < 0.0 ? 0.0 : a > 1.0 ? 1.0 : a;
-          qimData[j] = qRgba(static_cast<int>(col.r * a + .5), // not correct for some edge cases but faster than std::round
-                             static_cast<int>(col.g * a + .5),
-                             static_cast<int>(col.b * a + .5),
-                             static_cast<int>(col.a * a + .5));
+          qimData[j] =
+            qRgba(static_cast<int>(col.r * a + .5), // not correct for some edge cases but faster than std::round
+                  static_cast<int>(col.g * a + .5),
+                  static_cast<int>(col.b * a + .5),
+                  static_cast<int>(col.a * a + .5));
         }
       }
     }
@@ -329,16 +339,16 @@ void ZImgDisplay::setQImageData(const ZImg& img, QImage& qim) const
     channels[idx++] = chRange.first;
   }
 
-  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()),
-                    [&](const tbb::blocked_range<size_t>& range) {
-                      setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
-                    });
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, img.height()), [&](const tbb::blocked_range<size_t>& range) {
+    setQImageDataBlock<TVoxel>(&img, &qim, range, &channels);
+  });
 }
 
 void ZImgDisplay::fillQImage(const ZImg& img, QImage& qim) const
 {
-  if (m_channels.empty())
+  if (m_channels.empty()) {
     return;
+  }
   size_t bytesPerVoxel = img.bytesPerVoxel();
   VoxelFormat vf = img.voxelFormat();
   if (vf == VoxelFormat::Float) {
@@ -390,4 +400,3 @@ void ZImgDisplay::fillQImage(const ZImg& img, QImage& qim) const
 }
 
 } // namespace nim
-

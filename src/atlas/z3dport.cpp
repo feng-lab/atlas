@@ -6,7 +6,9 @@
 
 namespace nim {
 
-Z3DInputPortBase::Z3DInputPortBase(QString name, bool allowMultipleConnections, Z3DFilter* filter,
+Z3DInputPortBase::Z3DInputPortBase(QString name,
+                                   bool allowMultipleConnections,
+                                   Z3DFilter* filter,
                                    Z3DFilter::State invalidationState)
   : m_name(std::move(name))
   , m_allowMultipleConnections(allowMultipleConnections)
@@ -71,25 +73,30 @@ Z3DOutputPortBase::~Z3DOutputPortBase()
 
 bool Z3DOutputPortBase::canConnectTo(const Z3DInputPortBase* inport) const
 {
-  if (!inport)
+  if (!inport) {
     return false;
+  }
 
-  if (isConnectedTo(inport))
+  if (isConnectedTo(inport)) {
     return false;
+  }
 
-  if (!inport->m_allowMultipleConnections && inport->isConnected())
+  if (!inport->m_allowMultipleConnections && inport->isConnected()) {
     return false;
+  }
 
-  if (filter() == inport->filter())
+  if (filter() == inport->filter()) {
     return false;
+  }
 
   return true;
 }
 
 void Z3DOutputPortBase::invalidate()
 {
-  for (size_t i = 0; i < m_connectedInputPorts.size(); ++i)
+  for (size_t i = 0; i < m_connectedInputPorts.size(); ++i) {
     m_connectedInputPorts[i]->invalidate();
+  }
 }
 
 bool Z3DOutputPortBase::isConnectedTo(const Z3DInputPortBase* port) const
@@ -139,8 +146,3 @@ glm::uvec2 Z3DOutputPortBase::expectedSize() const
 }
 
 } // namespace nim
-
-
-
-
-

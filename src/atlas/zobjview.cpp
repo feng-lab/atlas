@@ -8,8 +8,7 @@ namespace nim {
 ZObjView::ZObjView(ZView& view)
   : QObject(&view)
   , m_view(view)
-{
-}
+{}
 
 QString ZObjView::infoOfPos(double /*x*/, double /*y*/)
 {

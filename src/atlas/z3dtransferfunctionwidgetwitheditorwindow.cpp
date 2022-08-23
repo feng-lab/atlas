@@ -10,8 +10,7 @@ Z3DTransferFunctionWidgetWithEditorWindow::Z3DTransferFunctionWidgetWithEditorWi
                                                                                      QWidget* parent)
   : ZClickableTransferFunctionLabel(tf, parent)
   , m_transferFunction(tf)
-{
-}
+{}
 
 void Z3DTransferFunctionWidgetWithEditorWindow::createEditorWindow()
 {
@@ -26,8 +25,7 @@ void Z3DTransferFunctionWidgetWithEditorWindow::createEditorWindow()
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();
-    connect(this, &Z3DTransferFunctionWidgetWithEditorWindow::destroyed,
-            m_editorWindow, &QWidget::deleteLater);
+    connect(this, &Z3DTransferFunctionWidgetWithEditorWindow::destroyed, m_editorWindow, &QWidget::deleteLater);
 
     QApplication::restoreOverrideCursor();
   }

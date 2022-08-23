@@ -7,25 +7,33 @@ namespace nim {
 
 class ZPunctaDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZPunctaDoc(ZDoc& doc);
 
   // return info of puncta with id, assume puncta exist, otherwise crash
   ZPunctaPack& punctaPack(size_t id)
-  { return *m_idToPunctaPacks.at(id); }
+  {
+    return *m_idToPunctaPacks.at(id);
+  }
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Puncta"; }
+  {
+    return "Puncta";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Puncta"; }
+  {
+    return "Puncta";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -91,4 +99,3 @@ private:
 };
 
 } // namespace nim
-

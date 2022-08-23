@@ -13,7 +13,8 @@
 
 namespace nim {
 
-Z2DAnimationDoc::Z2DAnimationDoc(ZDoc& doc) : ZObjDoc(doc)
+Z2DAnimationDoc::Z2DAnimationDoc(ZDoc& doc)
+  : ZObjDoc(doc)
 {
   createActions();
 }

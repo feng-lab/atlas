@@ -9,13 +9,16 @@ namespace nim {
 
 class ZStyledItemDelegate : public QStyledItemDelegate
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZStyledItemDelegate(QObject* parent = nullptr);
 
   inline QString displayText(const QVariant& value, const QLocale& locale) const
   {
-    if (value.metaType() == QMetaType(QMetaType::Double)) return locale.toString(value.toDouble(), 'g', 16);
+    if (value.metaType() == QMetaType(QMetaType::Double)) {
+      return locale.toString(value.toDouble(), 'g', 16);
+    }
     return QStyledItemDelegate::displayText(value, locale);
   }
 
@@ -41,4 +44,3 @@ protected:
 };
 
 } // namespace nim
-

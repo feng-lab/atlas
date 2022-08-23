@@ -12,7 +12,7 @@ namespace nim {
 
 class ZTheme : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
 
   Q_ENUMS(Color)
   Q_ENUMS(Icon)
@@ -25,15 +25,17 @@ public:
   void updateTheme();
 
   QString currentTheme() const
-  { return m_currentTheme; }
+  {
+    return m_currentTheme;
+  }
 
-  bool event(QEvent *event) override;
+  bool event(QEvent* event) override;
 
   enum Color
   {
     /* Palette for QPalette */
 
-      PaletteWindow,
+    PaletteWindow,
     PaletteWindowText,
     PaletteBase,
     PaletteAlternateBase,
@@ -77,7 +79,7 @@ public:
 
     /* Log */
 
-      LogErrorMessageTextColor,
+    LogErrorMessageTextColor,
     LogNormalMessageTextColor,
     LogWarningMessageTextColor,
   };
@@ -133,16 +135,22 @@ public:
   };
 
   const QIcon& icon(Icon file) const
-  { return m_icons.at(file); }
+  {
+    return m_icons.at(file);
+  }
 
   const QString& iconFile(Icon file) const
-  { return m_iconFiles.at(file); }
+  {
+    return m_iconFiles.at(file);
+  }
 
 private:
   void loadTheme(const QString& file);
 
   const QColor& color(Color role) const
-  { return m_colors.at(role).first; }
+  {
+    return m_colors.at(role).first;
+  }
 
   QPalette palette() const;
 

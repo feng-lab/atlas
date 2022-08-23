@@ -14,30 +14,45 @@ namespace nim {
 
 class ZObjDoc : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZObjDoc(ZDoc& doc);
 
   [[nodiscard]] inline bool hasObj() const
-  { return !objs().empty(); }
+  {
+    return !objs().empty();
+  }
 
   [[nodiscard]] inline bool hasObjWithID(size_t id) const
-  { return contains(m_doc.objsOfDoc(this), id); }
+  {
+    return contains(m_doc.objsOfDoc(this), id);
+  }
 
   [[nodiscard]] inline std::vector<size_t> objs() const
-  { return m_doc.objsOfDoc(this); }
+  {
+    return m_doc.objsOfDoc(this);
+  }
 
   [[nodiscard]] inline std::vector<size_t> selectedObjs() const
-  { return m_doc.selectedObjsOfDoc(this); }
+  {
+    return m_doc.selectedObjsOfDoc(this);
+  }
 
   [[nodiscard]] inline bool isObjSelected(size_t id) const
-  { return m_doc.isObjSelected(id); }
+  {
+    return m_doc.isObjSelected(id);
+  }
 
   [[nodiscard]] inline bool isObjVisible(size_t id) const
-  { return m_doc.isObjVisible(id); }
+  {
+    return m_doc.isObjVisible(id);
+  }
 
   ZDoc& doc()
-  { return m_doc; }
+  {
+    return m_doc;
+  }
 
   // if not changed, do nothing and return true, otherwise save file to its path or use saveas
   virtual bool save(size_t id) = 0;
@@ -64,7 +79,9 @@ public:
   [[nodiscard]] virtual std::vector<QAction*> loadFileActions() const = 0;
 
   [[nodiscard]] virtual QMenu* processObjMenu() const
-  { return nullptr; }
+  {
+    return nullptr;
+  }
 
   // remove obj with id
   virtual void removeObj(size_t id) = 0;
@@ -113,23 +130,27 @@ public:
   [[nodiscard]] virtual bool isAlias(size_t id) const = 0;
 
   virtual QWidget* createObjEditWidget(size_t /*id*/)
-  { return nullptr; }
+  {
+    return nullptr;
+  }
 
   std::map<size_t, size_t> read(const std::vector<std::pair<QString, json::value>>& docKeyValueList, QString& err);
 
   void write(json::object& json) const;
 
-//  // show/hide obj with id
-//  void setObjVisible(size_t id, bool v)
-//  { Q_EMIT objVisibleChanged(id, v); }
-//
-//  // lock/unlock obj from editing with id
-//  void setObjLocked(size_t id, bool v)
-//  { Q_EMIT objLockedChanged(id, v); }
+  //  // show/hide obj with id
+  //  void setObjVisible(size_t id, bool v)
+  //  { Q_EMIT objVisibleChanged(id, v); }
+  //
+  //  // lock/unlock obj from editing with id
+  //  void setObjLocked(size_t id, bool v)
+  //  { Q_EMIT objLockedChanged(id, v); }
 
   //
   void sendObjSelectionChangedFromDocSignal(const std::vector<size_t>& selected, const std::vector<size_t>& deselected)
-  { Q_EMIT selectionChangedFromDoc(selected, deselected); }
+  {
+    Q_EMIT selectionChangedFromDoc(selected, deselected);
+  }
 
   [[nodiscard]] QString lastOpenedObjPath() const;
 
@@ -155,4 +176,3 @@ protected:
 };
 
 } // namespace nim
-

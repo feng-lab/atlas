@@ -11,7 +11,9 @@ class Z3DShaderGroup
 public:
   explicit Z3DShaderGroup(Z3DRendererBase& rendererBase);
 
-  void init(const QStringList& shaderFiles, const QString& header, const QString& geomHeader = "",
+  void init(const QStringList& shaderFiles,
+            const QString& header,
+            const QString& geomHeader = "",
             const QStringList& normalShaderFiles = QStringList());
 
   void addAllSupportedPostShaders();
@@ -23,13 +25,19 @@ public:
   void addWeightedBlendedShaders();
 
   void setGeometryInputType(GLenum inputType)
-  { m_geometryInputType = inputType; }
+  {
+    m_geometryInputType = inputType;
+  }
 
   void setGeometryOutputType(GLenum outputType)
-  { m_geometryOutputType = outputType; }
+  {
+    m_geometryOutputType = outputType;
+  }
 
   void setGeometryOutputVertexCount(int count)
-  { m_geometryOutputVertexCount = count; }
+  {
+    m_geometryOutputVertexCount = count;
+  }
 
   void bind();
 
@@ -64,4 +72,3 @@ private:
 };
 
 } // namespace nim
-

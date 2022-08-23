@@ -11,7 +11,8 @@ struct LogData;
 
 class ZObjEditWidget : public QTabWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZObjEditWidget(ZDoc& doc, QWidget* mw = nullptr);
 
@@ -38,4 +39,3 @@ protected:
 };
 
 } // namespace nim
-

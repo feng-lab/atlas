@@ -13,4 +13,3 @@ void ZOpenGLWindow::initializeGL()
 }
 
 } // namespace nim
-

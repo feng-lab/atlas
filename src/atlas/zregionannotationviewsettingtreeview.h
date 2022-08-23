@@ -14,7 +14,8 @@ class ZROIFilter;
 
 class ZRegionAnnotationViewSettingTreeView : public QTreeView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZRegionAnnotationViewSettingTreeView(ZRegionAnnotationViewSettingTreeModel& objModel,
                                        ZRegionAnnotation& anno,
@@ -56,4 +57,3 @@ private:
 };
 
 } // namespace nim
-

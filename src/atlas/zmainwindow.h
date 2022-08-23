@@ -24,7 +24,7 @@ class Z3DCanvas;
 
 class ZMainWindow : public QMainWindow
 {
-Q_OBJECT
+  Q_OBJECT
 
 public:
   explicit ZMainWindow(QString versionStr);
@@ -32,7 +32,9 @@ public:
   void initOpenglContext();
 
   [[nodiscard]] const std::vector<QAction*>& recentFileActions() const
-  { return m_recentFileActions; }
+  {
+    return m_recentFileActions;
+  }
 
   void updateRecentFileActions();
 
@@ -52,28 +54,42 @@ public:
   ZView* view();
 
   QAction* exitAction()
-  { return m_exitAction; }
+  {
+    return m_exitAction;
+  }
 
   QAction* aboutAction()
-  { return m_aboutAction; }
+  {
+    return m_aboutAction;
+  }
 
   QAction* aboutQtAction()
-  { return m_aboutQtAction; }
+  {
+    return m_aboutQtAction;
+  }
 
   QAction* checkForUpdatesAction()
-  { return m_checkForUpdatesAction; }
+  {
+    return m_checkForUpdatesAction;
+  }
 
   QAction* viewLogAction()
-  { return m_viewLogAction; }
+  {
+    return m_viewLogAction;
+  }
 
   QAction* openLogFolderAction()
-  { return m_openLogFolderAction; }
+  {
+    return m_openLogFolderAction;
+  }
 
   QAction* openConfigFolderAction()
-  { return m_openConfigFolderAction; }
+  {
+    return m_openConfigFolderAction;
+  }
 
 protected:
-  //void appAboutToQuit();
+  // void appAboutToQuit();
 
   void closeEvent(QCloseEvent* event) override;
 
@@ -82,7 +98,7 @@ protected:
   void dropEvent(QDropEvent* event) override;
 
 private:
-  //void newWindow();
+  // void newWindow();
   void open();
 
   bool save();
@@ -97,7 +113,7 @@ private:
   void createDesktopEntry();
 #endif
 
-  void activateWindowIfNot();  //mac bug?
+  void activateWindowIfNot(); // mac bug?
 
   void openScreenshotPanel();
 
@@ -151,9 +167,9 @@ private:
 
   bool maybeSave();
 
-  //void loadWorkspace(const QString &fileName);
-  //bool saveFile(const QString &fileName);
-  //void setCurrentFile(const QString &fileName);
+  // void loadWorkspace(const QString &fileName);
+  // bool saveFile(const QString &fileName);
+  // void setCurrentFile(const QString &fileName);
   static QString strippedName(const QString& fullFileName);
 
   static ZMainWindow* findMainWindow(const QString& fileName);
@@ -179,7 +195,7 @@ private:
   QToolBar* m_roiToolBar = nullptr;
   QToolBar* m_helpToolBar = nullptr;
 
-  //QAction *m_newAction = nullptr;
+  // QAction *m_newAction = nullptr;
   QAction* m_openAction = nullptr;
   QAction* m_saveAction = nullptr;
   QAction* m_saveAsAction = nullptr;
@@ -238,4 +254,3 @@ private:
 };
 
 } // namespace nim
-

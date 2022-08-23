@@ -8,18 +8,22 @@ namespace nim {
 
 class ZFontParameter : public ZSingleValueParameter<QFont>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZFontParameter(const QString& name, QObject* parent = nullptr);
 
   ZFontParameter(const QString& name, const QFont& font, QObject* parent = nullptr);
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 
   bool supportInterpolation() const override
-  { return false; }
+  {
+    return false;
+  }
 
   json::value jsonValue() const override;
 
@@ -38,4 +42,3 @@ protected:
 };
 
 } // namespace nim
-

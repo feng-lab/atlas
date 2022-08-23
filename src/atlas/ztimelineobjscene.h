@@ -32,7 +32,9 @@ class ExpandArrowSvgItem : public QGraphicsSvgItem
 {
 public:
   ExpandArrowSvgItem(const QString& filename,
-                     const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline, QGraphicsItem* parent);
+                     const ZAnimationDisplayPack& pack,
+                     ZTimelineWidget& timeline,
+                     QGraphicsItem* parent);
 
 protected:
   void mousePressEvent(QGraphicsSceneMouseEvent* event) override;
@@ -62,7 +64,8 @@ private:
 class ParameterAnimationColorItem : public QGraphicsRectItem
 {
 public:
-  ParameterAnimationColorItem(const ZAnimationDisplayPack& pack, ZTimelineWidget& timeline,
+  ParameterAnimationColorItem(const ZAnimationDisplayPack& pack,
+                              ZTimelineWidget& timeline,
                               QGraphicsItem* parent = nullptr);
 
 protected:
@@ -75,7 +78,8 @@ private:
 
 class ZTimelineObjScene : public QGraphicsScene
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent = nullptr);
 
@@ -91,4 +95,3 @@ private:
 };
 
 } // namespace nim
-

@@ -9,8 +9,7 @@ ZSwcTreeModel::ZSwcTreeModel(ZSwcPack& swcPack, ZDoc& doc, QObject* parent)
   : QAbstractItemModel(parent)
   , m_swcPack(swcPack)
   , m_doc(doc)
-{
-}
+{}
 
 QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
 {
@@ -28,8 +27,7 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
     topologyType = "Leaf";
   }
 
-  if (role == Qt::BackgroundRole)
-  {
+  if (role == Qt::BackgroundRole) {
     if (ZSwc::isRoot(item)) {
       return QColor(0, 0, 128);
     } else if (ZSwc::isBranchNode(item)) {
@@ -67,8 +65,7 @@ QVariant ZSwcTreeModel::data(const QModelIndex& index, int role) const
   return QVariant();
 }
 
-QVariant ZSwcTreeModel::headerData(int section, Qt::Orientation orientation,
-                                   int role) const
+QVariant ZSwcTreeModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
   if (orientation == Qt::Horizontal && role == Qt::DisplayRole) {
     switch (section) {
@@ -109,12 +106,13 @@ QModelIndex ZSwcTreeModel::index(int row, int column, const QModelIndex& parent)
     return createIndex(row, column, reinterpret_cast<std::uintptr_t>(&m_swcPack.rootNodes()[row]));
   } else {
     CHECK(parent.row() < static_cast<int>(m_swcPack.rootNodes().size()))
-        << m_swcPack.rootNodes().size() << " " << parent.row();
+      << m_swcPack.rootNodes().size() << " " << parent.row();
     CHECK(row < static_cast<int>(m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size()))
-        << m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size() << " " << row;
-    auto res = createIndex(row, column,
-                           reinterpret_cast<std::uintptr_t>(&m_swcPack.rootToChildrenNodes().at(
-                             m_swcPack.rootNodes()[parent.row()])[row]));
+      << m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size() << " " << row;
+    auto res = createIndex(
+      row,
+      column,
+      reinterpret_cast<std::uintptr_t>(&m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()])[row]));
     return res;
   }
 }
@@ -156,7 +154,7 @@ int ZSwcTreeModel::rowCount(const QModelIndex& parent) const
       return 0;
     }
     CHECK(parent.row() < static_cast<int>(m_swcPack.rootNodes().size()))
-        << m_swcPack.rootNodes().size() << " " << parent.row();
+      << m_swcPack.rootNodes().size() << " " << parent.row();
     return m_swcPack.rootToChildrenNodes().at(m_swcPack.rootNodes()[parent.row()]).size();
   }
 }
@@ -231,4 +229,3 @@ void ZSwcTreeModel::updateModel()
 }
 
 } // namespace nim
-

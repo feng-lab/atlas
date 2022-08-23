@@ -8,6 +8,7 @@ namespace nim {
 class Z2DAnimationDoc : public ZObjDoc
 {
   Q_OBJECT
+
 public:
   explicit Z2DAnimationDoc(ZDoc& doc);
 
@@ -16,6 +17,7 @@ public:
   void createNewAnimation(const QString& name = "");
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
@@ -74,7 +76,8 @@ protected:
   size_t addAnimation(Z2DAnimation* animation, const QString& path, const QString& name = "");
 
 private:
-  struct AnimationPack { // animation and its associated data
+  struct AnimationPack
+  { // animation and its associated data
     AnimationPack(Z2DAnimation* animation_, const QString& path_, QString name = "");
 
     void updateDerivedData();
@@ -99,6 +102,7 @@ private:
     QString m_tmpName;
 
     // derived data
+
   private:
     mutable QString m_info;
     QString m_name;

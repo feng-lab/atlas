@@ -27,19 +27,28 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
   connect(&m_gradientOrientation, &ZStringIntOptionParameter::valueChanged, this, &Z3DBackgroundRenderer::compile);
 
   QStringList allshaders;
-  allshaders << "pass.vert" << "background_func.frag";
+  allshaders << "pass.vert"
+             << "background_func.frag";
   QStringList normalShaders;
-  normalShaders << "pass.vert" << "background.frag";
-  m_backgroundShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(),
-                             "", normalShaders);
+  normalShaders << "pass.vert"
+                << "background.frag";
+  m_backgroundShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
   m_backgroundShaderGrp.addAllSupportedPostShaders();
 
   if (m_hardwareSupportVAO) {
     m_VAO.bind();
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5f, //top left corner
-                                -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
-                                1.f, 1.f, 1.0f - 1e-5f, //top right corner
-                                1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f,
+                                1.f,
+                                1.0f - 1e-5f, // top left corner
+                                -1.f,
+                                -1.f,
+                                1.0f - 1e-5f, // bottom left corner
+                                1.f,
+                                1.f,
+                                1.0f - 1e-5f, // top right corner
+                                1.f,
+                                -1.f,
+                                1.0f - 1e-5f}; // bottom right rocner
     auto attr_vertex = m_backgroundShaderGrp.get().vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
@@ -69,14 +78,15 @@ QString Z3DBackgroundRenderer::generateHeader()
   if (m_mode.get() == "Uniform") {
     headerSource += "#define UNIFORM\n";
   } else {
-    if (m_gradientOrientation.isSelected("LeftToRight"))
+    if (m_gradientOrientation.isSelected("LeftToRight")) {
       headerSource += "#define GRADIENT_LEFT_TO_RIGHT\n";
-    else if (m_gradientOrientation.isSelected("RightToLeft"))
+    } else if (m_gradientOrientation.isSelected("RightToLeft")) {
       headerSource += "#define GRADIENT_RIGHT_TO_LEFT\n";
-    else if (m_gradientOrientation.isSelected("TopToBottom"))
+    } else if (m_gradientOrientation.isSelected("TopToBottom")) {
       headerSource += "#define GRADIENT_TOP_TO_BOTTOM\n";
-    else if (m_gradientOrientation.isSelected("BottomToTop"))
+    } else if (m_gradientOrientation.isSelected("BottomToTop")) {
       headerSource += "#define GRADIENT_BOTTOM_TO_TOP\n";
+    }
   }
   return headerSource;
 }
@@ -93,24 +103,26 @@ void Z3DBackgroundRenderer::renderUsingOpengl()
   glLoadIdentity();
 
   if (m_mode.get() == "Gradient") {
-    if (m_gradientOrientation.isSelected("LeftToRight"))
+    if (m_gradientOrientation.isSelected("LeftToRight")) {
       glRotatef(270.f, 0.0f, 0.0f, 1.0f);
-    else if (m_gradientOrientation.isSelected("RightToLeft"))
+    } else if (m_gradientOrientation.isSelected("RightToLeft")) {
       glRotatef(90.f, 0.0f, 0.0f, 1.0f);
-    else if (m_gradientOrientation.isSelected("TopToBottom"))
+    } else if (m_gradientOrientation.isSelected("TopToBottom")) {
       glRotatef(180.f, 0.0f, 0.0f, 1.0f);
-    else if (m_gradientOrientation.isSelected("BottomToTop"))
+    } else if (m_gradientOrientation.isSelected("BottomToTop")) {
       glRotatef(0.f, 0.0f, 0.0f, 1.0f);
+    }
   }
 
   glBegin(GL_QUADS);
   glColor4fv(&m_firstColor.get()[0]);
-  glVertex3f(-1.0, -1.0, 1.0-1e-5);
-  glVertex3f( 1.0, -1.0, 1.0-1e-5);
-  if (m_mode.get() == "Gradient")
+  glVertex3f(-1.0, -1.0, 1.0 - 1e-5);
+  glVertex3f(1.0, -1.0, 1.0 - 1e-5);
+  if (m_mode.get() == "Gradient") {
     glColor4fv(&m_secondColor.get()[0]);
-  glVertex3f( 1.0, 1.0, 1.0-1e-5);
-  glVertex3f(-1.0, 1.0, 1.0-1e-5);
+  }
+  glVertex3f(1.0, 1.0, 1.0 - 1e-5);
+  glVertex3f(-1.0, 1.0, 1.0 - 1e-5);
   glEnd();
 
   glMatrixMode(GL_PROJECTION);
@@ -143,10 +155,18 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     m_VAO.release();
   } else {
-    const GLfloat vertices[] = {-1.f, 1.f, 1.0f - 1e-5f, //top left corner
-                                -1.f, -1.f, 1.0f - 1e-5f, //bottom left corner
-                                1.f, 1.f, 1.0f - 1e-5f, //top right corner
-                                1.f, -1.f, 1.0f - 1e-5f}; // bottom right rocner
+    const GLfloat vertices[] = {-1.f,
+                                1.f,
+                                1.0f - 1e-5f, // top left corner
+                                -1.f,
+                                -1.f,
+                                1.0f - 1e-5f, // bottom left corner
+                                1.f,
+                                1.f,
+                                1.0f - 1e-5f, // top right corner
+                                1.f,
+                                -1.f,
+                                1.0f - 1e-5f}; // bottom right rocner
     auto attr_vertex = shader.vertexAttributeLocation();
 
     glEnableVertexAttribArray(attr_vertex);
@@ -172,12 +192,12 @@ void Z3DBackgroundRenderer::renderPicking(Z3DEye /*unused*/)
 void Z3DBackgroundRenderer::adjustWidgets()
 {
   if (m_mode.get() == "Gradient") {
-    //m_firstColor.setName("First Color");
+    // m_firstColor.setName("First Color");
     m_firstColor.setVisible(true);
     m_secondColor.setVisible(true);
     m_gradientOrientation.setVisible(true);
   } else if (m_mode.get() == "Uniform") {
-    //m_firstColor.setName("Color");
+    // m_firstColor.setName("Color");
     m_firstColor.setVisible(true);
     m_secondColor.setVisible(false);
     m_gradientOrientation.setVisible(false);

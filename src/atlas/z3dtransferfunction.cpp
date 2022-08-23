@@ -11,22 +11,24 @@
 
 namespace nim {
 
-Z3DTransferFunction::Z3DTransferFunction(double min, double max, const glm::col4& minColor,
-                                         const glm::col4& maxColor, uint32_t width, QObject* parent)
+Z3DTransferFunction::Z3DTransferFunction(double min,
+                                         double max,
+                                         const glm::col4& minColor,
+                                         const glm::col4& maxColor,
+                                         uint32_t width,
+                                         QObject* parent)
   : ZColorMap(min, max, minColor, maxColor, parent)
   , m_dimensions(width, 1, 1)
   , m_textureFormat(GL_BGRA)
   , m_textureDataType(GL_UNSIGNED_INT_8_8_8_8_REV)
-{
-}
+{}
 
 Z3DTransferFunction::Z3DTransferFunction(const Z3DTransferFunction& tf)
   : ZColorMap(tf)
   , m_dimensions(tf.m_dimensions)
   , m_textureFormat(tf.m_textureFormat)
   , m_textureDataType(tf.m_textureDataType)
-{
-}
+{}
 
 Z3DTransferFunction::Z3DTransferFunction(Z3DTransferFunction&& tf) noexcept
 {
@@ -43,14 +45,18 @@ void Z3DTransferFunction::swap(Z3DTransferFunction& other) noexcept
 
 bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
 {
-  if (!ZColorMap::equalTo(tf))
+  if (!ZColorMap::equalTo(tf)) {
     return false;
-  if (m_dimensions != tf.m_dimensions)
+  }
+  if (m_dimensions != tf.m_dimensions) {
     return false;
-  if (m_textureDataType != tf.m_textureDataType)
+  }
+  if (m_textureDataType != tf.m_textureDataType) {
     return false;
-  if (m_textureFormat != tf.m_textureFormat)
+  }
+  if (m_textureFormat != tf.m_textureFormat) {
     return false;
+  }
 
   return true;
 }
@@ -68,18 +74,21 @@ void Z3DTransferFunction::resetToDefault()
 
 Z3DTexture* Z3DTransferFunction::texture() const
 {
-  if (m_textureIsInvalid)
+  if (m_textureIsInvalid) {
     updateTexture();
+  }
 
   return m_texture.get();
 }
 
 QString Z3DTransferFunction::samplerType() const
 {
-  if (m_dimensions.z > 1)
+  if (m_dimensions.z > 1) {
     return "sampler3D";
-  if (m_dimensions.y > 1)
+  }
+  if (m_dimensions.y > 1) {
     return "sampler2D";
+  }
 
   return "sampler1D";
 }
@@ -103,25 +112,30 @@ void Z3DTransferFunction::fitDimensions(uint32_t& width, uint32_t& height, uint3
     maxTexSize = Z3DGpuInfo::instance().max3DTextureSize();
   }
 
-  if (maxTexSize < width)
+  if (maxTexSize < width) {
     width = maxTexSize;
+  }
 
-  if (maxTexSize < height)
+  if (maxTexSize < height) {
     height = maxTexSize;
+  }
 
-  if (maxTexSize < depth)
+  if (maxTexSize < depth) {
     depth = maxTexSize;
+  }
 }
 
 void Z3DTransferFunction::updateTexture() const
 {
-  if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions)))
+  if (!m_texture || (m_texture->dimension() != glm::uvec3(m_dimensions))) {
     createTexture();
+  }
   CHECK(m_texture);
 
   std::vector<glm::col4> tfData(m_dimensions.x);
-  for (size_t x = 0; x < tfData.size(); ++x)
+  for (size_t x = 0; x < tfData.size(); ++x) {
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
+  }
   m_texture->uploadImage(tfData.data());
 
   m_textureIsInvalid = false;
@@ -129,7 +143,8 @@ void Z3DTransferFunction::updateTexture() const
 
 void Z3DTransferFunction::createTexture() const
 {
-  m_texture = std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
+  m_texture =
+    std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
 }
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const
@@ -149,9 +164,13 @@ Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, 
   connect(&m_value, &Z3DTransferFunction::changed, this, &Z3DTransferFunctionParameter::valueChanged);
 }
 
-Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name, double min, double max,
+Z3DTransferFunctionParameter::Z3DTransferFunctionParameter(const QString& name,
+                                                           double min,
+                                                           double max,
                                                            const glm::col4& minColor,
-                                                           const glm::col4& maxColor, int width, QObject* parent)
+                                                           const glm::col4& maxColor,
+                                                           int width,
+                                                           QObject* parent)
   : ZSingleValueParameter<Z3DTransferFunction>(name, parent)
   , m_volume(nullptr)
 {
@@ -166,8 +185,9 @@ void Z3DTransferFunctionParameter::setVolume(Z3DVolume* volume)
     if (m_volume) {
       // Resize texture of tf according to bitdepth of volume
       int bits = m_volume->bitsStored();
-      if (bits > 16)
+      if (bits > 16) {
         bits = 16; // handle float data as if it was 16 bit to prevent overflow
+      }
 
       int max = 1 << bits;
       m_value.resize(max);
@@ -198,11 +218,11 @@ json::value Z3DTransferFunctionParameter::jsonValue() const
   json::array keyArray;
   for (const auto& k : m_value.m_keys) {
     keyArray.push_back({
-                         {"intensity", k.first.m_intensity},
-                         {"colorL",    json::value_from(k.first.m_colorL)},
-                         {"colorR",    json::value_from(k.first.m_colorR)},
-                         {"split",     k.first.m_split},
-                       });
+      {"intensity", k.first.m_intensity               },
+      {"colorL",    json::value_from(k.first.m_colorL)},
+      {"colorR",    json::value_from(k.first.m_colorR)},
+      {"split",     k.first.m_split                   },
+    });
   }
   return keyArray;
 }
@@ -214,9 +234,7 @@ void Z3DTransferFunctionParameter::readValue(const json::value& jsonValue)
   for (const auto& jv : keyArray) {
     const auto& keyObj = jv.as_object();
     ZColorMapKey key(0, glm::col4());
-    if (keyObj.contains("intensity") &&
-        keyObj.contains("colorL") &&
-        keyObj.contains("colorR") &&
+    if (keyObj.contains("intensity") && keyObj.contains("colorL") && keyObj.contains("colorR") &&
         keyObj.contains("split")) {
       if (keyObj.at("intensity").is_string()) {
         toVal(asQString(keyObj.at("intensity")), key.m_intensity);

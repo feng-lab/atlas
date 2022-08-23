@@ -7,25 +7,33 @@ namespace nim {
 
 class ZSvgDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSvgDoc(ZDoc& doc);
 
   // return info of svg with id, assume svg exist, otherwise crash
   QSvgRenderer& svg(size_t id)
-  { return *m_idToSvgPacks.at(id)->svg; }
+  {
+    return *m_idToSvgPacks.at(id)->svg;
+  }
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Svg"; }
+  {
+    return "Svg";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Svgs"; }
+  {
+    return "Svgs";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -71,16 +79,21 @@ private:
     const QString& info() const;
 
     inline const QString& name() const
-    { return m_name; }
+    {
+      return m_name;
+    }
 
     inline const QString& tooltip() const
-    { return m_tooltip; }
+    {
+      return m_tooltip;
+    }
 
     std::unique_ptr<QSvgRenderer> svg;
     QString path;
     bool hasUnsavedChange = false;
 
     // derived data
+
   private:
     mutable QString m_info;
     QString m_name;

@@ -10,7 +10,8 @@ class ZObjDoc;
 
 class ZItemSelectionModel : public QItemSelectionModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZItemSelectionModel(ZObjModel* model, QObject* parent = nullptr);
 
@@ -38,4 +39,3 @@ private:
 };
 
 } // namespace nim
-

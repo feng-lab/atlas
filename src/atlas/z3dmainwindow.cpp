@@ -51,7 +51,7 @@ void Z3DMainWindow::openEditWidget(size_t id)
       m_editObjDockWidget->setVisible(true);
     }
   } else {
-    //m_editObjDockWidget->setVisible(false);
+    // m_editObjDockWidget->setVisible(false);
     m_2dWindow.openEditWidget(id);
   }
 }
@@ -99,13 +99,12 @@ void Z3DMainWindow::dropEvent(QDropEvent* event)
       ++it;
     }
   }
-  if (!fileList.isEmpty())
+  if (!fileList.isEmpty()) {
     m_doc.loadFileList(fileList);
+  }
 }
 
-void Z3DMainWindow::open()
-{
-}
+void Z3DMainWindow::open() {}
 
 bool Z3DMainWindow::save()
 {
@@ -131,8 +130,9 @@ void Z3DMainWindow::openRecentFile()
 
 void Z3DMainWindow::activateWindowIfNot()
 {
-  if (!isActiveWindow())
+  if (!isActiveWindow()) {
     this->activateWindow();
+  }
 }
 
 void Z3DMainWindow::changeBackground()
@@ -232,8 +232,8 @@ void Z3DMainWindow::createActions()
   // edit
 
   // view
-  m_changeBackgroundAction = new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"),
-                                         this);
+  m_changeBackgroundAction =
+    new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
   connect(m_changeBackgroundAction, &QAction::triggered, this, &Z3DMainWindow::changeBackground);
 
@@ -260,11 +260,13 @@ void Z3DMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  for (auto act : m_doc.fileActions())
+  for (auto act : m_doc.fileActions()) {
     m_fileMenu->addAction(act);
+  }
   m_separatorAction = m_fileMenu->addSeparator();
-  for (auto recentFileAction : m_2dWindow.recentFileActions())
+  for (auto recentFileAction : m_2dWindow.recentFileActions()) {
     m_fileMenu->addAction(recentFileAction);
+  }
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
   m_fileMenu->addAction(m_2dWindow.exitAction());
@@ -355,21 +357,20 @@ void Z3DMainWindow::createDockWindows()
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
   m_objectDetailedInfoDockWidget = new QDockWidget(tr("Object Detailed Info"), this);
-  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                              QDockWidget::DockWidgetMovable |
+  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                               QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_objDetailedInfoWidget = new ZObjDetailedInfoWidget(m_doc, this);
-  if (m_doc.viewSettingId() > 0)
+  if (m_doc.viewSettingId() > 0) {
     m_objDetailedInfoWidget->showWidgetOfObj(m_doc.viewSettingId());
+  }
   m_objectDetailedInfoDockWidget->setWidget(m_objDetailedInfoWidget);
   addDockWidget(Qt::RightDockWidgetArea, m_objectDetailedInfoDockWidget);
   m_windowMenu->addAction(m_objectDetailedInfoDockWidget->toggleViewAction());
   m_objectDetailedInfoDockWidget->setVisible(false);
 
   m_globalSettingDockWidget = new QDockWidget(tr("Global View Setting"), this);
-  m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                         QDockWidget::DockWidgetMovable |
+  m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                          QDockWidget::DockWidgetFloatable);
   m_globalSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   addDockWidget(Qt::RightDockWidgetArea, m_globalSettingDockWidget);
@@ -377,8 +378,7 @@ void Z3DMainWindow::createDockWindows()
   tabifyDockWidget(m_viewSettingDockWidget, m_globalSettingDockWidget);
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
-  m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                   QDockWidget::DockWidgetMovable |
+  m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                    QDockWidget::DockWidgetFloatable);
   m_captureDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   addDockWidget(Qt::RightDockWidgetArea, m_captureDockWidget);
@@ -386,8 +386,7 @@ void Z3DMainWindow::createDockWindows()
   m_captureDockWidget->setVisible(false);
 
   m_helpDockWidget = new QDockWidget(tr("Help"), this);
-  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                QDockWidget::DockWidgetMovable |
+  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
   m_helpDockWidget->setVisible(false);
   addDockWidget(Qt::LeftDockWidgetArea, m_helpDockWidget);
@@ -395,8 +394,7 @@ void Z3DMainWindow::createDockWindows()
   m_helpDockWidget->setFloating(true);
 
   m_backgroundDockWidget = new QDockWidget(tr("Background"), this);
-  m_backgroundDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                      QDockWidget::DockWidgetMovable |
+  m_backgroundDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                       QDockWidget::DockWidgetFloatable);
   m_backgroundDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   addDockWidget(Qt::RightDockWidgetArea, m_backgroundDockWidget);
@@ -404,8 +402,7 @@ void Z3DMainWindow::createDockWindows()
   m_backgroundDockWidget->setVisible(false);
 
   m_axisDockWidget = new QDockWidget(tr("Axis"), this);
-  m_axisDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                QDockWidget::DockWidgetMovable |
+  m_axisDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
   m_axisDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   addDockWidget(Qt::RightDockWidgetArea, m_axisDockWidget);
@@ -428,8 +425,9 @@ void Z3DMainWindow::fillDockWindows()
   m_objectsDockWidget->setWidget(objWidget);
 
   m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_view, this);
-  if (m_doc.viewSettingId() > 0)
+  if (m_doc.viewSettingId() > 0) {
     m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc.viewSettingId());
+  }
   m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
 
   m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
@@ -448,7 +446,7 @@ void Z3DMainWindow::readSettings()
   QSettings settings;
   QPoint pos = settings.value("pos3d", QPoint(200, 200)).toPoint();
   QSize size = settings.value("size3d", QSize(400, 400)).toSize();
-  //LOG(INFO) << pos << " " << size.width() << " " <<  size.height();
+  // LOG(INFO) << pos << " " << size.width() << " " <<  size.height();
   move(pos);
   resize(size);
 }
@@ -464,15 +462,16 @@ bool Z3DMainWindow::maybeSave()
 {
   if (false) {
     QMessageBox::StandardButton ret;
-    ret = QMessageBox::warning(this, QApplication::applicationName(),
+    ret = QMessageBox::warning(this,
+                               QApplication::applicationName(),
                                tr("This workspace has been modified.\n"
                                   "Do you want to save your changes?"),
-                               QMessageBox::Save | QMessageBox::Discard
-                               | QMessageBox::Cancel);
-    if (ret == QMessageBox::Save)
+                               QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+    if (ret == QMessageBox::Save) {
       return save();
-    else if (ret == QMessageBox::Cancel)
+    } else if (ret == QMessageBox::Cancel) {
       return false;
+    }
   }
   return true;
 }

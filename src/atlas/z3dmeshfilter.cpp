@@ -8,8 +8,7 @@
 
 namespace nim {
 
-Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas,
-                             const RegionNode* regionNode, QObject* parent)
+Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode, QObject* parent)
   : Z3DGeometryFilter(globalParas, parent)
   , m_monoEyeOutport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
@@ -19,10 +18,11 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas,
   , m_rightEyeOutport2("RightEyeImage2", this)
   , m_triangleListRenderer(m_rendererBase)
   , m_colorMode("Color Mode")
-  , m_singleColorForAllMesh("Mesh Color", glm::vec4(ZRandom::instance().randReal<float>(),
-                                                    ZRandom::instance().randReal<float>(),
-                                                    ZRandom::instance().randReal<float>(),
-                                                    1.f))
+  , m_singleColorForAllMesh("Mesh Color",
+                            glm::vec4(ZRandom::instance().randReal<float>(),
+                                      ZRandom::instance().randReal<float>(),
+                                      ZRandom::instance().randReal<float>(),
+                                      1.f))
   , m_textureGlowRenderer(m_rendererBase)
   , m_glow("Glow", false)
   , m_textureCopyRenderer(m_rendererBase)
@@ -92,9 +92,9 @@ void Z3DMeshFilter::process(Z3DEye eye)
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-    Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono) ?
-                                          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                                   : m_rightEyeOutport;
+    Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_monoEyeOutport
+                                          : (eye == Z3DEye::Left) ? m_leftEyeOutport
+                                                                  : m_rightEyeOutport;
     currentOutport.resize(m_outPort.size());
 
     currentOutport.bindTarget();
@@ -104,9 +104,9 @@ void Z3DMeshFilter::process(Z3DEye eye)
     CHECK_GL_ERROR
     currentOutport.releaseTarget();
 
-    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono) ?
-                                           m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2
-                                                                                     : m_rightEyeOutport2;
+    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono)   ? m_monoEyeOutport2
+                                           : (eye == Z3DEye::Left) ? m_leftEyeOutport2
+                                                                   : m_rightEyeOutport2;
     currentOutport2.resize(m_outPort.size());
 
     currentOutport2.bindTarget();
@@ -143,16 +143,16 @@ bool Z3DMeshFilter::isReady(Z3DEye eye) const
   return Z3DGeometryFilter::isReady(eye) && m_visible.get() && !m_origMeshList.empty();
 }
 
-//namespace {
+// namespace {
 
-//bool compareParameterName(const ZParameter *p1, const ZParameter *p2)
+// bool compareParameterName(const ZParameter *p1, const ZParameter *p2)
 //{
-//  QString n1 = p1->getName().mid(5); // "Mesh "
-//  QString n2 = p2->getName().mid(5);
-//  n1.remove(n1.size()-6, 6); //" Color"
-//  n2.remove(n2.size()-6, 6);
-//  return n1.toInt() < n2.toInt();
-//}
+//   QString n1 = p1->getName().mid(5); // "Mesh "
+//   QString n2 = p2->getName().mid(5);
+//   n1.remove(n1.size()-6, 6); //" Color"
+//   n2.remove(n2.size()-6, 6);
+//   return n1.toInt() < n2.toInt();
+// }
 
 //}
 
@@ -175,14 +175,15 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroup()
         //        connect(pb, &QPushButton::clicked, this, &Z3DMeshFilter::onApplyTransform);
         //        m_widgetsGroup->addChild(*pb, 2);
       }
-        //else if (para->name() == "Size Scale")
-        //m_widgetsGroup->addChild(para, 3);
-        //else if (para->name() == "Rendering Method")
-        //m_widgetsGroup->addChild(para, 4);
-      else if (para->name() == "Opacity")
+      // else if (para->name() == "Size Scale")
+      // m_widgetsGroup->addChild(para, 3);
+      // else if (para->name() == "Rendering Method")
+      // m_widgetsGroup->addChild(para, 4);
+      else if (para->name() == "Opacity") {
         m_widgetsGroup->addChild(*para, 5);
-      else if (para->name() != "Size Scale")
+      } else if (para->name() != "Size Scale") {
         m_widgetsGroup->addChild(*para, 7);
+      }
     }
 
     m_widgetsGroup->addChild(m_glow, 5);
@@ -216,8 +217,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DMeshFilter::widgetsGroupForAnnotationFilter()
 
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (auto para : paras) {
-      if (para->name().contains("Opacity") || para->name().contains("Material"))
+      if (para->name().contains("Opacity") || para->name().contains("Material")) {
         m_widgetsGroup->addChild(*para, 5);
+      }
     }
     m_widgetsGroup->addChild(m_xCut, 5);
     m_widgetsGroup->addChild(m_yCut, 5);
@@ -239,9 +241,9 @@ void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 void Z3DMeshFilter::renderTransparent(Z3DEye eye)
 {
   if (m_glow.get()) {
-    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono) ?
-                                           m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2
-                                                                                     : m_rightEyeOutport2;
+    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono)   ? m_monoEyeOutport2
+                                           : (eye == Z3DEye::Left) ? m_leftEyeOutport2
+                                                                   : m_rightEyeOutport2;
     m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
     m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
     m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -254,15 +256,17 @@ void Z3DMeshFilter::renderTransparent(Z3DEye eye)
 
 void Z3DMeshFilter::renderPicking(Z3DEye eye)
 {
-  if (!m_pickingObjectsRegistered)
+  if (!m_pickingObjectsRegistered) {
     registerPickingObjects();
+  }
   m_rendererBase.renderPicking(eye, m_triangleListRenderer);
 }
 
 void Z3DMeshFilter::prepareData()
 {
-  if (!m_dataIsInvalid)
+  if (!m_dataIsInvalid) {
     return;
+  }
 
   deregisterPickingObjects();
 
@@ -285,7 +289,9 @@ void Z3DMeshFilter::registerPickingObjects()
     m_meshPickingColors.clear();
     for (auto mesh : m_meshList) {
       glm::col4 pickingColor = pickingManager().colorOfObject(mesh);
-      glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
+      glm::vec4 fPickingColor(pickingColor[0] / 255.f,
+                              pickingColor[1] / 255.f,
+                              pickingColor[2] / 255.f,
                               pickingColor[3] / 255.f);
       m_meshPickingColors.push_back(fPickingColor);
     }
@@ -335,7 +341,7 @@ ZBBox<glm::dvec3> Z3DMeshFilter::meshBound(ZMesh* p)
 void Z3DMeshFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.reset();
-  for (auto &mesh : m_origMeshList) {
+  for (auto& mesh : m_origMeshList) {
     m_notTransformedBoundBox.expand(mesh->boundBox());
   }
 }
@@ -367,13 +373,13 @@ void Z3DMeshFilter::adjustWidgets()
 
 void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
 {
-  if (m_meshList.empty())
+  if (m_meshList.empty()) {
     return;
+  }
 
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(
-      glm::ivec2(e->position().x(), e->position().y()));
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
@@ -399,22 +405,25 @@ void Z3DMeshFilter::selectMesh(QMouseEvent* e, int /*w*/, int /*h*/)
     }
 
     // Check if any point was selected...
-    for (auto m : m_meshList)
+    for (auto m : m_meshList) {
       if (m == obj) {
         m_pressedMesh = m;
         break;
       }
+    }
     return;
   }
 
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
-      if (e->modifiers() == Qt::ControlModifier)
+      if (e->modifiers() == Qt::ControlModifier) {
         Q_EMIT meshSelected(m_pressedMesh, true);
-      else
+      } else {
         Q_EMIT meshSelected(m_pressedMesh, false);
-      if (m_pressedMesh)
+      }
+      if (m_pressedMesh) {
         e->accept();
+      }
     }
     m_pressedMesh = nullptr;
   }
@@ -438,4 +447,3 @@ void Z3DMeshFilter::getVisibleData()
 }
 
 } // namespace nim
-

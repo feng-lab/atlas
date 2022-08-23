@@ -8,12 +8,15 @@ namespace nim {
 
 class ZShareItemSelectionModel : public QItemSelectionModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZShareItemSelectionModel(QAbstractItemModel* model,
-                                    QItemSelectionModel* srcSelectionModel, QObject* parent = nullptr);
+                                    QItemSelectionModel* srcSelectionModel,
+                                    QObject* parent = nullptr);
 
   // QItemSelectionModel interface
+
 public:
   void select(const QModelIndex& index, SelectionFlags command) override;
 
@@ -40,4 +43,3 @@ private:
 };
 
 } // namespace nim
-

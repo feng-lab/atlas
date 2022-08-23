@@ -12,10 +12,10 @@ namespace nim {
 
 class ZSwcTreeView : public QTreeView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack, ZDoc& doc,
-               QWidget* parent = nullptr);
+  ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack, ZDoc& doc, QWidget* parent = nullptr);
 
 protected:
   void contextMenu(const QPoint& pos);
@@ -30,7 +30,7 @@ protected:
 
   void keyPressEvent(QKeyEvent* e) override;
 
-  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+  void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected) override;
 
   void onSwcSelectionChanged();
 
@@ -48,7 +48,3 @@ private:
 };
 
 } // namespace nim
-
-
-
-

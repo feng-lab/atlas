@@ -26,13 +26,19 @@ public:
   virtual ~ZParameterKey();
 
   double time() const
-  { return m_time; }
+  {
+    return m_time;
+  }
 
   void setTime(double t)
-  { m_time = t; }
+  {
+    m_time = t;
+  }
 
   ZParameter& value() const
-  { return *m_value; }
+  {
+    return *m_value;
+  }
 
   void setValue(const ZParameter& v);
 
@@ -43,7 +49,9 @@ public:
   void updateEasingCurve();
 
   const ZStringIntOptionParameter& typePara() const
-  { return *m_type; }
+  {
+    return *m_type;
+  }
 
   // convert time to progress between prev key and current key
   double timeToProgress(const ZParameterKey& prev, double time) const;
@@ -69,4 +77,3 @@ protected:
 };
 
 } // namespace nim
-

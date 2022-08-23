@@ -28,10 +28,11 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
   dialog.setFileMode(QFileDialog::AnyFile);
   dialog.setNameFilters(filters);
   dialog.setDirectory(lastOpenedObjPath());
-  if (title.isEmpty())
+  if (title.isEmpty()) {
     dialog.setWindowTitle(tr("Save Mesh As"));
-  else
+  } else {
     dialog.setWindowTitle(title);
+  }
 
   if (dialog.exec()) {
     auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
@@ -43,7 +44,8 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
       setLastOpenedObjPath(dialog.selectedFiles().at(0));
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Save Mesh Error:\n%1").arg(e.what()));
     }
   }
@@ -51,8 +53,9 @@ void ZMeshDoc::askToSave(const ZMesh& msh, const QString& title)
 
 bool ZMeshDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToMeshPacks.at(id);
   if (ZMesh::canWriteFile(pack->path)) {
@@ -100,8 +103,9 @@ bool ZMeshDoc::canReadFile(const QString& fileName) const
 size_t ZMeshDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToMeshPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path == fileName) {
       return idPack.first;
+    }
   }
   try {
     ZMesh mesh(fileName);
@@ -124,8 +128,9 @@ size_t ZMeshDoc::loadFile(const json::value& jValue, QString& errorMsg)
       return 0;
     }
     for (const auto& idPack : m_idToMeshPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first)))
+      if (isSameObj(jValue, jsonValue(idPack.first))) {
         return idPack.first;
+      }
     }
     QString fileName = asQString(jValue);
 
@@ -194,12 +199,14 @@ json::value ZMeshDoc::jsonValue(size_t id) const
 bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -219,11 +226,9 @@ bool ZMeshDoc::isAlias(size_t id) const
 {
   CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
 
-  return std::any_of(m_idToMeshPacks.begin(), m_idToMeshPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToMeshPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToMeshPacks.begin(), m_idToMeshPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToMeshPacks.at(id);
+  });
 }
 
 void ZMeshDoc::loadMesh()
@@ -235,10 +240,11 @@ void ZMeshDoc::loadMesh()
   dialog.setWindowTitle("Load Mesh File");
   if (dialog.exec()) {
     QString errorMsg;
-    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read mesh.\n" + errorMsg);
       }
     }
@@ -336,8 +342,9 @@ bool ZMeshDoc::saveMesh(MeshPack* pack, const QString& fileName, QString& errorM
 void ZMeshDoc::packInfoUpdated(MeshPack* pack)
 {
   for (const auto& idPack : m_idToMeshPacks) {
-    if (idPack.second.get() == pack)
+    if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
   }
 }
 

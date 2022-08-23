@@ -18,12 +18,15 @@ class Z3DView;
 
 class Z3DGlobalParameters : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view);
 
   [[nodiscard]] const std::vector<ZParameter*>& parameters() const
-  { return m_parameters; }
+  {
+    return m_parameters;
+  }
 
   void read(const json::object& json);
 
@@ -33,32 +36,50 @@ public:
 
   // count is lightCount
   [[nodiscard]] const glm::vec4* lightPositionArray() const
-  { return m_lightPositionArray.data(); }
+  {
+    return m_lightPositionArray.data();
+  }
 
   [[nodiscard]] const glm::vec4* lightAmbientArray() const
-  { return m_lightAmbientArray.data(); }
+  {
+    return m_lightAmbientArray.data();
+  }
 
   [[nodiscard]] const glm::vec4* lightDiffuseArray() const
-  { return m_lightDiffuseArray.data(); }
+  {
+    return m_lightDiffuseArray.data();
+  }
 
   [[nodiscard]] const glm::vec4* lightSpecularArray() const
-  { return m_lightSpecularArray.data(); }
+  {
+    return m_lightSpecularArray.data();
+  }
 
   [[nodiscard]] const glm::vec3* lightAttenuationArray() const
-  { return m_lightAttenuationArray.data(); }
+  {
+    return m_lightAttenuationArray.data();
+  }
 
   [[nodiscard]] const float* lightSpotCutoffArray() const
-  { return m_lightSpotCutoffArray.data(); }
+  {
+    return m_lightSpotCutoffArray.data();
+  }
 
   [[nodiscard]] const float* lightSpotExponentArray() const
-  { return m_lightSpotExponentArray.data(); }
+  {
+    return m_lightSpotExponentArray.data();
+  }
 
   [[nodiscard]] const glm::vec3* lightSpotDirectionArray() const
-  { return m_lightSpotDirectionArray.data(); }
+  {
+    return m_lightSpotDirectionArray.data();
+  }
 
   // must call
   void setPickingTarget(Z3DRenderTarget& rt)
-  { pickingManager.setRenderTarget(rt); }
+  {
+    pickingManager.setRenderTarget(rt);
+  }
 
   void cameraFocusesOn(double x, double y, double z, double radius = 64);
 
@@ -72,7 +93,9 @@ private:
   void updateLightsArray();
 
   void addParameter(ZParameter& para)
-  { m_parameters.push_back(&para); }
+  {
+    m_parameters.push_back(&para);
+  }
 
 public:
   ZStringIntOptionParameter geometriesMultisampleMode;
@@ -129,4 +152,3 @@ private:
 };
 
 } // namespace nim
-

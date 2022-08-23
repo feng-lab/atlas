@@ -24,8 +24,9 @@ ZTimelineObjView::ZTimelineObjView(ZTimelineWidget& parent)
 
 void ZTimelineObjView::setScrollEnabled(bool v)
 {
-  if (!v)
+  if (!v) {
     verticalScrollBar()->setValue(0);
+  }
   m_scrollEnabled = v;
 }
 
@@ -40,9 +41,9 @@ void ZTimelineObjView::checkScrollBarValue(int v)
 
 void ZTimelineObjView::scrollContentsBy(int dx, int dy)
 {
-  if (m_scrollEnabled)
+  if (m_scrollEnabled) {
     QGraphicsView::scrollContentsBy(dx, dy);
+  }
 }
 
 } // namespace nim
-

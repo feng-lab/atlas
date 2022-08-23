@@ -75,8 +75,7 @@ void ZDoubleSpinBox::focusOutEvent(QFocusEvent* e)
 
 ZSpinBoxEventFilter::ZSpinBoxEventFilter(QObject* parent)
   : QObject(parent)
-{
-}
+{}
 
 bool ZSpinBoxEventFilter::eventFilter(QObject* obj, QEvent* event)
 {

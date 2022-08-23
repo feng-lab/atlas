@@ -12,14 +12,15 @@
 namespace nim {
 
 ZSaveObjsDialog::ZSaveObjsDialog(const ZDoc& doc, const std::vector<size_t>& objs, QWidget* parent)
-  : QDialog(parent), m_doc(doc)
+  : QDialog(parent)
+  , m_doc(doc)
 {
   createWidget();
 
   for (auto id : objs) {
     ZObjDoc* odoc = m_doc.idToDoc(id);
-    auto* item = new QTreeWidgetItem(m_treeWidget, QStringList()
-      << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
+    auto* item = new QTreeWidgetItem(m_treeWidget,
+                                     QStringList() << odoc->objName(id) << QDir::toNativeSeparators(odoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
   }
 
@@ -59,10 +60,11 @@ void ZSaveObjsDialog::createWidget()
 
   m_treeWidget->setFocus();
 
-  connect(m_buttonBox->button(QDialogButtonBox::Save), &QPushButton::clicked,
-          this, &ZSaveObjsDialog::collectObjsToSave);
-  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,
-          this, &ZSaveObjsDialog::reject);
+  connect(m_buttonBox->button(QDialogButtonBox::Save),
+          &QPushButton::clicked,
+          this,
+          &ZSaveObjsDialog::collectObjsToSave);
+  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked, this, &ZSaveObjsDialog::reject);
   connect(discardButton, &QPushButton::clicked, this, &ZSaveObjsDialog::discard);
 }
 
@@ -101,15 +103,17 @@ void ZSaveObjsDialog::adjustButtonWidths()
 {
   QStringList possibleTexts;
   possibleTexts << tr("Save") << tr("Save All");
-  if (m_treeWidget->topLevelItemCount() > 1)
+  if (m_treeWidget->topLevelItemCount() > 1) {
     possibleTexts << tr("Save Selected");
+  }
   int maxTextWidth = 0;
   QPushButton* saveButton = m_buttonBox->button(QDialogButtonBox::Save);
   for (const QString& text : possibleTexts) {
     saveButton->setText(text);
     auto hint = saveButton->sizeHint().width();
-    if (hint > maxTextWidth)
+    if (hint > maxTextWidth) {
       maxTextWidth = hint;
+    }
   }
   saveButton->setMinimumWidth(maxTextWidth);
 }

@@ -7,25 +7,33 @@ namespace nim {
 
 class ZSwcDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSwcDoc(ZDoc& doc);
 
   // return info of swc with id, assume swc exist, otherwise crash
   ZSwcPack& swcPack(size_t id)
-  { return *m_idToSwcPacks.at(id); }
+  {
+    return *m_idToSwcPacks.at(id);
+  }
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Swc"; }
+  {
+    return "Swc";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Swcs"; }
+  {
+    return "Swcs";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -82,4 +90,3 @@ private:
 };
 
 } // namespace nim
-

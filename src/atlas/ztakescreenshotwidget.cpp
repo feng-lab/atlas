@@ -23,9 +23,10 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget* par
   , m_captureStereoImage("Capture Stereo Image", false)
   , m_stereoImageType("Stereo Image Type")
   , m_useWindowSize("Use Window Size as Image Size", true)
-  , m_customSize("Use Custom Image Size", glm::ivec2(1920, 1080), glm::ivec2(128, 128),
-                 glm::ivec2(std::numeric_limits<int>::max(),
-                            std::numeric_limits<int>::max()))
+  , m_customSize("Use Custom Image Size",
+                 glm::ivec2(1920, 1080),
+                 glm::ivec2(128, 128),
+                 glm::ivec2(std::numeric_limits<int>::max(), std::numeric_limits<int>::max()))
   , m_namePrefix("filename prefix", "")
   , m_nextNumber(1)
   , m_axis("Rotate Around Axis")
@@ -61,13 +62,15 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 {
   QString filepath;
   if (m_useManualName->isChecked()) {
-    filepath = ZFileUtils::getSaveFileName(
-      this, "Save Capture", m_lastFName, "",
-      nullptr/*, QFileDialog::DontUseNativeDialog*/);
+    filepath = ZFileUtils::getSaveFileName(this,
+                                           "Save Capture",
+                                           m_lastFName,
+                                           "",
+                                           nullptr /*, QFileDialog::DontUseNativeDialog*/);
     if (!filepath.isEmpty()) {
       m_lastFName = filepath;
     }
-  } else {  // auto generate file name based on folder and prefix
+  } else { // auto generate file name based on folder and prefix
     if (m_folderWidget->getSelectedDirectory().isEmpty()) {
       QMessageBox::critical(this, QApplication::applicationName(), "Output Folder do not exist");
       return;
@@ -76,33 +79,36 @@ void ZTakeScreenShotWidget::captureButtonPressed()
 
     while (true) {
       QString filename = QString("%1%2.png").arg(m_namePrefix.get()).arg(m_nextNumber++);
-      if (dir.exists(filename))
+      if (dir.exists(filename)) {
         continue;
+      }
       filepath = dir.filePath(filename);
       break;
     }
   }
 
   if (m_is2D) {
-    if (m_useWindowSize.get())
+    if (m_useWindowSize.get()) {
       Q_EMIT take2DScreenShot(filepath);
-    else {
+    } else {
       glm::ivec2 size = m_customSize.get();
       Q_EMIT takeFixedSize2DScreenShot(filepath, size.x, size.y);
     }
   } else {
     Z3DScreenShotType sst;
     if (m_captureStereoImage.get()) {
-      if (m_stereoImageType.isSelected("Half Side-By-Side"))
+      if (m_stereoImageType.isSelected("Half Side-By-Side")) {
         sst = Z3DScreenShotType::HalfSideBySideStereoView;
-      else
+      } else {
         sst = Z3DScreenShotType::FullSideBySideStereoView;
-    } else
+      }
+    } else {
       sst = Z3DScreenShotType::MonoView;
+    }
 
-    if (m_useWindowSize.get())
+    if (m_useWindowSize.get()) {
       Q_EMIT take3DScreenShot(filepath, sst);
-    else {
+    } else {
       glm::ivec2 size = m_customSize.get();
       Q_EMIT takeFixedSize3DScreenShot(filepath, size.x, size.y, sst);
     }
@@ -117,29 +123,32 @@ void ZTakeScreenShotWidget::captureSequenceButtonPressed()
   }
   QDir dir(m_folderWidget->getSelectedDirectory());
   glm::vec3 axis;
-  if (m_axis.isSelected("X"))
+  if (m_axis.isSelected("X")) {
     axis = glm::vec3(1.f, 0.f, 0.f);
-  else if (m_axis.isSelected("Y"))
+  } else if (m_axis.isSelected("Y")) {
     axis = glm::vec3(0.f, 1.f, 0.f);
-  else
+  } else {
     axis = glm::vec3(0.f, 0.f, 1.f);
+  }
   int numFrame = m_framePerSecond.get() * m_timeInSecond.get();
 
   Z3DScreenShotType sst;
   if (m_captureStereoImage.get()) {
-    if (m_stereoImageType.isSelected("Half Side-By-Side"))
+    if (m_stereoImageType.isSelected("Half Side-By-Side")) {
       sst = Z3DScreenShotType::HalfSideBySideStereoView;
-    else
+    } else {
       sst = Z3DScreenShotType::FullSideBySideStereoView;
-  } else
+    }
+  } else {
     sst = Z3DScreenShotType::MonoView;
+  }
 
-  if (m_useWindowSize.get())
+  if (m_useWindowSize.get()) {
     Q_EMIT takeSeries3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, sst);
-  else {
+  } else {
     glm::ivec2 size = m_customSize.get();
-    Q_EMIT takeSeriesFixedSize3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame,
-                                         size.x, size.y, sst);
+    Q_EMIT
+      takeSeriesFixedSize3DScreenShot(dir, m_namePrefix.get(), axis, m_clockwise.get(), numFrame, size.x, size.y, sst);
   }
 }
 
@@ -195,23 +204,23 @@ void ZTakeScreenShotWidget::createWidget()
   QLabel* label;
 
   if (!m_is2D) {
-//    hlo = new QHBoxLayout;
-//    label = m_mode.createNameLabel();
-//    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
-//    label->setMinimumWidth(125);
-//    //label->setWordWrap(true);
-//    hlo->addWidget(label);
-//    wg = m_mode.createWidget();
-//    wg->setMinimumWidth(175);
-//    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-//    hlo->addWidget(wg);
-//    lo->addLayout(hlo);
+    //    hlo = new QHBoxLayout;
+    //    label = m_mode.createNameLabel();
+    //    label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    //    label->setMinimumWidth(125);
+    //    //label->setWordWrap(true);
+    //    hlo->addWidget(label);
+    //    wg = m_mode.createWidget();
+    //    wg->setMinimumWidth(175);
+    //    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    //    hlo->addWidget(wg);
+    //    lo->addLayout(hlo);
 
     hlo = new QHBoxLayout;
     label = m_captureStereoImage.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_captureStereoImage.createWidget();
     wg->setMinimumWidth(175);
@@ -223,7 +232,7 @@ void ZTakeScreenShotWidget::createWidget()
     label = m_stereoImageType.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_stereoImageType.createWidget();
     wg->setMinimumWidth(175);
@@ -236,7 +245,7 @@ void ZTakeScreenShotWidget::createWidget()
   label = m_useWindowSize.createNameLabel();
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   label->setMinimumWidth(125);
-  //label->setWordWrap(true);
+  // label->setWordWrap(true);
   hlo->addWidget(label);
   wg = m_useWindowSize.createWidget();
   wg->setMinimumWidth(175);
@@ -248,7 +257,7 @@ void ZTakeScreenShotWidget::createWidget()
   label = m_customSize.createNameLabel();
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   label->setMinimumWidth(125);
-  //label->setWordWrap(true);
+  // label->setWordWrap(true);
   hlo->addWidget(label);
   wg = m_customSize.createWidget();
   wg->setMinimumWidth(175);
@@ -268,7 +277,7 @@ void ZTakeScreenShotWidget::createWidget()
     label = m_axis.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_axis.createWidget();
     wg->setMinimumWidth(175);
@@ -280,7 +289,7 @@ void ZTakeScreenShotWidget::createWidget()
     label = m_clockwise.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_clockwise.createWidget();
     wg->setMinimumWidth(175);
@@ -292,7 +301,7 @@ void ZTakeScreenShotWidget::createWidget()
     label = m_timeInSecond.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_timeInSecond.createWidget();
     wg->setMinimumWidth(175);
@@ -304,7 +313,7 @@ void ZTakeScreenShotWidget::createWidget()
     label = m_framePerSecond.createNameLabel();
     label->setTextInteractionFlags(Qt::TextSelectableByMouse);
     label->setMinimumWidth(125);
-    //label->setWordWrap(true);
+    // label->setWordWrap(true);
     hlo->addWidget(label);
     wg = m_framePerSecond.createWidget();
     wg->setMinimumWidth(175);
@@ -321,10 +330,13 @@ void ZTakeScreenShotWidget::createWidget()
   hlo->getContentsMargins(&left, &top, &right, &bottom);
   hlo->setContentsMargins(left + 20, top, right, bottom);
 
-  m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory, "output folder:", QString(),
+  m_folderWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::Directory,
+                                         "output folder:",
+                                         QString(),
                                          QString("ScreenShot/exportPath"),
                                          QStandardPaths::writableLocation(QStandardPaths::DesktopLocation),
-                                         QBoxLayout::LeftToRight, this);
+                                         QBoxLayout::LeftToRight,
+                                         this);
   hlo->addWidget(m_folderWidget);
   lo->addLayout(hlo);
 
@@ -333,7 +345,7 @@ void ZTakeScreenShotWidget::createWidget()
   label = m_namePrefix.createNameLabel();
   label->setTextInteractionFlags(Qt::TextSelectableByMouse);
   label->setMinimumWidth(50);
-  //label->setWordWrap(true);
+  // label->setWordWrap(true);
   hlo->addWidget(label);
   wg = m_namePrefix.createWidget();
   wg->setMinimumWidth(175);

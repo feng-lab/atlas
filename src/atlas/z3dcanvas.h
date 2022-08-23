@@ -1,7 +1,7 @@
 #pragma once
 
-//#define ATLAS_USE_OPENGLWINDOW
-//#define ATLAS_USE_OPENGLWIDGET
+// #define ATLAS_USE_OPENGLWINDOW
+// #define ATLAS_USE_OPENGLWIDGET
 
 #include "zglmutils.h"
 #include <QGraphicsView>
@@ -31,9 +31,13 @@ class ZOpenGLWindow;
 
 class Z3DCanvas : public QOpenGLWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr,
+  Z3DCanvas(const QString& title,
+            int width,
+            int height,
+            QWidget* parent = nullptr,
             Qt::WindowFlags f = Qt::WindowFlags());
 
   void setNetworkEvaluator(Z3DNetworkEvaluator* n);
@@ -52,7 +56,9 @@ public:
 
   // Set the opengl context of this canvas as the current one.
   inline void getGLFocus()
-  { makeCurrent(); }
+  {
+    makeCurrent();
+  }
 
   void toggleFullScreen();
 
@@ -63,17 +69,20 @@ public:
   }
 
   void updateAll()
-  { update(); }
+  {
+    update();
+  }
 
   // for high dpi support like retina
   glm::ivec2 physicalSize()
   {
-    return glm::ivec2(width() * devicePixelRatioF(),
-                      height() * devicePixelRatioF());
+    return glm::ivec2(width() * devicePixelRatioF(), height() * devicePixelRatioF());
   }
 
   glm::ivec2 logicalSize()
-  { return glm::ivec2(width(), height()); }
+  {
+    return glm::ivec2(width(), height());
+  }
 
 Q_SIGNALS:
 
@@ -124,6 +133,7 @@ protected:
   void rotateZM();
 
   // QOpenGLWidget interface
+
 protected:
   void initializeGL() override;
 
@@ -152,9 +162,13 @@ private:
 
 class Z3DCanvas : public QGraphicsView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  Z3DCanvas(const QString& title, int width, int height, QWidget* parent = nullptr,
+  Z3DCanvas(const QString& title,
+            int width,
+            int height,
+            QWidget* parent = nullptr,
             Qt::WindowFlags f = Qt::WindowFlags());
 
   [[nodiscard]] QSurfaceFormat format() const;
@@ -164,10 +178,14 @@ public:
   void setFakeStereoOnce();
 
   void addEventListenerToBack(Z3DCanvasEventListener& e)
-  { m_listeners.push_back(&e); }
+  {
+    m_listeners.push_back(&e);
+  }
 
   void addEventListenerToFront(Z3DCanvasEventListener& e)
-  { m_listeners.push_front(&e); }
+  {
+    m_listeners.push_front(&e);
+  }
 
   void removeEventListener(Z3DCanvasEventListener& e);
 
@@ -191,12 +209,13 @@ public:
   // for high dpi support like retina
   glm::uvec2 physicalSize()
   {
-    return glm::uvec2(width() * devicePixelRatioF(),
-                      height() * devicePixelRatioF());
+    return glm::uvec2(width() * devicePixelRatioF(), height() * devicePixelRatioF());
   }
 
   glm::uvec2 logicalSize()
-  { return glm::uvec2(width(), height()); }
+  {
+    return glm::uvec2(width(), height());
+  }
 
 Q_SIGNALS:
 
@@ -236,8 +255,8 @@ protected:
 
   void dropEvent(QDropEvent* event) override;
 
-//  void setCursor(const QCursor& c)
-//  { viewport()->setCursor(c); }
+  //  void setCursor(const QCursor& c)
+  //  { viewport()->setCursor(c); }
 
   void rotateX();
 
@@ -252,7 +271,7 @@ protected:
   void rotateZM();
 
 private:
-  //double devicePixelRatio();
+  // double devicePixelRatio();
 
 private:
   bool m_fullscreen = false;
@@ -273,4 +292,3 @@ private:
 #endif
 
 } // namespace nim
-

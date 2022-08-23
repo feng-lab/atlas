@@ -15,7 +15,8 @@ namespace nim {
 // "CustomColor" : setDataColors must be called to set color of each mesh
 class Z3DMeshRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DMeshRenderer(Z3DRendererBase& rendererBase);
 
@@ -33,13 +34,19 @@ public:
 
   // One of "MeshColor", "Mesh1DTexture", "Mesh2DTexture", "Mesh3DTexture", "CustomColor"
   void setColorSource(const QString& sc)
-  { m_colorSource.select(sc); }
+  {
+    m_colorSource.select(sc);
+  }
 
   ZStringIntOptionParameter& wireframeModePara()
-  { return m_wireframeMode; }
+  {
+    return m_wireframeMode;
+  }
 
   ZVec4Parameter& wireframeColorPara()
-  { return m_wireframeColor; }
+  {
+    return m_wireframeColor;
+  }
 
 protected:
   void compile() override;
@@ -101,4 +108,3 @@ private:
 };
 
 } // namespace nim
-

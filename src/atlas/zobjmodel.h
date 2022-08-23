@@ -17,7 +17,8 @@ class ZObjDoc;
 
 class ZObjModel : public QAbstractItemModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum Column
   {
@@ -32,7 +33,15 @@ public:
     ViewSettingColumn,
     ColumnCount
 #else
-    ShowHideColumn = 0, LockColumn, NameColumn, TypeColumn, InfoColumn, IDColumn, ViewSettingColumn, ShowHideNameColumn, ColumnCount
+    ShowHideColumn = 0,
+    LockColumn,
+    NameColumn,
+    TypeColumn,
+    InfoColumn,
+    IDColumn,
+    ViewSettingColumn,
+    ShowHideNameColumn,
+    ColumnCount
 #endif
   };
 
@@ -44,11 +53,9 @@ public:
 
   bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
-  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
-                                    int role) const override;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
-  [[nodiscard]] QModelIndex index(int row, int column,
-                                  const QModelIndex& parent) const override;
+  [[nodiscard]] QModelIndex index(int row, int column, const QModelIndex& parent) const override;
 
   [[nodiscard]] QModelIndex parent(const QModelIndex& index) const override;
 
@@ -57,7 +64,9 @@ public:
   [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
   [[nodiscard]] inline bool hasObj() const
-  { return !m_rootItem->children.empty(); }
+  {
+    return !m_rootItem->children.empty();
+  }
 
   [[nodiscard]] size_t numObjs() const;
 
@@ -119,4 +128,3 @@ protected:
 };
 
 } // namespace nim
-

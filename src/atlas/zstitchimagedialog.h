@@ -66,9 +66,11 @@ public:
 
 class ZTileImageWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZTileImageWidget(QWidget* parent, QImage* image,
+  explicit ZTileImageWidget(QWidget* parent,
+                            QImage* image,
                             const std::vector<std::vector<size_t>>& tileMatrix,
                             std::vector<ZTile>* pTiles = nullptr,
                             const QStringList& filenames = QStringList());
@@ -109,7 +111,8 @@ private:
 
 class ZStitchImageDialog : public ZImgProcessDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZStitchImageDialog(QWidget* parent = nullptr);
 
@@ -201,7 +204,7 @@ private:
   QImage m_tileImage;
 
   QCheckBox* m_dsCheckBox = nullptr;
-  //QCheckBox *m_useLayoutRadioButton = nullptr;
+  // QCheckBox *m_useLayoutRadioButton = nullptr;
   QCheckBox* m_concatOnlyCheckBox = nullptr;
   QCheckBox* m_hasTwoInputStackSetCheckBox = nullptr;
 
@@ -262,4 +265,3 @@ private:
 };
 
 } // namespace nim
-

@@ -20,8 +20,9 @@ ZSwcDoc::ZSwcDoc(ZDoc& doc)
 
 bool ZSwcDoc::save(size_t id)
 {
-  if (!objHasUnsavedChange(id))
+  if (!objHasUnsavedChange(id)) {
     return true;
+  }
 
   auto& pack = m_idToSwcPacks.at(id);
   if (ZSwc::canWriteFile(pack->path())) {
@@ -30,7 +31,8 @@ bool ZSwcDoc::save(size_t id)
       m_doc.updateObjInfo(id);
       return true;
     }
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
                           tr("Error saving %1 to file %2: %3").arg(objName(id)).arg(pack->path()).arg(err));
     return false;
   }
@@ -65,8 +67,9 @@ bool ZSwcDoc::canReadFile(const QString& fileName) const
 size_t ZSwcDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToSwcPacks) {
-    if (idPack.second->path() == fileName)
+    if (idPack.second->path() == fileName) {
       return idPack.first;
+    }
   }
   try {
     ZSwc tree(fileName);
@@ -90,8 +93,9 @@ size_t ZSwcDoc::loadFile(const json::value& jValue, QString& errorMsg)
       return 0;
     }
     for (const auto& idPack : m_idToSwcPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first)))
+      if (isSameObj(jValue, jsonValue(idPack.first))) {
         return idPack.first;
+      }
     }
     QString fileName = asQString(jValue);
 
@@ -160,12 +164,14 @@ json::value ZSwcDoc::jsonValue(size_t id) const
 bool ZSwcDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -185,11 +191,9 @@ bool ZSwcDoc::isAlias(size_t id) const
 {
   CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
 
-  return std::any_of(m_idToSwcPacks.begin(), m_idToSwcPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToSwcPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToSwcPacks.begin(), m_idToSwcPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToSwcPacks.at(id);
+  });
 }
 
 QWidget* ZSwcDoc::createObjEditWidget(size_t id)
@@ -208,10 +212,11 @@ void ZSwcDoc::loadSwc()
   dialog.setWindowTitle("Load Swc File");
   if (dialog.exec()) {
     QString errorMsg;
-    //auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+    // auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read swc.\n" + errorMsg);
       }
     }
@@ -225,8 +230,7 @@ size_t ZSwcDoc::addSwc(ZSwc& tree, const QString& path)
   m_doc.registerNewObj(m_idToSwcPacks[id]);
 
   Q_EMIT objAdded(id, this);
-  connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged,
-          this, &ZSwcDoc::setModified);
+  connect(m_idToSwcPacks[id].get(), &ZSwcPack::undoStackCleanChanged, this, &ZSwcDoc::setModified);
   return id;
 }
 
@@ -268,8 +272,9 @@ bool ZSwcDoc::saveSwc(ZSwcPack* pack, const QString& fileName, QString& errorMsg
 void ZSwcDoc::packInfoUpdated(ZSwcPack* pack)
 {
   for (const auto& idPack : m_idToSwcPacks) {
-    if (idPack.second.get() == pack)
+    if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
   }
 }
 

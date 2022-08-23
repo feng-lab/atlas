@@ -4,7 +4,8 @@
 
 namespace nim {
 
-ZVideoEncoder::ZVideoEncoder(QObject* parent) : QObject(parent)
+ZVideoEncoder::ZVideoEncoder(QObject* parent)
+  : QObject(parent)
 {
   m_ffmpegProcess = new QProcess(this);
   connect(m_ffmpegProcess, &QProcess::errorOccurred, this, &ZVideoEncoder::ffmpegError);

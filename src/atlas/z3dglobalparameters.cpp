@@ -48,7 +48,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
     transparencyMethod.addOption("Dual Depth Peeling");
   }
-  //weightedBlendedDepthScale.setStyle("SPINBOX");
+  // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())
   //    m_transparencyMethod.addOption("Linked List");
@@ -69,9 +69,10 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   // lights
   QString lightname = "Key Light";
   QString name = lightname + " Position";
-  lightPositions.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1116f, 0.7660f, 0.6330f, 0.0f), glm::vec4(-1.0f),
-                                     glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name,
+                                                               glm::vec4(0.1116f, 0.7660f, 0.6330f, 0.0f),
+                                                               glm::vec4(-1.0f),
+                                                               glm::vec4(1.f)));
   name = lightname + " Ambient";
   lightAmbients.emplace_back(std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1f, 0.1f, 0.1f, 1.0f)));
   name = lightname + " Diffuse";
@@ -114,9 +115,10 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
 
   lightname = "Fill Light";
   name = lightname + " Position";
-  lightPositions.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(-0.0449f, -0.9659f, 0.2549f, 0.0f), glm::vec4(-1.0f),
-                                     glm::vec4(1.f)));
+  lightPositions.emplace_back(std::make_unique<ZVec4Parameter>(name,
+                                                               glm::vec4(-0.0449f, -0.9659f, 0.2549f, 0.0f),
+                                                               glm::vec4(-1.0f),
+                                                               glm::vec4(1.f)));
   name = lightname + " Ambient";
   lightAmbients.emplace_back(
     std::make_unique<ZVec4Parameter>(name, glm::vec4(0.1 * 0.333f, 0.1 * 0.333f, 0.1 * 0.333f, 1.0f)));
@@ -257,7 +259,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
 
 void Z3DGlobalParameters::read(const json::object& json)
 {
-  for (auto & m_parameter : m_parameters) {
+  for (auto& m_parameter : m_parameters) {
     m_parameter->read(json);
   }
 }

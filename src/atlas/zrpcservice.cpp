@@ -18,8 +18,10 @@ using helloworld::HelloReply;
 using helloworld::Greeter;
 
 // Logic and data behind the server's behavior.
-class GreeterServiceImpl final : public Greeter::Service {
-  Status SayHello(ServerContext* context, const HelloRequest* request, HelloReply* reply) override {
+class GreeterServiceImpl final : public Greeter::Service
+{
+  Status SayHello(ServerContext* context, const HelloRequest* request, HelloReply* reply) override
+  {
     // Overwrite the call's compression algorithm to DEFLATE.
     context->set_compression_algorithm(GRPC_COMPRESS_DEFLATE);
     std::string prefix("Hello ");
@@ -30,8 +32,7 @@ class GreeterServiceImpl final : public Greeter::Service {
 
 ZRPCService::ZRPCService(QObject* parent)
   : QObject(parent)
-{
-}
+{}
 
 void ZRPCService::init()
 {
@@ -83,4 +84,3 @@ void ZRPCService::onRPCThreadStarted()
 }
 
 } // namespace nim
-

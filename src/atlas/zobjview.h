@@ -11,12 +11,15 @@ namespace nim {
 
 class ZObjView : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZObjView(ZView& view);
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
-  { return m_boundBox; }
+  {
+    return m_boundBox;
+  }
 
   [[nodiscard]] virtual const ZObjDoc& doc() const = 0;
 
@@ -85,10 +88,14 @@ protected:
   virtual void onObjVisibleChangedFromView(bool v) = 0;
 
   inline void resetBoundBox()
-  { m_boundBox.reset(); }
+  {
+    m_boundBox.reset();
+  }
 
   inline void expandBoundBox(const ZBBox<glm::ivec4>& boundBox)
-  { m_boundBox.expand(boundBox); }
+  {
+    m_boundBox.expand(boundBox);
+  }
 
 protected:
   ZView& m_view;
@@ -96,4 +103,3 @@ protected:
 };
 
 } // namespace nim
-

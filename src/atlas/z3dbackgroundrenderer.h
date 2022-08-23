@@ -6,21 +6,30 @@ namespace nim {
 
 class Z3DBackgroundRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DBackgroundRenderer(Z3DRendererBase& rendererBase);
 
   ZStringIntOptionParameter& modePara()
-  { return m_mode; }
+  {
+    return m_mode;
+  }
 
   ZVec4Parameter& firstColorPara()
-  { return m_firstColor; }
+  {
+    return m_firstColor;
+  }
 
   ZVec4Parameter& secondColorPara()
-  { return m_secondColor; }
+  {
+    return m_secondColor;
+  }
 
   ZStringIntOptionParameter& gradientOrientationPara()
-  { return m_gradientOrientation; }
+  {
+    return m_gradientOrientation;
+  }
 
   void setRenderingRegion(double left = 0., double right = 1., double bottom = 0., double top = 1.);
 
@@ -55,4 +64,3 @@ protected:
 };
 
 } // namespace nim
-

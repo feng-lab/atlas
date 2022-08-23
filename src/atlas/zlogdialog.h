@@ -41,7 +41,7 @@ class ZLogFilterProxyModel;
 
 class ZLogDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
 
 public:
   explicit ZLogDialog(const LogSinkPtr& destination, QWidget* parent = nullptr);
@@ -51,7 +51,6 @@ public:
   virtual bool eventFilter(QObject* obj, QEvent* event);
 
 private:
-
   void OnPauseClicked();
 
   void OnSaveClicked();
@@ -80,5 +79,4 @@ private:
   bool mHasAutoScroll;
 };
 
-}  // namespace nim
-
+} // namespace nim

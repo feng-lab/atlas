@@ -7,31 +7,41 @@ namespace nim {
 
 class ZROIDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZROIDoc(ZDoc& doc);
 
   inline ZROIPack& roiPack(size_t id)
-  { return *m_idToROIPacks.at(id); }
+  {
+    return *m_idToROIPacks.at(id);
+  }
 
   [[nodiscard]] inline const ZROIPack& roiPack(size_t id) const
-  { return *m_idToROIPacks.at(id); }
+  {
+    return *m_idToROIPacks.at(id);
+  }
 
   ZROIPack& currentROIPack();
 
   void askToSave(const ZROI& roi, const QString& title = "");
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "ROI"; }
+  {
+    return "ROI";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "ROI"; }
+  {
+    return "ROI";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -98,4 +108,3 @@ private:
 };
 
 } // namespace nim
-

@@ -12,7 +12,8 @@ class ZAnalysisWorklistModel;
 
 class ZAnalysisWorklistDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZAnalysisWorklistDialog(QWidget* parent = nullptr);
 
@@ -41,5 +42,3 @@ private:
 };
 
 } // namespace nim
-
-

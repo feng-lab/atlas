@@ -17,11 +17,15 @@ void ZRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t>&
     expandBoundBox(viewControl->boundBox());
     m_idToFilter[obj].reset(viewControl);
     connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
-    connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this,
+    connect(viewControl,
+            &ZRegionAnnotationFilter::objDeselected,
+            this,
             &ZRegionAnnotationView::onObjDeselectedFromView);
     connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
-    connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged,
-            this, &ZRegionAnnotationView::onObjVisibleChangedFromView);
+    connect(viewControl,
+            &ZRegionAnnotationFilter::objVisibleChanged,
+            this,
+            &ZRegionAnnotationView::onObjVisibleChangedFromView);
     Q_EMIT objViewReady(obj);
   }
   if (!objs.empty()) {
@@ -39,10 +43,11 @@ void ZRegionAnnotationView::docRegionAnnotationAdded(size_t id)
   connect(viewControl, &ZRegionAnnotationFilter::boundBoxChanged, this, &ZRegionAnnotationView::updateBoundBox);
   connect(viewControl, &ZRegionAnnotationFilter::objDeselected, this, &ZRegionAnnotationView::onObjDeselectedFromView);
   connect(viewControl, &ZRegionAnnotationFilter::objSelected, this, &ZRegionAnnotationView::onObjSelectedFromView);
-  connect(viewControl, &ZRegionAnnotationFilter::objVisibleChanged, this,
+  connect(viewControl,
+          &ZRegionAnnotationFilter::objVisibleChanged,
+          this,
           &ZRegionAnnotationView::onObjVisibleChangedFromView);
   Q_EMIT objViewReady(id);
 }
 
 } // namespace nim
-

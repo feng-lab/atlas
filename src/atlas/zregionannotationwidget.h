@@ -10,7 +10,8 @@ namespace nim {
 
 class ZRegionAnnotationWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZRegionAnnotationWidget(ZRegionAnnotationPack& rap, ZDoc& doc, QWidget* parent = nullptr);
 
@@ -48,4 +49,3 @@ private:
 };
 
 } // namespace nim
-

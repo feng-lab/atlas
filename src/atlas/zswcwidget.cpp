@@ -26,4 +26,3 @@ void ZSwcWidget::createWidget()
 }
 
 } // namespace nim
-

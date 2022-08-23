@@ -10,9 +10,11 @@ namespace nim {
 
 class ZParameterAnimation : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  ZParameterAnimation(QString name, QString type,
+  ZParameterAnimation(QString name,
+                      QString type,
                       const QColor& color = QColor(ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255),
                                                    ZRandom::instance().randInt(255)),
@@ -22,47 +24,72 @@ public:
 
   // not valid means parameter type is wrong or no key
   [[nodiscard]] bool isValid() const
-  { return m_boundPara && !m_keys.empty(); }
+  {
+    return m_boundPara && !m_keys.empty();
+  }
 
   void bindParameter(ZParameter& para);
 
   void releaseParameter();
 
   [[nodiscard]] ZParameter* boundParameter() const
-  { return m_boundPara; }
+  {
+    return m_boundPara;
+  }
 
   [[nodiscard]] inline QString name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline void setName(const QString& n)
-  { m_name = n; }
+  {
+    m_name = n;
+  }
 
   [[nodiscard]] inline QString type() const
-  { return m_type; }
+  {
+    return m_type;
+  }
 
   [[nodiscard]] inline QColor color() const
-  { return m_color; }
+  {
+    return m_color;
+  }
 
   inline void setColor(const QColor& c)
-  { if (m_color != c) { m_color = c; Q_EMIT colorChanged(this); }}
+  {
+    if (m_color != c) {
+      m_color = c;
+      Q_EMIT colorChanged(this);
+    }
+  }
 
   void deleteKey(ZParameterKey* key);
 
   void addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant = true);
 
   [[nodiscard]] const std::vector<std::unique_ptr<ZParameterKey>>& keys() const
-  { return m_keys; }
+  {
+    return m_keys;
+  }
 
   [[nodiscard]] int numKeys() const
-  { return m_keys.size(); }
+  {
+    return m_keys.size();
+  }
 
   void sortKeys();
 
   void emitKeyChangedSignal(ZParameterKey* key)
-  { Q_EMIT keyChanged(key); }
+  {
+    Q_EMIT keyChanged(key);
+  }
 
   void emitKeysChangedSignal()
-  { Q_EMIT keysChanged(); }
+  {
+    Q_EMIT keysChanged();
+  }
 
   [[nodiscard]] QString jsonKey() const;
 
@@ -92,7 +119,9 @@ protected:
   virtual void updateParaToTime(double secs, ZParameter* para) const;
 
   [[nodiscard]] inline const ZParameterKey& lastKey() const
-  { return *m_keys[m_keys.size() - 1]; }
+  {
+    return *m_keys[m_keys.size() - 1];
+  }
 
 protected:
   QString m_name;
@@ -103,4 +132,3 @@ protected:
 };
 
 } // namespace nim
-

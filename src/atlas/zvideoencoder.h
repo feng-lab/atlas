@@ -8,12 +8,16 @@ namespace nim {
 
 class ZVideoEncoder : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZVideoEncoder(QObject* parent = nullptr);
 
-  void encode(const QDir& dir, const QString& namePrefix, int fieldWidth,
-              int framesPerSecond, const QString& outputFilename);
+  void encode(const QDir& dir,
+              const QString& namePrefix,
+              int fieldWidth,
+              int framesPerSecond,
+              const QString& outputFilename);
 
   void cancel();
 
@@ -39,4 +43,3 @@ private:
 };
 
 } // namespace nim
-

@@ -24,8 +24,11 @@ void ZAnalysisWorklistDialog::reject()
     return;
   }
 
-  int ans = QMessageBox::question(this, tr("Confirm"), tr("There are unsaved worklist changes. Exit anyway?"),
-                                  QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Ok);
+  int ans = QMessageBox::question(this,
+                                  tr("Confirm"),
+                                  tr("There are unsaved worklist changes. Exit anyway?"),
+                                  QMessageBox::Cancel | QMessageBox::Ok,
+                                  QMessageBox::Ok);
   if (ans == QMessageBox::Ok) {
     QDialog::reject();
   }
@@ -42,10 +45,7 @@ void ZAnalysisWorklistDialog::onNew()
 void ZAnalysisWorklistDialog::onOpen()
 {
   QString fileName =
-    QFileDialog::getOpenFileName(this, tr("Choose worklist file"),
-                                 m_filename,
-                                 tr("Worklist file (*.csv)"),
-                                 nullptr);
+    QFileDialog::getOpenFileName(this, tr("Choose worklist file"), m_filename, tr("Worklist file (*.csv)"), nullptr);
 
   if (!fileName.isEmpty()) {
     QString res = m_model->setSource(fileName);
@@ -61,11 +61,11 @@ void ZAnalysisWorklistDialog::onOpen()
 void ZAnalysisWorklistDialog::onSave()
 {
   if (m_filename.isEmpty() && !m_model->worklist().empty()) {
-    m_filename =
-      ZFileUtils::getSaveFileName(this, tr("Save worklist file as..."),
-                                  m_filename,
-                                  tr("Worklist file (*.csv)"),
-                                  nullptr);
+    m_filename = ZFileUtils::getSaveFileName(this,
+                                             tr("Save worklist file as..."),
+                                             m_filename,
+                                             tr("Worklist file (*.csv)"),
+                                             nullptr);
   }
   if (!m_filename.isEmpty()) {
     QString res = m_model->toCSV(m_filename, true);
@@ -80,10 +80,7 @@ void ZAnalysisWorklistDialog::onSave()
 void ZAnalysisWorklistDialog::onSaveAs()
 {
   QString fileName =
-    ZFileUtils::getSaveFileName(this, tr("Save worklist file as..."),
-                                m_filename,
-                                tr("Worklist file (*.csv)"),
-                                nullptr);
+    ZFileUtils::getSaveFileName(this, tr("Save worklist file as..."), m_filename, tr("Worklist file (*.csv)"), nullptr);
 
   if (!fileName.isEmpty()) {
     m_filename = fileName;
@@ -109,8 +106,9 @@ void ZAnalysisWorklistDialog::onGenerate()
     try {
       for (size_t i = 0; i < list.size(); ++i) {
         progress.setValue(i);
-        if (progress.wasCanceled())
+        if (progress.wasCanceled()) {
           break;
+        }
 
         QApplication::processEvents();
         gen.generate(list[i]);
@@ -121,7 +119,8 @@ void ZAnalysisWorklistDialog::onGenerate()
     catch (const ZException& e) {
       progress.setValue(list.size());
       LOG(ERROR) << "Error while generating analysis files: " << e.what();
-      QMessageBox::critical(this, QApplication::applicationName(),
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
                             QString("Error while generating analysis files:\n%1").arg(e.what()));
     }
   } else {

@@ -8,18 +8,22 @@ namespace nim {
 
 class ZStringParameter : public ZSingleValueParameter<QString>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZStringParameter(const QString& name, QObject* parent = nullptr);
 
   explicit ZStringParameter(const QString& name, const QString& str, QObject* parent = nullptr);
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 
   bool supportInterpolation() const override
-  { return false; }
+  {
+    return false;
+  }
 
   json::value jsonValue() const override;
 
@@ -38,4 +42,3 @@ protected:
 };
 
 } // namespace nim
-

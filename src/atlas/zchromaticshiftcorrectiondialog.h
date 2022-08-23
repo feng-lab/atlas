@@ -13,7 +13,8 @@ namespace nim {
 
 class ZChromaticShiftCorrectionDialog : public ZImgProcessDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZChromaticShiftCorrectionDialog(QWidget* parent = nullptr);
 
@@ -61,6 +62,3 @@ private:
 };
 
 } // namespace nim
-
-
-

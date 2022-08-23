@@ -12,9 +12,11 @@ Z3DTextureCopyRenderer::Z3DTextureCopyRenderer(Z3DRendererBase& rendererBase, Ou
   , m_VAO(1)
 {
   QStringList allshaders;
-  allshaders << "pass.vert" << "copyimage_func.frag";
+  allshaders << "pass.vert"
+             << "copyimage_func.frag";
   QStringList normalShaders;
-  normalShaders << "pass.vert" << "copyimage.frag";
+  normalShaders << "pass.vert"
+                << "copyimage.frag";
   m_copyTextureShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
   m_copyTextureShaderGrp.addAllSupportedPostShaders();
 }
@@ -37,8 +39,9 @@ QString Z3DTextureCopyRenderer::generateHeader() const
 
 void Z3DTextureCopyRenderer::render(Z3DEye eye)
 {
-  if (!m_colorTexture || !m_depthTexture)
+  if (!m_colorTexture || !m_depthTexture) {
     return;
+  }
 
   m_copyTextureShaderGrp.bind();
   Z3DShaderProgram& shader = m_copyTextureShaderGrp.get();

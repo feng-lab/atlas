@@ -9,8 +9,7 @@ namespace nim {
 ZRegionViewSettingWithEditorWindow::ZRegionViewSettingWithEditorWindow(ZROIFilter* rf, QWidget* parent)
   : ZRegionViewSettingLabel(rf, parent)
   , m_roiFilter(rf)
-{
-}
+{}
 
 void ZRegionViewSettingWithEditorWindow::createEditorWindow()
 {
@@ -29,8 +28,7 @@ void ZRegionViewSettingWithEditorWindow::createEditorWindow()
     m_editorWindow->showNormal();
     m_editorWindow->raise();
     m_editorWindow->activateWindow();
-    connect(this, &ZRegionViewSettingWithEditorWindow::destroyed,
-            m_editorWindow, &QWidget::deleteLater);
+    connect(this, &ZRegionViewSettingWithEditorWindow::destroyed, m_editorWindow, &QWidget::deleteLater);
 
     QApplication::restoreOverrideCursor();
   }

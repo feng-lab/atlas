@@ -13,11 +13,17 @@ Z3DLineWithFixedWidthColorRenderer::Z3DLineWithFixedWidthColorRenderer(Z3DRender
 #endif
   m_lineColor.setStyle("COLOR");
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
+  connect(&m_lineWidth,
+          &ZFloatParameter::valueChanged,
+          this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
-  connect(&m_lineWidth, &ZFloatParameter::valueChanged, this,
+  connect(&m_lineWidth,
+          &ZFloatParameter::valueChanged,
+          this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglPickingRenderer);
-  connect(&m_lineColor, &ZVec4Parameter::valueChanged, this,
+  connect(&m_lineColor,
+          &ZVec4Parameter::valueChanged,
+          this,
           &Z3DLineWithFixedWidthColorRenderer::invalidateOpenglRenderer);
 #endif
   connect(&m_lineColor, &ZVec4Parameter::valueChanged, this, &Z3DLineWithFixedWidthColorRenderer::setLineColors);
@@ -37,8 +43,9 @@ float Z3DLineWithFixedWidthColorRenderer::lineWidth() const
 void Z3DLineWithFixedWidthColorRenderer::setLineColors()
 {
   m_lineColorsPrivate.clear();
-  if (!m_linesPt)
+  if (!m_linesPt) {
     return;
+  }
   for (size_t i = 0; i < m_linesPt->size(); ++i) {
     m_lineColorsPrivate.push_back(m_lineColor.get());
   }

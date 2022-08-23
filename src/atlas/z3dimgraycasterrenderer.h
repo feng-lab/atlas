@@ -15,20 +15,28 @@ class Z3DImg;
 // transfer functions
 class Z3DImgRaycasterRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase);
 
   void setData(Z3DImg& img);
 
   void setLayerTarget(Z3DRenderTarget& target)
-  { m_layerTarget = &target; }
+  {
+    m_layerTarget = &target;
+  }
 
   void setBlockIDsRenderTarget(Z3DRenderTarget& target)
-  { m_blockIDsRenderTarget = &target; }
+  {
+    m_blockIDsRenderTarget = &target;
+  }
 
   void setImageRenderTargetWithRayDepthLayer(Z3DRenderTarget& target1, Z3DRenderTarget& target2)
-  { m_lastImageRenderTarget = &target1; m_currentImageRenderTarget = &target2; }
+  {
+    m_lastImageRenderTarget = &target1;
+    m_currentImageRenderTarget = &target2;
+  }
 
   // quad or entryexit texture should be set before rendering
 
@@ -39,7 +47,9 @@ public:
   // DO NOT call this function for 3d Raycaster
   // clear
   void clearQuads()
-  { m_quads.clear(); }
+  {
+    m_quads.clear();
+  }
 
   // add quad
   void addQuad(const ZMesh& quad);
@@ -52,10 +62,14 @@ public:
                         const Z3DTexture* exitEyeCoordTexture);
 
   void setFastRendering(bool v)
-  { m_fastRendering = v; }
+  {
+    m_fastRendering = v;
+  }
 
   [[nodiscard]] bool lastRenderingIsFastRendering() const
-  { return m_lastRenderingIsFastRendering; }
+  {
+    return m_lastRenderingIsFastRendering;
+  }
 
   // return true if something is rendered by this renderer
   [[nodiscard]] bool hasVisibleRendering() const;
@@ -63,25 +77,39 @@ public:
   [[nodiscard]] QString compositeMode() const;
 
   ZStringIntOptionParameter& compositingModePara()
-  { return m_compositingMode; }
+  {
+    return m_compositingMode;
+  }
 
   ZFloatParameter& samplingRatePara()
-  { return m_samplingRate; }
+  {
+    return m_samplingRate;
+  }
 
   ZFloatParameter& isoValuePara()
-  { return m_isoValue; }
+  {
+    return m_isoValue;
+  }
 
   ZFloatParameter& localMIPThresholdPara()
-  { return m_localMIPThreshold; }
+  {
+    return m_localMIPThreshold;
+  }
 
   [[nodiscard]] const std::vector<std::unique_ptr<ZBoolParameter>>& channelVisibleParas() const
-  { return m_channelVisibleParas; }
+  {
+    return m_channelVisibleParas;
+  }
 
   [[nodiscard]] const std::vector<std::unique_ptr<Z3DTransferFunctionParameter>>& transferFuncParas() const
-  { return m_transferFuncParas; }
+  {
+    return m_transferFuncParas;
+  }
 
   [[nodiscard]] const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
-  { return m_texFilterModeParas; }
+  {
+    return m_texFilterModeParas;
+  }
 
   void compile() override;
 
@@ -124,8 +152,8 @@ protected:
   Z3DRenderTarget* m_lastImageRenderTarget = nullptr;
   Z3DRenderTarget* m_currentImageRenderTarget = nullptr;
 
-  ZFloatParameter m_samplingRate;  // Sampling rate of the raycasting, specified relative to the size of one voxel
-  ZFloatParameter m_isoValue;  // The used isovalue, when isosurface raycasting is enabled
+  ZFloatParameter m_samplingRate; // Sampling rate of the raycasting, specified relative to the size of one voxel
+  ZFloatParameter m_isoValue; // The used isovalue, when isosurface raycasting is enabled
   ZFloatParameter m_localMIPThreshold;
 
   ZStringIntOptionParameter m_compositingMode;
@@ -146,7 +174,7 @@ private:
   const Z3DTexture* m_exitEyeCoordTexture;
 
   bool m_opaque;
-  double m_alpha; //only takes effect when m_opaque is true
+  double m_alpha; // only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
@@ -155,4 +183,3 @@ private:
 };
 
 } // namespace nim
-

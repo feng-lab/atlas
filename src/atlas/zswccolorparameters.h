@@ -10,7 +10,8 @@ namespace nim {
 
 class ZSwcColorParameters : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZSwcColorParameters(QObject* parent = nullptr);
 
@@ -46,5 +47,3 @@ private:
 };
 
 } // namespace nim
-
-

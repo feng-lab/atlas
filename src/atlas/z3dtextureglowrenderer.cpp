@@ -17,20 +17,22 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   m_glowMode.addOptionsWithData(std::make_pair<QString, QString>("Additive", "ADDITIVE_BLENDING"),
                                 std::make_pair<QString, QString>("Screen", "SCREEN_BLENDING"),
                                 std::make_pair<QString, QString>("Softlight", "SOFTLIGHT_BLENDING"),
-                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP")
-  );
+                                std::make_pair<QString, QString>("Glowmap", "GLOWMAP"));
   m_glowMode.select("Screen");
   connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);
 
   m_blurXTextureShader.bindFragDataLocation(0, "FragData0");
-  m_blurXTextureShader.loadFromSourceFile("pass.vert", "blur.frag",
+  m_blurXTextureShader.loadFromSourceFile("pass.vert",
+                                          "blur.frag",
                                           m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");
   m_blurYTextureShader.bindFragDataLocation(0, "FragData0");
-  m_blurYTextureShader.loadFromSourceFile("pass.vert", "blur.frag",
+  m_blurYTextureShader.loadFromSourceFile("pass.vert",
+                                          "blur.frag",
                                           m_rendererBase.generateHeader() + "#define ORIENTATION_Y\n");
 
   QStringList allshaders;
-  allshaders << "pass.vert" << "glow_func.frag";
+  allshaders << "pass.vert"
+             << "glow_func.frag";
   m_glowTextureShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_glowTextureShaderGrp.addAllSupportedPostShaders();
   CHECK_GL_ERROR
@@ -48,11 +50,13 @@ QString Z3DTextureGlowRenderer::generateHeader()
 
 void Z3DTextureGlowRenderer::render(Z3DEye eye)
 {
-  if (!m_colorTexture || !m_depthTexture)
+  if (!m_colorTexture || !m_depthTexture) {
     return;
+  }
 
   glm::uvec2 size = m_colorTexture->dimension().xy();
-  //glm::ivec2 size = glm::ivec2(glm::vec2(m_colorTexture->dimensions()) * 128.f / float(std::min(m_colorTexture->dimensions().x, m_colorTexture->dimensions().y)));
+  // glm::ivec2 size = glm::ivec2(glm::vec2(m_colorTexture->dimensions()) * 128.f /
+  // float(std::min(m_colorTexture->dimensions().x, m_colorTexture->dimensions().y)));
   m_blurXTarget.resize(size);
   m_blurYTarget.resize(size);
 

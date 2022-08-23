@@ -8,7 +8,8 @@ namespace nim {
 
 class ZROIView : public ZFilterView<ZROIDoc, ZROIFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZROIView(ZROIDoc& doc, ZView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

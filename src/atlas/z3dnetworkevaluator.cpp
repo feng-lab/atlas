@@ -10,7 +10,7 @@
 #include <algorithm>
 #include <queue>
 
-//#define PROFILE3DRENDERERS
+// #define PROFILE3DRENDERERS
 
 namespace nim {
 
@@ -40,7 +40,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
 {
   if (m_locked) {
     LOG(INFO) << "locked. Scheduling.";
-    //m_processPending = true;
+    // m_processPending = true;
     return;
   }
 
@@ -48,18 +48,18 @@ void Z3DNetworkEvaluator::process(bool stereo)
 
   // already locked
 
-//  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
-//    Z3DMeshFilter* meshFilter = qobject_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
-//    if (meshFilter && !meshFilter->isFixed()) {
-//      if (ZRandomInstance.randReal<float>() < 0.001f) {
-//        meshFilter->setVisible(true);
-//        meshFilter->setGlow(true);
-//        meshFilter->setStayOnTop(true);
-//      } else {
-//        meshFilter->setVisible(false);
-//      }
-//    }
-//  }
+  //  for (size_t i = 0; i < m_renderingOrder.size(); ++i) {
+  //    Z3DMeshFilter* meshFilter = qobject_cast<Z3DMeshFilter*>(m_renderingOrder[i]);
+  //    if (meshFilter && !meshFilter->isFixed()) {
+  //      if (ZRandomInstance.randReal<float>() < 0.001f) {
+  //        meshFilter->setVisible(true);
+  //        meshFilter->setGlow(true);
+  //        meshFilter->setStayOnTop(true);
+  //      } else {
+  //        meshFilter->setVisible(false);
+  //      }
+  //    }
+  //  }
 
   m_canvasPainter.canvas().getGLFocus();
 
@@ -187,8 +187,7 @@ void Z3DNetworkEvaluator::updateNetwork()
   sizeChangedFromFilter();
   for (auto filter : m_reverseSortedFilters) {
     QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, nullptr, 0);
-    connect(filter, &Z3DFilter::requestUpstreamSizeChange,
-            this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
+    connect(filter, &Z3DFilter::requestUpstreamSizeChange, this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
   }
 }
 
@@ -226,7 +225,6 @@ void Z3DCheckOpenGLStateFilterWrapper::beforeNetworkProcess()
 
 void Z3DCheckOpenGLStateFilterWrapper::checkState(const Z3DFilter* p)
 {
-
   if (!checkGLState(GL_BLEND, false)) {
     glDisable(GL_BLEND);
     warn(p, "GL_BLEND was enabled");

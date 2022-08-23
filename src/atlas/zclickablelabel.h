@@ -22,7 +22,8 @@ class Z3DMeshFilter;
 
 class ZClickableLabel : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZClickableLabel(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
@@ -44,16 +45,20 @@ protected:
 class ZClickableColorLabel : public ZClickableLabel
 {
 public:
-  explicit ZClickableColorLabel(ZVec4Parameter* color, QWidget* parent = nullptr,
+  explicit ZClickableColorLabel(ZVec4Parameter* color,
+                                QWidget* parent = nullptr,
                                 Qt::WindowFlags f = Qt::WindowFlags());
 
-  explicit ZClickableColorLabel(ZVec3Parameter* color, QWidget* parent = nullptr,
+  explicit ZClickableColorLabel(ZVec3Parameter* color,
+                                QWidget* parent = nullptr,
                                 Qt::WindowFlags f = Qt::WindowFlags());
 
-  explicit ZClickableColorLabel(ZDVec4Parameter* color, QWidget* parent = nullptr,
+  explicit ZClickableColorLabel(ZDVec4Parameter* color,
+                                QWidget* parent = nullptr,
                                 Qt::WindowFlags f = Qt::WindowFlags());
 
-  explicit ZClickableColorLabel(ZDVec3Parameter* color, QWidget* parent = nullptr,
+  explicit ZClickableColorLabel(ZDVec3Parameter* color,
+                                QWidget* parent = nullptr,
                                 Qt::WindowFlags f = Qt::WindowFlags());
 
 protected:
@@ -79,7 +84,8 @@ private:
 class ZClickableColorMapLabel : public ZClickableLabel
 {
 public:
-  explicit ZClickableColorMapLabel(ZColorMapParameter* colorMap, QWidget* parent = nullptr,
+  explicit ZClickableColorMapLabel(ZColorMapParameter* colorMap,
+                                   QWidget* parent = nullptr,
                                    Qt::WindowFlags f = Qt::WindowFlags());
 
 protected:
@@ -95,7 +101,8 @@ protected:
 class ZClickableTransferFunctionLabel : public ZClickableLabel
 {
 public:
-  explicit ZClickableTransferFunctionLabel(Z3DTransferFunctionParameter* transferFunc, QWidget* parent = nullptr,
+  explicit ZClickableTransferFunctionLabel(Z3DTransferFunctionParameter* transferFunc,
+                                           QWidget* parent = nullptr,
                                            Qt::WindowFlags f = Qt::WindowFlags());
 
 protected:
@@ -111,17 +118,22 @@ protected:
 class ZRegionViewSettingLabel : public ZClickableLabel
 {
 public:
-  explicit ZRegionViewSettingLabel(ZROIFilter* roiFilter, QWidget* parent = nullptr,
+  explicit ZRegionViewSettingLabel(ZROIFilter* roiFilter,
+                                   QWidget* parent = nullptr,
                                    Qt::WindowFlags f = Qt::WindowFlags());
 
   static QSize staticMinimumSizeHint()
-  { return QSize(50, 50); }
+  {
+    return QSize(50, 50);
+  }
 
 protected:
   void paintEvent(QPaintEvent* e) override;
 
   [[nodiscard]] QSize minimumSizeHint() const override
-  { return staticMinimumSizeHint(); }
+  {
+    return staticMinimumSizeHint();
+  }
 
   ZROIFilter* m_roiFilter;
 
@@ -131,17 +143,22 @@ protected:
 class Z3DRegionViewSettingLabel : public ZClickableLabel
 {
 public:
-  explicit Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter, QWidget* parent = nullptr,
+  explicit Z3DRegionViewSettingLabel(Z3DMeshFilter* meshFilter,
+                                     QWidget* parent = nullptr,
                                      Qt::WindowFlags f = Qt::WindowFlags());
 
   static QSize staticMinimumSizeHint()
-  { return QSize(40, 40); }
+  {
+    return QSize(40, 40);
+  }
 
 protected:
   void paintEvent(QPaintEvent* e) override;
 
   [[nodiscard]] QSize minimumSizeHint() const override
-  { return staticMinimumSizeHint(); }
+  {
+    return staticMinimumSizeHint();
+  }
 
   Z3DMeshFilter* m_meshFilter;
 
@@ -149,4 +166,3 @@ protected:
 };
 
 } // namespace nim
-

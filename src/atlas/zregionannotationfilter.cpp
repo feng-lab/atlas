@@ -33,15 +33,23 @@ void ZRegionAnnotationFilter::setData(ZRegionAnnotationPack& regionAnnotationPac
 
   allROIChanged();
 
-  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::boundBoxChanged,
-          this, &ZRegionAnnotationFilter::boundBoxChanged);
-  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::allROIChanged,
-          this, &ZRegionAnnotationFilter::allROIChanged);
-  connect(&m_regionAnnotationPack->regionAnnotation(), &ZRegionAnnotation::regionROIAdded,
-          this, &ZRegionAnnotationFilter::regionROIAdded);
+  connect(&m_regionAnnotationPack->regionAnnotation(),
+          &ZRegionAnnotation::boundBoxChanged,
+          this,
+          &ZRegionAnnotationFilter::boundBoxChanged);
+  connect(&m_regionAnnotationPack->regionAnnotation(),
+          &ZRegionAnnotation::allROIChanged,
+          this,
+          &ZRegionAnnotationFilter::allROIChanged);
+  connect(&m_regionAnnotationPack->regionAnnotation(),
+          &ZRegionAnnotation::regionROIAdded,
+          this,
+          &ZRegionAnnotationFilter::regionROIAdded);
 
-  connect(m_regionAnnotationPack, &ZRegionAnnotationPack::lockedStateChanged,
-          this, &ZRegionAnnotationFilter::onLockedStateChanged);
+  connect(m_regionAnnotationPack,
+          &ZRegionAnnotationPack::lockedStateChanged,
+          this,
+          &ZRegionAnnotationFilter::onLockedStateChanged);
 }
 
 void ZRegionAnnotationFilter::releaseItemsOwnership()
@@ -102,11 +110,11 @@ std::shared_ptr<ZWidgetsGroup> ZRegionAnnotationFilter::viewSettingWidgetsGroup(
 
     m_viewSettingTreeModel =
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
-                                                              m_idToROIFilters, this);
-    m_viewSettingTreeWidget =
-      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
-                                               m_regionAnnotationPack->regionAnnotation(),
-                                               m_idToROIFilters);
+                                                              m_idToROIFilters,
+                                                              this);
+    m_viewSettingTreeWidget = new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                                                       m_regionAnnotationPack->regionAnnotation(),
+                                                                       m_idToROIFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
   }
   return m_widgetsGroup;
@@ -233,20 +241,28 @@ void ZRegionAnnotationFilter::allROIChanged()
     flt->showControlPointsPara().set(m_showControlPoints.get());
     flt->fixedControlPointsSizePara().set(m_fixedControlPointsSize.get());
     flt->highlightRegionOnMouseHoverPara().set(m_highlightRegionOnMouseHover.get());
-    connect(&m_visible, &ZBoolParameter::valueChanged,
-            &flt->visiblePara(), &ZBoolParameter::updateFromSender);
-    connect(&m_viewPrecedencePara, &ZIntParameter::valueChanged,
-            &flt->viewPrecedencePara(), &ZIntParameter::updateFromSender);
-    connect(&m_transform, &Z2DTransformParameter::valueChanged,
-            &flt->transformPara(), &Z2DTransformParameter::updateFromSender);
-    connect(&m_offsetPara, &ZDVec2Parameter::valueChanged,
-            &flt->offsetPara(), &ZDVec2Parameter::updateFromSender);
-    connect(&m_showControlPoints, &ZBoolParameter::valueChanged,
-            &flt->showControlPointsPara(), &ZBoolParameter::updateFromSender);
-    connect(&m_fixedControlPointsSize, &ZBoolParameter::valueChanged,
-            &flt->fixedControlPointsSizePara(), &ZBoolParameter::updateFromSender);
-    connect(&m_highlightRegionOnMouseHover, &ZBoolParameter::valueChanged,
-            &flt->highlightRegionOnMouseHoverPara(), &ZBoolParameter::updateFromSender);
+    connect(&m_visible, &ZBoolParameter::valueChanged, &flt->visiblePara(), &ZBoolParameter::updateFromSender);
+    connect(&m_viewPrecedencePara,
+            &ZIntParameter::valueChanged,
+            &flt->viewPrecedencePara(),
+            &ZIntParameter::updateFromSender);
+    connect(&m_transform,
+            &Z2DTransformParameter::valueChanged,
+            &flt->transformPara(),
+            &Z2DTransformParameter::updateFromSender);
+    connect(&m_offsetPara, &ZDVec2Parameter::valueChanged, &flt->offsetPara(), &ZDVec2Parameter::updateFromSender);
+    connect(&m_showControlPoints,
+            &ZBoolParameter::valueChanged,
+            &flt->showControlPointsPara(),
+            &ZBoolParameter::updateFromSender);
+    connect(&m_fixedControlPointsSize,
+            &ZBoolParameter::valueChanged,
+            &flt->fixedControlPointsSizePara(),
+            &ZBoolParameter::updateFromSender);
+    connect(&m_highlightRegionOnMouseHover,
+            &ZBoolParameter::valueChanged,
+            &flt->highlightRegionOnMouseHoverPara(),
+            &ZBoolParameter::updateFromSender);
 
     m_idToRegionNames[id] = QString("%1_%2").arg(node.abbreviation).arg(node.id);
     m_nameToID[m_idToRegionNames[id]] = id;
@@ -264,19 +280,17 @@ void ZRegionAnnotationFilter::allROIChanged()
   if (m_widgetsGroup) {
     m_viewSettingTreeModel =
       std::make_unique<ZRegionAnnotationViewSettingTreeModel>(m_regionAnnotationPack->regionAnnotation(),
-                                                              m_idToROIFilters, this);
-    m_viewSettingTreeWidget =
-      new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
-                                               m_regionAnnotationPack->regionAnnotation(),
-                                               m_idToROIFilters);
+                                                              m_idToROIFilters,
+                                                              this);
+    m_viewSettingTreeWidget = new ZRegionAnnotationViewSettingTreeView(*m_viewSettingTreeModel,
+                                                                       m_regionAnnotationPack->regionAnnotation(),
+                                                                       m_idToROIFilters);
     m_widgetsGroup->addChild(*m_viewSettingTreeWidget, 4);
 
     m_widgetsGroup->emitWidgetsGroupChangedSignal();
   }
 }
 
-void ZRegionAnnotationFilter::onLockedStateChanged(bool)
-{}
+void ZRegionAnnotationFilter::onLockedStateChanged(bool) {}
 
 } // namespace nim
-

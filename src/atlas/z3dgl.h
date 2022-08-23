@@ -12,12 +12,16 @@ using namespace gl;
 
 enum class Z3DEye
 {
-  Left = 0, Mono, Right
+  Left = 0,
+  Mono,
+  Right
 };
 
 enum class Z3DScreenShotType
 {
-  MonoView, HalfSideBySideStereoView, FullSideBySideStereoView
+  MonoView,
+  HalfSideBySideStereoView,
+  FullSideBySideStereoView
 };
 
 bool GLVersionGE(int majorVersion, int minorVersion);
@@ -43,4 +47,3 @@ bool checkGLState(GLenum pname, const glm::vec4& value);
 GLenum toGLType(ZMesh::Type type);
 
 } // namespace nim
-

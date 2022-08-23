@@ -11,14 +11,17 @@
 namespace nim {
 
 ZParameterAnimation::ZParameterAnimation(QString name, QString type, const QColor& color, QObject* parent)
-  : QObject(parent), m_name(std::move(name)), m_type(std::move(type)), m_color(color)
-{
-}
+  : QObject(parent)
+  , m_name(std::move(name))
+  , m_type(std::move(type))
+  , m_color(color)
+{}
 
 ZParameterAnimation::~ZParameterAnimation()
 {
-  if (m_boundPara)
+  if (m_boundPara) {
     releaseParameter();
+  }
 }
 
 void ZParameterAnimation::bindParameter(ZParameter& para)
@@ -35,9 +38,7 @@ void ZParameterAnimation::releaseParameter()
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
   Q_EMIT keyAboutToDelete(key);
-  erase_if(m_keys, [key](const auto& ckey) {
-    return ckey.get() == key;
-  });
+  erase_if(m_keys, [key](const auto& ckey) { return ckey.get() == key; });
 }
 
 void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant)
@@ -89,10 +90,7 @@ void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRe
 
 void ZParameterAnimation::sortKeys()
 {
-  std::sort(m_keys.begin(), m_keys.end(),
-            [](const auto& a, const auto& b) {
-              return a->time() < b->time();
-            });
+  std::sort(m_keys.begin(), m_keys.end(), [](const auto& a, const auto& b) { return a->time() < b->time(); });
 }
 
 QString ZParameterAnimation::jsonKey() const
@@ -173,8 +171,9 @@ std::unique_ptr<ZParameterKey> ZParameterAnimation::createKey(double secs) const
 
 void ZParameterAnimation::setCurrentTime(double secs)
 {
-  if (!m_boundPara)
+  if (!m_boundPara) {
     return;
+  }
   updateParaToTime(secs, m_boundPara);
 }
 
@@ -183,8 +182,9 @@ void ZParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
   CHECK(para->type() == m_type);
   CHECK(secs >= 0);
 
-  if (m_keys.empty())
+  if (m_keys.empty()) {
     return;
+  }
   if (secs <= m_keys[0]->time()) {
     para->setValueSameAs(m_keys[0]->value());
     return;
@@ -200,19 +200,21 @@ void ZParameterAnimation::updateParaToTime(double secs, ZParameter* para) const
 
 void ZParameterAnimation::removeRedundantKeys()
 {
-  if (m_keys.size() < 2)
+  if (m_keys.size() < 2) {
     return;
+  }
 
   auto it = m_keys.begin();
-  auto result = it;  // pointer to last non-redundant key
+  auto result = it; // pointer to last non-redundant key
   ++it;
   while (it != m_keys.end()) {
     auto next = it + 1;
-    if ((*it)->value().jsonValue() != (*result)->value().jsonValue() ||   // not equal to prev
+    if ((*it)->value().jsonValue() != (*result)->value().jsonValue() || // not equal to prev
         (next != m_keys.end() && (*it)->value().jsonValue() != (*next)->value().jsonValue())) { // or not equal to next
-      ++result;  // make space for new valid it
-      if (it != result)
-        *result = std::move(*it);   // keep it and advance result
+      ++result; // make space for new valid it
+      if (it != result) {
+        *result = std::move(*it); // keep it and advance result
+      }
     }
     ++it;
   }

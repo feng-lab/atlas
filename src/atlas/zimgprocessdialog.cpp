@@ -12,28 +12,24 @@ namespace nim {
 
 ZImgProcessDialog::ZImgProcessDialog(QWidget* parent)
   : QDialog(parent)
-{
-}
+{}
 
 void ZImgProcessDialog::processCanceled()
 {
-  QMessageBox::critical(this, QApplication::applicationName(),
-                        QString("%1 is canceled by user.").arg(m_workerName));
+  QMessageBox::critical(this, QApplication::applicationName(), QString("%1 is canceled by user.").arg(m_workerName));
 }
 
 void ZImgProcessDialog::processFinished()
 {
   if (!m_isCanceled && !m_hasError) {
-    QMessageBox::information(this, QApplication::applicationName(),
-                             QString("%1 Finished.").arg(m_workerName));
+    QMessageBox::information(this, QApplication::applicationName(), QString("%1 Finished.").arg(m_workerName));
   }
 }
 
 void ZImgProcessDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, QApplication::applicationName(),
-                        QString("Error during %1: %2").arg(m_workerName).arg(e));
+  QMessageBox::critical(this, QApplication::applicationName(), QString("Error during %1: %2").arg(m_workerName).arg(e));
 }
 
 void ZImgProcessDialog::cancelButtonPressed()

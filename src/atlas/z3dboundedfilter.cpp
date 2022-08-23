@@ -45,7 +45,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
 
   connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DBoundedFilter::updateAxisAlignedBoundBox);
   connect(&m_rendererBase, &Z3DRendererBase::sizeScaleChanged, this, &Z3DBoundedFilter::updateBoundBox);
-  connect(&m_rendererBase.globalCameraPara(), &Z3DCameraParameter::valueChanged, this,
+  connect(&m_rendererBase.globalCameraPara(),
+          &Z3DCameraParameter::valueChanged,
+          this,
           &Z3DBoundedFilter::invalidateHandle);
 
   connect(&m_visible, &ZBoolParameter::boolChanged, this, &Z3DBoundedFilter::objVisibleChanged);
@@ -60,10 +62,10 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   connect(&m_rendererBase.globalZCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DBoundedFilter::setClipPlanes);
   connect(&m_boundBoxMode, &ZStringIntOptionParameter::valueChanged, this, &Z3DBoundedFilter::onBoundBoxModeChanged);
   m_boundBoxLineColor.setStyle("COLOR");
-  //m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
-  //m_boundBoxLineColor.get().addKey(ZColorMapKey(.1, QColor(233,239,235,255)));
-  //m_boundBoxLineColor.get().addKey(ZColorMapKey(.2, QColor(240,241,237,255)));
-  //m_boundBoxLineColor.get().addKey(ZColorMapKey(.3, QColor(248,205,165,255)));
+  // m_boundBoxLineColor.get().reset(0., 1., QColor(133,163,240,255), QColor(248,60,35,255));
+  // m_boundBoxLineColor.get().addKey(ZColorMapKey(.1, QColor(233,239,235,255)));
+  // m_boundBoxLineColor.get().addKey(ZColorMapKey(.2, QColor(240,241,237,255)));
+  // m_boundBoxLineColor.get().addKey(ZColorMapKey(.3, QColor(248,205,165,255)));
   connect(&m_boundBoxLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateBoundBoxLineColors);
   m_selectionLineColor.setStyle("COLOR");
   connect(&m_selectionLineColor, &ZVec4Parameter::valueChanged, this, &Z3DBoundedFilter::updateSelectionLineColors);
@@ -97,7 +99,9 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_selectionBoundBoxRenderer.setFollowOpacity(false);
   m_selectionBoundBoxRenderer.setEnableMultisample(false);
   m_selectionBoundBoxRenderer.setLineWidth(m_selectionLineWidth.get());
-  connect(&m_selectionLineWidth, &ZIntParameter::valueChanged, this,
+  connect(&m_selectionLineWidth,
+          &ZIntParameter::valueChanged,
+          this,
           &Z3DBoundedFilter::onSelectionBoundBoxLineWidthChanged);
   updateSelectionLineColors();
 
@@ -124,8 +128,7 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
   m_handleEvent.listenTo("transform handle", Qt::LeftButton, Qt::NoModifier, QEvent::MouseMove);
-  connect(&m_handleEvent, &ZEventListenerParameter::mouseEventTriggered,
-          this, &Z3DBoundedFilter::handleEvent);
+  connect(&m_handleEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DBoundedFilter::handleEvent);
   addEventListener(m_handleEvent);
   m_handleEvent.setEnabled(m_isSelected);
 
@@ -339,8 +342,8 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
     m_startTrans = m_rendererBase.coordTransformPara().translation();
     if (handleIdx == 1) {
       m_startDepth = camera().worldToScreen(m_center, viewport).z;
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth),
-                                                    viewport);
+      m_startMouseWorldPos =
+        camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), m_startDepth), viewport);
     } else {
       GLfloat WindowPosZ;
       pickingManager().bindTarget();
@@ -348,8 +351,8 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       glReadPixels(e->position().x(), h - e->position().y(), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &WindowPosZ);
       pickingManager().releaseTarget();
       CHECK_GL_ERROR
-      m_startMouseWorldPos = camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ),
-                                                    viewport);
+      m_startMouseWorldPos =
+        camera().screenToWorld(glm::vec3(e->position().x(), h - e->position().y(), WindowPosZ), viewport);
     }
     e->accept();
     return;
@@ -360,33 +363,32 @@ void Z3DBoundedFilter::handleEvent(QMouseEvent* e, int w, int h)
       return;
     }
     if (m_selectedHandle == 1) {
-      glm::vec3 endInWorld = camera().screenToWorld(
-        glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
-        glm::ivec4(0, 0, w, h));
+      glm::vec3 endInWorld =
+        camera().screenToWorld(glm::vec3(glm::vec2(e->position().x(), h - e->position().y()), m_startDepth),
+                               glm::ivec4(0, 0, w, h));
       m_rendererBase.coordTransformPara().setTranslation(m_startTrans + endInWorld - m_startMouseWorldPos);
     } else {
       glm::vec3 v1, v2;
       rayUnderScreenPoint(v1, v2, e->position().x(), e->position().y(), w, h);
       v2 -= v1;
-      gte::Ray<3, float> ray(gte::Vector<3, float>
-                               {v1.x, v1.y, v1.z}, gte::Vector<3, float>{v2.x, v2.y, v2.z});
+      gte::Ray<3, float> ray(gte::Vector<3, float>{v1.x, v1.y, v1.z}, gte::Vector<3, float>{v2.x, v2.y, v2.z});
       gte::DCPLineRay<3, float> dist;
       if (m_selectedHandle == 2) {
-        gte::Line<3, float> xLine(gte::Vector<3, float>
-                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-                                  gte::Vector<3, float>{1, 0, 0});
+        gte::Line<3, float> xLine(
+          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+          gte::Vector<3, float>{1, 0, 0});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(result.parameter[0], 0, 0));
       } else if (m_selectedHandle == 3) {
-        gte::Line<3, float> xLine(gte::Vector<3, float>
-                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-                                  gte::Vector<3, float>{0, 1, 0});
+        gte::Line<3, float> xLine(
+          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+          gte::Vector<3, float>{0, 1, 0});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, result.parameter[0], 0));
       } else if (m_selectedHandle == 4) {
-        gte::Line<3, float> xLine(gte::Vector<3, float>
-                                    {m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
-                                  gte::Vector<3, float>{0, 0, 1});
+        gte::Line<3, float> xLine(
+          gte::Vector<3, float>{m_startMouseWorldPos.x, m_startMouseWorldPos.y, m_startMouseWorldPos.z},
+          gte::Vector<3, float>{0, 0, 1});
         auto result = dist(xLine, ray);
         m_rendererBase.coordTransformPara().setTranslation(m_startTrans + glm::vec3(0, 0, result.parameter[0]));
       }
@@ -404,14 +406,11 @@ void Z3DBoundedFilter::initializeCutRange()
 {
   m_canUpdateClipPlane = false;
   const ZBBox<glm::dvec3>& bound = notTransformedBoundBox();
-  m_xCut.setRange(std::floor(bound.minCorner.x) - 1,
-                  std::ceil(bound.maxCorner.x) + 1);
+  m_xCut.setRange(std::floor(bound.minCorner.x) - 1, std::ceil(bound.maxCorner.x) + 1);
   m_xCut.set(m_xCut.range());
-  m_yCut.setRange(std::floor(bound.minCorner.y) - 1,
-                  std::ceil(bound.maxCorner.y) + 1);
+  m_yCut.setRange(std::floor(bound.minCorner.y) - 1, std::ceil(bound.maxCorner.y) + 1);
   m_yCut.set(m_yCut.range());
-  m_zCut.setRange(std::floor(bound.minCorner.z) - 1,
-                  std::ceil(bound.maxCorner.z) + 1);
+  m_zCut.setRange(std::floor(bound.minCorner.z) - 1, std::ceil(bound.maxCorner.z) + 1);
   m_zCut.set(m_zCut.range());
   m_canUpdateClipPlane = true;
   m_rendererBase.setClipPlanes(nullptr);
@@ -592,7 +591,7 @@ void Z3DBoundedFilter::updateBoundBoxLineColors()
   m_boundBoxLineColors.clear();
   m_boundBoxLineColors.resize(24, m_boundBoxLineColor.get());
   m_baseBoundBoxRenderer.setDataColors(&m_boundBoxLineColors);
-  //m_baseBoundBoxRenderer->setTexture(m_boundBoxLineColor.get().getTexture());
+  // m_baseBoundBoxRenderer->setTexture(m_boundBoxLineColor.get().getTexture());
 }
 
 void Z3DBoundedFilter::updateSelectionLineColors()
@@ -616,8 +615,8 @@ void Z3DBoundedFilter::onSelectionBoundBoxLineWidthChanged()
 void Z3DBoundedFilter::makeSelectionGeometries()
 {
   auto bbsz = m_axisAlignedBoundBox.size();
-  auto size = bbsz.x + bbsz.y + bbsz.z - std::max(bbsz.z, std::max(bbsz.x, bbsz.y)) -
-              std::min(bbsz.z, std::min(bbsz.x, bbsz.y));
+  auto size =
+    bbsz.x + bbsz.y + bbsz.z - std::max(bbsz.z, std::max(bbsz.x, bbsz.y)) - std::min(bbsz.z, std::min(bbsz.x, bbsz.y));
   auto cornerRadius = std::min(100.0, 0.01 * size);
   m_selectionBoundBox = m_axisAlignedBoundBox;
   m_selectionBoundBox.expand(cornerRadius);
@@ -655,9 +654,10 @@ void Z3DBoundedFilter::updateHandle()
 {
   if (!m_handleValid) {
     Z3DCamera& camera = m_rendererBase.globalCamera();
-    glm::mat4 mat = m_rendererBase.viewportMatrix() * camera.projectionMatrix(Z3DEye::Mono) *
-                    camera.viewMatrix(Z3DEye::Mono);
-    glm::vec3 rightVector = glm::vec3(camera.viewMatrix(Z3DEye::Mono)[0][0], camera.viewMatrix(Z3DEye::Mono)[1][0],
+    glm::mat4 mat =
+      m_rendererBase.viewportMatrix() * camera.projectionMatrix(Z3DEye::Mono) * camera.viewMatrix(Z3DEye::Mono);
+    glm::vec3 rightVector = glm::vec3(camera.viewMatrix(Z3DEye::Mono)[0][0],
+                                      camera.viewMatrix(Z3DEye::Mono)[1][0],
                                       camera.viewMatrix(Z3DEye::Mono)[2][0]);
     glm::vec3 centerScreen = glm::applyMatrix(mat, m_center);
     glm::vec3 rightScreen = glm::applyMatrix(mat, m_center + rightVector);
@@ -671,8 +671,7 @@ void Z3DBoundedFilter::updateHandle()
     m_handleArrowheadPosAndHeadRadius[1] = glm::vec4(m_center, 0.12f * size) + glm::vec4(0, size, 0, 0);
     m_handleArrowheadPosAndHeadRadius[2] = glm::vec4(m_center, 0.12f * size) + glm::vec4(0, 0, size, 0);
     m_handleCenterRenderer.setData(&m_handleCenterAndRadius);
-    m_handleArrowRenderer.setArrowData(&m_handleArrowTailPosAndTailRadius,
-                                       &m_handleArrowheadPosAndHeadRadius);
+    m_handleArrowRenderer.setArrowData(&m_handleArrowTailPosAndTailRadius, &m_handleArrowheadPosAndHeadRadius);
 
     m_handleValid = true;
   }
@@ -680,7 +679,7 @@ void Z3DBoundedFilter::updateHandle()
 
 void Z3DBoundedFilter::registerHandlePickingColors()
 {
-  pickingManager().registerObject(&m_handleCenterRenderer);  // center
+  pickingManager().registerObject(&m_handleCenterRenderer); // center
   pickingManager().registerObject(&m_handleArrowRenderer); // axis x
   pickingManager().registerObject(&m_handleArrowTailPosAndTailRadius); // axis y
   pickingManager().registerObject(&m_handleArrowheadPosAndHeadRadius); // axis z

@@ -26,7 +26,9 @@ template<class T>
 int numDigits(T number)
 {
   int digits = 0;
-  if (number < 0) { digits = 1; } // remove this line if '-' counts as a digit
+  if (number < 0) {
+    digits = 1;
+  } // remove this line if '-' counts as a digit
   while (number) {
     number /= 10;
     digits++;
@@ -38,8 +40,12 @@ int numDigits(T number)
 template<>
 int numDigits(int32_t x)
 {
-  if (x == std::numeric_limits<int>::min()) { return 10 + 1; }
-  if (x < 0) { return numDigits(-x) + 1; }
+  if (x == std::numeric_limits<int>::min()) {
+    return 10 + 1;
+  }
+  if (x < 0) {
+    return numDigits(-x) + 1;
+  }
 
   if (x >= 10000) {
     if (x >= 10000000) {
@@ -71,7 +77,7 @@ int numDigits(int32_t x)
   return 1;
 }
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
@@ -118,9 +124,9 @@ void ZAnimation::addKeyFrame(double time)
 
   auto objs = m_doc.objs();
   if (!is2DAnimation()) {
-    objs.push_back(1);  //background
-    objs.push_back(2);  //axis
-    objs.push_back(3);  //lighting
+    objs.push_back(1); // background
+    objs.push_back(2); // axis
+    objs.push_back(3); // lighting
   }
   for (auto id : objs) {
     QString objTypeName;
@@ -155,7 +161,7 @@ void ZAnimation::addKeyFrame(double time)
 
     for (size_t i = 0; i < paraList.size(); ++i) {
       bool found = false;
-      //LOG(INFO) << paraList[i]->name();
+      // LOG(INFO) << paraList[i]->name();
       for (size_t j = 0; j < paraAnimationList.size(); ++j) {
         if (paraList[i] == paraAnimationList[j]->boundParameter()) {
           found = true;
@@ -306,9 +312,12 @@ void ZAnimation::releaseView()
   }
 }
 
-void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSecond,
-                                            double startTime, double endTime,
-                                            int width, int height,
+void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
+                                            double framePerSecond,
+                                            double startTime,
+                                            double endTime,
+                                            int width,
+                                            int height,
                                             Z3DScreenShotType sst)
 {
   if (startTime < 0 || startTime >= m_duration) {
@@ -328,7 +337,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not create folder %1").arg(dir.path()));
       return;
     }
@@ -345,7 +355,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
       return;
     }
     if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not replace %1").arg(dir.filePath(fn)));
       return;
     }
@@ -407,30 +418,33 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
       }
     }
     QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShotWithoutResetCanvasPainterSize(filepath, width, height, sst)) {
+    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShotWithoutResetCanvasPainterSize(filepath,
+                                                                                              width,
+                                                                                              height,
+                                                                                              sst)) {
       break;
     }
   }
   dynamic_cast<Z3DView*>(m_view)->resetCanvasPainterSize();
-//  if (!progress->wasCanceled()) {
-//    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-//    QString filepath = tmpdir.filePath(filename);
-//    if (checkOverwrite) {
-//      if (tmpdir.exists(filename)) {
-//        QMessageBox msgBox(QApplication::activeWindow());
-//        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-//        msgBox.setInformativeText("");
-//        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-//        msgBox.setDefaultButton(QMessageBox::Cancel);
-//        int ret = msgBox.exec();
-//
-//        if (ret != QMessageBox::Cancel) {
-//          return;
-//        }
-//        QFile::remove(tmpdir.filePath(filename));
-//      }
-//    }
-//  }
+  //  if (!progress->wasCanceled()) {
+  //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+  //    QString filepath = tmpdir.filePath(filename);
+  //    if (checkOverwrite) {
+  //      if (tmpdir.exists(filename)) {
+  //        QMessageBox msgBox(QApplication::activeWindow());
+  //        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
+  //        msgBox.setInformativeText("");
+  //        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
+  //        msgBox.setDefaultButton(QMessageBox::Cancel);
+  //        int ret = msgBox.exec();
+  //
+  //        if (ret != QMessageBox::Cancel) {
+  //          return;
+  //        }
+  //        QFile::remove(tmpdir.filePath(filename));
+  //      }
+  //    }
+  //  }
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
@@ -443,7 +457,10 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn, double framePerSe
   }
 }
 
-void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
+void ZAnimation::export3DAnimation(const QString& fn,
+                                   double framePerSecond,
+                                   double startTime,
+                                   double endTime,
                                    Z3DScreenShotType sst)
 {
   if (startTime < 0 || startTime >= m_duration) {
@@ -463,7 +480,8 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, dou
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not create folder %1").arg(dir.path()));
       return;
     }
@@ -480,7 +498,8 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, dou
       return;
     }
     if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not replace %1").arg(dir.filePath(fn)));
       return;
     }
@@ -553,25 +572,25 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, dou
       break;
     }
   }
-//  if (!progress->wasCanceled()) {
-//    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-//    QString filepath = tmpdir.filePath(filename);
-//    if (checkOverwrite) {
-//      if (tmpdir.exists(filename)) {
-//        QMessageBox msgBox(QApplication::activeWindow());
-//        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-//        msgBox.setInformativeText("");
-//        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-//        msgBox.setDefaultButton(QMessageBox::Cancel);
-//        int ret = msgBox.exec();
-//
-//        if (ret != QMessageBox::Cancel) {
-//          return;
-//        }
-//        QFile::remove(tmpdir.filePath(filename));
-//      }
-//    }
-//  }
+  //  if (!progress->wasCanceled()) {
+  //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
+  //    QString filepath = tmpdir.filePath(filename);
+  //    if (checkOverwrite) {
+  //      if (tmpdir.exists(filename)) {
+  //        QMessageBox msgBox(QApplication::activeWindow());
+  //        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
+  //        msgBox.setInformativeText("");
+  //        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
+  //        msgBox.setDefaultButton(QMessageBox::Cancel);
+  //        int ret = msgBox.exec();
+  //
+  //        if (ret != QMessageBox::Cancel) {
+  //          return;
+  //        }
+  //        QFile::remove(tmpdir.filePath(filename));
+  //      }
+  //    }
+  //  }
 
   if (!progress->wasCanceled()) {
     progress->setLabelText("Compressing Video...");
@@ -584,8 +603,12 @@ void ZAnimation::export3DAnimation(const QString& fn, double framePerSecond, dou
   }
 }
 
-void ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime,
-                                            int width, int height)
+void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
+                                            double framePerSecond,
+                                            double startTime,
+                                            double endTime,
+                                            int width,
+                                            int height)
 {
   if (startTime < 0 || startTime >= m_duration) {
     QMessageBox::critical(QApplication::activeWindow(),
@@ -604,7 +627,8 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSe
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not create folder %1").arg(dir.path()));
       return;
     }
@@ -621,7 +645,8 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn, double framePerSe
       return;
     }
     if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not replace %1").arg(dir.filePath(fn)));
       return;
     }
@@ -717,7 +742,10 @@ void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond, dou
 {
   CHECK(m_view);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
-  exportFixedSize2DAnimation(fn, framePerSecond, startTime, endTime,
+  exportFixedSize2DAnimation(fn,
+                             framePerSecond,
+                             startTime,
+                             endTime,
                              canvasPainter.viewportSize().width(),
                              canvasPainter.viewportSize().height());
 }
@@ -740,8 +768,7 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
   ZObjDoc* doc = m_doc.idToDoc(id);
   auto jv = doc->jsonValue(id);
   for (const auto& obj : m_objList) {
-    if (obj->boundId == 0 && obj->objType == doc->typeName() &&
-        doc->isSameObj(obj->objJsonValue, jv)) {
+    if (obj->boundId == 0 && obj->objType == doc->typeName() && doc->isSameObj(obj->objJsonValue, jv)) {
       obj->boundId = id;
       std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
       CHECK(wg);
@@ -755,47 +782,46 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
 
 void ZAnimation::videoEncoderError(const QString& err)
 {
-  QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+  QMessageBox::critical(QApplication::activeWindow(),
+                        QApplication::applicationName(),
                         "Video Encoder Error.\nCan not encode video: " + err);
   m_tempDir.reset();
 }
 
 void ZAnimation::videoEncoderFinished()
 {
-  QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(),
-                           "Finish Encoding Video.");
+  QMessageBox::information(QApplication::activeWindow(), QApplication::applicationName(), "Finish Encoding Video.");
   m_tempDir.reset();
 }
 
 void ZAnimation::videoEncoderCanceled()
 {
-  QMessageBox::warning(QApplication::activeWindow(), QApplication::applicationName(),
-                       "Video Encoding was canceled.");
+  QMessageBox::warning(QApplication::activeWindow(), QApplication::applicationName(), "Video Encoding was canceled.");
   m_tempDir.reset();
 }
 
 void ZAnimation::updateObjAnimation()
 {
   for (const auto& pa : m_globalParaAnimations) {
-    connect(pa.get(), &ZParameterAnimation::keyChanged,
-            this, &ZAnimation::keyChanged, Qt::UniqueConnection);
-    connect(pa.get(), &ZParameterAnimation::keysChanged,
-            this, &ZAnimation::keysChanged, Qt::UniqueConnection);
-    connect(pa.get(), &ZParameterAnimation::keyAboutToDelete,
-            this, &ZAnimation::keyAboutToDelete, Qt::UniqueConnection);
-    connect(pa.get(), &ZParameterAnimation::colorChanged,
-            this, &ZAnimation::colorChanged, Qt::UniqueConnection);
+    connect(pa.get(), &ZParameterAnimation::keyChanged, this, &ZAnimation::keyChanged, Qt::UniqueConnection);
+    connect(pa.get(), &ZParameterAnimation::keysChanged, this, &ZAnimation::keysChanged, Qt::UniqueConnection);
+    connect(pa.get(),
+            &ZParameterAnimation::keyAboutToDelete,
+            this,
+            &ZAnimation::keyAboutToDelete,
+            Qt::UniqueConnection);
+    connect(pa.get(), &ZParameterAnimation::colorChanged, this, &ZAnimation::colorChanged, Qt::UniqueConnection);
   }
   for (const auto& obj : m_objList) {
     for (const auto& pa : obj->objParaAnimations) {
-      connect(pa.get(), &ZParameterAnimation::keyChanged,
-              this, &ZAnimation::keyChanged, Qt::UniqueConnection);
-      connect(pa.get(), &ZParameterAnimation::keysChanged,
-              this, &ZAnimation::keysChanged, Qt::UniqueConnection);
-      connect(pa.get(), &ZParameterAnimation::keyAboutToDelete,
-              this, &ZAnimation::keyAboutToDelete, Qt::UniqueConnection);
-      connect(pa.get(), &ZParameterAnimation::colorChanged,
-              this, &ZAnimation::colorChanged, Qt::UniqueConnection);
+      connect(pa.get(), &ZParameterAnimation::keyChanged, this, &ZAnimation::keyChanged, Qt::UniqueConnection);
+      connect(pa.get(), &ZParameterAnimation::keysChanged, this, &ZAnimation::keysChanged, Qt::UniqueConnection);
+      connect(pa.get(),
+              &ZParameterAnimation::keyAboutToDelete,
+              this,
+              &ZAnimation::keyAboutToDelete,
+              Qt::UniqueConnection);
+      connect(pa.get(), &ZParameterAnimation::colorChanged, this, &ZAnimation::colorChanged, Qt::UniqueConnection);
     }
   }
 
@@ -910,8 +936,7 @@ bool ZAnimation::bind(std::vector<std::unique_ptr<ZParameterAnimation>>& paraAni
   size_t foundNum = 0;
   for (auto para : paraList) {
     for (size_t j = 0; j < paraAnimationList.size(); ++j) {
-      if (para->name() == paraAnimationList[j]->name() &&
-          para->type() == paraAnimationList[j]->type()) {
+      if (para->name() == paraAnimationList[j]->name() && para->type() == paraAnimationList[j]->type()) {
         paraAnimationList[j]->bindParameter(*para);
         if (j != foundNum) {
           std::swap(paraAnimationList[j], paraAnimationList[foundNum]);
@@ -1021,8 +1046,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     // match global parameters
     for (auto& gp : globalParaAnimations) {
       for (auto& globalParaAnimation : m_globalParaAnimations) {
-        if (gp->name() == globalParaAnimation->name() &&
-            gp->type() == globalParaAnimation->type()) {
+        if (gp->name() == globalParaAnimation->name() && gp->type() == globalParaAnimation->type()) {
           globalParaAnimation = std::move(gp);
           break;
         }
@@ -1068,7 +1092,8 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     QString nName;
     for (int i = 0; i < 10000000; ++i) {
 #ifdef _MSC_VER
-      nName = fi.absolutePath() + QString("\\") + fi.baseName() + QString("_WritingTmp%1_.").arg(i) + fi.completeSuffix();
+      nName =
+        fi.absolutePath() + QString("\\") + fi.baseName() + QString("_WritingTmp%1_.").arg(i) + fi.completeSuffix();
 #else
       nName =
         fi.absolutePath() + QString("/") + fi.baseName() + QString("_WritingTmp%1_.").arg(i) + fi.completeSuffix();
@@ -1083,8 +1108,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
 
     json::object docObj;
     for (auto& i : m_objList) {
-      if (i->objType == "Axis" || i->objType == "Background" ||
-          i->objType == "Lighting") {
+      if (i->objType == "Axis" || i->objType == "Background" || i->objType == "Lighting") {
         continue;
       }
       docObj[QString("%1 %2").arg(i->objType).arg(i->uniqueId).toStdString()] = i->objJsonValue;
@@ -1144,7 +1168,9 @@ ZAnimation::AnimationObj* ZAnimation::findBoundId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->boundId == id) {
-      if (idx) { *idx = i; }
+      if (idx) {
+        *idx = i;
+      }
       return m_objList[i].get();
     }
   }
@@ -1155,7 +1181,9 @@ ZAnimation::AnimationObj* ZAnimation::findUniqueId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->uniqueId == id) {
-      if (idx) { *idx = i; }
+      if (idx) {
+        *idx = i;
+      }
       return m_objList[i].get();
     }
   }
@@ -1166,7 +1194,9 @@ const ZAnimation::AnimationObj* ZAnimation::findBoundId(size_t id, size_t* idx) 
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->boundId == id) {
-      if (idx) { *idx = i; }
+      if (idx) {
+        *idx = i;
+      }
       return m_objList[i].get();
     }
   }
@@ -1177,7 +1207,9 @@ const ZAnimation::AnimationObj* ZAnimation::findUniqueId(size_t id, size_t* idx)
 {
   for (size_t i = 0; i < m_objList.size(); ++i) {
     if (m_objList[i]->uniqueId == id) {
-      if (idx) { *idx = i; }
+      if (idx) {
+        *idx = i;
+      }
       return m_objList[i].get();
     }
   }

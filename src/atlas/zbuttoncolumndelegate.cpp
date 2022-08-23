@@ -42,7 +42,7 @@ void ZButtonColumnDelegate::setEditorData(QWidget* editor, const QModelIndex& in
     if (auto btn = qobject_cast<QPushButton*>(editor)) {
       btn->setProperty("user_data", index.data(Qt::UserRole));
     }
-    //LOG(INFO) << "set " << btn->property("user_data");
+    // LOG(INFO) << "set " << btn->property("user_data");
   } else {
     QStyledItemDelegate::setEditorData(editor, index);
   }
@@ -54,7 +54,7 @@ void ZButtonColumnDelegate::setModelData(QWidget* editor, QAbstractItemModel* mo
     if (auto btn = qobject_cast<QPushButton*>(editor)) {
       model->setData(index, btn->property("user_data"), Qt::UserRole);
     }
-    //LOG(INFO) << btn->property("user_data");
+    // LOG(INFO) << btn->property("user_data");
   } else {
     QStyledItemDelegate::setModelData(editor, model, index);
   }
@@ -68,8 +68,9 @@ void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem&
     m_button->setGeometry(rect);
     m_button->setText(index.data().toString());
     // m_button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    if (option.state == QStyle::State_Selected)
+    if (option.state == QStyle::State_Selected) {
       painter->fillRect(rect, option.palette.highlight());
+    }
     QPixmap map = m_button->grab();
     painter->drawPixmap(option.rect, map);
   } else {
@@ -77,7 +78,8 @@ void ZButtonColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem&
   }
 }
 
-void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option,
+void ZButtonColumnDelegate::updateEditorGeometry(QWidget* editor,
+                                                 const QStyleOptionViewItem& option,
                                                  const QModelIndex& /*index*/) const
 {
   editor->setGeometry(option.rect);
@@ -90,7 +92,7 @@ QSize ZButtonColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const 
     m_button->hide();
     QSize res = m_button->grab().size();
 
-    res.setWidth(res.width()  * 2. / m_widget->devicePixelRatio());
+    res.setWidth(res.width() * 2. / m_widget->devicePixelRatio());
     res.setHeight(res.height() / m_widget->devicePixelRatio());
     return res;
   }

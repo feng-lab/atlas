@@ -18,7 +18,8 @@ namespace nim {
 
 class Z3DCompositor : public Z3DBoundedFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
@@ -39,42 +40,53 @@ private:
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                         const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                        Z3DRenderOutputPort& port, Z3DEye eye,
+                        Z3DRenderOutputPort& port,
+                        Z3DEye eye,
                         const Z3DTexture* imageColorTex = nullptr,
                         const Z3DTexture* imageDepthTex = nullptr);
 
   void renderGeomsBlendDelayed(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                               Z3DRenderOutputPort& port, Z3DEye eye);
+                               Z3DRenderOutputPort& port,
+                               Z3DEye eye);
 
   void renderGeomsBlendNoDepthMask(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                                    const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                                   Z3DRenderOutputPort& port, Z3DEye eye);
+                                   Z3DRenderOutputPort& port,
+                                   Z3DEye eye);
 
   void renderGeomsOIT(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
                       const std::vector<Z3DBoundedFilter*>& transparentFilters,
-                      Z3DRenderOutputPort& port, Z3DEye eye, const QString& method,
+                      Z3DRenderOutputPort& port,
+                      Z3DEye eye,
+                      const QString& method,
                       const Z3DTexture* imageColorTex = nullptr,
                       const Z3DTexture* imageDepthTex = nullptr);
 
   void renderOpaqueFilters(const std::vector<Z3DBoundedFilter*>& filters, Z3DRenderOutputPort& port, Z3DEye eye);
 
   void renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& filters,
-                            Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                            Z3DRenderOutputPort& port,
+                            Z3DEye eye,
+                            Z3DTexture* depthTexture = nullptr,
                             const Z3DTexture* imageColorTex = nullptr,
                             const Z3DTexture* imageDepthTex = nullptr);
 
   bool createDDPRenderTarget(const glm::uvec2& size);
 
   void renderTransparentWA(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                           Z3DRenderOutputPort& port,
+                           Z3DEye eye,
+                           Z3DTexture* depthTexture = nullptr,
                            const Z3DTexture* imageColorTex = nullptr,
                            const Z3DTexture* imageDepthTex = nullptr);
 
   bool createWARenderTarget(const glm::uvec2& size);
 
   void renderTransparentWB(const std::vector<Z3DBoundedFilter*>& filters,
-                           Z3DRenderOutputPort& port, Z3DEye eye, Z3DTexture* depthTexture = nullptr,
+                           Z3DRenderOutputPort& port,
+                           Z3DEye eye,
+                           Z3DTexture* depthTexture = nullptr,
                            const Z3DTexture* imageColorTex = nullptr,
                            const Z3DTexture* imageDepthTex = nullptr);
 
@@ -82,8 +94,11 @@ private:
 
   // if image inport has more than 1 image, blend use tempport3 and tempport4,
   // send output to colorTex and depthTex
-  void renderImages(Z3DRenderInputPort& currentInport, Z3DRenderOutputPort& currentOutport,
-                    Z3DEye eye, const Z3DTexture*& colorTex, const Z3DTexture*& depthTex);
+  void renderImages(Z3DRenderInputPort& currentInport,
+                    Z3DRenderOutputPort& currentOutport,
+                    Z3DEye eye,
+                    const Z3DTexture*& colorTex,
+                    const Z3DTexture*& depthTex);
 
   void renderAxis(Z3DEye eye);
 
@@ -91,8 +106,7 @@ private:
 
   void setupAxisCamera();
 
-  void setClipPlanes() override
-  {}
+  void setClipPlanes() override {}
 
 private:
   Z3DTextureBlendRenderer m_alphaBlendRenderer;
@@ -102,7 +116,7 @@ private:
   Z3DTextureCopyRenderer m_textureCopyRenderer;
   Z3DBackgroundRenderer m_backgroundRenderer;
 
-  //ZBoolParameter m_renderGeometries;
+  // ZBoolParameter m_renderGeometries;
 
   Z3DRenderInputPort m_inport;
   Z3DRenderInputPort m_leftEyeInport;
@@ -164,4 +178,3 @@ private:
 };
 
 } // namespace nim
-

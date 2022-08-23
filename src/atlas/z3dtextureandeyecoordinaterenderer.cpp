@@ -26,9 +26,9 @@ void Z3DTextureAndEyeCoordinateRenderer::compile()
 
 void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
 {
-  if (!m_mesh || m_mesh->vertices().empty() ||
-      m_mesh->numVertices() != m_mesh->num3DTextureCoordinates())
+  if (!m_mesh || m_mesh->vertices().empty() || m_mesh->numVertices() != m_mesh->num3DTextureCoordinates()) {
     return;
+  }
 
   const std::vector<glm::vec3>& vertices = m_mesh->vertices();
   const std::vector<glm::vec3>& texCoords = m_mesh->textureCoordinates3D();
@@ -56,7 +56,9 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
 
       if (!triangleIndexes.empty()) {
         m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     triangleIndexes.size() * sizeof(GLuint),
+                     triangleIndexes.data(),
                      GL_STATIC_DRAW);
       }
 
@@ -93,7 +95,9 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
       glDrawArrays(toGLType(m_mesh->type()), 0, vertices.size());
     } else {
       m_VBOs.bind(GL_ELEMENT_ARRAY_BUFFER, bufIdx++);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, triangleIndexes.size() * sizeof(GLuint), triangleIndexes.data(),
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                   triangleIndexes.size() * sizeof(GLuint),
+                   triangleIndexes.data(),
                    GL_STATIC_DRAW);
       glDrawElements(toGLType(m_mesh->type()), triangleIndexes.size(), GL_UNSIGNED_INT, nullptr);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -109,4 +113,3 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
 }
 
 } // namespace nim
-

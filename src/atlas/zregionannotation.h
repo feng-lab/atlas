@@ -10,7 +10,8 @@ namespace nim {
 
 class ZRegionAnnotation : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // might throw ZIOException
   explicit ZRegionAnnotation(QObject* parent = nullptr);
@@ -21,30 +22,44 @@ public:
 
   void clear();
 
-//  ZRegionAnnotation(ZRegionAnnotation&&) = default;
-//
-//  ZRegionAnnotation& operator=(ZRegionAnnotation&&) = default;
-//
-//  ZRegionAnnotation(const ZRegionAnnotation&) = default;
-//
-//  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
+  //  ZRegionAnnotation(ZRegionAnnotation&&) = default;
+  //
+  //  ZRegionAnnotation& operator=(ZRegionAnnotation&&) = default;
+  //
+  //  ZRegionAnnotation(const ZRegionAnnotation&) = default;
+  //
+  //  ZRegionAnnotation& operator=(const ZRegionAnnotation&) = default;
 
-  void importLabelImage(const QString& fn, FileFormat format, bool createMesh = true, bool createROI = true,
-                        double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0);
+  void importLabelImage(const QString& fn,
+                        FileFormat format,
+                        bool createMesh = true,
+                        bool createROI = true,
+                        double scaleX = 1.0,
+                        double scaleY = 1.0,
+                        double scaleZ = 1.0);
 
-  void exportLabelImage(const QString& fn, FileFormat format, const ZImgWriteParameters& paras,
-                        double scaleX = 1.0, double scaleY = 1.0, double scaleZ = 1.0,
-                        bool keepOnlyInterpolatedSlices = false, int interpolationMethod = 0) const;
+  void exportLabelImage(const QString& fn,
+                        FileFormat format,
+                        const ZImgWriteParameters& paras,
+                        double scaleX = 1.0,
+                        double scaleY = 1.0,
+                        double scaleZ = 1.0,
+                        bool keepOnlyInterpolatedSlices = false,
+                        int interpolationMethod = 0) const;
 
   void exportSvgImage(const QString& fn, double scaleX = 1.0, double scaleY = 1.0) const;
 
   double getOptimizedScale() const;
 
-  void importLabelImageForSlicesWithoutAnnotation(const QString& fn, FileFormat format,
-                                                  double scaleX = 1.0, double scaleY = 1.0);
+  void importLabelImageForSlicesWithoutAnnotation(const QString& fn,
+                                                  FileFormat format,
+                                                  double scaleX = 1.0,
+                                                  double scaleY = 1.0);
 
   [[nodiscard]] size_t numRegions() const
-  { return m_ontology.size(); }
+  {
+    return m_ontology.size();
+  }
 
   void mergeROIToRegion(const ZROI& roi, int64_t regionID);
 
@@ -62,32 +77,50 @@ public:
   [[nodiscard]] QString nameOfRegion(int64_t regionID) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
-  { return m_boundBox; }
+  {
+    return m_boundBox;
+  }
 
   [[nodiscard]] const ZTree<RegionNode>& annotationTree() const
-  { return m_ontology; }
+  {
+    return m_ontology;
+  }
 
   ZTree<RegionNode>& annotationTree()
-  { return m_ontology; }
+  {
+    return m_ontology;
+  }
 
   QUndoStack* undoStack()
-  { return &m_undoStack; }
+  {
+    return &m_undoStack;
+  }
 
   // qt style read write name filter for filedialog
   static QString fileExtension()
-  { return ".reganno"; }
+  {
+    return ".reganno";
+  }
 
   static bool canReadFile(const QString& filename)
-  { return filename.endsWith(".reganno", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".reganno", Qt::CaseInsensitive);
+  }
 
   static bool canWriteFile(const QString& filename)
-  { return filename.endsWith(".reganno", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".reganno", Qt::CaseInsensitive);
+  }
 
   static QString getQtReadNameFilter()
-  { return QString("Region Annotation files (*.reganno)"); }
+  {
+    return QString("Region Annotation files (*.reganno)");
+  }
 
   static QString getQtWriteNameFilter()
-  { return QString("Region Annotation files (*.reganno)"); }
+  {
+    return QString("Region Annotation files (*.reganno)");
+  }
 
   // might throw ZIOException
   void load(const QString& filename);
@@ -111,7 +144,7 @@ Q_SIGNALS:
 
   void boundBoxChanged();
 
-  //void modified();
+  // void modified();
   void regionROIAdded(int64_t id, ZROI* roi);
 
   void allMeshChanged();
@@ -139,7 +172,7 @@ private:
   friend class ZRegionAnnotationUpdateMeshCommand;
   friend class ZRegionAnnotationTransformMeshCommand;
 
-  double m_voxelSizeX = 1.; //todo : these fields should always be available
+  double m_voxelSizeX = 1.; // todo : these fields should always be available
   double m_voxelSizeY = 1.;
   double m_voxelSizeZ = 1.;
   ZTree<RegionNode> m_ontology;
@@ -152,14 +185,21 @@ class ZRegionAnnotationInterpolateCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationInterpolateCommand(ZRegionAnnotation& ra)
-    : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.copyAnnotationTree()), m_firstRun(true)
+    : QUndoCommand()
+    , m_regionAnnotation(ra)
+    , m_oldOntology(m_regionAnnotation.copyAnnotationTree())
+    , m_firstRun(true)
   {}
 
   void setNewOntology(const ZTree<RegionNode>& no)
-  { m_newOntology = no; }
+  {
+    m_newOntology = no;
+  }
 
   void undo() override
-  { m_regionAnnotation.updateROI_Impl(m_oldOntology); }
+  {
+    m_regionAnnotation.updateROI_Impl(m_oldOntology);
+  }
 
   void redo() override;
 
@@ -174,14 +214,21 @@ class ZRegionAnnotationUpdateMeshCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationUpdateMeshCommand(ZRegionAnnotation& ra)
-    : QUndoCommand(), m_regionAnnotation(ra), m_oldOntology(m_regionAnnotation.m_ontology), m_firstRun(true)
+    : QUndoCommand()
+    , m_regionAnnotation(ra)
+    , m_oldOntology(m_regionAnnotation.m_ontology)
+    , m_firstRun(true)
   {}
 
   void setNewOntology(const ZTree<RegionNode>& no)
-  { m_newOntology = no; }
+  {
+    m_newOntology = no;
+  }
 
   void undo() override
-  { m_regionAnnotation.updateMesh_Impl(m_oldOntology); }
+  {
+    m_regionAnnotation.updateMesh_Impl(m_oldOntology);
+  }
 
   void redo() override;
 
@@ -196,12 +243,16 @@ class ZRegionAnnotationTransformMeshCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationTransformMeshCommand(ZRegionAnnotation& ra, const glm::mat4& trans)
-    : QUndoCommand(), m_regionAnnotation(ra), m_trans(trans)
+    : QUndoCommand()
+    , m_regionAnnotation(ra)
+    , m_trans(trans)
     , m_oldOntology(m_regionAnnotation.copyAnnotationTree())
   {}
 
   void undo() override
-  { m_regionAnnotation.updateMesh_Impl(m_oldOntology); }
+  {
+    m_regionAnnotation.updateMesh_Impl(m_oldOntology);
+  }
 
   void redo() override;
 
@@ -212,4 +263,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -46,9 +46,11 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
   connect(&m_showFontShadow, &ZBoolParameter::valueChanged, this, &Z3DFontRenderer::compile);
 
   QStringList allshaders;
-  allshaders << "almag.vert" << "almag_func.frag";
+  allshaders << "almag.vert"
+             << "almag_func.frag";
   QStringList normalShaders;
-  normalShaders << "almag.vert" << "almag.frag";
+  normalShaders << "almag.vert"
+                << "almag.frag";
   m_fontShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
   m_fontShaderGrp.addAllSupportedPostShaders();
 
@@ -62,8 +64,7 @@ Z3DFontRenderer::Z3DFontRenderer(Z3DRendererBase& rendererBase)
     if (!txtFileInfo.exists()) {
       continue;
     }
-    auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(),
-                                              txtFileInfo.absoluteFilePath());
+    auto sdFont = std::make_unique<Z3DSDFont>(fileInfo.absoluteFilePath(), txtFileInfo.absoluteFilePath());
     if (!sdFont->isEmpty()) {
       m_allFontNames.addOptionWithData(std::make_pair(sdFont->fontName(), static_cast<int>(m_allFonts.size())));
       m_allFonts.emplace_back(std::move(sdFont));
@@ -104,7 +105,7 @@ void Z3DFontRenderer::setDataPickingColors(std::vector<glm::vec4>* pickingColors
 
 void Z3DFontRenderer::adjustWidgets()
 {
-  //m_fontSoftEdgeScale.setVisible(m_fontUseSoftEdge.get());
+  // m_fontSoftEdgeScale.setVisible(m_fontUseSoftEdge.get());
   m_fontOutlineColor.setVisible(m_showFontOutline.get());
   m_fontOutlineMode.setVisible(m_showFontOutline.get());
   m_fontShadowColor.setVisible(m_showFontShadow.get());
@@ -136,7 +137,7 @@ std::vector<glm::vec4>* Z3DFontRenderer::getColors()
 
 QString Z3DFontRenderer::generateHeader()
 {
-  //if (m_fontUseSoftEdge.get())
+  // if (m_fontUseSoftEdge.get())
   QString headerSource = "#define USE_SOFTEDGE\n";
   if (m_showFontOutline.get()) {
     if (m_fontOutlineMode.isSelected("Glow")) {
@@ -157,8 +158,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
     LOG(ERROR) << "Can not find any font.";
     return;
   }
-  if (!m_positionsPt || m_positionsPt->empty()
-      || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
+  if (!m_positionsPt || m_positionsPt->empty() || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
     return;
   }
 
@@ -176,7 +176,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   shader.bindTexture("tex", font->texture());
-  //if (m_fontUseSoftEdge.get())
+  // if (m_fontUseSoftEdge.get())
   shader.setUniform("softedge_scale", m_fontSoftEdgeScale.get());
   if (m_showFontOutline.get()) {
     shader.setUniform("outline_color", m_fontOutlineColor.get());
@@ -195,13 +195,17 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_vertex);
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-      glBufferData(GL_ARRAY_BUFFER, m_fontPositions.size() * 3 * sizeof(GLfloat), m_fontPositions.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_fontPositions.size() * 3 * sizeof(GLfloat),
+                   m_fontPositions.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_2dTexCoord0);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_fontTextureCoords.size() * 2 * sizeof(GLfloat),
+                   m_fontTextureCoords.data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -236,7 +240,9 @@ void Z3DFontRenderer::render(Z3DEye eye)
 
     glEnableVertexAttribArray(attr_2dTexCoord0);
     m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-    glBufferData(GL_ARRAY_BUFFER, m_fontTextureCoords.size() * 2 * sizeof(GLfloat), m_fontTextureCoords.data(),
+    glBufferData(GL_ARRAY_BUFFER,
+                 m_fontTextureCoords.size() * 2 * sizeof(GLfloat),
+                 m_fontTextureCoords.data(),
                  GL_STATIC_DRAW);
     glVertexAttribPointer(attr_2dTexCoord0, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -271,16 +277,12 @@ void Z3DFontRenderer::renderPicking(Z3DEye)
     LOG(ERROR) << "Can not find any font.";
     return;
   }
-  if (!m_pickingColorsPt || m_pickingColorsPt->empty()
-      || m_pickingColorsPt->size() != m_positionsPt->size()) {
+  if (!m_pickingColorsPt || m_pickingColorsPt->empty() || m_pickingColorsPt->size() != m_positionsPt->size()) {
     return;
   }
-  if (!m_positionsPt || m_positionsPt->empty()
-      || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
+  if (!m_positionsPt || m_positionsPt->empty() || m_positionsPt->size() != static_cast<size_t>(m_texts.size())) {
     return;
   }
-
-
 }
 
 void Z3DFontRenderer::prepareFontShaderData(Z3DEye eye)

@@ -10,8 +10,7 @@
 
 namespace nim {
 
-ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
-                           ZDoc& doc, QWidget* parent)
+ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack, ZDoc& doc, QWidget* parent)
   : QTreeView(parent)
   , m_ratModel(objModel)
   , m_swcPack(swcPack)
@@ -32,25 +31,19 @@ ZSwcTreeView::ZSwcTreeView(ZSwcTreeModel& objModel, ZSwcPack& swcPack,
   connect(this, &ZSwcTreeView::activated, this, &ZSwcTreeView::indexActivated);
 
   setAlternatingRowColors(true);
-  //QPalette p = palette();
-  //p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
-  //setPalette(p);
+  // QPalette p = palette();
+  // p.setColor(QPalette::AlternateBase, QColor(240, 240, 240));
+  // setPalette(p);
 
   setSelectionMode(QTreeView::ExtendedSelection);
 
-  connect(this, &ZSwcTreeView::expanded,
-          this, &ZSwcTreeView::adaptColumns);
+  connect(this, &ZSwcTreeView::expanded, this, &ZSwcTreeView::adaptColumns);
 
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted,
-          this, &ZSwcTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved,
-          this, &ZSwcTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset,
-          this, &ZSwcTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged,
-          this, &ZSwcTreeView::adaptColumns);
-  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged,
-          this, &ZSwcTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsInserted, this, &ZSwcTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::rowsRemoved, this, &ZSwcTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::modelReset, this, &ZSwcTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::layoutChanged, this, &ZSwcTreeView::adaptColumns);
+  connect(m_ratProxyModel, &QSortFilterProxyModel::dataChanged, this, &ZSwcTreeView::adaptColumns);
   adaptColumns();
 
   header()->setStretchLastSection(false);
@@ -117,7 +110,7 @@ void ZSwcTreeView::keyPressEvent(QKeyEvent* e)
   }
 }
 
-void ZSwcTreeView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
+void ZSwcTreeView::selectionChanged(const QItemSelection& selected, const QItemSelection& deselected)
 {
   QTreeView::selectionChanged(selected, deselected);
 
@@ -163,9 +156,9 @@ void ZSwcTreeView::onSwcSelectionChanged()
     bool first = true;
     for (auto p : m_swcPack.selectedNodes()) {
       auto [parentRow, row] = m_swcPack.getParentRowAndRowOfNode(p);
-      auto index = m_ratProxyModel->mapFromSource(row >= 0 ?
-        m_ratModel.index(row, 0, m_ratModel.index(parentRow, 0, QModelIndex())) :
-        m_ratModel.index(parentRow, 0, QModelIndex()));
+      auto index = m_ratProxyModel->mapFromSource(
+        row >= 0 ? m_ratModel.index(row, 0, m_ratModel.index(parentRow, 0, QModelIndex()))
+                 : m_ratModel.index(parentRow, 0, QModelIndex()));
       if (first) {
         selectionModel()->select(index, QItemSelectionModel::Rows | QItemSelectionModel::ClearAndSelect);
         scrollTo(index);
@@ -187,9 +180,6 @@ void ZSwcTreeView::onSwcChanged()
   onSwcSelectionChanged();
 }
 
-void ZSwcTreeView::onLockedStateChanged(bool)
-{
-}
+void ZSwcTreeView::onLockedStateChanged(bool) {}
 
 } // namespace nim
-

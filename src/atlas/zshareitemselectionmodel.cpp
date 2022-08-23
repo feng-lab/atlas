@@ -7,7 +7,8 @@
 namespace nim {
 
 ZShareItemSelectionModel::ZShareItemSelectionModel(QAbstractItemModel* model,
-                                                   QItemSelectionModel* srcSelectionModel, QObject* parent)
+                                                   QItemSelectionModel* srcSelectionModel,
+                                                   QObject* parent)
   : QItemSelectionModel(model, parent)
   , m_srcSelectionModel(srcSelectionModel)
 {
@@ -28,12 +29,15 @@ ZShareItemSelectionModel::ZShareItemSelectionModel(QAbstractItemModel* model,
 
   QItemSelectionModel::select(mapSelectionFromSrc(m_srcSelectionModel->selection()), QItemSelectionModel::Select);
 
-  connect(m_srcSelectionModel, &QItemSelectionModel::currentChanged,
-          this, &ZShareItemSelectionModel::srcCurrentChanged);
-  connect(m_srcSelectionModel, &QItemSelectionModel::selectionChanged,
-          this, &ZShareItemSelectionModel::srcSelectionChanged);
-  connect(this, &ZShareItemSelectionModel::currentChanged,
-          this, &ZShareItemSelectionModel::thisCurrentChanged);
+  connect(m_srcSelectionModel,
+          &QItemSelectionModel::currentChanged,
+          this,
+          &ZShareItemSelectionModel::srcCurrentChanged);
+  connect(m_srcSelectionModel,
+          &QItemSelectionModel::selectionChanged,
+          this,
+          &ZShareItemSelectionModel::srcSelectionChanged);
+  connect(this, &ZShareItemSelectionModel::currentChanged, this, &ZShareItemSelectionModel::thisCurrentChanged);
 }
 
 void ZShareItemSelectionModel::select(const QModelIndex& index, SelectionFlags command)
@@ -57,23 +61,26 @@ void ZShareItemSelectionModel::srcSelectionChanged(const QItemSelection& selecte
 void ZShareItemSelectionModel::srcCurrentChanged(const QModelIndex& srcCurrent, const QModelIndex& /*unused*/)
 {
   const QModelIndex current = mapIndexFromSrc(srcCurrent);
-  if (!current.isValid() || current == currentIndex())
+  if (!current.isValid() || current == currentIndex()) {
     return;
+  }
   setCurrentIndex(current, QItemSelectionModel::NoUpdate);
 }
 
 void ZShareItemSelectionModel::thisCurrentChanged(const QModelIndex& current, const QModelIndex& /*unused*/)
 {
   const QModelIndex srcCurrent = mapIndexToSrc(current);
-  if (!srcCurrent.isValid() || srcCurrent == m_srcSelectionModel->currentIndex())
+  if (!srcCurrent.isValid() || srcCurrent == m_srcSelectionModel->currentIndex()) {
     return;
+  }
   m_srcSelectionModel->setCurrentIndex(srcCurrent, QItemSelectionModel::NoUpdate);
 }
 
 QModelIndex ZShareItemSelectionModel::mapIndexToSrc(const QModelIndex& index) const
 {
-  if (!index.isValid())
+  if (!index.isValid()) {
     return QModelIndex();
+  }
   QModelIndex res = index;
   for (index_t i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapToSource(res);
@@ -83,8 +90,9 @@ QModelIndex ZShareItemSelectionModel::mapIndexToSrc(const QModelIndex& index) co
 
 QModelIndex ZShareItemSelectionModel::mapIndexFromSrc(const QModelIndex& index) const
 {
-  if (!index.isValid())
+  if (!index.isValid()) {
     return QModelIndex();
+  }
   QModelIndex res = index;
   for (auto i : m_proxyChain) {
     res = i->mapFromSource(res);
@@ -94,8 +102,9 @@ QModelIndex ZShareItemSelectionModel::mapIndexFromSrc(const QModelIndex& index) 
 
 QItemSelection ZShareItemSelectionModel::mapSelectionToSrc(const QItemSelection& selection) const
 {
-  if (selection.isEmpty())
+  if (selection.isEmpty()) {
     return QItemSelection();
+  }
   QItemSelection res = selection;
   for (index_t i = m_proxyChain.size(); i-- > 0;) {
     res = m_proxyChain[i]->mapSelectionToSource(res);
@@ -105,8 +114,9 @@ QItemSelection ZShareItemSelectionModel::mapSelectionToSrc(const QItemSelection&
 
 QItemSelection ZShareItemSelectionModel::mapSelectionFromSrc(const QItemSelection& selection) const
 {
-  if (selection.isEmpty())
+  if (selection.isEmpty()) {
     return QItemSelection();
+  }
   QItemSelection res = selection;
   for (auto i : m_proxyChain) {
     res = i->mapSelectionFromSource(res);

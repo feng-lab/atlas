@@ -23,19 +23,24 @@ namespace nim {
 
 class ZParameter : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZParameter(QString name, QObject* parent = nullptr);
 
   [[nodiscard]] inline QString name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   void setName(const QString& name);
 
   [[nodiscard]] QString type() const;
 
   [[nodiscard]] inline QString style() const
-  { return m_style; }
+  {
+    return m_style;
+  }
 
   // if style does not exist, fall back to "DEFAULT"
   void setStyle(const QString& style);
@@ -46,10 +51,14 @@ public:
   QWidget* createWidget(QWidget* parent = nullptr);
 
   [[nodiscard]] bool isVisible() const
-  { return m_isWidgetsVisible; }
+  {
+    return m_isWidgetsVisible;
+  }
 
   [[nodiscard]] bool isEnabled() const
-  { return m_isWidgetsEnabled; }
+  {
+    return m_isWidgetsEnabled;
+  }
 
   [[nodiscard]] QString jsonKey() const;
 
@@ -69,14 +78,20 @@ public:
 
   // for option parameter
   virtual void forceSetValueSameAs(const ZParameter& rhs)
-  { setValueSameAs(rhs); }
+  {
+    setValueSameAs(rhs);
+  }
 
   [[nodiscard]] inline bool isSameType(const ZParameter& rhs) const
-  { return metaObject()->className() == rhs.metaObject()->className(); }
+  {
+    return metaObject()->className() == rhs.metaObject()->className();
+  }
 
   // return true if new value can be interpolated between two state
   [[nodiscard]] virtual bool supportInterpolation() const
-  { return true; }
+  {
+    return true;
+  }
 
   // if interpolation is not supported, assign dest to one of prev (if progress < 1) and current (if progress >= 1)
   virtual void interpolate(const ZParameter& prev, double progress, ZParameter& dest) = 0;
@@ -112,26 +127,22 @@ Q_SIGNALS:
 
 protected:
   // some templated subclass might need this
-  virtual void reservedIntSlot1(int /*unused*/)
-  {}
+  virtual void reservedIntSlot1(int /*unused*/) {}
 
-  virtual void reservedIntSlot2(int /*unused*/)
-  {}
+  virtual void reservedIntSlot2(int /*unused*/) {}
 
-  virtual void reservedStringSlot1(const QString& /*unused*/)
-  {}
+  virtual void reservedStringSlot1(const QString& /*unused*/) {}
 
-  virtual void reservedStringSlot2(const QString& /*unused*/)
-  {}
+  virtual void reservedStringSlot2(const QString& /*unused*/) {}
 
-  virtual void reservedSlot1()
-  {}
+  virtual void reservedSlot1() {}
 
-  virtual void reservedSlot2()
-  {}
+  virtual void reservedSlot2() {}
 
   inline void addStyle(const QString& style)
-  { m_allStyles.push_back(style); }
+  {
+    m_allStyles.push_back(style);
+  }
 
   // all subclass should implement this function
   virtual QWidget* actualCreateWidget(QWidget* parent) = 0;
@@ -141,7 +152,7 @@ protected:
   QString m_style{"DEFAULT"};
   QStringList m_allStyles;
 
-  //std::set<QWidget*> m_widgets;
+  // std::set<QWidget*> m_widgets;
   bool m_isWidgetsEnabled = true;
   bool m_isWidgetsVisible = true;
 };
@@ -158,10 +169,14 @@ public:
   void set(const T& valueIn);
 
   [[nodiscard]] inline const T& get() const
-  { return m_value; }
+  {
+    return m_value;
+  }
 
   [[nodiscard]] inline T& get()
-  { return m_value; }
+  {
+    return m_value;
+  }
 
   void setValueSameAs(const ZParameter& rhs) override
   {
@@ -227,36 +242,37 @@ void ZSingleValueParameter<T>::set(const T& valueIn)
 }
 
 template<class T>
-void ZSingleValueParameter<T>::makeValid(T&/*value*/) const
-{
-}
+void ZSingleValueParameter<T>::makeValid(T& /*value*/) const
+{}
 
 template<class T>
-void ZSingleValueParameter<T>::beforeChange(T&/*value*/)
-{
-}
+void ZSingleValueParameter<T>::beforeChange(T& /*value*/)
+{}
 
 template<class T>
-void ZSingleValueParameter<T>::afterChange(T&/*value*/)
-{
-}
+void ZSingleValueParameter<T>::afterChange(T& /*value*/)
+{}
 
 //-----------------------------------------------------------------------------------------------
 
 class ZBoolParameter : public ZSingleValueParameter<bool>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZBoolParameter(const QString& name, QObject* parent = nullptr);
 
   ZBoolParameter(const QString& name, bool value, QObject* parent = nullptr);
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 
   [[nodiscard]] bool supportInterpolation() const override
-  { return false; }
+  {
+    return false;
+  }
 
   [[nodiscard]] json::value jsonValue() const override;
 
@@ -279,4 +295,3 @@ protected:
 };
 
 } // namespace nim
-

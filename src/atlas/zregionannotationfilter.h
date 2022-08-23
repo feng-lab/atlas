@@ -9,7 +9,8 @@ namespace nim {
 
 class ZRegionAnnotationFilter : public ZObjFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZRegionAnnotationFilter(ZView& view);
 
@@ -78,4 +79,3 @@ private:
 };
 
 } // namespace nim
-

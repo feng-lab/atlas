@@ -22,7 +22,7 @@ class ZImg;
 
 class Z3DImgFilter : public Z3DBoundedFilter
 {
-Q_OBJECT
+  Q_OBJECT
 
   friend class Z3DCompositor;
 
@@ -32,10 +32,14 @@ public:
   void setData(const ZImgPack& imgPack);
 
   [[nodiscard]] virtual bool isStayOnTop() const
-  { return m_stayOnTop.get(); }
+  {
+    return m_stayOnTop.get();
+  }
 
   virtual void setStayOnTop(bool s)
-  { m_stayOnTop.set(s); }
+  {
+    m_stayOnTop.set(s);
+  }
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -75,8 +79,7 @@ protected:
   //  void invalidateFRVolumeYSlice2();
   //  void invalidateFRVolumeXSlice2();
 
-  void setClipPlanes() override
-  {}
+  void setClipPlanes() override {}
 
   void enterFastMode();
 
@@ -98,11 +101,10 @@ protected:
 
   void updateNotTransformedBoundBoxImpl() override;
 
-  void expandCutRange() override
-  {}
+  void expandCutRange() override {}
 
 private:
-  //void invalidateAllFRVolumeSlices();
+  // void invalidateAllFRVolumeSlices();
   void updateBlockIDTarget();
 
   void volumeChanged();
@@ -115,17 +117,17 @@ private:
   // use first channel intensity
   glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
 
-  //get 3D position from 2D screen position
+  // get 3D position from 2D screen position
   glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
 
-  //get 3D position from 2D screen position and depth
+  // get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
 
 private:
   Z3DImgRaycasterRenderer m_imgRaycasterRenderer;
   Z3DImgSliceRenderer m_imgSliceRenderer;
   Z3DTextureAndEyeCoordinateRenderer m_textureAndEyeCoordinateRenderer;
-  //std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
+  // std::vector<std::unique_ptr<Z3DImage2DRenderer>> m_image2DRenderers;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
   std::unique_ptr<Z3DImg> m_3dImg;
@@ -135,7 +137,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;
 
-  //ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
+  // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
   ZBoolParameter m_smoothInteraction;
 
   Z3DRenderTarget m_entryTarget;
@@ -163,11 +165,11 @@ private:
   Z3DRenderOutputPort m_opaqueLeftEyeOutport;
   Z3DRenderOutputPort m_opaqueRightEyeOutport;
 
-  //static const size_t m_maxNumOfFullResolutionVolumeSlice;
-  // each channel is represented by a Z3DVolume
-  //std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
-  //std::vector<bool> m_FRVolumeSlicesValidState;
-  //ZBoolParameter m_useFRVolumeSlice;
+  // static const size_t m_maxNumOfFullResolutionVolumeSlice;
+  //  each channel is represented by a Z3DVolume
+  // std::vector<std::vector<std::unique_ptr<Z3DVolume>>> m_FRVolumeSlices;
+  // std::vector<bool> m_FRVolumeSlicesValidState;
+  // ZBoolParameter m_useFRVolumeSlice;
   ZBoolParameter m_showXSlice;
   ZIntParameter m_xSlicePosition;
   ZBoolParameter m_showYSlice;
@@ -188,4 +190,3 @@ private:
 };
 
 } // namespace nim
-

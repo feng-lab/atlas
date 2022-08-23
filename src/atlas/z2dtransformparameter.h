@@ -10,6 +10,7 @@ namespace nim {
 class Z2DTransformParameter : public ZSingleValueParameter<glm::dmat3>
 {
   Q_OBJECT
+
 public:
   explicit Z2DTransformParameter(const QString& name, QObject* parent = nullptr);
 
@@ -93,6 +94,7 @@ public:
   void interpolate(const ZParameter& prev, double progress, ZParameter& dest) override;
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override;
 

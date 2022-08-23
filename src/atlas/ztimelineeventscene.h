@@ -41,18 +41,27 @@ public:
   };
 
   int type() const override
-  { return Type; }
+  {
+    return Type;
+  }
 
-  ParameterKeysItem(ZParameterKey& paraKey, ZParameterAnimation& paraAnimation, const ZAnimationDisplayPack& pack,
-                    ZTimelineWidget& timeline, QGraphicsItem* parent);
+  ParameterKeysItem(ZParameterKey& paraKey,
+                    ZParameterAnimation& paraAnimation,
+                    const ZAnimationDisplayPack& pack,
+                    ZTimelineWidget& timeline,
+                    QGraphicsItem* parent);
 
   void updateValue();
 
   ZParameterKey& paraKey()
-  { return m_paraKey; }
+  {
+    return m_paraKey;
+  }
 
   ZParameterAnimation& paraAnimation()
-  { return m_paraAnimation; }
+  {
+    return m_paraAnimation;
+  }
 
 protected:
   QVariant itemChange(GraphicsItemChange change, const QVariant& value) override;
@@ -96,7 +105,8 @@ protected:
 
 class ZTimelineEventScene : public QGraphicsScene
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZTimelineEventScene(ZTimelineWidget& timeline, ZTimelineEventView* view);
 
@@ -131,5 +141,3 @@ private:
 };
 
 } // namespace nim
-
-

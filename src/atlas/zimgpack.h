@@ -21,8 +21,14 @@ namespace nim {
 class ZImgPackSubBlock : public ZImgSubBlock
 {
 public:
-  ZImgPackSubBlock(std::shared_ptr<ZImg>& img, size_t ratio, size_t t, size_t z,
-                   index_t x, index_t y, size_t width, size_t height);
+  ZImgPackSubBlock(std::shared_ptr<ZImg>& img,
+                   size_t ratio,
+                   size_t t,
+                   size_t z,
+                   index_t x,
+                   index_t y,
+                   size_t width,
+                   size_t height);
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
@@ -38,7 +44,9 @@ class ZImgPack : public ZImgSliceProvider
 public:
   enum class MinMaxState
   {
-    Invalid, Partial, Complete
+    Invalid,
+    Partial,
+    Complete
   };
 
   explicit ZImgPack(ZImgSource imgSource);
@@ -50,13 +58,19 @@ public:
   const QString& detailedInfo() const;
 
   inline double rangeMin() const
-  { return m_rangeMin; }
+  {
+    return m_rangeMin;
+  }
 
   inline double rangeMax() const
-  { return m_rangeMax; }
+  {
+    return m_rangeMax;
+  }
 
   inline bool hasMinMax() const
-  { return m_minMaxState != MinMaxState::Invalid; }
+  {
+    return m_minMaxState != MinMaxState::Invalid;
+  }
 
   inline double minIntensity() const
   {
@@ -71,39 +85,61 @@ public:
   }
 
   inline bool isSequence() const
-  { return m_imgSource.filenames.size() > 1; }
+  {
+    return m_imgSource.filenames.size() > 1;
+  }
 
   inline const QString& name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline const QString& tooltip() const
-  { return m_tooltip; }
+  {
+    return m_tooltip;
+  }
 
   void setChannelColor(size_t c, col4 col);
 
   ZImgInfo& imgInfoRef()
-  { return m_imgInfo; }
+  {
+    return m_imgInfo;
+  }
 
   const ZImgSource& imgSource() const
-  { return m_imgSource; }
+  {
+    return m_imgSource;
+  }
 
   const QStringList& paths() const
-  { return m_imgSource.filenames; }
+  {
+    return m_imgSource.filenames;
+  }
 
   size_t sceneIdx() const
-  { return m_imgSource.scene; }
+  {
+    return m_imgSource.scene;
+  }
 
   Dimension catDim() const
-  { return m_imgSource.catDim; }
+  {
+    return m_imgSource.catDim;
+  }
 
   bool hasUnsavedChange() const
-  { return m_hasUnsavedChange; }
+  {
+    return m_hasUnsavedChange;
+  }
 
   void save(const QString& fileName, FileFormat format, const ZImgWriteParameters& paras);
 
-  bool needUpdate(const QRectF& viewport, double scale,
-                  const QRectF& oldViewport, double oldScale,
-                  size_t t, size_t z, bool mip) const;
+  bool needUpdate(const QRectF& viewport,
+                  double scale,
+                  const QRectF& oldViewport,
+                  double oldScale,
+                  size_t t,
+                  size_t z,
+                  bool mip) const;
 
   void retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
                            std::vector<QPoint>& locs,
@@ -131,11 +167,24 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
-  void readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc, size_t t,
-                       const ZImgInfo& resInfo, ZImg& res) const;
+  void readRegionToImg(index_t xyRatio,
+                       index_t zRatio,
+                       index_t sx,
+                       index_t sy,
+                       index_t sz,
+                       size_t sc,
+                       size_t t,
+                       const ZImgInfo& resInfo,
+                       ZImg& res) const;
 
-  folly::Future<ZImg> readRegionToImg(index_t xyRatio, index_t zRatio, index_t sx, index_t sy, index_t sz, size_t sc,
-                                      size_t t, const ZImgInfo& resInfo) const;
+  folly::Future<ZImg> readRegionToImg(index_t xyRatio,
+                                      index_t zRatio,
+                                      index_t sx,
+                                      index_t sy,
+                                      index_t sz,
+                                      size_t sc,
+                                      size_t t,
+                                      const ZImgInfo& resInfo) const;
 
   std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                      index_t zRatio,
@@ -154,7 +203,9 @@ public:
 
   // only for non-disk-cached image
   bool isDiskCached() const
-  { return m_diskCached; }
+  {
+    return m_diskCached;
+  }
 
   const ZImg& img() const
   {
@@ -165,9 +216,12 @@ public:
   const ZImg& maxZProjectedImg(size_t zStart, size_t zEnd) const;
 
   // ZImgSliceProvider interface
+
 public:
   ZImgInfo imgInfo() const override
-  { return m_imgInfo; }
+  {
+    return m_imgInfo;
+  }
 
   ZImg slice(size_t z, size_t t) const override;
 
@@ -209,6 +263,7 @@ protected:
   bool m_hasUnsavedChange;
 
   // derived data
+
 private:
   mutable QString m_sizeInfo;
   mutable QString m_detailedInfo;
@@ -218,7 +273,7 @@ private:
   QString m_tooltip;
 
   size_t m_tileSize = 512;
-  size_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024;  // 2000MB
+  size_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024; // 2000MB
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::set<std::array<size_t, 3>> m_pyramidalRatios;
@@ -244,5 +299,4 @@ private:
   mutable std::vector<std::shared_ptr<ZImg>> m_mipImgs;
 };
 
-}  // namespace nim
-
+} // namespace nim

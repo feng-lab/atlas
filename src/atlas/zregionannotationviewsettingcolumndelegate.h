@@ -10,11 +10,11 @@ class Z3DMeshFilter;
 
 class ZRegionAnnotationViewSettingColumnDelegate : public QStyledItemDelegate
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZRegionAnnotationViewSettingColumnDelegate(
-    std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
-    QObject* parent = nullptr);
+  explicit ZRegionAnnotationViewSettingColumnDelegate(std::map<int64_t, std::unique_ptr<ZROIFilter>>& idToROIFilters,
+                                                      QObject* parent = nullptr);
 
   explicit ZRegionAnnotationViewSettingColumnDelegate(
     std::map<int64_t, std::unique_ptr<Z3DMeshFilter>>& idToMeshFilters,
@@ -33,4 +33,3 @@ private:
 };
 
 } // namespace nim
-

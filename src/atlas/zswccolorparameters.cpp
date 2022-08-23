@@ -12,11 +12,8 @@ ZSwcColorParameters::ZSwcColorParameters(QObject* parent)
   initTypeColor();
   initSubclassTypeColor();
 
-  colorMode.addOptions("Single Color",
-                       "Branch Type",
-                       "Topology",
-                       "Colormap Branch Type"
-    // "Subclass"
+  colorMode.addOptions("Single Color", "Branch Type", "Topology", "Colormap Branch Type"
+                       // "Subclass"
   );
 
   colorMode.select("Branch Type");
@@ -37,8 +34,10 @@ void ZSwcColorParameters::setData(ZSwcPack* swcPack)
     if (m_swcPack->allNodeType().empty()) {
       colorMapBranchType.get().reset();
     } else {
-      colorMapBranchType.get().reset(m_swcPack->allNodeType().begin(), m_swcPack->allNodeType().end(),
-                                     glm::col4(0, 0, 255, 255), glm::col4(255, 0, 0, 255));
+      colorMapBranchType.get().reset(m_swcPack->allNodeType().begin(),
+                                     m_swcPack->allNodeType().end(),
+                                     glm::col4(0, 0, 255, 255),
+                                     glm::col4(255, 0, 0, 255));
     }
     colorMapBranchType.blockSignals(false);
   }
@@ -68,55 +67,55 @@ void ZSwcColorParameters::initTypeColor()
   int index = 0;
   QString name = QString("Type %1 Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(255 / 255.f, 255 / 255.f, 255 / 255.f, 1.f))); //white
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(255 / 255.f, 255 / 255.f, 255 / 255.f, 1.f))); // white
   // 1
   name = QString("Type %1 (Soma) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(20 / 255.f, 20 / 255.f, 20 / 255.f, 1.f))); //black
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(20 / 255.f, 20 / 255.f, 20 / 255.f, 1.f))); // black
   // 2
   name = QString("Type %1 (Axon) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 20 / 255.f, 0 / 255.f, 1.f))); //red
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 20 / 255.f, 0 / 255.f, 1.f))); // red
   // 3
   name = QString("Type %1 (Basal Dendrite) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 20 / 255.f, 200 / 255.f, 1.f))); //blue
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 20 / 255.f, 200 / 255.f, 1.f))); // blue
   // 4
   name = QString("Type %1 (Apical Dendrite) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 0 / 255.f, 200 / 255.f, 1.f))); //purple
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(200 / 255.f, 0 / 255.f, 200 / 255.f, 1.f))); // purple
   // 5
   name = QString("Type %1 (Main Trunk) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); //cyan
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); // cyan
   // 6
   name = QString("Type %1 (Basal Intermediate) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(220 / 255.f, 200 / 255.f, 0 / 255.f, 1.f))); //yellow
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(220 / 255.f, 200 / 255.f, 0 / 255.f, 1.f))); // yellow
   // 7
   name = QString("Type %1 (Basal Terminal) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 20 / 255.f, 1.f))); //green
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 200 / 255.f, 20 / 255.f, 1.f))); // green
   // 8
   name = QString("Type %1 (Apical Oblique Intermediate) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(188 / 255.f, 94 / 255.f, 37 / 255.f, 1.f))); //coffee
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(188 / 255.f, 94 / 255.f, 37 / 255.f, 1.f))); // coffee
   // 9
   name = QString("Type %1 (Apical Oblique Terminal) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(180 / 255.f, 200 / 255.f, 120 / 255.f, 1.f))); //asparagus
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(180 / 255.f, 200 / 255.f, 120 / 255.f, 1.f))); // asparagus
   // 10
   name = QString("Type %1 (Apical Tuft) Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(250 / 255.f, 100 / 255.f, 120 / 255.f, 1.f))); //salmon
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(250 / 255.f, 100 / 255.f, 120 / 255.f, 1.f))); // salmon
   // 11
   name = QString("Type %1 Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(120 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); //ice
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(120 / 255.f, 200 / 255.f, 200 / 255.f, 1.f))); // ice
   // 12
   name = QString("Type %1 Color").arg(index++);
   colorsForDifferentType.emplace_back(
-    std::make_unique<ZVec4Parameter>(name, glm::vec4(100 / 255.f, 120 / 255.f, 200 / 255.f, 1.f))); //orchid
+    std::make_unique<ZVec4Parameter>(name, glm::vec4(100 / 255.f, 120 / 255.f, 200 / 255.f, 1.f))); // orchid
   // 13
   name = QString("Type %1 Color").arg(index++);
   colorsForDifferentType.emplace_back(
@@ -204,7 +203,7 @@ glm::vec4 ZSwcColorParameters::colorByType(const ZSwc::ConstSwcTreeNode& n)
     } else {
       return colorsForSubclassType[colorsForSubclassType.size() - 1]->get();
     }
-  } else  /*if (colorMode.get() == "ColorMap Branch Type")*/ {
+  } else /*if (colorMode.get() == "ColorMap Branch Type")*/ {
     return colorMapBranchType.get().mappedFColor(n->type);
   }
 }
@@ -216,8 +215,7 @@ glm::vec4 ZSwcColorParameters::colorByDirection(const ZSwc::ConstSwcTreeNode& /*
 
 glm::vec4 ZSwcColorParameters::colorOfNode(const ZSwc::ConstSwcTreeNode& n)
 {
-  if (colorMode.isSelected("Branch Type") ||
-      colorMode.isSelected("Colormap Branch Type") ||
+  if (colorMode.isSelected("Branch Type") || colorMode.isSelected("Colormap Branch Type") ||
       colorMode.isSelected("Subclass")) {
     return colorByType(n);
   } else if (colorMode.isSelected("Single Color")) {
@@ -256,4 +254,3 @@ void ZSwcColorParameters::adjustWidgets()
 }
 
 } // namespace nim
-

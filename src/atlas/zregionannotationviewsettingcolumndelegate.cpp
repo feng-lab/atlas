@@ -25,13 +25,15 @@ ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDe
   m_idToMeshFilters = &idToMeshFilters;
 }
 
-void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const
+void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter,
+                                                       const QStyleOptionViewItem& option,
+                                                       const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     bool ok;
     int64_t regionID = index.data(Qt::UserRole).toLongLong(&ok);
     CHECK(ok);
-    //LOG(INFO) << "painting " << regionID;
+    // LOG(INFO) << "painting " << regionID;
     QRect rect = option.rect;
     QWidget* wgt = nullptr;
     if (m_idToROIFilters) {
@@ -42,8 +44,8 @@ void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const 
       CHECK(false);
     }
     wgt->setGeometry(rect);
-//    if (option.state == QStyle::State_Selected)
-//      painter->fillRect(rect, option.palette.highlight());
+    //    if (option.state == QStyle::State_Selected)
+    //      painter->fillRect(rect, option.palette.highlight());
     QPixmap map = wgt->grab();
     delete wgt;
     painter->drawPixmap(option.rect, map);
@@ -52,7 +54,8 @@ void ZRegionAnnotationViewSettingColumnDelegate::paint(QPainter* painter, const 
   }
 }
 
-QSize ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const
+QSize ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionViewItem& option,
+                                                           const QModelIndex& index) const
 {
   if (index.isValid() && index.model()->headerData(index.column(), Qt::Horizontal, Qt::UserRole).toInt() == 1) {
     if (m_idToROIFilters) {
@@ -68,7 +71,6 @@ QSize ZRegionAnnotationViewSettingColumnDelegate::sizeHint(const QStyleOptionVie
 
 ZRegionAnnotationViewSettingColumnDelegate::ZRegionAnnotationViewSettingColumnDelegate(QObject* parent)
   : QStyledItemDelegate(parent)
-{
-}
+{}
 
 } // namespace nim

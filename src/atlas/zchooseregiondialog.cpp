@@ -11,7 +11,8 @@
 namespace nim {
 
 ZChooseRegionDialog::ZChooseRegionDialog(const ZRegionAnnotation& ra, QWidget* parent)
-  : QDialog(parent), m_regionAnnotation(ra)
+  : QDialog(parent)
+  , m_regionAnnotation(ra)
 {
   setWindowTitle(QString("Choose Region"));
   createWidget();
@@ -22,8 +23,9 @@ ZChooseRegionDialog::ZChooseRegionDialog(const ZRegionAnnotation& ra, QWidget* p
     const auto& node = *it;
     if (annotationTree.isRoot(it)) {
       auto item = new QTreeWidgetItem(m_treeWidget,
-                                      QStringList() << node.abbreviation << node.name << QString::number(node.id)
-                                                    << "" << "" << "");
+                                      QStringList() << node.abbreviation << node.name << QString::number(node.id) << ""
+                                                    << ""
+                                                    << "");
       idToItem[node.id] = item;
       item->setData(0, Qt::UserRole, QVariant::fromValue(node.id));
       item->setSelected(false);
@@ -31,7 +33,8 @@ ZChooseRegionDialog::ZChooseRegionDialog(const ZRegionAnnotation& ra, QWidget* p
       const auto& parentNode = *annotationTree.parent(it);
       auto item = new QTreeWidgetItem(idToItem[parentNode.id],
                                       QStringList() << node.abbreviation << node.name << QString::number(node.id)
-                                                    << parentNode.abbreviation << parentNode.name << QString::number(parentNode.id));
+                                                    << parentNode.abbreviation << parentNode.name
+                                                    << QString::number(parentNode.id));
       idToItem[node.id] = item;
       item->setData(0, Qt::UserRole, QVariant::fromValue(node.id));
       item->setSelected(false);
@@ -72,10 +75,8 @@ void ZChooseRegionDialog::createWidget()
 
   m_treeWidget->setFocus();
 
-  connect(m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked,
-          this, &ZChooseRegionDialog::accept);
-  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,
-          this, &ZChooseRegionDialog::reject);
+  connect(m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked, this, &ZChooseRegionDialog::accept);
+  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked, this, &ZChooseRegionDialog::reject);
 }
 
 void ZChooseRegionDialog::updateSelectedID()
@@ -89,6 +90,3 @@ void ZChooseRegionDialog::updateSelectedID()
 }
 
 } // namespace nim
-
-
-

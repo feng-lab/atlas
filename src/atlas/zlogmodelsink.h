@@ -35,7 +35,8 @@ namespace nim {
 
 class ZLogModelSink : public QAbstractTableModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   static const char* const Type;
 
@@ -72,4 +73,3 @@ private:
 };
 
 } // namespace nim
-

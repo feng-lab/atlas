@@ -22,7 +22,8 @@ protected:
 
 class ZTimelineAxisView : public QGraphicsView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZTimelineAxisView(ZTimelineWidget& parent);
 

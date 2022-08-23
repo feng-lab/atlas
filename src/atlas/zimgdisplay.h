@@ -18,22 +18,34 @@ public:
   void reset();
 
   size_t slice() const
-  { return m_z; }
+  {
+    return m_z;
+  }
 
   size_t time() const
-  { return m_t; }
+  {
+    return m_t;
+  }
 
   double alpha() const
-  { return m_alpha; }
+  {
+    return m_alpha;
+  }
 
   inline void setSlice(size_t z)
-  { m_z = std::min(z, m_img.depth() - 1); }
+  {
+    m_z = std::min(z, m_img.depth() - 1);
+  }
 
   inline void setTime(size_t t)
-  { m_t = std::min(t, m_img.numTimes() - 1); }
+  {
+    m_t = std::min(t, m_img.numTimes() - 1);
+  }
 
   inline void setAlpha(double a)
-  { m_alpha = std::min(1.0, std::max(0.0, a)); }
+  {
+    m_alpha = std::min(1.0, std::max(0.0, a));
+  }
 
   void setChannelColor(size_t ch, col4 col)
   {
@@ -41,7 +53,7 @@ public:
   }
 
   // show channel ch and map minData to 0, map maxData to 255
-  void showChannel(size_t ch, double minData, double maxData);   // todo: long double??
+  void showChannel(size_t ch, double minData, double maxData); // todo: long double??
   void hideChannel(size_t ch);
 
   // show all channels use min max value as range
@@ -62,15 +74,21 @@ public:
 
 private:
   inline const ZImgInfo& imgInfo() const
-  { return m_img.info(); }
+  {
+    return m_img.info();
+  }
 
   template<typename TVoxel>
-  void setQImageDataBlockCM(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+  void setQImageDataBlockCM(const ZImg* img,
+                            QImage* qim,
+                            const tbb::blocked_range<size_t>& rowRange,
                             const std::vector<size_t>* channels,
                             const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 
   template<typename TVoxel>
-  void setQImageDataBlockCMMultAlpha(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+  void setQImageDataBlockCMMultAlpha(const ZImg* img,
+                                     QImage* qim,
+                                     const tbb::blocked_range<size_t>& rowRange,
                                      const std::vector<size_t>* channels,
                                      const std::vector<ZImgVoxelColormap<TVoxel>>* colormaps) const;
 
@@ -78,7 +96,9 @@ private:
   void setQImageDataCM(const ZImg& img, QImage& qim) const;
 
   template<typename TVoxel>
-  void setQImageDataBlock(const ZImg* img, QImage* qim, const tbb::blocked_range<size_t>& rowRange,
+  void setQImageDataBlock(const ZImg* img,
+                          QImage* qim,
+                          const tbb::blocked_range<size_t>& rowRange,
                           const std::vector<size_t>* channels) const;
 
   template<typename TVoxel>
@@ -96,4 +116,3 @@ private:
 };
 
 } // namespace nim
-

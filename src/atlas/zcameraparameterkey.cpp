@@ -7,18 +7,15 @@ namespace nim {
 
 ZCameraParameterKey::ZCameraParameterKey(double tm, const Z3DCameraParameter& p)
   : ZParameterKey(tm, p)
-{
-}
+{}
 
 ZCameraParameterKey::ZCameraParameterKey(double tm, Z3DCameraParameter* p)
   : ZParameterKey(tm, p)
-{
-}
+{}
 
 ZCameraParameterKey::ZCameraParameterKey()
   : ZParameterKey("3DCamera")
-{
-}
+{}
 
 ZCameraParameterKey::ZCameraParameterKey(const ZCameraParameterKey& key)
   : ZParameterKey(key)

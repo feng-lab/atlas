@@ -10,15 +10,17 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-//  m_image2DShader.bindFragDataLocation(0, "FragData0");
-//  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
-//                                     m_rendererBase.generateHeader() + generateHeader());
+  //  m_image2DShader.bindFragDataLocation(0, "FragData0");
+  //  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
+  //                                     m_rendererBase.generateHeader() + generateHeader());
 
   m_scImage2DShader.bindFragDataLocation(0, "FragData0");
-  m_scImage2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap_single_channel.frag",
+  m_scImage2DShader.loadFromSourceFile("transform_with_2dtexture.vert",
+                                       "image2d_with_colormap_single_channel.frag",
                                        m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
-  m_mergeChannelShader.loadFromSourceFile("pass.vert", "image2d_array_compositor.frag",
+  m_mergeChannelShader.loadFromSourceFile("pass.vert",
+                                          "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
 }
 
@@ -52,8 +54,7 @@ void Z3DImage2DRenderer::setChannels(const std::vector<std::unique_ptr<Z3DVolume
 
 void Z3DImage2DRenderer::addQuad(const ZMesh& quad)
 {
-  if (quad.empty() ||
-      (quad.numVertices() != 4 && quad.numVertices() != 6) ||
+  if (quad.empty() || (quad.numVertices() != 4 && quad.numVertices() != 6) ||
       quad.numVertices() != quad.num2DTextureCoordinates()) {
     LOG(FATAL) << "Input quad should be 2D slice with 2D texture coordinates";
     return;
@@ -94,7 +95,7 @@ bool Z3DImage2DRenderer::hasVolume() const
 
 void Z3DImage2DRenderer::compile()
 {
-  //m_image2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
+  // m_image2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
 
   m_scImage2DShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());
   m_mergeChannelShader.setHeaderAndRebuild(m_rendererBase.generateHeader() + generateHeader());

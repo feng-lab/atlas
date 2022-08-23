@@ -10,7 +10,8 @@ namespace nim {
 
 class ZObjFilter : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZObjFilter(ZView& view);
 
@@ -19,23 +20,27 @@ public:
   virtual void write(json::object& json) const;
 
   void setVisible(bool v)
-  { m_visible.set(v); }
+  {
+    m_visible.set(v);
+  }
 
   [[nodiscard]] virtual bool isVisible() const
-  { return m_visible.get(); }
+  {
+    return m_visible.get();
+  }
 
   ZBoolParameter& visiblePara()
-  { return m_visible; }
+  {
+    return m_visible;
+  }
 
   virtual void setNormalView(int z, int t) = 0;
 
   virtual void setMaxZProjView(int t) = 0;
 
-  virtual void deleteKeyPressed()
-  {}
+  virtual void deleteKeyPressed() {}
 
-  virtual void copyKeyPressed()
-  {}
+  virtual void copyKeyPressed() {}
 
   virtual void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
   {
@@ -58,19 +63,23 @@ public:
   }
 
   virtual void mouseReleased(const QPointF& scenePos)
-  { Q_UNUSED(scenePos) }
+  {
+    Q_UNUSED(scenePos)
+  }
 
-  virtual void rotateClockwise(double, double)
-  {}
+  virtual void rotateClockwise(double, double) {}
 
-  virtual void rotateCounterclockwise(double, double)
-  {}
+  virtual void rotateCounterclockwise(double, double) {}
 
   std::vector<ZParameter*> parameters()
-  { return m_parameters; }
+  {
+    return m_parameters;
+  }
 
   [[nodiscard]] int viewPrecedence() const
-  { return m_viewPrecedencePara.get(); }
+  {
+    return m_viewPrecedencePara.get();
+  }
 
   [[nodiscard]] QPointF mapFromScene(QPointF p) const;
 
@@ -94,23 +103,33 @@ protected:
   QTransform getQTransform() const;
 
   [[nodiscard]] glm::dvec2 getTransformScale() const
-  { return m_transform.scale(); }
+  {
+    return m_transform.scale();
+  }
 
   [[nodiscard]] QRectF mapToSceneRect(const QRectF& rect) const;
 
   [[nodiscard]] QRectF mapFromSceneRect(const QRectF& rect) const;
 
   [[nodiscard]] int realZ() const
-  { return m_view.currentSlice() - int(m_offsetPara.get().x); }
+  {
+    return m_view.currentSlice() - int(m_offsetPara.get().x);
+  }
 
   [[nodiscard]] int realZ(int z) const
-  { return z - int(m_offsetPara.get().x); }
+  {
+    return z - int(m_offsetPara.get().x);
+  }
 
   [[nodiscard]] int realT() const
-  { return m_view.currentTime() - int(m_offsetPara.get().y); }
+  {
+    return m_view.currentTime() - int(m_offsetPara.get().y);
+  }
 
   [[nodiscard]] int realT(int t) const
-  { return t - int(m_offsetPara.get().y); }
+  {
+    return t - int(m_offsetPara.get().y);
+  }
 
   virtual void viewPrecedenceChanged();
 
@@ -136,4 +155,3 @@ protected:
 };
 
 } // namespace nim
-

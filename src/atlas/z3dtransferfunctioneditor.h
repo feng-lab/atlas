@@ -33,9 +33,11 @@ class Z3DTransferFunction;
 
 class Z3DTransferFunctionWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf, bool showHistogram = true,
+  explicit Z3DTransferFunctionWidget(Z3DTransferFunctionParameter* tf,
+                                     bool showHistogram = true,
                                      QString histogramNormalizeMethod = tr("Log"),
                                      QString xAxisText = tr("Intensity"),
                                      QString yAxisText = tr("Opacity"),
@@ -116,20 +118,20 @@ protected:
   std::unique_ptr<QPixmap> m_histogramCache;
 
   // variables for interaction
-  bool m_selectedLeftPart;            // when selected key is split, was the left part selected?
-  bool m_dragging;                    // is the user dragging a key?
+  bool m_selectedLeftPart; // when selected key is split, was the left part selected?
+  bool m_dragging; // is the user dragging a key?
 
   // variables for appearance of widget
-  int m_padding;           // additional border of the widget
-  double m_splitFactor;     // offset between splitted keys
+  int m_padding; // additional border of the widget
+  double m_splitFactor; // offset between splitted keys
   int m_keyCircleRadius;
-  glm::dvec2 m_xRange;      // range in x direction
-  glm::dvec2 m_yRange;      // range in y direction
+  glm::dvec2 m_xRange; // range in x direction
+  glm::dvec2 m_yRange; // range in y direction
 
-  QString m_xAxisText;     // caption of the x axis
-  QString m_yAxisText;     // caption of the y axis
+  QString m_xAxisText; // caption of the x axis
+  QString m_yAxisText; // caption of the y axis
 
-  QMenu m_keyContextMenu;   // context menu for right mouse click when a key is selected
+  QMenu m_keyContextMenu; // context menu for right mouse click when a key is selected
   QMenu m_noKeyContextMenu; // context menu for right mouse click when no key is selected
 
   QAction* m_deleteKeyAction;
@@ -142,10 +144,10 @@ protected:
   Z3DVolume* m_volume;
 };
 
-
 class Z3DTransferFunctionEditor : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DTransferFunctionEditor(Z3DTransferFunctionParameter* para, QWidget* parent = nullptr);
 
@@ -193,4 +195,3 @@ protected:
 };
 
 } // namespace nim
-

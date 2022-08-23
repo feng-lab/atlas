@@ -20,7 +20,9 @@ public:
   void run() override;
 
   std::vector<size_t>& histogram()
-  { return m_histogram; }
+  {
+    return m_histogram;
+  }
 
 private:
   Z3DVolume* m_volume;
@@ -44,7 +46,8 @@ private:
 // only one channel GREY8, GREY16 or FLOAT32 volume is supported, so convert first
 class Z3DVolume : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   // Z3DVolume will take ownership of the img
   explicit Z3DVolume(ZImg& img,
@@ -57,57 +60,85 @@ public:
 
   // by default same as dimension.
   void setParentVolumeDimensions(const glm::uvec3& dim)
-  { m_parentVolumeDimensions = dim; }
+  {
+    m_parentVolumeDimensions = dim;
+  }
 
   // by default same as current offset
   void setParentVolumeOffset(const glm::vec3& of)
-  { m_parentVolumeOffset = of; }
+  {
+    m_parentVolumeOffset = of;
+  }
 
   bool isSubVolume() const
-  { return m_parentVolumeDimensions != m_detailVolumeDimensions; }
+  {
+    return m_parentVolumeDimensions != m_detailVolumeDimensions;
+  }
 
   bool isDownsampledVolume() const
-  { return m_detailVolumeDimensions != m_dimensions; }
+  {
+    return m_detailVolumeDimensions != m_dimensions;
+  }
 
   // actual data dimension of current stack
   glm::uvec3 dimensions() const
-  { return m_dimensions; }
+  {
+    return m_dimensions;
+  }
 
   // detail stack dimension, current stack might be downsampled from detail stack
   glm::uvec3 originalDimensions() const
-  { return m_detailVolumeDimensions; }
+  {
+    return m_detailVolumeDimensions;
+  }
 
   // parent stack dimension, detailed stack might be cropped form parent stack
   glm::uvec3 parentVolumeDimensions() const
-  { return m_parentVolumeDimensions; }
+  {
+    return m_parentVolumeDimensions;
+  }
 
   int bitsStored() const;
 
   size_t numVoxels() const;
 
   bool is1DData() const
-  { return m_dimensions.z == 1 && (m_dimensions.x == 1 || m_dimensions.y == 1); }
+  {
+    return m_dimensions.z == 1 && (m_dimensions.x == 1 || m_dimensions.y == 1);
+  }
 
   bool is2DData() const
-  { return m_dimensions.z == 1 && m_dimensions.x > 1 && m_dimensions.y > 1; }
+  {
+    return m_dimensions.z == 1 && m_dimensions.x > 1 && m_dimensions.y > 1;
+  }
 
   bool is3DData() const
-  { return m_dimensions.z > 1 && m_dimensions.x > 1 && m_dimensions.y > 1; }
+  {
+    return m_dimensions.z > 1 && m_dimensions.x > 1 && m_dimensions.y > 1;
+  }
 
   // Returns a string representation of the sampler type: "sampler2D" for 2D image, "sampler3D" for 3D volume
   QString samplerType() const;
 
   glm::vec3 spacing() const
-  { return m_spacing; }
+  {
+    return m_spacing;
+  }
 
   glm::vec3 offset() const
-  { return m_offset; }
+  {
+    return m_offset;
+  }
 
   double minValue() const
-  { return m_minValue; }
+  {
+    return m_minValue;
+  }
 
   double maxValue() const
-  { return m_maxValue; }
+  {
+    return m_maxValue;
+  }
 
   // float version return pixel value in range [0.0 1.0]
   double floatMinValue() const;
@@ -118,9 +149,12 @@ public:
 
   double value(size_t index) const;
 
-  // to use histogram, first check hasHistogram(), if not, then call asyncGenerateHistogram() and wait for signal histogramFinished().
+  // to use histogram, first check hasHistogram(), if not, then call asyncGenerateHistogram() and wait for signal
+  // histogramFinished().
   bool hasHistogram() const
-  { return !m_histogram.empty(); }
+  {
+    return !m_histogram.empty();
+  }
 
   void asyncGenerateHistogram();
 
@@ -128,7 +162,7 @@ public:
 
   size_t histogramValue(size_t index) const;
 
-  size_t histogramValue(double fraction) const;    // input value in range [0.0, 1.0]
+  size_t histogramValue(double fraction) const; // input value in range [0.0, 1.0]
   double normalizedHistogramValue(size_t index) const;
 
   double normalizedHistogramValue(double fraction) const;
@@ -142,148 +176,204 @@ public:
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
 
   glm::vec3 cubeSize() const
-  { return glm::vec3(dimensions()) * spacing(); }
+  {
+    return glm::vec3(dimensions()) * spacing();
+  }
 
   glm::vec3 physicalLUF() const
-  { return offset(); }
+  {
+    return offset();
+  }
 
   glm::vec3 physicalRDB() const
-  { return offset() + cubeSize() - spacing(); }
+  {
+    return offset() + cubeSize() - spacing();
+  }
 
   glm::vec3 physicalLDF() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z);
+  }
 
   glm::vec3 physicalRDF() const
-  { return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z);
+  }
 
   glm::vec3 physicalRUF() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z);
+  }
 
   glm::vec3 physicalLUB() const
-  { return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z);
+  }
 
   glm::vec3 physicalLDB() const
-  { return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z);
+  }
 
   glm::vec3 physicalRUB() const
-  { return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z); }
+  {
+    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z);
+  }
 
   ZBBox<glm::dvec3> physicalBoundBox() const
-  { return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB())); }
+  {
+    return ZBBox<glm::dvec3>(glm::dvec3(physicalLUF()), glm::dvec3(physicalRDB()));
+  }
 
   // bound voxels in world coordinate
   glm::vec3 worldLUF() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLUF()) : physicalLUF(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLUF()) : physicalLUF();
+  }
 
   glm::vec3 worldRDB() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRDB()) : physicalRDB(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRDB()) : physicalRDB();
+  }
 
   glm::vec3 worldLDF() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLDF()) : physicalLDF(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLDF()) : physicalLDF();
+  }
 
   glm::vec3 worldRDF() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRDF()) : physicalRDF(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRDF()) : physicalRDF();
+  }
 
   glm::vec3 worldRUF() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUF()) : physicalRUF(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUF()) : physicalRUF();
+  }
 
   glm::vec3 worldLUB() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLUB()) : physicalLUB(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLUB()) : physicalLUB();
+  }
 
   glm::vec3 worldLDB() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLDB()) : physicalLDB(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalLDB()) : physicalLDB();
+  }
 
   glm::vec3 worldRUB() const
-  { return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUB()) : physicalRUB(); }
+  {
+    return m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, physicalRUB()) : physicalRUB();
+  }
 
   ZBBox<glm::dvec3> worldBoundBox() const;
 
   // corners of parent volume
   glm::vec3 parentVolPhysicalLUF() const
-  { return m_parentVolumeOffset; }
+  {
+    return m_parentVolumeOffset;
+  }
 
   glm::vec3 parentVolPhysicalRDB() const
-  { return m_parentVolumeOffset + (glm::vec3(m_parentVolumeDimensions) - 1.f); }
+  {
+    return m_parentVolumeOffset + (glm::vec3(m_parentVolumeDimensions) - 1.f);
+  }
 
   glm::vec3 parentVolPhysicalLDF() const
-  { return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalRDB().y, parentVolPhysicalLUF().z); }
+  {
+    return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalRDB().y, parentVolPhysicalLUF().z);
+  }
 
   glm::vec3 parentVolPhysicalRDF() const
-  { return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalRDB().y, parentVolPhysicalLUF().z); }
+  {
+    return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalRDB().y, parentVolPhysicalLUF().z);
+  }
 
   glm::vec3 parentVolPhysicalRUF() const
-  { return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalLUF().y, parentVolPhysicalLUF().z); }
+  {
+    return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalLUF().y, parentVolPhysicalLUF().z);
+  }
 
   glm::vec3 parentVolPhysicalLUB() const
-  { return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalLUF().y, parentVolPhysicalRDB().z); }
+  {
+    return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalLUF().y, parentVolPhysicalRDB().z);
+  }
 
   glm::vec3 parentVolPhysicalLDB() const
-  { return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalRDB().y, parentVolPhysicalRDB().z); }
+  {
+    return glm::vec3(parentVolPhysicalLUF().x, parentVolPhysicalRDB().y, parentVolPhysicalRDB().z);
+  }
 
   glm::vec3 parentVolPhysicalRUB() const
-  { return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalLUF().y, parentVolPhysicalRDB().z); }
+  {
+    return glm::vec3(parentVolPhysicalRDB().x, parentVolPhysicalLUF().y, parentVolPhysicalRDB().z);
+  }
 
   glm::vec3 parentVolWorldLUF() const
   {
-    return !isSubVolume() ? worldLUF() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLUF())
-                                : parentVolPhysicalLUF();
+    return !isSubVolume()         ? worldLUF()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLUF())
+                                  : parentVolPhysicalLUF();
   }
 
   glm::vec3 parentVolWorldRDB() const
   {
-    return !isSubVolume() ? worldRDB() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRDB())
-                                : parentVolPhysicalRDB();
+    return !isSubVolume()         ? worldRDB()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRDB())
+                                  : parentVolPhysicalRDB();
   }
 
   glm::vec3 parentVolWorldLDF() const
   {
-    return !isSubVolume() ? worldLDF() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLDF())
-                                : parentVolPhysicalLDF();
+    return !isSubVolume()         ? worldLDF()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLDF())
+                                  : parentVolPhysicalLDF();
   }
 
   glm::vec3 parentVolWorldRDF() const
   {
-    return !isSubVolume() ? worldRDF() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRDF())
-                                : parentVolPhysicalRDF();
+    return !isSubVolume()         ? worldRDF()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRDF())
+                                  : parentVolPhysicalRDF();
   }
 
   glm::vec3 parentVolWorldRUF() const
   {
-    return !isSubVolume() ? worldRUF() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRUF())
-                                : parentVolPhysicalRUF();
+    return !isSubVolume()         ? worldRUF()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRUF())
+                                  : parentVolPhysicalRUF();
   }
 
   glm::vec3 parentVolWorldLUB() const
   {
-    return !isSubVolume() ? worldLUB() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLUB())
-                                : parentVolPhysicalLUB();
+    return !isSubVolume()         ? worldLUB()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLUB())
+                                  : parentVolPhysicalLUB();
   }
 
   glm::vec3 parentVolWorldLDB() const
   {
-    return !isSubVolume() ? worldLDB() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLDB())
-                                : parentVolPhysicalLDB();
+    return !isSubVolume()         ? worldLDB()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalLDB())
+                                  : parentVolPhysicalLDB();
   }
 
   glm::vec3 parentVolWorldRUB() const
   {
-    return !isSubVolume() ? worldRUB() :
-           m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRUB())
-                                : parentVolPhysicalRUB();
+    return !isSubVolume()         ? worldRUB()
+           : m_hasTransformMatrix ? glm::applyMatrix(m_transformationMatrix, parentVolPhysicalRUB())
+                                  : parentVolPhysicalRUB();
   }
 
   void setSpacing(const glm::vec3& spacing)
-  { m_spacing = spacing; }
+  {
+    m_spacing = spacing;
+  }
 
   void setOffset(const glm::vec3& offset)
-  { m_offset = offset; }
+  {
+    m_offset = offset;
+  }
 
   void setPhysicalToWorldMatrix(const glm::mat4& transformationMatrix);
 
@@ -291,10 +381,14 @@ public:
 
   // color of this channel, max intensity will map to this color
   void setVolColor(const glm::vec3& col)
-  { m_volColor = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f)); }
+  {
+    m_volColor = glm::clamp(col, glm::vec3(0.f), glm::vec3(1.f));
+  }
 
   glm::vec3 volColor() const
-  { return m_volColor; }
+  {
+    return m_volColor;
+  }
 
   // Returns the matrix mapping from voxel coordinates (i.e. [0; dim-1]) to world coordinates.
   glm::mat4 voxelToWorldMatrix() const;
@@ -313,7 +407,9 @@ public:
   glm::mat4 physicalToVoxelMatrix() const;
 
   glm::mat4 physicalToWorldMatrix() const
-  { return m_transformationMatrix; }
+  {
+    return m_transformationMatrix;
+  }
 
   glm::mat4 worldToPhysicalMatrix() const;
 
@@ -360,4 +456,3 @@ private:
 };
 
 } // namespace nim
-

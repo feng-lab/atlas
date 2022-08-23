@@ -11,7 +11,8 @@ namespace nim {
 
 class ZFontWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZFontWidget(const QFont& font, QWidget* parent = nullptr);
 
@@ -35,4 +36,3 @@ private:
 };
 
 } // namespace nim
-

@@ -11,7 +11,9 @@
 namespace nim {
 
 ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection, QWidget* parent)
-  : QDialog(parent), m_objDoc(&objDoc), m_multipleSelection(multipleSelection)
+  : QDialog(parent)
+  , m_objDoc(&objDoc)
+  , m_multipleSelection(multipleSelection)
 {
   setWindowTitle(QString("Choose %1").arg(m_objDoc->typeName()));
   createWidget();
@@ -19,9 +21,9 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection
 
   bool firstObj = true;
   for (auto id : objs) {
-    auto item = new QTreeWidgetItem(m_treeWidget,
-                                    QStringList() << m_objDoc->objName(id)
-                                                  << QDir::toNativeSeparators(m_objDoc->objPath(id)));
+    auto item =
+      new QTreeWidgetItem(m_treeWidget,
+                          QStringList() << m_objDoc->objName(id) << QDir::toNativeSeparators(m_objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
     item->setSelected(firstObj && !m_multipleSelection);
     firstObj = false;
@@ -34,7 +36,9 @@ ZChooseObjDialog::ZChooseObjDialog(const ZObjDoc& objDoc, bool multipleSelection
 }
 
 ZChooseObjDialog::ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWidget* parent)
-  : QDialog(parent), m_doc(&doc), m_multipleSelection(multipleSelection)
+  : QDialog(parent)
+  , m_doc(&doc)
+  , m_multipleSelection(multipleSelection)
 {
   setWindowTitle(QString("Choose object"));
   createWidget();
@@ -43,9 +47,9 @@ ZChooseObjDialog::ZChooseObjDialog(const ZDoc& doc, bool multipleSelection, QWid
   bool firstObj = true;
   for (auto id : objs) {
     auto objDoc = m_doc->idToDoc(id);
-    auto item = new QTreeWidgetItem(m_treeWidget,
-                                    QStringList() << objDoc->objName(id)
-                                                  << QDir::toNativeSeparators(objDoc->objPath(id)));
+    auto item =
+      new QTreeWidgetItem(m_treeWidget,
+                          QStringList() << objDoc->objName(id) << QDir::toNativeSeparators(objDoc->objPath(id)));
     item->setData(0, Qt::UserRole, QVariant::fromValue(id));
     item->setSelected(firstObj && !m_multipleSelection);
     firstObj = false;
@@ -79,8 +83,8 @@ void ZChooseObjDialog::createWidget()
   m_treeWidget->setHeaderHidden(true);
   m_treeWidget->setItemsExpandable(true);
   m_treeWidget->setMinimumWidth(500);
-  m_treeWidget->setSelectionMode(
-    m_multipleSelection ? QAbstractItemView::ExtendedSelection : QAbstractItemView::SingleSelection);
+  m_treeWidget->setSelectionMode(m_multipleSelection ? QAbstractItemView::ExtendedSelection
+                                                     : QAbstractItemView::SingleSelection);
   connect(m_treeWidget, &QTreeWidget::itemSelectionChanged, this, &ZChooseObjDialog::updateSelectedIDs);
   m_buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
 
@@ -90,10 +94,8 @@ void ZChooseObjDialog::createWidget()
 
   m_treeWidget->setFocus();
 
-  connect(m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked,
-          this, &ZChooseObjDialog::accept);
-  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,
-          this, &ZChooseObjDialog::reject);
+  connect(m_buttonBox->button(QDialogButtonBox::Ok), &QPushButton::clicked, this, &ZChooseObjDialog::accept);
+  connect(m_buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked, this, &ZChooseObjDialog::reject);
 }
 
 void ZChooseObjDialog::updateSelectedIDs()
@@ -105,4 +107,3 @@ void ZChooseObjDialog::updateSelectedIDs()
 }
 
 } // namespace nim
-

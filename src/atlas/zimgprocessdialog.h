@@ -11,6 +11,7 @@ class ZImgProcess;
 class ZImgProcessDialog : public QDialog
 {
   Q_OBJECT
+
 public:
   explicit ZImgProcessDialog(QWidget* parent = nullptr);
 
@@ -45,4 +46,3 @@ private:
 };
 
 } // namespace nim
-

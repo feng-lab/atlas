@@ -12,9 +12,12 @@ namespace nim {
 
 class ZRegionAnnotationTreeView : public QTreeView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel, ZRegionAnnotationPack& rap, ZDoc& doc,
+  ZRegionAnnotationTreeView(ZRegionAnnotationTreeModel& objModel,
+                            ZRegionAnnotationPack& rap,
+                            ZDoc& doc,
                             QWidget* parent = nullptr);
 
 protected:
@@ -32,7 +35,7 @@ protected:
 
   void keyPressEvent(QKeyEvent* e) override;
 
-  void selectionChanged(const QItemSelection &selected, const QItemSelection &deselected) override;
+  void selectionChanged(const QItemSelection& selected, const QItemSelection& deselected) override;
 
   void createContextMenu();
 
@@ -45,4 +48,3 @@ private:
 };
 
 } // namespace nim
-

@@ -49,32 +49,26 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 
   addParameter(m_swcColorParameters.colorMapBranchType);
-  connect(&m_swcColorParameters.colorMapBranchType, &ZColorMapParameter::valueChanged, this,
+  connect(&m_swcColorParameters.colorMapBranchType,
+          &ZColorMapParameter::valueChanged,
+          this,
           &Z3DSwcFilter::prepareColor);
 
-  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
-                            Qt::NoModifier, QEvent::MouseButtonPress);
-  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
-                            Qt::NoModifier, QEvent::MouseButtonRelease);
-  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
-                            Qt::NoModifier, QEvent::MouseButtonDblClick);
-  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton,
-                            Qt::ControlModifier, QEvent::MouseButtonDblClick);
+  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonPress);
+  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonRelease);
+  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::NoModifier, QEvent::MouseButtonDblClick);
+  m_selectSwcEvent.listenTo("select swc", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonDblClick);
   /*
   m_selectSwcEvent.listenTo("select swc", Qt::RightButton,
                              Qt::NoModifier, QEvent::MouseButtonPress);
   m_selectSwcEvent.listenTo("select swc", Qt::RightButton, Qt::NoModifier,
                              QEvent::MouseButtonRelease);
                              */
-  m_selectSwcEvent.listenTo("extend select swc", Qt::LeftButton,
-                            Qt::ShiftModifier, QEvent::MouseButtonPress);
-  m_selectSwcEvent.listenTo("extend select swc", Qt::LeftButton,
-                            Qt::ShiftModifier, QEvent::MouseButtonRelease);
+  m_selectSwcEvent.listenTo("extend select swc", Qt::LeftButton, Qt::ShiftModifier, QEvent::MouseButtonPress);
+  m_selectSwcEvent.listenTo("extend select swc", Qt::LeftButton, Qt::ShiftModifier, QEvent::MouseButtonRelease);
 
-  m_selectSwcEvent.listenTo("append select swc", Qt::LeftButton,
-                            Qt::ControlModifier, QEvent::MouseButtonPress);
-  m_selectSwcEvent.listenTo("append select swc", Qt::LeftButton,
-                            Qt::ControlModifier, QEvent::MouseButtonRelease);
+  m_selectSwcEvent.listenTo("append select swc", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonPress);
+  m_selectSwcEvent.listenTo("append select swc", Qt::LeftButton, Qt::ControlModifier, QEvent::MouseButtonRelease);
 
   /*
   m_selectSwcEvent.listenTo("append select swc", Qt::RightButton,
@@ -82,21 +76,22 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_selectSwcEvent.listenTo("append select swc", Qt::RightButton,
                              Qt::ControlModifier, QEvent::MouseButtonRelease);
 */
-  connect(&m_selectSwcEvent, &ZEventListenerParameter::mouseEventTriggered,
-          this, &Z3DSwcFilter::selectSwc);
+  connect(&m_selectSwcEvent, &ZEventListenerParameter::mouseEventTriggered, this, &Z3DSwcFilter::selectSwc);
   addEventListener(m_selectSwcEvent);
 
-  m_deleteSelectedNodesEvent.listenTo("delete", Qt::Key_Delete, Qt::NoModifier,
-                                      QEvent::KeyPress);
-  m_deleteSelectedNodesEvent.listenTo("backspace", Qt::Key_Backspace, Qt::NoModifier,
-                                      QEvent::KeyPress);
-  connect(&m_deleteSelectedNodesEvent, &ZEventListenerParameter::keyEventTriggered,
-          this, &Z3DSwcFilter::deleteSelectedNodes);
+  m_deleteSelectedNodesEvent.listenTo("delete", Qt::Key_Delete, Qt::NoModifier, QEvent::KeyPress);
+  m_deleteSelectedNodesEvent.listenTo("backspace", Qt::Key_Backspace, Qt::NoModifier, QEvent::KeyPress);
+  connect(&m_deleteSelectedNodesEvent,
+          &ZEventListenerParameter::keyEventTriggered,
+          this,
+          &Z3DSwcFilter::deleteSelectedNodes);
   addEventListener(m_deleteSelectedNodesEvent);
 
   m_contextMenuEvent.listenToContextMenuEvent();
-  connect(&m_contextMenuEvent, &ZEventListenerParameter::contextMenuEventTriggered,
-          this, &Z3DSwcFilter::contextMenuEvent);
+  connect(&m_contextMenuEvent,
+          &ZEventListenerParameter::contextMenuEventTriggered,
+          this,
+          &Z3DSwcFilter::contextMenuEvent);
   addEventListener(m_contextMenuEvent);
 }
 
@@ -119,7 +114,9 @@ void Z3DSwcFilter::registerPickingObjects()
     m_linePickingColors.clear();
     m_pointPickingColors.clear();
     glm::col4 pickingColor = pickingManager().colorOfObject(m_swcPack);
-    glm::vec4 fPickingColor(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
+    glm::vec4 fPickingColor(pickingColor[0] / 255.f,
+                            pickingColor[1] / 255.f,
+                            pickingColor[2] / 255.f,
                             pickingColor[3] / 255.f);
     for (size_t j = 0; j < m_swcPack->decompsedNodePairs().size(); ++j) {
       m_swcPickingColors.push_back(fPickingColor);
@@ -130,8 +127,8 @@ void Z3DSwcFilter::registerPickingObjects()
     m_sphereForConePickingColors.push_back(fPickingColor);
     for (auto& tn : m_swcPack->decomposedNodes()) {
       pickingColor = pickingManager().colorOfObject(&tn);
-      fPickingColor = glm::vec4(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f,
-                                pickingColor[3] / 255.f);
+      fPickingColor =
+        glm::vec4(pickingColor[0] / 255.f, pickingColor[1] / 255.f, pickingColor[2] / 255.f, pickingColor[3] / 255.f);
       m_pointPickingColors.push_back(fPickingColor);
     }
 
@@ -233,7 +230,7 @@ void Z3DSwcFilter::renderOpaque(Z3DEye eye)
     m_rendererBase.render(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
     m_rendererBase.render(eye, m_lineRenderer);
-  } else /* (m_renderingPrimitive.get() == "Sphere") */{
+  } else /* (m_renderingPrimitive.get() == "Sphere") */ {
     m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
@@ -248,7 +245,7 @@ void Z3DSwcFilter::renderTransparent(Z3DEye eye)
     m_rendererBase.render(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
     m_rendererBase.render(eye, m_lineRenderer);
-  } else /* (m_renderingPrimitive.get() == "Sphere") */{
+  } else /* (m_renderingPrimitive.get() == "Sphere") */ {
     m_rendererBase.render(eye, m_lineRenderer, m_sphereRenderer);
   }
   renderBoundBox(eye);
@@ -267,14 +264,13 @@ void Z3DSwcFilter::renderPicking(Z3DEye eye)
     m_rendererBase.renderPicking(eye, m_coneRenderer);
   } else if (m_renderingPrimitive.isSelected("Line")) {
     m_rendererBase.renderPicking(eye, m_lineRenderer);
-  } else /* (m_renderingPrimitive.get() == "Sphere") */{
+  } else /* (m_renderingPrimitive.get() == "Sphere") */ {
     m_rendererBase.renderPicking(eye, m_lineRenderer, m_sphereRenderer);
   }
 }
 
-void Z3DSwcFilter::addSelectionBox(
-  const std::pair<ZSwc::ConstSwcTreeNode, ZSwc::ConstSwcTreeNode>& nodePair,
-  std::vector<glm::vec3>& lines)
+void Z3DSwcFilter::addSelectionBox(const std::pair<ZSwc::ConstSwcTreeNode, ZSwc::ConstSwcTreeNode>& nodePair,
+                                   std::vector<glm::vec3>& lines)
 {
   const ZSwc::ConstSwcTreeNode& n1 = nodePair.first;
   const ZSwc::ConstSwcTreeNode& n2 = nodePair.second;
@@ -334,8 +330,7 @@ void Z3DSwcFilter::addSelectionBox(
   lines.push_back(p8);
 }
 
-void Z3DSwcFilter::addSelectionBox(
-  const ZSwc::ConstSwcTreeNode& tn, std::vector<glm::vec3>& lines)
+void Z3DSwcFilter::addSelectionBox(const ZSwc::ConstSwcTreeNode& tn, std::vector<glm::vec3>& lines)
 {
   float radius = std::max(.5, tn->radius) * m_rendererBase.sizeScale();
   glm::vec3 cent = glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z));
@@ -384,14 +379,14 @@ void Z3DSwcFilter::prepareData()
 
   deregisterPickingObjects();
 
-  //convert swc to format that glsl can use
+  // convert swc to format that glsl can use
   m_axisAndTopRadius.clear();
   m_baseAndBaseRadius.clear();
   m_pointAndRadius.clear();
   m_lines.clear();
 
-  bool checkRadius = false; //m_renderingPrimitive.isSelected("Normal") || m_renderingPrimitive.isSelected("Cylinder");
-  for (const auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
+  bool checkRadius = false; // m_renderingPrimitive.isSelected("Normal") || m_renderingPrimitive.isSelected("Cylinder");
+  for (const auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
     if (checkRadius && n1->radius < std::numeric_limits<double>::epsilon() &&
         n2->radius < std::numeric_limits<double>::epsilon()) {
       checkRadius = false;
@@ -409,14 +404,10 @@ void Z3DSwcFilter::prepareData()
     // make sure base has smaller radius.
     if (n1->radius <= n2->radius) {
       baseAndbRadius = glm::vec4(n1->x, n1->y, n1->z, std::max(.5, n1->radius));
-      axisAndtRadius = glm::vec4(n2->x - n1->x,
-                                 n2->y - n1->y,
-                                 n2->z - n1->z, std::max(.5, n2->radius));
+      axisAndtRadius = glm::vec4(n2->x - n1->x, n2->y - n1->y, n2->z - n1->z, std::max(.5, n2->radius));
     } else {
       baseAndbRadius = glm::vec4(n2->x, n2->y, n2->z, std::max(.5, n2->radius));
-      axisAndtRadius = glm::vec4(n1->x - n2->x,
-                                 n1->y - n2->y,
-                                 n1->z - n2->z, std::max(.5, n1->radius));
+      axisAndtRadius = glm::vec4(n1->x - n2->x, n1->y - n2->y, n1->z - n2->z, std::max(.5, n1->radius));
     }
     m_baseAndBaseRadius.push_back(baseAndbRadius);
     m_axisAndTopRadius.push_back(axisAndtRadius);
@@ -459,10 +450,8 @@ void Z3DSwcFilter::updateData()
 void Z3DSwcFilter::treeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const
 {
   glm::dvec3 cent = glm::dvec3(glm::applyMatrix(coordTransform(), glm::vec3(tn->x, tn->y, tn->z)));
-  result.setMinCorner(cent
-                      - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
-  result.setMaxCorner(cent
-                      + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMinCorner(cent - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMaxCorner(cent + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
 void Z3DSwcFilter::notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>& res) const
@@ -475,10 +464,10 @@ void Z3DSwcFilter::notTransformedTreeBound(ZSwcPack* swcPack, ZBBox<glm::dvec3>&
   }
 }
 
-//void Z3DSwcFilter::updateAxisAlignedBoundBoxImpl()
+// void Z3DSwcFilter::updateAxisAlignedBoundBoxImpl()
 //{
-//  getTreeBound(m_swcTree, m_axisAlignedBoundBox);
-//}
+//   getTreeBound(m_swcTree, m_axisAlignedBoundBox);
+// }
 
 void Z3DSwcFilter::updateNotTransformedBoundBoxImpl()
 {
@@ -511,10 +500,8 @@ void Z3DSwcFilter::addEditingSelectionLines()
 void Z3DSwcFilter::notTransformedTreeNodeBound(const ZSwc::ConstSwcTreeNode& tn, ZBBox<glm::dvec3>& result) const
 {
   glm::dvec3 cent(tn->x, tn->y, tn->z);
-  result.setMinCorner(cent
-                      - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
-  result.setMaxCorner(cent
-                      + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMinCorner(cent - std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
+  result.setMaxCorner(cent + std::max(.5, tn->radius) * (m_renderingPrimitive.isSelected("Line") ? 1 : sizeScale()));
 }
 
 void Z3DSwcFilter::prepareColor()
@@ -528,7 +515,7 @@ void Z3DSwcFilter::prepareColor()
   if (m_swcColorParameters.colorMode.isSelected("Branch Type") ||
       m_swcColorParameters.colorMode.isSelected("Colormap Branch Type") ||
       m_swcColorParameters.colorMode.isSelected("Subclass")) {
-    for (auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
+    for (auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
       glm::vec4 color1 = m_swcColorParameters.colorByType(n1);
       glm::vec4 color2 = m_swcColorParameters.colorByType(n2);
       if (n1->radius > n2->radius) {
@@ -555,7 +542,7 @@ void Z3DSwcFilter::prepareColor()
       m_pointColors.push_back(color);
     }
   } else if (m_swcColorParameters.colorMode.isSelected("Topology")) {
-    for (const auto&[n1, n2] : m_swcPack->decompsedNodePairs()) {
+    for (const auto& [n1, n2] : m_swcPack->decompsedNodePairs()) {
       glm::vec4 color1, color2;
       if (ZSwc::isRoot(n1)) {
         color1 = m_swcColorParameters.colorsForDifferentTopology[0]->get();
@@ -630,8 +617,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
 
   e->ignore();
   if (e->type() == QEvent::MouseButtonDblClick) {
-    const void* obj = pickingManager().objectAtWidgetPos(
-      glm::ivec2(e->position().x(), e->position().y()));
+    const void* obj = pickingManager().objectAtWidgetPos(glm::ivec2(e->position().x(), e->position().y()));
     bool appending = (e->modifiers() == Qt::ControlModifier);
     if (!obj && !appending && m_isSelected) {
       Q_EMIT objDeselected();
@@ -639,8 +625,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
     }
     bool hit = obj == m_swcPack;
     if (isNodeRendering()) {
-      hit = m_swcPack->allNodesSet().find(
-        static_cast<const ZSwc::SwcTreeNode*>(obj)) != m_swcPack->allNodesSet().end();
+      hit = m_swcPack->allNodesSet().find(static_cast<const ZSwc::SwcTreeNode*>(obj)) != m_swcPack->allNodesSet().end();
     }
     if (hit) {
       Q_EMIT objSelected(appending);
@@ -673,8 +658,8 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
   if (e->type() == QEvent::MouseButtonRelease) {
     if (std::abs(e->position().x() - m_startCoord.x) < 2 && std::abs(m_startCoord.y - e->position().y()) < 2) {
       Q_EMIT treeNodeSelected(m_pressedSwcTreeNode,
-                            e->modifiers() == Qt::ControlModifier,
-                            e->modifiers() == Qt::ShiftModifier);
+                              e->modifiers() == Qt::ControlModifier,
+                              e->modifiers() == Qt::ShiftModifier);
       if (m_pressedSwcTreeNode) {
         e->accept();
       }

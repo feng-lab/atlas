@@ -22,7 +22,9 @@ private:
   struct ShaderKey
   {
     ShaderKey(const QString& fn, const QString& hd, const Z3DContextGroup& ct)
-      : filename(fn), header(hd), context(ct)
+      : filename(fn)
+      , header(hd)
+      , context(ct)
     {}
 
     QString filename;
@@ -36,4 +38,3 @@ private:
 };
 
 } // namespace nim
-

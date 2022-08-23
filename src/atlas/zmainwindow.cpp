@@ -60,7 +60,7 @@ ZMainWindow::ZMainWindow(QString versionStr)
 {
   init();
   setWindowTitle(QString("Atlas version %1").arg(m_versionString));
-  //setCurrentFile("");
+  // setCurrentFile("");
 }
 
 void ZMainWindow::initOpenglContext()
@@ -97,8 +97,9 @@ void ZMainWindow::updateRecentFileActions()
       m_recentFileActions[idx++]->setVisible(true);
     }
   }
-  for (size_t j = idx; j < m_recentFileActions.size(); ++j)
+  for (size_t j = idx; j < m_recentFileActions.size(); ++j) {
     m_recentFileActions[j]->setVisible(false);
+  }
 
   m_separatorAction->setVisible(idx > 0);
 }
@@ -116,7 +117,7 @@ void ZMainWindow::openEditWidget(size_t id)
       m_editObjDockWidget->setVisible(true);
     }
   } else {
-    //m_editObjDockWidget->setVisible(false);
+    // m_editObjDockWidget->setVisible(false);
     if (!m_3dWindow) {
       open3DWindow();
     }
@@ -151,14 +152,16 @@ void ZMainWindow::loadUrls(const QList<QUrl>& urlList)
       ++it;
     }
   }
-  if (!fileList.isEmpty())
+  if (!fileList.isEmpty()) {
     m_doc->loadFileList(fileList);
+  }
 }
 
 void ZMainWindow::loadFileList(const QStringList& fileList)
 {
-  if (!fileList.isEmpty())
+  if (!fileList.isEmpty()) {
     m_doc->loadFileList(fileList);
+  }
 }
 
 void ZMainWindow::removeAllObjs()
@@ -193,7 +196,8 @@ void ZMainWindow::checkForUpdates()
     LOG(INFO) << program << " " << arguments.join(" ");
     QProcess::startDetached(program, arguments);
   } else {
-    QMessageBox::critical(QApplication::activeWindow(), QString("Could not find updater"),
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QString("Could not find updater"),
                           QString("Path to MaintenanceTool could not be determined or does not exist."));
   }
 }
@@ -234,9 +238,7 @@ void ZMainWindow::dropEvent(QDropEvent* event)
   loadUrls(event->mimeData()->urls());
 }
 
-void ZMainWindow::open()
-{
-}
+void ZMainWindow::open() {}
 
 bool ZMainWindow::save()
 {
@@ -262,11 +264,15 @@ void ZMainWindow::openRecentFile()
 
 void ZMainWindow::about()
 {
-  QMessageBox::about(QApplication::activeWindow(), QString("About Atlas"),
-                     QString("<p>Atlas version %1</p>"
-                             "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
-                             "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
-                             "<p>All rights reserved.</p>").arg(m_versionString));
+  QMessageBox::about(
+    QApplication::activeWindow(),
+    QString("About Atlas"),
+    QString(
+      "<p>Atlas version %1</p>"
+      "<p>Atlas is developed by Linqing Feng (flq@live.com).</p>"
+      "<p>Jinny Kim Lab and Feng Lab, Center for Functional Connectomics, Korea Institute of Science and Technology</p>"
+      "<p>All rights reserved.</p>")
+      .arg(m_versionString));
 }
 
 #ifdef Q_OS_LINUX
@@ -287,20 +293,19 @@ void ZMainWindow::createDesktopEntry()
     out << "Terminal=false\n";
     out << "StartupWMClass=Atlas\n";
 
-    QMessageBox::information(this, QString("done"),
-                             QString("Desktop entry created."));
+    QMessageBox::information(this, QString("done"), QString("Desktop entry created."));
     return;
   }
 
-  QMessageBox::critical(this, QString("error"),
-                        QString("Can not create desktop entry."));
+  QMessageBox::critical(this, QString("error"), QString("Can not create desktop entry."));
 }
 #endif
 
 void ZMainWindow::activateWindowIfNot()
 {
-  if (!isActiveWindow())
+  if (!isActiveWindow()) {
     this->activateWindow();
+  }
 }
 
 void ZMainWindow::openScreenshotPanel()
@@ -337,8 +342,8 @@ void ZMainWindow::raiseGlobalSettingDockWidget()
 
 void ZMainWindow::viewLog()
 {
-  //ZLogDialog logDialog(logModelSinkInstance(), this);
-  //logDialog.exec();
+  // ZLogDialog logDialog(logModelSinkInstance(), this);
+  // logDialog.exec();
   QStringList filters;
   filters << "atlas*_log.txt";
   QFileInfoList list = ZSystemInfo::logDir().entryInfoList(filters,
@@ -375,13 +380,13 @@ void ZMainWindow::generateConfigFile()
       return;
     }
     if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Could not replace %1").arg(dir.filePath(fn)));
       return;
     }
   }
-  if (!QFile::copy(ZSystemInfo::resourceDir().absoluteFilePath("settings_flagfile.txt"),
-                   dir.absoluteFilePath(fn))) {
+  if (!QFile::copy(ZSystemInfo::resourceDir().absoluteFilePath("settings_flagfile.txt"), dir.absoluteFilePath(fn))) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
                           QString("Could not copy file to %1").arg(dir.filePath(fn)));
@@ -429,29 +434,34 @@ void ZMainWindow::open3DWindow()
       m_3dWindow->showNormal();
       m_3dWindow->raise();
       m_3dWindow->activateWindow();
-      //m_3dWindow->setWindowState(Qt::WindowActive);
+      // m_3dWindow->setWindowState(Qt::WindowActive);
     }
     catch (const ZException& e) {
       LOG(ERROR) << "Failed to open 3D window: " << e.what();
-      QMessageBox::critical(this, QApplication::applicationName(), QString("Failed to open 3D window:\n%1").arg(e.what()));
+      QMessageBox::critical(this,
+                            QApplication::applicationName(),
+                            QString("Failed to open 3D window:\n%1").arg(e.what()));
       delete m_3dWindow.data();
       m_3dWindow.clear();
     }
   } else {
-    QMessageBox::critical(this, QApplication::applicationName(),
+    QMessageBox::critical(this,
+                          QApplication::applicationName(),
                           QString("3D functions are disabled:\n%1").arg(ZSystemInfo::instance().errorMessage()));
   }
 }
 
 void ZMainWindow::loadScene()
 {
-  QString fn = QFileDialog::getOpenFileName(QApplication::activeWindow(), "Load scene",
+  QString fn = QFileDialog::getOpenFileName(QApplication::activeWindow(),
+                                            "Load scene",
                                             m_doc->lastOpenedFilePath(),
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
     if (!loadJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             tr("Can not load scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
@@ -463,18 +473,21 @@ void ZMainWindow::loadScene()
 void ZMainWindow::saveScene()
 {
   if (!m_doc->saveAllObjs()) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
                           tr("Can not save scene because some objects have unsaved changes"));
     return;
   }
 
-  QString fn = ZFileUtils::getSaveFileName(QApplication::activeWindow(), "Save scene to file",
+  QString fn = ZFileUtils::getSaveFileName(QApplication::activeWindow(),
+                                           "Save scene to file",
                                            m_doc->lastOpenedFilePath(),
                                            tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
     if (!saveJsonSceneImpl(fn, err)) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             tr("Can not save scene %1: %2").arg(fn).arg(err));
     } else {
       m_doc->setLastOpenedFilePath(fn);
@@ -491,11 +504,13 @@ void ZMainWindow::loadJsonScene(const QString& fn)
 {
   QString err;
   if (!loadJsonSceneImpl(fn, err)) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
                           tr("Can not load scene %1: %2").arg(fn).arg(err));
   } else {
     if (!err.isEmpty()) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             tr("Error while loading scene %1: %2").arg(fn).arg(err));
     }
     ZSystemInfo::instance().addFileToRecentFileList(fn);
@@ -522,7 +537,7 @@ void ZMainWindow::init()
   m_doc = std::make_unique<ZDoc>(this);
   m_view = std::make_unique<ZView>(*m_doc, this);
 
-  //packages
+  // packages
   m_view->registerObjView(std::make_unique<ZImgView>(m_doc->imgDoc(), *m_view));
 
   m_view->registerObjView(std::make_unique<ZROIView>(m_doc->roiDoc(), *m_view));
@@ -558,10 +573,10 @@ void ZMainWindow::init()
 void ZMainWindow::createActions()
 {
   // file
-//  m_newAction = new QAction(ZTheme::instance().icon(ZTheme::FileIcon), tr("&New"), this);
-//  m_newAction->setShortcuts(QKeySequence::New);
-//  m_newAction->setStatusTip(tr("Open a new window"));
-//  connect(m_newAction, &QAction::triggered, this, &ZMainWindow::newWindow);
+  //  m_newAction = new QAction(ZTheme::instance().icon(ZTheme::FileIcon), tr("&New"), this);
+  //  m_newAction->setShortcuts(QKeySequence::New);
+  //  m_newAction->setStatusTip(tr("Open a new window"));
+  //  connect(m_newAction, &QAction::triggered, this, &ZMainWindow::newWindow);
 
   m_openAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open..."), this);
   m_openAction->setShortcuts(QKeySequence::Open);
@@ -647,11 +662,13 @@ void ZMainWindow::createActions()
   m_openLogFolderAction->setStatusTip(tr("Open Log Folder"));
   connect(m_openLogFolderAction, &QAction::triggered, this, &ZMainWindow::openLogFolder);
 
-  m_openConfigFolderAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Config Folder"), this);
+  m_openConfigFolderAction =
+    new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Open Config Folder"), this);
   m_openConfigFolderAction->setStatusTip(tr("Open Config Folder"));
   connect(m_openConfigFolderAction, &QAction::triggered, this, &ZMainWindow::openConfigFolder);
 
-  m_generateConfigFileAction = new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Generate Config File"), this);
+  m_generateConfigFileAction =
+    new QAction(ZTheme::instance().icon(ZTheme::OpenFolderIcon), tr("&Generate Config File"), this);
   m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
   connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
 
@@ -665,8 +682,8 @@ void ZMainWindow::createActions()
   connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
 #endif
 
-  m_runCustomCommandAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"),
-                                         this);
+  m_runCustomCommandAction =
+    new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
   m_runCustomCommandAction->setStatusTip(tr("Run Custom Command"));
   connect(m_runCustomCommandAction, &QAction::triggered, this, &ZMainWindow::runCustomCommand);
 
@@ -677,7 +694,7 @@ void ZMainWindow::createActions()
 void ZMainWindow::createMenus()
 {
   m_fileMenu = menuBar()->addMenu(tr("&File"));
-  //m_fileMenu->addAction(m_newAction);
+  // m_fileMenu->addAction(m_newAction);
   m_fileMenu->addAction(m_openAction);
   m_fileMenu->addAction(m_saveAction);
   m_fileMenu->addAction(m_saveAsAction);
@@ -685,11 +702,13 @@ void ZMainWindow::createMenus()
   m_fileMenu->addAction(m_loadSceneAction);
   m_fileMenu->addAction(m_saveSceneAction);
   m_fileMenu->addSeparator();
-  for (auto act : m_doc->fileActions())
+  for (auto act : m_doc->fileActions()) {
     m_fileMenu->addAction(act);
+  }
   m_separatorAction = m_fileMenu->addSeparator();
-  for (auto& recentFileAction : m_recentFileActions)
+  for (auto& recentFileAction : m_recentFileActions) {
     m_fileMenu->addAction(recentFileAction);
+  }
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_closeAction);
   m_fileMenu->addAction(m_exitAction);
@@ -701,7 +720,7 @@ void ZMainWindow::createMenus()
   m_editMenu->addSeparator();
   m_editMenu->addAction(m_view->copyAction());
   m_editMenu->addAction(m_view->pasteAction());
-  //m_editMenu->addAction(m_view->deleteAction());
+  // m_editMenu->addAction(m_view->deleteAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
   m_viewMenu->addAction(m_view->zoomInAction());
@@ -757,7 +776,7 @@ void ZMainWindow::createToolBars()
 {
   QSize iconSize(22, 22);
   m_fileToolBar = addToolBar(tr("File"));
-  //m_fileToolBar->addAction(m_newAction);
+  // m_fileToolBar->addAction(m_newAction);
   m_fileToolBar->addAction(m_openAction);
   m_fileToolBar->addAction(m_saveAction);
   m_fileToolBar->setIconSize(iconSize);
@@ -791,10 +810,10 @@ void ZMainWindow::createToolBars()
 
   m_helpToolBar = addToolBar(tr("Help"));
   m_helpToolBar->addAction(m_helpAction);
-//  #ifdef ATLAS_WITH_TESTS
-//    m_helpToolBar->addAction(m_testAction);
-//  #endif
-//    m_helpToolBar->addAction(m_runCustomCommandAction);
+  //  #ifdef ATLAS_WITH_TESTS
+  //    m_helpToolBar->addAction(m_testAction);
+  //  #endif
+  //    m_helpToolBar->addAction(m_runCustomCommandAction);
   m_helpToolBar->setIconSize(iconSize);
 }
 
@@ -823,8 +842,7 @@ void ZMainWindow::createDockWindows()
   m_windowMenu->addAction(m_viewSettingDockWidget->toggleViewAction());
 
   m_objectDetailedInfoDockWidget = new QDockWidget(tr("Object Detailed Info"), this);
-  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                              QDockWidget::DockWidgetMovable |
+  m_objectDetailedInfoDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                               QDockWidget::DockWidgetFloatable);
   m_objectDetailedInfoDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_objectDetailedInfoDockWidget->setWidget(new ZObjDetailedInfoWidget(*m_doc, this));
@@ -833,8 +851,7 @@ void ZMainWindow::createDockWindows()
   m_objectDetailedInfoDockWidget->setVisible(false);
 
   m_globalSettingDockWidget = new QDockWidget(tr("Global View Setting"), this);
-  m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                         QDockWidget::DockWidgetMovable |
+  m_globalSettingDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                          QDockWidget::DockWidgetFloatable);
   m_globalSettingDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
@@ -843,8 +860,7 @@ void ZMainWindow::createDockWindows()
   tabifyDockWidget(m_viewSettingDockWidget, m_globalSettingDockWidget);
 
   m_captureDockWidget = new QDockWidget(tr("Capture"), this);
-  m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                   QDockWidget::DockWidgetMovable |
+  m_captureDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                    QDockWidget::DockWidgetFloatable);
   m_captureDockWidget->setAllowedAreas(Qt::RightDockWidgetArea);
   m_captureDockWidget->setWidget(m_view->captureWidget());
@@ -853,8 +869,7 @@ void ZMainWindow::createDockWindows()
   m_captureDockWidget->setVisible(false);
 
   m_helpDockWidget = new QDockWidget(tr("Help"), this);
-  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable |
-                                QDockWidget::DockWidgetMovable |
+  m_helpDockWidget->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable |
                                 QDockWidget::DockWidgetFloatable);
   m_helpDockWidget->setVisible(false);
   auto edt = new QPlainTextEdit(this);
@@ -902,23 +917,23 @@ bool ZMainWindow::maybeSave()
   return m_doc->saveOrDiscard(m_doc->objs());
 }
 
-//void ZMainWindow::loadWorkspace(const QString &fileName)
+// void ZMainWindow::loadWorkspace(const QString &fileName)
 //{
-//  setCurrentFile(fileName);
-//  statusBar()->showMessage(tr("Workspace loaded"), 2000);
-//  activateWindowIfNot();
-//}
+//   setCurrentFile(fileName);
+//   statusBar()->showMessage(tr("Workspace loaded"), 2000);
+//   activateWindowIfNot();
+// }
 
-//bool ZMainWindow::saveFile(const QString &fileName)
+// bool ZMainWindow::saveFile(const QString &fileName)
 //{
-//  setCurrentFile(fileName);
-//  statusBar()->showMessage(tr("Workspace saved"), 2000);
-//  return true;
-//}
+//   setCurrentFile(fileName);
+//   statusBar()->showMessage(tr("Workspace saved"), 2000);
+//   return true;
+// }
 
-//void ZMainWindow::setCurrentFile(const QString &fileName)
+// void ZMainWindow::setCurrentFile(const QString &fileName)
 //{
-//  static int sequenceNumber = 1;
+//   static int sequenceNumber = 1;
 
 //  if (fileName.isEmpty()) {
 //    setWindowFilePath(tr("Workspace%1").arg(sequenceNumber++));
@@ -979,7 +994,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         if (ok) {
           if (idmap.find(objectId) != idmap.end()) {
             size_t id = idmap.at(objectId);
-            //LOG(INFO) << id;
+            // LOG(INFO) << id;
             const auto& viewObj = value.as_object();
             if (viewObj.contains("View2D")) {
               m_view->read(id, viewObj.at("View2D").as_object());

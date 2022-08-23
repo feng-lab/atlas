@@ -15,7 +15,8 @@ class Z3DImg;
 // use colormap of each volume to composite final image
 class Z3DVolumeSliceRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DVolumeSliceRenderer(Z3DRendererBase& rendererBase);
 
@@ -23,12 +24,16 @@ public:
                const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
 
   void setLayerTarget(Z3DRenderTarget* layerTarget)
-  { m_layerTarget = layerTarget; }
+  {
+    m_layerTarget = layerTarget;
+  }
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear
   void clearQuads()
-  { m_quads.clear(); }
+  {
+    m_quads.clear();
+  }
 
   // add quad
   void addQuad(const ZMesh& quad);
@@ -45,7 +50,7 @@ protected:
   void render(Z3DEye eye) override;
 
 protected:
-  //Z3DShaderProgram m_volumeSliceShader;
+  // Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DShaderProgram m_mergeChannelShader;
@@ -61,4 +66,3 @@ private:
 };
 
 } // namespace nim
-

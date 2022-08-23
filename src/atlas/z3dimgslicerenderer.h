@@ -15,29 +15,39 @@ class Z3DImg;
 // use colormap of each volume to composite final image
 class Z3DImgSliceRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DImgSliceRenderer(Z3DRendererBase& rendererBase);
 
-  void setData(Z3DImg& img,
-               const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
+  void setData(Z3DImg& img, const std::vector<std::unique_ptr<ZColorMapParameter>>& colormaps);
 
   void setFastRendering(bool v)
-  { m_fastRendering = v; }
+  {
+    m_fastRendering = v;
+  }
 
   void setLayerTarget(Z3DRenderTarget& target)
-  { m_layerTarget = &target; }
+  {
+    m_layerTarget = &target;
+  }
 
   void setBlockIDsRenderTarget(Z3DRenderTarget& target)
-  { m_blockIDsRenderTarget = &target; }
+  {
+    m_blockIDsRenderTarget = &target;
+  }
 
   [[nodiscard]] bool lastRenderingIsFastRendering() const
-  { return m_lastRenderingIsFastRendering; }
+  {
+    return m_lastRenderingIsFastRendering;
+  }
 
   // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
   // clear
   void clearQuads()
-  { m_quads.clear(); }
+  {
+    m_quads.clear();
+  }
 
   // add quad
   void addQuad(const ZMesh& quad);
@@ -54,7 +64,7 @@ protected:
   void render(Z3DEye eye) override;
 
 protected:
-  //Z3DShaderProgram m_volumeSliceShader;
+  // Z3DShaderProgram m_volumeSliceShader;
   Z3DShaderProgram m_scVolumeSliceShader;
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DRenderTarget* m_blockIDsRenderTarget = nullptr;
@@ -77,4 +87,3 @@ private:
 };
 
 } // namespace nim
-

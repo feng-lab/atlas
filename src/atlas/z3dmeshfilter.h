@@ -20,31 +20,43 @@ struct RegionNode;
 
 class Z3DMeshFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode* regionNode = nullptr,
+  explicit Z3DMeshFilter(Z3DGlobalParameters& globalParas,
+                         const RegionNode* regionNode = nullptr,
                          QObject* parent = nullptr);
 
   void setMeshColor(const glm::vec4& col)
-  { m_singleColorForAllMesh.set(col); }
+  {
+    m_singleColorForAllMesh.set(col);
+  }
 
   [[nodiscard]] glm::vec4 meshColor() const
-  { return m_singleColorForAllMesh.get(); }
+  {
+    return m_singleColorForAllMesh.get();
+  }
 
   [[nodiscard]] QString regionName() const;
 
   [[nodiscard]] bool isFixed() const
-  { return m_meshList[0]->numVertices() == 96957; }
+  {
+    return m_meshList[0]->numVertices() == 96957;
+  }
 
   void setGlow(bool v)
-  { m_glow.set(v); }
+  {
+    m_glow.set(v);
+  }
 
   void process(Z3DEye eye) override;
 
   void setData(std::vector<ZMesh*>* meshList);
 
   void setSelectedMeshes(std::set<ZMesh*>* list)
-  { m_selectedMeshes = list; }
+  {
+    m_selectedMeshes = list;
+  }
 
   [[nodiscard]] bool isReady(Z3DEye eye) const override;
 
@@ -53,12 +65,16 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroupForAnnotationFilter();
 
   [[nodiscard]] bool hasOpaque(Z3DEye eye) const override
-  { return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get(); }
+  {
+    return Z3DGeometryFilter::hasOpaque(eye) && !m_glow.get();
+  }
 
   void renderOpaque(Z3DEye eye) override;
 
   [[nodiscard]] bool hasTransparent(Z3DEye eye) const override
-  { return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get(); }
+  {
+    return Z3DGeometryFilter::hasTransparent(eye) || m_glow.get();
+  }
 
   void renderTransparent(Z3DEye eye) override;
 
@@ -85,7 +101,7 @@ protected:
 
   ZBBox<glm::dvec3> meshBound(ZMesh* p);
 
-  //void updateAxisAlignedBoundBoxImpl() override;
+  // void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
 
   void updateMeshVisibleState();
@@ -111,12 +127,12 @@ private:
   ZBoolParameter m_glow;
   Z3DTextureCopyRenderer m_textureCopyRenderer;
 
-  //std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
-  // mesh list used for rendering, it is a subset of m_origMeshList. Some mesh are
-  // hidden because they are unchecked from the object model. This allows us to control
-  // the visibility of each single punctum.
+  // std::map<QString, size_t> m_sourceColorMapper;   // should use unordered_map
+  //  mesh list used for rendering, it is a subset of m_origMeshList. Some mesh are
+  //  hidden because they are unchecked from the object model. This allows us to control
+  //  the visibility of each single punctum.
   std::vector<ZMesh*> m_meshList;
-  std::vector<ZMesh*> m_registeredMeshList;    // used for picking
+  std::vector<ZMesh*> m_registeredMeshList; // used for picking
 
   std::vector<glm::vec4> m_meshColors;
   std::vector<glm::vec4> m_meshPickingColors;
@@ -124,7 +140,7 @@ private:
   ZEventListenerParameter m_selectMeshEvent;
   glm::ivec2 m_startCoord{};
   ZMesh* m_pressedMesh;
-  std::set<ZMesh*>* m_selectedMeshes = nullptr;   //point to all selected meshes, managed by other class
+  std::set<ZMesh*>* m_selectedMeshes = nullptr; // point to all selected meshes, managed by other class
 
   // generate and save to speed up bound box rendering for big mesh
   std::map<ZMesh*, ZBBox<glm::dvec3>> m_meshBoundboxMapper;
@@ -138,4 +154,3 @@ private:
 };
 
 } // namespace nim
-

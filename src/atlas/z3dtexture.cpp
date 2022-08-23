@@ -8,8 +8,11 @@
 
 namespace nim {
 
-Z3DTexture::Z3DTexture(GLenum textureTarget, GLint internalFormat, const glm::uvec3& dimension,
-                       GLenum dataFormat, GLenum dataType)
+Z3DTexture::Z3DTexture(GLenum textureTarget,
+                       GLint internalFormat,
+                       const glm::uvec3& dimension,
+                       GLenum dataFormat,
+                       GLenum dataType)
   : m_textureTarget(textureTarget)
   , m_dimension(dimension)
   , m_internalFormat(internalFormat)
@@ -79,19 +82,30 @@ void Z3DTexture::uploadImage(const GLvoid* data) const
 
   switch (m_type) {
     case 3:
-      glTexImage3D(m_textureTarget, 0, m_internalFormat,
-                   m_dimension.x, m_dimension.y, m_dimension.z, 0,
-                   m_dataFormat, m_dataType, data);
+      glTexImage3D(m_textureTarget,
+                   0,
+                   m_internalFormat,
+                   m_dimension.x,
+                   m_dimension.y,
+                   m_dimension.z,
+                   0,
+                   m_dataFormat,
+                   m_dataType,
+                   data);
       break;
     case 2:
-      glTexImage2D(m_textureTarget, 0, m_internalFormat,
-                   m_dimension.x, m_dimension.y, 0,
-                   m_dataFormat, m_dataType, data);
+      glTexImage2D(m_textureTarget,
+                   0,
+                   m_internalFormat,
+                   m_dimension.x,
+                   m_dimension.y,
+                   0,
+                   m_dataFormat,
+                   m_dataType,
+                   data);
       break;
     case 1:
-      glTexImage1D(m_textureTarget, 0, m_internalFormat,
-                   m_dimension.x, 0,
-                   m_dataFormat, m_dataType, data);
+      glTexImage1D(m_textureTarget, 0, m_internalFormat, m_dimension.x, 0, m_dataFormat, m_dataType, data);
       break;
     default:
       break;
@@ -107,16 +121,23 @@ void Z3DTexture::uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size
 
   switch (m_type) {
     case 3:
-      glTexSubImage3D(m_textureTarget, 0, offset.x, offset.y, offset.z, size.x, size.y, size.z,
-                      m_dataFormat, m_dataType, data);
+      glTexSubImage3D(m_textureTarget,
+                      0,
+                      offset.x,
+                      offset.y,
+                      offset.z,
+                      size.x,
+                      size.y,
+                      size.z,
+                      m_dataFormat,
+                      m_dataType,
+                      data);
       break;
     case 2:
-      glTexSubImage2D(m_textureTarget, 0, offset.x, offset.y, size.x, size.y,
-                      m_dataFormat, m_dataType, data);
+      glTexSubImage2D(m_textureTarget, 0, offset.x, offset.y, size.x, size.y, m_dataFormat, m_dataType, data);
       break;
     case 1:
-      glTexSubImage1D(m_textureTarget, 0, offset.x, size.x,
-                      m_dataFormat, m_dataType, data);
+      glTexSubImage1D(m_textureTarget, 0, offset.x, size.x, m_dataFormat, m_dataType, data);
       break;
     default:
       break;
@@ -331,7 +352,7 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
     auto colorBuffer = std::make_unique<uint8_t[]>(bypePerPixel(dataFormat, dataType) * numPixels());
     downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), width(), height(),QImage::Format_ARGB32);
+    QImage upsideDownImage(colorBuffer.get(), width(), height(), QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);
     ZImg::fromQImage(image).save(filename);
   }
@@ -397,39 +418,33 @@ void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
 
 bool Z3DTexture::is1DTexture() const
 {
-  return m_textureTarget == GL_TEXTURE_1D ||
-         m_textureTarget == GL_PROXY_TEXTURE_1D;
+  return m_textureTarget == GL_TEXTURE_1D || m_textureTarget == GL_PROXY_TEXTURE_1D;
 }
 
 bool Z3DTexture::is2DTexture() const
 {
-  const GLenum all_2dtexture_targets[] = {
-    GL_TEXTURE_2D,
-    GL_TEXTURE_1D_ARRAY,
-    GL_TEXTURE_RECTANGLE,
-    GL_PROXY_TEXTURE_2D,
-    GL_PROXY_TEXTURE_1D_ARRAY,
-    GL_PROXY_TEXTURE_RECTANGLE,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_X,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
-    GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
-    GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
-    GL_PROXY_TEXTURE_CUBE_MAP
-  };
+  const GLenum all_2dtexture_targets[] = {GL_TEXTURE_2D,
+                                          GL_TEXTURE_1D_ARRAY,
+                                          GL_TEXTURE_RECTANGLE,
+                                          GL_PROXY_TEXTURE_2D,
+                                          GL_PROXY_TEXTURE_1D_ARRAY,
+                                          GL_PROXY_TEXTURE_RECTANGLE,
+                                          GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+                                          GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+                                          GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+                                          GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+                                          GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+                                          GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+                                          GL_PROXY_TEXTURE_CUBE_MAP};
 
   return contains(all_2dtexture_targets, m_textureTarget);
 }
 
 bool Z3DTexture::is3DTexture() const
 {
-  return m_textureTarget == GL_TEXTURE_3D ||
-         m_textureTarget == GL_PROXY_TEXTURE_3D ||
-         m_textureTarget == GL_TEXTURE_2D_ARRAY ||
-         m_textureTarget == GL_PROXY_TEXTURE_2D_ARRAY ||
-         m_textureTarget == GL_TEXTURE_CUBE_MAP_ARRAY ||
-         m_textureTarget == GL_PROXY_TEXTURE_CUBE_MAP_ARRAY;
+  return m_textureTarget == GL_TEXTURE_3D || m_textureTarget == GL_PROXY_TEXTURE_3D ||
+         m_textureTarget == GL_TEXTURE_2D_ARRAY || m_textureTarget == GL_PROXY_TEXTURE_2D_ARRAY ||
+         m_textureTarget == GL_TEXTURE_CUBE_MAP_ARRAY || m_textureTarget == GL_PROXY_TEXTURE_CUBE_MAP_ARRAY;
 }
 
 void Z3DTexture::getType()
@@ -448,8 +463,7 @@ void Z3DTexture::getType()
 Z3DTextureUnitManager::Z3DTextureUnitManager()
   : m_maxTextureUnits(Z3DGpuInfo::instance().maxCombinedTextureImageUnits())
   , m_currentUnitNumber(-1)
-{
-}
+{}
 
 void Z3DTextureUnitManager::nextAvailableUnit()
 {

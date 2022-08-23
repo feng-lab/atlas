@@ -8,7 +8,8 @@
 
 namespace nim {
 
-ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation, ZParameterKey& paraKey,
+ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimation,
+                                               ZParameterKey& paraKey,
                                                QWidget* parent)
   : QDialog(parent)
   , m_paraAnimation(paraAnimation)
@@ -31,7 +32,8 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
 
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
     m_para = ZParameterFactory::instance().create(m_paraAnimation.boundParameter()->name(),
-                                                  m_paraAnimation.boundParameter()->type(), this);
+                                                  m_paraAnimation.boundParameter()->type(),
+                                                  this);
     m_para->setSameAs(*m_paraAnimation.boundParameter());
     connect(m_para, &ZParameter::valueChanged, m_paraAnimation.boundParameter(), &ZParameter::updateFromSender);
     m_para->setStyle("SPINBOX");
@@ -46,12 +48,13 @@ ZTimelineKeyEditDialog::ZTimelineKeyEditDialog(ZParameterAnimation& paraAnimatio
                                                            std::numeric_limits<double>::max());
     }
     addWidget(m_para->createNameLabel(this), m_para->createWidget(this), lo);
-    //connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
+    // connect(m_para, &ZParameter::valueChanged, this, &ZTimelineKeyEditDialog::raiseAndActivate);
   } else {
     addWidget(m_paraAnimation.boundParameter()->createNameLabel(this),
-              m_paraAnimation.boundParameter()->createWidget(this), lo);
-    //connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this,
-    //        &ZTimelineKeyEditDialog::raiseAndActivate);
+              m_paraAnimation.boundParameter()->createWidget(this),
+              lo);
+    // connect(m_paraAnimation.boundParameter(), &ZParameter::valueChanged, this,
+    //         &ZTimelineKeyEditDialog::raiseAndActivate);
   }
 
   if (m_paraAnimation.type() == "3DCamera") {
@@ -96,7 +99,7 @@ void ZTimelineKeyEditDialog::setInitialValue()
 
 void ZTimelineKeyEditDialog::accept()
 {
-  //m_paraAnimation.boundParameter()->disconnect(this);
+  // m_paraAnimation.boundParameter()->disconnect(this);
   m_paraAnimation.blockSignals(true);
   m_paraKey.setTime(m_time.get());
   m_paraKey.setType(m_type.get());
@@ -121,7 +124,7 @@ void ZTimelineKeyEditDialog::accept()
 
 void ZTimelineKeyEditDialog::reject()
 {
-  //m_paraAnimation.boundParameter()->disconnect(this);
+  // m_paraAnimation.boundParameter()->disconnect(this);
   if (m_paraAnimation.boundParameter()->type().contains("Span")) {
     m_para->setValueSameAs(m_paraKey.value());
   } else {
@@ -139,14 +142,14 @@ void ZTimelineKeyEditDialog::raiseAndActivate()
 
 void ZTimelineKeyEditDialog::addWidget(QLabel* label, QWidget* wg, QGridLayout* lo)
 {
-  //QHBoxLayout *hbl = new QHBoxLayout;
+  // QHBoxLayout *hbl = new QHBoxLayout;
   label->setMinimumWidth(125);
   label->setWordWrap(true);
-  //hbl->addWidget(label);
+  // hbl->addWidget(label);
   wg->setMinimumWidth(175);
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
-  //hbl->addWidget(wg);
-  //return hbl;
+  // hbl->addWidget(wg);
+  // return hbl;
   int row = lo->rowCount() + 1;
   lo->addWidget(label, row, 0);
   lo->addWidget(wg, row, 1);

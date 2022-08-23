@@ -13,6 +13,7 @@ class ZCameraParameterAnimation;
 class Z3DAnimation : public ZAnimation
 {
   Q_OBJECT
+
 public:
   explicit Z3DAnimation(ZDoc& doc, QObject* parent = nullptr);
 

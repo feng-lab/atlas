@@ -6,16 +6,13 @@ namespace nim {
 
 inline QString toQString(const QColor& v)
 {
-  return "[" + QString::number(v.red()) +
-         ", " + QString::number(v.green()) +
-         ", " + QString::number(v.blue()) +
-         ", " + QString::number(v.alpha()) +
-         "]";
+  return "[" + QString::number(v.red()) + ", " + QString::number(v.green()) + ", " + QString::number(v.blue()) + ", " +
+         QString::number(v.alpha()) + "]";
 }
 
 inline void toVal(const QString& str, QColor& v)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
   for (qsizetype i = 0; i < std::min(qsizetype(4), numList.size()); ++i) {
     int c;

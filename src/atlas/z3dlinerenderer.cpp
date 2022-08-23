@@ -36,18 +36,21 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_useGeomLineShader(GLVersionGE(3, 2))
 {
   updateLineWidth();
-  connect(&m_rendererBase.geometriesMultisampleModePara(), &ZStringIntOptionParameter::valueChanged,
-          this, &Z3DLineRenderer::updateLineWidth);
+  connect(&m_rendererBase.geometriesMultisampleModePara(),
+          &ZStringIntOptionParameter::valueChanged,
+          this,
+          &Z3DLineRenderer::updateLineWidth);
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   setUseDisplayList(true);
 #endif
 
   QStringList allshaders;
-  allshaders << "line.vert" << "line_func.frag";
+  allshaders << "line.vert"
+             << "line_func.frag";
   QStringList normalShaders;
-  normalShaders << "line.vert" << "line.frag";
-  m_lineShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "",
-                       normalShaders);
+  normalShaders << "line.vert"
+                << "line.frag";
+  m_lineShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
   m_lineShaderGrp.addAllSupportedPostShaders();
 
   if (m_useGeomLineShader) {
@@ -58,13 +61,17 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
       m_smoothLineShaderGrp.setGeometryOutputVertexCount(4);
     }
     allshaders.clear();
-    allshaders << "wideline.vert" << "wideline.geom" << "wideline_func.frag";
-    m_smoothLineShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(),
+    allshaders << "wideline.vert"
+               << "wideline.geom"
+               << "wideline_func.frag";
+    m_smoothLineShaderGrp.init(allshaders,
+                               m_rendererBase.generateHeader() + generateHeader(),
                                m_rendererBase.generateGeomHeader() + generateHeader());
     m_smoothLineShaderGrp.addAllSupportedPostShaders();
   } else {
     allshaders.clear();
-    allshaders << "wideline1.vert" << "wideline_func1.frag";
+    allshaders << "wideline1.vert"
+               << "wideline_func1.frag";
     m_smoothLineShaderGrp1.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
     m_smoothLineShaderGrp1.addAllSupportedPostShaders();
   }
@@ -113,10 +120,10 @@ void Z3DLineRenderer::setData(std::vector<glm::vec3>* linesInput)
         }
       }
       size_t rightUpSize = m_allFlags.size();
-      float cornerFlags[4] = {0 << 4 | 0,      // (-1, -1) left down
-                              2 << 4 | 0,      // (1, -1) right down
-                              0 << 4 | 2,      // (-1, 1) left up
-                              2 << 4 | 2};     // (1, 1) right up
+      float cornerFlags[4] = {0 << 4 | 0, // (-1, -1) left down
+                              2 << 4 | 0, // (1, -1) right down
+                              0 << 4 | 2, // (-1, 1) left up
+                              2 << 4 | 2}; // (1, 1) right up
 
       if (rightUpSize > m_smoothLineP0s.size()) {
         m_allFlags.resize(m_smoothLineP0s.size());
@@ -229,57 +236,63 @@ void Z3DLineRenderer::setDataPickingColors(std::vector<glm::vec4>* linePickingCo
 void Z3DLineRenderer::setRoundCap(bool v)
 {
   m_roundCap = v;
-  if (m_roundCap)
+  if (m_roundCap) {
     m_screenAligned = false;
+  }
   compile();
 }
 
 void Z3DLineRenderer::setScreenAlign(bool v)
 {
   m_screenAligned = v;
-  if (m_screenAligned)
+  if (m_screenAligned) {
     m_roundCap = false;
+  }
   compile();
 }
 
 void Z3DLineRenderer::compile()
 {
   m_lineShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader());
-  if (m_useGeomLineShader)
+  if (m_useGeomLineShader) {
     m_smoothLineShaderGrp.rebuild(m_rendererBase.generateHeader() + generateHeader(),
                                   m_rendererBase.generateGeomHeader() + generateHeader());
-  else
+  } else {
     m_smoothLineShaderGrp1.rebuild(m_rendererBase.generateHeader() + generateHeader());
+  }
 }
 
 QString Z3DLineRenderer::generateHeader()
 {
   QString headerSource;
-  if (m_useTextureColor)
+  if (m_useTextureColor) {
     headerSource += "#define USE_1DTEXTURE\n";
-  if (m_screenAligned)
+  }
+  if (m_screenAligned) {
     headerSource += "#define LINE_SCREEN_ALIGNED\n";
-  if (m_roundCap)
+  }
+  if (m_roundCap) {
     headerSource += "#define ROUND_CAP\n";
+  }
   return headerSource;
 }
 
 float Z3DLineRenderer::lineWidth() const
 {
   if (m_followSizeScale) {
-    if (m_useSmoothLine)
+    if (m_useSmoothLine) {
       return std::max(1.f, m_lineWidth * m_rendererBase.sizeScale());
-    else
+    } else {
       return std::min(Z3DGpuInfo::instance().maxAliasedLineWidth(),
-                      std::max(m_rendererBase.sizeScale() * m_lineWidth,
-                               Z3DGpuInfo::instance().minAliasedLineWidth()));
+                      std::max(m_rendererBase.sizeScale() * m_lineWidth, Z3DGpuInfo::instance().minAliasedLineWidth()));
+    }
   } else {
-    if (m_useSmoothLine)
+    if (m_useSmoothLine) {
       return m_lineWidth;
-    else
+    } else {
       return std::min(Z3DGpuInfo::instance().maxAliasedLineWidth(),
-                      std::max(m_lineWidth,
-                               Z3DGpuInfo::instance().minAliasedLineWidth()));
+                      std::max(m_lineWidth, Z3DGpuInfo::instance().minAliasedLineWidth()));
+    }
   }
 }
 
@@ -305,14 +318,16 @@ std::vector<glm::vec4>* Z3DLineRenderer::lineColors()
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DLineRenderer::renderUsingOpengl()
 {
-  if (!m_linesPt || m_linesPt->empty())
+  if (!m_linesPt || m_linesPt->empty()) {
     return;
+  }
 
-  std::vector<glm::vec4> * colors = lineColors();
+  std::vector<glm::vec4>* colors = lineColors();
 
   if ((*colors)[0].a != opacity()) {
-    for (size_t i=0; i<colors->size(); ++i)
+    for (size_t i = 0; i < colors->size(); ++i) {
       (*colors)[i].a = opacity();
+    }
   }
 
   glLineWidth(lineWidth());
@@ -320,20 +335,20 @@ void Z3DLineRenderer::renderUsingOpengl()
 
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();
-  //glScalef(getCoordTransform().x, getCoordTransform().y, getCoordTransform().z);
-  glMultMatrixf(&coordTransform()[0][0]);   // not sure, todo check
+  // glScalef(getCoordTransform().x, getCoordTransform().y, getCoordTransform().z);
+  glMultMatrixf(&coordTransform()[0][0]); // not sure, todo check
 
   GLuint bufObjects[2];
   glGenBuffers(2, bufObjects);
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
-  glBufferData(GL_ARRAY_BUFFER, colors->size()*4*sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
   glDrawArrays(GL_LINES, 0, m_linesPt->size());
@@ -353,32 +368,36 @@ void Z3DLineRenderer::renderUsingOpengl()
 
 void Z3DLineRenderer::renderPickingUsingOpengl()
 {
-  if (!m_linesPt || m_linesPt->empty())
+  if (!m_linesPt || m_linesPt->empty()) {
     return;
+  }
 
-  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty()
-      || m_linePickingColorsPt->size() != m_linesPt->size())
+  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty() || m_linePickingColorsPt->size() != m_linesPt->size()) {
     return;
+  }
 
   glLineWidth(lineWidth());
   glPointSize(lineWidth());
 
   glMatrixMode(GL_MODELVIEW);
   glPushMatrix();
-  //glScalef(getCoordTransform().x, getCoordTransform().y, getCoordTransform().z);
-  glMultMatrixf(&coordTransform()[0][0]);   // not sure, todo check
+  // glScalef(getCoordTransform().x, getCoordTransform().y, getCoordTransform().z);
+  glMultMatrixf(&coordTransform()[0][0]); // not sure, todo check
 
   GLuint bufObjects[2];
   glGenBuffers(2, bufObjects);
 
   glEnableClientState(GL_VERTEX_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size()*3*sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
   glVertexPointer(3, GL_FLOAT, 0, 0);
 
   glEnableClientState(GL_COLOR_ARRAY);
   glBindBuffer(GL_ARRAY_BUFFER, bufObjects[1]);
-  glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size()*4*sizeof(GLfloat), m_linePickingColorsPt->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER,
+               m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
+               m_linePickingColorsPt->data(),
+               GL_STATIC_DRAW);
   glColorPointer(4, GL_FLOAT, 0, 0);
 
   glDrawArrays(GL_LINES, 0, m_linesPt->size());
@@ -399,8 +418,9 @@ void Z3DLineRenderer::renderPickingUsingOpengl()
 
 void Z3DLineRenderer::render(Z3DEye eye)
 {
-  if (!m_linesPt || m_linesPt->empty())
+  if (!m_linesPt || m_linesPt->empty()) {
     return;
+  }
 
   if (!m_useGeomLineShader && m_useSmoothLine) {
     renderSmooth(eye);
@@ -419,8 +439,9 @@ void Z3DLineRenderer::render(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
   shader.setLineWidthUniform(m_lineWidth);
-  if (m_useTextureColor)
+  if (m_useTextureColor) {
     shader.bindTexture("texture", m_texture);
+  }
 
   if (m_hardwareSupportVAO) {
     if (m_dataChanged) {
@@ -449,23 +470,27 @@ void Z3DLineRenderer::render(Z3DEye eye)
     m_VAO.bind();
     if (!m_lineWidthArray.empty()) {
       for (size_t i = 0; i < m_lineWidthArray.size(); ++i) {
-        if (!m_useSmoothLine)
+        if (!m_useSmoothLine) {
           glLineWidth(m_lineWidthArray[i]);
-        if (m_isLineStrip)
+        }
+        if (m_isLineStrip) {
           glDrawArrays(GL_LINE_STRIP, i * 2, 2);
-        else
+        } else {
           glDrawArrays(GL_LINES, i * 2, 2);
+        }
       }
     } else {
-      if (m_isLineStrip)
+      if (m_isLineStrip) {
         glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
-      else
+      } else {
         glDrawArrays(GL_LINES, 0, m_linesPt->size());
+      }
     }
 
 #ifndef _FLYEM_
-    if (!m_useSmoothLine)
+    if (!m_useSmoothLine) {
       glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+    }
 #endif
     m_VAO.release();
 
@@ -473,8 +498,9 @@ void Z3DLineRenderer::render(Z3DEye eye)
     auto attr_vertex = shader.vertexAttributeLocation();
     glEnableVertexAttribArray(attr_vertex);
     m_VBOs.bind(GL_ARRAY_BUFFER, 0);
-    if (m_dataChanged)
+    if (m_dataChanged) {
       glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+    }
     glVertexAttribPointer(attr_vertex, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     GLint attr_color = -1;
@@ -482,35 +508,41 @@ void Z3DLineRenderer::render(Z3DEye eye)
       attr_color = shader.colorAttributeLocation();
       glEnableVertexAttribArray(attr_color);
       m_VBOs.bind(GL_ARRAY_BUFFER, 1);
-      if (m_dataChanged)
+      if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, colors->size() * 4 * sizeof(GLfloat), colors->data(), GL_STATIC_DRAW);
+      }
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
     }
 
     if (!m_lineWidthArray.empty()) {
       for (size_t i = 0; i < m_lineWidthArray.size(); ++i) {
-        if (!m_useSmoothLine)
+        if (!m_useSmoothLine) {
           glLineWidth(m_lineWidthArray[i]);
-        if (m_isLineStrip)
+        }
+        if (m_isLineStrip) {
           glDrawArrays(GL_LINE_STRIP, i * 2, 2);
-        else
+        } else {
           glDrawArrays(GL_LINES, i * 2, 2);
+        }
       }
     } else {
-      if (m_isLineStrip)
+      if (m_isLineStrip) {
         glDrawArrays(GL_LINE_STRIP, 0, m_linesPt->size());
-      else
+      } else {
         glDrawArrays(GL_LINES, 0, m_linesPt->size());
+      }
     }
 
 #ifndef _FLYEM_
-    if (!m_useSmoothLine)
+    if (!m_useSmoothLine) {
       glDrawArrays(GL_POINTS, 0, m_linesPt->size());
+    }
 #endif
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    if (!m_useTextureColor)
+    if (!m_useTextureColor) {
       glDisableVertexAttribArray(attr_color);
+    }
     glDisableVertexAttribArray(attr_vertex);
 
     m_dataChanged = false;
@@ -524,12 +556,13 @@ void Z3DLineRenderer::render(Z3DEye eye)
 
 void Z3DLineRenderer::renderPicking(Z3DEye eye)
 {
-  if (!m_linesPt || m_linesPt->empty())
+  if (!m_linesPt || m_linesPt->empty()) {
     return;
+  }
 
-  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty()
-      || m_linePickingColorsPt->size() != m_linesPt->size())
+  if (!m_linePickingColorsPt || m_linePickingColorsPt->empty() || m_linePickingColorsPt->size() != m_linesPt->size()) {
     return;
+  }
 
   if (!m_useGeomLineShader && m_useSmoothLine) {
     renderSmoothPicking(eye);
@@ -564,7 +597,9 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
 
       glEnableVertexAttribArray(attr_color);
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
-      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size() * 4 * sizeof(GLfloat), m_linePickingColorsPt->data(),
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
+                   m_linePickingColorsPt->data(),
                    GL_STATIC_DRAW);
       glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
@@ -589,8 +624,9 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
     glEnableVertexAttribArray(attr_vertex);
     if (m_dataChanged) {
       m_pickingVBOs.bind(GL_ARRAY_BUFFER, 0);
-      if (m_pickingDataChanged)
+      if (m_pickingDataChanged) {
         glBufferData(GL_ARRAY_BUFFER, m_linesPt->size() * 3 * sizeof(GLfloat), m_linesPt->data(), GL_STATIC_DRAW);
+      }
     } else {
       m_VBOs.bind(GL_ARRAY_BUFFER, 0);
     }
@@ -598,9 +634,12 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
 
     glEnableVertexAttribArray(attr_color);
     m_pickingVBOs.bind(GL_ARRAY_BUFFER, 1);
-    if (m_pickingDataChanged)
-      glBufferData(GL_ARRAY_BUFFER, m_linePickingColorsPt->size() * 4 * sizeof(GLfloat), m_linePickingColorsPt->data(),
+    if (m_pickingDataChanged) {
+      glBufferData(GL_ARRAY_BUFFER,
+                   m_linePickingColorsPt->size() * 4 * sizeof(GLfloat),
+                   m_linePickingColorsPt->data(),
                    GL_STATIC_DRAW);
+    }
     glVertexAttribPointer(attr_color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
     if (m_isLineStrip) {
@@ -636,8 +675,9 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
   shader.setLineWidthUniform(m_lineWidth);
-  if (m_useTextureColor)
+  if (m_useTextureColor) {
     shader.bindTexture("texture", m_texture);
+  }
 
   size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / m_oneBatchNumber);
 
@@ -664,8 +704,9 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
       for (size_t i = 0; i < numBatch; ++i) {
         m_VAOs.bind(i);
         size_t size = m_oneBatchNumber;
-        if (i == numBatch - 1)
+        if (i == numBatch - 1) {
           size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        }
         size_t start = m_oneBatchNumber * i;
 
         glEnableVertexAttribArray(attr_p0);
@@ -707,8 +748,9 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
-      if (i == numBatch - 1)
+      if (i == numBatch - 1) {
         size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+      }
       m_VAOs.bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
       m_VAOs.release();
@@ -734,45 +776,52 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
-      if (i == numBatch - 1)
+      if (i == numBatch - 1) {
         size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+      }
       size_t start = m_oneBatchNumber * i;
 
       glEnableVertexAttribArray(attr_p0);
       m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 0);
-      if (m_dataChanged)
+      if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * 3 * sizeof(GLfloat), &(m_smoothLineP0s[start]), GL_STATIC_DRAW);
+      }
       glVertexAttribPointer(attr_p0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       glEnableVertexAttribArray(attr_p1);
       m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 1);
-      if (m_dataChanged)
+      if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * 3 * sizeof(GLfloat), &(m_smoothLineP1s[start]), GL_STATIC_DRAW);
+      }
       glVertexAttribPointer(attr_p1, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       if (!m_useTextureColor) {
         glEnableVertexAttribArray(attr_p0color);
         m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 3);
-        if (m_dataChanged)
+        if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_smoothLineP0Colors[start]), GL_STATIC_DRAW);
+        }
         glVertexAttribPointer(attr_p0color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
         glEnableVertexAttribArray(attr_p1color);
         m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 4);
-        if (m_dataChanged)
+        if (m_dataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 4 * sizeof(GLfloat), &(m_smoothLineP1Colors[start]), GL_STATIC_DRAW);
+        }
         glVertexAttribPointer(attr_p1color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
       }
 
       glEnableVertexAttribArray(attr_flags);
       m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 2);
-      if (m_dataChanged)
+      if (m_dataChanged) {
         glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
+      }
       glVertexAttribPointer(attr_flags, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 
       m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
-      if (m_dataChanged)
+      if (m_dataChanged) {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+      }
 
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
 
@@ -822,8 +871,9 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
       for (size_t i = 0; i < numBatch; ++i) {
         m_pickingVAOs.bind(i);
         size_t size = m_oneBatchNumber;
-        if (i == numBatch - 1)
+        if (i == numBatch - 1) {
           size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+        }
         size_t start = m_oneBatchNumber * i;
 
         glEnableVertexAttribArray(attr_p0);
@@ -877,8 +927,9 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
-      if (i == numBatch - 1)
+      if (i == numBatch - 1) {
         size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+      }
       m_pickingVAOs.bind(i);
       glDrawElements(GL_TRIANGLES, size * 6 / 4, GL_UNSIGNED_INT, nullptr);
       m_pickingVAOs.release();
@@ -901,15 +952,17 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
     for (size_t i = 0; i < numBatch; ++i) {
       size_t size = m_oneBatchNumber;
-      if (i == numBatch - 1)
+      if (i == numBatch - 1) {
         size = m_smoothLineP0s.size() - (numBatch - 1) * m_oneBatchNumber;
+      }
       size_t start = m_oneBatchNumber * i;
 
       glEnableVertexAttribArray(attr_p0);
       if (m_dataChanged) {
         m_batchPickingVBOs[i].bind(GL_ARRAY_BUFFER, 0);
-        if (m_pickingDataChanged)
+        if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 3 * sizeof(GLfloat), &(m_smoothLineP0s[start]), GL_STATIC_DRAW);
+        }
       } else {
         m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 0);
       }
@@ -918,8 +971,9 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_p1);
       if (m_dataChanged) {
         m_batchPickingVBOs[i].bind(GL_ARRAY_BUFFER, 1);
-        if (m_pickingDataChanged)
+        if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * 3 * sizeof(GLfloat), &(m_smoothLineP1s[start]), GL_STATIC_DRAW);
+        }
       } else {
         m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 1);
       }
@@ -933,12 +987,12 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
       glEnableVertexAttribArray(attr_p1color);
       glVertexAttribPointer(attr_p1color, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 
-
       glEnableVertexAttribArray(attr_flags);
       if (m_dataChanged) {
         m_batchPickingVBOs[i].bind(GL_ARRAY_BUFFER, 3);
-        if (m_pickingDataChanged)
+        if (m_pickingDataChanged) {
           glBufferData(GL_ARRAY_BUFFER, size * sizeof(GLfloat), &(m_allFlags[start]), GL_STATIC_DRAW);
+        }
       } else {
         m_batchVBOs[i].bind(GL_ARRAY_BUFFER, 2);
       }
@@ -946,8 +1000,9 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
       if (m_dataChanged) {
         m_batchPickingVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 4);
-        if (m_pickingDataChanged)
+        if (m_pickingDataChanged) {
           glBufferData(GL_ELEMENT_ARRAY_BUFFER, size * 6 / 4 * sizeof(GLuint), m_indexs.data(), GL_STATIC_DRAW);
+        }
       } else {
         m_batchVBOs[i].bind(GL_ELEMENT_ARRAY_BUFFER, 5);
       }
@@ -969,36 +1024,36 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
   m_smoothLineShaderGrp1.release();
 }
 
-//void Z3DLineRenderer::enableLineSmooth()
+// void Z3DLineRenderer::enableLineSmooth()
 //{
-//#if defined(_WIN32) || defined(_WIN64)
-//  if (Z3DGpuInfoInstance.getGpuVendor() == Z3DGpuInfo::GPU_VENDOR_ATI) {
-//    return;
-//  }
-//#endif
-//  return;
-//  if (m_rendererBase->getShaderHookType() == Z3DRendererBase::Normal) {
-//    glPushAttrib(GL_ALL_ATTRIB_BITS);
-//    glDisable(GL_MULTISAMPLE);
-//    glEnable(GL_LINE_SMOOTH);
-//    glEnable(GL_BLEND);
-//    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
-//  } else {
-//    glPushAttrib(GL_LINE_BIT);
-//    glDisable(GL_MULTISAMPLE);
-//    glEnable(GL_LINE_SMOOTH);
-//  }
-//}
+// #if defined(_WIN32) || defined(_WIN64)
+//   if (Z3DGpuInfoInstance.getGpuVendor() == Z3DGpuInfo::GPU_VENDOR_ATI) {
+//     return;
+//   }
+// #endif
+//   return;
+//   if (m_rendererBase->getShaderHookType() == Z3DRendererBase::Normal) {
+//     glPushAttrib(GL_ALL_ATTRIB_BITS);
+//     glDisable(GL_MULTISAMPLE);
+//     glEnable(GL_LINE_SMOOTH);
+//     glEnable(GL_BLEND);
+//     glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
+//   } else {
+//     glPushAttrib(GL_LINE_BIT);
+//     glDisable(GL_MULTISAMPLE);
+//     glEnable(GL_LINE_SMOOTH);
+//   }
+// }
 
-//void Z3DLineRenderer::disableLineSmooth()
+// void Z3DLineRenderer::disableLineSmooth()
 //{
-//#if defined(_WIN32) || defined(_WIN64)
-//  if (Z3DGpuInfoInstance.getGpuVendor() == Z3DGpuInfo::GPU_VENDOR_ATI) {
-//    return;
-//  }
-//#endif
-//  return;
-//  glPopAttrib();
-//}
+// #if defined(_WIN32) || defined(_WIN64)
+//   if (Z3DGpuInfoInstance.getGpuVendor() == Z3DGpuInfo::GPU_VENDOR_ATI) {
+//     return;
+//   }
+// #endif
+//   return;
+//   glPopAttrib();
+// }
 
 } // namespace nim

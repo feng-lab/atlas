@@ -23,17 +23,23 @@ public:
   ~ZFilterView() override
   {
     for (const auto& idFilter : m_idToFilter) {
-      idFilter.second->releaseItemsOwnership();  // destroy view means mainwindow is closing, this will speed up the closing process
+      idFilter.second
+        ->releaseItemsOwnership(); // destroy view means mainwindow is closing, this will speed up the closing process
     }
   }
 
   // ZObjView interface
+
 public:
   [[nodiscard]] const ZObjDoc& doc() const override
-  { return m_doc; }
+  {
+    return m_doc;
+  }
 
   [[nodiscard]] bool hasObj(size_t id) const override
-  { return m_idToFilter.find(id) != m_idToFilter.end(); }
+  {
+    return m_idToFilter.find(id) != m_idToFilter.end();
+  }
 
   void read(size_t id, const json::object& json) override
   {
@@ -154,10 +160,7 @@ public:
     }
   }
 
-  void selectionChanged(const QList<QGraphicsItem*>&) override
-  {
-
-  }
+  void selectionChanged(const QList<QGraphicsItem*>&) override {}
 
   void rotateClockwise(double x, double y) override
   {
@@ -221,8 +224,9 @@ protected:
   void onObjVisibleChanged(size_t id, bool v) override
   {
     auto it = m_idToFilter.find(id);
-    if (it == m_idToFilter.end())
+    if (it == m_idToFilter.end()) {
       return;
+    }
     it->second->setVisible(v);
   }
 
@@ -230,14 +234,16 @@ protected:
   {
     for (auto id : selected) {
       auto it = m_idToFilter.find(id);
-      if (it == m_idToFilter.end())
+      if (it == m_idToFilter.end()) {
         return;
+      }
       it->second->setSelected(true);
     }
     for (auto id : deselected) {
       auto it = m_idToFilter.find(id);
-      if (it == m_idToFilter.end())
+      if (it == m_idToFilter.end()) {
         return;
+      }
       it->second->setSelected(false);
     }
   }
@@ -247,10 +253,11 @@ protected:
     if (FilterType* filter = qobject_cast<FilterType*>(sender())) {
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
-          if (append)
+          if (append) {
             m_doc.doc().appendSelectObj(idFilter.first);
-          else
+          } else {
             m_doc.doc().clearAndSelectObj(idFilter.first);
+          }
           return;
         }
       }
@@ -275,7 +282,7 @@ protected:
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
           if (m_doc.doc().isObjVisible(idFilter.first) != v) {
-            m_doc.doc().setObjVisible(idFilter.first, v);  // slow
+            m_doc.doc().setObjVisible(idFilter.first, v); // slow
             // updateBoundBox();
           }
           return;
@@ -290,4 +297,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -6,22 +6,25 @@
 
 namespace nim {
 
-ZSelectFileWidget::ZSelectFileWidget(FileMode mode, const QString& guiname, const QString& filter,
+ZSelectFileWidget::ZSelectFileWidget(FileMode mode,
+                                     const QString& guiname,
+                                     const QString& filter,
                                      const QString& startDirQSettingLocation,
                                      const QString& alternativeStartDir,
-                                     QBoxLayout::Direction direction, QWidget* parent)
+                                     QBoxLayout::Direction direction,
+                                     QWidget* parent)
   : QWidget(parent)
   , m_fileMode(mode)
   , m_guiName(guiname)
   , m_filter(filter)
   , m_startDirQSettingLocation(startDirQSettingLocation)
 {
-  //LOG(INFO) << alternativeDir;
+  // LOG(INFO) << alternativeDir;
   m_startDir = alternativeStartDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     QString res = settings.value(m_startDirQSettingLocation).toString();
-    //LOG(INFO) << res;
+    // LOG(INFO) << res;
     if (!res.isEmpty()) {
       m_startDir = res;
     }
@@ -31,33 +34,37 @@ ZSelectFileWidget::ZSelectFileWidget(FileMode mode, const QString& guiname, cons
 
 void ZSelectFileWidget::setDestination(QString* name)
 {
-  if (m_fileMode != FileMode::OpenMultipleFiles && m_fileMode != FileMode::OpenMultipleFilesWithFilter)
+  if (m_fileMode != FileMode::OpenMultipleFiles && m_fileMode != FileMode::OpenMultipleFilesWithFilter) {
     m_destName = name;
+  }
 }
 
 void ZSelectFileWidget::setDestination(QStringList* namelist)
 {
-  if (m_fileMode == FileMode::OpenMultipleFiles || m_fileMode == FileMode::OpenMultipleFilesWithFilter)
+  if (m_fileMode == FileMode::OpenMultipleFiles || m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
     m_destNames = namelist;
+  }
 }
 
-void ZSelectFileWidget::setCompareFunc(bool (* lessThan)(const QString&, const QString&))
+void ZSelectFileWidget::setCompareFunc(bool (*lessThan)(const QString&, const QString&))
 {
   m_lessThan = lessThan;
 }
 
 QString ZSelectFileWidget::getSelectedOpenFile()
 {
-  if (m_fileMode == FileMode::OpenSingleFile)
+  if (m_fileMode == FileMode::OpenSingleFile) {
     return m_lineEdit->text();
+  }
 
   return QString();
 }
 
 QString ZSelectFileWidget::getSelectedSaveFile()
 {
-  if (m_fileMode == FileMode::SaveFile)
+  if (m_fileMode == FileMode::SaveFile) {
     return m_lineEdit->text();
+  }
 
   return QString();
 }
@@ -85,16 +92,17 @@ QStringList ZSelectFileWidget::getSelectedMultipleOpenFiles()
 
 QString ZSelectFileWidget::getSelectedDirectory()
 {
-  if (m_fileMode == FileMode::Directory)
+  if (m_fileMode == FileMode::Directory) {
     return m_lineEdit->text();
+  }
 
   return QString();
 }
 
 void ZSelectFileWidget::setFile(const QString& fn)
 {
-  if (m_fileMode != FileMode::OpenMultipleFiles && m_fileMode != FileMode::OpenMultipleFilesWithFilter
-      && m_lineEdit->text() != fn) {
+  if (m_fileMode != FileMode::OpenMultipleFiles && m_fileMode != FileMode::OpenMultipleFilesWithFilter &&
+      m_lineEdit->text() != fn) {
     m_lineEdit->setText(fn);
     Q_EMIT changed();
   }
@@ -155,9 +163,10 @@ void ZSelectFileWidget::createWidget(QBoxLayout::Direction direction)
     m_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     m_lineEdit = new QLineEdit(this);
     m_lineEdit->setReadOnly(true);
-    //LOG(INFO) << m_startDir;
-    if (m_fileMode != FileMode::OpenSingleFile)
+    // LOG(INFO) << m_startDir;
+    if (m_fileMode != FileMode::OpenSingleFile) {
       m_lineEdit->setText(m_startDir);
+    }
     m_button = new QToolButton(this);
     m_button->setText(tr("..."));
     connect(m_button, &QToolButton::clicked, this, &ZSelectFileWidget::selectFile);
@@ -171,51 +180,50 @@ void ZSelectFileWidget::selectFile()
 {
   if (m_fileMode == FileMode::OpenMultipleFiles || m_fileMode == FileMode::OpenMultipleFilesWithFilter) {
     QStringList tmp;
-    tmp = QFileDialog::getOpenFileNames(this, m_guiName, getStartDir(), m_filter,
-                                        nullptr);
+    tmp = QFileDialog::getOpenFileNames(this, m_guiName, getStartDir(), m_filter, nullptr);
     if (!tmp.isEmpty()) {
       setStartDir(tmp[0]);
       m_multipleFNames.clear();
       m_multipleFNames = tmp;
-      if (m_lessThan)
+      if (m_lessThan) {
         std::sort(m_multipleFNames.begin(), m_multipleFNames.end(), m_lessThan);
-      else
+      } else {
         std::sort(m_multipleFNames.begin(), m_multipleFNames.end());
+      }
       m_textEdit->setText(QString("%1").arg(m_multipleFNames.join("\n")));
-      if (m_destNames)
+      if (m_destNames) {
         *m_destNames = m_multipleFNames;
+      }
       Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::OpenSingleFile) {
-    QString fileName = QFileDialog::getOpenFileName(
-      this, m_guiName, getStartDir(), m_filter,
-      nullptr);
+    QString fileName = QFileDialog::getOpenFileName(this, m_guiName, getStartDir(), m_filter, nullptr);
     if (!fileName.isEmpty()) {
       setStartDir(fileName);
       m_lineEdit->setText(fileName);
-      if (m_destName)
+      if (m_destName) {
         *m_destName = fileName;
+      }
       Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::SaveFile) {
-    QString outputFileName = ZFileUtils::getSaveFileName(
-      this, m_guiName, getStartDir(), m_filter,
-      &m_selectedFilter);
+    QString outputFileName = ZFileUtils::getSaveFileName(this, m_guiName, getStartDir(), m_filter, &m_selectedFilter);
     if (!outputFileName.isEmpty()) {
       setStartDir(outputFileName);
       m_lineEdit->setText(outputFileName);
-      if (m_destName)
+      if (m_destName) {
         *m_destName = outputFileName;
+      }
       Q_EMIT changed();
     }
   } else if (m_fileMode == FileMode::Directory) {
-    QString dir = QFileDialog::getExistingDirectory(
-      this, m_guiName, getStartDir());
+    QString dir = QFileDialog::getExistingDirectory(this, m_guiName, getStartDir());
     if (!dir.isEmpty()) {
       setStartDir(dir);
       m_lineEdit->setText(dir);
-      if (m_destName)
+      if (m_destName) {
         *m_destName = dir;
+      }
       Q_EMIT changed();
     }
   }
@@ -247,7 +255,7 @@ void ZSelectFileWidget::setStartDir(const QString& path)
   } else {
     m_startDir = QFileInfo(path).canonicalPath();
   }
-  //LOG(INFO) << path << m_startDir;
+  // LOG(INFO) << path << m_startDir;
   if (!m_startDirQSettingLocation.isEmpty()) {
     QSettings settings;
     settings.setValue(m_startDirQSettingLocation, m_startDir);

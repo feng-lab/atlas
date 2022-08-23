@@ -19,7 +19,8 @@ class ZSelectFileWidget;
 
 class ZAnimationExportWidget : public QScrollArea
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZAnimationExportWidget(bool is2DAni = false, QWidget* parent = nullptr);
 
@@ -29,7 +30,9 @@ public:
   void setCaptureStereoImage(bool v)
   {
     m_captureStereoImage.set(v);
-    if (v) m_captureStereoImage.setVisible(false);
+    if (v) {
+      m_captureStereoImage.setVisible(false);
+    }
   }
 
   QSize sizeHint() const override;
@@ -44,12 +47,18 @@ Q_SIGNALS:
                                   int height,
                                   Z3DScreenShotType sst);
 
-  void export3DAnimation(const QString& filename, double framePerSecond,
-                         double startTime, double endTime,
+  void export3DAnimation(const QString& filename,
+                         double framePerSecond,
+                         double startTime,
+                         double endTime,
                          Z3DScreenShotType sst);
 
-  void exportFixedSize2DAnimation(const QString& filename, double framePerSecond, double startTime, double endTime,
-                                  int width, int height);
+  void exportFixedSize2DAnimation(const QString& filename,
+                                  double framePerSecond,
+                                  double startTime,
+                                  double endTime,
+                                  int width,
+                                  int height);
 
   void export2DAnimation(const QString& filename, double framePerSecond, double startTime, double endTime);
 
@@ -84,4 +93,3 @@ private:
 };
 
 } // namespace nim
-

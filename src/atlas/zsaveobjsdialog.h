@@ -14,12 +14,15 @@ class ZDoc;
 
 class ZSaveObjsDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSaveObjsDialog(const ZDoc& doc, const std::vector<size_t>& objs, QWidget* parent = nullptr);
 
   [[nodiscard]] const std::vector<size_t>& objsToSave() const
-  { return m_objsToSave; }
+  {
+    return m_objsToSave;
+  }
 
 protected:
   void createWidget();
@@ -43,4 +46,3 @@ private:
 };
 
 } // namespace nim
-

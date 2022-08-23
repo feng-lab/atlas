@@ -25,8 +25,10 @@ ZRegionAnnotationWidget::ZRegionAnnotationWidget(ZRegionAnnotationPack& rap, ZDo
 {
   createWidget();
   onLockedStateChanged(m_regionAnnotationPack.isLocked());
-  connect(&m_regionAnnotationPack, &ZRegionAnnotationPack::lockedStateChanged,
-          this, &ZRegionAnnotationWidget::onLockedStateChanged);
+  connect(&m_regionAnnotationPack,
+          &ZRegionAnnotationPack::lockedStateChanged,
+          this,
+          &ZRegionAnnotationWidget::onLockedStateChanged);
 }
 
 void ZRegionAnnotationWidget::exportLabelImage()
@@ -44,7 +46,8 @@ void ZRegionAnnotationWidget::exportLabelImage()
   {
     QDialog dialog(QApplication::activeWindow());
     auto alllayout = new QVBoxLayout;
-    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Label Image:",
+    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                   "Output Label Image:",
                                                    filters.join(";;"),
                                                    ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
     for (size_t i = 0; i < formats.size(); ++i) {
@@ -80,13 +83,14 @@ void ZRegionAnnotationWidget::exportLabelImage()
     try {
       ZImgWriteParameters paras;
       paras.compression = comps[fmtIdx];
-      m_regionAnnotationPack.regionAnnotation().exportLabelImage(fn, fileFormat, paras, ratioPara.get().x,
-                                                                 ratioPara.get().y, ratioPara.get().z);
+      m_regionAnnotationPack.regionAnnotation()
+        .exportLabelImage(fn, fileFormat, paras, ratioPara.get().x, ratioPara.get().y, ratioPara.get().z);
       ZSystemInfo::instance().addFileToRecentFileList(fn);
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not export label image:\n%1").arg(e.what()));
     }
   }
@@ -105,9 +109,16 @@ void ZRegionAnnotationWidget::interpolateRegionAnnotation()
 {
   bool ok;
   auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
-  double d = QInputDialog::getDouble(this, tr("Scale ROI before Interpolating"),
-                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
-                                     Qt::WindowFlags(), 1);
+  double d = QInputDialog::getDouble(this,
+                                     tr("Scale ROI before Interpolating"),
+                                     tr("Scale:"),
+                                     value,
+                                     1e-5,
+                                     1e10,
+                                     6,
+                                     &ok,
+                                     Qt::WindowFlags(),
+                                     1);
   if (ok) {
     m_regionAnnotationPack.regionAnnotation().interpolateRegionAnnotation(d);
   }
@@ -117,9 +128,16 @@ void ZRegionAnnotationWidget::interpolateRegionAnnotation2()
 {
   bool ok;
   auto value = m_regionAnnotationPack.regionAnnotation().getOptimizedScale();
-  double d = QInputDialog::getDouble(this, tr("Scale ROI before Interpolating"),
-                                     tr("Scale:"), value, 1e-5, 1e10, 6, &ok,
-                                     Qt::WindowFlags(), 1);
+  double d = QInputDialog::getDouble(this,
+                                     tr("Scale ROI before Interpolating"),
+                                     tr("Scale:"),
+                                     value,
+                                     1e-5,
+                                     1e10,
+                                     6,
+                                     &ok,
+                                     Qt::WindowFlags(),
+                                     1);
   if (ok) {
     m_regionAnnotationPack.regionAnnotation().interpolateRegionAnnotation2(d);
   }
@@ -153,10 +171,10 @@ void ZRegionAnnotationWidget::updateMesh()
 
 void ZRegionAnnotationWidget::exportMeshes()
 {
-  QString dir = QFileDialog::getExistingDirectory(this, tr("Choose Directory for Meshes"),
+  QString dir = QFileDialog::getExistingDirectory(this,
+                                                  tr("Choose Directory for Meshes"),
                                                   ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"),
-                                                  QFileDialog::ShowDirsOnly
-                                                  | QFileDialog::DontResolveSymlinks);
+                                                  QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
   if (!dir.isEmpty()) {
     QDir outDir(dir);
     for (const auto& rgn : m_regionAnnotationPack.regionAnnotation().annotationTree()) {
@@ -169,7 +187,8 @@ void ZRegionAnnotationWidget::exportMeshes()
           m_doc.meshDoc().setLastOpenedObjPath(fn);
         }
         catch (const ZException& e) {
-          QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+          QMessageBox::critical(QApplication::activeWindow(),
+                                QApplication::applicationName(),
                                 QString("Save Mesh Error:\n%1").arg(e.what()));
         }
       }
@@ -185,7 +204,8 @@ void ZRegionAnnotationWidget::exportSvgImage()
   {
     QDialog dialog(QApplication::activeWindow());
     auto alllayout = new QVBoxLayout;
-    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile, "Output Svg Image(s):",
+    auto outputImageWidget = new ZSelectFileWidget(ZSelectFileWidget::FileMode::SaveFile,
+                                                   "Output Svg Image(s):",
                                                    tr("Svg File (*.svg)"),
                                                    ZSystemInfo::instance().lastOpenedObjPath("RegionAnnotation"));
     alllayout->addWidget(outputImageWidget);
@@ -216,7 +236,8 @@ void ZRegionAnnotationWidget::exportSvgImage()
       ZSystemInfo::instance().setLastOpenedImagePath(fn);
     }
     catch (const ZException& e) {
-      QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+      QMessageBox::critical(QApplication::activeWindow(),
+                            QApplication::applicationName(),
                             QString("Can not export svg image:\n%1").arg(e.what()));
     }
   }
@@ -230,13 +251,19 @@ void ZRegionAnnotationWidget::createWidget()
   m_interpolateRegionAnnotationButton->setToolTip("Interpolate regions for slices without annotations");
   m_interpolateRegionAnnotationButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_interpolateRegionAnnotationButton, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(m_interpolateRegionAnnotationButton, &QPushButton::clicked, this, &ZRegionAnnotationWidget::interpolateRegionAnnotation);
+  connect(m_interpolateRegionAnnotationButton,
+          &QPushButton::clicked,
+          this,
+          &ZRegionAnnotationWidget::interpolateRegionAnnotation);
 
   m_interpolateRegionAnnotationButton2 = new QPushButton("Interpolate Region Annotations2");
   m_interpolateRegionAnnotationButton2->setToolTip("Interpolate regions for slices without annotations");
   m_interpolateRegionAnnotationButton2->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   vlo->addWidget(m_interpolateRegionAnnotationButton2, 0, Qt::AlignLeft | Qt::AlignVCenter);
-  connect(m_interpolateRegionAnnotationButton2, &QPushButton::clicked, this, &ZRegionAnnotationWidget::interpolateRegionAnnotation2);
+  connect(m_interpolateRegionAnnotationButton2,
+          &QPushButton::clicked,
+          this,
+          &ZRegionAnnotationWidget::interpolateRegionAnnotation2);
 
   m_update3DMeshFromROIButton = new QPushButton("Update 3D Meshes From Modified ROIs");
   m_update3DMeshFromROIButton->setToolTip("Update 3D meshes with current region contours");

@@ -8,27 +8,40 @@ namespace nim {
 
 class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase);
 
   void setColorTexture(const Z3DTexture* colorTex)
-  { m_colorTexture = colorTex; }
+  {
+    m_colorTexture = colorTex;
+  }
 
   void setDepthTexture(const Z3DTexture* depthTex)
-  { m_depthTexture = depthTex; }
+  {
+    m_depthTexture = depthTex;
+  }
 
   ZStringStringOptionParameter& glowModePara()
-  { return m_glowMode; }
+  {
+    return m_glowMode;
+  }
 
   ZIntParameter& blurRadiusPara()
-  { return m_blurRadius; }
+  {
+    return m_blurRadius;
+  }
 
   ZFloatParameter& blurScalePara()
-  { return m_blurScale; }
+  {
+    return m_blurScale;
+  }
 
   ZFloatParameter& blurStrengthPara()
-  { return m_blurStrength; }
+  {
+    return m_blurStrength;
+  }
 
 protected:
   void compile() override;
@@ -57,4 +70,3 @@ protected:
 };
 
 } // namespace nim
-

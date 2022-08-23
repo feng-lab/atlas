@@ -11,11 +11,18 @@ namespace nim {
 
 class ZRegionAnnotationTreeModel : public QAbstractItemModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum Column
   {
-    AbbreviationColumn, IDColumn, NameColumn, MergeROIColumn, ExportROIColumn, ExportMeshColumn, ColumnCount
+    AbbreviationColumn,
+    IDColumn,
+    NameColumn,
+    MergeROIColumn,
+    ExportROIColumn,
+    ExportMeshColumn,
+    ColumnCount
   };
 
   explicit ZRegionAnnotationTreeModel(ZRegionAnnotationPack& rap, QObject* parent = nullptr);
@@ -26,11 +33,9 @@ public:
 
   bool setData(const QModelIndex& index, const QVariant& value, int role) override;
 
-  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
-                                    int role) const override;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
-  [[nodiscard]] QModelIndex index(int row, int column,
-                                  const QModelIndex& parent) const override;
+  [[nodiscard]] QModelIndex index(int row, int column, const QModelIndex& parent) const override;
 
   [[nodiscard]] QModelIndex parent(const QModelIndex& index) const override;
 
@@ -53,4 +58,3 @@ protected:
 };
 
 } // namespace nim
-

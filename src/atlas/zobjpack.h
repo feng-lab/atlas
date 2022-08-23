@@ -11,6 +11,7 @@ class ZObjDoc;
 class ZObjPack : public QObject
 {
   Q_OBJECT
+
 public:
   ZObjPack(size_t id, ZObjDoc* objDoc, QObject* parent = nullptr);
 
@@ -19,7 +20,9 @@ public:
   void setLocked(bool v);
 
   [[nodiscard]] bool isLocked() const
-  { return m_locked; }
+  {
+    return m_locked;
+  }
 
 Q_SIGNALS:
 
@@ -43,5 +46,3 @@ private:
 };
 
 } // namespace nim
-
-

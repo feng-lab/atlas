@@ -20,7 +20,8 @@ protected:
 
 class ZSlider2 : public QSlider
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSlider2(QWidget* parent = nullptr);
 
@@ -34,11 +35,17 @@ protected:
 
 class ZSpinBoxWithSlider : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZSpinBoxWithSlider(int value, int min, int max, int step = 1,
-                              bool tracking = true, const QString& prefix = "",
-                              const QString& suffix = "", QWidget* parent = nullptr);
+  explicit ZSpinBoxWithSlider(int value,
+                              int min,
+                              int max,
+                              int step = 1,
+                              bool tracking = true,
+                              const QString& prefix = "",
+                              const QString& suffix = "",
+                              QWidget* parent = nullptr);
 
   void setValue(int v);
 
@@ -49,8 +56,7 @@ Q_SIGNALS:
   void valueChanged(int);
 
 protected:
-  void createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix,
-                    const QString& suffix);
+  void createWidget(int value, int min, int max, int step, bool tracking, const QString& prefix, const QString& suffix);
 
 private:
   void valueChangedFromSlider(int v);
@@ -63,11 +69,18 @@ private:
 
 class ZDoubleSpinBoxWithSlider : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
-  explicit ZDoubleSpinBoxWithSlider(double value, double min, double max, double step = .01,
-                                    int decimal = 3, bool tracking = true, const QString& prefix = "",
-                                    const QString& suffix = "", QWidget* parent = nullptr);
+  explicit ZDoubleSpinBoxWithSlider(double value,
+                                    double min,
+                                    double max,
+                                    double step = .01,
+                                    int decimal = 3,
+                                    bool tracking = true,
+                                    const QString& prefix = "",
+                                    const QString& suffix = "",
+                                    QWidget* parent = nullptr);
 
   void setValue(double v);
 
@@ -78,8 +91,7 @@ Q_SIGNALS:
   void valueChanged(double);
 
 protected:
-  void createWidget(const QString& prefix,
-                    const QString& suffix);
+  void createWidget(const QString& prefix, const QString& suffix);
 
 private:
   void valueChangedFromSlider(int v);
@@ -99,4 +111,3 @@ private:
 };
 
 } // namespace nim
-

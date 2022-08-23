@@ -7,27 +7,35 @@ namespace nim {
 
 class ZMeshDoc : public ZObjDoc
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZMeshDoc(ZDoc& doc);
 
   // return info of mesh with id, assume mesh exist, otherwise crash
   std::vector<ZMesh*>* meshList(size_t id)
-  { return &(m_idToMeshPacks.at(id)->meshList); }
+  {
+    return &(m_idToMeshPacks.at(id)->meshList);
+  }
 
   void askToSave(const ZMesh& msh, const QString& title = "");
 
   // ZObjDoc interface
+
 public:
   bool save(size_t id) override;
 
   bool saveAs(size_t id) override;
 
   [[nodiscard]] QString typeName() const override
-  { return "Mesh"; }
+  {
+    return "Mesh";
+  }
 
   [[nodiscard]] QString typePluralName() const override
-  { return "Mesh"; }
+  {
+    return "Mesh";
+  }
 
   [[nodiscard]] bool canReadFile(const QString& fileName) const override;
 
@@ -79,10 +87,14 @@ private:
     const QString& detailedInfo() const;
 
     inline const QString& name() const
-    { return m_name; }
+    {
+      return m_name;
+    }
 
     inline const QString& tooltip() const
-    { return m_tooltip; }
+    {
+      return m_tooltip;
+    }
 
     ZMesh mesh;
     std::vector<ZMesh*> meshList;
@@ -90,6 +102,7 @@ private:
     bool hasUnsavedChange = false;
 
     // derived data
+
   private:
     mutable QString m_info;
     mutable QString m_detailedInfo;
@@ -111,4 +124,3 @@ private:
 };
 
 } // namespace nim
-

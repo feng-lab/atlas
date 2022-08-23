@@ -7,13 +7,11 @@ namespace nim {
 
 ZFontParameter::ZFontParameter(const QString& name, QObject* parent)
   : ZSingleValueParameter<QFont>(name, parent)
-{
-}
+{}
 
 ZFontParameter::ZFontParameter(const QString& name, const QFont& font, QObject* parent)
   : ZSingleValueParameter<QFont>(name, font, parent)
-{
-}
+{}
 
 void ZFontParameter::setValue(const QFont& v)
 {

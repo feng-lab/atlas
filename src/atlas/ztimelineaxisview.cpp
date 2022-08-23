@@ -55,7 +55,7 @@ ZTimelineAxisView::ZTimelineAxisView(ZTimelineWidget& parent)
   setMinimumHeight(m_timeline.rowHeight() + 2);
   setMaximumHeight(m_timeline.rowHeight() + 2);
   setViewportUpdateMode(QGraphicsView::FullViewportUpdate);
-  //setStyleSheet("border-style: none;");
+  // setStyleSheet("border-style: none;");
 
   updateAxisScene();
   connect(&m_timeline, &ZTimelineWidget::pixelsPerSecondChagned, this, &ZTimelineAxisView::updateAxisScene);
@@ -109,7 +109,7 @@ void ZTimelineAxisView::updateAxisScene()
       QFont font;
       font.setPointSize(11);
       text->setFont(font);
-      //text->setDefaultTextColor(palette().color(QPalette::Text));
+      // text->setDefaultTextColor(palette().color(QPalette::Text));
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else if (count % 5 == 0) { // middle tick
@@ -121,7 +121,7 @@ void ZTimelineAxisView::updateAxisScene()
       QFont font;
       font.setPointSize(11);
       text->setFont(font);
-      //text->setDefaultTextColor(palette().color(QPalette::Text));
+      // text->setDefaultTextColor(palette().color(QPalette::Text));
       m_scene->addItem(line);
       m_scene->addItem(text);
     } else { // small tick
@@ -134,12 +134,12 @@ void ZTimelineAxisView::updateAxisScene()
 
   m_currentTimeItem = new CurrentTimeItem(m_timeline);
   QPainterPath path;
-  //path.addRect(-3,0,6,m_timeline.rowHeight()*.7);
+  // path.addRect(-3,0,6,m_timeline.rowHeight()*.7);
   QPolygonF poly;
   poly << QPointF(-3, 0) << QPointF(-3, m_timeline.rowHeight() * .7) << QPointF(0, m_timeline.rowHeight())
        << QPointF(3, m_timeline.rowHeight() * .7) << QPointF(3, 0);
   path.addPolygon(poly);
-  //path.closeSubpath();
+  // path.closeSubpath();
   m_currentTimeItem->setPath(path);
   m_currentTimeItem->setPos(m_timeline.timeToX(m_timeline.currentTime()), 0);
   m_scene->addItem(m_currentTimeItem);
@@ -169,6 +169,4 @@ void ZTimelineAxisView::moveCurrentTime()
   ensureVisible(m_currentTimeItem);
 }
 
-
 } // namespace nim
-

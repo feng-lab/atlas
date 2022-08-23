@@ -99,8 +99,9 @@ std::vector<size_t> ZDoc::selectedObjs() const
 std::vector<ZObjDoc*> ZDoc::objDocs()
 {
   std::vector<ZObjDoc*> res;
-  for (auto& docPack : m_docPacks)
+  for (auto& docPack : m_docPacks) {
     res.push_back(docPack.doc);
+  }
   return res;
 }
 
@@ -259,8 +260,9 @@ std::vector<QMenu*> ZDoc::processObjMenu() const
   std::vector<QMenu*> res;
   for (auto& docPack : m_docPacks) {
     QMenu* menu = docPack.doc->processObjMenu();
-    if (menu)
+    if (menu) {
       res.push_back(menu);
+    }
   }
   return res;
 }
@@ -373,24 +375,25 @@ bool ZDoc::saveOrDiscard(const std::vector<size_t>& objs)
       unsavedObjs.push_back(obj);
     }
   }
-  if (unsavedObjs.empty())
+  if (unsavedObjs.empty()) {
     return true;
+  }
 
   ZSaveObjsDialog dlg(*this, unsavedObjs, QApplication::activeWindow());
   auto ret = dlg.exec();
   switch (ret) {
     case QDialog::Accepted: {
-      //LOG(INFO) << "Save or Discard was clicked";
+      // LOG(INFO) << "Save or Discard was clicked";
       bool saveSuccess = true;
       const auto& sobjs = dlg.objsToSave();
       for (auto sobj : sobjs) {
-        //LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
+        // LOG(INFO) << "save " << m_objModel->idToDoc(sobjs[i])->objName(sobjs[i]);
         saveSuccess = saveSuccess && m_objModel->idToDoc(sobj)->save(sobj);
       }
       return saveSuccess;
     }
     case QDialog::Rejected:
-      //LOG(INFO) << "Cancel was clicked";
+      // LOG(INFO) << "Cancel was clicked";
       break;
     default:
       // should never be reached
@@ -404,9 +407,9 @@ void ZDoc::loadFile(const QString& fileName)
 {
   QString error;
   if (!loadFile(fileName, error)) {
-    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
-                          tr("Can not read file %1. Error: %2")
-                            .arg(fileName).arg(error));
+    QMessageBox::critical(QApplication::activeWindow(),
+                          QApplication::applicationName(),
+                          tr("Can not read file %1. Error: %2").arg(fileName).arg(error));
   }
 }
 
@@ -461,10 +464,12 @@ std::map<size_t, size_t> ZDoc::read(const json::object& jo, QString& err)
 void ZDoc::write(json::object& json, bool includeAnimation) const
 {
   for (auto& docPack : m_docPacks) {
-    if (!includeAnimation && docPack.doc == m_animation3DDoc)
+    if (!includeAnimation && docPack.doc == m_animation3DDoc) {
       continue;
-    if (!includeAnimation && docPack.doc == m_animation2DDoc)
+    }
+    if (!includeAnimation && docPack.doc == m_animation2DDoc) {
       continue;
+    }
     docPack.doc->write(json);
   }
 }
@@ -477,8 +482,9 @@ QString ZDoc::lastOpenedFilePath()
 
 void ZDoc::setLastOpenedFilePath(const QString& path)
 {
-  if (path.isEmpty())
+  if (path.isEmpty()) {
     return;
+  }
   QDir dir = QFileInfo(path).dir();
   QSettings settings;
   settings.setValue(QString("doc/lastOpenedPath"), dir.absolutePath());
@@ -507,8 +513,9 @@ void ZDoc::removeAllObjs()
     for (auto& docPack : m_docPacks) {
       removeAllObjsOfDoc(docPack.doc);
     }
-    if (!hasObj())
+    if (!hasObj()) {
       m_nextObjId = 100;
+    }
   } else {
     for (auto& docPack : m_docPacks) {
       if (docPack.removeAllAction == action) {
@@ -627,7 +634,7 @@ void ZDoc::onObjAboutToBeRemoved(size_t id, ZObjDoc* doc)
   Q_EMIT objAboutToBeRemoved(id, doc);
 }
 
-void ZDoc::onObjAdded(size_t id, ZObjDoc *doc)
+void ZDoc::onObjAdded(size_t id, ZObjDoc* doc)
 {
   if (auto us = doc->objUndoStack(id); us) {
     m_undoGroup->addStack(us);
@@ -637,21 +644,29 @@ void ZDoc::onObjAdded(size_t id, ZObjDoc *doc)
 void ZDoc::create2DAnimation()
 {
   bool ok;
-  QString text = QInputDialog::getText(QApplication::activeWindow(), tr("Animation Name:"),
-                                       tr("Name of 2D Animation:"), QLineEdit::Normal,
-                                       "Unnamed_2D_Animation", &ok);
-  if (ok && !text.isEmpty())
+  QString text = QInputDialog::getText(QApplication::activeWindow(),
+                                       tr("Animation Name:"),
+                                       tr("Name of 2D Animation:"),
+                                       QLineEdit::Normal,
+                                       "Unnamed_2D_Animation",
+                                       &ok);
+  if (ok && !text.isEmpty()) {
     m_animation2DDoc->createNewAnimation(text);
+  }
 }
 
 void ZDoc::create3DAnimation()
 {
   bool ok;
-  QString text = QInputDialog::getText(QApplication::activeWindow(), tr("Animation Name:"),
-                                       tr("Name of 3D Animation:"), QLineEdit::Normal,
-                                       "Unnamed_3D_Animation", &ok);
-  if (ok && !text.isEmpty())
+  QString text = QInputDialog::getText(QApplication::activeWindow(),
+                                       tr("Animation Name:"),
+                                       tr("Name of 3D Animation:"),
+                                       QLineEdit::Normal,
+                                       "Unnamed_3D_Animation",
+                                       &ok);
+  if (ok && !text.isEmpty()) {
     m_animation3DDoc->createNewAnimation(text);
+  }
 }
 
 void ZDoc::createActions()

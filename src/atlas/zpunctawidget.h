@@ -8,7 +8,8 @@ namespace nim {
 
 class ZPunctaWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZPunctaWidget(ZPunctaPack& p, ZDoc& doc, QWidget* parent = nullptr);
 
@@ -21,4 +22,3 @@ private:
 };
 
 } // namespace nim
-

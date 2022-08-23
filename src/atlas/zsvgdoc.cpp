@@ -35,8 +35,9 @@ bool ZSvgDoc::canReadFile(const QString& fileName) const
 size_t ZSvgDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
   for (const auto& idPack : m_idToSvgPacks) {
-    if (idPack.second->path == fileName)
+    if (idPack.second->path == fileName) {
       return idPack.first;
+    }
   }
   auto svg = std::make_unique<QSvgRenderer>(fileName);
   if (svg->isValid()) {
@@ -57,8 +58,9 @@ size_t ZSvgDoc::loadFile(const json::value& jValue, QString& errorMsg)
     return 0;
   }
   for (const auto& idPack : m_idToSvgPacks) {
-    if (isSameObj(jValue, jsonValue(idPack.first)))
+    if (isSameObj(jValue, jsonValue(idPack.first))) {
       return idPack.first;
+    }
   }
   QString fileName = asQString(jValue);
   auto svg = std::make_unique<QSvgRenderer>(fileName);
@@ -121,12 +123,14 @@ json::value ZSvgDoc::jsonValue(size_t id) const
 bool ZSvgDoc::isSameObj(const json::value& v1, const json::value& v2) const
 {
   CHECK(v1.is_string() && v2.is_string());
-  if (v1 == v2)
+  if (v1 == v2) {
     return true;
+  }
   QString f1 = asQString(v1);
   QString f2 = asQString(v2);
-  if (!QFile::exists(f1) || !QFile::exists(f2))
+  if (!QFile::exists(f1) || !QFile::exists(f2)) {
     return false;
+  }
   return QFileInfo(f1).canonicalFilePath() == QFileInfo(f2).canonicalFilePath();
 }
 
@@ -146,11 +150,9 @@ bool ZSvgDoc::isAlias(size_t id) const
 {
   CHECK(m_idToSvgPacks.find(id) != m_idToSvgPacks.end());
 
-  return std::any_of(m_idToSvgPacks.begin(), m_idToSvgPacks.end(),
-                     [&, this](const auto& idPack) {
-                       return idPack.first != id && idPack.second == m_idToSvgPacks.at(id);
-                     }
-  );
+  return std::any_of(m_idToSvgPacks.begin(), m_idToSvgPacks.end(), [&, this](const auto& idPack) {
+    return idPack.first != id && idPack.second == m_idToSvgPacks.at(id);
+  });
 }
 
 void ZSvgDoc::loadSvg()
@@ -164,7 +166,8 @@ void ZSvgDoc::loadSvg()
     QString errorMsg;
     for (index_t i = 0; i < dialog.selectedFiles().size(); ++i) {
       if (!loadFile(dialog.selectedFiles().at(i), errorMsg)) {
-        QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(),
+        QMessageBox::critical(QApplication::activeWindow(),
+                              QApplication::applicationName(),
                               "Can not read svg.\n" + errorMsg);
       }
     }
@@ -182,7 +185,8 @@ size_t ZSvgDoc::addSvg(std::unique_ptr<QSvgRenderer> svg, const QString& path)
 }
 
 ZSvgDoc::SvgPack::SvgPack(std::unique_ptr<QSvgRenderer> svg_, const QString& path_)
-  : svg(std::move(svg_)), path(QFileInfo(path_).canonicalFilePath())
+  : svg(std::move(svg_))
+  , path(QFileInfo(path_).canonicalFilePath())
 {
   updateDerivedData();
 }
@@ -212,8 +216,9 @@ void ZSvgDoc::createActions()
 void ZSvgDoc::packInfoUpdated(SvgPack* pack)
 {
   for (const auto& idPack : m_idToSvgPacks) {
-    if (idPack.second.get() == pack)
+    if (idPack.second.get() == pack) {
       m_doc.updateObjInfo(idPack.first);
+    }
   }
 }
 

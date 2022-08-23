@@ -9,8 +9,7 @@ ZItemSelectionModel::ZItemSelectionModel(ZObjModel* model, QObject* parent)
   : QItemSelectionModel(model, parent)
   , m_model(model)
 {
-  connect(this, &ZItemSelectionModel::selectionChanged,
-          this, &ZItemSelectionModel::convertSelectionChangedSignal);
+  connect(this, &ZItemSelectionModel::selectionChanged, this, &ZItemSelectionModel::convertSelectionChangedSignal);
 }
 
 size_t ZItemSelectionModel::numSelectedObjs() const
@@ -18,8 +17,9 @@ size_t ZItemSelectionModel::numSelectedObjs() const
   size_t num = 0;
   QModelIndexList indexes = selectedIndexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
+    }
     ++num;
   }
   return num;
@@ -30,8 +30,9 @@ std::vector<size_t> ZItemSelectionModel::selectedObjs() const
   std::vector<size_t> res;
   QModelIndexList indexes = selectedIndexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
+    }
     res.push_back(m_model->indexToId(index));
   }
   return res;
@@ -42,10 +43,12 @@ std::vector<size_t> ZItemSelectionModel::selectedObjsOfDoc(const ZObjDoc* objD) 
   std::vector<size_t> res;
   QModelIndexList indexes = selectedIndexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
-    if (m_model->indexToDoc(index) == objD)
+    }
+    if (m_model->indexToDoc(index) == objD) {
       res.push_back(m_model->indexToId(index));
+    }
   }
   return res;
 }
@@ -54,10 +57,12 @@ bool ZItemSelectionModel::isObjSelected(size_t id) const
 {
   QModelIndexList indexes = selectedIndexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
-    if (id == m_model->indexToId(index))
+    }
+    if (id == m_model->indexToId(index)) {
       return true;
+    }
   }
   return false;
 }
@@ -94,15 +99,16 @@ void ZItemSelectionModel::appendSelectObj(size_t id)
   }
 }
 
-void
-ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection& selected, const QItemSelection& deselected)
+void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection& selected,
+                                                        const QItemSelection& deselected)
 {
   std::map<ZObjDoc*, std::vector<size_t>> docSelected;
   std::map<ZObjDoc*, std::vector<size_t>> docDeselected;
   QModelIndexList indexes = selected.indexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
+    }
     ZObjDoc* doc = m_model->indexToDoc(index);
     size_t id = m_model->indexToId(index);
     docSelected[doc].push_back(id);
@@ -110,17 +116,18 @@ ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection& selecte
   }
   indexes = deselected.indexes();
   for (auto& index : indexes) {
-    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn)
+    if (index.column() != ZObjModel::ShowHideNameColumn && index.column() != ZObjModel::NameColumn) {
       continue;
+    }
     ZObjDoc* doc = m_model->indexToDoc(index);
     size_t id = m_model->indexToId(index);
     docDeselected[doc].push_back(id);
-    if (docSelected.find(doc) == docSelected.end())
+    if (docSelected.find(doc) == docSelected.end()) {
       docSelected.emplace(doc, std::vector<size_t>());
+    }
   }
   auto it1 = docDeselected.begin();
-  for (auto it = docSelected.begin();
-       it != docSelected.end(); ++it, ++it1) {
+  for (auto it = docSelected.begin(); it != docSelected.end(); ++it, ++it1) {
     it->first->sendObjSelectionChangedFromDocSignal(it->second, it1->second);
   }
 }

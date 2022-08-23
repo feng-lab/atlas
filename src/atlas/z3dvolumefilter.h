@@ -26,7 +26,7 @@ class ZMesh;
 
 class Z3DVolumeFilter : public Z3DBoundedFilter
 {
-Q_OBJECT
+  Q_OBJECT
 
   friend class Z3DCompositor;
 
@@ -36,10 +36,14 @@ public:
   void setData(const ZImgPack& img);
 
   [[nodiscard]] virtual bool isStayOnTop() const
-  { return m_stayOnTop.get(); }
+  {
+    return m_stayOnTop.get();
+  }
 
   virtual void setStayOnTop(bool s)
-  { m_stayOnTop.set(s); }
+  {
+    m_stayOnTop.set(s);
+  }
 
   // input volPos should be in volume coordinate
   // means it is in range [0 width-1 0 height-1 0 depth-1]
@@ -48,14 +52,18 @@ public:
   void exitZoomInView();
 
   [[nodiscard]] const ZBBox<glm::dvec3>& zoomInBound() const
-  { return m_zoomInBound; }
+  {
+    return m_zoomInBound;
+  }
 
   [[nodiscard]] bool volumeNeedDownsample() const;
 
   [[nodiscard]] bool isVolumeDownsampled() const;
 
   [[nodiscard]] bool isSubvolume() const
-  { return m_isSubVolume.get(); }
+  {
+    return m_isSubVolume.get();
+  }
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
@@ -86,7 +94,6 @@ Q_SIGNALS:
   void pointInVolumeRightClicked(QPoint pt, glm::ivec3 pos3D);
 
 protected:
-
   void changeCoordTransform();
 
   void changeZoomInViewSize();
@@ -109,8 +116,7 @@ protected:
 
   void updateCubeSerieSlices();
 
-  void setClipPlanes() override
-  {}
+  void setClipPlanes() override {}
 
 protected:
   void process(Z3DEye eye) override;
@@ -123,8 +129,7 @@ protected:
 
   void updateNotTransformedBoundBoxImpl() override;
 
-  void expandCutRange() override
-  {}
+  void expandCutRange() override {}
 
 private:
   void readVolumes();
@@ -139,10 +144,10 @@ private:
   // use first channel intensity
   glm::vec3 getMaxInten3DPositionUnderScreenPoint(int x, int y, int width, int height, bool& success);
 
-  //get 3D position from 2D screen position
+  // get 3D position from 2D screen position
   glm::vec3 get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port);
 
-  //get 3D position from 2D screen position and depth
+  // get 3D position from 2D screen position and depth
   glm::vec3 get3DPosition(glm::ivec2 pos2D, double depth, int width, int height);
 
   // based on context, prepare minimum necessary data and send to raycasterrenderer
@@ -173,7 +178,7 @@ private:
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;
   size_t m_numParas;
 
-  ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
+  ZIntParameter m_interactionDownsample; // screen space downsample during interaction
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;
@@ -222,4 +227,3 @@ private:
 };
 
 } // namespace nim
-

@@ -19,7 +19,8 @@ namespace nim {
 
 class Z3DPunctaFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
@@ -29,10 +30,11 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  //bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
+  // bool hasOpaque(Z3DEye eye) const override { return Z3DGeometryFilter::hasOpaque(eye) && !m_randomGlow.get(); }
   void renderOpaque(Z3DEye eye) override;
 
-  //bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) || m_randomGlow.get(); }
+  // bool hasTransparent(Z3DEye eye) const override { return Z3DGeometryFilter::hasTransparent(eye) ||
+  // m_randomGlow.get(); }
   void renderTransparent(Z3DEye eye) override;
 
 Q_SIGNALS:
@@ -68,7 +70,7 @@ protected:
   // result should have at least 6 elements
   void notTransformedPunctumBound(const ZPunctum& p, ZBBox<glm::dvec3>& result) const;
 
-  //void updateAxisAlignedBoundBoxImpl() override;
+  // void updateAxisAlignedBoundBoxImpl() override;
   void updateNotTransformedBoundBoxImpl() override;
 
   void addSelectionLines() override;
@@ -126,4 +128,3 @@ private:
 };
 
 } // namespace nim
-

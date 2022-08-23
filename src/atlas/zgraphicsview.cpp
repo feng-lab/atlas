@@ -24,11 +24,11 @@ ZGraphicsView::ZGraphicsView(QGraphicsScene* scene, ZView* parent)
   setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
   // setResizeAnchor(QGraphicsView::AnchorUnderMouse);
   setMouseTracking(true);
-  //viewport()->setCursor(Qt::ArrowCursor);
+  // viewport()->setCursor(Qt::ArrowCursor);
   setBackgroundRole(QPalette::NoRole);
   setAcceptDrops(true);
-  //setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-  //setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  // setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  // setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
   grabGesture(Qt::PanGesture);
   grabGesture(Qt::PinchGesture);
@@ -48,19 +48,22 @@ void ZGraphicsView::updateScaleFactorRange()
   // find the ideal x / y scaling ratio to fit scene in the view.
   int margin = 2;
   QRectF viewRect = viewport()->rect().adjusted(margin, margin, -margin, -margin);
-  if (viewRect.isEmpty())
+  if (viewRect.isEmpty()) {
     return;
+  }
   QRectF sceneRect = scene()->sceneRect();
-  if (sceneRect.isEmpty())
+  if (sceneRect.isEmpty()) {
     return;
+  }
   double xratio = viewRect.width() / sceneRect.width();
   double yratio = viewRect.height() / sceneRect.height();
 
   double ratio = std::min(xratio, yratio) * 100;
-  if (ratio < m_scale.rangeMin())
+  if (ratio < m_scale.rangeMin()) {
     m_scale.setRange(ratio, m_scale.rangeMax());
-  else if (ratio > m_scale.rangeMax())
+  } else if (ratio > m_scale.rangeMax()) {
     m_scale.setRange(m_scale.rangeMin(), ratio);
+  }
 }
 
 QRectF ZGraphicsView::getCurrrentlyVisibleRegion() const
@@ -124,11 +127,12 @@ bool ZGraphicsView::renderToImage(const QString& filename, int width, int height
 void ZGraphicsView::scaleParaChanged()
 {
   double targetScale = m_scale.get() / 100.0;
-  if (targetScale == transform().m11() * 100)
+  if (targetScale == transform().m11() * 100) {
     return;
+  }
   double scaleFactor = targetScale / transform().m11();
 
-  //double factor = transform().scale(scaleFactor, scaleFactor).mapRect(QRectF(0, 0, 1, 1)).width();
+  // double factor = transform().scale(scaleFactor, scaleFactor).mapRect(QRectF(0, 0, 1, 1)).width();
 
   scale(scaleFactor, scaleFactor);
 
@@ -161,24 +165,27 @@ void ZGraphicsView::wheelEvent(QWheelEvent* event)
   checkViewport();
 }
 
-bool ZGraphicsView::event(QEvent *event)
+bool ZGraphicsView::event(QEvent* event)
 {
-  if (event->type() == QEvent::Gesture)
+  if (event->type() == QEvent::Gesture) {
     return gestureEvent(static_cast<QGestureEvent*>(event));
+  }
   return QGraphicsView::event(event);
 }
 
-bool ZGraphicsView::gestureEvent(QGestureEvent *event)
+bool ZGraphicsView::gestureEvent(QGestureEvent* event)
 {
   LOG(INFO) << "gestureEvent():" << event;
-  if (QGesture *pan = event->gesture(Qt::PanGesture))
-    panTriggered(static_cast<QPanGesture *>(pan));
-  if (QGesture *pinch = event->gesture(Qt::PinchGesture))
-    pinchTriggered(static_cast<QPinchGesture *>(pinch));
+  if (QGesture* pan = event->gesture(Qt::PanGesture)) {
+    panTriggered(static_cast<QPanGesture*>(pan));
+  }
+  if (QGesture* pinch = event->gesture(Qt::PinchGesture)) {
+    pinchTriggered(static_cast<QPinchGesture*>(pinch));
+  }
   return true;
 }
 
-void ZGraphicsView::panTriggered(QPanGesture *gesture)
+void ZGraphicsView::panTriggered(QPanGesture* gesture)
 {
 #ifndef QT_NO_CURSOR
   switch (gesture->state()) {
@@ -195,25 +202,24 @@ void ZGraphicsView::panTriggered(QPanGesture *gesture)
   translate(delta.x(), delta.y());
 }
 
-void ZGraphicsView::pinchTriggered(QPinchGesture *gesture)
+void ZGraphicsView::pinchTriggered(QPinchGesture* gesture)
 {
   QPinchGesture::ChangeFlags changeFlags = gesture->changeFlags();
   if (changeFlags & QPinchGesture::RotationAngleChanged) {
-//    qreal rotationDelta = gesture->rotationAngle() - gesture->lastRotationAngle();
-//    rotationAngle += rotationDelta;
-//    qCDebug(lcExample) << "pinchTriggered(): rotate by" <<
-//                       rotationDelta << "->" << rotationAngle;
+    //    qreal rotationDelta = gesture->rotationAngle() - gesture->lastRotationAngle();
+    //    rotationAngle += rotationDelta;
+    //    qCDebug(lcExample) << "pinchTriggered(): rotate by" <<
+    //                       rotationDelta << "->" << rotationAngle;
   }
   if (changeFlags & QPinchGesture::ScaleFactorChanged) {
     m_currentStepScaleFactor = gesture->scaleFactor();
-    LOG(INFO) << "pinchTriggered(): zoom by " <<
-              gesture->scaleFactor() << " -> " << m_currentStepScaleFactor;
+    LOG(INFO) << "pinchTriggered(): zoom by " << gesture->scaleFactor() << " -> " << m_currentStepScaleFactor;
     setScale(currentScale() * m_currentStepScaleFactor);
   }
-//  if (gesture->state() == Qt::GestureFinished) {
-//    setScale(currentScale() * m_currentStepScaleFactor)
-//    m_currentStepScaleFactor = 1.;
-//  }
+  //  if (gesture->state() == Qt::GestureFinished) {
+  //    setScale(currentScale() * m_currentStepScaleFactor)
+  //    m_currentStepScaleFactor = 1.;
+  //  }
 }
 
 } // namespace nim

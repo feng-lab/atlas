@@ -28,8 +28,9 @@ ZObjDetailedInfoWidget::ZObjDetailedInfoWidget(ZDoc& doc, QWidget* mw)
 
 void ZObjDetailedInfoWidget::showDefaultWidget()
 {
-  if (m_widget->currentWidget() != m_defaultWidget)
+  if (m_widget->currentWidget() != m_defaultWidget) {
     m_widget->setCurrentWidget(m_defaultWidget);
+  }
 }
 
 void ZObjDetailedInfoWidget::showWidgetOfObj(size_t id)
@@ -80,8 +81,9 @@ void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 {
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      if (m_widget->currentWidget() == m_subWidgets[i].widget)
+      if (m_widget->currentWidget() == m_subWidgets[i].widget) {
         m_widget->setCurrentWidget(m_defaultWidget);
+      }
       m_widget->removeWidget(m_subWidgets[i].widget);
       delete m_subWidgets[i].widget;
       m_subWidgets.erase(m_subWidgets.begin() + i);
@@ -92,7 +94,7 @@ void ZObjDetailedInfoWidget::removeWidgetOfObj(size_t id)
 
 void ZObjDetailedInfoWidget::updateWidgetLabelOfObj(size_t id)
 {
-  //LOG(INFO) << "..";
+  // LOG(INFO) << "..";
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
       m_subWidgets[i].infoLabel->setPlainText(m_doc.objDetailedInfo(id));

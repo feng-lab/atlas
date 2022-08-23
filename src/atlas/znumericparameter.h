@@ -11,7 +11,9 @@ class ZNumericParameter : public ZSingleValueParameter<T>
 {
 public:
   ZNumericParameter(const QString& name, T value, T min, T max, QObject* parent = nullptr)
-    : ZSingleValueParameter<T>(name, value, parent), m_min(min), m_max(max)
+    : ZSingleValueParameter<T>(name, value, parent)
+    , m_min(min)
+    , m_max(max)
   {
     if (std::numeric_limits<T>::is_integer) {
       m_step = 1;
@@ -21,20 +23,28 @@ public:
       m_decimal = 3;
     }
     m_tracking = true;
-    if (this->m_value < m_min)
+    if (this->m_value < m_min) {
       this->m_value = m_min;
-    if (this->m_value > m_max)
+    }
+    if (this->m_value > m_max) {
       this->m_value = m_max;
+    }
   }
 
   inline void setSingleStep(T v)
-  { m_step = v; }
+  {
+    m_step = v;
+  }
 
   inline void setTracking(bool t)
-  { m_tracking = t; }
+  {
+    m_tracking = t;
+  }
 
   inline void setDecimal(int d)
-  { m_decimal = d; }
+  {
+    m_decimal = d;
+  }
 
   void setRange(T min, T max)
   {
@@ -46,18 +56,27 @@ public:
   }
 
   void setPrefix(const QString& pre)
-  { m_prefix = pre; }
+  {
+    m_prefix = pre;
+  }
 
   void setSuffix(const QString& suf)
-  { m_suffix = suf; }
+  {
+    m_suffix = suf;
+  }
 
   [[nodiscard]] T rangeMin() const
-  { return m_min; }
+  {
+    return m_min;
+  }
 
   [[nodiscard]] T rangeMax() const
-  { return m_max; }
+  {
+    return m_max;
+  }
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override
   {
@@ -98,15 +117,16 @@ public:
 protected:
   void makeValid(T& value) const override
   {
-    if (value < m_min)
+    if (value < m_min) {
       value = m_min;
-    if (value > m_max)
+    }
+    if (value > m_max) {
       value = m_max;
+    }
   }
 
   // inherite this to notify associated widgets about the range change (Q_EMIT a signal)
-  virtual void changeRange()
-  {}
+  virtual void changeRange() {}
 
 protected:
   T m_min;
@@ -121,7 +141,8 @@ protected:
 
 class ZIntParameter : public ZNumericParameter<int>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZIntParameter(const QString& name, QObject* parent = nullptr);
 
@@ -149,7 +170,8 @@ protected:
 
 class ZDoubleParameter : public ZNumericParameter<double>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDoubleParameter(const QString& name, QObject* parent = nullptr);
 
@@ -177,7 +199,8 @@ protected:
 
 class ZFloatParameter : public ZNumericParameter<float>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZFloatParameter(const QString& name, QObject* parent = nullptr);
 
@@ -210,7 +233,10 @@ class ZNumericVectorParameter : public ZSingleValueParameter<T>
 {
 public:
   ZNumericVectorParameter(const QString& name, T value, T min, T max, QObject* parent = nullptr)
-    : ZSingleValueParameter<T>(name, value, parent), m_min(min), m_max(max), m_widgetOrientation(Qt::Vertical)
+    : ZSingleValueParameter<T>(name, value, parent)
+    , m_min(min)
+    , m_max(max)
+    , m_widgetOrientation(Qt::Vertical)
   {
     if (std::numeric_limits<typename T::value_type>::is_integer) {
       m_step = 1;
@@ -221,26 +247,36 @@ public:
     }
     m_tracking = true;
     for (size_t i = 0; i < this->m_value.length(); ++i) {
-      if (this->m_value[i] < m_min[i])
+      if (this->m_value[i] < m_min[i]) {
         this->m_value[i] = m_min[i];
-      if (this->m_value[i] > m_max[i])
+      }
+      if (this->m_value[i] > m_max[i]) {
         this->m_value[i] = m_max[i];
+      }
       m_nameOfEachValue.emplace_back("");
     }
   }
 
   inline void setSingleStep(typename T::value_type v)
-  { m_step = v; }
+  {
+    m_step = v;
+  }
 
   inline void setTracking(bool t)
-  { m_tracking = t; }
+  {
+    m_tracking = t;
+  }
 
   inline void setDecimal(int d)
-  { m_decimal = d; }
+  {
+    m_decimal = d;
+  }
 
   // default is vertical
   inline void setWidgetOrientation(Qt::Orientation o)
-  { m_widgetOrientation = o; }
+  {
+    m_widgetOrientation = o;
+  }
 
   void setNameForEachValue(const std::vector<QString>& other)
   {
@@ -251,21 +287,32 @@ public:
   // for some widget style all subwidgets be bound by a groupbox
   // default is empty
   inline void setGroupBoxName(const QString& name)
-  { m_groupBoxName = name; }
+  {
+    m_groupBoxName = name;
+  }
 
   [[nodiscard]] T rangeMin() const
-  { return m_min; }
+  {
+    return m_min;
+  }
 
   [[nodiscard]] T rangeMax() const
-  { return m_max; }
+  {
+    return m_max;
+  }
 
   void setPrefix(const QString& pre)
-  { m_prefix = pre; }
+  {
+    m_prefix = pre;
+  }
 
   void setSuffix(const QString& suf)
-  { m_suffix = suf; }
+  {
+    m_suffix = suf;
+  }
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override
   {
@@ -311,10 +358,12 @@ protected:
   void makeValid(T& value) const override
   {
     for (size_t i = 0; i < this->m_value.length(); ++i) {
-      if (value[i] < m_min[i])
+      if (value[i] < m_min[i]) {
         value[i] = m_min[i];
-      if (value[i] > m_max[i])
+      }
+      if (value[i] > m_max[i]) {
         value[i] = m_max[i];
+      }
     }
   }
 
@@ -325,7 +374,7 @@ protected:
   bool m_tracking;
   int m_decimal;
   Qt::Orientation m_widgetOrientation;
-  std::vector<QString> m_nameOfEachValue;   // default is empty string for each value
+  std::vector<QString> m_nameOfEachValue; // default is empty string for each value
   QString m_groupBoxName;
 
   QString m_prefix;
@@ -334,12 +383,16 @@ protected:
 
 class ZVec2Parameter : public ZNumericVectorParameter<glm::vec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZVec2Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZVec2Parameter(const QString& name, glm::vec2 value, glm::vec2 min = glm::vec2(0.f),
-                 glm::vec2 max = glm::vec2(1.f), QObject* parent = nullptr);
+  ZVec2Parameter(const QString& name,
+                 glm::vec2 value,
+                 glm::vec2 min = glm::vec2(0.f),
+                 glm::vec2 max = glm::vec2(1.f),
+                 QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -359,12 +412,16 @@ protected:
 
 class ZVec3Parameter : public ZNumericVectorParameter<glm::vec3>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZVec3Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZVec3Parameter(const QString& name, glm::vec3 value, glm::vec3 min = glm::vec3(0.f),
-                 glm::vec3 max = glm::vec3(1.f), QObject* parent = nullptr);
+  ZVec3Parameter(const QString& name,
+                 glm::vec3 value,
+                 glm::vec3 min = glm::vec3(0.f),
+                 glm::vec3 max = glm::vec3(1.f),
+                 QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -388,12 +445,16 @@ protected:
 
 class ZVec4Parameter : public ZNumericVectorParameter<glm::vec4>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZVec4Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZVec4Parameter(const QString& name, glm::vec4 value, glm::vec4 min = glm::vec4(0.f),
-                 glm::vec4 max = glm::vec4(1.f), QObject* parent = nullptr);
+  ZVec4Parameter(const QString& name,
+                 glm::vec4 value,
+                 glm::vec4 min = glm::vec4(0.f),
+                 glm::vec4 max = glm::vec4(1.f),
+                 QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -421,12 +482,16 @@ protected:
 
 class ZDVec2Parameter : public ZNumericVectorParameter<glm::dvec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDVec2Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZDVec2Parameter(const QString& name, glm::dvec2 value, glm::dvec2 min = glm::dvec2(0.f),
-                  glm::dvec2 max = glm::dvec2(1.f), QObject* parent = nullptr);
+  ZDVec2Parameter(const QString& name,
+                  glm::dvec2 value,
+                  glm::dvec2 min = glm::dvec2(0.f),
+                  glm::dvec2 max = glm::dvec2(1.f),
+                  QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -446,12 +511,16 @@ protected:
 
 class ZDVec3Parameter : public ZNumericVectorParameter<glm::dvec3>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDVec3Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZDVec3Parameter(const QString& name, glm::dvec3 value, glm::dvec3 min = glm::dvec3(0.f),
-                  glm::dvec3 max = glm::dvec3(1.f), QObject* parent = nullptr);
+  ZDVec3Parameter(const QString& name,
+                  glm::dvec3 value,
+                  glm::dvec3 min = glm::dvec3(0.f),
+                  glm::dvec3 max = glm::dvec3(1.f),
+                  QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -475,12 +544,16 @@ protected:
 
 class ZDVec4Parameter : public ZNumericVectorParameter<glm::dvec4>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDVec4Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZDVec4Parameter(const QString& name, glm::dvec4 value, glm::dvec4 min = glm::dvec4(0.f),
-                  glm::dvec4 max = glm::dvec4(1.f), QObject* parent = nullptr);
+  ZDVec4Parameter(const QString& name,
+                  glm::dvec4 value,
+                  glm::dvec4 min = glm::dvec4(0.f),
+                  glm::dvec4 max = glm::dvec4(1.f),
+                  QObject* parent = nullptr);
 
   void setValue1(double v);
 
@@ -508,12 +581,12 @@ protected:
 
 class ZIVec2Parameter : public ZNumericVectorParameter<glm::ivec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZIVec2Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZIVec2Parameter(const QString& name, glm::ivec2 value, glm::ivec2 min,
-                  glm::ivec2 max, QObject* parent = nullptr);
+  ZIVec2Parameter(const QString& name, glm::ivec2 value, glm::ivec2 min, glm::ivec2 max, QObject* parent = nullptr);
 
   void setValue1(int v);
 
@@ -533,12 +606,12 @@ protected:
 
 class ZIVec3Parameter : public ZNumericVectorParameter<glm::ivec3>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZIVec3Parameter(const QString& name, QObject* parent = nullptr);
 
-  ZIVec3Parameter(const QString& name, glm::ivec3 value, glm::ivec3 min,
-                  glm::ivec3 max, QObject* parent = nullptr);
+  ZIVec3Parameter(const QString& name, glm::ivec3 value, glm::ivec3 min, glm::ivec3 max, QObject* parent = nullptr);
 
   void setValue1(int v);
 
@@ -566,9 +639,15 @@ template<class T>
 class ZNumericSpanParameter : public ZSingleValueParameter<T>
 {
 public:
-  ZNumericSpanParameter(const QString& name, T value, typename T::value_type min, typename T::value_type max,
+  ZNumericSpanParameter(const QString& name,
+                        T value,
+                        typename T::value_type min,
+                        typename T::value_type max,
                         QObject* parent = nullptr)
-    : ZSingleValueParameter<T>(name, value, parent), m_min(min), m_max(max), m_widgetOrientation(Qt::Horizontal)
+    : ZSingleValueParameter<T>(name, value, parent)
+    , m_min(min)
+    , m_max(max)
+    , m_widgetOrientation(Qt::Horizontal)
   {
     if (std::numeric_limits<typename T::value_type>::is_integer) {
       m_step = 1;
@@ -579,27 +658,37 @@ public:
     }
     m_tracking = true;
     for (auto i = 0; i < 2; ++i) {
-      if (this->m_value[i] < m_min)
+      if (this->m_value[i] < m_min) {
         this->m_value[i] = m_min;
-      if (this->m_value[i] > m_max)
+      }
+      if (this->m_value[i] > m_max) {
         this->m_value[i] = m_max;
+      }
       m_nameOfEachValue.emplace_back(i == 0 ? "low" : "high");
     }
     m_groupBoxName = "Range";
   }
 
   inline void setSingleStep(typename T::value_type v)
-  { m_step = v; }
+  {
+    m_step = v;
+  }
 
   inline void setTracking(bool t)
-  { m_tracking = t; }
+  {
+    m_tracking = t;
+  }
 
   inline void setDecimal(int d)
-  { m_decimal = d; }
+  {
+    m_decimal = d;
+  }
 
   // default is horizonal
   inline void setWidgetOrientation(Qt::Orientation o)
-  { m_widgetOrientation = o; }
+  {
+    m_widgetOrientation = o;
+  }
 
   void setNameForEachValue(const std::vector<QString>& other)
   {
@@ -636,7 +725,9 @@ public:
   }
 
   [[nodiscard]] T range() const
-  { return T(m_min, m_max); }
+  {
+    return T(m_min, m_max);
+  }
 
   [[nodiscard]] typename T::value_type lowerValue() const
   {
@@ -661,15 +752,22 @@ public:
   // for some widget style all subwidgets be bound by a groupbox
   // default is empty
   inline void setGroupBoxName(const QString& name)
-  { m_groupBoxName = name; }
+  {
+    m_groupBoxName = name;
+  }
 
   void setPrefix(const QString& pre)
-  { m_prefix = pre; }
+  {
+    m_prefix = pre;
+  }
 
   void setSuffix(const QString& suf)
-  { m_suffix = suf; }
+  {
+    m_suffix = suf;
+  }
 
   // ZParameter interface
+
 public:
   void setSameAs(const ZParameter& rhs) override
   {
@@ -713,18 +811,20 @@ protected:
   void makeValid(T& value) const override
   {
     for (auto i = 0; i < 2; ++i) {
-      if (value[i] < m_min)
+      if (value[i] < m_min) {
         value[i] = m_min;
-      if (value[i] > m_max)
+      }
+      if (value[i] > m_max) {
         value[i] = m_max;
+      }
     }
-    if (value[0] > value[1])
+    if (value[0] > value[1]) {
       std::swap(value[0], value[1]);
+    }
   }
 
   // inherite this to notify associated widgets about the range change (Q_EMIT a signal)
-  virtual void changeRange()
-  {}
+  virtual void changeRange() {}
 
 protected:
   typename T::value_type m_min;
@@ -743,12 +843,12 @@ protected:
 
 class ZIntSpanParameter : public ZNumericSpanParameter<glm::ivec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZIntSpanParameter(const QString& name, QObject* parent = nullptr);
 
-  ZIntSpanParameter(const QString& name, glm::ivec2 value, int min,
-                    int max, QObject* parent = nullptr);
+  ZIntSpanParameter(const QString& name, glm::ivec2 value, int min, int max, QObject* parent = nullptr);
 
   void setLowerValue(int v);
 
@@ -772,12 +872,12 @@ protected:
 
 class ZFloatSpanParameter : public ZNumericSpanParameter<glm::vec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZFloatSpanParameter(const QString& name, QObject* parent = nullptr);
 
-  ZFloatSpanParameter(const QString& name, glm::vec2 value, float min,
-                      float max, QObject* parent = nullptr);
+  ZFloatSpanParameter(const QString& name, glm::vec2 value, float min, float max, QObject* parent = nullptr);
 
   void setLowerValue(double v);
 
@@ -801,12 +901,12 @@ protected:
 
 class ZDoubleSpanParameter : public ZNumericSpanParameter<glm::dvec2>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZDoubleSpanParameter(const QString& name, QObject* parent = nullptr);
 
-  ZDoubleSpanParameter(const QString& name, glm::dvec2 value, double min,
-                       double max, QObject* parent = nullptr);
+  ZDoubleSpanParameter(const QString& name, glm::dvec2 value, double min, double max, QObject* parent = nullptr);
 
   void setLowerValue(double v);
 
@@ -829,4 +929,3 @@ protected:
 };
 
 } // namespace nim
-

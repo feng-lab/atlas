@@ -11,7 +11,12 @@ class Z3DShader
 public:
   enum class Type
   {
-    Vertex, Fragment, Geometry, TessellationControl, TessellationEvaluation, Compute
+    Vertex,
+    Fragment,
+    Geometry,
+    TessellationControl,
+    TessellationEvaluation,
+    Compute
   };
 
   explicit Z3DShader(Z3DShader::Type type);
@@ -23,7 +28,9 @@ public:
   Z3DShader& operator=(const Z3DShader&) = delete;
 
   [[nodiscard]] Z3DShader::Type shaderType() const
-  { return m_type; }
+  {
+    return m_type;
+  }
 
   void compileSourceCode(const char* source);
 
@@ -32,13 +39,19 @@ public:
   [[nodiscard]] std::string sourceCode() const;
 
   [[nodiscard]] bool isCompiled() const
-  { return m_compiled; }
+  {
+    return m_compiled;
+  }
 
   [[nodiscard]] unsigned int shaderId() const
-  { return m_id; }
+  {
+    return m_id;
+  }
 
   [[nodiscard]] Z3DContextGroup context() const
-  { return m_context; }
+  {
+    return m_context;
+  }
 
 private:
   Type m_type;
@@ -48,4 +61,3 @@ private:
 };
 
 } // namespace nim
-

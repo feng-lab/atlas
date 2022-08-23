@@ -61,16 +61,17 @@ QStringList ZLoadImageSequenceDialog::selectedFiles()
 
 Dimension ZLoadImageSequenceDialog::alongDimension()
 {
-  if (m_catDimension.isSelected("X"))
+  if (m_catDimension.isSelected("X")) {
     return Dimension::X;
-  else if (m_catDimension.isSelected("Y"))
+  } else if (m_catDimension.isSelected("Y")) {
     return Dimension::Y;
-  else if (m_catDimension.isSelected("Z"))
+  } else if (m_catDimension.isSelected("Z")) {
     return Dimension::Z;
-  else if (m_catDimension.isSelected("C"))
+  } else if (m_catDimension.isSelected("C")) {
     return Dimension::C;
-  else
+  } else {
     return Dimension::T;
+  }
 }
 
 } // namespace nim

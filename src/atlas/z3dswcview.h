@@ -8,7 +8,8 @@ namespace nim {
 
 class Z3DSwcView : public Z3DFilterView<ZSwcDoc, Z3DSwcFilter>
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   Z3DSwcView(ZSwcDoc& doc, Z3DView& view);
 
@@ -19,4 +20,3 @@ private:
 };
 
 } // namespace nim
-

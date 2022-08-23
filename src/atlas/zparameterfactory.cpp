@@ -66,8 +66,9 @@ bool ZParameterFactory::isTypeValid(const QString& type)
 ZParameter* ZParameterFactory::create(const QString& name, const QString& type, QObject* parent) const
 {
   auto it = m_makers.find(type);
-  if (it == m_makers.end())
+  if (it == m_makers.end()) {
     return nullptr;
+  }
   return it->second->create(name, parent);
 }
 

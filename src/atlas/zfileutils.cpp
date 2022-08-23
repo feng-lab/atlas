@@ -14,8 +14,9 @@ namespace nim {
 void ZFileUtils::showInGraphicalShell(const QString& filePath)
 {
   QFileInfo info(filePath);
-  if (!info.exists())
+  if (!info.exists()) {
     return;
+  }
 
 #ifdef Q_OS_MAC
   QStringList args;
@@ -32,8 +33,8 @@ void ZFileUtils::showInGraphicalShell(const QString& filePath)
   QStringList args;
   args << "/select," << QDir::toNativeSeparators(filePath);
   QProcess::startDetached("explorer", args);
-  //QString command = "explorer " + param;
-  //QProcess::startDetached(command);
+  // QString command = "explorer " + param;
+  // QProcess::startDetached(command);
 #else
   if (QFileInfo("/usr/bin/nautilus").exists() || QFileInfo("/usr/local/bin/nautilus").exists()) {
     QStringList args;
@@ -45,8 +46,12 @@ void ZFileUtils::showInGraphicalShell(const QString& filePath)
 #endif
 }
 
-QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, const QString& dir, const QString& filter,
-                                    QString* selectedFilter, QFileDialog::Options options)
+QString ZFileUtils::getSaveFileName(QWidget* parent,
+                                    const QString& caption,
+                                    const QString& dir,
+                                    const QString& filter,
+                                    QString* selectedFilter,
+                                    QFileDialog::Options options)
 {
 #if defined(Q_OS_DARWIN) || defined(Q_OS_WIN)
   return QFileDialog::getSaveFileName(parent, caption, dir, filter, selectedFilter, options);
@@ -61,13 +66,13 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
   dialog.setOptions(options);
   QRegularExpression filter_regex(QString(R"((?:^\*\.(?!.*\()|\(\*\.)(\w+))"));
   QStringList filters = filter.split(QString(";;"));
-//  if (!filters.isEmpty()) {
-//    dialog.setNameFilter(filters.first());
-//    if (filter_regex.indexIn(filters.first()) != -1) {
-//      //LOG(INFO) << filter_regex.cap(1);
-//      dialog.setDefaultSuffix(filter_regex.cap(1));
-//    }
-//  }
+  //  if (!filters.isEmpty()) {
+  //    dialog.setNameFilter(filters.first());
+  //    if (filter_regex.indexIn(filters.first()) != -1) {
+  //      //LOG(INFO) << filter_regex.cap(1);
+  //      dialog.setDefaultSuffix(filter_regex.cap(1));
+  //    }
+  //  }
   dialog.setAcceptMode(QFileDialog::AcceptSave);
   QString res;
   do {
@@ -77,20 +82,21 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
       }
       res = dialog.selectedFiles().first();
       QFileInfo info(res);
-      //LOG(INFO) << file_name << " " << dialog.selectedNameFilter();
+      // LOG(INFO) << file_name << " " << dialog.selectedNameFilter();
       if (info.suffix().isEmpty() && !dialog.selectedNameFilter().isEmpty()) {
         auto match = filter_regex.match(dialog.selectedNameFilter());
         if (match.hasMatch()) {
           QString extension = match.captured(1);
-          //LOG(INFO) << extension;
+          // LOG(INFO) << extension;
           res += QString(".") + extension;
 
           info.setFile(res);
           if (info.exists()) {
-            if (QMessageBox::Yes !=
-                QMessageBox::question(&dialog, QString(),
-                                      QString("A file named '%1' already exists. "
-                                                "Do you want to replace it?").arg(res))) {
+            if (QMessageBox::Yes != QMessageBox::question(&dialog,
+                                                          QString(),
+                                                          QString("A file named '%1' already exists. "
+                                                                  "Do you want to replace it?")
+                                                            .arg(res))) {
               res.clear();
             }
           }
@@ -105,4 +111,3 @@ QString ZFileUtils::getSaveFileName(QWidget* parent, const QString& caption, con
 }
 
 } // namespace nim
-

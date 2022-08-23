@@ -107,7 +107,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   std::vector<const void*> res;
   if (ascend) {
     std::multimap<int, const void*> dist2obj;
-    for (auto&[color, dist] : col2dist) {
+    for (auto& [color, dist] : col2dist) {
       const void* obj = objectOfColor(color);
       if (obj) {
         dist2obj.emplace(dist, obj);
@@ -118,7 +118,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
     }
   } else {
     std::multimap<int, const void*, std::greater<>> dist2obj;
-    for (auto&[color, dist] : col2dist) {
+    for (auto& [color, dist] : col2dist) {
       const void* obj = objectOfColor(color);
       if (obj) {
         dist2obj.emplace(dist, obj);
@@ -144,7 +144,7 @@ void Z3DPickingManager::increaseColor()
     m_currentColor = bit_cast<glm::col4>(col);
   } else {
     m_currentColor = glm::col4(0, 0, 0, 128);
-    //LOG(ERROR) << "Out of colors...";
+    // LOG(ERROR) << "Out of colors...";
   }
 }
 

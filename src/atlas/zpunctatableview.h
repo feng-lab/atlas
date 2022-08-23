@@ -13,7 +13,8 @@ namespace nim {
 
 class ZPunctaTableView : public QTableView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZPunctaTableView(ZPunctaTableModel& objModel, ZPunctaPack& p, ZDoc& doc, QWidget* parent = nullptr);
 
@@ -48,4 +49,3 @@ private:
 };
 
 } // namespace nim
-

@@ -28,8 +28,9 @@ ZViewSettingWidget::ZViewSettingWidget(ZDoc& doc, ZViewSettingInterface* view, Q
 
 void ZViewSettingWidget::showDefaultWidget()
 {
-  if (m_widget->currentWidget() != m_defaultWidget)
+  if (m_widget->currentWidget() != m_defaultWidget) {
     m_widget->setCurrentWidget(m_defaultWidget);
+  }
 }
 
 void ZViewSettingWidget::showViewSettingWidgetOfObj(size_t id)
@@ -74,8 +75,9 @@ void ZViewSettingWidget::removeViewSettingWidgetOfObj(size_t id)
 {
   for (size_t i = 0; i < m_subWidgets.size(); ++i) {
     if (m_subWidgets[i].id == id) {
-      if (m_widget->currentWidget() == m_subWidgets[i].widget)
+      if (m_widget->currentWidget() == m_subWidgets[i].widget) {
         m_widget->setCurrentWidget(m_defaultWidget);
+      }
       m_widget->removeWidget(m_subWidgets[i].widget);
       delete m_subWidgets[i].widget;
       m_subWidgets.erase(m_subWidgets.begin() + i);

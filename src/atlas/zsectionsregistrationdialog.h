@@ -13,7 +13,8 @@ namespace nim {
 
 class ZSectionsRegistrationDialog : public ZImgProcessDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZSectionsRegistrationDialog(QWidget* parent = nullptr);
 
@@ -59,4 +60,3 @@ private:
 };
 
 } // namespace nim
-

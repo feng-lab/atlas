@@ -11,12 +11,21 @@ namespace nim {
 
 class ZPunctaTableModel : public QAbstractTableModel
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   enum Column
   {
-    ScoreColumn, XColumn, YColumn, ZColumn, RadiusColumn, VolSizeColumn, MassColumn,
-    MeanIntensityColumn, MaxIntensityColumn, SDIntensityColumn,
+    ScoreColumn,
+    XColumn,
+    YColumn,
+    ZColumn,
+    RadiusColumn,
+    VolSizeColumn,
+    MassColumn,
+    MeanIntensityColumn,
+    MaxIntensityColumn,
+    SDIntensityColumn,
     ColumnCount
   };
 
@@ -24,8 +33,7 @@ public:
 
   [[nodiscard]] QVariant data(const QModelIndex& index, int role) const override;
 
-  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation,
-                                    int role) const override;
+  [[nodiscard]] QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
   [[nodiscard]] int rowCount(const QModelIndex& parent) const override;
 
@@ -44,4 +52,3 @@ protected:
 };
 
 } // namespace nim
-

@@ -16,8 +16,7 @@ ZPunctaPack::ZPunctaPack(ZPuncta puncta, const QString& path, size_t id, ZPuncta
   updateDerivedData();
   updateViewRelatedData();
   createContextMenu();
-  connect(&m_undoStack, &QUndoStack::cleanChanged,
-          this, &ZPunctaPack::undoStackCleanChanged);
+  connect(&m_undoStack, &QUndoStack::cleanChanged, this, &ZPunctaPack::undoStackCleanChanged);
 }
 
 ZPunctaPack::~ZPunctaPack()
@@ -42,7 +41,7 @@ QMenu& ZPunctaPack::contextMenu()
   return m_contextMenu;
 }
 
-void ZPunctaPack::save(const QString &fileName, const QString &format)
+void ZPunctaPack::save(const QString& fileName, const QString& format)
 {
   m_puncta.save(fileName, format);
   m_path = QFileInfo(fileName).canonicalFilePath();
@@ -113,7 +112,8 @@ void ZPunctaPack::deleteSelectedPuncta()
     return;
   }
   m_undoStack.push(new ZPunctaEditCommand(QString("Deleted Selected %1 Puncta").arg(m_selectedPuncta.size()),
-                                          *this, m_selectedPuncta));
+                                          *this,
+                                          m_selectedPuncta));
 }
 
 void ZPunctaPack::transferSelectedPuncta()
@@ -132,10 +132,13 @@ void ZPunctaPack::transferSelectedPuncta()
       selected.push_back(*p);
     }
     m_undoStack.push(new ZPunctaEditCommand(QString("Transfer Selected %1 Puncta").arg(m_selectedPuncta.size()),
-                                            *this, m_selectedPuncta));
+                                            *this,
+                                            m_selectedPuncta));
     targetPunctaPack.m_undoStack.push(
       new ZPunctaEditCommand(QString("Accept Transferred %1 Puncta").arg(selected.size()),
-                             targetPunctaPack, std::set<const ZPunctum*>(), selected));
+                             targetPunctaPack,
+                             std::set<const ZPunctum*>(),
+                             selected));
   }
 }
 
@@ -150,7 +153,9 @@ void ZPunctaPack::mergeSelectedPuncta()
   }
   auto mergedPunctum = ZPunctum::merge(selected.begin(), selected.end());
   m_undoStack.push(new ZPunctaEditCommand(QString("Merge Selected %1 Puncta").arg(m_selectedPuncta.size()),
-                                          *this, m_selectedPuncta, std::list<ZPunctum>{mergedPunctum}));
+                                          *this,
+                                          m_selectedPuncta,
+                                          std::list<ZPunctum>{mergedPunctum}));
 }
 
 void ZPunctaPack::splitSelectedPunctum()
@@ -159,13 +164,20 @@ void ZPunctaPack::splitSelectedPunctum()
     return;
   }
   bool ok = false;
-  int numParts = QInputDialog::getInt(QApplication::activeWindow(), tr("Split Punctum"),
-                                       tr("Number of Parts to Split Into:"),
-                                       2, 2, 10, 1, &ok);
+  int numParts = QInputDialog::getInt(QApplication::activeWindow(),
+                                      tr("Split Punctum"),
+                                      tr("Number of Parts to Split Into:"),
+                                      2,
+                                      2,
+                                      10,
+                                      1,
+                                      &ok);
   if (ok) {
     auto splitedPuncta = (*m_selectedPuncta.begin())->split(numParts);
     m_undoStack.push(new ZPunctaEditCommand(QString("Merge Selected %1 Puncta").arg(m_selectedPuncta.size()),
-                                            *this, m_selectedPuncta, splitedPuncta));
+                                            *this,
+                                            m_selectedPuncta,
+                                            splitedPuncta));
   }
 }
 
@@ -199,8 +211,7 @@ void ZPunctaPack::createContextMenu()
 
   m_transferSelectedPunctaToAnotherFileAction = new QAction(tr("Transfer Selected Puncta to Another File..."), this);
   m_transferSelectedPunctaToAnotherFileAction->setStatusTip(tr("Transfer the selected puncta to another puncta file"));
-  connect(m_transferSelectedPunctaToAnotherFileAction, &QAction::triggered,
-          this, &ZPunctaPack::transferSelectedPuncta);
+  connect(m_transferSelectedPunctaToAnotherFileAction, &QAction::triggered, this, &ZPunctaPack::transferSelectedPuncta);
 
   m_mergeSelectedPuntaAction = new QAction(tr("Merge Selected Puncta"), this);
   m_mergeSelectedPuntaAction->setStatusTip(tr("Merge selected puncta into 1 punctum"));

@@ -117,7 +117,7 @@ void Z3DCameraControlWidget::createWidget()
   auto* hlo = new QHBoxLayout;
   auto* azimuthButton = new QPushButton("Azimuth Camera", this);
   azimuthButton->setToolTip("Rotate the camera about the view up vector centered at the focal point. "
-                              "The result is a horizontal rotation of the camera.");
+                            "The result is a horizontal rotation of the camera.");
   hlo->addWidget(azimuthButton);
   connect(azimuthButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::azimuth);
   m_azimuthDegreeSpinBox = new QSpinBox(this);
@@ -132,8 +132,8 @@ void Z3DCameraControlWidget::createWidget()
   auto* elevationButton = new QPushButton("Elevation Camera", this);
   elevationButton->setToolTip(
     "Rotate the camera about the cross product of the view up vector and the view vector (point at left in screen), "
-      "using the focal point as the center of rotation. "
-      "The result is a vertical rotation of the scene.");
+    "using the focal point as the center of rotation. "
+    "The result is a vertical rotation of the scene.");
   hlo->addWidget(elevationButton);
   connect(elevationButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::elevation);
   m_elevationDegreeSpinBox = new QSpinBox(this);
@@ -147,7 +147,7 @@ void Z3DCameraControlWidget::createWidget()
   hlo = new QHBoxLayout;
   auto* rollButton = new QPushButton("Roll Camera", this);
   rollButton->setToolTip("Rotate the camera about the view vector. "
-                           "This will spin the camera about its axis.");
+                         "This will spin the camera about its axis.");
   hlo->addWidget(rollButton);
   connect(rollButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::roll);
   m_rollDegreeSpinBox = new QSpinBox(this);
@@ -161,8 +161,8 @@ void Z3DCameraControlWidget::createWidget()
   hlo = new QHBoxLayout;
   auto* yawButton = new QPushButton("Yaw Camera", this);
   yawButton->setToolTip("Rotate the focal point about the view up vector, "
-                          "using the camera's position as the center of rotation. "
-                          "The result is a horizontal rotation of the scene.");
+                        "using the camera's position as the center of rotation. "
+                        "The result is a horizontal rotation of the scene.");
   hlo->addWidget(yawButton);
   connect(yawButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::yaw);
   m_yawDegreeSpinBox = new QSpinBox(this);
@@ -173,13 +173,12 @@ void Z3DCameraControlWidget::createWidget()
   hlo->addWidget(m_yawDegreeSpinBox);
   vlo->addLayout(hlo);
 
-
   hlo = new QHBoxLayout;
   auto* pitchButton = new QPushButton("Pitch Camera", this);
   pitchButton->setToolTip(
     "Rotate the focal point about the cross product of the view vector and the view up vector (point right in screen), "
-      "using the camera's position as the center of rotation. "
-      "The result is a vertical rotation of the camera.");
+    "using the camera's position as the center of rotation. "
+    "The result is a vertical rotation of the camera.");
   hlo->addWidget(pitchButton);
   connect(pitchButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::pitch);
   m_pitchDegreeSpinBox = new QSpinBox(this);
@@ -191,16 +190,14 @@ void Z3DCameraControlWidget::createWidget()
   vlo->addLayout(hlo);
 
   m_focusOnButton = new QPushButton("Focuses on Objects...", this);
-  m_focusOnButton->setToolTip(
-    "Set the camera to focus on the selected objects");
+  m_focusOnButton->setToolTip("Set the camera to focus on the selected objects");
   connect(m_focusOnButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::focusOn);
   vlo->addWidget(m_focusOnButton);
 
   m_focusOnIgnoreClippingButton = new QPushButton("Focuses on Objects (ignore clipping)...", this);
   m_focusOnIgnoreClippingButton->setToolTip(
     "Set the camera to focus on the selected objects, clipping of selected objects are ignored.");
-  connect(m_focusOnIgnoreClippingButton, &QPushButton::clicked,
-          this, &Z3DCameraControlWidget::focusOnIgnoreClipping);
+  connect(m_focusOnIgnoreClippingButton, &QPushButton::clicked, this, &Z3DCameraControlWidget::focusOnIgnoreClipping);
   vlo->addWidget(m_focusOnIgnoreClippingButton);
 
   m_moveCenterButton = new QPushButton("Camera Points to Objects...", this);
@@ -213,8 +210,10 @@ void Z3DCameraControlWidget::createWidget()
   m_moveCenterIgnoreClippingButton->setToolTip(
     "Move the center of camera to the center of selected objects ignoring their clippings, "
     "camera position will not be changed.");
-  connect(m_moveCenterIgnoreClippingButton, &QPushButton::clicked,
-          this, &Z3DCameraControlWidget::pointsToIgnoreClipping);
+  connect(m_moveCenterIgnoreClippingButton,
+          &QPushButton::clicked,
+          this,
+          &Z3DCameraControlWidget::pointsToIgnoreClipping);
   vlo->addWidget(m_moveCenterIgnoreClippingButton);
 
   hlo = new QHBoxLayout;

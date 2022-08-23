@@ -17,7 +17,9 @@ public:
 
   // must call
   void setDevicePixelRatio(double dpr)
-  { m_devicePixelRatio = dpr; }
+  {
+    m_devicePixelRatio = dpr;
+  }
 
   glm::col4 registerObject(const void* obj);
 
@@ -30,7 +32,9 @@ public:
   glm::col4 colorOfObject(const void* obj);
 
   glm::vec4 fColorOfObject(const void* obj)
-  { return glm::vec4(glm::vec4(colorOfObject(obj)) / 255.f); }
+  {
+    return glm::vec4(glm::vec4(colorOfObject(obj)) / 255.f);
+  }
 
   const void* objectOfColor(const glm::col4& col);
 
@@ -41,24 +45,36 @@ public:
   std::vector<const void*> sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius = -1, bool ascend = true);
 
   bool isHit(const glm::ivec2& pos, const void* obj)
-  { return (objectAtWidgetPos(pos) == obj); }
+  {
+    return (objectAtWidgetPos(pos) == obj);
+  }
 
   void bindTarget()
-  { m_renderTarget->bind(); }
+  {
+    m_renderTarget->bind();
+  }
 
   void releaseTarget()
-  { m_renderTarget->release(); }
+  {
+    m_renderTarget->release();
+  }
 
   static void clearTarget();
 
   Z3DRenderTarget& renderTarget() const
-  { return *m_renderTarget; }
+  {
+    return *m_renderTarget;
+  }
 
   bool isRegistered(const void* obj)
-  { return m_objectToColor.find(obj) != m_objectToColor.end(); }
+  {
+    return m_objectToColor.find(obj) != m_objectToColor.end();
+  }
 
   bool isRegistered(const glm::col4& col)
-  { return m_colorToObject.find(col) != m_colorToObject.end(); }
+  {
+    return m_colorToObject.find(col) != m_colorToObject.end();
+  }
 
 private:
   void increaseColor();
@@ -72,4 +88,3 @@ private:
 };
 
 } // namespace nim
-

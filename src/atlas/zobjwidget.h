@@ -16,7 +16,8 @@ class ZObjModel;
 
 class ZObjWidget : public QTreeView
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* selectionModel, QWidget* parent = nullptr);
 
@@ -43,4 +44,3 @@ private:
 };
 
 } // namespace nim
-

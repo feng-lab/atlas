@@ -50,19 +50,13 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
   m_layout->addWidget(m_label);
 
   m_scene = new ZGraphicsScene(this);
-  connect(m_scene, &ZGraphicsScene::mousePressed,
-          this, &ZView::mousePressed);
-  connect(m_scene, &ZGraphicsScene::mouseMoved,
-          this, &ZView::mouseMoved);
-  connect(m_scene, &ZGraphicsScene::mouseReleased,
-          this, &ZView::mouseReleased);
-  connect(m_scene, &ZGraphicsScene::selectionChanged,
-          this, &ZView::selectionChanged);
+  connect(m_scene, &ZGraphicsScene::mousePressed, this, &ZView::mousePressed);
+  connect(m_scene, &ZGraphicsScene::mouseMoved, this, &ZView::mouseMoved);
+  connect(m_scene, &ZGraphicsScene::mouseReleased, this, &ZView::mouseReleased);
+  connect(m_scene, &ZGraphicsScene::selectionChanged, this, &ZView::selectionChanged);
   m_view = new ZGraphicsView(m_scene, this);
-  connect(m_view, &ZGraphicsView::viewportChanged,
-          this, &ZView::viewportChanged);
-  connect(m_view, &ZGraphicsView::viewportChanged,
-          this, &ZView::updateMontageScene);
+  connect(m_view, &ZGraphicsView::viewportChanged, this, &ZView::viewportChanged);
+  connect(m_view, &ZGraphicsView::viewportChanged, this, &ZView::updateMontageScene);
 
   m_montageScene = new QGraphicsScene(this);
 
@@ -93,8 +87,7 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
 
   setLayout(m_layout);
 
-  connect(&m_doc, &ZDoc::requestToAdjustViewToPosition,
-          this, &ZView::gotoPosition);
+  connect(&m_doc, &ZDoc::requestToAdjustViewToPosition, this, &ZView::gotoPosition);
 
   m_roiMode = new ZStringIntOptionParameter("ROI Mode", this);
   m_roiMode->addOptions("RegionAnnotation", "ROI");
@@ -103,7 +96,7 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
 
 ZView::~ZView()
 {
-  m_objViews.clear();  // objviews hold some reference to view's member, so they should die first
+  m_objViews.clear(); // objviews hold some reference to view's member, so they should die first
 }
 
 QWidget* ZView::createScaleWidget(QWidget* parent)
@@ -114,7 +107,7 @@ QWidget* ZView::createScaleWidget(QWidget* parent)
 QToolButton* ZView::createROIToolButton(QWidget* parent)
 {
   auto res = new QToolButton(parent);
-  //res->setCheckable(true);
+  // res->setCheckable(true);
   res->addAction(m_roiSplineAction);
   res->addAction(m_roiPolygonAction);
   res->addAction(m_roiRectangleAction);
@@ -188,29 +181,32 @@ ZRegionAnnotationPack& ZView::currentRegionAnnotationPack()
 
 ZView::State ZView::state() const
 {
-  if (m_roiEllipseAction->isChecked())
+  if (m_roiEllipseAction->isChecked()) {
     return State::ROIEllipse;
-  if (m_roiRectangleAction->isChecked())
+  }
+  if (m_roiRectangleAction->isChecked()) {
     return State::ROIRect;
-  if (m_roiPolygonAction->isChecked())
+  }
+  if (m_roiPolygonAction->isChecked()) {
     return State::ROIPolygon;
-  if (m_roiSplineAction->isChecked())
+  }
+  if (m_roiSplineAction->isChecked()) {
     return State::ROISpline;
-  if (m_roiCutLineAction->isChecked())
+  }
+  if (m_roiCutLineAction->isChecked()) {
     return State::ROICut;
+  }
 
   return State::Normal;
 }
 
 QWidget* ZView::captureWidget() const
 {
-  //auto res = new QScrollArea();
+  // auto res = new QScrollArea();
   auto m_screenShotWidget = new ZTakeScreenShotWidget(true, false, nullptr);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot,
-          this, &ZView::takeScreenShot);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot,
-          this, &ZView::takeFixedSizeScreenShot);
-  //res->setWidget(m_screenShotWidget);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take2DScreenShot, this, &ZView::takeScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeFixedSize2DScreenShot, this, &ZView::takeFixedSizeScreenShot);
+  // res->setWidget(m_screenShotWidget);
   return m_screenShotWidget;
 }
 
@@ -250,8 +246,9 @@ void ZView::updateBoundBox()
   m_zoomOutAction->setEnabled(m_doc.hasObj());
   m_imgViewStyleActionGroup->setEnabled(m_doc.hasObj() && m_boundBox.maxCorner.z > m_boundBox.minCorner.z);
 
-  if (m_imgSlice->get() != sliceBefore || m_imgTime->get() != timeBefore)
+  if (m_imgSlice->get() != sliceBefore || m_imgTime->get() != timeBefore) {
     sliceChanged();
+  }
 }
 
 void ZView::setInfo(double x, double y)
@@ -276,12 +273,14 @@ void ZView::registerObjView(std::unique_ptr<ZObjView>&& v)
 
 std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
 {
-  if (id == 1 || id == 2 || id == 3)
+  if (id == 1 || id == 2 || id == 3) {
     return std::shared_ptr<ZWidgetsGroup>();
+  }
   for (const auto& view : m_objViews) {
     std::shared_ptr<ZWidgetsGroup> wg = view->viewSettingWidgetsGroupOf(id);
-    if (wg)
+    if (wg) {
       return wg;
+    }
   }
   return std::shared_ptr<ZWidgetsGroup>();
 }
@@ -301,8 +300,8 @@ void ZView::read(size_t id, const json::object& json)
       if (asQString(json.at("ViewObjType")) == view->doc().typeName()) {
         view->read(id, json);
       } else {
-        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType"))
-                     << " does not match object type " << view->doc().typeName() << ". abort.";
+        LOG(WARNING) << "view object type " << asQString(json.at("ViewObjType")) << " does not match object type "
+                     << view->doc().typeName() << ". abort.";
       }
       return;
     }
@@ -351,8 +350,7 @@ void ZView::gotoPosition(double x, double y, double z, double radius)
   if (currentViewStyle() == ViewStyle::Normal) {
     m_imgSlice->set(std::round(z));
   }
-  QRectF sceneRect(x - radius, y - radius,
-                   radius * 2 + 1, radius * 2 + 1);
+  QRectF sceneRect(x - radius, y - radius, radius * 2 + 1, radius * 2 + 1);
   m_view->fitRect(sceneRect);
 }
 
@@ -456,8 +454,9 @@ ZView::ViewStyle ZView::currentViewStyle() const
 
 void ZView::sliceChanged()
 {
-  if (m_doNotReceiveSliceSignal)
+  if (m_doNotReceiveSliceSignal) {
     return;
+  }
 
   if (currentViewStyle() == ViewStyle::MIP) {
     for (const auto& view : m_objViews) {
@@ -505,12 +504,14 @@ void ZView::triggerMontageView(bool v)
 
 void ZView::changeViewStyle()
 {
-  if (!m_doc.hasObj())
+  if (!m_doc.hasObj()) {
     return;
+  }
 
   if (currentViewStyle() == ViewStyle::MIP) {
-    if (!m_maxZProjViewAction->isChecked())
+    if (!m_maxZProjViewAction->isChecked()) {
       m_maxZProjViewAction->setChecked(true);
+    }
 
     if (m_view->scene() != m_scene) {
       m_scene->disconnect(m_montageScene);
@@ -525,8 +526,9 @@ void ZView::changeViewStyle()
 
     m_imgSlice->setEnabled(false);
   } else if (currentViewStyle() == ViewStyle::Normal) {
-    if (!m_normalViewAction->isChecked())
+    if (!m_normalViewAction->isChecked()) {
       m_normalViewAction->setChecked(true);
+    }
 
     if (m_view->scene() != m_scene) {
       m_scene->disconnect(m_montageScene);
@@ -552,7 +554,7 @@ void ZView::changeViewStyle()
     }
 
     updateMontageScene();
-//    connect(m_scene, &ZGraphicsScene::changed, this, &ZView::emptyFun);
+    //    connect(m_scene, &ZGraphicsScene::changed, this, &ZView::emptyFun);
     connect(m_scene, &ZGraphicsScene::changed, this, &ZView::updateMontageScene);
 
     m_imgSlice->setEnabled(false);
@@ -562,10 +564,7 @@ void ZView::changeViewStyle()
 
 void ZView::changeViewport()
 {
-  QRectF rect = QRectF(m_viewport->get().x,
-                       m_viewport->get().y,
-                       m_viewport->get().z,
-                       m_viewport->get().w);
+  QRectF rect = QRectF(m_viewport->get().x, m_viewport->get().y, m_viewport->get().z, m_viewport->get().w);
   if (rect != m_view->getCurrrentlyVisibleRegion() && rect.isValid()) {
     m_view->fitRect(rect);
   }
@@ -642,8 +641,9 @@ void ZView::keyPressEvent(QKeyEvent* event)
       break;
     case Qt::Key_Right:
       if (event->modifiers() == Qt::NoModifier || event->modifiers() == Qt::KeypadModifier) {
-        if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax())
+        if (m_normalViewAction->isChecked() && m_imgSlice->get() < m_imgSlice->rangeMax()) {
           m_imgSlice->set(m_imgSlice->get() + 1);
+        }
       }
       break;
     case Qt::Key_Backspace:
@@ -685,12 +685,12 @@ void ZView::createActions()
   m_pasteAction->setShortcut(QKeySequence::Paste);
   connect(m_pasteAction, &QAction::triggered, this, &ZView::paste);
 
-//  m_deleteAction = new QAction(tr("&Delete"), this);
-//  m_deleteAction->setStatusTip(tr("Delete Selected Items"));
-//  QList<QKeySequence> deleteKey;
-//  deleteKey << QKeySequence::Delete << QKeySequence(Qt::Key_Backspace);
-//  m_deleteAction->setShortcuts(deleteKey);
-//  connect(m_deleteAction, &QAction::triggered, this, &ZView::deleteKeyPressed);
+  //  m_deleteAction = new QAction(tr("&Delete"), this);
+  //  m_deleteAction->setStatusTip(tr("Delete Selected Items"));
+  //  QList<QKeySequence> deleteKey;
+  //  deleteKey << QKeySequence::Delete << QKeySequence(Qt::Key_Backspace);
+  //  m_deleteAction->setShortcuts(deleteKey);
+  //  connect(m_deleteAction, &QAction::triggered, this, &ZView::deleteKeyPressed);
 
   m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
   QList<QKeySequence> zoomInKey;
@@ -711,7 +711,8 @@ void ZView::createActions()
   m_normalViewAction->setStatusTip(tr("Default Image View"));
   connect(m_normalViewAction, &QAction::toggled, this, &ZView::triggerNormalView);
 
-  m_maxZProjViewAction = new QAction(ZTheme::instance().icon(ZTheme::ProjectionViewIcon), tr("&Maximum Z Projection"), this);
+  m_maxZProjViewAction =
+    new QAction(ZTheme::instance().icon(ZTheme::ProjectionViewIcon), tr("&Maximum Z Projection"), this);
   m_maxZProjViewAction->setCheckable(true);
   m_maxZProjViewAction->setStatusTip(tr("Maximum Project Image Along Dimension Z"));
   connect(m_maxZProjViewAction, &QAction::toggled, this, &ZView::triggerMaxZProjView);
@@ -753,7 +754,8 @@ void ZView::createActions()
   setViewDragMode(m_rubberBandDragAction);
   connect(m_dragModeActionGroup, &QActionGroup::triggered, this, &ZView::setViewDragMode);
 
-  m_roiRectangleAction = new QAction(ZTheme::instance().icon(ZTheme::RectangleIcon), tr("&Rectangular Selections"), this);
+  m_roiRectangleAction =
+    new QAction(ZTheme::instance().icon(ZTheme::RectangleIcon), tr("&Rectangular Selections"), this);
   m_roiRectangleAction->setCheckable(true);
   m_roiRectangleAction->setStatusTip(tr("Make Rectangular Selections"));
 
@@ -790,7 +792,8 @@ void ZView::updateViewportPara() const
 
 void ZView::updateSceneRectFromBoundBox()
 {
-  QRectF sceneRect(m_boundBox.minCorner.x, m_boundBox.minCorner.y,
+  QRectF sceneRect(m_boundBox.minCorner.x,
+                   m_boundBox.minCorner.y,
                    m_boundBox.maxCorner.x - m_boundBox.minCorner.x + 1,
                    m_boundBox.maxCorner.y - m_boundBox.minCorner.y + 1);
   if (sceneRect != m_scene->sceneRect()) {
@@ -823,8 +826,10 @@ void ZView::updateMontageScene()
   for (auto z = 0; z <= m_boundBox.maxCorner.z - m_boundBox.minCorner.z; ++z) {
     auto r = z / m_montageColumns->get();
     auto c = z % m_montageColumns->get();
-    QRectF sceneRgn(c * m_scene->sceneRect().width(), r * m_scene->sceneRect().height(),
-                    m_scene->sceneRect().width(), m_scene->sceneRect().height());
+    QRectF sceneRgn(c * m_scene->sceneRect().width(),
+                    r * m_scene->sceneRect().height(),
+                    m_scene->sceneRect().width(),
+                    m_scene->sceneRect().height());
     if (!sceneRgn.intersects(rgn)) {
       continue;
     }

@@ -26,11 +26,13 @@ Z3DSphereRenderer::Z3DSphereRenderer(Z3DRendererBase& rendererBase)
 #endif
 
   connect(&m_useDynamicMaterial, &ZBoolParameter::valueChanged, this, &Z3DSphereRenderer::compile);
-  //addParameter(m_sphereSlicesStacks);
-  //addParameter(m_useDynamicMaterial);
+  // addParameter(m_sphereSlicesStacks);
+  // addParameter(m_useDynamicMaterial);
 
   QStringList allshaders;
-  allshaders << "sphere.vert" << "sphere_func.frag" << "lighting2.frag";
+  allshaders << "sphere.vert"
+             << "sphere_func.frag"
+             << "lighting2.frag";
   m_sphereShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader());
   m_sphereShaderGrp.addAllSupportedPostShaders();
 }
@@ -64,10 +66,10 @@ void Z3DSphereRenderer::setData(std::vector<glm::vec4>* pointAndRadiusInput,
     }
   }
   size_t rightUpSize = m_allFlags.size();
-  float cornerFlags[4] = {0 << 4 | 0,      // (-1, -1) left down
-                          2 << 4 | 0,      // (1, -1) right down
-                          0 << 4 | 2,      // (-1, 1) left up
-                          2 << 4 | 2};     // (1, 1) right up
+  float cornerFlags[4] = {0 << 4 | 0, // (-1, -1) left down
+                          2 << 4 | 0, // (1, -1) right down
+                          0 << 4 | 2, // (-1, 1) left up
+                          2 << 4 | 2}; // (1, 1) right up
 
   if (rightUpSize > m_pointAndRadius.size()) {
     m_allFlags.resize(m_pointAndRadius.size());
@@ -139,12 +141,13 @@ QString Z3DSphereRenderer::generateHeader()
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 void Z3DSphereRenderer::renderUsingOpengl()
 {
-  if (m_pointAndRadius.empty())
+  if (m_pointAndRadius.empty()) {
     return;
+  }
   appendDefaultColors();
 
   GLUquadricObj* quadric = gluNewQuadric();
-  for (size_t i=0; i<m_pointAndRadius.size(); i+=4) {
+  for (size_t i = 0; i < m_pointAndRadius.size(); i += 4) {
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glm::vec3 loc = glm::applyMatrix(coordTransform(), glm::vec3(m_pointAndRadius[i].xyz()));
@@ -166,12 +169,14 @@ void Z3DSphereRenderer::renderUsingOpengl()
 
 void Z3DSphereRenderer::renderPickingUsingOpengl()
 {
-  if (m_pointAndRadius.empty())
+  if (m_pointAndRadius.empty()) {
     return;
-  if (m_pointPickingColors.empty() || m_pointAndRadius.size() != m_pointPickingColors.size())
+  }
+  if (m_pointPickingColors.empty() || m_pointAndRadius.size() != m_pointPickingColors.size()) {
     return;
+  }
   GLUquadricObj* quadric = gluNewQuadric();
-  for (size_t i=0; i<m_pointAndRadius.size(); i+=4) {
+  for (size_t i = 0; i < m_pointAndRadius.size(); i += 4) {
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glm::vec3 loc = glm::applyMatrix(coordTransform(), glm::vec3(m_pointAndRadius[i].xyz()));
@@ -179,7 +184,7 @@ void Z3DSphereRenderer::renderPickingUsingOpengl()
     float radius = m_pointAndRadius[i].w * sizeScale();
     glScalef(radius, radius, radius);
     glColor4fv(glm::value_ptr(m_pointPickingColors[i]));
-    gluSphere(quadric, 1., 12, 12/*m_sphereSlicesStacks.get(), m_sphereSlicesStacks.get()*/);
+    gluSphere(quadric, 1., 12, 12 /*m_sphereSlicesStacks.get(), m_sphereSlicesStacks.get()*/);
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
   }

@@ -12,7 +12,8 @@ class ZSelectFileWidget;
 
 class ZLoadImageSequenceDialog : public QDialog
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZLoadImageSequenceDialog(const QString& title, QWidget* parent = nullptr);
 
@@ -21,7 +22,9 @@ public:
   Dimension alongDimension();
 
   bool catScences() const
-  { return m_catScenes.get(); }
+  {
+    return m_catScenes.get();
+  }
 
 private:
   QPushButton* m_runButton = nullptr;
@@ -33,4 +36,3 @@ private:
 };
 
 } // namespace nim
-

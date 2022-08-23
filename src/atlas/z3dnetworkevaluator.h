@@ -23,22 +23,18 @@ class Z3DFilterWrapper
 public:
   virtual ~Z3DFilterWrapper() = default;
 
-  virtual void beforeFilterProcess(const Z3DFilter* /*unused*/)
-  {}
+  virtual void beforeFilterProcess(const Z3DFilter* /*unused*/) {}
 
-  virtual void afterFilterProcess(const Z3DFilter* /*unused*/)
-  {}
+  virtual void afterFilterProcess(const Z3DFilter* /*unused*/) {}
 
-  virtual void beforeNetworkProcess()
-  {}
+  virtual void beforeNetworkProcess() {}
 
-  virtual void afterNetworkProcess()
-  {}
+  virtual void afterNetworkProcess() {}
 };
 
 class Z3DNetworkEvaluator : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
 
 public:
   explicit Z3DNetworkEvaluator(Z3DCanvasPainter& canvasPainter, QObject* parent = nullptr);
@@ -70,10 +66,12 @@ private:
 
   struct VertexInfo
   {
-    VertexInfo() : filter(nullptr)
+    VertexInfo()
+      : filter(nullptr)
     {}
 
-    explicit VertexInfo(Z3DFilter* p) : filter(p)
+    explicit VertexInfo(Z3DFilter* p)
+      : filter(p)
     {}
 
     Z3DFilter* filter;
@@ -82,7 +80,9 @@ private:
 
   struct EdgeInfo
   {
-    EdgeInfo(Z3DOutputPortBase* out, Z3DInputPortBase* in) : outPort(out), inPort(in)
+    EdgeInfo(Z3DOutputPortBase* out, Z3DInputPortBase* in)
+      : outPort(out)
+      , inPort(in)
     {}
 
     Z3DOutputPortBase* outPort;
@@ -116,6 +116,7 @@ private:
 class Z3DProfileFilterWrapper : public Z3DFilterWrapper
 {
   ZBenchTimer m_benchTimer;
+
 public:
   void beforeFilterProcess(const Z3DFilter* /*unused*/) override;
 
@@ -127,4 +128,3 @@ public:
 };
 
 } // namespace nim
-

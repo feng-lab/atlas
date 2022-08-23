@@ -29,14 +29,17 @@ struct ZROIShapeOperation
   ZROIShapeOperation() = default;
 
   ZROIShapeOperation(bool isAdd_, ROIType type_, const QRectF& rect)
-    : isAdd(isAdd_), type(type_)
+    : isAdd(isAdd_)
+    , type(type_)
   {
     poly.push_back(rect.topLeft());
     poly.push_back(rect.bottomRight());
   }
 
   ZROIShapeOperation(bool isAdd_, ROIType type_, QPolygonF poly_)
-    : isAdd(isAdd_), type(type_), poly(std::move(poly_))
+    : isAdd(isAdd_)
+    , type(type_)
+    , poly(std::move(poly_))
   {
     if (type != ROIType::Line) {
       CHECK(poly.isClosed());
@@ -46,7 +49,9 @@ struct ZROIShapeOperation
   }
 
   void translate(double x, double y)
-  { poly.translate(x, y); }
+  {
+    poly.translate(x, y);
+  }
 
   void flipAround(double x, double y, bool hFlip, bool vFlip);
 
@@ -87,7 +92,11 @@ struct ZROIControlPoint
   };
 
   ZROIControlPoint(int slice_, size_t shapeID_, size_t shapeIndex_, Pos pos_, size_t pointIndex_ = 0)
-    : slice(slice_), shapeID(shapeID_), shapeIndex(shapeIndex_), pos(pos_), pointIndex(pointIndex_)
+    : slice(slice_)
+    , shapeID(shapeID_)
+    , shapeIndex(shapeIndex_)
+    , pos(pos_)
+    , pointIndex(pointIndex_)
   {}
 
   int slice;
@@ -101,12 +110,14 @@ class ZSliceROI
 {
 public:
   [[nodiscard]] bool isEmpty() const
-  { return m_idToShapeOperations.empty(); }
+  {
+    return m_idToShapeOperations.empty();
+  }
 
   void updatePaintPath(size_t id);
 
-  static QPainterPath shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape,
-                                         double scaleX = 1.0, double scaleY = 1.0);
+  static QPainterPath
+  shapeToPainterPath(const std::vector<ZROIShapeOperation>& shape, double scaleX = 1.0, double scaleY = 1.0);
 
   void newRect(const QRectF& rect, size_t id);
 
@@ -134,11 +145,15 @@ public:
 
   void subtractSpline(const QPolygonF& spline, size_t id);
 
-  void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints, double angle, double x, double y,
+  void rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
+                        double angle,
+                        double x,
+                        double y,
                         std::set<size_t>& editedShapes);
 
   void deleteCtrlPoints(const std::map<size_t, std::vector<ZROIControlPoint>>& shapeIDToControlPoints,
-                        std::set<size_t>& removedShapes, std::set<size_t>& editedShapes);
+                        std::set<size_t>& removedShapes,
+                        std::set<size_t>& editedShapes);
 
   bool addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes);
 
@@ -171,7 +186,8 @@ class ZROISliceMoveSelectedControlPointsCommand;
 
 class ZROI : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   using const_iterator = std::map<int, ZSliceROI>::const_iterator;
 
@@ -179,19 +195,29 @@ public:
 
   void importMaskImage(const QString& fn, FileFormat format);
 
-  [[nodiscard]] ZImg
-  toMaskImg(int outWidth = 0, int outHeight = 0, int outDepth = -1, bool doInterpolation = true,
-            double scaleX = 1.0, double scaleY = 1.0,
-            bool keepOnlyInterpolatedSlices = false, int intepolationMethod = 0) const;
+  [[nodiscard]] ZImg toMaskImg(int outWidth = 0,
+                               int outHeight = 0,
+                               int outDepth = -1,
+                               bool doInterpolation = true,
+                               double scaleX = 1.0,
+                               double scaleY = 1.0,
+                               bool keepOnlyInterpolatedSlices = false,
+                               int intepolationMethod = 0) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
-  { return m_boundBox; }
+  {
+    return m_boundBox;
+  }
 
   QUndoStack* undoStack()
-  { return m_undoStack; }
+  {
+    return m_undoStack;
+  }
 
   [[nodiscard]] bool isEmpty() const
-  { return m_sliceROIs.empty(); }
+  {
+    return m_sliceROIs.empty();
+  }
 
   void clear();
 
@@ -336,7 +362,9 @@ public:
   void mergeWith(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1);
 
   std::set<int> mergeWith_Impl(const ZROI& other, int64_t slice = -1, int64_t shapeID = -1)
-  { return mergeWith_Impl(other.m_sliceROIs, slice, shapeID); }
+  {
+    return mergeWith_Impl(other.m_sliceROIs, slice, shapeID);
+  }
 
   std::set<int> mergeWith_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice = -1, int64_t shapeID = -1);
 
@@ -347,31 +375,43 @@ public:
   static QPainterPath splineToPainterPath(const QPolygonF& spline, bool makeCloseIfNot = false);
 
   [[nodiscard]] const_iterator begin() const noexcept
-  { return m_sliceROIs.begin(); }
+  {
+    return m_sliceROIs.begin();
+  }
 
   [[nodiscard]] const_iterator end() const noexcept
-  { return m_sliceROIs.end(); }
+  {
+    return m_sliceROIs.end();
+  }
 
   [[nodiscard]] const_iterator cbegin() const noexcept
-  { return m_sliceROIs.cbegin(); }
+  {
+    return m_sliceROIs.cbegin();
+  }
 
   [[nodiscard]] const_iterator cend() const noexcept
-  { return m_sliceROIs.cend(); }
+  {
+    return m_sliceROIs.cend();
+  }
 
   [[nodiscard]] size_t numSlices() const
-  { return m_sliceROIs.size(); }
+  {
+    return m_sliceROIs.size();
+  }
 
   [[nodiscard]] std::vector<ZROIControlPoint> sliceControlPoints(int slice) const;
 
   [[nodiscard]] std::vector<ZROIControlPoint> sliceControlPoints(int slice, size_t shapeID) const;
 
   [[nodiscard]] bool hasSlice(int slice) const
-  { return m_sliceROIs.find(slice) != m_sliceROIs.end(); }
+  {
+    return m_sliceROIs.find(slice) != m_sliceROIs.end();
+  }
 
   [[nodiscard]] std::vector<size_t> sliceShapeIDs(int slice) const
   {
     std::vector<size_t> res;
-    for (const auto&[id, shape] : m_sliceROIs.at(slice).m_idToShapeOperations) {
+    for (const auto& [id, shape] : m_sliceROIs.at(slice).m_idToShapeOperations) {
       res.push_back(id);
     }
     return res;
@@ -389,7 +429,8 @@ public:
 
   void rotateROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints, double angle, double x, double y);
 
-  std::set<int> rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle, double x, double y);
+  std::set<int>
+  rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPoints, double angle, double x, double y);
 
   void deleteROIControlPoints(const std::vector<ZROIControlPoint>& controlPoints);
 
@@ -400,13 +441,18 @@ public:
   void deleteROIShape_Impl(int slice, size_t shapeId);
 
   void clearCopy()
-  { m_sliceROICopy.clear(); }
+  {
+    m_sliceROICopy.clear();
+  }
 
   void copyROIFromControlPoints(const std::vector<ZROIControlPoint>& controlPoints);
 
   [[nodiscard]] ZBBox<glm::ivec4> copiedItemBoundBox() const;
 
-  void pasteROIToCoord(int slice, QPointF point, const ZBBox<glm::ivec4>& srcBoundBox, bool hFlip = false,
+  void pasteROIToCoord(int slice,
+                       QPointF point,
+                       const ZBBox<glm::ivec4>& srcBoundBox,
+                       bool hFlip = false,
                        bool vFlip = false);
 
   [[nodiscard]] QPointF controlPointCoord(const ZROIControlPoint& ctrlPt) const;
@@ -418,10 +464,14 @@ public:
   [[nodiscard]] const ZROIShapeOperation& controlPointShapeOp(const ZROIControlPoint& ctrlPt) const;
 
   [[nodiscard]] bool sliceHasPolyOrSpline(int slice) const
-  { return m_sliceROIs.at(slice).hasPolyOrSpline(); }
+  {
+    return m_sliceROIs.at(slice).hasPolyOrSpline();
+  }
 
   [[nodiscard]] QPainterPath slicePaintPath(int slice, double scaleX = 1.0, double scaleY = 1.0) const
-  { return m_sliceROIs.at(slice).paintPath(scaleX, scaleY); }
+  {
+    return m_sliceROIs.at(slice).paintPath(scaleX, scaleY);
+  }
 
   void sliceAddCtrlPoint(int slice, const QPointF& pt, int shapeID = -1);
 
@@ -455,20 +505,30 @@ public:
 
   // qt style read write name filter for filedialog
   static QString fileExtension()
-  { return ".nimroi"; }
+  {
+    return ".nimroi";
+  }
 
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename)
-  { return filename.endsWith(".nimroi", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".nimroi", Qt::CaseInsensitive);
+  }
 
   static bool canWriteFile(const QString& filename)
-  { return filename.endsWith(".nimroi", Qt::CaseInsensitive); }
+  {
+    return filename.endsWith(".nimroi", Qt::CaseInsensitive);
+  }
 
   static QString getQtReadNameFilter()
-  { return QString("ROI files (*.nimroi)"); }
+  {
+    return QString("ROI files (*.nimroi)");
+  }
 
   static QString getQtWriteNameFilter()
-  { return QString("ROI files (*.nimroi)"); }
+  {
+    return QString("ROI files (*.nimroi)");
+  }
 
   // might throw ZIOException
   void load(const QString& filename);
@@ -481,7 +541,8 @@ public:
 
 Q_SIGNALS:
 
-  void roiChanged(int slice, const std::set<size_t>& newShapes,
+  void roiChanged(int slice,
+                  const std::set<size_t>& newShapes,
                   const std::set<size_t>& deletedShapes,
                   const std::set<size_t>& changedShapes);
 
@@ -526,11 +587,15 @@ class ZROICommand : public QUndoCommand
 {
 public:
   explicit ZROICommand(ZROI& roi)
-    : QUndoCommand(), m_roi(roi), m_oldSliceROIs(m_roi.m_sliceROIs)
+    : QUndoCommand()
+    , m_roi(roi)
+    , m_oldSliceROIs(m_roi.m_sliceROIs)
   {}
 
   void undo() override
-  { m_roi.changeSliceROIs(m_oldSliceROIs, m_changedSlices); }
+  {
+    m_roi.changeSliceROIs(m_oldSliceROIs, m_changedSlices);
+  }
 
 protected:
   ZROI& m_roi;
@@ -541,14 +606,24 @@ protected:
 class ZROIRotateControlPointsCommand : public ZROICommand
 {
 public:
-  ZROIRotateControlPointsCommand(ZROI& roi, std::vector<ZROIControlPoint> controlPoints, double angle, double x, double y)
-    : ZROICommand(roi), m_controlPoints(std::move(controlPoints)), m_angle(angle), m_x(x), m_y(y)
+  ZROIRotateControlPointsCommand(ZROI& roi,
+                                 std::vector<ZROIControlPoint> controlPoints,
+                                 double angle,
+                                 double x,
+                                 double y)
+    : ZROICommand(roi)
+    , m_controlPoints(std::move(controlPoints))
+    , m_angle(angle)
+    , m_x(x)
+    , m_y(y)
   {
     setText("Rotate Control Points");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.rotateROIControlPoints_Impl(m_controlPoints, m_angle, m_x, m_y); }
+  {
+    m_changedSlices = m_roi.rotateROIControlPoints_Impl(m_controlPoints, m_angle, m_x, m_y);
+  }
 
 protected:
   std::vector<ZROIControlPoint> m_controlPoints;
@@ -561,13 +636,16 @@ class ZROIDeleteControlPointsCommand : public ZROICommand
 {
 public:
   ZROIDeleteControlPointsCommand(ZROI& roi, std::vector<ZROIControlPoint> controlPoints)
-    : ZROICommand(roi), m_controlPoints(std::move(controlPoints))
+    : ZROICommand(roi)
+    , m_controlPoints(std::move(controlPoints))
   {
     setText("Delete Control Points");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.deleteROIControlPoints_Impl(m_controlPoints); }
+  {
+    m_changedSlices = m_roi.deleteROIControlPoints_Impl(m_controlPoints);
+  }
 
 protected:
   std::vector<ZROIControlPoint> m_controlPoints;
@@ -577,7 +655,9 @@ class ZROIDeleteROIShapeCommand : public ZROICommand
 {
 public:
   ZROIDeleteROIShapeCommand(ZROI& roi, int slice, size_t shapeId)
-    : ZROICommand(roi), m_slice(slice), m_shapeId(shapeId)
+    : ZROICommand(roi)
+    , m_slice(slice)
+    , m_shapeId(shapeId)
   {
     setText("Delete Shape");
   }
@@ -597,7 +677,8 @@ class ZROIDeleteSliceROICommand : public ZROICommand
 {
 public:
   ZROIDeleteSliceROICommand(ZROI& roi, int slice)
-    : ZROICommand(roi), m_slice(slice)
+    : ZROICommand(roi)
+    , m_slice(slice)
   {
     setText("Delete Slice ROI");
   }
@@ -616,7 +697,10 @@ class ZROISliceAddControlPointCommand : public ZROICommand
 {
 public:
   ZROISliceAddControlPointCommand(ZROI& roi, int slice, const QPointF& pt, int shapeID = -1)
-    : ZROICommand(roi), m_slice(slice), m_controlPoint(pt), m_shapeID(shapeID)
+    : ZROICommand(roi)
+    , m_slice(slice)
+    , m_controlPoint(pt)
+    , m_shapeID(shapeID)
   {
     setText("Add Control Points");
   }
@@ -637,7 +721,10 @@ class ZROISliceSubtractShapeCommand : public ZROICommand
 {
 public:
   ZROISliceSubtractShapeCommand(ZROI& roi, int slice, size_t shapeID, std::vector<ZROIShapeOperation> otherShape)
-    : ZROICommand(roi), m_slice(slice), m_shapeID(shapeID), m_subtractedShape(std::move(otherShape))
+    : ZROICommand(roi)
+    , m_slice(slice)
+    , m_shapeID(shapeID)
+    , m_subtractedShape(std::move(otherShape))
   {
     setText("Subtract Shape");
   }
@@ -658,16 +745,21 @@ class ZROISliceMoveSelectedControlPointsCommand : public ZROICommand
 {
 public:
   explicit ZROISliceMoveSelectedControlPointsCommand(ZROI& roi)
-    : ZROICommand(roi), m_firstRun(true)
+    : ZROICommand(roi)
+    , m_firstRun(true)
   {
     setText("Move Selected Control Points");
   }
 
   void setNewSliceROIs(const std::map<int, ZSliceROI>& nsr)
-  { m_newSliceROIs = nsr; }
+  {
+    m_newSliceROIs = nsr;
+  }
 
   void setChangedSlices(const std::set<int>& cs)
-  { m_changedSlices = cs; }
+  {
+    m_changedSlices = cs;
+  }
 
   void redo() override;
 
@@ -680,13 +772,18 @@ class ZROIMergeROICommand : public ZROICommand
 {
 public:
   ZROIMergeROICommand(ZROI& roi, std::map<int, ZSliceROI> otherSliceROIs, int64_t slice = -1, int64_t shapeID = -1)
-    : ZROICommand(roi), m_otherSliceROIs(std::move(otherSliceROIs)), m_slice(slice), m_shapeID(shapeID)
+    : ZROICommand(roi)
+    , m_otherSliceROIs(std::move(otherSliceROIs))
+    , m_slice(slice)
+    , m_shapeID(shapeID)
   {
     setText("Merge ROI");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.mergeWith_Impl(m_otherSliceROIs, m_slice, m_shapeID); }
+  {
+    m_changedSlices = m_roi.mergeWith_Impl(m_otherSliceROIs, m_slice, m_shapeID);
+  }
 
 protected:
   std::map<int, ZSliceROI> m_otherSliceROIs;
@@ -698,13 +795,18 @@ class ZROISubtractROICommand : public ZROICommand
 {
 public:
   ZROISubtractROICommand(ZROI& roi, std::map<int, ZSliceROI> otherSliceROIs, int64_t slice = -1, int64_t shapeID = -1)
-    : ZROICommand(roi), m_otherSliceROIs(std::move(otherSliceROIs)), m_slice(slice), m_shapeID(shapeID)
+    : ZROICommand(roi)
+    , m_otherSliceROIs(std::move(otherSliceROIs))
+    , m_slice(slice)
+    , m_shapeID(shapeID)
   {
     setText("Subtract ROI");
   }
 
   void redo() override
-  { m_changedSlices = m_roi.subtractROI_Impl(m_otherSliceROIs, m_slice, m_shapeID); }
+  {
+    m_changedSlices = m_roi.subtractROI_Impl(m_otherSliceROIs, m_slice, m_shapeID);
+  }
 
 protected:
   std::map<int, ZSliceROI> m_otherSliceROIs;
@@ -713,4 +815,3 @@ protected:
 };
 
 } // namespace nim
-

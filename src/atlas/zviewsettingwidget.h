@@ -10,7 +10,8 @@ namespace nim {
 
 class ZViewSettingWidget : public QWidget
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit ZViewSettingWidget(ZDoc& doc, ZViewSettingInterface* view, QWidget* mw = nullptr);
 
@@ -38,7 +39,10 @@ protected:
   struct SubWidget
   {
     SubWidget(size_t id_, ZWidgetsGroup* wg, QLabel* label_, QWidget* wt)
-      : id(id_), widgetsGroup(wg), label(label_), widget(wt)
+      : id(id_)
+      , widgetsGroup(wg)
+      , label(label_)
+      , widget(wt)
     {}
 
     size_t id;
@@ -51,4 +55,3 @@ protected:
 };
 
 } // namespace nim
-
