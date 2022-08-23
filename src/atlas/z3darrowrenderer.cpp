@@ -2,10 +2,9 @@
 
 namespace nim {
 
-Z3DArrowRenderer::Z3DArrowRenderer(Z3DRendererBase& rendererBase) :
-  Z3DConeRenderer(rendererBase)
-{
-}
+Z3DArrowRenderer::Z3DArrowRenderer(Z3DRendererBase& rendererBase)
+  : Z3DConeRenderer(rendererBase)
+{}
 
 void Z3DArrowRenderer::setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius,
                                     std::vector<glm::vec4>* headPosAndHeadRadius,
@@ -38,8 +37,8 @@ void Z3DArrowRenderer::setFixedHeadLengthArrowData(std::vector<glm::vec4>* tailP
     glm::vec3 tail = (*tailPosAndTailRadius)[i].xyz();
     glm::vec3 head = (*headPosAndHeadRadius)[i].xyz();
     float totalLength = glm::length(head - tail);
-    glm::vec3 cutPos = head + glm::normalize(tail - head) *
-                              (fixedHeadLength < totalLength ? fixedHeadLength : .5f * totalLength);
+    glm::vec3 cutPos =
+      head + glm::normalize(tail - head) * (fixedHeadLength < totalLength ? fixedHeadLength : .5f * totalLength);
     m_arrowConeBaseAndBaseRadius.emplace_back(cutPos, (*tailPosAndTailRadius)[i].w);
     m_arrowConeAxisAndTopRadius.emplace_back(tail - cutPos, (*tailPosAndTailRadius)[i].w);
     m_arrowConeBaseAndBaseRadius.emplace_back(head, 0.f);

@@ -63,12 +63,13 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_ZAxisColor, 1);
     std::vector<ZParameter*> paras = m_rendererBase.parameters();
     for (auto para : paras) {
-      if (para->name() == "Size Scale")
+      if (para->name() == "Size Scale") {
         m_widgetsGroup->addChild(*para, 1);
-      else if (para->name() == "Rendering Method")
+      } else if (para->name() == "Rendering Method") {
         m_widgetsGroup->addChild(*para, 3);
-      else if (para->name() == "Opacity")
+      } else if (para->name() == "Opacity") {
         m_widgetsGroup->addChild(*para, 3);
+      }
     }
     m_widgetsGroup->addChild(m_fontRenderer.allFontNamesPara(), 4);
     m_widgetsGroup->addChild(m_fontRenderer.fontPara(), 4);
@@ -94,10 +95,11 @@ void Z3DAxisFilter::renderOpaque(Z3DEye eye)
   GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
   glViewport(viewport.x, viewport.y, size, size);
 
-  if (m_mode.get() == "Arrow")
+  if (m_mode.get() == "Arrow") {
     m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
-  else
+  } else {
     m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+  }
 
   glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
   m_rendererBase.coordTransformPara().blockSignals(false);
@@ -131,7 +133,7 @@ void Z3DAxisFilter::setupCamera()
   float radius = 300.f;
 
   float distance = radius / std::sin(camera.fieldOfView() * 0.5f);
-  glm::vec3 vn(0, 0, 1);     //plane normal
+  glm::vec3 vn(0, 0, 1); // plane normal
   glm::vec3 position = center + vn * distance;
   camera.setCamera(position, center, glm::vec3(0.0, 1.0, 0.0));
   camera.setNearDist(distance - radius - 1);

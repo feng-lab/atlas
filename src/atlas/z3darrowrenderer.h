@@ -6,12 +6,14 @@ namespace nim {
 
 class Z3DArrowRenderer : public Z3DConeRenderer
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DArrowRenderer(Z3DRendererBase& rendererBase);
 
   // head length is in proportion to whole length
-  void setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius, std::vector<glm::vec4>* headPosAndHeadRadius,
+  void setArrowData(std::vector<glm::vec4>* tailPosAndTailRadius,
+                    std::vector<glm::vec4>* headPosAndHeadRadius,
                     float headLengthProportion = 0.1);
 
   // head length is fixed
@@ -33,4 +35,3 @@ private:
 };
 
 } // namespace nim
-

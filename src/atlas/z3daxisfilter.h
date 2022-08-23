@@ -11,7 +11,8 @@ class ZWidgetsGroup;
 
 class Z3DAxisFilter : public Z3DGeometryFilter
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   explicit Z3DAxisFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
@@ -20,21 +21,26 @@ public:
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
   bool hasOpaque(Z3DEye /*unused*/) const override
-  { return false; }
+  {
+    return false;
+  }
 
   void renderOpaque(Z3DEye eye) override;
 
   bool hasTransparent(Z3DEye /*unused*/) const override
-  { return true; }
+  {
+    return true;
+  }
 
   void renderTransparent(Z3DEye eye) override
-  { renderOpaque(eye); }
+  {
+    renderOpaque(eye);
+  }
 
 protected:
   void prepareData(Z3DEye eye);
 
-  void setClipPlanes() override
-  {}
+  void setClipPlanes() override {}
 
   void setupCamera();
 
@@ -65,4 +71,3 @@ protected:
 };
 
 } // namespace nim
-
