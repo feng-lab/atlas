@@ -227,7 +227,7 @@ def build_atlas_installer():
 
     if 'feng' in os.path.expanduser("~"):
         if common_dirs.is_mac():
-            out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', 'My Drive', "code", 'my', 'proxy', 'static')
+            out_folder = os.path.join(common_dirs.google_drive_dir(), "code", 'my', 'proxy', 'static')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')
@@ -244,11 +244,7 @@ def build_atlas_installer():
         #                    cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         #     shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), suffix), ignore_errors=False)
         else:
-            out_folder = os.path.join('Z:', os.sep, 'Google Drive', 'My Drive', "code", 'my', 'proxy', 'static')
-            if not os.path.exists(out_folder):
-                out_folder = os.path.join(os.path.expanduser('~'), 'GoogleDrive', "code", 'my', 'proxy', 'static')
-            if not os.path.exists(out_folder):
-                out_folder = os.path.join(os.path.expanduser('~'), 'Google Drive', "code", 'my', 'proxy', 'static')
+            out_folder = os.path.join(common_dirs.google_drive_dir(), "code", 'my', 'proxy', 'static')
             shutil.copy2(os.path.join(common_dirs.deploy_target_dir(), installer_zip_name),
                          os.path.join(out_folder, 'installers', installer_zip_name))
             target_folder = os.path.join(out_folder, 'packages')
