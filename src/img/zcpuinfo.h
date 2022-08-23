@@ -57,7 +57,7 @@ public:
   bool bCMPXCHG16B = false;
   bool bPOPCNT = false;
   bool bLZCNT = false;
-  bool bABM = false;  // for AMD
+  bool bABM = false; // for AMD
   bool bRDTSCP = false;
 
   bool bAESNI = false;

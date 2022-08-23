@@ -18,88 +18,137 @@ public:
   ZPunctaDetection() = default;
 
   explicit ZPunctaDetection(const QString& filename, size_t punctaChannel = 0, size_t t = 0, size_t scene = 0)
-  { setInputFile(filename, punctaChannel, t, scene); }
-
-  // only image resolution in imgInfo is used
-  ZPunctaDetection(const QString& filename, const ZImgInfo& imgInfo,
-                   size_t punctaChannel = 0, size_t t = 0, size_t scene = 0)
   {
-    CHECK(imgInfo.voxelSizeUnit != VoxelSizeUnit::none);
-    setInputFile(filename, punctaChannel, t, scene,
-                 imgInfo.voxelSizeXInUm(), imgInfo.voxelSizeYInUm(), imgInfo.voxelSizeZInUm());
+    setInputFile(filename, punctaChannel, t, scene);
   }
 
-  void setInputFile(const QString& filename, size_t punctaChannel = 0, size_t t = 0, size_t scene = 0,
-                    double voxelSizeInUmX = -1, double voxelSizeInUmY = -1, double VoxelSizeInUmZ = -1);
+  // only image resolution in imgInfo is used
+  ZPunctaDetection(const QString& filename,
+                   const ZImgInfo& imgInfo,
+                   size_t punctaChannel = 0,
+                   size_t t = 0,
+                   size_t scene = 0)
+  {
+    CHECK(imgInfo.voxelSizeUnit != VoxelSizeUnit::none);
+    setInputFile(filename,
+                 punctaChannel,
+                 t,
+                 scene,
+                 imgInfo.voxelSizeXInUm(),
+                 imgInfo.voxelSizeYInUm(),
+                 imgInfo.voxelSizeZInUm());
+  }
+
+  void setInputFile(const QString& filename,
+                    size_t punctaChannel = 0,
+                    size_t t = 0,
+                    size_t scene = 0,
+                    double voxelSizeInUmX = -1,
+                    double voxelSizeInUmY = -1,
+                    double VoxelSizeInUmZ = -1);
 
   // if set, result will be saved to these files
   void setResultPunctaFilename(const QString& fn)
-  { m_detectedPunctaFileName = fn; }
+  {
+    m_detectedPunctaFileName = fn;
+  }
 
   void setResultSomaPunctaFilename(const QString& fn)
-  { m_detectedSomaPunctaFileName = fn; }
+  {
+    m_detectedSomaPunctaFileName = fn;
+  }
 
   // if not set, auto threshold will be used
   void setPunctaThreshold(index_t thre)
-  { m_punctaThreshold = thre; }
+  {
+    m_punctaThreshold = thre;
+  }
 
   // if not set, auto threshold will be used
   void setSomaPunctaThreshold(index_t thre)
-  { m_somaPunctaThreshold = thre; }
+  {
+    m_somaPunctaThreshold = thre;
+  }
 
   // miminum voxel number to goto split step, default is 20 voxels
   void setSplitThreshold(index_t thre)
-  { m_splitSizeThreshold = thre; }
+  {
+    m_splitSizeThreshold = thre;
+  }
 
   // confidence region of gaussian, used to estimate punctum radius, default is 0.95
   void setConfidenceRegionForRadiusEstimate(double c)
-  { m_confRadius = c; }
+  {
+    m_confRadius = c;
+  }
 
   // confidence region of gaussian, used to get overlap area of error ellipse, default is 0.8
   void setConfidenceRegionForOverlapArea(double c)
-  { m_confOverlapArea = c; }
+  {
+    m_confOverlapArea = c;
+  }
 
   // overlap threshold to merge two gaussian, default is 0.8
   void setOverlapRateThreshold(double t)
-  { m_overlapRateThreshold = t; }
+  {
+    m_overlapRateThreshold = t;
+  }
 
   // for watershed
   void setSeedSizeThreshold(index_t i)
-  { m_seedSizeThreshold = i; }
+  {
+    m_seedSizeThreshold = i;
+  }
 
   // default is true
   void setUseMultithreading(bool v)
-  { m_useMultithreading = v; }
+  {
+    m_useMultithreading = v;
+  }
 
   // optional, if set, soma will be detected and puncta in soma area will be
   // detected differently.
   void setDendriteChannel(index_t c)
-  { m_dendriteChannel = c; }
+  {
+    m_dendriteChannel = c;
+  }
 
   // for soma detection
   // default use 2.6um
   void setMaxDendriteTubeRadiusInUm(double mtr)
-  { m_maxDendriteTubeRadius = mtr; }
+  {
+    m_maxDendriteTubeRadius = mtr;
+  }
 
   void setDendriteThreshold(double tt)
-  { m_dendriteThreshold = tt; }
+  {
+    m_dendriteThreshold = tt;
+  }
 
   void setSwcFiles(const QStringList& swcFiles)
-  { m_swcPaths = swcFiles; }
+  {
+    m_swcPaths = swcFiles;
+  }
 
   // default is 2.5um, valid range of puncta
   // puncta within this distance to branch are considered as belong to
   // this dendrite branch
   void setMaxDistToBranchInUm(double d)
-  { m_maxDistToBranch = d; }
+  {
+    m_maxDistToBranch = d;
+  }
 
   // default is 1.0, Punctum is considered as ambiguous if it is within valid range
   // of many branches and (secondMinDistance < MinDistance * ambiguousFactor)
   void setAmbiguousFactor(double f)
-  { m_ambiguousFactor = f; }
+  {
+    m_ambiguousFactor = f;
+  }
 
-  static double getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1, const Eigen::MatrixXd& cov1,
-                                                Eigen::RowVectorXd m2, const Eigen::MatrixXd& cov2,
+  static double getOverlapRateOfTwoErrorEllipse(Eigen::RowVectorXd m1,
+                                                const Eigen::MatrixXd& cov1,
+                                                Eigen::RowVectorXd m2,
+                                                const Eigen::MatrixXd& cov2,
                                                 double conf = 0.8);
 
 protected:
@@ -113,9 +162,17 @@ private:
   // all works are done here, detect from img with thre and put result into resList
   // img will be cleared after using
   // minLoc is the offset of img related to rawimg, so img can be a subimg of rawimg
-  void detectImpl(const ZImg& rawimg, size_t pc, size_t t,
-                  ZImg& img, index_t thre, ZPuncta& resList, ZPuncta& filteredList,
-                  const Eigen::RowVectorXi& minLoc, double weight, double baseWeight, double totalSubOpsWeight);
+  void detectImpl(const ZImg& rawimg,
+                  size_t pc,
+                  size_t t,
+                  ZImg& img,
+                  index_t thre,
+                  ZPuncta& resList,
+                  ZPuncta& filteredList,
+                  const Eigen::RowVectorXi& minLoc,
+                  double weight,
+                  double baseWeight,
+                  double totalSubOpsWeight);
 
 #if 0
   // detect puncta in soma area, save result in m_detectedSomaPuncta, return soma voxels
@@ -143,30 +200,44 @@ private:
 
   [[nodiscard]] std::vector<Eigen::MatrixXi> watershedSplit(const ZImg& img) const;
 
-  static void getVoxelRange(const Eigen::MatrixXi& voxelLocations,
-                            Eigen::RowVectorXi& minLoc, Eigen::RowVectorXi& size);
+  static void
+  getVoxelRange(const Eigen::MatrixXi& voxelLocations, Eigen::RowVectorXi& minLoc, Eigen::RowVectorXi& size);
 
-  static Eigen::VectorXd getVoxelIntensities(const Eigen::MatrixXi& voxelLocations,
-                                             const ZImg& rawimg, size_t c, size_t t);
+  static Eigen::VectorXd
+  getVoxelIntensities(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t);
 
   // crop with minLoc and size, then set any voxel other than voxels in voxelLocations as zero
   // both img and res are uint8_t type
-  static ZImg cropZImg(const Eigen::MatrixXi& voxelLocations, const ZImg& rawimg, size_t c, size_t t,
-                       const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
+  static ZImg cropZImg(const Eigen::MatrixXi& voxelLocations,
+                       const ZImg& rawimg,
+                       size_t c,
+                       size_t t,
+                       const Eigen::RowVectorXi& minLoc,
+                       const Eigen::RowVectorXi& size);
 
-  static ZImg cropZImg(const ZImg& rawimg, size_t c, size_t t,
-                       const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
+  static ZImg
+  cropZImg(const ZImg& rawimg, size_t c, size_t t, const Eigen::RowVectorXi& minLoc, const Eigen::RowVectorXi& size);
 
-  static size_t getNumCenters(const ZImg& rawimg, size_t pc, size_t t,
-                              const Eigen::MatrixXi& voxelLocations, const Eigen::VectorXd& voxelIntensities,
-                              const ZImg& locmax, double saturatedIntensity, const Eigen::RowVectorXi& minLoc);
+  static size_t getNumCenters(const ZImg& rawimg,
+                              size_t pc,
+                              size_t t,
+                              const Eigen::MatrixXi& voxelLocations,
+                              const Eigen::VectorXd& voxelIntensities,
+                              const ZImg& locmax,
+                              double saturatedIntensity,
+                              const Eigen::RowVectorXi& minLoc);
 
   // split voxels use vbgmm and save result puncta into detectedPunctaList
   // voxelLocs is coordinates of voxels in stack, voxelIntens is intensities of these voxels.
   // minLoc is the start Location of stack in case this stack is a cropped region.
-  static void vbgmmSplit(const Eigen::MatrixXi& voxelLocs, const Eigen::VectorXd& voxelIntens,
-                         size_t numCenter, const ZImg& img, ZPuncta& detectedPunctaList,
-                         double confRadius = .95, double confOverlapArea = .8, double overlapRateThreshold = .8,
+  static void vbgmmSplit(const Eigen::MatrixXi& voxelLocs,
+                         const Eigen::VectorXd& voxelIntens,
+                         size_t numCenter,
+                         const ZImg& img,
+                         ZPuncta& detectedPunctaList,
+                         double confRadius = .95,
+                         double confOverlapArea = .8,
+                         double overlapRateThreshold = .8,
                          const Eigen::RowVectorXi& minLoc = Eigen::RowVectorXi::Zero(3),
                          bool useMultithreading = true);
 
@@ -189,7 +260,7 @@ private:
 
   // parameters for soma detection
   index_t m_dendriteChannel = -1;
-  double m_maxDendriteTubeRadius = 2.6;  // in um
+  double m_maxDendriteTubeRadius = 2.6; // in um
   double m_dendriteThreshold = 100;
 
   // parameters for assign puncta to swc tree
@@ -207,4 +278,3 @@ private:
 };
 
 } // namespace nim
-

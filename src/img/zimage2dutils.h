@@ -20,8 +20,7 @@ namespace nim {
 
 // everything is row major
 
-bool seperate2DKernel(const double* kernel, size_t width, size_t height,
-                      double* rowKernel, double* colKernel);
+bool seperate2DKernel(const double* kernel, size_t width, size_t height, double* rowKernel, double* colKernel);
 
 // wrap a pixel coordinate to a valid pixel coordinate inside image of sizes using padOption, image can be any dimension
 // if padOption is constant, do nothing
@@ -44,8 +43,9 @@ void wrapCoordToImage(SignedIntegerType* coord, const size_t* imgSize, size_t nu
       if (coord[i] < 0) {
         coord[i] = 0;
       }
-      if (coord[i] > static_cast<int>(imgSize[i]) - 1)
+      if (coord[i] > static_cast<int>(imgSize[i]) - 1) {
         coord[i] = imgSize[i] - 1;
+      }
     }
   } else if (padOption == PadOption::Circular) {
     for (size_t i = 0; i < numDimensions; ++i) {
@@ -62,13 +62,17 @@ template<>
 void wrapCoordToImage<size_t>(size_t* coord, const size_t* imgSize, size_t numDimensions, PadOption padOption);
 
 template<typename SignedIntegerType, typename TPixel>
-TPixel getImage2DPixelValue(const TPixel* img, size_t width, size_t height,
-                            SignedIntegerType x, SignedIntegerType y,
-                            PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
+TPixel getImage2DPixelValue(const TPixel* img,
+                            size_t width,
+                            size_t height,
+                            SignedIntegerType x,
+                            SignedIntegerType y,
+                            PadOption padOption = PadOption::Constant,
+                            TPixel padValue = TPixel(0))
 {
-  if (x >= 0 && x < static_cast<SignedIntegerType>(width) &&
-      y >= 0 && y < static_cast<SignedIntegerType>(height))
+  if (x >= 0 && x < static_cast<SignedIntegerType>(width) && y >= 0 && y < static_cast<SignedIntegerType>(height)) {
     return img[y * width + x];
+  }
 
   if (padOption == PadOption::Constant) {
     return padValue;
@@ -86,9 +90,16 @@ TPixel getImage2DPixelValue(const TPixel* img, size_t width, size_t height,
 
 // imgOut should be preallocated and not same as img
 template<typename TPixel>
-void image2DPad(const TPixel* img, size_t width, size_t height,
-                size_t leftPad, size_t rightPad, size_t upPad, size_t downPad,
-                TPixel* imgOut, PadOption padOption = PadOption::Constant, TPixel padValue = TPixel(0))
+void image2DPad(const TPixel* img,
+                size_t width,
+                size_t height,
+                size_t leftPad,
+                size_t rightPad,
+                size_t upPad,
+                size_t downPad,
+                TPixel* imgOut,
+                PadOption padOption = PadOption::Constant,
+                TPixel padValue = TPixel(0))
 {
   DCHECK_NE(img, imgOut);
   size_t size = sizeof(TPixel) * width * height;
@@ -203,9 +214,7 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
         } else {
           refY = refY % height;
         }
-        std::memcpy(imgOut + j * desWidth + leftPad,
-                    img + refY * width,
-                    sizeof(TPixel) * width);
+        std::memcpy(imgOut + j * desWidth + leftPad, img + refY * width, sizeof(TPixel) * width);
       }
       // down
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
@@ -215,11 +224,8 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
         } else {
           refY = refY % height;
         }
-        std::memcpy(imgOut + j * desWidth + leftPad,
-                    img + refY * width,
-                    sizeof(TPixel) * width);
+        std::memcpy(imgOut + j * desWidth + leftPad, img + refY * width, sizeof(TPixel) * width);
       }
-
     }
 
     // copy image
@@ -234,7 +240,7 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       }
     }
 
-    if (padOption == PadOption::Replicate) { //replicate
+    if (padOption == PadOption::Replicate) { // replicate
       // left
       for (size_t i = 0; i < leftPad; ++i) {
         for (size_t j = 0; j < height; ++j) {
@@ -249,17 +255,13 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       }
       // up
       for (size_t j = 0; j < upPad; ++j) {
-        std::memcpy(imgOut + j * desWidth,
-                    imgOut + upPad * desWidth,
-                    sizeof(TPixel) * desWidth);
+        std::memcpy(imgOut + j * desWidth, imgOut + upPad * desWidth, sizeof(TPixel) * desWidth);
       }
       // down
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
-        std::memcpy(imgOut + j * desWidth,
-                    imgOut + (desHeight - 1 - downPad) * desWidth,
-                    sizeof(TPixel) * desWidth);
+        std::memcpy(imgOut + j * desWidth, imgOut + (desHeight - 1 - downPad) * desWidth, sizeof(TPixel) * desWidth);
       }
-    } else if (padOption == PadOption::Circular) { //circular
+    } else if (padOption == PadOption::Circular) { // circular
       // left
       index_t refX = width;
       for (size_t i = leftPad; i-- > 0;) {
@@ -283,18 +285,14 @@ void image2DPad(const TPixel* img, size_t width, size_t height,
       for (size_t j = upPad; j-- > 0;) {
         --refY;
         refY = refY < 0 ? index_t(height) - 1 : refY;
-        std::memcpy(imgOut + j * desWidth,
-                    imgOut + (refY + upPad) * desWidth,
-                    sizeof(TPixel) * desWidth);
+        std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
       }
       // down
       refY = -1;
       for (size_t j = desHeight - downPad; j < desHeight; ++j) {
         ++refY;
         refY = refY >= static_cast<int>(height) ? 0 : refY;
-        std::memcpy(imgOut + j * desWidth,
-                    imgOut + (refY + upPad) * desWidth,
-                    sizeof(TPixel) * desWidth);
+        std::memcpy(imgOut + j * desWidth, imgOut + (refY + upPad) * desWidth, sizeof(TPixel) * desWidth);
       }
     }
   }
@@ -304,15 +302,17 @@ template<typename TPixel>
 void image2DFlip(TPixel* img, size_t width, size_t height, Dimension dim)
 {
   if (dim == Dimension::X) {
-    if (width <= 1)
+    if (width <= 1) {
       return;
+    }
     for (size_t i = 0; i < height; ++i) {
       TPixel* start = img + i * width;
       std::reverse(start, start + width);
     }
   } else if (dim == Dimension::Y) {
-    if (height <= 1)
+    if (height <= 1) {
       return;
+    }
     std::vector<TPixel> buffer(width);
     size_t j = 0;
     size_t k = height - 1;
@@ -339,8 +339,9 @@ void image2DTranspose(TPixel* img, size_t width, size_t height)
 {
   if (width == height) {
     for (size_t i = 0; i < height; ++i) {
-      for (size_t j = i + 1; j < width; ++j)
+      for (size_t j = i + 1; j < width; ++j) {
         std::swap(img[i + j * height], img[j + i * width]);
+      }
     }
   } else {
     const size_t blockSize = 32;
@@ -378,18 +379,16 @@ struct Image2DFilterForOneBlock
     , m_kernelHeight(kernelHeight)
     , m_imgOut(imgOut)
     , m_imgOutWidth(imgOutWidth)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
       for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
-        for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+        for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
           const TPixel* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
-          sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
-                                   m_kernel + r * m_kernelWidth, sum);
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel + r * m_kernelWidth, sum);
         }
         m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
       }
@@ -422,28 +421,47 @@ struct Image2DFilterForOneBlock<double, double>
     , m_kernelHeight(kernelHeight)
     , m_imgOut(imgOut)
     , m_imgOutWidth(imgOutWidth)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image2DFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
-                                      m_imgOut, m_imgOutWidth, range.begin(), range.end());
+      Image2DFilterForOneBlock_AVX512(m_padImg,
+                                      m_padImgWidth,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_kernelHeight,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      range.begin(),
+                                      range.end());
     } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
-      Image2DFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
-                                   m_imgOut, m_imgOutWidth, range.begin(), range.end());
+      Image2DFilterForOneBlock_AVX(m_padImg,
+                                   m_padImgWidth,
+                                   m_kernel,
+                                   m_kernelWidth,
+                                   m_kernelHeight,
+                                   m_imgOut,
+                                   m_imgOutWidth,
+                                   range.begin(),
+                                   range.end());
     } else if (m_kernelWidth >= 2) {
-      Image2DFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_kernelHeight,
-                                    m_imgOut, m_imgOutWidth, range.begin(), range.end());
+      Image2DFilterForOneBlock_SSE3(m_padImg,
+                                    m_padImgWidth,
+                                    m_kernel,
+                                    m_kernelWidth,
+                                    m_kernelHeight,
+                                    m_imgOut,
+                                    m_imgOutWidth,
+                                    range.begin(),
+                                    range.end());
     } else {
       for (size_t j = range.begin(); j != range.end(); ++j) {
         for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
-          for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+          for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
             const double* imgStart = m_padImg + (j + r) * m_padImgWidth + i;
-            sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
-                                     m_kernel + r * m_kernelWidth, sum);
+            sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel + r * m_kernelWidth, sum);
           }
           m_imgOut[j * m_imgOutWidth + i] = sum;
         }
@@ -475,8 +493,7 @@ struct Image2DRowFilterForOneBlock
     , m_kernelWidth(kernelWidth)
     , m_imgOut(imgOut)
     , m_imgOutWidth(imgOutWidth)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
@@ -484,8 +501,7 @@ struct Image2DRowFilterForOneBlock
       for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
         const TPixel* imgStart = m_padImg + j * m_padImgWidth + i;
-        sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
-                                 m_kernel, sum);
+        sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
         m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
       }
     }
@@ -514,27 +530,43 @@ struct Image2DRowFilterForOneBlock<double, double>
     , m_kernelWidth(kernelWidth)
     , m_imgOut(imgOut)
     , m_imgOutWidth(imgOutWidth)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     if (ZCpuInfo::instance().bAVX512F && m_kernelWidth >= 8) {
-      Image2DRowFilterForOneBlock_AVX512(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
-                                         range.begin(), range.end());
+      Image2DRowFilterForOneBlock_AVX512(m_padImg,
+                                         m_padImgWidth,
+                                         m_kernel,
+                                         m_kernelWidth,
+                                         m_imgOut,
+                                         m_imgOutWidth,
+                                         range.begin(),
+                                         range.end());
     } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
-      Image2DRowFilterForOneBlock_AVX(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
-                                      range.begin(), range.end());
+      Image2DRowFilterForOneBlock_AVX(m_padImg,
+                                      m_padImgWidth,
+                                      m_kernel,
+                                      m_kernelWidth,
+                                      m_imgOut,
+                                      m_imgOutWidth,
+                                      range.begin(),
+                                      range.end());
     } else if (m_kernelWidth >= 2) {
-      Image2DRowFilterForOneBlock_SSE3(m_padImg, m_padImgWidth, m_kernel, m_kernelWidth, m_imgOut, m_imgOutWidth,
-                                       range.begin(), range.end());
+      Image2DRowFilterForOneBlock_SSE3(m_padImg,
+                                       m_padImgWidth,
+                                       m_kernel,
+                                       m_kernelWidth,
+                                       m_imgOut,
+                                       m_imgOutWidth,
+                                       range.begin(),
+                                       range.end());
     } else {
       for (size_t j = range.begin(); j != range.end(); ++j) {
         for (size_t i = 0; i < m_imgOutWidth; ++i) {
           double sum = 0.0;
           const double* imgStart = m_padImg + j * m_padImgWidth + i;
-          sum = std::inner_product(imgStart, imgStart + m_kernelWidth,
-                                   m_kernel, sum);
+          sum = std::inner_product(imgStart, imgStart + m_kernelWidth, m_kernel, sum);
           m_imgOut[j * m_imgOutWidth + i] = sum;
         }
       }
@@ -564,15 +596,14 @@ struct Image2DColFilterForOneBlock
     , m_kernelHeight(kernelHeight)
     , m_imgOut(imgOut)
     , m_imgOutWidth(imgOutWidth)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
     for (size_t j = range.begin(); j != range.end(); ++j) {
       for (size_t i = 0; i < m_imgOutWidth; ++i) {
         double sum = 0.0;
-        for (size_t r = 0; r < m_kernelHeight; ++r) {  // row by row
+        for (size_t r = 0; r < m_kernelHeight; ++r) { // row by row
           sum += m_kernel[r] * (*(m_padImg + (j + r) * m_padImgWidth + i));
         }
         m_imgOut[j * m_imgOutWidth + i] = saturate_cast<TPixelOut>(sum);
@@ -589,10 +620,15 @@ struct Image2DColFilterForOneBlock
 };
 
 template<typename TPixel, typename TPixelOut>
-void image2DFilter(const TPixel* img, size_t width, size_t height,
-                   const double* kernel, size_t kernelWidth, size_t kernelHeight,
+void image2DFilter(const TPixel* img,
+                   size_t width,
+                   size_t height,
+                   const double* kernel,
+                   size_t kernelWidth,
+                   size_t kernelHeight,
                    TPixelOut* imgOut,
-                   PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
+                   PadOption boundaryOption = PadOption::Constant,
+                   TPixel boundaryValue = TPixel(0),
                    bool corr = true,
                    bool useMultithreading = true)
 {
@@ -603,13 +639,12 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
   std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight);
-  //ZBenchTimer bt;
-  //bt.start();
-  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
-             boundaryOption, boundaryValue);
-  //bt.stopAndPrint();
+  // ZBenchTimer bt;
+  // bt.start();
+  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(), boundaryOption, boundaryValue);
+  // bt.stopAndPrint();
 
-  //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  // image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedKernel;
   alignedKernel.insert(alignedKernel.end(), kernel, kernel + kernelWidth * kernelHeight);
@@ -619,14 +654,21 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> rowKernel(kernelWidth);
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> colKernel(kernelHeight);
-  if (seperate2DKernel(alignedKernel.data(), kernelWidth, kernelHeight,
-                       rowKernel.data(), colKernel.data())) {
+  if (seperate2DKernel(alignedKernel.data(), kernelWidth, kernelHeight, rowKernel.data(), colKernel.data())) {
     std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg(width * desHeight);
 
-    Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(), desWidth,
-                                                           rowKernel.data(), kernelWidth, bufImg.data(), width);
-    Image2DColFilterForOneBlock<double, TPixelOut> colfunctor(bufImg.data(), width,
-                                                              colKernel.data(), kernelHeight, imgOut, width);
+    Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(),
+                                                           desWidth,
+                                                           rowKernel.data(),
+                                                           kernelWidth,
+                                                           bufImg.data(),
+                                                           width);
+    Image2DColFilterForOneBlock<double, TPixelOut> colfunctor(bufImg.data(),
+                                                              width,
+                                                              colKernel.data(),
+                                                              kernelHeight,
+                                                              imgOut,
+                                                              width);
 
     // get correlation of padImg and adjKernel
     if (!useMultithreading) {
@@ -638,8 +680,8 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
     }
   } else {
     // get correlation of padImg and adjKernel
-    Image2DFilterForOneBlock<TPixel, TPixelOut> functor(padImg.data(), desWidth,
-                                                        alignedKernel.data(), kernelWidth, kernelHeight, imgOut, width);
+    Image2DFilterForOneBlock<TPixel, TPixelOut>
+      functor(padImg.data(), desWidth, alignedKernel.data(), kernelWidth, kernelHeight, imgOut, width);
     if (!useMultithreading) {
       functor(tbb::blocked_range<size_t>(0, height));
     } else {
@@ -649,11 +691,16 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 }
 
 template<typename TPixel, typename TPixelOut>
-void image2DFilter(const TPixel* img, size_t width, size_t height,
-                   const double* rowkernel, size_t kernelWidth,
-                   const double* colkernel, size_t kernelHeight,
+void image2DFilter(const TPixel* img,
+                   size_t width,
+                   size_t height,
+                   const double* rowkernel,
+                   size_t kernelWidth,
+                   const double* colkernel,
+                   size_t kernelHeight,
                    TPixelOut* imgOut,
-                   PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
+                   PadOption boundaryOption = PadOption::Constant,
+                   TPixel boundaryValue = TPixel(0),
                    bool corr = true,
                    bool useMultithreading = true)
 {
@@ -664,13 +711,12 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
   size_t desWidth = leftPad + width + rightPad;
   size_t desHeight = upPad + height + downPad;
   std::vector<TPixel, boost::alignment::aligned_allocator<TPixel, 64>> padImg(desWidth * desHeight);
-  //ZBenchTimer bt;
-  //bt.start();
-  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(),
-             boundaryOption, boundaryValue);
-  //bt.stopAndPrint();
+  // ZBenchTimer bt;
+  // bt.start();
+  image2DPad(img, width, height, leftPad, rightPad, upPad, downPad, padImg.data(), boundaryOption, boundaryValue);
+  // bt.stopAndPrint();
 
-  //image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
+  // image2DWrite(padImg.data(), desWidth, desHeight, "/Users/feng/Downloads/padImg.tif");
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedRowKernel;
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> alignedColKernel;
@@ -683,10 +729,18 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
   std::vector<double, boost::alignment::aligned_allocator<double, 64>> bufImg(width * desHeight);
 
-  Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(), desWidth,
-                                                         alignedRowKernel.data(), kernelWidth, bufImg.data(), width);
-  Image2DColFilterForOneBlock<double, TPixelOut> colfunctor(bufImg.data(), width,
-                                                            alignedColKernel.data(), kernelHeight, imgOut, width);
+  Image2DRowFilterForOneBlock<TPixel, double> rowfunctor(padImg.data(),
+                                                         desWidth,
+                                                         alignedRowKernel.data(),
+                                                         kernelWidth,
+                                                         bufImg.data(),
+                                                         width);
+  Image2DColFilterForOneBlock<double, TPixelOut> colfunctor(bufImg.data(),
+                                                            width,
+                                                            alignedColKernel.data(),
+                                                            kernelHeight,
+                                                            imgOut,
+                                                            width);
 
   // get correlation of padImg and adjKernel
   if (!useMultithreading) {
@@ -700,11 +754,16 @@ void image2DFilter(const TPixel* img, size_t width, size_t height,
 
 // boundaryOption see image2DFilter
 template<typename TPixel, typename TPixelOut>
-void image2DGaussianFilter(const TPixel* img, size_t width, size_t height,
-                           double kernelSigmaX, double kernelSigmaY,
+void image2DGaussianFilter(const TPixel* img,
+                           size_t width,
+                           size_t height,
+                           double kernelSigmaX,
+                           double kernelSigmaY,
                            TPixelOut* imgOut,
-                           index_t kernelWidth = -1, index_t kernelHeight = -1,
-                           PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
+                           index_t kernelWidth = -1,
+                           index_t kernelHeight = -1,
+                           PadOption boundaryOption = PadOption::Constant,
+                           TPixel boundaryValue = TPixel(0),
                            bool useMultithreading = true)
 {
   size_t kWidth;
@@ -723,12 +782,21 @@ void image2DGaussianFilter(const TPixel* img, size_t width, size_t height,
   std::vector<double> rowkernel = create1DGaussianKernel(kernelSigmaX, kernelWidth, &kWidth);
   std::vector<double> colkernel = create1DGaussianKernel(kernelSigmaY, kernelHeight, &kHeight);
 
-  //ZBenchTimer bt;
-  //bt.start();
-  image2DFilter(img, width, height, rowkernel.data(), kWidth,
-                colkernel.data(), kHeight,
-                imgOut, boundaryOption, boundaryValue, true, useMultithreading);
-  //bt.stopAndPrint();
+  // ZBenchTimer bt;
+  // bt.start();
+  image2DFilter(img,
+                width,
+                height,
+                rowkernel.data(),
+                kWidth,
+                colkernel.data(),
+                kHeight,
+                imgOut,
+                boundaryOption,
+                boundaryValue,
+                true,
+                useMultithreading);
+  // bt.stopAndPrint();
 #endif
 }
 
@@ -736,11 +804,16 @@ void image2DGaussianFilter(const TPixel* img, size_t width, size_t height,
 // such as double
 // boundaryOption see image2DFilter
 template<typename TPixel, typename TPixelOut>
-void image2DLoGFilter(const TPixel* img, size_t width, size_t height,
-                      double kernelSigmaX, double kernelSigmaY,
+void image2DLoGFilter(const TPixel* img,
+                      size_t width,
+                      size_t height,
+                      double kernelSigmaX,
+                      double kernelSigmaY,
                       TPixelOut* imgOut,
-                      index_t kernelWidth = -1, index_t kernelHeight = -1,
-                      PadOption boundaryOption = PadOption::Constant, TPixel boundaryValue = TPixel(0),
+                      index_t kernelWidth = -1,
+                      index_t kernelHeight = -1,
+                      PadOption boundaryOption = PadOption::Constant,
+                      TPixel boundaryValue = TPixel(0),
                       bool useMultithreading = true)
 {
   size_t kWidth;
@@ -751,40 +824,79 @@ void image2DLoGFilter(const TPixel* img, size_t width, size_t height,
   std::vector<double> rowGkernel = create1DGaussianKernel(kernelSigmaX, kernelWidth, &kWidth);
   std::vector<double> colGkernel = create1DGaussianKernel(kernelSigmaY, kernelHeight, &kHeight);
 
-  //ZBenchTimer bt;
-  //bt.start();
-  image2DFilter(img, width, height, rowLoGkernel.data(), kWidth,
-                colGkernel.data(), kHeight,
-                imgOut, boundaryOption, boundaryValue, true, useMultithreading);
+  // ZBenchTimer bt;
+  // bt.start();
+  image2DFilter(img,
+                width,
+                height,
+                rowLoGkernel.data(),
+                kWidth,
+                colGkernel.data(),
+                kHeight,
+                imgOut,
+                boundaryOption,
+                boundaryValue,
+                true,
+                useMultithreading);
 
   std::vector<TPixelOut> bufImg(width * height);
 
-  image2DFilter(img, width, height, rowGkernel.data(), kWidth,
-                colLoGkernel.data(), kHeight,
-                bufImg.data(), boundaryOption, boundaryValue, true, useMultithreading);
+  image2DFilter(img,
+                width,
+                height,
+                rowGkernel.data(),
+                kWidth,
+                colLoGkernel.data(),
+                kHeight,
+                bufImg.data(),
+                boundaryOption,
+                boundaryValue,
+                true,
+                useMultithreading);
 
-  for (size_t i = 0; i < bufImg.size(); ++i)
+  for (size_t i = 0; i < bufImg.size(); ++i) {
     imgOut[i] += bufImg[i];
+  }
 
-  //bt.stopAndPrint();
+  // bt.stopAndPrint();
 }
 
-void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpolant, bool antialiasing,
-                          std::vector<double>& weights, std::vector<size_t>& indices, size_t& kernelWidth);
+void _resizeContributions(size_t inLength,
+                          size_t outLength,
+                          Interpolant interpolant,
+                          bool antialiasing,
+                          std::vector<double>& weights,
+                          std::vector<size_t>& indices,
+                          size_t& kernelWidth);
 
 template<typename TPixel, typename TPixelOut>
 struct Resize2DForOneBlock
 {
-  Resize2DForOneBlock(const TPixel* img, size_t width, size_t height,
-                      TPixelOut* imgOut, size_t outWidth, size_t outHeight,
-                      const std::vector<double>& xWeights, const std::vector<size_t>& xIndices, size_t xKernelWidth,
-                      const std::vector<double>& yWeights, const std::vector<size_t>& yIndices, size_t yKernelWidth)
-    : m_img(img), m_width(width), m_height(height)
-    , m_imgOut(imgOut), m_outWidth(outWidth), m_outHeight(outHeight)
-    , m_xWeights(xWeights), m_xIndices(xIndices), m_xKernelWidth(xKernelWidth)
-    , m_yWeights(yWeights), m_yIndices(yIndices), m_yKernelWidth(yKernelWidth)
-  {
-  }
+  Resize2DForOneBlock(const TPixel* img,
+                      size_t width,
+                      size_t height,
+                      TPixelOut* imgOut,
+                      size_t outWidth,
+                      size_t outHeight,
+                      const std::vector<double>& xWeights,
+                      const std::vector<size_t>& xIndices,
+                      size_t xKernelWidth,
+                      const std::vector<double>& yWeights,
+                      const std::vector<size_t>& yIndices,
+                      size_t yKernelWidth)
+    : m_img(img)
+    , m_width(width)
+    , m_height(height)
+    , m_imgOut(imgOut)
+    , m_outWidth(outWidth)
+    , m_outHeight(outHeight)
+    , m_xWeights(xWeights)
+    , m_xIndices(xIndices)
+    , m_xKernelWidth(xKernelWidth)
+    , m_yWeights(yWeights)
+    , m_yIndices(yIndices)
+    , m_yKernelWidth(yKernelWidth)
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
@@ -827,13 +939,18 @@ struct Resize2DForOneBlock
 };
 
 //((scale-1)/2) in output image maps to 0 in input image, and ((3*scale-1)/2) in output
-//image maps to 1 in input image.
+// image maps to 1 in input image.
 // 'antialiasing' specifies whether to perform antialiasing when shrinking an image. For the 'nearest' method,
 // the parameter 'antialiasingForNearest' is used (default false); for all other methods, the default is true.
 template<typename TPixel, typename TPixelOut>
-void image2DResize(const TPixel* img, size_t width, size_t height,
-                   TPixelOut* imgOut, size_t outWidth, size_t outHeight,
-                   Interpolant interpolant = Interpolant::Cubic, bool antialiasing = true,
+void image2DResize(const TPixel* img,
+                   size_t width,
+                   size_t height,
+                   TPixelOut* imgOut,
+                   size_t outWidth,
+                   size_t outHeight,
+                   Interpolant interpolant = Interpolant::Cubic,
+                   bool antialiasing = true,
                    bool antialiasingForNearest = false,
                    bool useMultithreading = true)
 {
@@ -843,15 +960,33 @@ void image2DResize(const TPixel* img, size_t width, size_t height,
   std::vector<double> yWeights;
   std::vector<size_t> yIndices;
   size_t yKernelWidth;
-  _resizeContributions(width, outWidth, interpolant,
+  _resizeContributions(width,
+                       outWidth,
+                       interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
-                       xWeights, xIndices, xKernelWidth);
-  _resizeContributions(height, outHeight, interpolant,
+                       xWeights,
+                       xIndices,
+                       xKernelWidth);
+  _resizeContributions(height,
+                       outHeight,
+                       interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
-                       yWeights, yIndices, yKernelWidth);
+                       yWeights,
+                       yIndices,
+                       yKernelWidth);
 
-  Resize2DForOneBlock<TPixel, TPixelOut> func(img, width, height, imgOut, outWidth, outHeight,
-                                              xWeights, xIndices, xKernelWidth, yWeights, yIndices, yKernelWidth);
+  Resize2DForOneBlock<TPixel, TPixelOut> func(img,
+                                              width,
+                                              height,
+                                              imgOut,
+                                              outWidth,
+                                              outHeight,
+                                              xWeights,
+                                              xIndices,
+                                              xKernelWidth,
+                                              yWeights,
+                                              yIndices,
+                                              yKernelWidth);
   if (!useMultithreading) {
     func(tbb::blocked_range<size_t>(0, outHeight));
   } else {

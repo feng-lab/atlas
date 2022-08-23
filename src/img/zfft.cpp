@@ -7,13 +7,13 @@ namespace nim {
 ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   if (img.isEmpty() || img.numChannels() != 1 || img.numTimes() != 1) {
-    throw ZImgException(QString("fft: input img dimension is not supported: <%1>")
-                          .arg(img.info().toQString()));
+    throw ZImgException(QString("fft: input img dimension is not supported: <%1>").arg(img.info().toQString()));
   }
 
   ZComplexImg res;
-  if (img.isEmpty())
+  if (img.isEmpty()) {
     return res;
+  }
 
   size_t width = outWidth / 2 + 1;
   ZComplexImg tmp(width, outHeight, outDepth);
@@ -25,10 +25,12 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
   // reinterpret_cast allowed (section "Complex numbers")
   wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
   wrapImg.pasteImg(img);
-  wrapImg.clear();   // copy data finished
+  wrapImg.clear(); // copy data finished
 
   // do fft
-  fftw_plan p = fftw_plan_dft_r2c_3d(outDepth, outHeight, outWidth,
+  fftw_plan p = fftw_plan_dft_r2c_3d(outDepth,
+                                     outHeight,
+                                     outWidth,
                                      reinterpret_cast<double*>(res.rawData()),
                                      reinterpret_cast<fftw_complex*>(res.rawData()),
                                      FFTW_ESTIMATE);
@@ -41,10 +43,13 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
 ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   ZImg res;
-  if (cimg.isEmpty())
+  if (cimg.isEmpty()) {
     return res;
+  }
 
-  fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(), cimg.height(), width,
+  fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
+                                     cimg.height(),
+                                     width,
                                      reinterpret_cast<fftw_complex*>(cimg.rawData()),
                                      reinterpret_cast<double*>(cimg.rawData()),
                                      FFTW_ESTIMATE);

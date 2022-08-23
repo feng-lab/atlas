@@ -51,8 +51,7 @@ public:
   // conn can be 4, 8 (2D) or 6, 18, 26 (3D)
   // if conn == 0, uses a default connectivity of 8 for two dimensions, 26 for three dimensions
   template<typename GenericForegroundPredictor>
-  ConnComp run(const ZImg& img, size_t conn, size_t c, size_t t,
-               const GenericForegroundPredictor& isForeground)
+  ConnComp run(const ZImg& img, size_t conn, size_t c, size_t t, const GenericForegroundPredictor& isForeground)
   {
     ConnComp res = createRes(img, conn, c, t);
     ZImg bimg = img.createView(c, t).binarized(isForeground);
@@ -80,4 +79,3 @@ private:
 };
 
 } // namespace nim
-

@@ -130,20 +130,20 @@ template<>
 Compression stringToEnum<Compression>(std::string_view s)
 {
   static const std::map<std::string_view, Compression> compressionMap = {
-    {"AUTO",          Compression::AUTO},
-    {"NONE",          Compression::NONE},
-    {"LZW",           Compression::LZW},
-    {"JPEG",          Compression::JPEG},
-    {"T85",           Compression::T85},
-    {"T43",           Compression::T43},
-    {"PACKBITS",      Compression::PACKBITS},
-    {"DEFLATE",       Compression::DEFLATE},
+    {"AUTO",          Compression::AUTO         },
+    {"NONE",          Compression::NONE         },
+    {"LZW",           Compression::LZW          },
+    {"JPEG",          Compression::JPEG         },
+    {"T85",           Compression::T85          },
+    {"T43",           Compression::T43          },
+    {"PACKBITS",      Compression::PACKBITS     },
+    {"DEFLATE",       Compression::DEFLATE      },
     {"ADOBE_DEFLATE", Compression::ADOBE_DEFLATE},
-    {"DCS",           Compression::DCS},
-    {"JP2000",        Compression::JP2000},
-    {"LZMA",          Compression::LZMA},
-    {"ZSTD",          Compression::ZSTD},
-    {"WEBP",          Compression::WEBP},
+    {"DCS",           Compression::DCS          },
+    {"JP2000",        Compression::JP2000       },
+    {"LZMA",          Compression::LZMA         },
+    {"ZSTD",          Compression::ZSTD         },
+    {"WEBP",          Compression::WEBP         },
   };
   auto it = compressionMap.find(s);
   if (it == compressionMap.end()) {
@@ -170,4 +170,4 @@ template Interpolant stringToEnum<Interpolant>(std::string_view);
 template Dimension stringToEnum<Dimension>(std::string_view);
 template ImgMergeMode stringToEnum<ImgMergeMode>(std::string_view);
 
-}  // namespace nim
+} // namespace nim

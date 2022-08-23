@@ -13,24 +13,24 @@
 
 namespace {
 
-#define  TIFFTAG_ORIENTATION    274  /* +image orientation */
-#define      ORIENTATION_TOPLEFT    1  /* row 0 top, col 0 lhs */
-#define      ORIENTATION_TOPRIGHT  2  /* row 0 top, col 0 rhs */
-#define      ORIENTATION_BOTRIGHT  3  /* row 0 bottom, col 0 rhs */
-#define      ORIENTATION_BOTLEFT    4  /* row 0 bottom, col 0 lhs */
-#define      ORIENTATION_LEFTTOP    5  /* row 0 lhs, col 0 top */
-#define      ORIENTATION_RIGHTTOP  6  /* row 0 rhs, col 0 top */
-#define      ORIENTATION_RIGHTBOT  7  /* row 0 rhs, col 0 bottom */
-#define      ORIENTATION_LEFTBOT    8  /* row 0 lhs, col 0 bottom */
-#define  TIFFTAG_JPEGIFOFFSET    513  /* !pointer to SOI marker */
+#define TIFFTAG_ORIENTATION 274 /* +image orientation */
+#define ORIENTATION_TOPLEFT 1 /* row 0 top, col 0 lhs */
+#define ORIENTATION_TOPRIGHT 2 /* row 0 top, col 0 rhs */
+#define ORIENTATION_BOTRIGHT 3 /* row 0 bottom, col 0 rhs */
+#define ORIENTATION_BOTLEFT 4 /* row 0 bottom, col 0 lhs */
+#define ORIENTATION_LEFTTOP 5 /* row 0 lhs, col 0 top */
+#define ORIENTATION_RIGHTTOP 6 /* row 0 rhs, col 0 top */
+#define ORIENTATION_RIGHTBOT 7 /* row 0 rhs, col 0 bottom */
+#define ORIENTATION_LEFTBOT 8 /* row 0 lhs, col 0 bottom */
+#define TIFFTAG_JPEGIFOFFSET 513 /* !pointer to SOI marker */
 
 using namespace nim;
 
 struct my_error_mgr
 {
-  struct jpeg_error_mgr pub;  /* "public" fields */
+  struct jpeg_error_mgr pub; /* "public" fields */
 
-  //jmp_buf setjmp_buffer;	/* for return to caller */
+  // jmp_buf setjmp_buffer;	/* for return to caller */
 };
 
 /*
@@ -63,7 +63,7 @@ struct my_error_mgr
 void my_error_exit(j_common_ptr cinfo)
 {
   /* cinfo->err really points to a my_error_mgr struct, so coerce pointer */
-  //my_error_mgr* myerr = (my_error_mgr*) cinfo->err;
+  // my_error_mgr* myerr = (my_error_mgr*) cinfo->err;
 
   char errbuffer[JMSG_LENGTH_MAX];
 
@@ -102,23 +102,20 @@ void startReading(FILE* infile, jpeg_decompress_struct& cinfo)
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
-  (void) jpeg_read_header(&cinfo, TRUE);
+  (void)jpeg_read_header(&cinfo, TRUE);
   /* We can ignore the return value from jpeg_read_header since
-     *   (a) suspension is not possible with the stdio data source, and
-     *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
-     * See libjpeg.txt for more info.
-     */
+   *   (a) suspension is not possible with the stdio data source, and
+   *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
+   * See libjpeg.txt for more info.
+   */
 
   /* Step 4: set parameters for decompression */
 
-  if (cinfo.jpeg_color_space == JCS_YCbCr ||
-      cinfo.jpeg_color_space == JCS_CMYK ||
-      cinfo.jpeg_color_space == JCS_YCCK ||
-      cinfo.jpeg_color_space == JCS_EXT_RGBX ||
-      cinfo.jpeg_color_space == JCS_EXT_BGRX ||
-      cinfo.jpeg_color_space == JCS_EXT_XBGR ||
-      cinfo.jpeg_color_space == JCS_EXT_XRGB)
+  if (cinfo.jpeg_color_space == JCS_YCbCr || cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK ||
+      cinfo.jpeg_color_space == JCS_EXT_RGBX || cinfo.jpeg_color_space == JCS_EXT_BGRX ||
+      cinfo.jpeg_color_space == JCS_EXT_XBGR || cinfo.jpeg_color_space == JCS_EXT_XRGB) {
     cinfo.out_color_space = JCS_RGB;
+  }
 
   cinfo.quantize_colors = FALSE;
 }
@@ -131,23 +128,20 @@ void startReading(unsigned char* inbuffer, size_t insize, jpeg_decompress_struct
 
   /* Step 3: read file parameters with jpeg_read_header() */
 
-  (void) jpeg_read_header(&cinfo, TRUE);
+  (void)jpeg_read_header(&cinfo, TRUE);
   /* We can ignore the return value from jpeg_read_header since
-     *   (a) suspension is not possible with the stdio data source, and
-     *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
-     * See libjpeg.txt for more info.
-     */
+   *   (a) suspension is not possible with the stdio data source, and
+   *   (b) we passed TRUE to reject a tables-only JPEG file as an error.
+   * See libjpeg.txt for more info.
+   */
 
   /* Step 4: set parameters for decompression */
 
-  if (cinfo.jpeg_color_space == JCS_YCbCr ||
-      cinfo.jpeg_color_space == JCS_CMYK ||
-      cinfo.jpeg_color_space == JCS_YCCK ||
-      cinfo.jpeg_color_space == JCS_EXT_RGBX ||
-      cinfo.jpeg_color_space == JCS_EXT_BGRX ||
-      cinfo.jpeg_color_space == JCS_EXT_XBGR ||
-      cinfo.jpeg_color_space == JCS_EXT_XRGB)
+  if (cinfo.jpeg_color_space == JCS_YCbCr || cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK ||
+      cinfo.jpeg_color_space == JCS_EXT_RGBX || cinfo.jpeg_color_space == JCS_EXT_BGRX ||
+      cinfo.jpeg_color_space == JCS_EXT_XBGR || cinfo.jpeg_color_space == JCS_EXT_XRGB) {
     cinfo.out_color_space = JCS_RGB;
+  }
 
   cinfo.quantize_colors = FALSE;
 }
@@ -195,14 +189,15 @@ void readInfoFromJpeg(jpeg_decompress_struct& cinfo, ZImgInfo& info)
   info.voxelFormat = VoxelFormat::Unsigned;
   info.createDefaultDescriptions();
 
-  if (orientation > 4)
+  if (orientation > 4) {
     std::swap(info.width, info.height);
+  }
 }
 
 void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion& region, uint16_t orientation)
 {
   /* Step 5: Start decompressor */
-  (void) jpeg_start_decompress(&cinfo);
+  (void)jpeg_start_decompress(&cinfo);
 
   ZImgInfo imgInfo;
   imgInfo.bytesPerVoxel = 1;
@@ -222,37 +217,38 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   ZImgInfo partialImgInfo = region.clip(imgInfo);
   ZImg imgTmp(partialImgInfo);
 
-
   /* We may need to do some setup of our own at this point before reading
-     * the data.  After jpeg_start_decompress() we have the correct scaled
-     * output image dimensions available, as well as the output colormap
-     * if we asked for color quantization.
-     * In this example, we need to make an output work buffer of the right size.
-     */
+   * the data.  After jpeg_start_decompress() we have the correct scaled
+   * output image dimensions available, as well as the output colormap
+   * if we asked for color quantization.
+   * In this example, we need to make an output work buffer of the right size.
+   */
   /* JSAMPLEs per row in output buffer */
   /* Make a one-row-high sample array that will go away when done with image */
-  JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)
-    (reinterpret_cast<j_common_ptr>(&cinfo), JPOOL_IMAGE,
-     imgInfo.rowByteNumber() * imgInfo.numChannels, cinfo.rec_outbuf_height);
+  JSAMPARRAY buffer = (*cinfo.mem->alloc_sarray)(reinterpret_cast<j_common_ptr>(&cinfo),
+                                                 JPOOL_IMAGE,
+                                                 imgInfo.rowByteNumber() * imgInfo.numChannels,
+                                                 cinfo.rec_outbuf_height);
 
   /* Step 6: while (scan lines remain to be read) */
   /*           jpeg_read_scanlines(...); */
 
   /* Here we use the library's state variable cinfo.output_scanline as the
-     * loop counter, so that we don't have to keep track ourselves.
-     */
+   * loop counter, so that we don't have to keep track ourselves.
+   */
   size_t lineStart = 0;
   while (cinfo.output_scanline < cinfo.output_height) {
     /* jpeg_read_scanlines expects an array of pointers to scanlines.
-       * Here the array is only one element long, but you could ask for
-       * more than one scanline at a time if that's more convenient.
-       */
+     * Here the array is only one element long, but you could ask for
+     * more than one scanline at a time if that's more convenient.
+     */
     size_t lineRead = jpeg_read_scanlines(&cinfo, buffer, cinfo.rec_outbuf_height);
 
     for (size_t y = lineStart; y < lineStart + lineRead; ++y) {
       if (region.yInRegion(y)) {
         if (imgInfo.numChannels == 1) {
-          std::memcpy(imgTmp.rowData<uint8_t>(y - region.start.y), &(buffer[y - lineStart][region.start.x]),
+          std::memcpy(imgTmp.rowData<uint8_t>(y - region.start.y),
+                      &(buffer[y - lineStart][region.start.x]),
                       imgTmp.rowByteNumber());
         } else {
           size_t cEnd = region.end.c == -1 ? imgInfo.numChannels : region.end.c;
@@ -271,7 +267,7 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
   }
 
   /* Step 7: Finish decompression */
-  (void) jpeg_finish_decompress(&cinfo);
+  (void)jpeg_finish_decompress(&cinfo);
 
   if (orientation > 4) {
     std::swap(imgTmp.infoRef().width, imgTmp.infoRef().height);
@@ -348,11 +344,13 @@ QString ZImgJpeg::fullName() const
 QStringList ZImgJpeg::extensions() const
 {
   QStringList res;
-  res << "jpg" << "jpeg";
+  res << "jpg"
+      << "jpeg";
   return res;
 }
 
-void ZImgJpeg::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgJpeg::readInfo(const QString& filename,
+                        std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   auto infile = openFile(filename, "rb");
@@ -417,8 +415,10 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
   }
 }
 
-void
-ZImgJpeg::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene)
+void ZImgJpeg::readThumbnail(const QString& filename,
+                             ZImgThumbernail& thumbnail,
+                             const ZImgRegion& region,
+                             size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -521,7 +521,7 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   readMetadata(filename, img.metadataRef(), scene);
 }
 
-void ZImgJpeg::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
+void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO) {
@@ -530,15 +530,12 @@ void ZImgJpeg::checkImgBeforeWriting(const QString &filename, const ZImgInfo &in
   if (info.numTimes != 1 || info.depth != 1) {
     throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
   }
-  if (!(info.numChannels == 1 ||
-        (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
+  if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
         (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
-      info.voxelFormat != VoxelFormat::Unsigned ||
-      info.bytesPerVoxel > 1) {
+      info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 1) {
     throw ZIOException(QString("image can not be represented as jpeg: %1").arg(info.toQString()));
   }
-  if (paras.jpegChrominanceSubsampling != 444 &&
-      paras.jpegChrominanceSubsampling != 422 &&
+  if (paras.jpegChrominanceSubsampling != 444 && paras.jpegChrominanceSubsampling != 422 &&
       paras.jpegChrominanceSubsampling != 420) {
     throw ZIOException(QString("unsupported chrominance subsampling: %1").arg(paras.jpegChrominanceSubsampling));
   }
@@ -580,19 +577,32 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
     throw ZIOException(QString("libjpeg-turbo: initializing compressor: %1").arg(tjGetErrorStr2(tjInstance)));
   }
   [[maybe_unused]] auto guard1 = folly::makeGuard([&tjInstance]() {
-    if (tjInstance) tjDestroy(tjInstance);
+    if (tjInstance) {
+      tjDestroy(tjInstance);
+    }
   });
 
   ZImg tmp(img.info());
   CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
   ZImgFormat::XYZCtoCXYZ(img, tmp);
-  unsigned char* jpegBuf = nullptr;  /* Dynamically allocate the JPEG buffer */
+  unsigned char* jpegBuf = nullptr; /* Dynamically allocate the JPEG buffer */
   [[maybe_unused]] auto guard2 = folly::makeGuard([&jpegBuf]() {
-    if (jpegBuf) tjFree(jpegBuf);
+    if (jpegBuf) {
+      tjFree(jpegBuf);
+    }
   });
   unsigned long jpegSize;
-  if (tjCompress2(tjInstance, tmp.channelData<uint8_t>(0), img.width(), 0, img.height(), pixelFormat,
-                  &jpegBuf, &jpegSize, chrominanceSubsampling, paras.jpegQuality, flags) < 0) {
+  if (tjCompress2(tjInstance,
+                  tmp.channelData<uint8_t>(0),
+                  img.width(),
+                  0,
+                  img.height(),
+                  pixelFormat,
+                  &jpegBuf,
+                  &jpegSize,
+                  chrominanceSubsampling,
+                  paras.jpegQuality,
+                  flags) < 0) {
     throw ZIOException(QString("libjpeg-turbo: compressing image: %1").arg(tjGetErrorStr2(tjInstance)));
   }
 
@@ -653,4 +663,4 @@ void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSiz
   std::memcpy(des, img.channelData<uint8_t>(0), img.byteNumber());
 }
 
-}  // namespace nim
+} // namespace nim

@@ -6,10 +6,12 @@
 
 namespace nim {
 
-ZImgInfo::ZImgInfo(size_t w, size_t h, size_t d,
-                   size_t c, size_t t,
-                   size_t bytePerVox, VoxelFormat vf)
-  : width(w), height(h), depth(d), numChannels(c), numTimes(t)
+ZImgInfo::ZImgInfo(size_t w, size_t h, size_t d, size_t c, size_t t, size_t bytePerVox, VoxelFormat vf)
+  : width(w)
+  , height(h)
+  , depth(d)
+  , numChannels(c)
+  , numTimes(t)
 {
   bytesPerVoxel = bytePerVox;
   voxelFormat = vf;
@@ -44,7 +46,7 @@ void ZImgInfo::clear()
   timeStamps.clear();
   channelNames.clear();
   channelColors.clear();
-  //locations.clear();
+  // locations.clear();
   position.clear();
   lastChannelIsAlphaChannel = false;
 }
@@ -56,7 +58,7 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
   std::swap(depth, other.depth);
   std::swap(numChannels, other.numChannels);
   std::swap(numTimes, other.numTimes);
-  //std::swap(numLocations, other.numLocations);
+  // std::swap(numLocations, other.numLocations);
   std::swap(bytesPerVoxel, other.bytesPerVoxel);
   std::swap(voxelFormat, other.voxelFormat);
   std::swap(validBitCount, other.validBitCount);
@@ -68,26 +70,26 @@ void ZImgInfo::swap(ZImgInfo& other) noexcept
   timeStamps.swap(other.timeStamps);
   channelNames.swap(other.channelNames);
   channelColors.swap(other.channelColors);
-  //locations.swap(other.locations);
+  // locations.swap(other.locations);
   position.swap(other.position);
   std::swap(lastChannelIsAlphaChannel, other.lastChannelIsAlphaChannel);
 }
 
-//std::string ZImgInfo::toString() const
+// std::string ZImgInfo::toString() const
 //{
-//  std::ostringstream res;
-//  res << "width:" << width
-//      << ", height:" << height
-//      << ", depth:" << depth
-//      << ", numChannels:" << numChannels
-//      << ", numTimes:" << numTimes
-//      << ", numLocations:" << numLocations
-//      << ", bytesPerVoxel:" << bytesPerVoxel
-//      << ", voxelFormat:" << VoxelFormatString[voxelFormat]
-//      << ", voxelSizeUnit:" << VoxelSizeUnitString[voxelSizeUnit]
-//      << ", voxelSizeX:" << voxelSizeX
-//      << ", voxelSizeY:" << voxelSizeY
-//      << ", voxelSizeZ:" << voxelSizeZ;
+//   std::ostringstream res;
+//   res << "width:" << width
+//       << ", height:" << height
+//       << ", depth:" << depth
+//       << ", numChannels:" << numChannels
+//       << ", numTimes:" << numTimes
+//       << ", numLocations:" << numLocations
+//       << ", bytesPerVoxel:" << bytesPerVoxel
+//       << ", voxelFormat:" << VoxelFormatString[voxelFormat]
+//       << ", voxelSizeUnit:" << VoxelSizeUnitString[voxelSizeUnit]
+//       << ", voxelSizeX:" << voxelSizeX
+//       << ", voxelSizeY:" << voxelSizeY
+//       << ", voxelSizeZ:" << voxelSizeZ;
 
 //  return res.str();
 //}
@@ -136,13 +138,13 @@ void ZImgInfo::createDefaultChannelColors()
       } else if (i == 5) {
         channelColors[i] = col4(0, 255, 255);
       } else {
-        channelColors[i] = col4(ZRandom::instance().randInt(255),
-                                ZRandom::instance().randInt(255),
-                                ZRandom::instance().randInt(255));
+        channelColors[i] =
+          col4(ZRandom::instance().randInt(255), ZRandom::instance().randInt(255), ZRandom::instance().randInt(255));
       }
     }
-    if (lastChannelIsAlphaChannel && numChannels > 0)
+    if (lastChannelIsAlphaChannel && numChannels > 0) {
       channelColors[numChannels - 1] = col4(0, 0, 0);
+    }
   }
 }
 
@@ -156,20 +158,20 @@ void ZImgInfo::createDefaultTimeStamps()
   }
 }
 
-//void ZImgInfo::createDefaultLocations()
+// void ZImgInfo::createDefaultLocations()
 //{
-//  if (locations.size() != numLocations) {
-//    locations.resize(numLocations);
-//    for (size_t i=0; i<numLocations; ++i)
-//      locations[i] = Location();
-//  }
-//}
+//   if (locations.size() != numLocations) {
+//     locations.resize(numLocations);
+//     for (size_t i=0; i<numLocations; ++i)
+//       locations[i] = Location();
+//   }
+// }
 
 void ZImgInfo::createDefaultDescriptions()
 {
   createDefaultChannelColors();
   createDefaultChannelNames();
-  //createDefaultLocations();
+  // createDefaultLocations();
   createDefaultTimeStamps();
 }
 
@@ -210,7 +212,7 @@ template<typename TVoxel>
 void ZImgInfo::setVoxelFormat(size_t validBitCountIn)
 {
   static_assert(std::is_arithmetic_v<TVoxel> &&
-                (sizeof(TVoxel) == 1 || sizeof(TVoxel) == 2 || sizeof(TVoxel) == 4 || sizeof(TVoxel) == 8),
+                  (sizeof(TVoxel) == 1 || sizeof(TVoxel) == 2 || sizeof(TVoxel) == 4 || sizeof(TVoxel) == 8),
                 "need arithmetic type");
   validBitCount = validBitCountIn;
   bytesPerVoxel = sizeof(TVoxel);
@@ -385,16 +387,19 @@ bool ZImgInfo::isType() const
   if (voxelByteNumber() == sizeof(TVoxel)) {
     switch (voxelFormat) {
       case VoxelFormat::Unsigned:
-        if (std::is_integral_v<TVoxel> && std::is_unsigned_v<TVoxel>)
+        if (std::is_integral_v<TVoxel> && std::is_unsigned_v<TVoxel>) {
           return true;
+        }
         break;
       case VoxelFormat::Signed:
-        if (std::is_integral_v<TVoxel> && std::is_signed_v<TVoxel>)
+        if (std::is_integral_v<TVoxel> && std::is_signed_v<TVoxel>) {
           return true;
+        }
         break;
       case VoxelFormat::Float:
-        if (std::is_floating_point_v<TVoxel>)
+        if (std::is_floating_point_v<TVoxel>) {
           return true;
+        }
         break;
       default:
         break;

@@ -5,7 +5,7 @@
 #include <boost/json/src.hpp>
 #include <sstream>
 
-namespace  {
+namespace {
 
 void pretty_print(std::ostream& os, const json::value& jv, std::string* indent = nullptr)
 {
@@ -129,13 +129,11 @@ json::object loadJsonObject(const QString& file)
 {
   auto fileString = readFileIntoByteArray(file);
 
-  json::parse_options opt;  // all extensions default to off
-  opt.allow_comments = true;  // permit C and C++ style comments to appear in whitespace
+  json::parse_options opt; // all extensions default to off
+  opt.allow_comments = true; // permit C and C++ style comments to appear in whitespace
   opt.allow_trailing_commas = true; // allow an additional trailing comma in object and array element lists
 
-  auto jv = json::parse(json::string_view(fileString.data(), fileString.size()),
-                        json::storage_ptr(),
-                        opt);
+  auto jv = json::parse(json::string_view(fileString.data(), fileString.size()), json::storage_ptr(), opt);
   return jv.as_object();
 }
 

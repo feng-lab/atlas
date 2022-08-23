@@ -36,16 +36,19 @@ const LogSeverity OffLevel = google::GLOG_FATAL + 1;
 
 struct LogData
 {
-  LogData(LogSeverity severity, const char* full_filename,
-          const char* base_filename, int line_,
+  LogData(LogSeverity severity,
+          const char* full_filename,
+          const char* base_filename,
+          int line_,
           const std::tm& tm,
-          const char* msg, size_t message_len, size_t prefix_len)
+          const char* msg,
+          size_t message_len,
+          size_t prefix_len)
     : level(severity)
     , fullFilename(full_filename)
     , baseFilename(base_filename)
     , line(line_)
-    , time(QDate(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday),
-           QTime(tm.tm_hour, tm.tm_min, tm.tm_sec))
+    , time(QDate(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday), QTime(tm.tm_hour, tm.tm_min, tm.tm_sec))
     , message(msg, message_len)
     , formatted(QString::fromUtf8(msg - prefix_len, static_cast<int>(message_len + prefix_len)))
   {}
@@ -67,16 +70,32 @@ LogSinkPtr createFileLogSink(const QString& filename);
 LogSinkPtr createFunctorLogSink(const LogFunction& f);
 
 inline void addLogSink(LogSink* sink)
-{ if (sink) google::AddLogSink(sink); }
+{
+  if (sink) {
+    google::AddLogSink(sink);
+  }
+}
 
 inline void addLogSink(const LogSinkPtr& sink)
-{ if (sink) google::AddLogSink(sink.get()); }
+{
+  if (sink) {
+    google::AddLogSink(sink.get());
+  }
+}
 
 inline void removeLogSink(LogSink* sink)
-{ if (sink) google::RemoveLogSink(sink); }
+{
+  if (sink) {
+    google::RemoveLogSink(sink);
+  }
+}
 
 inline void removeLogSink(const LogSinkPtr& sink)
-{ if (sink) google::RemoveLogSink(sink.get()); }
+{
+  if (sink) {
+    google::RemoveLogSink(sink.get());
+  }
+}
 
 QString levelToString(LogSeverity theLevel);
 
@@ -86,42 +105,52 @@ QString levelToString(LogSeverity theLevel);
 #define LFATALF(file, line) google::LogMessage(file, line, google::GLOG_FATAL).stream()
 
 inline std::ostream& operator<<(std::ostream& s, const QByteArray& q)
-{ return (s << q.constData()); }
+{
+  return (s << q.constData());
+}
 
 inline std::ostream& operator<<(std::ostream& s, const QString& q)
-{ return (s << q.toUtf8().constData()); }
+{
+  return (s << q.toUtf8().constData());
+}
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
 inline std::ostream& operator<<(std::ostream& s, QStringView q)
-{ return (s << q.toUtf8().constData()); }
+{
+  return (s << q.toUtf8().constData());
+}
 inline std::ostream& operator<<(std::ostream& s, QUtf8StringView q)
-{ return (s << q.data()); }
+{
+  return (s << q.data());
+}
 inline std::ostream& operator<<(std::ostream& s, QByteArrayView q)
-{ return (s << q.constData()); }
+{
+  return (s << q.constData());
+}
 #else
 inline std::ostream& operator<<(std::ostream& s, QStringRef q)
-{ return (s << q.toUtf8().constData()); }
+{
+  return (s << q.toUtf8().constData());
+}
 #endif
 
-
-
-//template<class T, std::size_t N>
-//inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
+// template<class T, std::size_t N>
+// inline std::ostream& operator<<(std::ostream& s, const std::array<T, N>& arr)
 //{
-//  std::copy(arr.cbegin(), arr.cend(), std::ostream_iterator<T>(s, " "));
-//  return s;
-//}
+//   std::copy(arr.cbegin(), arr.cend(), std::ostream_iterator<T>(s, " "));
+//   return s;
+// }
 
 inline void logLongString(const QString& q)
 {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-  for (qsizetype i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
+  for (qsizetype i = 0; i < q.size(); i += 10000) { // glog limit is 30000
     auto length = std::min(qsizetype(10000), q.size() - i);
     QStringView qView(q.data() + i, length);
     LOG(INFO) << qView;
   }
 #else
-  for (int i = 0; i < q.size(); i += 10000) {   // glog limit is 30000
+  for (int i = 0; i < q.size(); i += 10000) { // glog limit is 30000
     int length = std::min(10000, q.size() - i);
     QStringRef qRef(&q, i, length);
     LOG(INFO) << qRef;
@@ -172,29 +201,29 @@ inline std::ostream& operator<<(std::ostream& s, const QVector<T>& vec)
 }
 #endif
 
-//template<typename T, typename Alloc>
-//inline std::ostream& operator<<(std::ostream& s, const std::vector<T, Alloc>& vec)
+// template<typename T, typename Alloc>
+// inline std::ostream& operator<<(std::ostream& s, const std::vector<T, Alloc>& vec)
 //{
-//  return (s << qtTypeToQString(vec).toUtf8().constData());
-//}
+//   return (s << qtTypeToQString(vec).toUtf8().constData());
+// }
 //
-//template<typename T, typename Alloc>
-//inline std::ostream& operator<<(std::ostream& s, const std::list<T, Alloc>& vec)
+// template<typename T, typename Alloc>
+// inline std::ostream& operator<<(std::ostream& s, const std::list<T, Alloc>& vec)
 //{
-//  return (s << qtTypeToQString(vec).toUtf8().constData());
-//}
+//   return (s << qtTypeToQString(vec).toUtf8().constData());
+// }
 //
-//template<typename Key, typename T, typename Compare, typename Alloc>
-//inline std::ostream& operator<<(std::ostream& s, const std::map<Key, T, Compare, Alloc>& map)
+// template<typename Key, typename T, typename Compare, typename Alloc>
+// inline std::ostream& operator<<(std::ostream& s, const std::map<Key, T, Compare, Alloc>& map)
 //{
-//  return (s << qtTypeToQString(map).toUtf8().constData());
-//}
+//   return (s << qtTypeToQString(map).toUtf8().constData());
+// }
 //
-//template<typename Key, typename T, typename Compare, typename Alloc>
-//inline std::ostream& operator<<(std::ostream& s, const std::multimap<Key, T, Compare, Alloc>& map)
+// template<typename Key, typename T, typename Compare, typename Alloc>
+// inline std::ostream& operator<<(std::ostream& s, const std::multimap<Key, T, Compare, Alloc>& map)
 //{
-//  return (s << qtTypeToQString(map).toUtf8().constData());
-//}
+//   return (s << qtTypeToQString(map).toUtf8().constData());
+// }
 
 template<class Key, class T>
 inline std::ostream& operator<<(std::ostream& s, const QMap<Key, T>& map)
@@ -228,11 +257,11 @@ inline std::ostream& operator<<(std::ostream& s, const QPair<T1, T2>& pair)
 }
 #endif
 
-//template<class T1, class T2>
-//inline std::ostream& operator<<(std::ostream& s, const std::pair<T1, T2>& pair)
+// template<class T1, class T2>
+// inline std::ostream& operator<<(std::ostream& s, const std::pair<T1, T2>& pair)
 //{
-//  return (s << qtTypeToQString(pair).toUtf8().constData());
-//}
+//   return (s << qtTypeToQString(pair).toUtf8().constData());
+// }
 
 template<typename T>
 inline std::ostream& operator<<(std::ostream& s, const QSet<T>& set)
@@ -253,7 +282,7 @@ inline std::ostream& operator<<(std::ostream& s, const QSharedPointer<T>& ptr)
 }
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
-template <typename T, typename Tag>
+template<typename T, typename Tag>
 inline std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& ptr)
 {
   return (s << qtTypeToQString(ptr).toUtf8().constData());
@@ -261,17 +290,17 @@ inline std::ostream& operator<<(std::ostream& s, const QTaggedPointer<T, Tag>& p
 #endif
 
 template<typename T>
-inline typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type
-operator<<(std::ostream& s, T value)
+inline typename std::enable_if<QtPrivate::IsQEnumHelper<T>::Value, std::ostream&>::Type operator<<(std::ostream& s,
+                                                                                                   T value)
 {
   return (s << qtTypeToQString(value).toUtf8().constData());
 }
 
 template<typename T,
-  typename A = typename std::enable_if<std::is_enum<T>::value, void>::type,
-  typename B = typename std::enable_if<sizeof(T) <= sizeof(int), void>::type,
-  typename C = typename std::enable_if<!QtPrivate::IsQEnumHelper<T>::Value, void>::type,
-  typename D = typename std::enable_if<QtPrivate::IsQEnumHelper<QFlags<T>>::Value, void>::type>
+         typename A = typename std::enable_if<std::is_enum<T>::value, void>::type,
+         typename B = typename std::enable_if<sizeof(T) <= sizeof(int), void>::type,
+         typename C = typename std::enable_if<!QtPrivate::IsQEnumHelper<T>::Value, void>::type,
+         typename D = typename std::enable_if<QtPrivate::IsQEnumHelper<QFlags<T>>::Value, void>::type>
 inline std::ostream& operator<<(std::ostream& s, T value)
 {
   return (s << qtTypeToQString(value).toUtf8().constData());

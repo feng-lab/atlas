@@ -24,18 +24,33 @@ void normXCorr_S(ZImg& fixedImg, ZImg& movingImg, ZImg& nccImg, ZImg& numberOfOv
 
 // only compute ncc of part region, same as crop a region from whole ncc image
 // throw exception if region is not valid
-void normXCorrPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
-                   size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
-                   ZImg& nccImg, ZImg& numberOfOverlapVoxelsImg);
+void normXCorrPart(ZImg& fixedImg,
+                   ZImg& movingImg,
+                   size_t xStart,
+                   size_t xEnd,
+                   size_t yStart,
+                   size_t yEnd,
+                   size_t zStart,
+                   size_t zEnd,
+                   ZImg& nccImg,
+                   ZImg& numberOfOverlapVoxelsImg);
 
 ZImg xCorrFFT(const ZImg& fixedImg, ZImg& movingImg, bool reflectMovingImg);
 
-ZImg xCorrPart(const ZImg& fixedImg, const ZImg& movingImg, size_t xStart, size_t xEnd,
-               size_t yStart, size_t yEnd, size_t zStart, size_t zEnd);
+ZImg xCorrPart(const ZImg& fixedImg,
+               const ZImg& movingImg,
+               size_t xStart,
+               size_t xEnd,
+               size_t yStart,
+               size_t yEnd,
+               size_t zStart,
+               size_t zEnd);
 
 // throw exception if not overlap
-void cropOverlapSubImg(const ZImg& fixedImgIn, const ZImg& movingImgIn, const ZVoxelCoordinate& offset,
-                       ZImg& subFixedImg, ZImg& subMovingImg);
+void cropOverlapSubImg(const ZImg& fixedImgIn,
+                       const ZImg& movingImgIn,
+                       const ZVoxelCoordinate& offset,
+                       ZImg& subFixedImg,
+                       ZImg& subMovingImg);
 
 } // namespace nim
-

@@ -4,10 +4,10 @@
 // for glm
 
 #define GLM_FORCE_AVX
-//#define GLM_FORCE_INLINE
+// #define GLM_FORCE_INLINE
 #define GLM_FORCE_SIZE_T_LENGTH
 #define GLM_FORCE_EXPLICIT_CTOR
-//#define GLM_FORCE_MESSAGES
+// #define GLM_FORCE_MESSAGES
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
 
@@ -55,8 +55,9 @@ void getOrthogonalVectors(const vec<3, T, Q>& v, vec<3, T, Q>& e1, vec<3, T, Q>&
   T eps = std::numeric_limits<T>::epsilon() * 1e2;
 
   e1 = cross(v, vec<3, T, Q>(T(1), T(0), T(0)));
-  if (dot(e1, e1) < eps)
+  if (dot(e1, e1) < eps) {
     e1 = cross(v, vec<3, T, Q>(T(0), T(1), T(0)));
+  }
   e1 = normalize(e1);
   e2 = normalize(cross(e1, v));
 }
@@ -70,53 +71,75 @@ using nim::tuple_like_get_helper;
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(glm::vec<N, T, Q>& v) noexcept
-{ return tuple_like_get_helper<Index, N>(v); }
+{
+  return tuple_like_get_helper<Index, N>(v);
+}
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(const glm::vec<N, T, Q>& v) noexcept
-{ return tuple_like_get_helper<Index, N>(v); }
+{
+  return tuple_like_get_helper<Index, N>(v);
+}
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(glm::vec<N, T, Q>&& v) noexcept
-{ return tuple_like_get_helper<Index, N>(std::move(v)); }
+{
+  return tuple_like_get_helper<Index, N>(std::move(v));
+}
 
 template<std::size_t Index, auto N, typename T, auto Q>
 constexpr auto&& get(const glm::vec<N, T, Q>&& v) noexcept
-{ return tuple_like_get_helper<Index, N>(std::move(v)); }
-
+{
+  return tuple_like_get_helper<Index, N>(std::move(v));
+}
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(glm::tquat<T, Q>& v) noexcept
-{ return tuple_like_get_helper<Index, 4>(v); }
+{
+  return tuple_like_get_helper<Index, 4>(v);
+}
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(const glm::tquat<T, Q>& v) noexcept
-{ return tuple_like_get_helper<Index, 4>(v); }
+{
+  return tuple_like_get_helper<Index, 4>(v);
+}
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(glm::tquat<T, Q>&& v) noexcept
-{ return tuple_like_get_helper<Index, 4>(std::move(v)); }
+{
+  return tuple_like_get_helper<Index, 4>(std::move(v));
+}
 
 template<std::size_t Index, typename T, auto Q>
 constexpr auto&& get(const glm::tquat<T, Q>&& v) noexcept
-{ return tuple_like_get_helper<Index, 4>(std::move(v)); }
-
+{
+  return tuple_like_get_helper<Index, 4>(std::move(v));
+}
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(glm::mat<C, R, T, Q>& m) noexcept
-{ return tuple_like_get_helper<Index, C>(m); }
+{
+  return tuple_like_get_helper<Index, C>(m);
+}
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(const glm::mat<C, R, T, Q>& m) noexcept
-{ return tuple_like_get_helper<Index, C>(m); }
+{
+  return tuple_like_get_helper<Index, C>(m);
+}
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(glm::mat<C, R, T, Q>&& m) noexcept
-{ return tuple_like_get_helper<Index, C>(std::move(m)); }
+{
+  return tuple_like_get_helper<Index, C>(std::move(m));
+}
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 constexpr auto&& get(const glm::mat<C, R, T, Q>&& m) noexcept
-{ return tuple_like_get_helper<Index, C>(std::move(m)); }
+{
+  return tuple_like_get_helper<Index, C>(std::move(m));
+}
 
 } // namespace glm
 
@@ -124,8 +147,7 @@ namespace std {
 
 template<auto N, typename T, auto Q>
 struct tuple_size<glm::vec<N, T, Q>> : integral_constant<std::size_t, N>
-{
-};
+{};
 
 template<std::size_t Index, auto N, typename T, auto Q>
 struct tuple_element<Index, glm::vec<N, T, Q>>
@@ -136,8 +158,7 @@ struct tuple_element<Index, glm::vec<N, T, Q>>
 
 template<typename T, auto Q>
 struct tuple_size<glm::tquat<T, Q>> : integral_constant<std::size_t, 4>
-{
-};
+{};
 
 template<std::size_t Index, typename T, auto Q>
 struct tuple_element<Index, glm::tquat<T, Q>>
@@ -148,8 +169,7 @@ struct tuple_element<Index, glm::tquat<T, Q>>
 
 template<auto C, auto R, typename T, auto Q>
 struct tuple_size<glm::mat<C, R, T, Q>> : integral_constant<std::size_t, C>
-{
-};
+{};
 
 template<std::size_t Index, auto C, auto R, typename T, auto Q>
 struct tuple_element<Index, glm::mat<C, R, T, Q>>
@@ -166,6 +186,7 @@ template<typename T, glm::qualifier Q>
 class Vec2Compare
 {
   bool less;
+
 public:
   explicit Vec2Compare(bool less_ = true)
     : less(less_)
@@ -185,6 +206,7 @@ template<typename T, glm::qualifier Q>
 class Vec3Compare
 {
   bool less;
+
 public:
   explicit Vec3Compare(bool less_ = true)
     : less(less_)
@@ -204,6 +226,7 @@ template<typename T, glm::qualifier Q>
 class Vec4Compare
 {
   bool less;
+
 public:
   explicit Vec4Compare(bool less_ = true)
     : less(less_)
@@ -297,7 +320,7 @@ inline QString toQString(const glm::vec<L, T, Q>& v)
 template<size_t L, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else
@@ -313,11 +336,13 @@ inline QString toQString(const glm::mat<C, R, T, Q>& m)
 {
   QString res = "[";
   for (size_t r = 0; r < R; ++r) {
-    if (r > 0)
+    if (r > 0) {
       res += "; ";
+    }
     for (size_t c = 0; c < C; ++c) {
-      if (c > 0)
+      if (c > 0) {
         res += ", ";
+      }
       res += toQString(m[c][r]);
     }
   }
@@ -328,7 +353,7 @@ inline QString toQString(const glm::mat<C, R, T, Q>& m)
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else
@@ -342,17 +367,13 @@ inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 template<typename T, glm::qualifier Q>
 inline QString toQString(const glm::tquat<T, Q>& v)
 {
-  return "[" + toQString(v[0]) +
-         ", " + toQString(v[1]) +
-         ", " + toQString(v[2]) +
-         ", " + toQString(v[3]) +
-         "]";
+  return "[" + toQString(v[0]) + ", " + toQString(v[1]) + ", " + toQString(v[2]) + ", " + toQString(v[3]) + "]";
 }
 
 template<typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::tquat<T, Q>& q)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else
@@ -387,4 +408,3 @@ inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
 } // namespace nim
 
 //-------------------------------------------------------------------------------------------------------------------------
-

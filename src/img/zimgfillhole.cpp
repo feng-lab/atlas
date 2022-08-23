@@ -28,18 +28,16 @@ void ZImgFillHole<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c
   typename BinaryFillHoleFilterType::Pointer bfhFilter = BinaryFillHoleFilterType::New();
   bfhFilter->SetInput(itkimg);
   bfhFilter->SetFullyConnected(m_fullyConnected);
-  if (m_foregroundValue != 0)
+  if (m_foregroundValue != 0) {
     bfhFilter->SetForegroundValue(m_foregroundValue);
+  }
   bfhFilter->SetNumberOfWorkUnits(this->m_numThreads);
   bfhFilter->Update();
   copyITKImgToMemory(bfhFilter->GetOutput(), res.channelData<typename TITKImg::PixelType>(c, t));
 }
 
-template
-class ZImgFillHole<true>;
+template class ZImgFillHole<true>;
 
-template
-class ZImgFillHole<false>;
+template class ZImgFillHole<false>;
 
 } // namespace nim
-

@@ -8,11 +8,13 @@ class ZMeshUtils
 {
 public:
   template<typename Real>
-  static bool isApproxEqual(const glm::tvec3<Real, glm::highp>& vertex1, const glm::tvec3<Real, glm::highp>& vertex2,
+  static bool isApproxEqual(const glm::tvec3<Real, glm::highp>& vertex1,
+                            const glm::tvec3<Real, glm::highp>& vertex2,
                             Real epsilon = 1e-6);
 
   template<typename Real>
-  static Real vertexPlaneDistance(const glm::tvec3<Real, glm::highp>& vertex, const glm::tvec4<Real, glm::highp>& plane,
+  static Real vertexPlaneDistance(const glm::tvec3<Real, glm::highp>& vertex,
+                                  const glm::tvec4<Real, glm::highp>& plane,
                                   Real epsilon = 1e-6);
 
   //
@@ -20,60 +22,73 @@ public:
   // the vertices provided.  Returns distance squared. Note: line is assumed
   // infinite in extent.
   template<typename Real>
-  static Real vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x, const glm::tvec3<Real, glm::highp>& p1,
+  static Real vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x,
+                                        const glm::tvec3<Real, glm::highp>& p1,
                                         const glm::tvec3<Real, glm::highp>& p2);
 
   // Compute distance to finite line. Returns parametric coordinate t
   // and point location on line.
   template<typename Real>
-  static Real
-  vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::highp>& x, const glm::tvec3<Real, glm::highp>& p1,
-                                   const glm::tvec3<Real, glm::highp>& p2,
-                                   Real& t, glm::tvec3<Real, glm::highp>& closestPoint);
+  static Real vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::highp>& x,
+                                               const glm::tvec3<Real, glm::highp>& p1,
+                                               const glm::tvec3<Real, glm::highp>& p2,
+                                               Real& t,
+                                               glm::tvec3<Real, glm::highp>& closestPoint);
 
   // Note: This method assume that P is on triangle plane. P = A + u * (B - A) + v * (C - A)
   // vertex inside tirangle if (u >= 0) && (v >= 0) && (u + v < 1)
   template<typename Real>
-  static bool vertexInsideTriangle(const glm::tvec3<Real, glm::highp>& P, const glm::tvec3<Real, glm::highp>& A,
+  static bool vertexInsideTriangle(const glm::tvec3<Real, glm::highp>& P,
+                                   const glm::tvec3<Real, glm::highp>& A,
                                    const glm::tvec3<Real, glm::highp>& B,
-                                   const glm::tvec3<Real, glm::highp>& C, Real epsilon, Real& u, Real& v);
+                                   const glm::tvec3<Real, glm::highp>& C,
+                                   Real epsilon,
+                                   Real& u,
+                                   Real& v);
 
   // distance between P and Triangle A + s * (B - A) + t * (C - A)
   // return value s and t can be used for intepolation
   template<typename Real>
-  static Real vertexTriangleSquaredDistance(glm::tvec3<Real, glm::highp> P, glm::tvec3<Real, glm::highp> A,
-                                            glm::tvec3<Real, glm::highp> B, glm::tvec3<Real, glm::highp> C, Real& s,
+  static Real vertexTriangleSquaredDistance(glm::tvec3<Real, glm::highp> P,
+                                            glm::tvec3<Real, glm::highp> A,
+                                            glm::tvec3<Real, glm::highp> B,
+                                            glm::tvec3<Real, glm::highp> C,
+                                            Real& s,
                                             Real& t);
 
   // from VTK
   static ZMesh clipClosedSurface(const ZMesh& mesh, const std::vector<glm::vec4>& clipPlanes, double epsilon = 1e-6);
 };
 
-
 // -------------------------------------------------------------------------------------------
 
 template<typename Real>
-bool ZMeshUtils::isApproxEqual(const glm::tvec3<Real, glm::highp>& vertex1, const glm::tvec3<Real, glm::highp>& vertex2,
+bool ZMeshUtils::isApproxEqual(const glm::tvec3<Real, glm::highp>& vertex1,
+                               const glm::tvec3<Real, glm::highp>& vertex2,
                                Real epsilon)
 {
   return glm::length(vertex1 - vertex2) <= epsilon;
 }
 
 template<typename Real>
-Real
-ZMeshUtils::vertexPlaneDistance(const glm::tvec3<Real, glm::highp>& vertex, const glm::tvec4<Real, glm::highp>& plane,
-                                Real epsilon)
+Real ZMeshUtils::vertexPlaneDistance(const glm::tvec3<Real, glm::highp>& vertex,
+                                     const glm::tvec4<Real, glm::highp>& plane,
+                                     Real epsilon)
 {
   double distance = glm::dot(plane.xyz(), vertex) - plane.w;
-  if (std::abs(distance) <= epsilon)
+  if (std::abs(distance) <= epsilon) {
     return 0;
+  }
 
   return distance;
 }
 
 template<typename Real>
-Real ZMeshUtils::vertexTriangleSquaredDistance(glm::tvec3<Real, glm::highp> P, glm::tvec3<Real, glm::highp> A,
-                                               glm::tvec3<Real, glm::highp> B, glm::tvec3<Real, glm::highp> C, Real& s,
+Real ZMeshUtils::vertexTriangleSquaredDistance(glm::tvec3<Real, glm::highp> P,
+                                               glm::tvec3<Real, glm::highp> A,
+                                               glm::tvec3<Real, glm::highp> B,
+                                               glm::tvec3<Real, glm::highp> C,
+                                               Real& s,
                                                Real& t)
 {
   glm::tvec3<Real, glm::highp> diff = A - P;
@@ -91,189 +106,161 @@ Real ZMeshUtils::vertexTriangleSquaredDistance(glm::tvec3<Real, glm::highp> P, g
   Real sqrDistance;
 
   if (s + t <= det) {
-    if (s < (Real) 0) {
-      if (t < (Real) 0)  // region 4
+    if (s < (Real)0) {
+      if (t < (Real)0) // region 4
       {
-        if (b0 < (Real) 0) {
-          t = (Real) 0;
+        if (b0 < (Real)0) {
+          t = (Real)0;
           if (-b0 >= a00) {
-            s = (Real) 1;
-            sqrDistance = a00 + ((Real) 2) * b0 + c;
-          }
-          else {
+            s = (Real)1;
+            sqrDistance = a00 + ((Real)2) * b0 + c;
+          } else {
             s = -b0 / a00;
             sqrDistance = b0 * s + c;
           }
-        }
-        else {
-          s = (Real) 0;
-          if (b1 >= (Real) 0) {
-            t = (Real) 0;
+        } else {
+          s = (Real)0;
+          if (b1 >= (Real)0) {
+            t = (Real)0;
             sqrDistance = c;
-          }
-          else if (-b1 >= a11) {
-            t = (Real) 1;
-            sqrDistance = a11 + ((Real) 2) * b1 + c;
-          }
-          else {
+          } else if (-b1 >= a11) {
+            t = (Real)1;
+            sqrDistance = a11 + ((Real)2) * b1 + c;
+          } else {
             t = -b1 / a11;
             sqrDistance = b1 * t + c;
           }
         }
-      }
-      else  // region 3
+      } else // region 3
       {
-        s = (Real) 0;
-        if (b1 >= (Real) 0) {
-          t = (Real) 0;
+        s = (Real)0;
+        if (b1 >= (Real)0) {
+          t = (Real)0;
           sqrDistance = c;
-        }
-        else if (-b1 >= a11) {
-          t = (Real) 1;
-          sqrDistance = a11 + ((Real) 2) * b1 + c;
-        }
-        else {
+        } else if (-b1 >= a11) {
+          t = (Real)1;
+          sqrDistance = a11 + ((Real)2) * b1 + c;
+        } else {
           t = -b1 / a11;
           sqrDistance = b1 * t + c;
         }
       }
-    }
-    else if (t < (Real) 0)  // region 5
+    } else if (t < (Real)0) // region 5
     {
-      t = (Real) 0;
-      if (b0 >= (Real) 0) {
-        s = (Real) 0;
+      t = (Real)0;
+      if (b0 >= (Real)0) {
+        s = (Real)0;
         sqrDistance = c;
-      }
-      else if (-b0 >= a00) {
-        s = (Real) 1;
-        sqrDistance = a00 + ((Real) 2) * b0 + c;
-      }
-      else {
+      } else if (-b0 >= a00) {
+        s = (Real)1;
+        sqrDistance = a00 + ((Real)2) * b0 + c;
+      } else {
         s = -b0 / a00;
         sqrDistance = b0 * s + c;
       }
-    }
-    else  // region 0
+    } else // region 0
     {
       // minimum at interior point
-      Real invDet = ((Real) 1) / det;
+      Real invDet = ((Real)1) / det;
       s *= invDet;
       t *= invDet;
-      sqrDistance = s * (a00 * s + a01 * t + ((Real) 2) * b0) +
-                    t * (a01 * s + a11 * t + ((Real) 2) * b1) + c;
+      sqrDistance = s * (a00 * s + a01 * t + ((Real)2) * b0) + t * (a01 * s + a11 * t + ((Real)2) * b1) + c;
     }
-  }
-  else {
+  } else {
     Real tmp0, tmp1, numer, denom;
 
-    if (s < (Real) 0)  // region 2
+    if (s < (Real)0) // region 2
     {
       tmp0 = a01 + b0;
       tmp1 = a11 + b1;
       if (tmp1 > tmp0) {
         numer = tmp1 - tmp0;
-        denom = a00 - ((Real) 2) * a01 + a11;
+        denom = a00 - ((Real)2) * a01 + a11;
         if (numer >= denom) {
-          s = (Real) 1;
-          t = (Real) 0;
-          sqrDistance = a00 + ((Real) 2) * b0 + c;
-        }
-        else {
+          s = (Real)1;
+          t = (Real)0;
+          sqrDistance = a00 + ((Real)2) * b0 + c;
+        } else {
           s = numer / denom;
-          t = (Real) 1 - s;
-          sqrDistance = s * (a00 * s + a01 * t + ((Real) 2) * b0) +
-                        t * (a01 * s + a11 * t + ((Real) 2) * b1) + c;
+          t = (Real)1 - s;
+          sqrDistance = s * (a00 * s + a01 * t + ((Real)2) * b0) + t * (a01 * s + a11 * t + ((Real)2) * b1) + c;
         }
-      }
-      else {
-        s = (Real) 0;
-        if (tmp1 <= (Real) 0) {
-          t = (Real) 1;
-          sqrDistance = a11 + ((Real) 2) * b1 + c;
-        }
-        else if (b1 >= (Real) 0) {
-          t = (Real) 0;
+      } else {
+        s = (Real)0;
+        if (tmp1 <= (Real)0) {
+          t = (Real)1;
+          sqrDistance = a11 + ((Real)2) * b1 + c;
+        } else if (b1 >= (Real)0) {
+          t = (Real)0;
           sqrDistance = c;
-        }
-        else {
+        } else {
           t = -b1 / a11;
           sqrDistance = b1 * t + c;
         }
       }
-    }
-    else if (t < (Real) 0)  // region 6
+    } else if (t < (Real)0) // region 6
     {
       tmp0 = a01 + b1;
       tmp1 = a00 + b0;
       if (tmp1 > tmp0) {
         numer = tmp1 - tmp0;
-        denom = a00 - ((Real) 2) * a01 + a11;
+        denom = a00 - ((Real)2) * a01 + a11;
         if (numer >= denom) {
-          t = (Real) 1;
-          s = (Real) 0;
-          sqrDistance = a11 + ((Real) 2) * b1 + c;
-        }
-        else {
+          t = (Real)1;
+          s = (Real)0;
+          sqrDistance = a11 + ((Real)2) * b1 + c;
+        } else {
           t = numer / denom;
-          s = (Real) 1 - t;
-          sqrDistance = s * (a00 * s + a01 * t + ((Real) 2) * b0) +
-                        t * (a01 * s + a11 * t + ((Real) 2) * b1) + c;
+          s = (Real)1 - t;
+          sqrDistance = s * (a00 * s + a01 * t + ((Real)2) * b0) + t * (a01 * s + a11 * t + ((Real)2) * b1) + c;
         }
-      }
-      else {
-        t = (Real) 0;
-        if (tmp1 <= (Real) 0) {
-          s = (Real) 1;
-          sqrDistance = a00 + ((Real) 2) * b0 + c;
-        }
-        else if (b0 >= (Real) 0) {
-          s = (Real) 0;
+      } else {
+        t = (Real)0;
+        if (tmp1 <= (Real)0) {
+          s = (Real)1;
+          sqrDistance = a00 + ((Real)2) * b0 + c;
+        } else if (b0 >= (Real)0) {
+          s = (Real)0;
           sqrDistance = c;
-        }
-        else {
+        } else {
           s = -b0 / a00;
           sqrDistance = b0 * s + c;
         }
       }
-    }
-    else  // region 1
+    } else // region 1
     {
       numer = a11 + b1 - a01 - b0;
-      if (numer <= (Real) 0) {
-        s = (Real) 0;
-        t = (Real) 1;
-        sqrDistance = a11 + ((Real) 2) * b1 + c;
-      }
-      else {
-        denom = a00 - ((Real) 2) * a01 + a11;
+      if (numer <= (Real)0) {
+        s = (Real)0;
+        t = (Real)1;
+        sqrDistance = a11 + ((Real)2) * b1 + c;
+      } else {
+        denom = a00 - ((Real)2) * a01 + a11;
         if (numer >= denom) {
-          s = (Real) 1;
-          t = (Real) 0;
-          sqrDistance = a00 + ((Real) 2) * b0 + c;
-        }
-        else {
+          s = (Real)1;
+          t = (Real)0;
+          sqrDistance = a00 + ((Real)2) * b0 + c;
+        } else {
           s = numer / denom;
-          t = (Real) 1 - s;
-          sqrDistance = s * (a00 * s + a01 * t + ((Real) 2) * b0) +
-                        t * (a01 * s + a11 * t + ((Real) 2) * b1) + c;
+          t = (Real)1 - s;
+          sqrDistance = s * (a00 * s + a01 * t + ((Real)2) * b0) + t * (a01 * s + a11 * t + ((Real)2) * b1) + c;
         }
       }
     }
   }
 
   // Account for numerical round-off error.
-  if (sqrDistance < (Real) 0) {
-    sqrDistance = (Real) 0;
+  if (sqrDistance < (Real)0) {
+    sqrDistance = (Real)0;
   }
 
   return sqrDistance;
 }
 
 template<typename Real>
-Real
-ZMeshUtils::vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x, const glm::tvec3<Real, glm::highp>& p1,
-                                      const glm::tvec3<Real, glm::highp>& p2)
+Real ZMeshUtils::vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x,
+                                           const glm::tvec3<Real, glm::highp>& p1,
+                                           const glm::tvec3<Real, glm::highp>& p2)
 {
   Real proj, den;
   glm::tvec3<Real, glm::highp> np1, p1p2;
@@ -285,8 +272,7 @@ ZMeshUtils::vertexLineSquaredDistance(const glm::tvec3<Real, glm::highp>& x, con
     for (int i = 0; i < 3; ++i) {
       p1p2[i] /= den;
     }
-  }
-  else {
+  } else {
     return glm::dot(np1, np1);
   }
 
@@ -299,7 +285,8 @@ template<typename Real>
 Real ZMeshUtils::vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::highp>& x,
                                                   const glm::tvec3<Real, glm::highp>& p1,
                                                   const glm::tvec3<Real, glm::highp>& p2,
-                                                  Real& t, glm::tvec3<Real, glm::highp>& closestPoint)
+                                                  Real& t,
+                                                  glm::tvec3<Real, glm::highp>& closestPoint)
 {
   Real denom, num;
   glm::tvec3<Real, glm::highp> closest;
@@ -312,7 +299,7 @@ Real ZMeshUtils::vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::hi
   //
   //   Get parametric location
   //
-  //num = p21[0]*(x[0]-p1[0]) + p21[1]*(x[1]-p1[1]) + p21[2]*(x[2]-p1[2]);
+  // num = p21[0]*(x[0]-p1[0]) + p21[1]*(x[1]-p1[1]) + p21[2]*(x[2]-p1[2]);
   num = glm::dot(p21, x - p1);
   denom = glm::dot(p21, p21);
 
@@ -321,26 +308,24 @@ Real ZMeshUtils::vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::hi
   if (tolerance < 0.0) {
     tolerance = -tolerance;
   }
-  if (-tolerance < denom && denom < tolerance) //numerically bad!
+  if (-tolerance < denom && denom < tolerance) // numerically bad!
   {
-    closest = p1; //arbitrary, point is (numerically) far away
+    closest = p1; // arbitrary, point is (numerically) far away
   }
-    //
-    // If parametric coordinate is within 0<=p<=1, then the point is closest to
-    // the line.  Otherwise, it's closest to a point at the end of the line.
-    //
+  //
+  // If parametric coordinate is within 0<=p<=1, then the point is closest to
+  // the line.  Otherwise, it's closest to a point at the end of the line.
+  //
   else if (denom <= 0.0 || (t = num / denom) < 0.0) {
     closest = p1;
-  }
-  else if (t > 1.0) {
+  } else if (t > 1.0) {
     closest = p2;
-  }
-  else {
+  } else {
     closest = p21;
     p21 = p1 + p21 * t;
-    //p21[0] = p1[0] + t*p21[0];
-    //p21[1] = p1[1] + t*p21[1];
-    //p21[2] = p1[2] + t*p21[2];
+    // p21[0] = p1[0] + t*p21[0];
+    // p21[1] = p1[1] + t*p21[1];
+    // p21[2] = p1[2] + t*p21[2];
   }
 
   closestPoint = closest;
@@ -348,9 +333,13 @@ Real ZMeshUtils::vertexLineSegmentSquaredDistance(const glm::tvec3<Real, glm::hi
 }
 
 template<typename Real>
-bool ZMeshUtils::vertexInsideTriangle(const glm::tvec3<Real, glm::highp>& P, const glm::tvec3<Real, glm::highp>& A,
+bool ZMeshUtils::vertexInsideTriangle(const glm::tvec3<Real, glm::highp>& P,
+                                      const glm::tvec3<Real, glm::highp>& A,
                                       const glm::tvec3<Real, glm::highp>& B,
-                                      const glm::tvec3<Real, glm::highp>& C, Real epsilon, Real& u, Real& v)
+                                      const glm::tvec3<Real, glm::highp>& C,
+                                      Real epsilon,
+                                      Real& u,
+                                      Real& v)
 {
   // Compute vectors
   glm::tvec3<Real, glm::highp> v0 = C - A;
@@ -658,4 +647,3 @@ private:
 #endif // reference
 
 } // namespace nim
-

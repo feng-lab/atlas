@@ -22,19 +22,29 @@ public:
   void minimize();
 
   [[nodiscard]] const std::vector<double>& currentParameters() const
-  { return m_currentParameters; }
+  {
+    return m_currentParameters;
+  }
 
   [[nodiscard]] std::string briefReport() const
-  { return m_summary.BriefReport(); }
+  {
+    return m_summary.BriefReport();
+  }
 
   [[nodiscard]] std::string fullReport() const
-  { return m_summary.FullReport(); }
+  {
+    return m_summary.FullReport();
+  }
 
   [[nodiscard]] double initialCost() const
-  { return m_summary.initial_cost; }
+  {
+    return m_summary.initial_cost;
+  }
 
   [[nodiscard]] double finalCost() const
-  { return m_summary.final_cost; }
+  {
+    return m_summary.final_cost;
+  }
 
 protected:
   void checkParameterNumber() const;
@@ -50,4 +60,3 @@ private:
 };
 
 } // namespace nim
-

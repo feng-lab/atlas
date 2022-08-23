@@ -24,6 +24,7 @@ AlwaysBreakAfterReturnType: None
 AlwaysBreakTemplateDeclarations: Yes
 BinPackArguments: false
 BinPackParameters: false
+BitFieldColonSpacing: Both
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: false

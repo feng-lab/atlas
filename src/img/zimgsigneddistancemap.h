@@ -12,14 +12,17 @@ template<bool ReportProgress = false>
 class ZImgSignedDistanceMap : public ZImgAlgorithm<ReportProgress>
 {
 public:
-
   // default false
   inline void setInsideIsPositive(bool v)
-  { m_insideIsPositive = v; }
+  {
+    m_insideIsPositive = v;
+  }
 
   // default false
   inline void setUseSquaredDistance(bool v)
-  { m_useSquaredDistance = v; }
+  {
+    m_useSquaredDistance = v;
+  }
 
   // TVoxelOut needs to be floating point
   template<typename TVoxelOut>
@@ -35,4 +38,3 @@ private:
 };
 
 } // namespace nim
-

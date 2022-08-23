@@ -43,8 +43,9 @@ void ZBenchTimer::stop()
 
 void ZBenchTimer::pause()
 {
-  if (m_paused)
+  if (m_paused) {
     return;
+  }
 
   m_time += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
   m_paused = true;
@@ -53,8 +54,9 @@ void ZBenchTimer::pause()
 
 void ZBenchTimer::resume()
 {
-  if (!m_paused)
+  if (!m_paused) {
     return;
+  }
 
   m_pauseTime += std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_start).count();
   m_paused = false;
@@ -65,14 +67,16 @@ std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
 {
   if (m.m_rep == 1) {
     s << "Function " << m.m_name << " took " << m.m_time << " seconds.\n";
-    if (m.m_pauseTime > 0)
+    if (m.m_pauseTime > 0) {
       s << "Function " << m.m_name << " pause " << m.m_pauseTime << " seconds.\n";
+    }
   } else if (m.m_rep > 1) {
     s << "Function " << m.m_name << " took on average " << m.m_average << " seconds.";
     s << " (out of " << m.m_rep << " repeats. best: " << m.m_best << "  worst: ";
     s << m.m_worst << ")\n";
-    if (m.m_averagePauseTime > 0)
+    if (m.m_averagePauseTime > 0) {
       s << "Function " << m.m_name << " pause on average " << m.m_averagePauseTime << " seconds.\n";
+    }
   }
   return s;
 }

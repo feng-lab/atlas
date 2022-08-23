@@ -9,13 +9,13 @@ namespace nim {
 class ZROIUtils2
 {
 public:
-// for python
+  // for python
   using RowMatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using RowMatrixXu8 = Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using RowMatrixXb = Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   using EigenDRef = Eigen::Ref<const RowMatrixXd, 0, Eigen::Stride<Eigen::Dynamic, Eigen::Dynamic>>;
 
-// return tight mask, x_start, y_start in which mask could be empty
+  // return tight mask, x_start, y_start in which mask could be empty
   static std::tuple<ZImg, index_t, index_t> splineToMask_Python(const EigenDRef& spline);
 
   static std::tuple<ZImg, index_t, index_t> rectToMask_Python(const EigenDRef& rect);
@@ -29,5 +29,3 @@ public:
 };
 
 } // namespace nim
-
-

@@ -25,7 +25,8 @@ template<typename TITKImg>
 void ZImgInterpolate<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_t c, size_t t)
 {
   using MorphologicalContourInterpolatorFilterType = itk::MorphologicalContourInterpolator<TITKImg>;
-  typename MorphologicalContourInterpolatorFilterType::Pointer iFilter = MorphologicalContourInterpolatorFilterType::New();
+  typename MorphologicalContourInterpolatorFilterType::Pointer iFilter =
+    MorphologicalContourInterpolatorFilterType::New();
   iFilter->SetInput(itkimg);
   iFilter->SetAxis(2);
   iFilter->SetNumberOfWorkUnits(this->m_numThreads);
@@ -33,11 +34,8 @@ void ZImgInterpolate<ReportProgress>::run_Impl(TITKImg* itkimg, ZImg& res, size_
   copyITKImgToMemory(iFilter->GetOutput(), res.channelData<typename TITKImg::PixelType>(c, t));
 }
 
-template
-class ZImgInterpolate<true>;
+template class ZImgInterpolate<true>;
 
-template
-class ZImgInterpolate<false>;
+template class ZImgInterpolate<false>;
 
 } // namespace nim
-

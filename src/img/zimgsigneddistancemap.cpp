@@ -16,8 +16,7 @@ ZImg ZImgSignedDistanceMap<ReportProgress>::run(const ZImg& img, bool useVoxelSi
 
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
-      IMG_ITK_TYPED_CALL_FIX2NDTYPE(run_Impl, img, c, t, TVoxelOut,
-                                    useVoxelSize, res, c, t)
+      IMG_ITK_TYPED_CALL_FIX2NDTYPE(run_Impl, img, c, t, TVoxelOut, useVoxelSize, res, c, t)
     }
   }
 
@@ -41,16 +40,14 @@ void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVo
   copyITKImgToMemory(dmFilter->GetOutput(), res.channelData<TVoxelOut>(c, t));
 }
 
-template
-class ZImgSignedDistanceMap<true>;
+template class ZImgSignedDistanceMap<true>;
 
-template
-class ZImgSignedDistanceMap<false>;
+template class ZImgSignedDistanceMap<false>;
 
-//template ZImg ZImgSignedDistanceMap<true>::run<int8_t>(const ZImg&, bool);
-//template ZImg ZImgSignedDistanceMap<true>::run<int16_t>(const ZImg&, bool);
-// integer output not supported by ITK
-// template ZImg ZImgSignedDistanceMap<true>::run<int32_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<true>::run<int8_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<true>::run<int16_t>(const ZImg&, bool);
+//  integer output not supported by ITK
+//  template ZImg ZImgSignedDistanceMap<true>::run<int32_t>(const ZImg&, bool);
 
 // template ZImg ZImgSignedDistanceMap<true>::run<int64_t>(const ZImg&, bool);
 
@@ -58,9 +55,9 @@ template ZImg ZImgSignedDistanceMap<true>::run<float>(const ZImg&, bool);
 
 template ZImg ZImgSignedDistanceMap<true>::run<double>(const ZImg&, bool);
 
-//template ZImg ZImgSignedDistanceMap<false>::run<int8_t>(const ZImg&, bool);
-//template ZImg ZImgSignedDistanceMap<false>::run<int16_t>(const ZImg&, bool);
-// template ZImg ZImgSignedDistanceMap<false>::run<int32_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<false>::run<int8_t>(const ZImg&, bool);
+// template ZImg ZImgSignedDistanceMap<false>::run<int16_t>(const ZImg&, bool);
+//  template ZImg ZImgSignedDistanceMap<false>::run<int32_t>(const ZImg&, bool);
 
 // template ZImg ZImgSignedDistanceMap<false>::run<int64_t>(const ZImg&, bool);
 

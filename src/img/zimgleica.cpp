@@ -25,7 +25,7 @@ struct XMLOrTypeContent
 {
   unsigned char test; // test == 0x2A
   int32_t textLength; // Number of unicode characters
-  //QChar text[]; // XML Object Description or Type Name: "LMS_Object_File"
+  // QChar text[]; // XML Object Description or Type Name: "LMS_Object_File"
 };
 
 struct Int32Block
@@ -47,22 +47,22 @@ struct MemoryBlock32
   uint32_t memorySize; // Memory size of the object
   unsigned char test2; // test == 0x2A
   int32_t textLength; // Number of Unicode characters
-  //QChar text[]; // Short image description (Name)
+  // QChar text[]; // Short image description (Name)
 };
 
 // Memory Description for File Version 2 (64 Bit)
 struct MemoryBlock64
 {
   unsigned char test1; // test == 0x2A
-  uint64_t memorySize;// Memory size of the object
+  uint64_t memorySize; // Memory size of the object
   unsigned char test2; // test == 0x2A
   int32_t textLength; // Number of Unicode characters
-  //QChar text[]; // Short image description (Name)
+  // QChar text[]; // Short image description (Name)
 };
 
 #pragma pack(pop)
 
-}
+} // namespace
 
 namespace nim {
 
@@ -91,11 +91,15 @@ QString ZImgLeica::fullName() const
 QStringList ZImgLeica::extensions() const
 {
   QStringList res;
-  res << "lif" << "lof" << "xlef" << "xllf";
+  res << "lif"
+      << "lof"
+      << "xlef"
+      << "xllf";
   return res;
 }
 
-void ZImgLeica::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgLeica::readInfo(const QString& filename,
+                         std::vector<ZImgInfo>& infos,
                          std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   clearInternalState();
@@ -126,10 +130,11 @@ void ZImgLeica::readMetadata(const QString& filename, ZImgMetadata& meta, size_t
   meta.attachToTopLevel(tag);
 }
 
-void ZImgLeica::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                              const ZImgRegion& /*region*/, size_t /*scene*/)
-{
-}
+void ZImgLeica::readThumbnail(const QString& /*filename*/,
+                              ZImgThumbernail& /*thumbnail*/,
+                              const ZImgRegion& /*region*/,
+                              size_t /*scene*/)
+{}
 
 void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
@@ -160,7 +165,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
   rgn.resolveRegionEnd(info);
 
   const auto& ii = leicaImageInfos[scene];
-  if (!allMemoryOffsetNameLength.empty() ||  // lof or lif
+  if (!allMemoryOffsetNameLength.empty() || // lof or lif
       (ii.imageMemory.fileNames.size() == 1 &&
        ii.imageMemory.fileNames[0].endsWith(".lof", Qt::CaseInsensitive))) { // single lof file
     QString fn = filename;
@@ -174,8 +179,8 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     if (allMemoryOffsetNameLength.size() > 1) {
       bool found = false;
       for (const auto& tmp : allMemoryOffsetNameLength) {
-        //LOG(INFO) << std::get<1>(tmp);
-        //LOG(INFO) << ii.imageMemory.memoryBlockID;
+        // LOG(INFO) << std::get<1>(tmp);
+        // LOG(INFO) << ii.imageMemory.memoryBlockID;
         if (std::get<1>(tmp) == ii.imageMemory.memoryBlockID) {
           found = true;
           monl = tmp;
@@ -189,7 +194,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
     if (std::get<2>(monl) == 0) {
       throw ZIOException("find invalid memory, please send this file to flq@live.com");
     }
-    std::vector<size_t> dimensionStrides(5, 0);  // XYZCT
+    std::vector<size_t> dimensionStrides(5, 0); // XYZCT
     std::vector<uint64_t> channelOffsets;
     for (const auto& cd : ii.channels) {
       channelOffsets.push_back(cd.bytesInc);
@@ -230,10 +235,10 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
                                      dimensionStrides[2] * info.size(2));
     }
     if (dimensionStrides[4] == 0) {
-      dimensionStrides[4] = std::max(
-        std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
-                 dimensionStrides[2] * info.size(2)),
-        dimensionStrides[3] * info.size(3));
+      dimensionStrides[4] =
+        std::max(std::max(std::max(dimensionStrides[0] * info.size(0), dimensionStrides[1] * info.size(1)),
+                          dimensionStrides[2] * info.size(2)),
+                 dimensionStrides[3] * info.size(3));
     }
 
     img = readRawImg(fn, info, dimensionStrides, std::get<0>(monl) + ii.imageMemory.sceneOffset, rgn);
@@ -276,9 +281,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
   img.metadataRef().attachToTopLevel(tag);
 }
 
-void ZImgLeica::clearInternalState()
-{
-}
+void ZImgLeica::clearInternalState() {}
 
 int ZImgLeica::parseLIFVersion(const QString& xmlString)
 {
@@ -312,7 +315,8 @@ int ZImgLeica::parseLIFVersion(const QString& xmlString)
   return res;
 }
 
-void ZImgLeica::readXml(const QString& filename, QString& xml,
+void ZImgLeica::readXml(const QString& filename,
+                        QString& xml,
                         std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const
 {
   if (filename.endsWith(".xlef", Qt::CaseInsensitive) || filename.endsWith(".xllf", Qt::CaseInsensitive)) {
@@ -361,8 +365,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
       if (memorySizeBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF memory size");
       }
-      memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
-                                          QString(""), size_t(memorySizeBlock.Number));
+      memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), QString(""), size_t(memorySizeBlock.Number));
       inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
 
       readStream(inputFileStream, &nb, sizeof(NextBlock));
@@ -393,8 +396,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
-                                              imageDescription, size_t(md.memorySize));
+          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), imageDescription, size_t(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else if (majorVersion == 2) {
@@ -406,8 +408,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
           charBuf.resize(md.textLength);
           readStream(inputFileStream, charBuf.data(), md.textLength * 2);
           QString imageDescription(charBuf.data(), charBuf.size());
-          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()),
-                                              imageDescription, size_t(md.memorySize));
+          memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), imageDescription, size_t(md.memorySize));
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else {
@@ -417,7 +418,7 @@ void ZImgLeica::readXml(const QString& filename, QString& xml,
     }
   }
 
-  //std::cout << xml.toLocal8Bit();
+  // std::cout << xml.toLocal8Bit();
 }
 
 void ZImgLeica::readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos)
@@ -496,7 +497,6 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
   ImageInfo imageInfo;
 
   while (xml.readNextStartElement()) {
-
     if (xml.name() == QString("Data")) {
       while (xml.readNextStartElement()) {
         if (xml.name() == QString("Experiment")) {
@@ -642,7 +642,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
             }
           }
         } else if (xml.name() == QString("Collection")) {
-          xml.skipCurrentElement(); //todo: what is ChildTypeTest?
+          xml.skipCurrentElement(); // todo: what is ChildTypeTest?
         } else {
           xml.skipCurrentElement();
         }
@@ -674,7 +674,7 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
         }
         xml.skipCurrentElement();
       }
-      //LOG(INFO) << imageInfo.imageMemory.memoryBlockID;
+      // LOG(INFO) << imageInfo.imageMemory.memoryBlockID;
     } else if (xml.name() == QString("Children")) {
       while (xml.readNextStartElement()) {
         if (xml.name() == QString("Element")) {
@@ -702,8 +702,8 @@ void ZImgLeica::parseElement(QXmlStreamReader& xml, const QDir& xmlDir, std::vec
   }
 
   bool willRead = !imageInfo.channels.empty() && !imageInfo.dimensions.empty();
-//    LOG(INFO) << imageInfo.channels.size();
-//    LOG(INFO) << imageInfo.dimensions.size();
+  //    LOG(INFO) << imageInfo.channels.size();
+  //    LOG(INFO) << imageInfo.dimensions.size();
   if (willRead) {
     for (const auto& channel : imageInfo.channels) {
       if (channel.bitInc != 0) {
@@ -813,9 +813,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
 
     if (!hasSceneDim) {
       ImageInfo info = ii;
-      erase_if(info.dimensions, [](const auto& ddd) {
-        return ddd.dimID >= 5;
-      });
+      erase_if(info.dimensions, [](const auto& ddd) { return ddd.dimID >= 5; });
       res.push_back(info);
     } else {
       if (ii.channels.size() > 1) {
@@ -831,8 +829,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
         di.stride = channelOffsets[1] - channelOffsets[0];
         dims.push_back(di);
       }
-      std::sort(dims.begin(), dims.end(),
-                [](const DimensionInfo& i1, const DimensionInfo& i2) { return i1.stride < i2.stride; });
+      std::sort(dims.begin(), dims.end(), [](const DimensionInfo& i1, const DimensionInfo& i2) {
+        return i1.stride < i2.stride;
+      });
 
       std::vector<size_t> sceneDimIdxReverseOrder;
       for (size_t i = dims.size(); i-- > 0;) {
@@ -878,9 +877,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
             }
           }
         }
-        erase_if(info.dimensions, [](const auto& ddd) {
-          return ddd.dimID >= 5;
-        });
+        erase_if(info.dimensions, [](const auto& ddd) { return ddd.dimID >= 5; });
         res.push_back(info);
 
         // advance to next scene
@@ -903,7 +900,7 @@ ZImgLeica::getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dim
   size_t startDim = 0;
   while (startDim + 1 < dimensionInfos.size() &&
          dimensionInfos[startDim + 1].stride ==
-         dimensionInfos[startDim].stride * (dimensionInfos[startDim].end - dimensionInfos[startDim].start)) {
+           dimensionInfos[startDim].stride * (dimensionInfos[startDim].end - dimensionInfos[startDim].start)) {
     ++startDim;
   }
 

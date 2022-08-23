@@ -7,7 +7,8 @@ namespace nim {
 
 class ZMemoryMappedFile;
 
-struct HDF5ChunkInfo {
+struct HDF5ChunkInfo
+{
   size_t offset = 0;
   size_t length = 0;
   bool compressed = true;
@@ -54,6 +55,7 @@ class ZImgHDF5 : public ZImgFormat
 {
 public:
   // ZImgFormat interface
+
 public:
   [[nodiscard]] QString shortName() const override;
 

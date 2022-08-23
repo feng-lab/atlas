@@ -54,43 +54,69 @@ public:
 
   // access
   inline ZVoxelCoordinate& operator[](size_t n)
-  { return m_offsets[n]; }
+  {
+    return m_offsets[n];
+  }
 
   inline const ZVoxelCoordinate& operator[](size_t n) const
-  { return m_offsets[n]; }
+  {
+    return m_offsets[n];
+  }
 
   inline ZVoxelCoordinate& offset(size_t n)
-  { return m_offsets[n]; }
+  {
+    return m_offsets[n];
+  }
 
   [[nodiscard]] inline const ZVoxelCoordinate& offset(size_t n) const
-  { return m_offsets[n]; }
+  {
+    return m_offsets[n];
+  }
 
   [[nodiscard]] inline const std::vector<ZVoxelCoordinate>& offsets() const
-  { return m_offsets; }
+  {
+    return m_offsets;
+  }
 
   [[nodiscard]] inline size_t size() const
-  { return m_offsets.size(); }
+  {
+    return m_offsets.size();
+  }
 
   [[nodiscard]] inline bool empty() const
-  { return m_offsets.empty(); }
+  {
+    return m_offsets.empty();
+  }
 
   [[nodiscard]] inline size_t leftExtend() const
-  { return m_leftExtend; }
+  {
+    return m_leftExtend;
+  }
 
   [[nodiscard]] inline size_t rightExtend() const
-  { return m_rightExtend; }
+  {
+    return m_rightExtend;
+  }
 
   [[nodiscard]] inline size_t upExtend() const
-  { return m_upExtend; }
+  {
+    return m_upExtend;
+  }
 
   [[nodiscard]] inline size_t downExtend() const
-  { return m_downExtend; }
+  {
+    return m_downExtend;
+  }
 
   [[nodiscard]] inline size_t frontExtend() const
-  { return m_frontExtend; }
+  {
+    return m_frontExtend;
+  }
 
   [[nodiscard]] inline size_t backExtend() const
-  { return m_backExtend; }
+  {
+    return m_backExtend;
+  }
 
 private:
   std::vector<ZVoxelCoordinate> m_offsets;
@@ -103,4 +129,3 @@ private:
 };
 
 } // namespace nim
-

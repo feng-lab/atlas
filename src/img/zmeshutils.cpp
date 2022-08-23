@@ -15,8 +15,11 @@ namespace {
 class vtkCCSEdgeLocatorNode
 {
 public:
-  vtkCCSEdgeLocatorNode() :
-    ptId0(-1), ptId1(-1), edgeId(-1), next(nullptr)
+  vtkCCSEdgeLocatorNode()
+    : ptId0(-1)
+    , ptId1(-1)
+    , edgeId(-1)
+    , next(nullptr)
   {}
 
   ~vtkCCSEdgeLocatorNode()
@@ -36,11 +39,11 @@ public:
   vtkCCSEdgeLocatorNode* next;
 };
 
-
 class vtkCCSEdgeLocator
 {
   using MapType = std::map<int64_t, vtkCCSEdgeLocatorNode>;
   MapType EdgeMap;
+
 public:
   static vtkCCSEdgeLocator* New()
   {
@@ -69,8 +72,7 @@ void vtkCCSEdgeLocator::Initialize()
   this->EdgeMap.clear();
 }
 
-int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(
-  int64_t i0, int64_t i1, int64_t& edgeId)
+int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(int64_t i0, int64_t i1, int64_t& edgeId)
 {
   // Ensure consistent ordering of edge
   if (i1 < i0) {
@@ -126,10 +128,14 @@ int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(
 // Point interpolation for clipping and contouring, given the scalar
 // values (v0, v1) for the two endpoints (p0, p1).  The use of this
 // function guarantees perfect consistency in the results.
-int InterpolateEdge(
-  std::vector<glm::dvec3>& vertices, vtkCCSEdgeLocator* locator,
-  double tol, int64_t i0, int64_t i1, double v0, double v1,
-  int64_t& i)
+int InterpolateEdge(std::vector<glm::dvec3>& vertices,
+                    vtkCCSEdgeLocator* locator,
+                    double tol,
+                    int64_t i0,
+                    int64_t i1,
+                    double v0,
+                    double v1,
+                    int64_t& i)
 {
   // This swap guarantees that exactly the same point is computed
   // for both line directions, as long as the endpoints are the same.
@@ -216,12 +222,17 @@ public:
   {
     size_t n = (bit >> 5);
     size_t i = (bit & 0x1f);
-    if (n >= bitstorage.size()) { bitstorage.resize(n + 1); }
+    if (n >= bitstorage.size()) {
+      bitstorage.resize(n + 1);
+    }
     unsigned int chunk = bitstorage[n];
     int bitval = 1;
     bitval <<= i;
-    if (val) { chunk = chunk | bitval; }
-    else { chunk = chunk & ~bitval; }
+    if (val) {
+      chunk = chunk | bitval;
+    } else {
+      chunk = chunk & ~bitval;
+    }
     bitstorage[n] = chunk;
   }
 
@@ -229,7 +240,9 @@ public:
   {
     size_t n = (bit >> 5);
     size_t i = (bit & 0x1f);
-    if (n >= bitstorage.size()) { return 0; }
+    if (n >= bitstorage.size()) {
+      return 0;
+    }
     unsigned int chunk = bitstorage[n];
     return ((chunk >> i) & 1);
   }
@@ -272,9 +285,11 @@ using vtkCCSPolyEdges = std::vector<int64_t>;
 // of the edges originally had more than two points, as indicated
 // by originalEdges.  If scalars is not null, then add a scalar for
 // each triangle.
-void vtkCCSInsertTriangle(
-  std::vector<glm::i64vec3>& polys, const std::vector<int64_t>& poly, const size_t* trids,
-  const std::vector<int64_t>& polyEdges, std::vector<std::vector<int64_t>>& originalEdges)
+void vtkCCSInsertTriangle(std::vector<glm::i64vec3>& polys,
+                          const std::vector<int64_t>& poly,
+                          const size_t* trids,
+                          const std::vector<int64_t>& polyEdges,
+                          std::vector<std::vector<int64_t>>& originalEdges)
 {
   static const size_t nextVert[3] = {1, 2, 0};
 
@@ -291,7 +306,9 @@ void vtkCCSInsertTriangle(
     int64_t edgeLoc = polyEdges[currId];
     if (edgeLoc >= 0) {
       size_t nextId = currId + 1;
-      if (nextId == poly.size()) { nextId = 0; }
+      if (nextId == poly.size()) {
+        nextId = 0;
+      }
 
       // Is the triangle edge a polygon edge?
       if (nextId == trids[nextVert[vert]]) {
@@ -304,8 +321,7 @@ void vtkCCSInsertTriangle(
   if (edgeCount == 0) {
     // No special edge handling, so just do one triangle
     polys.push_back(glm::i64vec3(poly[trids[0]], poly[trids[1]], poly[trids[2]]));
-  }
-  else {
+  } else {
     // Make triangle fans for edges with extra points
 
     int64_t edgePtIds[4];
@@ -358,8 +374,7 @@ void vtkCCSInsertTriangle(
 
     // Go through the sides and make the fans
     for (int side = 0; side < 3; side++) {
-      if ((side != prevSide || prevNeeded) &&
-          (side != nextSide || nextNeeded)) {
+      if ((side != prevSide || prevNeeded) && (side != nextSide || nextNeeded)) {
         int64_t m = 0;
         int64_t n = edgeNPts[side] - 1;
 
@@ -379,8 +394,9 @@ void vtkCCSInsertTriangle(
 glm::dvec3 ComputePolygonNormal(const std::vector<int64_t>& poly, const std::vector<glm::dvec3>& vertices)
 {
   glm::dvec3 normal(0.0);
-  if (poly.empty())
+  if (poly.empty()) {
     return normal;
+  }
   glm::dvec3 anchor = vertices[poly[0]];
   for (size_t i = 1; i < poly.size() - 1; ++i) {
     glm::dvec3 v1 = vertices[poly[i]] - anchor;
@@ -395,27 +411,30 @@ glm::dvec3 ComputePolygonNormal(const std::vector<int64_t>& poly, const std::vec
 // the sign of the measure is determined by dotting the local
 // vector with the normal (concave features return a negative
 // measure).
-double ComputePolygonTriangleMeasure(size_t centerVertexIdx, glm::dvec3 normal, const std::vector<int64_t>& poly,
+double ComputePolygonTriangleMeasure(size_t centerVertexIdx,
+                                     glm::dvec3 normal,
+                                     const std::vector<int64_t>& poly,
                                      const std::vector<glm::dvec3>& vertices)
 {
   size_t prev = centerVertexIdx - 1;
   size_t next = centerVertexIdx + 1;
-  if (centerVertexIdx == 0)
+  if (centerVertexIdx == 0) {
     prev = poly.size() - 1;
-  if (next >= poly.size())
+  }
+  if (next >= poly.size()) {
     next = 0;
+  }
   glm::dvec3 v1 = vertices[poly[centerVertexIdx]] - vertices[poly[prev]];
   glm::dvec3 v2 = vertices[poly[next]] - vertices[poly[centerVertexIdx]];
   glm::dvec3 v3 = vertices[poly[prev]] - vertices[poly[next]];
   glm::dvec3 v4 = glm::cross(v1, v2); //|v4| is twice the area
   double area;
   if ((area = glm::dot(v4, normal)) < 0.0) {
-    return -1.0; //concave or bad triangle
+    return -1.0; // concave or bad triangle
   } else if (area == 0.0) {
-    return std::numeric_limits<double>::lowest(); //concave or bad triangle
+    return std::numeric_limits<double>::lowest(); // concave or bad triangle
   } else {
-    double perimeter = glm::length(v1) + glm::length(v2) +
-                       glm::length(v3);
+    double perimeter = glm::length(v1) + glm::length(v2) + glm::length(v3);
     return perimeter * perimeter / area;
   }
 }
@@ -425,12 +444,11 @@ double ComputePolygonTriangleMeasure(size_t centerVertexIdx, glm::dvec3 normal, 
 // the projection of the two lines onto the plane perpendicular to the cross
 // product of the two lines intersect. The parameters (u,v) are the
 // parametric coordinates of the lines at the position of closest approach.
-int IntersectionLine(glm::dvec3 a1, glm::dvec3 a2, glm::dvec3 b1, glm::dvec3 b2,
-                     double& u, double& v)
+int IntersectionLine(glm::dvec3 a1, glm::dvec3 a2, glm::dvec3 b1, glm::dvec3 b2, double& u, double& v)
 {
   glm::dvec3 a21, b21, b1a1;
   double c[2];
-  double* A[2], row1[2], row2[2];
+  double *A[2], row1[2], row2[2];
 
   //  Initialize
   u = v = 0.0;
@@ -452,7 +470,6 @@ int IntersectionLine(glm::dvec3 a1, glm::dvec3 a2, glm::dvec3 b1, glm::dvec3 b2,
   c[0] = glm::dot(a21, b1a1);
   c[1] = -glm::dot(b21, b1a1);
 
-
   //  Solve the system of equations
   double det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
 
@@ -467,8 +484,7 @@ int IntersectionLine(glm::dvec3 a1, glm::dvec3 a2, glm::dvec3 b1, glm::dvec3 b2,
   //  Check parametric coordinates for intersection.
   if ((0.0 <= u) && (u <= 1.0) && (0.0 <= v) && (v <= 1.0)) {
     return 2;
-  }
-  else {
+  } else {
     return 0;
   }
 }
@@ -480,10 +496,10 @@ int IntersectionLine(glm::dvec3 a1, glm::dvec3 a2, glm::dvec3 b1, glm::dvec3 b2,
 #define VTK_POLYGON_ON_LINE 3
 #define VTK_POLYGON_CERTAIN 1
 #define VTK_POLYGON_UNCERTAIN 0
-#define VTK_POLYGON_RAY_TOL 1.e-03 //Tolerance for ray firing
-#define VTK_POLYGON_MAX_ITER 10    //Maximum iterations for ray-firing
+#define VTK_POLYGON_RAY_TOL 1.e-03 // Tolerance for ray firing
+#define VTK_POLYGON_MAX_ITER 10 // Maximum iterations for ray-firing
 #define VTK_POLYGON_VOTE_THRESHOLD 2
-#define  VTK_TOL   1.e-05
+#define VTK_TOL 1.e-05
 
 //----------------------------------------------------------------------------
 // Determine whether point is inside polygon. Function uses ray-casting
@@ -503,9 +519,8 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
   int deltaVotes;
 
   // do a quick bounds check
-  if (x[0] < bounds[0] || x[0] > bounds[1] ||
-      x[1] < bounds[2] || x[1] > bounds[3] ||
-      x[2] < bounds[4] || x[2] > bounds[5]) {
+  if (x[0] < bounds[0] || x[0] > bounds[1] || x[1] < bounds[2] || x[1] > bounds[3] || x[2] < bounds[4] ||
+      x[2] > bounds[5]) {
     return VTK_POLYGON_OUTSIDE;
   }
 
@@ -515,8 +530,7 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
   //  size of the face bounding box.
   //
   for (int i = 0; i < 3; ++i) {
-    ray[i] = (bounds[2 * i + 1] - bounds[2 * i]) * 1.1 +
-             std::abs((bounds[2 * i + 1] + bounds[2 * i]) / 2.0 - x[i]);
+    ray[i] = (bounds[2 * i + 1] - bounds[2 * i]) * 1.1 + std::abs((bounds[2 * i + 1] + bounds[2 * i]) / 2.0 - x[i]);
   }
 
   if ((rayMag = glm::length(ray)) == 0.0) {
@@ -530,20 +544,17 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
       maxComp = 0;
       comps[0] = 1;
       comps[1] = 2;
-    }
-    else {
+    } else {
       maxComp = 2;
       comps[0] = 0;
       comps[1] = 1;
     }
-  }
-  else {
+  } else {
     if (std::abs(normal[1]) > std::abs(normal[2])) {
       maxComp = 1;
       comps[0] = 0;
       comps[1] = 2;
-    }
-    else {
+    } else {
       maxComp = 2;
       comps[0] = 0;
       comps[1] = 1;
@@ -572,8 +583,7 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
   //  appropriate "in" or "out" status is returned.
   //
   for (deltaVotes = 0, iterNumber = 1;
-       (iterNumber < VTK_POLYGON_MAX_ITER)
-       && (std::abs(deltaVotes) < VTK_POLYGON_VOTE_THRESHOLD);
+       (iterNumber < VTK_POLYGON_MAX_ITER) && (std::abs(deltaVotes) < VTK_POLYGON_VOTE_THRESHOLD);
        iterNumber++) {
     //
     //  Generate ray
@@ -582,8 +592,7 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
     for (rayOK = false; rayOK == false;) {
       ray[comps[0]] = nim::ZRandom::instance().randReal(rayMag, -rayMag);
       ray[comps[1]] = nim::ZRandom::instance().randReal(rayMag, -rayMag);
-      ray[maxComp] = -(normal[comps[0]] * ray[comps[0]] +
-                       normal[comps[1]] * ray[comps[1]]) / normal[maxComp];
+      ray[maxComp] = -(normal[comps[0]] * ray[comps[0]] + normal[comps[1]] * ray[comps[1]]) / normal[maxComp];
       if ((mag = glm::length(ray)) > rayMag * VTK_TOL) {
         rayOK = true;
       }
@@ -608,31 +617,27 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
       if ((status = IntersectionLine(x, xray, x1, x2, u, v)) == VTK_POLYGON_INTERSECTION) {
         if ((VTK_POLYGON_RAY_TOL < v) && (v < 1.0 - VTK_POLYGON_RAY_TOL)) {
           numInts++;
-        }
-        else {
+        } else {
           testResult = VTK_POLYGON_UNCERTAIN;
         }
-      }
-      else if (status == VTK_POLYGON_ON_LINE) {
+      } else if (status == VTK_POLYGON_ON_LINE) {
         testResult = VTK_POLYGON_UNCERTAIN;
       }
     }
     if (testResult == VTK_POLYGON_CERTAIN) {
       if ((numInts % 2) == 0) {
         --deltaVotes;
-      }
-      else {
+      } else {
         ++deltaVotes;
       }
     }
-  } //try another ray
+  } // try another ray
 
   //   If the number of intersections is odd, the point is in the polygon.
   //
   if (deltaVotes < 0) {
     return VTK_POLYGON_OUTSIDE;
-  }
-  else {
+  } else {
     return VTK_POLYGON_INSIDE;
   }
 }
@@ -642,7 +647,10 @@ int PointInPolygon(glm::dvec3 x, const std::vector<glm::dvec3>& pts, const doubl
 // comparison to determine whether ear-cut is valid, and may
 // resort to line-plane intersections to resolve possible
 // instersections with ear-cut.
-int CanRemovePolygonVertex(size_t idx, double tolerance, glm::dvec3 normal, const std::vector<int64_t>& poly,
+int CanRemovePolygonVertex(size_t idx,
+                           double tolerance,
+                           glm::dvec3 normal,
+                           const std::vector<int64_t>& poly,
                            const std::vector<glm::dvec3>& vertices)
 {
   int sign, currentSign;
@@ -657,22 +665,25 @@ int CanRemovePolygonVertex(size_t idx, double tolerance, glm::dvec3 normal, cons
   // is always on the positive side of the plane.
   size_t prevIdx = idx - 1;
   size_t nextIdx = idx + 1;
-  if (idx == 0)
+  if (idx == 0) {
     prevIdx = poly.size() - 1;
-  if (nextIdx >= poly.size())
+  }
+  if (nextIdx >= poly.size()) {
     nextIdx = 0;
+  }
   size_t nextNextIdx = nextIdx + 1;
-  if (nextNextIdx >= poly.size())
+  if (nextNextIdx >= poly.size()) {
     nextNextIdx = 0;
+  }
   int64_t previous = poly[prevIdx];
   int64_t next = poly[nextIdx];
 
-  glm::dvec3 sPt = vertices[previous]; //point on plane
+  glm::dvec3 sPt = vertices[previous]; // point on plane
   glm::dvec3 v = vertices[next] - vertices[previous];
   glm::dvec3 sN = glm::cross(v, normal);
 
   if ((glm::dot(sN, sN)) == 0.0) {
-    return 0; //bad split, indeterminant
+    return 0; // bad split, indeterminant
   }
 
   // Traverse the other points to see if a) they are all on the
@@ -680,37 +691,37 @@ int CanRemovePolygonVertex(size_t idx, double tolerance, glm::dvec3 normal, cons
   // the split line.
   int oneNegative = 0;
   val = glm::dot(sN, vertices[poly[nextNextIdx]] - sPt);
-  //val = vtkPlane::Evaluate(sN,sPt,next->next->x);
+  // val = vtkPlane::Evaluate(sN,sPt,next->next->x);
   currentSign = (val > tolerance ? 1 : (val < -tolerance ? -1 : 0));
-  oneNegative = (currentSign < 0 ? 1 : 0); //very important
+  oneNegative = (currentSign < 0 ? 1 : 0); // very important
 
   // Intersections are only computed when the split half-space is crossed
   for (size_t vtxIdx = nextNextIdx + 1; vtxIdx != static_cast<size_t>(previous); vtxIdx++) {
-    if (vtxIdx >= poly.size())
+    if (vtxIdx >= poly.size()) {
       vtxIdx = 0;
+    }
     val = glm::dot(sN, vertices[poly[vtxIdx]] - sPt);
-    //val = vtkPlane::Evaluate(sN,sPt,vtxIdx->x);
+    // val = vtkPlane::Evaluate(sN,sPt,vtxIdx->x);
     sign = (val > tolerance ? 1 : (val < -tolerance ? -1 : 0));
     if (sign != currentSign) {
       if (!oneNegative) {
-        oneNegative = (sign < 0 ? 1 : 0); //very important
+        oneNegative = (sign < 0 ? 1 : 0); // very important
       }
       size_t vtxIdxPrevious = vtxIdx - 1;
-      if (vtxIdx == 0)
+      if (vtxIdx == 0) {
         vtxIdxPrevious = poly.size() - 1;
+      }
       if (IntersectionLine(sPt, vertices[next], vertices[poly[vtxIdx]], vertices[poly[vtxIdxPrevious]], s, t) != 0) {
         return 0;
-      }
-      else {
+      } else {
         currentSign = sign;
       }
-    }//if crossing occurs
-  }//for the rest of the loop
+    } // if crossing occurs
+  } // for the rest of the loop
 
   if (!oneNegative) {
-    return 0; //entire loop is on this side of plane
-  }
-  else {
+    return 0; // entire loop is on this side of plane
+  } else {
     return 1;
   }
 }
@@ -720,8 +731,7 @@ int CanRemovePolygonVertex(size_t idx, double tolerance, glm::dvec3 normal, cons
 class MeasureIDComparison
 {
 public:
-  MeasureIDComparison()
-  {}
+  MeasureIDComparison() {}
 
   bool operator()(const std::pair<double, size_t>& lhs, const std::pair<double, size_t>& rhs) const
   {
@@ -734,8 +744,7 @@ public:
 // Returns the sum of the squares of the dimensions.
 // Requires a poly with at least one  point.
 // Compute polygon bounds.  Poly must have at least one point.
-double vtkCCSPolygonBounds(
-  const std::vector<int64_t>& poly, const std::vector<glm::dvec3>& vertices, double bounds[6])
+double vtkCCSPolygonBounds(const std::vector<int64_t>& poly, const std::vector<glm::dvec3>& vertices, double bounds[6])
 {
   size_t n = poly.size();
   glm::dvec3 p = vertices[poly[0]];
@@ -746,12 +755,24 @@ double vtkCCSPolygonBounds(
 
   for (size_t j = 1; j < n; ++j) {
     p = vertices[poly[j]];
-    if (p[0] < bounds[0]) { bounds[0] = p[0]; };
-    if (p[0] > bounds[1]) { bounds[1] = p[0]; };
-    if (p[1] < bounds[2]) { bounds[2] = p[1]; };
-    if (p[1] > bounds[3]) { bounds[3] = p[1]; };
-    if (p[2] < bounds[4]) { bounds[4] = p[2]; };
-    if (p[2] > bounds[5]) { bounds[5] = p[2]; };
+    if (p[0] < bounds[0]) {
+      bounds[0] = p[0];
+    };
+    if (p[0] > bounds[1]) {
+      bounds[1] = p[0];
+    };
+    if (p[1] < bounds[2]) {
+      bounds[2] = p[1];
+    };
+    if (p[1] > bounds[3]) {
+      bounds[3] = p[1];
+    };
+    if (p[2] < bounds[4]) {
+      bounds[4] = p[2];
+    };
+    if (p[2] > bounds[5]) {
+      bounds[5] = p[2];
+    };
   }
 
   double bx = (bounds[1] - bounds[0]);
@@ -769,7 +790,8 @@ double vtkCCSPolygonBounds(
 // algorithm works in 3D (the points don't have to be projected into
 // 2D, and the ordering direction of the points is nor important as
 // long as the polygon edges do not self intersect).
-bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm::dvec3>& vertices,
+bool TriangulatePolygon2(const std::vector<int64_t>& poly,
+                         const std::vector<glm::dvec3>& vertices,
                          std::vector<size_t>& triangles)
 {
   double bounds[6];
@@ -786,9 +808,10 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
   // vertex. Place the structure into a priority queue (those
   // vertices with smallest angle are to be removed first).
   //
-  std::priority_queue<std::pair<double, size_t>, std::vector<std::pair<double, size_t>>, MeasureIDComparison> VertexQueue;
+  std::priority_queue<std::pair<double, size_t>, std::vector<std::pair<double, size_t>>, MeasureIDComparison>
+    VertexQueue;
   for (size_t i = 0; i < poly.size(); ++i) {
-    //concave (negative measure) vertices are not elgible for removal
+    // concave (negative measure) vertices are not elgible for removal
     double measure = ComputePolygonTriangleMeasure(i, normal, poly, vertices);
     if (measure > 0.0) {
       VertexQueue.push(std::make_pair(measure, i));
@@ -804,62 +827,67 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
   //
   size_t numInQueue;
   std::vector<int64_t> polyCopy = poly;
-  while (polyCopy.size() > 2 &&
-         (numInQueue = VertexQueue.size()) > 0) {
-    if (numInQueue == polyCopy.size()) //convex, pop away
+  while (polyCopy.size() > 2 && (numInQueue = VertexQueue.size()) > 0) {
+    if (numInQueue == polyCopy.size()) // convex, pop away
     {
       size_t idx = VertexQueue.top().second;
       VertexQueue.pop();
       size_t nextIdx = idx + 1;
-      if (nextIdx >= polyCopy.size())
+      if (nextIdx >= polyCopy.size()) {
         nextIdx = 0;
+      }
       size_t prevIdx = idx - 1;
-      if (idx == 0)
+      if (idx == 0) {
         prevIdx = polyCopy.size() - 1;
+      }
       triangles.push_back(polyCopy[idx]);
       triangles.push_back(polyCopy[nextIdx]);
       triangles.push_back(polyCopy[prevIdx]);
       polyCopy.erase(polyCopy.begin() + idx);
       // rebuild VertexQueue
-      while (!VertexQueue.empty())
+      while (!VertexQueue.empty()) {
         VertexQueue.pop();
+      }
       for (size_t i = 0; i < polyCopy.size(); ++i) {
-        //concave (negative measure) vertices are not elgible for removal
+        // concave (negative measure) vertices are not elgible for removal
         double measure = ComputePolygonTriangleMeasure(i, normal, polyCopy, vertices);
         if (measure > 0.0) {
           VertexQueue.push(std::make_pair(measure, i));
         }
       }
-    }//convex
+    } // convex
     else {
       size_t idx = VertexQueue.top().second;
-      VertexQueue.pop(); //removes it, even if can't be split
+      VertexQueue.pop(); // removes it, even if can't be split
       if (CanRemovePolygonVertex(idx, tolerance, normal, polyCopy, vertices)) {
         size_t nextIdx = idx + 1;
-        if (nextIdx >= polyCopy.size())
+        if (nextIdx >= polyCopy.size()) {
           nextIdx = 0;
+        }
         size_t prevIdx = idx - 1;
-        if (idx == 0)
+        if (idx == 0) {
           prevIdx = polyCopy.size() - 1;
+        }
         triangles.push_back(polyCopy[idx]);
         triangles.push_back(polyCopy[nextIdx]);
         triangles.push_back(polyCopy[prevIdx]);
         polyCopy.erase(polyCopy.begin() + idx);
         // rebuild VertexQueue
-        while (!VertexQueue.empty())
+        while (!VertexQueue.empty()) {
           VertexQueue.pop();
+        }
         for (size_t i = 0; i < polyCopy.size(); ++i) {
-          //concave (negative measure) vertices are not elgible for removal
+          // concave (negative measure) vertices are not elgible for removal
           double measure = ComputePolygonTriangleMeasure(i, normal, polyCopy, vertices);
           if (measure > 0.0) {
             VertexQueue.push(std::make_pair(measure, i));
           }
         }
       }
-    }//concave
-  }//while
+    } // concave
+  } // while
 
-  if (polyCopy.size() > 2) //couldn't triangulate
+  if (polyCopy.size() > 2) // couldn't triangulate
   {
     LOG(ERROR) << "Degenerate polygon encountered during triangulation in TriangulatePolygon2 2";
     return false;
@@ -874,10 +902,11 @@ bool TriangulatePolygon2(const std::vector<int64_t>& poly, const std::vector<glm
 // be added to "scalars".  The final two arguments (polygon and
 // triangles) are only for temporary storage.
 // The return value is true if triangulation was successful.
-bool vtkCCSTriangulate(
-  const std::vector<int64_t>& poly, const std::vector<glm::dvec3>& vertices,
-  const std::vector<int64_t>& polyEdges, std::vector<std::vector<int64_t>>& originalEdges,
-  std::vector<glm::i64vec3>& triangles)
+bool vtkCCSTriangulate(const std::vector<int64_t>& poly,
+                       const std::vector<glm::dvec3>& vertices,
+                       const std::vector<int64_t>& polyEdges,
+                       std::vector<std::vector<int64_t>>& originalEdges,
+                       std::vector<glm::i64vec3>& triangles)
 {
   int triangulationFailure = false;
   size_t n = poly.size();
@@ -886,7 +915,7 @@ bool vtkCCSTriangulate(
   if (n < 3) {
     return true;
   }
-    // If the poly is a triangle, then pass it
+  // If the poly is a triangle, then pass it
   if (n == 3) {
     size_t trids[3];
     trids[0] = 0;
@@ -895,7 +924,7 @@ bool vtkCCSTriangulate(
 
     vtkCCSInsertTriangle(triangles, poly, trids, polyEdges, originalEdges);
   }
-    // If the poly has 4 or more points, triangulate it
+  // If the poly has 4 or more points, triangulate it
   else {
     std::vector<size_t> tris;
     if (!TriangulatePolygon2(poly, vertices, tris)) {
@@ -924,10 +953,9 @@ bool vtkCCSTriangulate(
 // ---------------------------------------------------
 // Here is the code for creating polygons from line segments.
 // Take a set of lines, join them tip-to-tail to create polygons
-void vtkCCSMakePolysFromLines(
-  std::vector<glm::i64vec2>& lines,
-  std::vector<std::vector<int64_t>>& newPolys,
-  std::vector<size_t>& incompletePolys)
+void vtkCCSMakePolysFromLines(std::vector<glm::i64vec2>& lines,
+                              std::vector<std::vector<int64_t>>& newPolys,
+                              std::vector<size_t>& incompletePolys)
 {
   // Bitfield for marking lines as used
   vtkCCSBitArray usedLines;
@@ -962,7 +990,6 @@ void vtkCCSMakePolysFromLines(
       // This is cleared if a match is found
       noLinesMatch = true;
 
-
       glm::i64vec2 endPts, reverseEndPts;
 
       // For both open ends of the polygon
@@ -996,8 +1023,7 @@ void vtkCCSMakePolysFromLines(
                   (endIdx == 1 && (poly[1] == lines[lineId][0] || poly[1] == lines[lineId][1]))) {
                 matches.erase(matches.begin() + k);
               }
-            }
-            while (k > 0 && matches.size() > 1);
+            } while (k > 0 && matches.size() > 1);
 
             // If there are multiple matches due to intersections,
             // they should be dealt with here.
@@ -1012,16 +1038,17 @@ void vtkCCSMakePolysFromLines(
 
           if (!completePoly) {
             if (endIdx == 0) {
-              if (lines[lineId].x == endPts[endIdx])
+              if (lines[lineId].x == endPts[endIdx]) {
                 poly.insert(poly.end(), lines[lineId].y);
-              else
+              } else {
                 poly.insert(poly.end(), lines[lineId].x);
-            }
-            else {
-              if (lines[lineId].x == endPts[endIdx])
+              }
+            } else {
+              if (lines[lineId].x == endPts[endIdx]) {
                 poly.insert(poly.begin(), lines[lineId].y);
-              else
+              } else {
                 poly.insert(poly.begin(), lines[lineId].x);
+              }
             }
           }
 
@@ -1045,9 +1072,10 @@ void vtkCCSMakePolysFromLines(
 // and any new edges that are created will be on the hull of the point set.
 // Shorter edges will be preferred over long edges.
 // Finish any incomplete polygons by trying to join loose ends
-void vtkCCSJoinLooseEnds(
-  std::vector<std::vector<int64_t>>& polys, std::vector<size_t>& incompletePolys,
-  std::vector<glm::dvec3>& vertices, const glm::dvec3 normal)
+void vtkCCSJoinLooseEnds(std::vector<std::vector<int64_t>>& polys,
+                         std::vector<size_t>& incompletePolys,
+                         std::vector<glm::dvec3>& vertices,
+                         const glm::dvec3 normal)
 {
   // Relative tolerance for checking whether an edge is on the hull
   const double tol = VTK_CCS_POLYGON_TOLERANCE;
@@ -1083,7 +1111,7 @@ void vtkCCSJoinLooseEnds(
       // Create a plane equation
       double pc[4];
       glm::dvec3 glmpc = glm::cross(v, normal);
-      //vtkMath::Cross(v, normal, pc);
+      // vtkMath::Cross(v, normal, pc);
       pc[0] = glmpc[0];
       pc[1] = glmpc[1];
       pc[2] = glmpc[2];
@@ -1125,8 +1153,7 @@ void vtkCCSJoinLooseEnds(
       if (iMin == n - 1) {
         // Mark the poly as closed
         incompletePolys.pop_back();
-      }
-      else {
+      } else {
         size_t id2 = incompletePolys[iMin];
 
         // Combine the polys
@@ -1136,8 +1163,7 @@ void vtkCCSJoinLooseEnds(
         removePolys.push_back(id2);
         incompletePolys.erase(incompletePolys.begin() + iMin);
       }
-    }
-    else {
+    } else {
       // If no match, erase this poly from consideration
       removePolys.push_back(incompletePolys[n - 1]);
       incompletePolys.pop_back();
@@ -1162,9 +1188,11 @@ void vtkCCSJoinLooseEnds(
 // or counterclockwise progression with respect to the normal.
 // The return value is -1 for clockwise, +1 for counterclockwise,
 // and 0 if any two of the vectors are coincident.
-int vtkCCSVectorProgression(
-  const glm::dvec3 p, const glm::dvec3 p1,
-  const glm::dvec3 p2, const glm::dvec3 p3, const glm::dvec3 normal)
+int vtkCCSVectorProgression(const glm::dvec3 p,
+                            const glm::dvec3 p1,
+                            const glm::dvec3 p2,
+                            const glm::dvec3 p3,
+                            const glm::dvec3 normal)
 {
   glm::dvec3 v1, v2, v3;
   v1 = p1 - p;
@@ -1210,11 +1238,11 @@ int vtkCCSVectorProgression(
 // the number of splits made.
 // Check for polygons that contain multiple loops, and split the loops apart.
 // Returns the number of splits made.
-int vtkCCSSplitAtPinchPoints(
-  std::vector<std::vector<int64_t>>& polys, std::vector<glm::dvec3>& vertices,
-  std::vector<std::vector<size_t>>& polyGroups,
-  std::vector<std::vector<int64_t>>& polyEdges,
-  const glm::dvec3 normal)
+int vtkCCSSplitAtPinchPoints(std::vector<std::vector<int64_t>>& polys,
+                             std::vector<glm::dvec3>& vertices,
+                             std::vector<std::vector<size_t>>& polyGroups,
+                             std::vector<std::vector<int64_t>>& polyEdges,
+                             const glm::dvec3 normal)
 {
   int splitCount = 0;
 
@@ -1246,8 +1274,7 @@ int vtkCCSSplitAtPinchPoints(
       double minsqdist = std::numeric_limits<double>::max();
       int64_t vertIdx = -1;
       for (size_t locatorIdx = 0; locatorIdx < locator.size(); ++locatorIdx) {
-        double sqdist = glm::dot(vertices[locator[locatorIdx]] - point,
-                                 vertices[locator[locatorIdx]] - point);
+        double sqdist = glm::dot(vertices[locator[locatorIdx]] - point, vertices[locator[locatorIdx]] - point);
         if (sqdist < minsqdist) {
           minsqdist = sqdist;
           vertIdx = locator[locatorIdx];
@@ -1271,9 +1298,15 @@ int vtkCCSSplitAtPinchPoints(
           size_t prevIdx = n + idx1 - 1;
           size_t midIdx = idx1 + 1;
           size_t nextIdx = idx2 + 1;
-          if (prevIdx >= n) { prevIdx -= n; }
-          if (midIdx >= n) { midIdx -= n; }
-          if (nextIdx >= n) { nextIdx -= n; }
+          if (prevIdx >= n) {
+            prevIdx -= n;
+          }
+          if (midIdx >= n) {
+            midIdx -= n;
+          }
+          if (nextIdx >= n) {
+            nextIdx -= n;
+          }
 
           glm::dvec3 p1 = vertices[poly[prevIdx]];
           glm::dvec3 p2 = vertices[poly[midIdx]];
@@ -1352,9 +1385,10 @@ int vtkCCSSplitAtPinchPoints(
 // The original edges are appended to the originalEdges cell array,
 // where each cell in this array will be a polyline consisting of two
 // corner vertices and all the points in between.
-void vtkCCSFindTrueEdges(
-  std::vector<std::vector<int64_t>>& polys, std::vector<glm::dvec3>& vertices,
-  std::vector<std::vector<int64_t>>& polyEdges, std::vector<std::vector<int64_t>>& originalEdges)
+void vtkCCSFindTrueEdges(std::vector<std::vector<int64_t>>& polys,
+                         std::vector<glm::dvec3>& vertices,
+                         std::vector<std::vector<int64_t>>& polyEdges,
+                         std::vector<std::vector<int64_t>>& originalEdges)
 {
   // Tolerance^2 for angle to see if line segments are parallel
   const double atol2 = (VTK_CCS_POLYGON_TOLERANCE * VTK_CCS_POLYGON_TOLERANCE);
@@ -1403,7 +1437,9 @@ void vtkCCSFindTrueEdges(
 
     for (size_t j = 0; j < n; ++j) {
       size_t k = j + 1;
-      if (k >= n) { k -= n; }
+      if (k >= n) {
+        k -= n;
+      }
 
       p2 = vertices[oldPoly[k]];
       v2 = p2 - p1;
@@ -1425,9 +1461,7 @@ void vtkCCSFindTrueEdges(
       // 1) removing it would create a 2-point poly OR
       // 2) it's more than "tol" distance from the prev point AND
       // 3) the angle is greater than atol:
-      if (m <= 3 ||
-          (l1 > tol2 &&
-           (c < 0 || l1 < tol2 || l2 < tol2 || s2 > l1 * l2 * atol2))) {
+      if (m <= 3 || (l1 > tol2 && (c < 0 || l1 < tol2 || l2 < tol2 || s2 > l1 * l2 * atol2))) {
         // Complete the previous edge only if the final point count
         // will be greater than two
         if (cellCount > 1) {
@@ -1436,11 +1470,9 @@ void vtkCCSFindTrueEdges(
             cellCount++;
           }
           newEdges.push_back(originalEdges.size() - 1);
-        }
-        else if (cellCount == 0) {
+        } else if (cellCount == 0) {
           partialEdge.push_back(pointId);
-        }
-        else {
+        } else {
           newEdges.push_back(-1);
         }
 
@@ -1456,8 +1488,7 @@ void vtkCCSFindTrueEdges(
         p1 = p2;
         v1 = v2;
         l1 = l2;
-      }
-      else {
+      } else {
         if (cellCount > 0 && pointId != oldOriginalId) {
           // First check to see if we have to add cornerPointId
           if (cellCount == 1) {
@@ -1468,8 +1499,7 @@ void vtkCCSFindTrueEdges(
           originalEdges[originalEdges.size() - 1].push_back(pointId);
           oldOriginalId = pointId;
           cellCount++;
-        }
-        else {
+        } else {
           // No corner yet, so save the point
           partialEdge.push_back(pointId);
         }
@@ -1507,15 +1537,15 @@ void vtkCCSFindTrueEdges(
   }
 }
 
-
 // ---------------------------------------------------
 // Check the sense of the polygon against the given normal.  Returns
 // zero if the normal is zero.
 // Set sense to 1 if the poly's normal matches the specified normal, and
 // zero otherwise. Returns zero if poly is degenerate.
-int vtkCCSCheckPolygonSense(
-  std::vector<int64_t>& poly, std::vector<glm::dvec3>& vertices, const glm::dvec3 normal,
-  int& sense)
+int vtkCCSCheckPolygonSense(std::vector<int64_t>& poly,
+                            std::vector<glm::dvec3>& vertices,
+                            const glm::dvec3 normal,
+                            int& sense)
 {
   // Compute the normal
   glm::dvec3 pnormal, p0, p1, p2, v1, v2, v;
@@ -1551,11 +1581,13 @@ int vtkCCSCheckPolygonSense(
 // The values of pp, bounds, and tol2 must be precomputed
 // by calling vtkCCSPrepareForPolyInPoly() on outerPoly.
 
-int vtkCCSPolyInPoly(
-  const std::vector<int64_t>& outerPoly, const std::vector<int64_t>& innerPoly,
-  std::vector<glm::dvec3>& vertices, const glm::dvec3 normal,
-  const std::vector<glm::dvec3>& pp, const double bounds[6],
-  double tol2)
+int vtkCCSPolyInPoly(const std::vector<int64_t>& outerPoly,
+                     const std::vector<int64_t>& innerPoly,
+                     std::vector<glm::dvec3>& vertices,
+                     const glm::dvec3 normal,
+                     const std::vector<glm::dvec3>& pp,
+                     const double bounds[6],
+                     double tol2)
 {
   // Find a vertex of poly "j" that isn't on the edge of poly "i".
   // This is necessary or the PointInPolygon might return "true"
@@ -1605,9 +1637,11 @@ int vtkCCSPolyInPoly(
 // tol2: a tolerance value based on the size of the polygon
 // (note: pp must be pre-allocated to the 3*outerPoly.size())
 
-void vtkCCSPrepareForPolyInPoly(
-  const std::vector<int64_t>& outerPoly, std::vector<glm::dvec3>& vertices,
-  std::vector<glm::dvec3>& pp, double bounds[6], double& tol2)
+void vtkCCSPrepareForPolyInPoly(const std::vector<int64_t>& outerPoly,
+                                std::vector<glm::dvec3>& vertices,
+                                std::vector<glm::dvec3>& pp,
+                                double bounds[6],
+                                double& tol2)
 {
   size_t n = outerPoly.size();
 
@@ -1618,14 +1652,13 @@ void vtkCCSPrepareForPolyInPoly(
 
   // Pull out the points
   for (size_t k = 0; k < n; ++k) {
-    //double *p = &pp[3*k];
-    //vertices->GetPoint(outerPoly[k], p);
+    // double *p = &pp[3*k];
+    // vertices->GetPoint(outerPoly[k], p);
     pp.push_back(vertices[outerPoly[k]]);
   }
 
   // Find the bounding box and tolerance for the polygon
-  tol2 = (vtkCCSPolygonBounds(outerPoly, vertices, bounds) *
-          (VTK_CCS_POLYGON_TOLERANCE * VTK_CCS_POLYGON_TOLERANCE));
+  tol2 = (vtkCCSPolygonBounds(outerPoly, vertices, bounds) * (VTK_CCS_POLYGON_TOLERANCE * VTK_CCS_POLYGON_TOLERANCE));
 }
 
 // ---------------------------------------------------
@@ -1635,10 +1668,10 @@ void vtkCCSPrepareForPolyInPoly(
 // will be reversed twice and will become its own group.
 // Check for polys within other polys, i.e. find polys that are holes and
 // add them to the "polyGroup" of the poly that they are inside of.
-void vtkCCSMakeHoleyPolys(
-  std::vector<std::vector<int64_t>>& newPolys, std::vector<glm::dvec3>& vertices,
-  std::vector<std::vector<size_t>>& polyGroups,
-  const glm::dvec3 normal)
+void vtkCCSMakeHoleyPolys(std::vector<std::vector<int64_t>>& newPolys,
+                          std::vector<glm::dvec3>& vertices,
+                          std::vector<std::vector<size_t>>& polyGroups,
+                          const glm::dvec3 normal)
 {
   size_t numNewPolys = newPolys.size();
   if (numNewPolys <= 1) {
@@ -1653,7 +1686,9 @@ void vtkCCSMakeHoleyPolys(
   size_t nmax = 1;
   for (size_t kk = 0; kk < numNewPolys; kk++) {
     size_t n = newPolys[kk].size();
-    if (n > nmax) { nmax = n; }
+    if (n > nmax) {
+      nmax = n;
+    }
   }
 
   // These are some values needed for poly-in-poly checks
@@ -1665,7 +1700,9 @@ void vtkCCSMakeHoleyPolys(
   for (size_t i = 0; i < numNewPolys; ++i) {
     size_t n = newPolys[i].size();
 
-    if (n < 3) { continue; }
+    if (n < 3) {
+      continue;
+    }
 
     // Check if poly is reversed
     int sense = 0;
@@ -1679,7 +1716,9 @@ void vtkCCSMakeHoleyPolys(
     // Look for polygons inside of this one
     for (size_t j = 0; j < numNewPolys; ++j) {
       size_t m = newPolys[j].size();
-      if (j == i || m < 3) { continue; }
+      if (j == i || m < 3) {
+        continue;
+      }
 
       // Make sure polygon i is not in polygon j
       int isInteriorPoly = 0;
@@ -1694,8 +1733,7 @@ void vtkCCSMakeHoleyPolys(
         continue;
       }
 
-      if (vtkCCSPolyInPoly(newPolys[i], newPolys[j], vertices,
-                           normal, pp, bounds, tol2)) {
+      if (vtkCCSPolyInPoly(newPolys[i], newPolys[j], vertices, normal, pp, bounds, tol2)) {
         // Add to group
         polyGroups[i].push_back(j);
       }
@@ -1707,8 +1745,8 @@ void vtkCCSMakeHoleyPolys(
     if (polyReversed.get(j)) {
       polyGroups[j].clear();
     }
-      // Polys inside the interior polys have their own groups, so remove
-      // them from this group
+    // Polys inside the interior polys have their own groups, so remove
+    // them from this group
     else if (polyGroups[j].size() > 1) {
       // Convert the group into a bit array, to make manipulation easier
       innerPolys.clear();
@@ -1747,11 +1785,14 @@ void vtkCCSMakeHoleyPolys(
 // Return value of zero means check failed and the cut is not
 // usable.
 
-int vtkCCSCheckCut(
-  const std::vector<std::vector<int64_t>>& polys, std::vector<glm::dvec3>& vertices,
-  const glm::dvec3 normal, const std::vector<size_t>& polyGroup,
-  size_t outerPolyId, size_t innerPolyId,
-  int64_t outerIdx, int64_t innerIdx)
+int vtkCCSCheckCut(const std::vector<std::vector<int64_t>>& polys,
+                   std::vector<glm::dvec3>& vertices,
+                   const glm::dvec3 normal,
+                   const std::vector<size_t>& polyGroup,
+                   size_t outerPolyId,
+                   size_t innerPolyId,
+                   int64_t outerIdx,
+                   int64_t innerIdx)
 {
   int64_t ptId1 = polys[outerPolyId][outerIdx];
   int64_t ptId2 = polys[innerPolyId][innerIdx];
@@ -1783,8 +1824,12 @@ int vtkCCSCheckCut(
     size_t n = poly.size();
     size_t prevIdx = n - polyIdx - 1;
     size_t nextIdx = polyIdx + 1;
-    if (prevIdx >= n) { prevIdx -= n; }
-    if (nextIdx >= n) { nextIdx -= n; }
+    if (prevIdx >= n) {
+      prevIdx -= n;
+    }
+    if (nextIdx >= n) {
+      nextIdx -= n;
+    }
 
     glm::dvec3 r1 = vertices[poly[prevIdx]];
     glm::dvec3 r3 = vertices[poly[nextIdx]];
@@ -1825,8 +1870,7 @@ int vtkCCSCheckCut(
 
       // If lines share an endpoint, they can't intersect,
       // so don't bother with the check.
-      if (ptId1 != qtId1 && ptId1 != qtId2 &&
-          ptId2 != qtId1 && ptId2 != qtId2) {
+      if (ptId1 != qtId1 && ptId1 != qtId2 && ptId2 != qtId1 && ptId2 != qtId2) {
         // Check for intersection
         if ((c1 ^ c2) || v1 * v1 < tol2 || v2 * v2 < tol2) {
           w[0] = q2[0] - q1[0];
@@ -1849,8 +1893,12 @@ int vtkCCSCheckCut(
               // One final check to make sure endpoints aren't coincident
               glm::dvec3 p = p1;
               glm::dvec3 q = q1;
-              if (v2 * v2 < v1 * v1) { p = p2; }
-              if (u2 * u2 < u1 * u1) { q = q2; }
+              if (v2 * v2 < v1 * v1) {
+                p = p2;
+              }
+              if (u2 * u2 < u1 * u1) {
+                q = q2;
+              }
               if (glm::dot(p - q, p - q) > tol2) {
                 return 0;
               }
@@ -1877,9 +1925,11 @@ int vtkCCSCheckCut(
 // line segment that it joins to.  Smaller values indicate a
 // higher quality cut.
 
-double vtkCCSCutQuality(
-  const std::vector<int64_t>& outerPoly, const std::vector<int64_t>& innerPoly,
-  size_t i, size_t j, std::vector<glm::dvec3>& vertices)
+double vtkCCSCutQuality(const std::vector<int64_t>& outerPoly,
+                        const std::vector<int64_t>& innerPoly,
+                        size_t i,
+                        size_t j,
+                        std::vector<glm::dvec3>& vertices)
 {
   size_t n = outerPoly.size();
   size_t m = innerPoly.size();
@@ -1906,7 +1956,9 @@ double vtkCCSCutQuality(
   if (l2 > 0) {
     q = glm::dot(v1, v2);
     q *= q / l2;
-    if (q > qmax) { qmax = q; }
+    if (q > qmax) {
+      qmax = q;
+    }
   }
 
   p0 = vertices[outerPoly[b]];
@@ -1915,7 +1967,9 @@ double vtkCCSCutQuality(
   if (l2 > 0) {
     q = glm::dot(v1, v2);
     q *= q / l2;
-    if (q > qmax) { qmax = q; }
+    if (q > qmax) {
+      qmax = q;
+    }
   }
 
   p0 = vertices[innerPoly[c]];
@@ -1924,7 +1978,9 @@ double vtkCCSCutQuality(
   if (l2 > 0) {
     q = glm::dot(v1, v2);
     q *= q / l2;
-    if (q > qmax) { qmax = q; }
+    if (q > qmax) {
+      qmax = q;
+    }
   }
 
   p0 = vertices[innerPoly[d]];
@@ -1933,7 +1989,9 @@ double vtkCCSCutQuality(
   if (l2 > 0) {
     q = glm::dot(v1, v2);
     q *= q / l2;
-    if (q > qmax) { qmax = q; }
+    if (q > qmax) {
+      qmax = q;
+    }
   }
 
   if (l1 > 0) {
@@ -1946,9 +2004,10 @@ double vtkCCSCutQuality(
 // ---------------------------------------------------
 // Find the two sharpest verts on an inner (i.e. inside-out) poly.
 
-void vtkCCSFindSharpestVerts(
-  const std::vector<int64_t>& poly, std::vector<glm::dvec3>& vertices, const glm::dvec3 normal,
-  size_t verts[2])
+void vtkCCSFindSharpestVerts(const std::vector<int64_t>& poly,
+                             std::vector<glm::dvec3>& vertices,
+                             const glm::dvec3 normal,
+                             size_t verts[2])
 {
   glm::dvec3 v1, v2, v;
   double l1, l2;
@@ -1970,7 +2029,9 @@ void vtkCCSFindSharpestVerts(
 
   for (size_t j = 0; j < n; ++j) {
     size_t k = j + 1;
-    if (k == n) { k = 0; }
+    if (k == n) {
+      k = 0;
+    }
 
     p2 = vertices[poly[k]];
     v2 = p2 - p1;
@@ -2001,11 +2062,14 @@ void vtkCCSFindSharpestVerts(
 // Find two valid cuts between outerPoly and innerPoly.
 // Used by vtkCCSCutHoleyPolys.
 
-int vtkCCSFindCuts(
-  const std::vector<std::vector<int64_t>>& polys,
-  const std::vector<size_t>& polyGroup, size_t outerPolyId, size_t innerPolyId,
-  std::vector<glm::dvec3>& vertices, const glm::dvec3 normal, size_t cuts[2][2],
-  size_t exhaustive)
+int vtkCCSFindCuts(const std::vector<std::vector<int64_t>>& polys,
+                   const std::vector<size_t>& polyGroup,
+                   size_t outerPolyId,
+                   size_t innerPolyId,
+                   std::vector<glm::dvec3>& vertices,
+                   const glm::dvec3 normal,
+                   size_t cuts[2][2],
+                   size_t exhaustive)
 {
   const std::vector<int64_t>& outerPoly = polys[outerPolyId];
   const std::vector<int64_t>& innerPoly = polys[innerPolyId];
@@ -2066,8 +2130,7 @@ int vtkCCSFindCuts(
         }
 
         // This check is done for both cuts
-        if (vtkCCSCheckCut(polys, vertices, normal, polyGroup,
-                           outerPolyId, innerPolyId, k, j)) {
+        if (vtkCCSCheckCut(polys, vertices, normal, polyGroup, outerPolyId, innerPolyId, k, j)) {
           cuts[cutId][0] = k;
           cuts[cutId][1] = j;
           foundCut = 1;
@@ -2088,11 +2151,12 @@ int vtkCCSFindCuts(
 // Helper for vtkCCSCutHoleyPolys.  Change a polygon and a hole
 // into two separate polygons by making two cuts between them.
 
-void vtkCCSMakeCuts(
-  std::vector<std::vector<int64_t>>& polys,
-  std::vector<std::vector<int64_t>>& polyEdges,
-  size_t outerPolyId, size_t innerPolyId,
-  std::vector<glm::dvec3>& vertices, const size_t cuts[2][2])
+void vtkCCSMakeCuts(std::vector<std::vector<int64_t>>& polys,
+                    std::vector<std::vector<int64_t>>& polyEdges,
+                    size_t outerPolyId,
+                    size_t innerPolyId,
+                    std::vector<glm::dvec3>& vertices,
+                    const size_t cuts[2][2])
 {
   glm::dvec3 q, r;
   for (size_t bb = 0; bb < 2; bb++) {
@@ -2178,11 +2242,11 @@ void vtkCCSMakeCuts(
 // are created.
 // For each poly that has holes, make two cuts between each hole and
 // the outer poly in order to turn the polygon+hole into two polys.
-int vtkCCSCutHoleyPolys(
-  std::vector<std::vector<int64_t>>& polys, std::vector<glm::dvec3>& vertices,
-  std::vector<std::vector<size_t>>& polyGroups,
-  std::vector<std::vector<int64_t>>& polyEdges,
-  const glm::dvec3 normal)
+int vtkCCSCutHoleyPolys(std::vector<std::vector<int64_t>>& polys,
+                        std::vector<glm::dvec3>& vertices,
+                        std::vector<std::vector<size_t>>& polyGroups,
+                        std::vector<std::vector<int64_t>>& polyEdges,
+                        const glm::dvec3 normal)
 {
   int cutFailure = 0;
 
@@ -2202,8 +2266,7 @@ int vtkCCSCutHoleyPolys(
       size_t innerPolyId = polyGroup[1];
 
       // Sort the group by size, do largest holes first
-      std::vector<std::pair<size_t, size_t>>
-        innerBySize(polyGroup.size());
+      std::vector<std::pair<size_t, size_t>> innerBySize(polyGroup.size());
 
       for (size_t i = 1; i < polyGroup.size(); ++i) {
         innerBySize[i].first = polys[polyGroup[i]].size();
@@ -2223,10 +2286,8 @@ int vtkCCSCutHoleyPolys(
           innerPolyId = polyGroup[inner];
 
           size_t cuts[2][2];
-          if (vtkCCSFindCuts(polys, polyGroup, outerPolyId, innerPolyId,
-                             vertices, normal, cuts, exhaustive)) {
-            vtkCCSMakeCuts(polys, polyEdges, outerPolyId, innerPolyId,
-                           vertices, cuts);
+          if (vtkCCSFindCuts(polys, polyGroup, outerPolyId, innerPolyId, vertices, normal, cuts, exhaustive)) {
+            vtkCCSMakeCuts(polys, polyEdges, outerPolyId, innerPolyId, vertices, cuts);
             madeCut = 1;
             break;
           }
@@ -2237,8 +2298,7 @@ int vtkCCSCutHoleyPolys(
         // Move successfuly cut innerPolyId into its own group
         polyGroup.erase(polyGroup.begin() + inner);
         polyGroups[innerPolyId].push_back(innerPolyId);
-      }
-      else {
+      } else {
         // Remove all failed inner polys from the group
         for (size_t k = 1; k < polyGroup.size(); ++k) {
           innerPolyId = polyGroup[k];
@@ -2259,12 +2319,10 @@ int vtkCCSCutHoleyPolys(
 
         size_t ii = 1;
         while (ii < polyGroup.size()) {
-          if (vtkCCSPolyInPoly(poly1, polys[polyGroup[ii]],
-                               vertices, normal, pp, bounds, tol2)) {
+          if (vtkCCSPolyInPoly(poly1, polys[polyGroup[ii]], vertices, normal, pp, bounds, tol2)) {
             // Keep this poly in polyGroup
             ii++;
-          }
-          else {
+          } else {
             // Move this poly to poly2 group
             polyGroups[innerPolyId].push_back(polyGroup[ii]);
             polyGroup.erase(polyGroup.begin() + ii);
@@ -2301,11 +2359,12 @@ int vtkCCSCutHoleyPolys(
 
 // If this is defined, then the outlines of any failed polygons will be
 // added to "data".  It is only meant as a debugging tool.
-//#define VTK_CCS_SHOW_FAILED_POLYS
+// #define VTK_CCS_SHOW_FAILED_POLYS
 
-void MakePolysFromContours(
-  std::vector<glm::i64vec2>& lines, std::vector<glm::dvec3>& vertices,
-  std::vector<glm::i64vec3>& triangles, const glm::dvec3 normal)
+void MakePolysFromContours(std::vector<glm::i64vec2>& lines,
+                           std::vector<glm::dvec3>& vertices,
+                           std::vector<glm::i64vec3>& triangles,
+                           const glm::dvec3 normal)
 {
   // If no cut lines were generated, there's nothing to do
   if (lines.empty()) {
@@ -2380,8 +2439,7 @@ void MakePolysFromContours(
       continue;
     }
 
-    if (!vtkCCSTriangulate(newPolys[polyId], vertices, polyEdges[polyId],
-                           originalEdges, triangles)) {
+    if (!vtkCCSTriangulate(newPolys[polyId], vertices, polyEdges[polyId], originalEdges, triangles)) {
       triangulationFailure = 1;
     }
   }
@@ -2392,7 +2450,8 @@ void MakePolysFromContours(
 }
 
 // ---------------------------------------------------
-bool TriangulatePolygon(std::vector<int64_t>& polygon, std::vector<glm::dvec3>& vertices,
+bool TriangulatePolygon(std::vector<int64_t>& polygon,
+                        std::vector<glm::dvec3>& vertices,
                         std::vector<glm::i64vec3>& triangles)
 {
   std::vector<std::vector<int64_t>> polys(1);
@@ -2414,12 +2473,13 @@ bool TriangulatePolygon(std::vector<int64_t>& polygon, std::vector<glm::dvec3>& 
 // that the contour lines exactly match the new free edges of
 // the clipped polygons.  This exact correspondence is necessary
 // in order to guarantee that the surface remains closed.
-void ClipAndContourPolys(
-  std::vector<glm::dvec3>& vertices, std::vector<double>& vertexDists,
-  vtkCCSEdgeLocator* edgeLocator,
-  std::vector<glm::i64vec3>& inputTriangles,
-  std::vector<glm::i64vec3>& outputTriangles, std::vector<glm::i64vec2>& outputLines,
-  double epsilon = 1e-6)
+void ClipAndContourPolys(std::vector<glm::dvec3>& vertices,
+                         std::vector<double>& vertexDists,
+                         vtkCCSEdgeLocator* edgeLocator,
+                         std::vector<glm::i64vec3>& inputTriangles,
+                         std::vector<glm::i64vec3>& outputTriangles,
+                         std::vector<glm::i64vec2>& outputLines,
+                         double epsilon = 1e-6)
 {
   std::vector<int64_t> polygon;
 
@@ -2454,8 +2514,7 @@ void ClipAndContourPolys(
       if ((c0 | c1)) {
         // If only one end was clipped, interpolate new point
         if ((c0 ^ c1)) {
-          InterpolateEdge(vertices, edgeLocator, epsilon,
-                          i0, i1, v0, v1, j1);
+          InterpolateEdge(vertices, edgeLocator, epsilon, i0, i1, v0, v1, j1);
 
           if (j1 != j0) {
             polygon.push_back(j1);
@@ -2485,8 +2544,7 @@ void ClipAndContourPolys(
       if (!TriangulatePolygon(polygon, vertices, outputTriangles)) {
         LOG(ERROR) << "Triangulation failed, output may not be watertight";
       }
-    }
-    else if (numPoints == 3) {
+    } else if (numPoints == 3) {
       // Insert the polygon without triangulating it
       outputTriangles.push_back(glm::i64vec3(polygon[0], polygon[1], polygon[2]));
     }
@@ -2508,7 +2566,9 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::ve
   std::vector<glm::uvec3> tris = mesh.triangleIndices();
   std::vector<glm::i64vec3> inputTriangles;
   vtkCCSEdgeLocator* edgeLocator = vtkCCSEdgeLocator::New();
-  for (auto& tri : tris) inputTriangles.emplace_back(tri);
+  for (auto& tri : tris) {
+    inputTriangles.emplace_back(tri);
+  }
 
   bool clipped = false;
 
@@ -2519,7 +2579,9 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::ve
     bool needClip2 = false;
     for (auto& vertex : vertices) {
       vertexDists.push_back(-vertexPlaneDistance(vertex, plane, 0.0));
-      if (vertexDists[vertexDists.size() - 1] < 0) needClip2 = true;
+      if (vertexDists[vertexDists.size() - 1] < 0) {
+        needClip2 = true;
+      }
     }
 
     if (needClip2) {
@@ -2546,8 +2608,9 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::ve
 
     result.interpolate(mesh);
     return result;
-  } else
+  } else {
     return mesh;
+  }
 }
 
 } // namespace nim

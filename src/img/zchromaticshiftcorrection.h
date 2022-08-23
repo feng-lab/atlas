@@ -14,7 +14,8 @@ class ZImageCompositeTransform;
 
 class ZChromaticShiftCorrection : public ZImgProcess
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZChromaticShiftCorrection() = default;
 
@@ -31,50 +32,71 @@ public:
 
   // use this channel to do registration
   void setReferenceChannel(index_t ch)
-  { m_referenceChannel = ch; }
+  {
+    m_referenceChannel = ch;
+  }
 
   // correct this channel
   void setTargetChannel(index_t ch)
-  { m_targetChannel = ch; }
+  {
+    m_targetChannel = ch;
+  }
 
   // some preprocess before registration
   // default is true
   void setRemoveBackground(bool v)
-  { m_removeBackground = v; }
+  {
+    m_removeBackground = v;
+  }
 
   // default is true
   void setRemoveHighForeground(bool v)
-  { m_removeHighForeground = v; }
+  {
+    m_removeHighForeground = v;
+  }
 
   // default is false
   void setBrightBackground(bool v)
-  { m_brightBackground = v; }
+  {
+    m_brightBackground = v;
+  }
 
   void setMethod(const QString& str)
-  { m_method = str; }
+  {
+    m_method = str;
+  }
 
   // registration methods
   void setMetric(const QString& str)
-  { m_metric = str; }
+  {
+    m_metric = str;
+  }
 
   //
   void setTransform(const QString& str)
-  { m_transform = str; }
+  {
+    m_transform = str;
+  }
 
   //
   void setOptimizer(const QString& str)
-  { m_optimizer = str; }
+  {
+    m_optimizer = str;
+  }
 
   // default is true
   void setUseMultithreading(bool i)
-  { m_useMultithreading = i; }
+  {
+    m_useMultithreading = i;
+  }
 
   // use multiscale registration if number of scale > 1, default is 1
   void setNumScales(size_t i)
-  { m_numScales = i; }
+  {
+    m_numScales = i;
+  }
 
 Q_SIGNALS:
-
   void resultReady(QString path);
 
 protected:
@@ -127,7 +149,3 @@ private:
 };
 
 } // namespace nim
-
-
-
-

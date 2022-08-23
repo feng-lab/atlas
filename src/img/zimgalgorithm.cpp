@@ -106,8 +106,8 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
   }
 }
 
-void
-ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* caller, const itk::EventObject& event)
+void ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Object* caller,
+                                                                 const itk::EventObject& event)
 {
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {

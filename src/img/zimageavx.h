@@ -23,7 +23,6 @@ void Image2DRowFilterForOneBlock_AVX(const double* padImg,
                                      size_t rangeStart,
                                      size_t rangeEnd);
 
-
 void Image3DFilterForOneBlock_AVX(const double* padImg,
                                   size_t padImgWidth,
                                   size_t padImgHeight,

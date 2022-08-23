@@ -36,15 +36,18 @@ public:
     std::vector<IntType> res;
     if (maxValue >= minValue) {
       res.resize(maxValue - minValue + 1);
-      for (IntType i = minValue; i <= maxValue; ++i)
+      for (IntType i = minValue; i <= maxValue; ++i) {
         res[i - minValue] = i;
+      }
       std::shuffle(res.begin(), res.end(), m_eng);
     }
     return res;
   }
 
   std::mt19937_64& engine()
-  { return m_eng; }
+  {
+    return m_eng;
+  }
 
 private:
   std::mt19937_64 m_eng;

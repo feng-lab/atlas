@@ -6,8 +6,7 @@
 
 namespace nim {
 
-namespace
-{
+namespace {
 namespace llfio = LLFIO_V2_NAMESPACE;
 }
 
@@ -24,7 +23,8 @@ public:
 
   inline void prefetch(size_t offset, size_t length) const
   {
-    auto result = llfio::map_handle::prefetch(llfio::map_handle::buffer_type(m_mappedFileHandle.address() + offset, length));
+    auto result =
+      llfio::map_handle::prefetch(llfio::map_handle::buffer_type(m_mappedFileHandle.address() + offset, length));
     if (!result.has_value()) {
       LOG(ERROR) << "error prefetching " << result.error().message();
     }

@@ -34,16 +34,24 @@ public:
   [[nodiscard]] bool isSameSize(const ZComplexImg& rhs) const;
 
   [[nodiscard]] inline size_t width() const
-  { return m_width; }
+  {
+    return m_width;
+  }
 
   [[nodiscard]] inline size_t height() const
-  { return m_height; }
+  {
+    return m_height;
+  }
 
   [[nodiscard]] inline size_t depth() const
-  { return m_depth; }
+  {
+    return m_depth;
+  }
 
   inline std::complex<double>* rawData()
-  { return m_data.data(); }
+  {
+    return m_data.data();
+  }
 
   [[nodiscard]] inline QString toQString() const
   {
@@ -97,4 +105,3 @@ private:
 };
 
 } // namespace nim
-

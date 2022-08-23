@@ -7,7 +7,9 @@ namespace nim {
 QString randomString(index_t minLength, index_t maxLength);
 
 inline QString randomString(index_t size)
-{ return randomString(size, size); }
+{
+  return randomString(size, size);
+}
 
 bool naturalSortLessThan(const QString& s1, const QString& s2);
 
@@ -30,4 +32,3 @@ public:
 };
 
 } // namespace nim
-

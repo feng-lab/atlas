@@ -34,13 +34,15 @@ int64_t lastInteger(const QString& str)
     --index;
   }
 
-  if (startNumPos == -1)
+  if (startNumPos == -1) {
     return 0;
+  }
 
   auto res = str.mid(startNumPos, endNumPos - startNumPos + 1).toLongLong();
 
-  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
+  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-')) {
     res = -res;
+  }
 
   return res;
 }
@@ -81,7 +83,9 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
 #if 1
   return myCollator().compare(s1, s2) < 0;
 #else
-  if (s1 == "" || s2 == "") return s1 < s2;
+  if (s1 == "" || s2 == "") {
+    return s1 < s2;
+  }
 
   // Move to the first difference between the strings
   int startIndex = -1;
@@ -96,7 +100,9 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
   }
 
   // If the strings are the same, exit now.
-  if (startIndex < 0) return s1 < s2;
+  if (startIndex < 0) {
+    return s1 < s2;
+  }
 
   // Now extract the numbers, if any, from the two strings.
   QString sn1;
@@ -122,17 +128,25 @@ bool naturalSortLessThan(const QString& s1, const QString& s2)
       }
     }
 
-    if (done1 && done2) break;
+    if (done1 && done2) {
+      break;
+    }
   }
 
   // If none of the strings contain a number, use a regular comparison.
-  if (sn1 == "" && sn2 == "") return s1 < s2;
+  if (sn1 == "" && sn2 == "") {
+    return s1 < s2;
+  }
 
   // If one of the strings doesn't contain a number at that position,
   // we put the string without number first so that, for example,
   // "example.bin" is before "example1.bin"
-  if (sn1 == "" && sn2 != "") return true;
-  if (sn1 != "" && sn2 == "") return false;
+  if (sn1 == "" && sn2 != "") {
+    return true;
+  }
+  if (sn1 != "" && sn2 == "") {
+    return false;
+  }
 
   return sn1.toInt() < sn2.toInt();
 #endif
@@ -165,11 +179,13 @@ QString replaceLastInteger(const QString& str, const QString& replacement)
     --index;
   }
 
-  if (startNumPos == -1)
+  if (startNumPos == -1) {
     return str;
+  }
 
-  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-'))
+  if (startNumPos > 0 && str[startNumPos - 1] == QChar('-')) {
     startNumPos -= 1;
+  }
 
   QString res = str;
   res.replace(startNumPos, endNumPos - startNumPos + 1, replacement);
@@ -229,8 +245,9 @@ void removeComment(std::string& line, const std::string& commentStart, bool chec
     }
 
     for (auto pose : poses) {
-      if (pose < line.size())
+      if (pose < line.size()) {
         line[pose] = '#';
+      }
     }
   } else {
     size_t idx = line.find(commentStart);
@@ -293,8 +310,9 @@ void removeComment(QString& line, const QString& commentStart, bool checkSpecial
     }
 
     for (auto pose : poses) {
-      if (pose < line.size())
+      if (pose < line.size()) {
         line[pose] = QChar('#');
+      }
     }
   } else {
     auto idx = line.indexOf(commentStart);

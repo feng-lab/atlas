@@ -24,19 +24,27 @@ public:
   };
 
   void setType(Type type)
-  { m_type = type; }
+  {
+    m_type = type;
+  }
 
   [[nodiscard]] Type type() const
-  { return m_type; }
+  {
+    return m_type;
+  }
 
   void setUseMultithreading(bool v)
-  { m_useMultithreading = v; }
+  {
+    m_useMultithreading = v;
+  }
 
   // for mutual information
   // number of histogram bins and value range to build histogram
   // default is 128
   void setNumHistogramBins(size_t nbins)
-  { m_nbins = nbins; }
+  {
+    m_nbins = nbins;
+  }
 
   // if not set, default for float type is 0.0 to 1.0
   // for other type is available range
@@ -51,22 +59,22 @@ public:
   double value(const TPixel1* img1, const TPixel2* img2, size_t width, size_t height, size_t depth = 1);
 
 protected:
-//  template <typename TPixel>
-//  void getHistogramRange(double &Imin, double &Imax)
-//  {
-//    if (m_Imax > m_Imin) {
-//      Imin = m_Imin;
-//      Imax = m_Imax;
-//      return;
-//    }
-//    if (std::is_integral<TPixel>::value) {
-//      Imin = std::numeric_limits<TPixel>::min();
-//      Imax = std::numeric_limits<TPixel>::max();
-//    } else {
-//      Imin = TPixel(0.0);
-//      Imax = TPixel(1.0);
-//    }
-//  }
+  //  template <typename TPixel>
+  //  void getHistogramRange(double &Imin, double &Imax)
+  //  {
+  //    if (m_Imax > m_Imin) {
+  //      Imin = m_Imin;
+  //      Imax = m_Imax;
+  //      return;
+  //    }
+  //    if (std::is_integral<TPixel>::value) {
+  //      Imin = std::numeric_limits<TPixel>::min();
+  //      Imax = std::numeric_limits<TPixel>::max();
+  //    } else {
+  //      Imin = TPixel(0.0);
+  //      Imax = TPixel(1.0);
+  //    }
+  //  }
 
 private:
   Type m_type = Type::LogAbsoluteDifferences;
@@ -85,34 +93,53 @@ struct EvaluateMetricForOneBlock
                             const TPixel2* img2,
                             size_t size,
                             ZImageToImageMetric::Type type,
-                            double mean1 = 0, double std1 = 0, double mean2 = 0, double std2 = 0)
-    : m_img1(img1), m_img2(img2), m_size(size), m_type(type)
-    , m_mean1(mean1), m_mean2(mean2), m_std1(std1), m_std2(std2)
+                            double mean1 = 0,
+                            double std1 = 0,
+                            double mean2 = 0,
+                            double std2 = 0)
+    : m_img1(img1)
+    , m_img2(img2)
+    , m_size(size)
+    , m_type(type)
+    , m_mean1(mean1)
+    , m_mean2(mean2)
+    , m_std1(std1)
+    , m_std2(std2)
     , m_metric(0)
-  {
-  }
+  {}
 
   void operator()(const tbb::blocked_range<size_t>& range)
   {
     if (m_type == ZImageToImageMetric::Type::MeanDifferences) {
-      for (size_t i = range.begin(); i < range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i) {
         m_metric += (m_img1[i] * 1.0 - m_img2[i]) / m_size;
+      }
     } else if (m_type == ZImageToImageMetric::Type::MeanSquaredDifferences) {
-      for (size_t i = range.begin(); i < range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i) {
         m_metric += (m_img1[i] * 1.0 - m_img2[i]) * (m_img1[i] * 1.0 - m_img2[i]) / m_size;
+      }
     } else if (m_type == ZImageToImageMetric::Type::LogAbsoluteDifferences) {
-      for (size_t i = range.begin(); i < range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i) {
         m_metric += std::log(std::abs(m_img1[i] * 1.0 - m_img2[i]) + 1.0) / m_size;
+      }
     } else if (m_type == ZImageToImageMetric::Type::NormalizedCrossCorrelation) {
       double scale = 1. / (m_size * m_std1 * m_std2);
-      for (size_t i = range.begin(); i < range.end(); ++i)
+      for (size_t i = range.begin(); i < range.end(); ++i) {
         m_metric += -(m_img1[i] - m_mean1) * (m_img2[i] - m_mean2) * scale;
+      }
     }
   }
 
   EvaluateMetricForOneBlock(EvaluateMetricForOneBlock& x, tbb::split /*unused*/)
-    : m_img1(x.m_img1), m_img2(x.m_img2), m_size(x.m_size), m_type(x.m_type)
-    , m_mean1(x.m_mean1), m_mean2(x.m_mean2), m_std1(x.m_std1), m_std2(x.m_std2), m_metric(0)
+    : m_img1(x.m_img1)
+    , m_img2(x.m_img2)
+    , m_size(x.m_size)
+    , m_type(x.m_type)
+    , m_mean1(x.m_mean1)
+    , m_mean2(x.m_mean2)
+    , m_std1(x.m_std1)
+    , m_std2(x.m_std2)
+    , m_metric(0)
   {}
 
   void join(const EvaluateMetricForOneBlock& y)
@@ -131,18 +158,18 @@ struct EvaluateMetricForOneBlock
   double m_metric;
 };
 
-//template<typename TPixel1, typename TPixel2>
-//struct BuildImageHistogramForOneBlock {
-//  BuildImageHistogramForOneBlock(const TPixel1 *img1,
-//                                 const TPixel2 *img2,
-//                                 size_t size,
-//                                 double Imin,
-//                                 double Imax,
-//                                 size_t nbins)
-//    : m_img1(img1), m_img2(img2), m_size(size)
-//    , m_Imin(Imin), m_Imax(Imax), m_nbins(nbins)
-//  {
-//  }
+// template<typename TPixel1, typename TPixel2>
+// struct BuildImageHistogramForOneBlock {
+//   BuildImageHistogramForOneBlock(const TPixel1 *img1,
+//                                  const TPixel2 *img2,
+//                                  size_t size,
+//                                  double Imin,
+//                                  double Imax,
+//                                  size_t nbins)
+//     : m_img1(img1), m_img2(img2), m_size(size)
+//     , m_Imin(Imin), m_Imax(Imax), m_nbins(nbins)
+//   {
+//   }
 
 //  using result_type = std::vector<std::vector<double>>;
 
@@ -218,4 +245,3 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
 }
 
 } // namespace nim
-

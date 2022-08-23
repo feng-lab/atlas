@@ -31,7 +31,8 @@ bool ZImgFormat::canWrite(const QString& filename) const
   });
 }
 
-void ZImgFormat::checkImgBeforeWriting(const QString& filename, const ZImgInfo& /*info*/,
+void ZImgFormat::checkImgBeforeWriting(const QString& filename,
+                                       const ZImgInfo& /*info*/,
                                        const ZImgWriteParameters& /*paras*/)
 {
   if (!canWrite(filename)) {
@@ -39,9 +40,7 @@ void ZImgFormat::checkImgBeforeWriting(const QString& filename, const ZImgInfo& 
   }
 }
 
-void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, const ZImgWriteParameters& /*paras*/)
-{
-}
+void ZImgFormat::writeImg(const QString& /*filename*/, const ZImg& /*img*/, const ZImgWriteParameters& /*paras*/) {}
 
 void ZImgFormat::writeImg(const QString& filename,
                           const ZImgSliceProvider& imgSliceProvider,
@@ -59,12 +58,16 @@ void ZImgFormat::writeImg(const QString& filename,
   writeImg(filename, imgBlockProvider.wholeImg(), paras);
 }
 
-ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, const QString& dimensionOrderIn,
-                            size_t dataOffset, const ZImgRegion& region, size_t timeStride)
+ZImg ZImgFormat::readRawImg(const QString& filename,
+                            const ZImgInfo& imgInfo,
+                            const QString& dimensionOrderIn,
+                            size_t dataOffset,
+                            const ZImgRegion& region,
+                            size_t timeStride)
 {
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
   }
   if (dimensionOrderIn != "XYZCT" && dimensionOrderIn != "XYCZT" && dimensionOrderIn != "CXYZT") {
     throw ZIOException(QString("Not supported dimension order: %1").arg(dimensionOrderIn));
@@ -91,7 +94,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
       CXYZtoXYZC(tmpImg, res);
     } else {
       ZImgInfo tmpPartialImgInfo = rgn.clip(imgInfo);
-      ZImg tmpRes(tmpPartialImgInfo);   // tmpImg contains all channel so res is not big enough, need a tmp res
+      ZImg tmpRes(tmpPartialImgInfo); // tmpImg contains all channel so res is not big enough, need a tmp res
       tmpImg.infoRef() = tmpRes.info();
       CXYZtoXYZC(tmpImg, tmpRes);
       ZImgRegion tmpRgn;
@@ -122,10 +125,11 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
         auto cEnd = region.end.c == -1 ? ZImgRegion::value_type(imgInfo.numChannels) : region.end.c;
         // channel by channel
         for (auto c = region.start.c; c < cEnd; ++c) {
-          size_t offset = dataOffset + t * timeStride + c * imgInfo.channelByteNumber() +
-                          region.start.z * imgInfo.planeByteNumber();
+          size_t offset =
+            dataOffset + t * timeStride + c * imgInfo.channelByteNumber() + region.start.z * imgInfo.planeByteNumber();
           inputFileStream.seekg(offset, std::ios_base::beg);
-          readStream(inputFileStream, res.channelData<char>(c - region.start.c, t - region.start.t),
+          readStream(inputFileStream,
+                     res.channelData<char>(c - region.start.c, t - region.start.t),
                      res.channelByteNumber());
         }
       } else if (region.containsWholeRow(imgInfo)) {
@@ -136,16 +140,15 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
           for (auto z = region.start.z; z < zEnd; ++z) {
             size_t offset;
             if ((dimensionOrder == "XYZCT")) {
-              offset = dataOffset + t * timeStride +
-                       c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
+              offset = dataOffset + t * timeStride + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                        region.start.y * imgInfo.rowByteNumber();
             } else { // "XYCZT"
-              offset = dataOffset + t * timeStride +
-                       (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
+              offset = dataOffset + t * timeStride + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                        region.start.y * imgInfo.rowByteNumber();
             }
             inputFileStream.seekg(offset, std::ios_base::beg);
-            readStream(inputFileStream, res.planeData<char>(z - region.start.z, c - region.start.c, t - region.start.t),
+            readStream(inputFileStream,
+                       res.planeData<char>(z - region.start.z, c - region.start.c, t - region.start.t),
                        res.planeByteNumber());
           }
         }
@@ -159,19 +162,17 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
             for (auto y = region.start.y; y < yEnd; ++y) {
               size_t offset;
               if ((dimensionOrder == "XYZCT")) {
-                offset = dataOffset + t * timeStride +
-                         c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
+                offset = dataOffset + t * timeStride + c * imgInfo.channelByteNumber() + z * imgInfo.planeByteNumber() +
                          y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
               } else { // "XYCZT"
-                offset = dataOffset + t * timeStride +
-                         (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
+                offset = dataOffset + t * timeStride + (c + imgInfo.numChannels * z) * imgInfo.planeByteNumber() +
                          y * imgInfo.rowByteNumber() + region.start.x * imgInfo.voxelByteNumber();
               }
               inputFileStream.seekg(offset, std::ios_base::beg);
-              readStream(inputFileStream,
-                         res.rowData<char>(y - region.start.y, z - region.start.z, c - region.start.c,
-                                           t - region.start.t),
-                         res.rowByteNumber());
+              readStream(
+                inputFileStream,
+                res.rowData<char>(y - region.start.y, z - region.start.z, c - region.start.c, t - region.start.t),
+                res.rowByteNumber());
             }
           }
         }
@@ -182,15 +183,17 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo, co
   return res;
 }
 
-ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
+ZImg ZImgFormat::readRawImg(const QString& filename,
+                            const ZImgInfo& imgInfo,
                             const std::vector<size_t>& dimensionStrides,
-                            size_t dataOffset, const ZImgRegion& region)
+                            size_t dataOffset,
+                            const ZImgRegion& region)
 {
   ZImg res;
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
   }
 
   CHECK(dimensionStrides.size() == 5);
@@ -204,8 +207,8 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
     auto idx = sortedIndexes[i];
     packedStrides[idx] = packedPrev;
     if (dimensionStrides[idx] < prev) {
-      throw ZIOException(QString("invalid dimensionStrides %1 for image %2").arg(qtTypeToQString(dimensionStrides)).arg(
-        imgInfo.toQString()));
+      throw ZIOException(QString("invalid dimensionStrides %1 for image %2")
+                           .arg(qtTypeToQString(dimensionStrides), imgInfo.toQString()));
     }
     packedPrev = packedStrides[idx] * imgInfo.size(idx);
     prev = dimensionStrides[idx] * imgInfo.size(idx);
@@ -213,7 +216,7 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
   }
   packedStrides[4] = dimensionStrides[4]; // time dimenstion does not need to be packed
   bool packed = packedStrides == dimensionStrides;
-  //LOG(INFO) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
+  // LOG(INFO) << dimensionStrides << " " << dimensionOrder << " Packed: " << packed << " " << imgInfo.toQString();
   if (packed && (dimensionOrder == "XYZCT" || dimensionOrder == "XYCZT" || dimensionOrder == "CXYZT")) {
     res = readRawImg(filename, imgInfo, dimensionOrder, dataOffset, region, dimensionStrides[4]);
   } else {
@@ -234,12 +237,14 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
         for (auto z = region.start.z; z < zEnd; ++z) {
           for (auto y = region.start.y; y < yEnd; ++y) {
             for (auto x = region.start.x; x < xEnd; ++x) {
-              size_t offset = dataOffset + t * dimensionStrides[4] +
-                              c * dimensionStrides[3] + z * dimensionStrides[2] +
+              size_t offset = dataOffset + t * dimensionStrides[4] + c * dimensionStrides[3] + z * dimensionStrides[2] +
                               y * dimensionStrides[1] + x * dimensionStrides[0];
               inputFileStream.seekg(offset, std::ios_base::beg);
               readStream(inputFileStream,
-                         res.data<char>(x - region.start.x, y - region.start.y, z - region.start.z, c - region.start.c,
+                         res.data<char>(x - region.start.x,
+                                        y - region.start.y,
+                                        z - region.start.z,
+                                        c - region.start.c,
                                         t - region.start.t),
                          res.voxelByteNumber());
             }
@@ -254,15 +259,13 @@ ZImg ZImgFormat::readRawImg(const QString& filename, const ZImgInfo& imgInfo,
 
 void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool ARGBtoRGBA)
 {
-  CHECK(
-    bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
+  CHECK(bufImg.isSameSize(img) && bufImg.isSameType(img) &&
+        img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
 
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t) {
-      std::memcpy(img.timeData<uint8_t>(t),
-                  bufImg.timeData<uint8_t>(t),
-                  bufImg.timeByteNumber());
+      std::memcpy(img.timeData<uint8_t>(t), bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber());
     }
     return;
   }
@@ -295,8 +298,8 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
             ++des;
             src += numCh;
           }
-        }
           break;
+        }
         case 2: {
           auto* des = img.channelData<uint16_t>(c, t);
           const uint16_t* src = bufImg.channelData<uint16_t>(0, t) + srcC;
@@ -307,8 +310,8 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
             ++des;
             src += numCh;
           }
-        }
           break;
+        }
         default: {
           auto* des = img.channelData<uint8_t>(c, t);
           const uint8_t* src = bufImg.channelData<uint8_t>(0, t) + srcC * img.voxelByteNumber();
@@ -328,15 +331,13 @@ void ZImgFormat::CXYZtoXYZC(const ZImg& bufImg, ZImg& img, bool BGRtoRGB, bool A
 
 void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
 {
-  CHECK(
-    bufImg.isSameSize(img) && bufImg.isSameType(img) && img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
+  CHECK(bufImg.isSameSize(img) && bufImg.isSameType(img) &&
+        img.channelData<uint8_t>(0) != bufImg.channelData<uint8_t>(0));
 
   if (bufImg.numChannels() == 1) {
     CHECK(false);
     for (size_t t = 0; t < img.numTimes(); ++t) {
-      std::memcpy(img.timeData<uint8_t>(t),
-                  bufImg.timeData<uint8_t>(t),
-                  bufImg.timeByteNumber());
+      std::memcpy(img.timeData<uint8_t>(t), bufImg.timeData<uint8_t>(t), bufImg.timeByteNumber());
     }
     return;
   }
@@ -355,8 +356,8 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
             des += numCh;
             ++src;
           }
-        }
           break;
+        }
         case 2: {
           auto* des = img.channelData<uint16_t>(0, t) + srcC;
           const auto* src = bufImg.channelData<uint16_t>(c, t);
@@ -367,8 +368,8 @@ void ZImgFormat::XYZCtoCXYZ(const ZImg& bufImg, ZImg& img)
             des += numCh;
             ++src;
           }
-        }
           break;
+        }
         default: {
           auto* des = img.channelData<uint8_t>(0, t) + srcC * img.voxelByteNumber();
           const auto* src = bufImg.channelData<uint8_t>(c, t);
@@ -428,9 +429,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
       }
     } else {
       for (size_t t = 0; t < img.numTimes(); ++t) {
-        std::memcpy(img.timeData<uint8_t>(t),
-                    buf + t * img.timeByteNumber(),
-                    img.timeByteNumber());
+        std::memcpy(img.timeData<uint8_t>(t), buf + t * img.timeByteNumber(), img.timeByteNumber());
       }
     }
     return;

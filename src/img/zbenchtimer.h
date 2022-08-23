@@ -15,23 +15,25 @@ namespace nim {
     STOP_AND_LOG(bt)
   */
 
-#define BENCH_AND_LOG(TIMER, TRIES, REP, CODE, FUNCNAME) { \
-  (TIMER).reset(); \
-  (TIMER).setName(FUNCNAME); \
-  for(decltype(TRIES) i=0; i<(TRIES); ++i){ \
-    (TIMER).start(); \
-    for(decltype(REP) j=0; j<(REP); ++j){ \
-      CODE; \
-    } \
-    (TIMER).stop(); \
-  } \
-  LOG(INFO) << (TIMER); \
-}
+#define BENCH_AND_LOG(TIMER, TRIES, REP, CODE, FUNCNAME) \
+  {                                                      \
+    (TIMER).reset();                                     \
+    (TIMER).setName(FUNCNAME);                           \
+    for (decltype(TRIES) i = 0; i < (TRIES); ++i) {      \
+      (TIMER).start();                                   \
+      for (decltype(REP) j = 0; j < (REP); ++j) {        \
+        CODE;                                            \
+      }                                                  \
+      (TIMER).stop();                                    \
+    }                                                    \
+    LOG(INFO) << (TIMER);                                \
+  }
 
-#define STOP_AND_LOG(TIMER) { \
-  (TIMER).stop(); \
-  LOG(INFO) << (TIMER); \
-}
+#define STOP_AND_LOG(TIMER) \
+  {                         \
+    (TIMER).stop();         \
+    LOG(INFO) << (TIMER);   \
+  }
 
 class ZBenchTimer
 {
@@ -75,30 +77,44 @@ public:
 
   // elapsed time in seconds
   [[nodiscard]] inline double time() const
-  { return m_time; }
+  {
+    return m_time;
+  }
 
   // average elapsed time in seconds.
   [[nodiscard]] inline double average() const
-  { return m_average; }
+  {
+    return m_average;
+  }
 
   // best elapsed time in seconds
   [[nodiscard]] inline double best() const
-  { return m_best; }
+  {
+    return m_best;
+  }
 
   // total elapsed time in seconds.
   [[nodiscard]] inline double total() const
-  { return m_total; }
+  {
+    return m_total;
+  }
 
   // elapsed pause time in seconds
   [[nodiscard]] inline double pauseTime() const
-  { return m_pauseTime; }
+  {
+    return m_pauseTime;
+  }
 
   // total elapsed pause time in seconds.
   [[nodiscard]] inline double totalPauseTime() const
-  { return m_totalPauseTime; }
+  {
+    return m_totalPauseTime;
+  }
 
   inline void setName(const std::string& str)
-  { m_name = str; }
+  {
+    m_name = str;
+  }
 
 protected:
   friend std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);

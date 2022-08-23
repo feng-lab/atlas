@@ -8,7 +8,7 @@
 #include <itkImageIOFactory.h>
 #include <itkSCIFIOImageIOFactory.h>
 #include <itkMetaDataObject.h>
-//#define ATLAS_SUPPORT_DICOM
+// #define ATLAS_SUPPORT_DICOM
 #ifdef ATLAS_SUPPORT_DICOM
 #include <itkGDCMImageIOFactory.h>
 #endif
@@ -56,7 +56,7 @@ QStringList ZImgITKImage::extensions() const
   try {
     for (const auto& pt : itk::ObjectFactoryBase::CreateAllInstance("itkImageIOBase")) {
       if (auto io = dynamic_cast<const itk::ImageIOBase*>(pt.GetPointer())) {
-        //LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
+        // LOG(INFO) << "ImageIO: " << io->GetNameOfClass();
         for (const auto& ext : io->GetSupportedReadExtensions()) {
           res.push_back(QString::fromStdString(ext));
           res.last().remove(0, 1); // remove '.'
@@ -77,15 +77,18 @@ QStringList ZImgITKImage::extensions() const
   return res;
 }
 
-void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgITKImage::readInfo(const QString& filename,
+                            std::vector<ZImgInfo>& infos,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   try {
-    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
+    itk::ImageIOBase::Pointer imageIO =
+      itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                         itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
-    if (imageIO.IsNull())
+    if (imageIO.IsNull()) {
       throw ZIOException("can not create reader");
+    }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
     imageIO->ReadImageInformation();
@@ -111,11 +114,13 @@ void ZImgITKImage::readInfo(const QString& filename, std::vector<ZImgInfo>& info
 void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
 {
   try {
-    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
+    itk::ImageIOBase::Pointer imageIO =
+      itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                         itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
-    if (imageIO.IsNull())
+    if (imageIO.IsNull()) {
       throw ZIOException("can not create reader");
+    }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
     imageIO->ReadImageInformation();
@@ -127,8 +132,10 @@ void ZImgITKImage::readMetadata(const QString& filename, ZImgMetadata& meta, siz
   }
 }
 
-void ZImgITKImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                                 const ZImgRegion& /*region*/, size_t /*scene*/)
+void ZImgITKImage::readThumbnail(const QString& /*filename*/,
+                                 ZImgThumbernail& /*thumbnail*/,
+                                 const ZImgRegion& /*region*/,
+                                 size_t /*scene*/)
 {
   try {
   }
@@ -144,11 +151,13 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   }
 
   try {
-    itk::ImageIOBase::Pointer imageIO = itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
-                                                                           itk::ImageIOFactory::IOFileModeEnum::ReadMode);
+    itk::ImageIOBase::Pointer imageIO =
+      itk::ImageIOFactory::CreateImageIO(QFile::encodeName(filename).constData(),
+                                         itk::ImageIOFactory::IOFileModeEnum::ReadMode);
 
-    if (imageIO.IsNull())
+    if (imageIO.IsNull()) {
       throw ZIOException("can not create reader");
+    }
 
     imageIO->SetFileName(QFile::encodeName(filename).constData());
     imageIO->ReadImageInformation();
@@ -161,8 +170,9 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     parseInfo(imageIO.GetPointer(), imgInfo, isNd2);
 
     if (region.isEmpty() || !region.isValid(imgInfo)) {
-      throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(
-        region.toQString()));
+      throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'")
+                           .arg(imgInfo.toQString())
+                           .arg(region.toQString()));
     }
 
     if (region.containsWholeImg(imgInfo) || isNrrd) {
@@ -195,8 +205,9 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         img.swap(tpImg);
       }
 
-      if (isNrrd && !region.containsWholeImg(imgInfo))
+      if (isNrrd && !region.containsWholeImg(imgInfo)) {
         img = img.crop(region);
+      }
     } else {
       ZImgRegion rgn = region;
       rgn.resolveRegionEnd(imgInfo);
@@ -255,15 +266,15 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   }
 }
 
-void ZImgITKImage::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info,
+void ZImgITKImage::checkImgBeforeWriting(const QString& filename,
+                                         const ZImgInfo& info,
                                          const ZImgWriteParameters& paras)
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (!filename.endsWith(".nrrd", Qt::CaseInsensitive)) {
     throw ZIOException("only support nrrd format for now");
   }
-  if (!(paras.compression == Compression::AUTO ||
-        paras.compression == Compression::NONE ||
+  if (!(paras.compression == Compression::AUTO || paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
     throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
   }
@@ -386,8 +397,9 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   }
   info.createDefaultDescriptions();
   if (ndims == 4) {
-    for (auto timeStamp : info.timeStamps)
+    for (auto& timeStamp : info.timeStamps) {
       timeStamp *= imageIO->GetSpacing(3);
+    }
   }
 
   if (info.isEmpty()) {
@@ -405,8 +417,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
 
     while (itr != end) {
       itk::MetaDataObjectBase::Pointer entry = itr->second;
-      MetaDataStringType::Pointer entryvalue =
-        dynamic_cast<MetaDataStringType*>( entry.GetPointer());
+      MetaDataStringType::Pointer entryvalue = dynamic_cast<MetaDataStringType*>(entry.GetPointer());
       if (entryvalue) {
         std::string tagkey = itr->first;
         for (size_t ch = 0; ch < info.numChannels; ++ch) {
@@ -414,8 +425,9 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
             QString tagvalue = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
             bool ok;
             int32_t color = tagvalue.toInt(&ok);
-            if (!ok)
+            if (!ok) {
               throw ZIOException("Can not parse nd2 channel Color");
+            }
             col4 col;
             std::memcpy(static_cast<void*>(&col), &color, 3);
             col.a = 255;
@@ -445,8 +457,7 @@ void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, nim::ZImgMetad
 
   while (itr != end) {
     itk::MetaDataObjectBase::Pointer entry = itr->second;
-    MetaDataStringType::Pointer entryvalue =
-      dynamic_cast<MetaDataStringType*>( entry.GetPointer());
+    MetaDataStringType::Pointer entryvalue = dynamic_cast<MetaDataStringType*>(entry.GetPointer());
     if (entryvalue) {
       std::string tagkey = itr->first;
       std::string tagvalue = entryvalue->GetMetaDataObjectValue();
@@ -462,5 +473,4 @@ bool ZImgITKImage::hasSCIFIOSupport() const
   return !ZGlobal::jarsDIR.isEmpty();
 }
 
-}  // namespace nim
-
+} // namespace nim

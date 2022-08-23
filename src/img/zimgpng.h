@@ -7,8 +7,8 @@ namespace nim {
 class ZImgPng : public ZImgFormat
 {
 public:
-
   // ZImgFormat interface
+
 public:
   QString shortName() const override;
 
@@ -17,9 +17,12 @@ public:
   QStringList extensions() const override;
 
   FileFormat format() const override
-  { return FileFormat::Png; }
+  {
+    return FileFormat::Png;
+  }
 
-  void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+  void readInfo(const QString& filename,
+                std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
@@ -39,4 +42,3 @@ public:
 };
 
 } // namespace nim
-

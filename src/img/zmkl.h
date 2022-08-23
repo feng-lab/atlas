@@ -4,4 +4,3 @@
 #define MKL_Complex16 std::complex<double>
 
 #include "mkl.h"
-

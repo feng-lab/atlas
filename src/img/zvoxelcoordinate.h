@@ -18,13 +18,18 @@ struct ZVoxelCoordinate
 
   enum class Init
   {
-    Minimum, Maximum
+    Minimum,
+    Maximum
   };
 
   value_type x, y, z, c, t;
 
   inline constexpr ZVoxelCoordinate()
-    : x(0), y(0), z(0), c(0), t(0)
+    : x(0)
+    , y(0)
+    , z(0)
+    , c(0)
+    , t(0)
   {}
 
   inline explicit ZVoxelCoordinate(Init init)
@@ -54,14 +59,20 @@ struct ZVoxelCoordinate
     }
   }
 
-  inline constexpr ZVoxelCoordinate(value_type xin, value_type yin,
+  inline constexpr ZVoxelCoordinate(value_type xin,
+                                    value_type yin,
                                     value_type zin = value_type(0),
                                     value_type cin = value_type(0),
                                     value_type tin = value_type(0))
-    : x(xin), y(yin), z(zin), c(cin), t(tin)
+    : x(xin)
+    , y(yin)
+    , z(zin)
+    , c(cin)
+    , t(tin)
   {}
 
-  inline void set(value_type xin, value_type yin,
+  inline void set(value_type xin,
+                  value_type yin,
                   value_type zin = value_type(0),
                   value_type cin = value_type(0),
                   value_type tin = value_type(0))
@@ -74,17 +85,25 @@ struct ZVoxelCoordinate
   }
 
   [[nodiscard]] inline constexpr size_t size() const
-  { return 5; }
+  {
+    return 5;
+  }
 
   [[nodiscard]] inline constexpr size_t length() const
-  { return 5; }
+  {
+    return 5;
+  }
 
   // access
   inline value_type& operator[](size_t i)
-  { return (&x)[i]; }
+  {
+    return (&x)[i];
+  }
 
   inline const value_type& operator[](size_t i) const
-  { return (&x)[i]; }
+  {
+    return (&x)[i];
+  }
 
   [[nodiscard]] inline bool allGreaterThan(const ZVoxelCoordinate& other) const
   {
@@ -392,55 +411,65 @@ inline ZVoxelCoordinate operator/(const ZVoxelCoordinate& a, const ZVoxelCoordin
 
 inline ZVoxelCoordinate max(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z),
-                          std::max(a.c, b.c), std::max(a.t, b.t));
+  return ZVoxelCoordinate(std::max(a.x, b.x),
+                          std::max(a.y, b.y),
+                          std::max(a.z, b.z),
+                          std::max(a.c, b.c),
+                          std::max(a.t, b.t));
 }
 
 inline ZVoxelCoordinate max(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b),
-                          std::max(a.c, b), std::max(a.t, b));
+  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b));
 }
 
 inline ZVoxelCoordinate max(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b),
-                          std::max(a.c, b), std::max(a.t, b));
+  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b));
 }
 
 inline ZVoxelCoordinate min(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z),
-                          std::min(a.c, b.c), std::min(a.t, b.t));
+  return ZVoxelCoordinate(std::min(a.x, b.x),
+                          std::min(a.y, b.y),
+                          std::min(a.z, b.z),
+                          std::min(a.c, b.c),
+                          std::min(a.t, b.t));
 }
 
 inline ZVoxelCoordinate min(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b),
-                          std::min(a.c, b), std::min(a.t, b));
+  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b));
 }
 
 inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b),
-                          std::min(a.c, b), std::min(a.t, b));
+  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b));
 }
 
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate& v) noexcept
-{ return tuple_like_get_helper<Index, 5>(v); }
+{
+  return tuple_like_get_helper<Index, 5>(v);
+}
 
 template<std::size_t Index>
 constexpr auto&& get(const ZVoxelCoordinate& v) noexcept
-{ return tuple_like_get_helper<Index, 5>(v); }
+{
+  return tuple_like_get_helper<Index, 5>(v);
+}
 
 template<std::size_t Index>
 constexpr auto&& get(ZVoxelCoordinate&& v) noexcept
-{ return tuple_like_get_helper<Index, 5>(v); }
+{
+  return tuple_like_get_helper<Index, 5>(v);
+}
 
 template<std::size_t Index>
 constexpr auto&& get(const ZVoxelCoordinate&& v) noexcept
-{ return tuple_like_get_helper<Index, 5>(v); }
+{
+  return tuple_like_get_helper<Index, 5>(v);
+}
 
 } // namespace nim
 
@@ -448,8 +477,7 @@ namespace std {
 
 template<>
 struct tuple_size<nim::ZVoxelCoordinate> : integral_constant<size_t, 5>
-{
-};
+{};
 
 template<std::size_t Index>
 struct tuple_element<Index, nim::ZVoxelCoordinate>
@@ -459,4 +487,3 @@ struct tuple_element<Index, nim::ZVoxelCoordinate>
 };
 
 } // namespace std
-

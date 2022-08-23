@@ -11,6 +11,7 @@ template<class T, class WeightT>
 class _ZVBGMMReduce
 {
   const ZVBGMM<T, WeightT>* m_vbgmm;
+
 public:
   typename ZVBGMM<T, WeightT>::Params m_result;
 
@@ -18,8 +19,9 @@ public:
   {
     for (size_t i = range.begin(); i != range.end(); ++i) {
       typename ZVBGMM<T, WeightT>::Params inter = m_vbgmm->runOneAttempt();
-      if (m_result.loglikHist < inter.loglikHist)
+      if (m_result.loglikHist < inter.loglikHist) {
         m_result.swap(inter);
+      }
     }
   }
 
@@ -29,8 +31,9 @@ public:
 
   void join(const _ZVBGMMReduce& y)
   {
-    if (m_result.loglikHist < y.m_result.loglikHist)
-      m_result.swap(const_cast<typename ZVBGMM<T, WeightT>::Params&>(y.m_result));  //don't need intermediate result
+    if (m_result.loglikHist < y.m_result.loglikHist) {
+      m_result.swap(const_cast<typename ZVBGMM<T, WeightT>::Params&>(y.m_result)); // don't need intermediate result
+    }
   }
 
   explicit _ZVBGMMReduce(const ZVBGMM<T, WeightT>* vbgmm)
@@ -42,10 +45,9 @@ template<class T, class WeightT = float>
 class ZVBGMM
 {
 public:
-
   using ResultDataType = typename MaxFloatType<T, WeightT>::type;
-  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;  // matrix of result data type
-  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>;  // vector of result data type
+  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>; // matrix of result data type
+  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>; // vector of result data type
   using RowVectorXrt = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>; // row vector of result data type
 
   struct Params
@@ -109,12 +111,20 @@ public:
   friend class _ZVBGMMReduce<T, WeightT>;
 
   ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
-         size_t nclasses, size_t nattempts = 10,
-         const MatrixXrt& m = MatrixXrt(0, 0), ResultDataType alpha0 = 0.001,
+         size_t nclasses,
+         size_t nattempts = 10,
+         const MatrixXrt& m = MatrixXrt(0, 0),
+         ResultDataType alpha0 = 0.001,
          ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200, 1e-5),
          IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria)
-    , m_logLevel(logLevel), m_hasWeight(false), m_hasInitData(false)
+    : m_nclasses(nclasses)
+    , m_nattemps(nattempts)
+    , m_m0(m)
+    , m_alpha0(alpha0)
+    , m_termCriteria(termCriteria)
+    , m_logLevel(logLevel)
+    , m_hasWeight(false)
+    , m_hasInitData(false)
   {
     if constexpr (std::is_same_v<T, ResultDataType>) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
@@ -123,18 +133,27 @@ public:
       m_NonIntegerData = data.template cast<ResultDataType>();
       m_pData = &m_NonIntegerData;
     }
-    if (checkData())
+    if (checkData()) {
       initPrior();
+    }
   }
 
   ZVBGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
          const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
-         size_t nclasses, size_t nattempts = 10,
-         const MatrixXrt& m = MatrixXrt(0, 0), ResultDataType alpha0 = 0.001,
+         size_t nclasses,
+         size_t nattempts = 10,
+         const MatrixXrt& m = MatrixXrt(0, 0),
+         ResultDataType alpha0 = 0.001,
          ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(200, 1e-5),
          IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_nattemps(nattempts), m_m0(m), m_alpha0(alpha0), m_termCriteria(termCriteria), m_logLevel(
-    logLevel), m_hasWeight(true), m_hasInitData(false)
+    : m_nclasses(nclasses)
+    , m_nattemps(nattempts)
+    , m_m0(m)
+    , m_alpha0(alpha0)
+    , m_termCriteria(termCriteria)
+    , m_logLevel(logLevel)
+    , m_hasWeight(true)
+    , m_hasInitData(false)
   {
     bool hasZeroWeight = false;
     for (Eigen::Index i = 0; i < data.rows(); ++i) {
@@ -171,8 +190,9 @@ public:
         m_pWeight = &m_NonIntegerWeight;
       }
     }
-    if (checkData())
+    if (checkData()) {
       initPrior();
+    }
   }
 
   void setLogLevel(IterAlgorithmLogLevel logLevel)
@@ -210,9 +230,7 @@ public:
 
       if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {
         if (result.iter >= m_termCriteria.maxIter()) {
-          LOG(INFO) << "VBGMM maximum number of iterations ("
-                    << m_termCriteria.maxIter()
-                    << ") has been exceeded.";
+          LOG(INFO) << "VBGMM maximum number of iterations (" << m_termCriteria.maxIter() << ") has been exceeded.";
         }
         LOG(INFO) << "VBGMM Final Loglikelihood: " << result.loglikHist;
         LOG(INFO) << "VBGMM Final Centroids:\n" << centroids();
@@ -223,7 +241,7 @@ public:
     ResultDataType bestLogLikHist = std::numeric_limits<ResultDataType>::lowest();
     size_t finalIter = 0;
     for (size_t i = 0; i < m_nattemps; ++i) {
-      //m_post.display("before init");
+      // m_post.display("before init");
       if (m_hasInitData) {
         initPostWithInitData(m_post);
       } else {
@@ -233,31 +251,31 @@ public:
       bool done = false;
       ResultDataType oldLoglikHist = std::numeric_limits<ResultDataType>::infinity();
       ResultDataType loglikHist;
-      //m_post.display("before loop");
+      // m_post.display("before loop");
       while (!done) {
-        //LOG(INFO) << "-1";
-        // E step
-        //m_post.display("before infer");
+        // LOG(INFO) << "-1";
+        //  E step
+        // m_post.display("before infer");
         mixGaussBayesInfer(m_post);
-        //m_post.display("after infer");
+        // m_post.display("after infer");
         VectorXrt Nk;
         MatrixXrt xbar;
         std::vector<MatrixXrt> S;
         computeEss(Nk, xbar, S, m_post);
-        //LOG(INFO) << Nk;
+        // LOG(INFO) << Nk;
         loglikHist = lowerBound(Nk, xbar, S, m_post);
-        //LOG(INFO) << "out E";
-        // M step
+        // LOG(INFO) << "out E";
+        //  M step
         Mstep(Nk, xbar, S, m_post);
-        //m_post.display("after M");
-        //LOG(INFO) << "out M";
+        // m_post.display("after M");
+        // LOG(INFO) << "out M";
 
         bool useSlopeCovergeTest = true;
 
         if (useSlopeCovergeTest) {
-          //converged if the slope of the function falls below 'threshold',
-          // i.e., |f(t) - f(t-1)| / avg < threshold,
-          // where avg = (|f(t)| + |f(t-1)|)/2
+          // converged if the slope of the function falls below 'threshold',
+          //  i.e., |f(t) - f(t-1)| / avg < threshold,
+          //  where avg = (|f(t)| + |f(t-1)|)/2
           ResultDataType avg =
             (std::abs(loglikHist) + std::abs(oldLoglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
           ResultDataType slope = std::abs(loglikHist - oldLoglikHist) / avg;
@@ -287,9 +305,7 @@ public:
     }
     if (m_logLevel == IterAlgorithmLogLevel::Final || m_logLevel == IterAlgorithmLogLevel::Iter) {
       if (finalIter >= m_termCriteria.maxIter()) {
-        LOG(INFO) << "VBGMM maximum number of iterations ("
-                  << m_termCriteria.maxIter()
-                  << ") has been exceeded.";
+        LOG(INFO) << "VBGMM maximum number of iterations (" << m_termCriteria.maxIter() << ") has been exceeded.";
       }
       LOG(INFO) << "VBGMM Final Loglikelihood: " << bestLogLikHist;
       LOG(INFO) << "VBGMM Final Centroids:\n" << centroids();
@@ -298,13 +314,19 @@ public:
   }
 
   inline size_t numOfClusters() const
-  { return m_result.m.rows(); }
+  {
+    return m_result.m.rows();
+  }
 
   inline MatrixXrt centroids() const
-  { return m_result.m; }
+  {
+    return m_result.m;
+  }
 
   inline MatrixXrt covar(size_t compIdx) const
-  { return m_result.invW[compIdx] / (m_result.v(compIdx) - m_dimension - 1); }
+  {
+    return m_result.invW[compIdx] / (m_result.v(compIdx) - m_dimension - 1);
+  }
 
   Eigen::VectorXi labels() const
   {
@@ -312,11 +334,12 @@ public:
   }
 
   inline MatrixXrt responsiblities() const
-  { return m_resultRnk; }
+  {
+    return m_resultRnk;
+  }
 
 protected:
-
-  bool checkData()   // check if there are enough data points to make m_nclasses initial clusters
+  bool checkData() // check if there are enough data points to make m_nclasses initial clusters
   {
     m_hasEnoughData = true;
     if (m_nclasses == 0 || m_pData->rows() == 0) {
@@ -356,9 +379,9 @@ protected:
   void initPrior()
   {
     m_dimension = m_pData->cols();
-    if (m_m0.size() == 0) {  // init m use data center ??
-      //RowVectorXni centre = ZEigenUtils::featureMean(*m_pData, *m_pWeight);
-      //m = centre.colwise().replicate(m_nclasses);
+    if (m_m0.size() == 0) { // init m use data center ??
+      // RowVectorXni centre = ZEigenUtils::featureMean(*m_pData, *m_pWeight);
+      // m = centre.colwise().replicate(m_nclasses);
       m_m0 = MatrixXrt::Zero(m_nclasses, m_pData->cols());
     } else {
       CHECK(m_m0.cols() == m_pData->cols() && m_m0.rows() == static_cast<int>(m_nclasses));
@@ -366,7 +389,7 @@ protected:
     if (m_hasWeight) {
       // define a vague prior
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
-      VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
+      VectorXrt beta = VectorXrt::Ones(m_nclasses); // low precision for mean
       std::vector<MatrixXrt> W;
       for (size_t i = 0; i < m_nclasses; ++i) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
@@ -376,7 +399,7 @@ protected:
     } else {
       // define a vague prior
       VectorXrt alpha = VectorXrt::Ones(m_nclasses) * m_alpha0;
-      VectorXrt beta = VectorXrt::Ones(m_nclasses);   // low precision for mean
+      VectorXrt beta = VectorXrt::Ones(m_nclasses); // low precision for mean
       std::vector<MatrixXrt> W;
       for (size_t i = 0; i < m_nclasses; ++i) {
         W.push_back(200 * MatrixXrt::Identity(m_dimension, m_dimension));
@@ -390,8 +413,11 @@ protected:
   {
     if (m_hasWeight) {
       ResultDataType numData = m_pWeight->sum();
-      ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, *m_pWeight, m_nclasses,
-                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
+      ZGMM<ResultDataType, ResultDataType> gmm(*m_pData,
+                                               *m_pWeight,
+                                               m_nclasses,
+                                               true,
+                                               ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
                                                ZTermCriteria<ResultDataType>(200, 1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
@@ -413,8 +439,10 @@ protected:
       Mstep(Nk, xbar, S, post);
     } else {
       ResultDataType numData = m_pData->rows();
-      ZGMM<ResultDataType, ResultDataType> gmm(*m_pData, m_nclasses,
-                                               true, ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
+      ZGMM<ResultDataType, ResultDataType> gmm(*m_pData,
+                                               m_nclasses,
+                                               true,
+                                               ZGMM<ResultDataType, ResultDataType>::CovarianceType::Full,
                                                ZTermCriteria<ResultDataType>(200, 1e-5));
       gmm.setLogLevel(m_logLevel);
       gmm.runEM();
@@ -459,7 +487,7 @@ protected:
   void Mstep(VectorXrt& Nk, MatrixXrt& xbar, std::vector<MatrixXrt>& S, Params& post) const
   {
     VectorXrt alpha = m_prior.alpha + Nk; // 10.58
-    VectorXrt beta = m_prior.beta + Nk;  // 10.60
+    VectorXrt beta = m_prior.beta + Nk; // 10.60
     MatrixXrt m = MatrixXrt::Zero(m_nclasses, m_dimension);
     VectorXrt v = VectorXrt::Zero(m_nclasses);
     std::vector<MatrixXrt> invW;
@@ -469,29 +497,31 @@ protected:
         invW.push_back(m_prior.invW[k]);
         v(k) = m_prior.v(k);
       } else {
-        m.row(k) = (m_prior.beta(k) * m_prior.m.row(k) + Nk(k) * xbar.row(k)) / beta(k); //10.61
-        invW.push_back(m_prior.invW[k] + Nk(k) * S[k]
-                       + (m_prior.beta(k) * Nk(k) / (m_prior.beta(k) + Nk(k))) *
+        m.row(k) = (m_prior.beta(k) * m_prior.m.row(k) + Nk(k) * xbar.row(k)) / beta(k); // 10.61
+        invW.push_back(m_prior.invW[k] + Nk(k) * S[k] +
+                       (m_prior.beta(k) * Nk(k) / (m_prior.beta(k) + Nk(k))) *
                          (xbar.row(k) - m_prior.m.row(k)).transpose() * (xbar.row(k) - m_prior.m.row(k))); // 10.62
-        v(k) = m_prior.v(k) + Nk(k); //10.63
+        v(k) = m_prior.v(k) + Nk(k); // 10.63
       }
     }
     mixGaussBayesStructure(alpha, beta, m, v, invW, true, post);
-    //displayParams(m_post);
+    // displayParams(m_post);
   }
 
-  ResultDataType lowerBound(const VectorXrt& Nk, const MatrixXrt& xbar, const std::vector<MatrixXrt>& S,
-                            const Params& post) const  // Bishop sec 10.2.2
+  ResultDataType lowerBound(const VectorXrt& Nk,
+                            const MatrixXrt& xbar,
+                            const std::vector<MatrixXrt>& S,
+                            const Params& post) const // Bishop sec 10.2.2
   {
     using namespace boost::math::double_constants;
     // 10.71
     VectorXrt ElogpXall = VectorXrt::Zero(m_nclasses);
     for (size_t k = 0; k < m_nclasses; ++k) {
       RowVectorXrt xbarc = xbar.row(k) - post.m.row(k);
-      ElogpXall(k) = 0.5 * Nk(k) * (post.logLambdaTilde(k) - m_dimension / post.beta(k)
-                                    - (post.v(k) * S[k] * post.W[k]).trace()
-                                    - post.v(k) * (((xbarc * post.W[k]).array() * xbarc.array()).sum())
-                                    - m_dimension * std::log(two_pi));
+      ElogpXall(k) =
+        0.5 * Nk(k) *
+        (post.logLambdaTilde(k) - m_dimension / post.beta(k) - (post.v(k) * S[k] * post.W[k]).trace() -
+         post.v(k) * (((xbarc * post.W[k]).array() * xbarc.array()).sum()) - m_dimension * std::log(two_pi));
     }
     ResultDataType ElogpX = ElogpXall.sum();
 
@@ -506,10 +536,10 @@ protected:
     for (size_t k = 0; k < m_nclasses; ++k) {
       RowVectorXrt mc = post.m.row(k) - m_prior.m.row(k);
       ElogpmuSigmaAll(k) = 0.5 * (m_dimension * std::log(m_prior.beta(k) / two_pi) + post.logLambdaTilde(k) -
-                                  m_dimension * m_prior.beta(k) / post.beta(k)
-                                  - m_prior.beta(k) * post.v(k) * ((mc * post.W[k]).array() * mc.array()).sum()) +
-                           m_prior.logWishartConst(k)
-                           + 0.5 * (m_prior.v(k) - m_dimension - 1) * post.logLambdaTilde(k) -
+                                  m_dimension * m_prior.beta(k) / post.beta(k) -
+                                  m_prior.beta(k) * post.v(k) * ((mc * post.W[k]).array() * mc.array()).sum()) +
+                           m_prior.logWishartConst(k) +
+                           0.5 * (m_prior.v(k) - m_dimension - 1) * post.logLambdaTilde(k) -
                            0.5 * post.v(k) * ((m_prior.invW[k] * post.W[k]).trace());
     }
     ResultDataType ElogpmuSigma = ElogpmuSigmaAll.sum();
@@ -517,18 +547,20 @@ protected:
     // Entropy terms
     // 10.75//
     ResultDataType ElogqZ;
-    if (m_hasWeight)
+    if (m_hasWeight) {
       ElogqZ = ((post.rnk.array() * post.logrnk.array()).rowwise().sum() * (*m_pWeight).array()).sum();
-    else
+    } else {
       ElogqZ = (post.rnk.array() * post.logrnk.array()).sum();
+    }
 
     // 10.76
     ResultDataType Elogqpi = (post.logPiTilde.array() * (post.alpha.array() - 1)).sum() + post.logDirConst;
 
     // 10.77//
-    ResultDataType ElogqmuSigma = (0.5 * post.logLambdaTilde.array() +
-                                   m_dimension / 2. * log(post.beta.array() / two_pi) - m_dimension / 2. -
-                                   post.entropy.array()).sum();
+    ResultDataType ElogqmuSigma =
+      (0.5 * post.logLambdaTilde.array() + m_dimension / 2. * log(post.beta.array() / two_pi) - m_dimension / 2. -
+       post.entropy.array())
+        .sum();
 
     // overall sum
     // 10.70
@@ -544,11 +576,16 @@ protected:
       S.clear();
       for (size_t k = 0; k < m_nclasses; ++k) {
         xbar.row(k) = (m_pData->array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array() *
-                       (m_pWeight->rowwise().replicate(m_dimension)).array()).colwise().sum() / Nk(k); // 10.52
+                       (m_pWeight->rowwise().replicate(m_dimension)).array())
+                        .colwise()
+                        .sum() /
+                      Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
         S.push_back((XC.array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array() *
-                     (m_pWeight->rowwise().replicate(m_dimension)).array()).matrix().transpose() * XC /
-                    Nk(k)); // 10.53
+                     (m_pWeight->rowwise().replicate(m_dimension)).array())
+                      .matrix()
+                      .transpose() *
+                    XC / Nk(k)); // 10.53
       }
     } else {
       Nk = post.rnk.colwise().sum();
@@ -559,9 +596,8 @@ protected:
         xbar.row(k) = (m_pData->array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array()).colwise().sum() /
                       Nk(k); // 10.52
         MatrixXrt XC = m_pData->rowwise() - xbar.row(k);
-        S.push_back(
-          (XC.array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array()).matrix().transpose() * XC /
-          Nk(k)); // 10.53
+        S.push_back((XC.array() * (post.rnk.col(k).rowwise().replicate(m_dimension)).array()).matrix().transpose() *
+                    XC / Nk(k)); // 10.53
       }
     }
   }
@@ -585,9 +621,13 @@ protected:
     return logSumRho;
   }
 
-  void mixGaussBayesStructure(VectorXrt& alpha, VectorXrt& beta, MatrixXrt& m, VectorXrt& v,
+  void mixGaussBayesStructure(VectorXrt& alpha,
+                              VectorXrt& beta,
+                              MatrixXrt& m,
+                              VectorXrt& v,
                               std::vector<MatrixXrt>& W,
-                              bool isInvW, Params& out) const
+                              bool isInvW,
+                              Params& out) const
   {
     out.alpha.swap(alpha);
     out.beta.swap(beta);
@@ -607,10 +647,10 @@ protected:
       }
     }
     // precompute various functions of the distribution for speed
-    //LOG(INFO) << out.alpha;
-    //LOG(INFO) << out.alpha.sum();
-    //out.display();
-    out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() - ZEigenUtils::digamma(out.alpha.sum());  //10.66
+    // LOG(INFO) << out.alpha;
+    // LOG(INFO) << out.alpha.sum();
+    // out.display();
+    out.logPiTilde = ZEigenUtils::matrixDigamma(out.alpha).array() - ZEigenUtils::digamma(out.alpha.sum()); // 10.66
     out.logDirConst = ZEigenUtils::gammaln(out.alpha.sum()) - ZEigenUtils::matrixGammaln(out.alpha).sum(); // B.23
     out.logLambdaTilde = VectorXrt::Zero(m_nclasses);
     out.logWishartConst = VectorXrt::Zero(m_nclasses);
@@ -619,12 +659,11 @@ protected:
       ResultDataType logdetW = ZEigenUtils::logdet(out.W[k]);
       VectorXrt tmp =
         (VectorXrt::LinSpaced(m_dimension, -static_cast<int>(m_dimension), -1).array() + out.v(k) + 1) * 0.5;
-      out.logLambdaTilde(k) = ZEigenUtils::matrixDigamma(tmp).sum()
-                              + m_dimension * std::log(2.0) + logdetW; // B.81
-      out.logWishartConst(k) = -(out.v(k) / 2.0) * logdetW - (out.v(k) * m_dimension / 2.) * std::log(2.0)
-                               - ZEigenUtils::mvtGammaln<double>(m_dimension, out.v(k) / 2.0); // B.79
-      out.entropy(k) = -out.logWishartConst(k) - (out.v(k) - m_dimension - 1) / 2 * out.logLambdaTilde(k)
-                       + out.v(k) * m_dimension / 2.; // B.82
+      out.logLambdaTilde(k) = ZEigenUtils::matrixDigamma(tmp).sum() + m_dimension * std::log(2.0) + logdetW; // B.81
+      out.logWishartConst(k) = -(out.v(k) / 2.0) * logdetW - (out.v(k) * m_dimension / 2.) * std::log(2.0) -
+                               ZEigenUtils::mvtGammaln<double>(m_dimension, out.v(k) / 2.0); // B.79
+      out.entropy(k) = -out.logWishartConst(k) - (out.v(k) - m_dimension - 1) / 2 * out.logLambdaTilde(k) +
+                       out.v(k) * m_dimension / 2.; // B.82
     }
   }
 
@@ -653,9 +692,9 @@ protected:
       bool useSlopeCovergeTest = true;
 
       if (useSlopeCovergeTest) {
-        //converged if the slope of the function falls below 'threshold',
-        // i.e., |f(t) - f(t-1)| / avg < threshold,
-        // where avg = (|f(t)| + |f(t-1)|)/2
+        // converged if the slope of the function falls below 'threshold',
+        //  i.e., |f(t) - f(t-1)| / avg < threshold,
+        //  where avg = (|f(t)| + |f(t-1)|)/2
         ResultDataType avg =
           (std::abs(loglikHist) + std::abs(post.loglikHist) + std::numeric_limits<ResultDataType>::epsilon()) / 2;
         ResultDataType slope = std::abs(loglikHist - post.loglikHist) / avg;
@@ -678,7 +717,7 @@ protected:
     return post;
   }
 
-  void composeResults(Params& post)   // remove extinguished components, assign labels
+  void composeResults(Params& post) // remove extinguished components, assign labels
   {
     Eigen::Index idx = 0;
     m_result.alpha = VectorXrt::Zero(m_nclasses);
@@ -734,20 +773,20 @@ protected:
   }
 
 private:
-
   Params m_prior;
   Params m_post;
   Params m_result;
 
-  size_t m_dimension;   //dimension of the space
-  size_t m_nclasses;    //number of mixture components
+  size_t m_dimension; // dimension of the space
+  size_t m_nclasses; // number of mixture components
   size_t m_nattemps;
-  MatrixXrt m_m0;       //prior mean positions
+  MatrixXrt m_m0; // prior mean positions
   ResultDataType m_alpha0;
 
-  Eigen::VectorXi m_resultLabels;    //results components idx for each data
+  Eigen::VectorXi m_resultLabels; // results components idx for each data
 
-  MatrixXrt m_resultRnk; //nData*nResultClasses responsibilities matrix, entry ij represents class j's responsibility for data i
+  MatrixXrt m_resultRnk; // nData*nResultClasses responsibilities matrix, entry ij represents class j's responsibility
+                         // for data i
 
   ZTermCriteria<ResultDataType> m_termCriteria;
   IterAlgorithmLogLevel m_logLevel;
@@ -758,7 +797,7 @@ private:
   const MatrixXrt* m_pData;
   const VectorXrt* m_pWeight;
 
-  bool m_hasEnoughData;      //
+  bool m_hasEnoughData; //
 
   bool m_hasInitData;
   VectorXrt m_initMixingCoefficients;
@@ -767,4 +806,3 @@ private:
 };
 
 } // namespace nim
-

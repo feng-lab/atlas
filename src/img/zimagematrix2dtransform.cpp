@@ -2,28 +2,37 @@
 
 namespace {
 
-void getAffineParameterScales(double width, double height, double* scaleRotation = nullptr,
-                              double* scaleScaleX = nullptr, double* scaleScaleY = nullptr,
-                              double* scaleShearXY = nullptr, double* scaleShearYX = nullptr)
+void getAffineParameterScales(double width,
+                              double height,
+                              double* scaleRotation = nullptr,
+                              double* scaleScaleX = nullptr,
+                              double* scaleScaleY = nullptr,
+                              double* scaleShearXY = nullptr,
+                              double* scaleShearYX = nullptr)
 {
   using namespace boost::math::double_constants;
   double dt = 1;
   double axy = std::atan(height / width);
   double bxy = half_pi - axy;
-  double Kxy = std::pow(width, 3) * (std::sin(axy) / std::pow(std::cos(axy), 2) +
-                                     std::log(std::abs(std::tan((pi / 4) + (axy / 2))))) +
-               std::pow(height, 3) * (std::sin(bxy) / std::pow(std::cos(bxy), 2)
-                                      + std::log(std::abs(std::tan((half_pi) - (axy / 2)))));
-  if (scaleRotation)
+  double Kxy = std::pow(width, 3) *
+                 (std::sin(axy) / std::pow(std::cos(axy), 2) + std::log(std::abs(std::tan((pi / 4) + (axy / 2))))) +
+               std::pow(height, 3) *
+                 (std::sin(bxy) / std::pow(std::cos(bxy), 2) + std::log(std::abs(std::tan((half_pi) - (axy / 2)))));
+  if (scaleRotation) {
     *scaleRotation = std::abs(2 * std::asin((6 * dt * width * height) / Kxy));
-  if (scaleScaleX)
+  }
+  if (scaleScaleX) {
     *scaleScaleX = 4 * dt / width;
-  if (scaleScaleY)
+  }
+  if (scaleScaleY) {
     *scaleScaleY = 4 * dt / height;
-  if (scaleShearXY)
+  }
+  if (scaleShearXY) {
     *scaleShearXY = 4 * dt / height;
-  if (scaleShearYX)
+  }
+  if (scaleShearYX) {
     *scaleShearYX = 4 * dt / width;
+  }
 }
 
 } // namespace
@@ -37,8 +46,14 @@ ZImageMatrix2DTransform::ZImageMatrix2DTransform()
   m_parameters[4] = 1;
 }
 
-void ZImageMatrix2DTransform::transformRange(double inXMin, double inXMax, double inYMin, double inYMax,
-                                             double& outXMin, double& outXMax, double& outYMin, double& outYMax) const
+void ZImageMatrix2DTransform::transformRange(double inXMin,
+                                             double inXMax,
+                                             double inYMin,
+                                             double inYMax,
+                                             double& outXMin,
+                                             double& outXMax,
+                                             double& outYMin,
+                                             double& outYMax) const
 {
   double outCoords[8];
   outCoords[0] = outCoords[2] = inXMin;
@@ -80,15 +95,15 @@ size_t ZImageMatrix2DTransform::numParameters() const
 void ZImageMatrix2DTransform::setParameters(const double* para)
 {
   m_tform.reset();
-  m_tform.setMatrix(para[0], para[1], para[2],
-                    para[3], para[4], para[5]);
+  m_tform.setMatrix(para[0], para[1], para[2], para[3], para[4], para[5]);
   m_parameters = std::vector<double>(para, para + 6);
 }
 
 void ZImageMatrix2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -145,8 +160,9 @@ void ZImageYTranslation2DTransform::setParameters(const double* para)
 
 void ZImageYTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -196,8 +212,9 @@ void ZImageTranslation2DTransform::setParameters(const double* para)
 
 void ZImageTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -250,8 +267,9 @@ void ZImageRigid2DTransform::setParameters(const double* para)
 
 void ZImageRigid2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -304,8 +322,9 @@ void ZImageSimilarity2DTransform::setParameters(const double* para)
 
 void ZImageSimilarity2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -360,8 +379,9 @@ void ZImageAffine2DTransform::setParameters(const double* para)
 
 void ZImageAffine2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -373,8 +393,13 @@ void ZImageAffine2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 std::vector<double> ZImageAffine2DTransform::estimateParameterScales(const double* dims) const
 {
   std::vector<double> optimizerScales(numParameters(), 1.0);
-  getAffineParameterScales(dims[0], dims[1], &optimizerScales[2], &optimizerScales[3], &optimizerScales[4],
-                           &optimizerScales[5], &optimizerScales[6]);
+  getAffineParameterScales(dims[0],
+                           dims[1],
+                           &optimizerScales[2],
+                           &optimizerScales[3],
+                           &optimizerScales[4],
+                           &optimizerScales[5],
+                           &optimizerScales[6]);
   return optimizerScales;
 }
 

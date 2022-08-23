@@ -8,10 +8,8 @@
 #include <QDir>
 
 #ifdef ZIMG_USE_IPP
-
 #include <ippcore.h>
 #include <ippi.h>
-
 #endif
 
 namespace nim {
@@ -39,8 +37,12 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
   }
 }
 
-void initImgLib(const char* argv0, const QString& resourcesDIR,
-                const QString& jdkDIR, const QString& jarsDIR, const QString& logFilename, bool isApp)
+void initImgLib(const char* argv0,
+                const QString& resourcesDIR,
+                const QString& jdkDIR,
+                const QString& jarsDIR,
+                const QString& logFilename,
+                bool isApp)
 {
   initLogging(argv0, logFilename);
 
@@ -109,11 +111,8 @@ void initImgLib(const char* argv0, const QString& resourcesDIR,
   // todo: check this for amd cpu
   MKLVersion mklVer;
   MKL_Get_Version(&mklVer);
-  LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " "
-            << mklVer.MajorVersion << "."
-            << mklVer.MinorVersion << "."
-            << mklVer.UpdateVersion << ".b"
-            << mklVer.Build;
+  LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " " << mklVer.MajorVersion << "."
+            << mklVer.MinorVersion << "." << mklVer.UpdateVersion << ".b" << mklVer.Build;
 
 #ifdef ZIMG_USE_IPP
   // todo: check this for amd cpu
@@ -233,4 +232,3 @@ void shutdownImgLib(bool isApp)
 }
 
 } // namespace nim
-

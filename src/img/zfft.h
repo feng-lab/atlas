@@ -17,4 +17,3 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
 ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, size_t outDepth);
 
 } // namespace nim
-

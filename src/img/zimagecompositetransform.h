@@ -15,12 +15,13 @@ public:
   void addTransform(ZImageTransform* tfm);
 
   // ZImageTransform interface
+
 public:
-  size_t numParameters() const override;
+  [[nodiscard]] size_t numParameters() const override;
 
   void setParameters(double const* para) override;
 
-  bool is2DTransform() const override;
+  [[nodiscard]] bool is2DTransform() const override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
@@ -28,11 +29,11 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  QString toQString() const override;
+  [[nodiscard]] QString toQString() const override;
 
-  ZImageTransform* clone() const override;
+  [[nodiscard]] ZImageTransform* clone() const override;
 
-  ZImageTransform* makeInverseTransform() const override;
+  [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 
 protected:
   void constructParameters();
@@ -42,4 +43,3 @@ protected:
 };
 
 } // namespace nim
-

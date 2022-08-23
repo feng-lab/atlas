@@ -13,9 +13,17 @@ class distance_heuristic : public boost::astar_heuristic<Graph, double>
 public:
   using Vertex = typename boost::graph_traits<Graph>::vertex_descriptor;
 
-  distance_heuristic(const ZImgRegion& region, const ZImgInfo& regionInfo,
-                     const std::vector<Vertex>& goals, double weight, bool useVoxelSize, const ZNeighborhood& nb)
-    : m_region(region), m_regionInfo(regionInfo), m_goals(goals), m_weight(weight), m_useVoxelSize(useVoxelSize)
+  distance_heuristic(const ZImgRegion& region,
+                     const ZImgInfo& regionInfo,
+                     const std::vector<Vertex>& goals,
+                     double weight,
+                     bool useVoxelSize,
+                     const ZNeighborhood& nb)
+    : m_region(region)
+    , m_regionInfo(regionInfo)
+    , m_goals(goals)
+    , m_weight(weight)
+    , m_useVoxelSize(useVoxelSize)
   {
     if (nb.size() == 2_uz || nb.size() == 3_uz) {
       // no diagonal connection
@@ -29,13 +37,17 @@ public:
     } else { // there are many other cases but I am too lazy to write
       m_wxyz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX +
                                           m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY +
-                                          m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ) : std::sqrt(3.0);
+                                          m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ)
+                              : std::sqrt(3.0);
       m_wxy = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX +
-                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY) : std::sqrt(2.0);
+                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY)
+                             : std::sqrt(2.0);
       m_wyz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ +
-                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY) : std::sqrt(2.0);
+                                         m_regionInfo.voxelSizeY * m_regionInfo.voxelSizeY)
+                             : std::sqrt(2.0);
       m_wxz = m_useVoxelSize ? std::sqrt(m_regionInfo.voxelSizeZ * m_regionInfo.voxelSizeZ +
-                                         m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX) : std::sqrt(2.0);
+                                         m_regionInfo.voxelSizeX * m_regionInfo.voxelSizeX)
+                             : std::sqrt(2.0);
       m_wx = m_useVoxelSize ? m_regionInfo.voxelSizeX : 1.0;
       m_wy = m_useVoxelSize ? m_regionInfo.voxelSizeY : 1.0;
       m_wz = m_useVoxelSize ? m_regionInfo.voxelSizeZ : 1.0;
@@ -60,8 +72,9 @@ public:
       dy = dy - dxyz - dxy - dyz;
       dz = dz - dxyz - dyz - dxz;
 
-      res = std::min(res, m_weight * (dxyz * m_wxyz + dxy * m_wxy + dyz * m_wyz + dxz * m_wxz + dx * m_wx + dy * m_wy +
-                                      dz * m_wz));
+      res = std::min(res,
+                     m_weight *
+                       (dxyz * m_wxyz + dxy * m_wxy + dyz * m_wyz + dxz * m_wxz + dx * m_wx + dy * m_wy + dz * m_wz));
       //      if (m_useVoxelSize) {
       //        double x = (vertexCoord.x - goalCoord.x) * m_regionInfo.voxelSizeX;
       //        double y = (vertexCoord.y - goalCoord.y) * m_regionInfo.voxelSizeY;
@@ -97,7 +110,8 @@ private:
 template<class Vertex>
 struct found_goal
 {
-  explicit found_goal(Vertex v_) : v(v_)
+  explicit found_goal(Vertex v_)
+    : v(v_)
   {}
 
   Vertex v;
@@ -108,15 +122,17 @@ template<class Vertex>
 class astar_goal_visitor : public boost::default_astar_visitor
 {
 public:
-  explicit astar_goal_visitor(const std::vector<Vertex>& goals) : m_goals(goals)
+  explicit astar_goal_visitor(const std::vector<Vertex>& goals)
+    : m_goals(goals)
   {}
 
   template<class Graph>
   void examine_vertex(Vertex u, Graph& /*unused*/)
   {
     for (Vertex gv : m_goals) {
-      if (gv == u)
+      if (gv == u) {
         throw found_goal<Vertex>(gv);
+      }
     }
   }
 
@@ -125,11 +141,13 @@ private:
 };
 
 ZImgGraph::ZImgGraph(const ZImg& img, const ZImgRegion& rgn)
-  : m_img(img), m_region(rgn)
+  : m_img(img)
+  , m_region(rgn)
 {
   if (!rgn.isValid(m_img.info())) {
     throw ZImgException(QString("Can not build graph with invalid region <%1> of img <%2>")
-                          .arg(m_region.toQString()).arg(m_img.info().toQString()));
+                          .arg(m_region.toQString())
+                          .arg(m_img.info().toQString()));
   }
 
   m_region.resolveRegionEnd(m_img.info());
@@ -160,28 +178,27 @@ std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t
     throw ZImgException("Img graph is not built yet");
   }
   if (startIdx >= boost::num_vertices(m_graph)) {
-    throw ZImgException(QString("Invalid start idx %1 for shortest path in img region <%2>")
-                          .arg(startIdx).arg(m_region.toQString()));
+    throw ZImgException(
+      QString("Invalid start idx %1 for shortest path in img region <%2>").arg(startIdx).arg(m_region.toQString()));
   }
 
   std::vector<double> distance(boost::num_vertices(m_graph));
 
   if (predecessor) {
     predecessor->resize(boost::num_vertices(m_graph));
-    dijkstra_shortest_paths(m_graph, startIdx,
-                            boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
-                              predecessor_map(boost::make_iterator_property_map(predecessor->begin(),
-                                                                                boost::get(boost::vertex_index,
-                                                                                           m_graph))).
-                              distance_map(boost::make_iterator_property_map(distance.begin(),
-                                                                             boost::get(boost::vertex_index,
-                                                                                        m_graph))));
+    dijkstra_shortest_paths(
+      m_graph,
+      startIdx,
+      boost::weight_map(boost::get(&EdgeInfo::weight, m_graph))
+        .predecessor_map(
+          boost::make_iterator_property_map(predecessor->begin(), boost::get(boost::vertex_index, m_graph)))
+        .distance_map(boost::make_iterator_property_map(distance.begin(), boost::get(boost::vertex_index, m_graph))));
   } else {
-    dijkstra_shortest_paths(m_graph, startIdx,
-                            boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
-                              distance_map(boost::make_iterator_property_map(distance.begin(),
-                                                                             boost::get(boost::vertex_index,
-                                                                                        m_graph))));
+    dijkstra_shortest_paths(
+      m_graph,
+      startIdx,
+      boost::weight_map(boost::get(&EdgeInfo::weight, m_graph))
+        .distance_map(boost::make_iterator_property_map(distance.begin(), boost::get(boost::vertex_index, m_graph))));
   }
 
   return distance;
@@ -191,29 +208,30 @@ std::vector<double> ZImgGraph::shortestPaths(const ZVoxelCoordinate& startCoord,
 {
   if (!m_region.containsCoord(startCoord, m_img.info())) {
     throw ZImgException(QString("Invalid start coord %1 for shortest path in img region <%2>")
-                          .arg(startCoord.toQString()).arg(m_region.toQString()));
+                          .arg(startCoord.toQString())
+                          .arg(m_region.toQString()));
   }
   size_t startIdx = ZImg::coordToIndex(startCoord - m_region.start, m_regionInfo);
   return shortestPaths(startIdx, predecessor);
 }
 
-std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs,
-                                                   std::vector<size_t>* resPath)
+std::tuple<double, size_t>
+ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs, std::vector<size_t>* resPath)
 {
   if (!m_graphIsValid) {
     throw ZImgException("Img graph is not built yet");
   }
   if (startIdx >= boost::num_vertices(m_graph)) {
-    throw ZImgException(QString("Invalid start idx %1 for shortest path in img region <%2>")
-                          .arg(startIdx).arg(m_region.toQString()));
+    throw ZImgException(
+      QString("Invalid start idx %1 for shortest path in img region <%2>").arg(startIdx).arg(m_region.toQString()));
   }
   if (targetIdxs.empty()) {
     throw ZImgException("No target idxs");
   }
   for (size_t idx : targetIdxs) {
     if (idx >= boost::num_vertices(m_graph)) {
-      throw ZImgException(QString("Invalid target idx %1 for shortest path in img region <%2>")
-                            .arg(idx).arg(m_region.toQString()));
+      throw ZImgException(
+        QString("Invalid target idx %1 for shortest path in img region <%2>").arg(idx).arg(m_region.toQString()));
     }
   }
 
@@ -223,22 +241,25 @@ std::tuple<double, size_t> ZImgGraph::shortestPath(size_t startIdx, const std::v
   DistMap distance;
   try {
     if (resPath) {
-      boost::astar_search(m_graph, startIdx,
-                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize,
-                                                     m_neighborhood),
-                          boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
-                            predecessor_map(boost::associative_property_map<PredMap>(predecessor)).
-                            distance_map(boost::associative_property_map<DistMap>(distance)).
-                            visitor(astar_goal_visitor<size_t>(targetIdxs)));
+      boost::astar_search(
+        m_graph,
+        startIdx,
+        distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize, m_neighborhood),
+        boost::weight_map(boost::get(&EdgeInfo::weight, m_graph))
+          .predecessor_map(boost::associative_property_map<PredMap>(predecessor))
+          .distance_map(boost::associative_property_map<DistMap>(distance))
+          .visitor(astar_goal_visitor<size_t>(targetIdxs)));
     } else {
-      boost::astar_search(m_graph, startIdx,
-                          distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize,
-                                                     m_neighborhood),
-                          boost::weight_map(boost::get(&EdgeInfo::weight, m_graph)).
-                            distance_map(boost::associative_property_map<DistMap>(distance)).
-                            visitor(astar_goal_visitor<size_t>(targetIdxs)));
+      boost::astar_search(
+        m_graph,
+        startIdx,
+        distance_heuristic<GraphT>(m_region, m_regionInfo, targetIdxs, m_lowestWeight, m_useVoxelSize, m_neighborhood),
+        boost::weight_map(boost::get(&EdgeInfo::weight, m_graph))
+          .distance_map(boost::associative_property_map<DistMap>(distance))
+          .visitor(astar_goal_visitor<size_t>(targetIdxs)));
     }
-  } catch (found_goal<size_t> fg) {
+  }
+  catch (found_goal<size_t> fg) {
     if (resPath) {
       resPath->clear();
       for (size_t v = fg.v;; v = predecessor[v]) {

@@ -20,7 +20,8 @@ struct EdgeInfo
 struct VertexInfo
 {
   VertexInfo(size_t imgidx, size_t idx_)
-    : img(imgidx), idx(idx_)
+    : img(imgidx)
+    , idx(idx_)
   {}
 
   size_t img;
@@ -35,8 +36,7 @@ struct edge_in_MST
 
   explicit edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
-  {
-  }
+  {}
 
   bool operator()(const Edge& e) const
   {
@@ -72,7 +72,7 @@ private:
   std::vector<Edge>& m_dfsSortedEdges;
 };
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
@@ -81,7 +81,9 @@ void ZImageTransformResolve::addFixedImage(size_t idx, const ZImageTransform* tf
   m_idxTransforms[idx] = tfm;
 }
 
-void ZImageTransformResolve::addImagePair(size_t fixedIdx, size_t movingIdx, const ZImageTransform* tfm,
+void ZImageTransformResolve::addImagePair(size_t fixedIdx,
+                                          size_t movingIdx,
+                                          const ZImageTransform* tfm,
                                           double transformCost)
 {
   m_idxPairs.erase(std::make_pair(fixedIdx, movingIdx));
@@ -97,8 +99,9 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     res[idxTfm.first] = std::make_unique<ZImageCompositeTransform>();
     res[idxTfm.first]->addTransform(*idxTfm.second);
   }
-  if (m_idxPairs.empty())
+  if (m_idxPairs.empty()) {
     return res;
+  }
 
   size_t refIdx = m_idxTransforms.cbegin()->first;
   double minCost = std::numeric_limits<double>::max();
@@ -128,10 +131,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
       auto nextIt = it;
       ++nextIt;
       for (; nextIt != m_idxTransforms.cend(); ++nextIt, ++it) {
-        boost::add_edge(idxToVertexMapper[it->first],
-                        idxToVertexMapper[nextIt->first],
-                        EdgeInfo(minCost - 1e3),
-                        graph);
+        boost::add_edge(idxToVertexMapper[it->first], idxToVertexMapper[nextIt->first], EdgeInfo(minCost - 1e3), graph);
       }
     }
   }
@@ -152,26 +152,30 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   }
 
   std::vector<int> c(boost::num_vertices(graph));
-  auto num = boost::connected_components(graph, boost::make_iterator_property_map(c.begin(),
-                                                                                  boost::get(&VertexInfo::idx, graph)),
-                                         boost::color_map(boost::get(&VertexInfo::m_algo_color, graph)));
+  auto num =
+    boost::connected_components(graph,
+                                boost::make_iterator_property_map(c.begin(), boost::get(&VertexInfo::idx, graph)),
+                                boost::color_map(boost::get(&VertexInfo::m_algo_color, graph)));
   if (num != 1) {
     throw ZImgException("Transform resolve error: images are not fully connected");
   }
 
   std::vector<Edge> tree;
-  boost::kruskal_minimum_spanning_tree(graph, std::back_inserter(tree),
-                                       boost::weight_map(boost::get(&EdgeInfo::cost, graph)).
-                                         vertex_index_map(boost::get(&VertexInfo::idx, graph)));
+  boost::kruskal_minimum_spanning_tree(
+    graph,
+    std::back_inserter(tree),
+    boost::weight_map(boost::get(&EdgeInfo::cost, graph)).vertex_index_map(boost::get(&VertexInfo::idx, graph)));
 
   edge_in_MST<Edge> filter(tree);
   boost::filtered_graph<GraphT, edge_in_MST<Edge>> fg(graph, filter);
 
   std::vector<Edge> sortedEdges;
   dfs_edge_visitor<Edge> vis(sortedEdges);
-  boost::depth_first_search(fg, boost::visitor(vis).root_vertex(idxToVertexMapper[refIdx]).
-    vertex_index_map(boost::get(&VertexInfo::idx, fg)).
-    color_map(boost::get(&VertexInfo::m_algo_color, fg)));
+  boost::depth_first_search(fg,
+                            boost::visitor(vis)
+                              .root_vertex(idxToVertexMapper[refIdx])
+                              .vertex_index_map(boost::get(&VertexInfo::idx, fg))
+                              .color_map(boost::get(&VertexInfo::m_algo_color, fg)));
 
   for (size_t i = 0; i < sortedEdges.size(); ++i) {
     size_t img1 = graph[boost::source(sortedEdges[i], graph)].img;
@@ -182,24 +186,22 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     if (img1HasLocation && !img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
-      res[img2] = std::unique_ptr<ZImageCompositeTransform>(
-        static_cast<ZImageCompositeTransform*>(res[img1]->clone()));
+      res[img2] = std::unique_ptr<ZImageCompositeTransform>(static_cast<ZImageCompositeTransform*>(res[img1]->clone()));
       if (pairIt != m_idxPairs.end()) {
         res[img2]->addTransform(*pairIt->second.first);
       } else {
-        pairIt = m_idxPairs.find(std::make_pair(img2, img1));  // must exist
+        pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img2]->addTransform(pairIt->second.first->makeInverseTransform());
       }
       summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
     } else if (!img1HasLocation && img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
-      res[img1] = std::unique_ptr<ZImageCompositeTransform>(
-        static_cast<ZImageCompositeTransform*>(res[img2]->clone()));
-      if (pairIt != m_idxPairs.end())
+      res[img1] = std::unique_ptr<ZImageCompositeTransform>(static_cast<ZImageCompositeTransform*>(res[img2]->clone()));
+      if (pairIt != m_idxPairs.end()) {
         res[img1]->addTransform(pairIt->second.first->makeInverseTransform());
-      else {
-        pairIt = m_idxPairs.find(std::make_pair(img2, img1));  // must exist
+      } else {
+        pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img1]->addTransform(*pairIt->second.first);
       }
       summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
@@ -210,8 +212,9 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
 
   LOG(INFO) << "transform resolve summary:";
   LOG(INFO) << summ;
-  if (summary)
+  if (summary) {
     summ.swap(*summary);
+  }
 
   return res;
 }

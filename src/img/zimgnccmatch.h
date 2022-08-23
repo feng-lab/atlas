@@ -18,7 +18,7 @@ public:
   enum class PositionHint
   {
     None = 0, // no hint, any position can be possible
-    Left = 1,  // img is in left side, only overlap with left part of another img
+    Left = 1, // img is in left side, only overlap with left part of another img
     Right = 1 << 1, // img is in right side, only overlap with right part of another img
     Up = 1 << 2,
     Down = 1 << 3,
@@ -66,7 +66,9 @@ public:
 
   // use coarse-to-fine method to reduce memory usage
   // coarse image is created by averaging pixels in block of size (intvX + 1, intvY + 1, intvZ + 1)
-  ZVoxelCoordinate computeMovingImgOffsetMR(size_t intvX, size_t intvY, size_t intvZ,
+  ZVoxelCoordinate computeMovingImgOffsetMR(size_t intvX,
+                                            size_t intvY,
+                                            size_t intvZ,
                                             double* maxNCC = nullptr,
                                             double* maxWeightedNCC = nullptr,
                                             double* numOverlapVoxels = nullptr,
@@ -76,7 +78,9 @@ public:
 
   // use prior info of offset, radiusXYZ is the search radius in each direction
   ZVoxelCoordinate refineMovingImgOffset(const ZVoxelCoordinate& offset,
-                                         size_t radiusX, size_t radiusY, size_t radiusZ,
+                                         size_t radiusX,
+                                         size_t radiusY,
+                                         size_t radiusZ,
                                          double* maxNCC = nullptr,
                                          double* maxWeightedNCC = nullptr,
                                          double* numOverlapVoxels = nullptr);
@@ -84,8 +88,12 @@ public:
   // use coarse-to-fine method to reduce memory usage
   // coarse image is created by averaging pixels in block of size (intvX + 1, intvY + 1, intvZ + 1)
   ZVoxelCoordinate refineMovingImgOffsetMR(const ZVoxelCoordinate& offset,
-                                           size_t radiusX, size_t radiusY, size_t radiusZ,
-                                           size_t intvX, size_t intvY, size_t intvZ,
+                                           size_t radiusX,
+                                           size_t radiusY,
+                                           size_t radiusZ,
+                                           size_t intvX,
+                                           size_t intvY,
+                                           size_t intvZ,
                                            double* maxNCC = nullptr,
                                            double* maxWeightedNCC = nullptr,
                                            double* numOverlapVoxels = nullptr,
@@ -105,20 +113,22 @@ public:
   std::tuple<ZImg, ZImg> computeNCC();
 
   // for python
-  std::tuple<ZVoxelCoordinate, double, double, double>
-  computeMovingImgOffset_Python();
+  std::tuple<ZVoxelCoordinate, double, double, double> computeMovingImgOffset_Python();
 
   std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
   computeMovingImgOffsetMR_Python(size_t intvX, size_t intvY, size_t intvZ);
 
   std::tuple<ZVoxelCoordinate, double, double, double>
-  refineMovingImgOffset_Python(const ZVoxelCoordinate& offset,
-                               size_t radiusX, size_t radiusY, size_t radiusZ);
+  refineMovingImgOffset_Python(const ZVoxelCoordinate& offset, size_t radiusX, size_t radiusY, size_t radiusZ);
 
   std::tuple<ZVoxelCoordinate, double, double, double, double, double, double>
   refineMovingImgOffsetMR_Python(const ZVoxelCoordinate& offset,
-                                 size_t radiusX, size_t radiusY, size_t radiusZ,
-                                 size_t intvX, size_t intvY, size_t intvZ);
+                                 size_t radiusX,
+                                 size_t radiusY,
+                                 size_t radiusZ,
+                                 size_t intvX,
+                                 size_t intvY,
+                                 size_t intvZ);
 
 private:
   void init();
@@ -137,7 +147,8 @@ private:
 
   // will release input, need 4 double padded extra space
   // for two 200M 8bit imgs, this will need 4*200*8*8M = 51200M = 51.2G memory
-  static ZVoxelCoordinate maxNormXCorrLoc(ZImg& fixedImg, ZImg& movingImg,
+  static ZVoxelCoordinate maxNormXCorrLoc(ZImg& fixedImg,
+                                          ZImg& movingImg,
                                           const ZImgRegion& nccImgValidRegion,
                                           double requiredNumberOfOverlapPixels,
                                           double& maxNCC,
@@ -146,15 +157,22 @@ private:
 
   // slower but use less memory, need 3 double padded extra space
   // for two 200M 8bit imgs, this will need 3*200*8*8M = 38400M = 38.4G memory
-  static ZVoxelCoordinate maxNormXCorrLoc_S(ZImg& fixedImg, ZImg& movingImg,
+  static ZVoxelCoordinate maxNormXCorrLoc_S(ZImg& fixedImg,
+                                            ZImg& movingImg,
                                             const ZImgRegion& nccImgValidRegion,
                                             double requiredNumberOfOverlapPixels,
                                             double& maxNCC,
                                             double& maxWeightedNCC,
                                             double& numOverlapVoxels);
 
-  static ZVoxelCoordinate maxNormXCorrLocPart(ZImg& fixedImg, ZImg& movingImg, size_t xStart, size_t xEnd,
-                                              size_t yStart, size_t yEnd, size_t zStart, size_t zEnd,
+  static ZVoxelCoordinate maxNormXCorrLocPart(ZImg& fixedImg,
+                                              ZImg& movingImg,
+                                              size_t xStart,
+                                              size_t xEnd,
+                                              size_t yStart,
+                                              size_t yEnd,
+                                              size_t zStart,
+                                              size_t zEnd,
                                               double& maxNCC,
                                               double& maxWeightedNCC,
                                               double& numOverlapVoxels);
@@ -163,35 +181,46 @@ private:
   getNccImgValidRegion(const PositionHint& hint, const ZImgInfo& fixedImgInfo, const ZImgInfo& movingImgInfo);
 
   // ting's method, partial
-  static double getRequiredNumberOfOverlapPixels(const PositionHint& hint, double minOverlapRate,
-                                                 const ZImgInfo& fixedImgInfo, const ZImgInfo& movingImgInfo);
+  static double getRequiredNumberOfOverlapPixels(const PositionHint& hint,
+                                                 double minOverlapRate,
+                                                 const ZImgInfo& fixedImgInfo,
+                                                 const ZImgInfo& movingImgInfo);
 
   // ting's method
-  static size_t
-  getMaxWeightedNCCIdx(const double* NCCs, const double* overlapVoxels, double overlapVoxelThre, size_t dataLength,
-                       double& maxNCC, double& maxWeightedNCC, double& numOverlapVoxels);
+  static size_t getMaxWeightedNCCIdx(const double* NCCs,
+                                     const double* overlapVoxels,
+                                     double overlapVoxelThre,
+                                     size_t dataLength,
+                                     double& maxNCC,
+                                     double& maxWeightedNCC,
+                                     double& numOverlapVoxels);
 
-  static std::pair<ZImgRegion, ZImgRegion> getRequiredSrcImgRegion(const PositionHint& hint,
-                                                                   const ZImg& fixedImg, const ZImg& movingImg,
-                                                                   double overlapRate);
-
+  static std::pair<ZImgRegion, ZImgRegion>
+  getRequiredSrcImgRegion(const PositionHint& hint, const ZImg& fixedImg, const ZImg& movingImg, double overlapRate);
 
   static std::tuple<ZImgRegion, ZImgRegion, ZImgRegion>
   getRequiredSrcImgRegionAndValidNccRegion(const ZVoxelCoordinate& offset,
-                                           size_t radiusX, size_t radiusY, size_t radiusZ,
-                                           const ZImg& fixedImg, const ZImg& movingImg);
+                                           size_t radiusX,
+                                           size_t radiusY,
+                                           size_t radiusZ,
+                                           const ZImg& fixedImg,
+                                           const ZImg& movingImg);
 
   static ZVoxelCoordinate
   mapOffsetToSrcImg(ZVoxelCoordinate offset, const ZImgRegion& fixedRgn, const ZImgRegion& movingRgn);
 
-  ZVoxelCoordinate computeMovingImgOffset(const PositionHint& movingImgPosHint, double maxOverlapRate,
+  ZVoxelCoordinate computeMovingImgOffset(const PositionHint& movingImgPosHint,
+                                          double maxOverlapRate,
                                           double& maxNCC,
                                           double& maxWeightedNCC,
                                           double& numOverlapVoxels);
 
   // use coarse-to-fine method to reduce memory usage
-  ZVoxelCoordinate computeMovingImgOffsetMR(const PositionHint& movingImgPosHint, double maxOverlapRate,
-                                            size_t intvX, size_t intvY, size_t intvZ,
+  ZVoxelCoordinate computeMovingImgOffsetMR(const PositionHint& movingImgPosHint,
+                                            double maxOverlapRate,
+                                            size_t intvX,
+                                            size_t intvY,
+                                            size_t intvZ,
                                             double& maxNCC,
                                             double& maxWeightedNCC,
                                             double& numOverlapVoxels,
@@ -200,15 +229,21 @@ private:
                                             double& lowResNumOverlapVoxels);
 
   ZVoxelCoordinate refineMovingImgOffset(const ZVoxelCoordinate& offset,
-                                         size_t radiusX, size_t radiusY, size_t radiusZ,
+                                         size_t radiusX,
+                                         size_t radiusY,
+                                         size_t radiusZ,
                                          double& maxNCC,
                                          double& maxWeightedNCC,
                                          double& numOverlapVoxels);
 
   // use coarse-to-fine method to reduce memory usage
   ZVoxelCoordinate refineMovingImgOffsetMR(const ZVoxelCoordinate& offset,
-                                           size_t radiusX, size_t radiusY, size_t radiusZ,
-                                           size_t intvX, size_t intvY, size_t intvZ,
+                                           size_t radiusX,
+                                           size_t radiusY,
+                                           size_t radiusZ,
+                                           size_t intvX,
+                                           size_t intvY,
+                                           size_t intvZ,
                                            double& maxNCC,
                                            double& maxWeightedNCC,
                                            double& numOverlapVoxels,
@@ -222,7 +257,7 @@ private:
   size_t m_fixedT;
   size_t m_movingT;
   PositionHint m_movingImgPosHint = PositionHint::None;
-  double m_maxOverlapRate = 1.0;  // 0 to 1
+  double m_maxOverlapRate = 1.0; // 0 to 1
 
   std::set<size_t> m_fixedImgChannelsToUse;
   std::set<size_t> m_movingImgChannelsToUse;
@@ -233,4 +268,3 @@ private:
 DECLARE_OPERATORS_FOR_ENUM(ZImgNCCMatch::PositionHint)
 
 } // namespace nim
-

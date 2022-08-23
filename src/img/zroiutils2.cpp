@@ -18,11 +18,11 @@ using namespace nim;
 SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
 {
   SkPath res;
-  if (spline.size() < 2)
+  if (spline.size() < 2) {
     return res;
+  }
   bool isClosed = spline.front() == spline.back();
-  if ((isClosed && spline.size() < 4) ||
-      (!isClosed && spline.size() < 3)) {
+  if ((isClosed && spline.size() < 4) || (!isClosed && spline.size() < 3)) {
     res.moveTo(spline[0].x(), spline[0].y());
     res.lineTo(spline[1].x(), spline[1].y());
     return res;
@@ -35,7 +35,9 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
     times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
   }
 
-  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed, spline.size(), (gte::Vector<2, double> const*) spline.data(),
+  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
+                                                 spline.size(),
+                                                 (gte::Vector<2, double> const*)spline.data(),
                                                  times.data());
   res.moveTo(spline[0].x(), spline[0].y());
   auto endSeg = showLastSeg ? numSegments : numSegments - 1;
@@ -48,10 +50,14 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
     gte::Vector<2, double>& m1 = values1[1];
     m0 *= times[i + 1] - times[i];
     m1 *= times[i + 1] - times[i];
-    //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
-    res.cubicTo(spline[i].x() + 1. / 3. * m0[0], spline[i].y() + 1. / 3. * m0[1],
-                spline[i + 1].x() - 1. / 3. * m1[0], spline[i + 1].y() - 1. / 3. * m1[1],
-                spline[i + 1].x(), spline[i + 1].y());
+    // LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " <<
+    // cspline[i+1];
+    res.cubicTo(spline[i].x() + 1. / 3. * m0[0],
+                spline[i].y() + 1. / 3. * m0[1],
+                spline[i + 1].x() - 1. / 3. * m1[0],
+                spline[i + 1].y() - 1. / 3. * m1[1],
+                spline[i + 1].x(),
+                spline[i + 1].y());
   }
 
   return res;
@@ -82,17 +88,17 @@ std::tuple<ZImg, index_t, index_t> pathToMask(const SkPath& path)
     img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
     for (auto y = minY; y <= maxY; ++y) {
       for (auto x = minX; x <= maxX; ++x) {
-        if (path.contains(x, y)) {       // not accurate for some spline
+        if (path.contains(x, y)) { // not accurate for some spline
           *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
         }
       }
     }
   } else {
-    SkImageInfo info = SkImageInfo::Make((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, kGray_8_SkColorType,
-                                         kOpaque_SkAlphaType);
+    SkImageInfo info =
+      SkImageInfo::Make((maxX - minX + 1) * scale, (maxY - minY + 1) * scale, kGray_8_SkColorType, kOpaque_SkAlphaType);
     size_t rowBytes = info.minRowBytes();
     size_t size = info.computeByteSize(rowBytes);
-    std::vector<uint8_t> pixelMemory(size);  // allocate memory
+    std::vector<uint8_t> pixelMemory(size); // allocate memory
     sk_sp<SkSurface> surface = SkSurface::MakeRasterDirect(info, &pixelMemory[0], rowBytes);
     SkCanvas* canvas = surface->getCanvas();
 
@@ -134,11 +140,10 @@ std::tuple<ZImg, index_t, index_t> pathToStroke(const SkPath& path, double width
     return std::make_tuple(img, 0_z, 0_z);
   }
 
-  SkImageInfo info = SkImageInfo::Make((maxX - minX + 1), (maxY - minY + 1), kGray_8_SkColorType,
-                                       kOpaque_SkAlphaType);
+  SkImageInfo info = SkImageInfo::Make((maxX - minX + 1), (maxY - minY + 1), kGray_8_SkColorType, kOpaque_SkAlphaType);
   size_t rowBytes = info.minRowBytes();
   size_t size = info.computeByteSize(rowBytes);
-  std::vector<uint8_t> pixelMemory(size);  // allocate memory
+  std::vector<uint8_t> pixelMemory(size); // allocate memory
   sk_sp<SkSurface> surface = SkSurface::MakeRasterDirect(info, &pixelMemory[0], rowBytes);
   SkCanvas* canvas = surface->getCanvas();
 
@@ -194,8 +199,9 @@ inline SkPath polygonToPath(const std::vector<QPointF>& poly)
 inline std::vector<QPointF> matToPoly(const ZROIUtils2::EigenDRef& mat)
 {
   std::vector<QPointF> res;
-  if (mat.rows() == 0 || mat.cols() == 0)
+  if (mat.rows() == 0 || mat.cols() == 0) {
     return res;
+  }
   CHECK(mat.cols() == 2) << mat.rows() << " " << mat.cols();
   res.resize(mat.rows());
   for (Eigen::Index r = 0; r < mat.rows(); ++r) {
@@ -229,10 +235,11 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils2::polygonToMask_Python(const EigenD
   return pathToMask(polygonToPath(matToPoly(poly)));
 }
 
-std::tuple<ZImg, index_t, index_t> ZROIUtils2::shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
+std::tuple<ZImg, index_t, index_t>
+ZROIUtils2::shapeToMask_Python(const std::vector<std::tuple<EigenDRef, std::string, bool>>& shapeOps)
 {
   SkPath pp;
-  for (const auto&[points, type, isAdd] : shapeOps) {
+  for (const auto& [points, type, isAdd] : shapeOps) {
     SkPath subpp;
     auto poly = matToPoly(points);
     if (type == "Rect") {
@@ -244,7 +251,7 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils2::shapeToMask_Python(const std::vec
     } else if (type == "Spline") {
       subpp = splineToPath(poly);
     } else if (type == "Line") {
-      if(shapeOps.size() == 1) {
+      if (shapeOps.size() == 1) {
         return pathToStroke(splineToPath(poly));
       }
     }

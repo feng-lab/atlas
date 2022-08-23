@@ -16,7 +16,9 @@ public:
   explicit ZPuncta(const QString& filename);
 
   explicit ZPuncta(const std::list<ZPunctum>& p)
-  { data = p; }
+  {
+    data = p;
+  }
 
   ZPuncta(ZPuncta&&) = default;
 
@@ -27,16 +29,24 @@ public:
   ZPuncta& operator=(const ZPuncta&) = default;
 
   inline void clear() noexcept
-  { data.clear(); }
+  {
+    data.clear();
+  }
 
   inline void swap(ZPuncta& other) noexcept
-  { data.swap(other.data); }
+  {
+    data.swap(other.data);
+  }
 
   inline bool operator==(const ZPuncta& l) const
-  { return data == l.data; }
+  {
+    return data == l.data;
+  }
 
   inline bool operator!=(const ZPuncta& l) const
-  { return !(*this == l); }
+  {
+    return !(*this == l);
+  }
 
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename);
@@ -53,11 +63,14 @@ public:
   void save(const QString& filename, const QString& format = "") const;
 
   [[nodiscard]] inline QString toQString() const
-  { return QString("%1 puncta").arg(data.size()); }
+  {
+    return QString("%1 puncta").arg(data.size());
+  }
 
   [[nodiscard]] inline std::string toString() const
-  { return fmt::format("{} puncta", data.size()); }
+  {
+    return fmt::format("{} puncta", data.size());
+  }
 };
 
 } // namespace nim
-

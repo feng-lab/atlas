@@ -18,7 +18,9 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
   }
   if (c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
     throw ZImgException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
-                          .arg(c).arg(t).arg(img.info().toQString()));
+                          .arg(c)
+                          .arg(t)
+                          .arg(img.info().toQString()));
   }
   using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
@@ -68,7 +70,10 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
   }
   if (z >= img.depth() || c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
     throw ZImgException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
-                          .arg(z).arg(c).arg(t).arg(img.info().toQString()));
+                          .arg(z)
+                          .arg(c)
+                          .arg(t)
+                          .arg(img.info().toQString()));
   }
   using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
@@ -104,7 +109,8 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
 
 // tell itk image to use our pre-allocated memory as internal buffer so we can save one memory copy
 // **note** not work for some filter
-// pass the output of last filter of the itk pipeline as first parameter, pass memory location and size to other parameters
+// pass the output of last filter of the itk pipeline as first parameter, pass memory location and size to other
+// parameters
 // **note** call this after set up the pipeline and before update the pipeline (at least before updating last filter)
 // for example, to tell lastFilter to put result of size (w,h,d) into data:
 
@@ -132,8 +138,7 @@ void letITKImgUseMemory(itk::Image<TVoxel, 3>* itkImg, TVoxel* data, size_t widt
 }
 
 template<typename TVoxel>
-void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height,
-                        size_t /*dummyDepth*/)
+void letITKImgUseMemory(itk::Image<TVoxel, 2>* itkImg, TVoxel* data, size_t width, size_t height, size_t /*dummyDepth*/)
 {
   using TITKImg = itk::Image<TVoxel, 2>;
   typename TITKImg::SizeType size;
@@ -207,240 +212,250 @@ void copyITKImgToMemory(const itk::Image<TVoxel, 2>* image, TVoxel* data)
 //
 //
 
-#define TO_ITK_3D_IMG_AND_CALL(function, img, c, t, TVoxel, ...) { \
-  itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t); \
-  function(itkimg.GetPointer(), __VA_ARGS__); \
-  }
-
-#define TO_ITK_3D_IMG_AND_CALL_R(function, img, c, t, TVoxel, ...) { \
-  itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t); \
-  return function(itkimg.GetPointer(), __VA_ARGS__); \
-  }
-
-#define TO_ITK_2D_IMG_AND_CALL(function, img, z, c, t, TVoxel, ...) { \
-  itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, z, c, t); \
-  function(itkimg.GetPointer(), __VA_ARGS__); \
-  }
-
-#define TO_ITK_2D_IMG_AND_CALL_R(function, img, z, c, t, TVoxel, ...) { \
-  itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, z, c, t); \
-  return function(itkimg.GetPointer(), __VA_ARGS__); \
-  }
-
-#define TO_ITK_IMG_AND_CALL(function, img, c, t, TVoxel, ...) { \
-  if (img.is2DImg()) { \
-    itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
-    function(itkimg.GetPointer(), __VA_ARGS__); \
-  } else { \
+#define TO_ITK_3D_IMG_AND_CALL(function, img, c, t, TVoxel, ...)                        \
+  {                                                                                     \
     itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t); \
-    function(itkimg.GetPointer(), __VA_ARGS__); \
-  } \
+    function(itkimg.GetPointer(), __VA_ARGS__);                                         \
   }
 
-#define TO_ITK_IMG_AND_CALL_R(function, img, c, t, TVoxel, ...) { \
-  if (img.is2DImg()) { \
-    itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
-    return function(itkimg.GetPointer(), __VA_ARGS__); \
-  } else { \
+#define TO_ITK_3D_IMG_AND_CALL_R(function, img, c, t, TVoxel, ...)                      \
+  {                                                                                     \
     itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t); \
-    return function(itkimg.GetPointer(), __VA_ARGS__); \
-  } \
+    return function(itkimg.GetPointer(), __VA_ARGS__);                                  \
   }
 
-#define TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, TVoxel, T2ND, ...) { \
-  if (img.is2DImg()) { \
-    itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
-    function<itk::Image<TVoxel, 2>, T2ND>(itkimg.GetPointer(), __VA_ARGS__); \
-  } else { \
-    itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t); \
-    function<itk::Image<TVoxel, 3>, T2ND>(itkimg.GetPointer(), __VA_ARGS__); \
-  } \
+#define TO_ITK_2D_IMG_AND_CALL(function, img, z, c, t, TVoxel, ...)                      \
+  {                                                                                      \
+    itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, z, c, t); \
+    function(itkimg.GetPointer(), __VA_ARGS__);                                          \
   }
 
-#define INTEGER_IMG_ITK_3D_TYPED_CALL(function, img, c, t, ...) {                    \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint8_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint16_t, __VA_ARGS__)     \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint32_t, __VA_ARGS__)     \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint64_t, __VA_ARGS__)     \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                               \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int8_t, __VA_ARGS__)       \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int16_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int32_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int64_t, __VA_ARGS__)      \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  }                                                                          \
-}
+#define TO_ITK_2D_IMG_AND_CALL_R(function, img, z, c, t, TVoxel, ...)                    \
+  {                                                                                      \
+    itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, z, c, t); \
+    return function(itkimg.GetPointer(), __VA_ARGS__);                                   \
+  }
 
-#define IMG_ITK_TYPED_CALL(function, img, c, t, ...) {                    \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, uint8_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, uint16_t, __VA_ARGS__)     \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, uint32_t, __VA_ARGS__)     \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, uint64_t, __VA_ARGS__)     \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                                \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, float, __VA_ARGS__)        \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, double, __VA_ARGS__)       \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                               \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, int8_t, __VA_ARGS__)       \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, int16_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, int32_t, __VA_ARGS__)      \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL(function, img, c, t, int64_t, __VA_ARGS__)      \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  }                                                                          \
-}
+#define TO_ITK_IMG_AND_CALL(function, img, c, t, TVoxel, ...)                              \
+  {                                                                                        \
+    if (img.is2DImg()) {                                                                   \
+      itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
+      function(itkimg.GetPointer(), __VA_ARGS__);                                          \
+    } else {                                                                               \
+      itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t);  \
+      function(itkimg.GetPointer(), __VA_ARGS__);                                          \
+    }                                                                                      \
+  }
 
-#define IMG_RETURN_ITK_TYPED_CALL(function, img, c, t, ...) {               \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                      \
-    switch (img.bytesPerVoxel()) {                                             \
-    case 1:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint8_t, __VA_ARGS__)      \
-      break;                                                                   \
-    case 2:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint16_t, __VA_ARGS__)     \
-      break;                                                                   \
-    case 4:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint32_t, __VA_ARGS__)     \
-      break;                                                                   \
-    case 8:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint64_t, __VA_ARGS__)     \
-      break;                                                                   \
-    default:                                                                   \
-      break;                                                                   \
-    }                                                                          \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                                  \
-    switch (img.bytesPerVoxel()) {                                             \
-    case 4:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, float, __VA_ARGS__)        \
-      break;                                                                   \
-    case 8:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, double, __VA_ARGS__)       \
-      break;                                                                   \
-    default:                                                                   \
-      break;                                                                   \
-    }                                                                          \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                                 \
-    switch (img.bytesPerVoxel()) {                                             \
-    case 1:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, int8_t, __VA_ARGS__)       \
-      break;                                                                   \
-    case 2:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, int16_t, __VA_ARGS__)      \
-      break;                                                                   \
-    case 4:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, int32_t, __VA_ARGS__)      \
-      break;                                                                   \
-    case 8:                                                                    \
-      TO_ITK_IMG_AND_CALL_R(function, img, c, t, int64_t, __VA_ARGS__)      \
-      break;                                                                   \
-    default:                                                                   \
-      break;                                                                   \
-    }                                                                          \
-  }                                                                            \
-}
+#define TO_ITK_IMG_AND_CALL_R(function, img, c, t, TVoxel, ...)                            \
+  {                                                                                        \
+    if (img.is2DImg()) {                                                                   \
+      itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
+      return function(itkimg.GetPointer(), __VA_ARGS__);                                   \
+    } else {                                                                               \
+      itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t);  \
+      return function(itkimg.GetPointer(), __VA_ARGS__);                                   \
+    }                                                                                      \
+  }
 
-#define IMG_ITK_TYPED_CALL_FIX2NDTYPE(function, img, c, t, T2ND, ...) {   \
-  if (img.voxelFormat() == VoxelFormat::Unsigned) {                                    \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint8_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint16_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint32_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint64_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
+#define TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, TVoxel, T2ND, ...)             \
+  {                                                                                        \
+    if (img.is2DImg()) {                                                                   \
+      itk::Image<TVoxel, 2>::Pointer itkimg = wrapZImgPlaneAsITKImg<TVoxel>(img, 0, c, t); \
+      function<itk::Image<TVoxel, 2>, T2ND>(itkimg.GetPointer(), __VA_ARGS__);             \
+    } else {                                                                               \
+      itk::Image<TVoxel, 3>::Pointer itkimg = wrapZImgChannelAsITKImg<TVoxel>(img, c, t);  \
+      function<itk::Image<TVoxel, 3>, T2ND>(itkimg.GetPointer(), __VA_ARGS__);             \
+    }                                                                                      \
+  }
+
+#define INTEGER_IMG_ITK_3D_TYPED_CALL(function, img, c, t, ...)              \
+  {                                                                          \
+    if (img.voxelFormat() == VoxelFormat::Unsigned) {                        \
+      switch (img.bytesPerVoxel()) {                                         \
+        case 1:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint8_t, __VA_ARGS__)  \
+          break;                                                             \
+        case 2:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint16_t, __VA_ARGS__) \
+          break;                                                             \
+        case 4:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint32_t, __VA_ARGS__) \
+          break;                                                             \
+        case 8:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, uint64_t, __VA_ARGS__) \
+          break;                                                             \
+        default:                                                             \
+          break;                                                             \
+      }                                                                      \
+    } else if (img.voxelFormat() == VoxelFormat::Signed) {                   \
+      switch (img.bytesPerVoxel()) {                                         \
+        case 1:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int8_t, __VA_ARGS__)   \
+          break;                                                             \
+        case 2:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int16_t, __VA_ARGS__)  \
+          break;                                                             \
+        case 4:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int32_t, __VA_ARGS__)  \
+          break;                                                             \
+        case 8:                                                              \
+          TO_ITK_3D_IMG_AND_CALL(function, img, c, t, int64_t, __VA_ARGS__)  \
+          break;                                                             \
+        default:                                                             \
+          break;                                                             \
+      }                                                                      \
     }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Float) {                                \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, float, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, double, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  } else if (img.voxelFormat() == VoxelFormat::Signed) {                               \
-    switch (img.bytesPerVoxel()) {                                           \
-    case 1:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int8_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 2:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int16_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 4:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int32_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    case 8:                                                                  \
-      TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int64_t, T2ND, __VA_ARGS__)      \
-      break;                                                                 \
-    default:                                                                 \
-      break;                                                                 \
-    }                                                                        \
-  }                                                                          \
-}
+  }
+
+#define IMG_ITK_TYPED_CALL(function, img, c, t, ...)                      \
+  {                                                                       \
+    if (img.voxelFormat() == VoxelFormat::Unsigned) {                     \
+      switch (img.bytesPerVoxel()) {                                      \
+        case 1:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, uint8_t, __VA_ARGS__)  \
+          break;                                                          \
+        case 2:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, uint16_t, __VA_ARGS__) \
+          break;                                                          \
+        case 4:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, uint32_t, __VA_ARGS__) \
+          break;                                                          \
+        case 8:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, uint64_t, __VA_ARGS__) \
+          break;                                                          \
+        default:                                                          \
+          break;                                                          \
+      }                                                                   \
+    } else if (img.voxelFormat() == VoxelFormat::Float) {                 \
+      switch (img.bytesPerVoxel()) {                                      \
+        case 4:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, float, __VA_ARGS__)    \
+          break;                                                          \
+        case 8:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, double, __VA_ARGS__)   \
+          break;                                                          \
+        default:                                                          \
+          break;                                                          \
+      }                                                                   \
+    } else if (img.voxelFormat() == VoxelFormat::Signed) {                \
+      switch (img.bytesPerVoxel()) {                                      \
+        case 1:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, int8_t, __VA_ARGS__)   \
+          break;                                                          \
+        case 2:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, int16_t, __VA_ARGS__)  \
+          break;                                                          \
+        case 4:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, int32_t, __VA_ARGS__)  \
+          break;                                                          \
+        case 8:                                                           \
+          TO_ITK_IMG_AND_CALL(function, img, c, t, int64_t, __VA_ARGS__)  \
+          break;                                                          \
+        default:                                                          \
+          break;                                                          \
+      }                                                                   \
+    }                                                                     \
+  }
+
+#define IMG_RETURN_ITK_TYPED_CALL(function, img, c, t, ...)                 \
+  {                                                                         \
+    if (img.voxelFormat() == VoxelFormat::Unsigned) {                       \
+      switch (img.bytesPerVoxel()) {                                        \
+        case 1:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint8_t, __VA_ARGS__)  \
+          break;                                                            \
+        case 2:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint16_t, __VA_ARGS__) \
+          break;                                                            \
+        case 4:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint32_t, __VA_ARGS__) \
+          break;                                                            \
+        case 8:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, uint64_t, __VA_ARGS__) \
+          break;                                                            \
+        default:                                                            \
+          break;                                                            \
+      }                                                                     \
+    } else if (img.voxelFormat() == VoxelFormat::Float) {                   \
+      switch (img.bytesPerVoxel()) {                                        \
+        case 4:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, float, __VA_ARGS__)    \
+          break;                                                            \
+        case 8:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, double, __VA_ARGS__)   \
+          break;                                                            \
+        default:                                                            \
+          break;                                                            \
+      }                                                                     \
+    } else if (img.voxelFormat() == VoxelFormat::Signed) {                  \
+      switch (img.bytesPerVoxel()) {                                        \
+        case 1:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, int8_t, __VA_ARGS__)   \
+          break;                                                            \
+        case 2:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, int16_t, __VA_ARGS__)  \
+          break;                                                            \
+        case 4:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, int32_t, __VA_ARGS__)  \
+          break;                                                            \
+        case 8:                                                             \
+          TO_ITK_IMG_AND_CALL_R(function, img, c, t, int64_t, __VA_ARGS__)  \
+          break;                                                            \
+        default:                                                            \
+          break;                                                            \
+      }                                                                     \
+    }                                                                       \
+  }
+
+#define IMG_ITK_TYPED_CALL_FIX2NDTYPE(function, img, c, t, T2ND, ...)                      \
+  {                                                                                        \
+    if (img.voxelFormat() == VoxelFormat::Unsigned) {                                      \
+      switch (img.bytesPerVoxel()) {                                                       \
+        case 1:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint8_t, T2ND, __VA_ARGS__)  \
+          break;                                                                           \
+        case 2:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint16_t, T2ND, __VA_ARGS__) \
+          break;                                                                           \
+        case 4:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint32_t, T2ND, __VA_ARGS__) \
+          break;                                                                           \
+        case 8:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, uint64_t, T2ND, __VA_ARGS__) \
+          break;                                                                           \
+        default:                                                                           \
+          break;                                                                           \
+      }                                                                                    \
+    } else if (img.voxelFormat() == VoxelFormat::Float) {                                  \
+      switch (img.bytesPerVoxel()) {                                                       \
+        case 4:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, float, T2ND, __VA_ARGS__)    \
+          break;                                                                           \
+        case 8:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, double, T2ND, __VA_ARGS__)   \
+          break;                                                                           \
+        default:                                                                           \
+          break;                                                                           \
+      }                                                                                    \
+    } else if (img.voxelFormat() == VoxelFormat::Signed) {                                 \
+      switch (img.bytesPerVoxel()) {                                                       \
+        case 1:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int8_t, T2ND, __VA_ARGS__)   \
+          break;                                                                           \
+        case 2:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int16_t, T2ND, __VA_ARGS__)  \
+          break;                                                                           \
+        case 4:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int32_t, T2ND, __VA_ARGS__)  \
+          break;                                                                           \
+        case 8:                                                                            \
+          TO_ITK_IMG_AND_CALL_FIX2NDTYPE(function, img, c, t, int64_t, T2ND, __VA_ARGS__)  \
+          break;                                                                           \
+        default:                                                                           \
+          break;                                                                           \
+      }                                                                                    \
+    }                                                                                      \
+  }
 
 } // namespace nim
-

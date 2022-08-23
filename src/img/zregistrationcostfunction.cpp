@@ -5,8 +5,9 @@ namespace nim {
 void ZRegistrationCostFunction::setUseMultithreading(bool i)
 {
   m_useMultithreading = i;
-  if (m_transform)
+  if (m_transform) {
     m_transform->setUseMultithreading(i);
+  }
 }
 
 void ZRegistrationCostFunction::setTransform(ZImageTransform& transform)

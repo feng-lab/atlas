@@ -20,7 +20,7 @@ using namespace nim;
 void createMaterials(aiScene* pScene)
 {
   pScene->mNumMaterials = 1;
-  pScene->mMaterials = new aiMaterial* [pScene->mNumMaterials];
+  pScene->mMaterials = new aiMaterial*[pScene->mNumMaterials];
   for (unsigned int matIndex = 0; matIndex < pScene->mNumMaterials; matIndex++) {
     auto mat = new aiMaterial;
     pScene->mMaterials[matIndex] = mat;
@@ -78,7 +78,7 @@ void appendChildToParentNode(aiNode* pParent, aiNode* pChild)
 
   // Copy node instances into parent node
   pParent->mNumChildren++;
-  pParent->mChildren = new aiNode* [pParent->mNumChildren];
+  pParent->mChildren = new aiNode*[pParent->mNumChildren];
   for (size_t index = 0; index < pParent->mNumChildren - 1; index++) {
     pParent->mChildren[index] = temp[index];
   }
@@ -106,7 +106,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
   const size_t meshSizeDiff = MeshArray.size() - oldMeshSize;
   if (meshSizeDiff > 0) {
     pNode->mMeshes = new unsigned int[meshSizeDiff];
-    pNode->mNumMeshes = static_cast<unsigned int>( meshSizeDiff );
+    pNode->mNumMeshes = static_cast<unsigned int>(meshSizeDiff);
     size_t index = 0;
     for (size_t i = oldMeshSize; i < MeshArray.size(); ++i) {
       pNode->mMeshes[index] = pScene->mNumMeshes;
@@ -118,7 +118,7 @@ aiNode* createNodes(const ZMesh& mesh, aiNode* pParent, aiScene* pScene, std::ve
   return pNode;
 }
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
@@ -203,31 +203,18 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
     } else {
       Assimp::Importer importer;
       importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE,
-                                  aiPrimitiveType_POINT |      //remove points and
-                                  aiPrimitiveType_LINE);      //lines
+                                  aiPrimitiveType_POINT | // remove points and
+                                    aiPrimitiveType_LINE); // lines
       importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
-                                  aiComponent_CAMERAS |
-                                  aiComponent_LIGHTS |
-                                  aiComponent_BONEWEIGHTS |
-                                  aiComponent_COLORS |
-                                  aiComponent_TANGENTS_AND_BITANGENTS |
-                                  aiComponent_ANIMATIONS |
-                                  aiComponent_MATERIALS |
-                                  0);
-      const aiScene* scene = importer.ReadFile(QFile::encodeName(filename).constData(),
-                                               aiProcess_GenSmoothNormals |
-                                               aiProcess_JoinIdenticalVertices |
-                                               aiProcess_ImproveCacheLocality |
-                                               aiProcess_PreTransformVertices |
-                                               aiProcess_RemoveRedundantMaterials |
-                                               aiProcess_Triangulate |
-                                               aiProcess_GenUVCoords |
-                                               aiProcess_TransformUVCoords |
-                                               aiProcess_SortByPType |
-                                               aiProcess_FindDegenerates |
-                                               aiProcess_FindInvalidData |
-                                               aiProcess_RemoveComponent |
-                                               0);
+                                  aiComponent_CAMERAS | aiComponent_LIGHTS | aiComponent_BONEWEIGHTS |
+                                    aiComponent_COLORS | aiComponent_TANGENTS_AND_BITANGENTS | aiComponent_ANIMATIONS |
+                                    aiComponent_MATERIALS | 0);
+      const aiScene* scene = importer.ReadFile(
+        QFile::encodeName(filename).constData(),
+        aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality |
+          aiProcess_PreTransformVertices | aiProcess_RemoveRedundantMaterials | aiProcess_Triangulate |
+          aiProcess_GenUVCoords | aiProcess_TransformUVCoords | aiProcess_SortByPType | aiProcess_FindDegenerates |
+          aiProcess_FindInvalidData | aiProcess_RemoveComponent | 0);
 
       if (!scene) {
         throw ZIOException(importer.GetErrorString());
@@ -245,8 +232,9 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
       std::memcpy(mesh.m_normals.data(), msh->mNormals, sizeof(float) * 3 * mesh.m_vertices.size());
 
       for (size_t i = 0; i < msh->mNumFaces; ++i) {
-        if (msh->mFaces[i].mNumIndices != 3)
+        if (msh->mFaces[i].mNumIndices != 3) {
           continue;
+        }
         mesh.m_indices.push_back(msh->mFaces[i].mIndices[0]);
         mesh.m_indices.push_back(msh->mFaces[i].mIndices[1]);
         mesh.m_indices.push_back(msh->mFaces[i].mIndices[2]);
@@ -261,17 +249,18 @@ void ZMeshIO::load(const QString& filename, ZMesh& mesh)
         std::memcpy(&mesh.m_normals[numV], msh->mNormals, sizeof(float) * 3 * msh->mNumVertices);
 
         for (size_t i = 0; i < msh->mNumFaces; ++i) {
-          if (msh->mFaces[i].mNumIndices != 3)
+          if (msh->mFaces[i].mNumIndices != 3) {
             continue;
+          }
           mesh.m_indices.push_back(msh->mFaces[i].mIndices[0] + numV);
           mesh.m_indices.push_back(msh->mFaces[i].mIndices[1] + numV);
           mesh.m_indices.push_back(msh->mFaces[i].mIndices[2] + numV);
         }
       }
 
-      //mesh.generateNormals();
+      // mesh.generateNormals();
 
-      //throw ZIOException("Not supported mesh format");
+      // throw ZIOException("Not supported mesh format");
     }
   }
   catch (const ZException& e) {
@@ -322,7 +311,7 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
 
     // Create mesh pointer buffer for this scene
     if (sc->mNumMeshes > 0) {
-      sc->mMeshes = new aiMesh* [meshArray.size()];
+      sc->mMeshes = new aiMesh*[meshArray.size()];
       for (size_t index = 0; index < meshArray.size(); index++) {
         sc->mMeshes[index] = meshArray[index];
       }
@@ -342,8 +331,10 @@ void ZMeshIO::save(const ZMesh& mesh, const QString& filename, std::string forma
   }
 }
 
-void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                                 std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices)
+void ZMeshIO::readAllenAtlasMesh(const QString& filename,
+                                 std::vector<glm::vec3>& normals,
+                                 std::vector<glm::vec3>& vertices,
+                                 std::vector<uint32_t>& indices)
 {
   std::ifstream inputFileStream;
   openFileStream(inputFileStream, filename, std::ios::in | std::ios::binary);
@@ -354,8 +345,8 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
   normals.resize(numPoints);
   vertices.resize(numPoints);
 
-  //read points
-  // 3 floats for normals followed by 3 floats for coordinates per point
+  // read points
+  //  3 floats for normals followed by 3 floats for coordinates per point
   for (uint32_t i = 0; i < numPoints; ++i) {
     readStream(inputFileStream, &normals[i][0], 3 * 4);
     readStream(inputFileStream, &vertices[i][0], 3 * 4);
@@ -367,7 +358,7 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
 
   // read triangle strips
   for (uint32_t i = 0; i < numTriangleStrips; ++i) {
-    //read number of points in the strip
+    // read number of points in the strip
     uint32_t numPointsInStrip = 0;
     readStream(inputFileStream, &numPointsInStrip, 2);
 
@@ -388,8 +379,8 @@ void ZMeshIO::readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>
   size_t triIdx = 0;
   for (uint32_t i = 0; i < numTriangleStrips; ++i) {
     for (size_t j = 0; j < allStrips[i].size() - 2; ++j) {
-      //Indicies in the triStripIndices are like: ABCDEFG
-      //We need to change them to be ABC CBD CDE EDF EFG(note swapping of ordering)
+      // Indicies in the triStripIndices are like: ABCDEFG
+      // We need to change them to be ABC CBD CDE EDF EFG(note swapping of ordering)
       if (j % 2 == 0) {
         indices[triIdx * 3] = allStrips[i][j];
         indices[triIdx * 3 + 1] = allStrips[i][j + 1];

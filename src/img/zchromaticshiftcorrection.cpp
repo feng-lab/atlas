@@ -68,8 +68,7 @@ void ZChromaticShiftCorrection::doWork()
 
 void ZChromaticShiftCorrection::read(const json::object& jo)
 {
-  setInputOutput(json::value_to<QString>(jo.at("input_file")),
-                 json::value_to<QString>(jo.at("result_file")));
+  setInputOutput(json::value_to<QString>(jo.at("input_file")), json::value_to<QString>(jo.at("result_file")));
 
   setReferenceChannel(json::value_to<int>(jo.at("reference_channel")));
   setTargetChannel(json::value_to<int>(jo.at("target_channel")));
@@ -104,15 +103,16 @@ void ZChromaticShiftCorrection::write(json::object& jo) const
 
 template<typename ImagePixelType>
 void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcImg,
-                                                                size_t movingChannel, const QString& presetName)
+                                                                size_t movingChannel,
+                                                                const QString& presetName)
 {
   std::map<QString, std::vector<double>> presetNameToParameters = {
     {"40x_1z", {-0.481418, 0.702386, 0.}},
-    {"40x_2z", {-1.29442,  1.44593,  0.}},
-    {"40x_4z", {-2.56525,  2.57374,  0.}},
-    {"63x_1z", {-0.440559, 2.27874,  0.}},
-    {"63x_2z", {-0.891503, 4.75318,  0.}},
-    {"63x_4z", {-2.137,    10.1926,  0.}}
+    {"40x_2z", {-1.29442, 1.44593, 0.}  },
+    {"40x_4z", {-2.56525, 2.57374, 0.}  },
+    {"63x_1z", {-0.440559, 2.27874, 0.} },
+    {"63x_2z", {-0.891503, 4.75318, 0.} },
+    {"63x_4z", {-2.137, 10.1926, 0.}    }
   };
 
   std::unique_ptr<ZImageTransform> transform;
@@ -133,18 +133,22 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
   }
 
   // get output image from registered parameters
-  transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
-                                                       m_brightBackground ? m_channelInfos[movingChannel].max
-                                                                          : m_channelInfos[movingChannel].min));
+  transform->setImageInterpolation(
+    ZImageInterpolation(Interpolant::Cubic,
+                        PadOption::Constant,
+                        m_brightBackground ? m_channelInfos[movingChannel].max : m_channelInfos[movingChannel].min));
 
   ZImg correctedImg = srcImg;
   if (srcImg.depth() > 1) {
     transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
-                              srcImg.width(), srcImg.height(), srcImg.depth(),
+                              srcImg.width(),
+                              srcImg.height(),
+                              srcImg.depth(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
     transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
-                              srcImg.width(), srcImg.height(),
+                              srcImg.width(),
+                              srcImg.height(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   }
 
@@ -258,13 +262,27 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, size_t fixedCha
   std::vector<double> filteredMovingImageData(length);
 
   for (size_t i = 0; i < srcImg.depth(); ++i) {
-    image2DGaussianFilter(fixedImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
-                          2.5, 2.5, filteredFixedImageData.data() + i * srcImg.planeByteNumber(), 11, 11,
-                          PadOption::Constant, 0.0,
+    image2DGaussianFilter(fixedImageData.data() + i * srcImg.planeByteNumber(),
+                          srcImg.width(),
+                          srcImg.height(),
+                          2.5,
+                          2.5,
+                          filteredFixedImageData.data() + i * srcImg.planeByteNumber(),
+                          11,
+                          11,
+                          PadOption::Constant,
+                          0.0,
                           m_useMultithreading);
-    image2DGaussianFilter(movingImageData.data() + i * srcImg.planeByteNumber(), srcImg.width(), srcImg.height(),
-                          2.5, 2.5, filteredMovingImageData.data() + i * srcImg.planeByteNumber(), 11, 11,
-                          PadOption::Constant, 0.0,
+    image2DGaussianFilter(movingImageData.data() + i * srcImg.planeByteNumber(),
+                          srcImg.width(),
+                          srcImg.height(),
+                          2.5,
+                          2.5,
+                          filteredMovingImageData.data() + i * srcImg.planeByteNumber(),
+                          11,
+                          11,
+                          PadOption::Constant,
+                          0.0,
                           m_useMultithreading);
   }
 
@@ -325,18 +343,22 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, size_t fixedCha
   registration.run();
 
   // get output image from registered parameters
-  transform->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
-                                                       m_brightBackground ? m_channelInfos[movingChannel].max
-                                                                          : m_channelInfos[movingChannel].min));
+  transform->setImageInterpolation(
+    ZImageInterpolation(Interpolant::Cubic,
+                        PadOption::Constant,
+                        m_brightBackground ? m_channelInfos[movingChannel].max : m_channelInfos[movingChannel].min));
 
   ZImg correctedImg = srcImg;
   if (srcImg.depth() > 1) {
     transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
-                              srcImg.width(), srcImg.height(), srcImg.depth(),
+                              srcImg.width(),
+                              srcImg.height(),
+                              srcImg.depth(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   } else {
     transform->transformImage(srcImg.channelData<ImagePixelType>(movingChannel),
-                              srcImg.width(), srcImg.height(),
+                              srcImg.width(),
+                              srcImg.height(),
                               correctedImg.channelData<ImagePixelType>(movingChannel));
   }
 
@@ -352,23 +374,25 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
   size_t length = srcImg.channelVoxelNumber();
   for (size_t i = 0; i < srcImg.numChannels(); ++i) {
     const auto* data = srcImg.channelData<ImagePixelType>(i);
-    std::pair<const ImagePixelType*, const ImagePixelType*> minmax =
-      minMaxElement(data, data + length);
+    std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
     m_channelInfos[i].min = *minmax.first;
     m_channelInfos[i].max = *minmax.second;
     m_minValue = std::min(m_minValue, m_channelInfos[i].min);
     m_maxValue = std::max(m_maxValue, m_channelInfos[i].max);
     std::vector<ImagePixelType> dataWithoutZero;
     for (size_t j = 0; j < length; ++j) {
-      if (data[j] > 0)
+      if (data[j] > 0) {
         dataWithoutZero.push_back(data[j]);
+      }
     }
     if (dataWithoutZero.empty()) {
       m_channelInfos[i].mean = 0;
       m_channelInfos[i].std = 0;
       m_channelInfos[i].median = 0;
     } else {
-      meanAndStandardDeviation(dataWithoutZero.begin(), dataWithoutZero.end(), m_channelInfos[i].mean,
+      meanAndStandardDeviation(dataWithoutZero.begin(),
+                               dataWithoutZero.end(),
+                               m_channelInfos[i].mean,
                                m_channelInfos[i].std);
       m_channelInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
     }
@@ -376,5 +400,3 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
 }
 
 } // namespace nim
-
-

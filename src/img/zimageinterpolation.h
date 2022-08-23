@@ -46,24 +46,36 @@ public:
   // see above, instead we use global PadOption, the only different is bound, we set it as an option for Replicate
   // call this if you want "bound" behavior, and m_padOption must be Replicate and fillValue must be provided
   void setBoundInBorder(bool v)
-  { m_boundInBorder = v; }
+  {
+    m_boundInBorder = v;
+  }
 
 #endif
 
   void setPadOption(PadOption po)
-  { m_padOption = po; }
+  {
+    m_padOption = po;
+  }
 
   void setInterpolant(Interpolant ip)
-  { m_interpolant = ip; }
+  {
+    m_interpolant = ip;
+  }
 
   PadOption padOption() const
-  { return m_padOption; }
+  {
+    return m_padOption;
+  }
 
   void setFillValue(double v)
-  { m_fillValue = v; }
+  {
+    m_fillValue = v;
+  }
 
   Interpolant interpolant() const
-  { return m_interpolant; }
+  {
+    return m_interpolant;
+  }
 
   // http://www.paulinternet.nl/?page=bicubic
   double cubicInterpolate(double p[4], double x) const;
@@ -78,12 +90,13 @@ public:
   double sample(const TPixel* img, size_t width, size_t height, double x, double y) const;
 
   template<typename TPixel>
-  double sample(const TPixel* img, size_t width, size_t height, size_t depth,
-                double x, double y, double z) const;
+  double sample(const TPixel* img, size_t width, size_t height, size_t depth, double x, double y, double z) const;
 
 protected:
   inline bool inBound(size_t width, size_t height, double x, double y) const
-  { return x >= 0. && x < static_cast<double>(width) && y >= 0. && y < static_cast<double>(height); }
+  {
+    return x >= 0. && x < static_cast<double>(width) && y >= 0. && y < static_cast<double>(height);
+  }
 
   inline bool inBound(size_t width, size_t height, size_t depth, double x, double y, double z) const
   {
@@ -99,4 +112,3 @@ private:
 };
 
 } // namespace nim
-

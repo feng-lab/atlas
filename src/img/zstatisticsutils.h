@@ -18,21 +18,25 @@ template<typename RandomAccessIterator>
 class MinMaxElementReduce_Impl
 {
   RandomAccessIterator m_begin;
+
 public:
   std::pair<RandomAccessIterator, RandomAccessIterator> m_minmax;
 
   void operator()(const tbb::blocked_range<RandomAccessIterator>& range)
   {
     for (RandomAccessIterator it = range.begin(); it != range.end(); ++it) {
-      if (*it < *m_minmax.first)
+      if (*it < *m_minmax.first) {
         m_minmax.first = it;
-      if (*it > *m_minmax.second)
+      }
+      if (*it > *m_minmax.second) {
         m_minmax.second = it;
+      }
     }
   }
 
   MinMaxElementReduce_Impl(MinMaxElementReduce_Impl& x, tbb::split /*unused*/)
-    : m_begin(x.m_begin), m_minmax(m_begin, m_begin)
+    : m_begin(x.m_begin)
+    , m_minmax(m_begin, m_begin)
   {}
 
   void join(const MinMaxElementReduce_Impl& y)
@@ -46,7 +50,8 @@ public:
   }
 
   explicit MinMaxElementReduce_Impl(RandomAccessIterator begin)
-    : m_begin(begin), m_minmax(m_begin, m_begin)
+    : m_begin(begin)
+    , m_minmax(m_begin, m_begin)
   {}
 };
 
@@ -75,13 +80,17 @@ public:
     m_sum += std::accumulate(range.begin(), range.end(), ResultType(0));
   }
 
-  SumRangeReduce_Impl(SumRangeReduce_Impl& /*unused*/, tbb::split /*unused*/) : m_sum(0)
+  SumRangeReduce_Impl(SumRangeReduce_Impl& /*unused*/, tbb::split /*unused*/)
+    : m_sum(0)
   {}
 
   void join(const SumRangeReduce_Impl& y)
-  { m_sum += y.m_sum; }
+  {
+    m_sum += y.m_sum;
+  }
 
-  SumRangeReduce_Impl() : m_sum(0)
+  SumRangeReduce_Impl()
+    : m_sum(0)
   {}
 };
 
@@ -92,7 +101,7 @@ sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, 
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
     return std::accumulate(begin, end, init);
   } else {
-    SumRangeReduce_Impl <RandomAccessIterator, ResultType> sum;
+    SumRangeReduce_Impl<RandomAccessIterator, ResultType> sum;
     tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), sum);
     return init + sum.m_sum;
   }
@@ -113,20 +122,26 @@ class StandardDeviationReduce_Impl
   RandomAccessIterator m_begin;
   DiffIterator m_diffbegin;
   ResultType m_meanV;
+
 public:
   ResultType m_sqSum;
 
   void operator()(const tbb::blocked_range<size_t>& range)
   {
     ResultType meanVLocal = m_meanV;
-    std::transform(m_begin + range.begin(), m_begin + range.end(), m_diffbegin + range.begin(),
+    std::transform(m_begin + range.begin(),
+                   m_begin + range.end(),
+                   m_diffbegin + range.begin(),
                    [meanVLocal](ResultType v) { return v - meanVLocal; });
-    m_sqSum += std::inner_product(m_diffbegin + range.begin(), m_diffbegin + range.end(), m_diffbegin + range.begin(),
-                                  0.0);
+    m_sqSum +=
+      std::inner_product(m_diffbegin + range.begin(), m_diffbegin + range.end(), m_diffbegin + range.begin(), 0.0);
   }
 
   StandardDeviationReduce_Impl(StandardDeviationReduce_Impl& x, tbb::split /*unused*/)
-    : m_begin(x.m_begin), m_diffbegin(x.m_diffbegin), m_meanV(x.m_meanV), m_sqSum(0)
+    : m_begin(x.m_begin)
+    , m_diffbegin(x.m_diffbegin)
+    , m_meanV(x.m_meanV)
+    , m_sqSum(0)
   {}
 
   void join(const StandardDeviationReduce_Impl& y)
@@ -135,12 +150,16 @@ public:
   }
 
   StandardDeviationReduce_Impl(RandomAccessIterator begin, DiffIterator diffbegin, ResultType mean)
-    : m_begin(begin), m_diffbegin(diffbegin), m_meanV(mean), m_sqSum(0)
+    : m_begin(begin)
+    , m_diffbegin(diffbegin)
+    , m_meanV(mean)
+    , m_sqSum(0)
   {}
 };
 
 template<class RandomAccessIterator>
-void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator end,
+void meanAndStandardDeviation(RandomAccessIterator begin,
+                              RandomAccessIterator end,
                               double& meanV,
                               double& stdV,
                               bool bias = false,
@@ -154,13 +173,13 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
   meanV = mean(begin, end, useMultithreading);
   ResultType sq_sum;
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
-    std::transform(begin, end, diff.begin(),
-                   [meanV](ResultType v) { return v - meanV; });
+    std::transform(begin, end, diff.begin(), [meanV](ResultType v) { return v - meanV; });
     sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
   } else {
-    StandardDeviationReduce_Impl <RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(begin,
-                                                                                                             diff.begin(),
-                                                                                                             meanV);
+    StandardDeviationReduce_Impl<RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(
+      begin,
+      diff.begin(),
+      meanV);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, size), sqsum);
     sq_sum = sqsum.m_sqSum;
   }
@@ -172,7 +191,9 @@ void meanAndStandardDeviation(RandomAccessIterator begin, RandomAccessIterator e
 }
 
 template<class RandomAccessIterator>
-double standardDeviation(RandomAccessIterator begin, RandomAccessIterator end, bool bias = false,
+double standardDeviation(RandomAccessIterator begin,
+                         RandomAccessIterator end,
+                         bool bias = false,
                          bool useMultithreading = true)
 {
   double meanV;
@@ -195,9 +216,9 @@ double median(RandomAccessIterator begin, RandomAccessIterator end)
   typename std::vector<ValueType>::iterator target = vec.begin() + middleIdx;
   std::nth_element(vec.begin(), target, vec.end());
 
-  if (size % 2 != 0) { //Odd number of elements
+  if (size % 2 != 0) { // Odd number of elements
     return static_cast<ResultType>(*target);
-  } else {            //Even number of elements
+  } else { // Even number of elements
     ResultType a = *target;
     return (a + *std::max_element(vec.begin(), target)) / 2.0;
   }
@@ -215,9 +236,9 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
   RandomAccessIterator target = begin + middleIdx;
   std::nth_element(begin, target, end);
 
-  if (size % 2 != 0) { //Odd number of elements
+  if (size % 2 != 0) { // Odd number of elements
     return static_cast<ResultType>(*target);
-  }            //Even number of elements
+  } // Even number of elements
   ResultType a = *target;
   return (a + *std::max_element(begin, target)) / 2.0;
 }

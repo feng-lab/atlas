@@ -20,7 +20,9 @@ public:
   [[nodiscard]] bool canWriteFile(const QString& filename) const;
 
   [[nodiscard]] const QString& getQtReadNameFilter() const
-  { return m_readFilter; }
+  {
+    return m_readFilter;
+  }
 
   void getQtWriteNameFilter(QStringList& filters, std::vector<std::string>& formats);
 
@@ -29,11 +31,13 @@ public:
   void save(const ZMesh& mesh, const QString& filename, std::string format) const;
 
 private:
-  static void readAllenAtlasMesh(const QString& filename, std::vector<glm::vec3>& normals,
-                                 std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
+  static void readAllenAtlasMesh(const QString& filename,
+                                 std::vector<glm::vec3>& normals,
+                                 std::vector<glm::vec3>& vertices,
+                                 std::vector<uint32_t>& indices);
 
-  static void readPrecomputed(const QString& filename,
-                              std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
+  static void
+  readPrecomputed(const QString& filename, std::vector<glm::vec3>& vertices, std::vector<uint32_t>& indices);
 
   static void writePrecomputed(const ZMesh& mesh, const QString& filename);
 
@@ -46,4 +50,3 @@ private:
 };
 
 } // namespace nim
-

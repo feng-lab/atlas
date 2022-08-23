@@ -16,9 +16,10 @@ struct ZImgInfo;
 class ZTiffIFD
 {
 public:
-
   [[nodiscard]] bool isNormalImage() const
-  { return !isReducedResolutionImage() && !isTransparencyMask(); }
+  {
+    return !isReducedResolutionImage() && !isTransparencyMask();
+  }
 
   [[nodiscard]] bool isReducedResolutionImage() const;
 
@@ -27,10 +28,14 @@ public:
   [[nodiscard]] bool isTransparencyMask() const;
 
   [[nodiscard]] inline bool containsTag(uint64_t tag) const
-  { return indexOf(tag) != -1; }
+  {
+    return indexOf(tag) != -1;
+  }
 
   [[nodiscard]] const ZImgMetatag& tag(size_t idx) const
-  { return m_entries[idx]; }
+  {
+    return m_entries[idx];
+  }
 
   // return -1 if not found
   [[nodiscard]] index_t indexOf(uint64_t tag) const;
@@ -80,27 +85,41 @@ public:
   [[nodiscard]] uint64_t tileByteCounts(size_t idx) const;
 
   [[nodiscard]] uint64_t offset() const
-  { return m_offset; }
+  {
+    return m_offset;
+  }
 
   [[nodiscard]] uint64_t nextIFDOffset() const
-  { return m_nextIFDOffset; }
+  {
+    return m_nextIFDOffset;
+  }
 
   inline void addField(const ZImgMetatag& fd)
-  { m_entries.push_back(fd); }
+  {
+    m_entries.push_back(fd);
+  }
 
   inline void addSubIFD(const ZTiffIFD& sub)
-  { m_subIFDs.push_back(sub); }
+  {
+    m_subIFDs.push_back(sub);
+  }
 
   inline void setOffset(uint64_t off)
-  { m_offset = off; }
+  {
+    m_offset = off;
+  }
 
   inline void setNextIFDOffset(uint64_t off)
-  { m_nextIFDOffset = off; }
+  {
+    m_nextIFDOffset = off;
+  }
 
   [[nodiscard]] QString toQString() const;
 
   [[nodiscard]] const std::vector<ZTiffIFD>& subIFDs() const
-  { return m_subIFDs; }
+  {
+    return m_subIFDs;
+  }
 
   inline void setExifIFD(const ZTiffIFD& exif)
   {
@@ -109,10 +128,18 @@ public:
   }
 
   [[nodiscard]] inline bool hasExifIFD() const
-  { return !m_exifIFD.empty(); }
+  {
+    return !m_exifIFD.empty();
+  }
 
   [[nodiscard]] const ZTiffIFD* exifIFD() const
-  { if (m_exifIFD.empty()) { return nullptr; } else { return m_exifIFD.data(); }}
+  {
+    if (m_exifIFD.empty()) {
+      return nullptr;
+    } else {
+      return m_exifIFD.data();
+    }
+  }
 
   inline void setGpsIFD(const ZTiffIFD& gps)
   {
@@ -121,10 +148,18 @@ public:
   }
 
   [[nodiscard]] inline bool hasGpsIFD() const
-  { return !m_gpsIFD.empty(); }
+  {
+    return !m_gpsIFD.empty();
+  }
 
   [[nodiscard]] const ZTiffIFD* gpsIFD() const
-  { if (m_gpsIFD.empty()) { return nullptr; } else { return m_gpsIFD.data(); }}
+  {
+    if (m_gpsIFD.empty()) {
+      return nullptr;
+    } else {
+      return m_gpsIFD.data();
+    }
+  }
 
   inline void setInteroperabilityIFD(const ZTiffIFD& interop)
   {
@@ -133,10 +168,18 @@ public:
   }
 
   [[nodiscard]] inline bool hasInteroperabilityIFD() const
-  { return !m_interoperabilityIFD.empty(); }
+  {
+    return !m_interoperabilityIFD.empty();
+  }
 
   [[nodiscard]] const ZTiffIFD* InteroperabilityIFD() const
-  { if (m_interoperabilityIFD.empty()) { return nullptr; } else { return m_interoperabilityIFD.data(); }}
+  {
+    if (m_interoperabilityIFD.empty()) {
+      return nullptr;
+    } else {
+      return m_interoperabilityIFD.data();
+    }
+  }
 
   [[nodiscard]] bool isGrayscaleColormap() const;
 
@@ -151,9 +194,9 @@ private:
   uint64_t m_offset = 0;
   uint64_t m_nextIFDOffset = 0;
   std::vector<ZTiffIFD> m_subIFDs;
-  std::vector<ZTiffIFD> m_exifIFD;  // should contains 0 or 1 IFD
-  std::vector<ZTiffIFD> m_gpsIFD;   // should contains 0 or 1 IFD
-  std::vector<ZTiffIFD> m_interoperabilityIFD;  // should contains 0 or 1 IFD
+  std::vector<ZTiffIFD> m_exifIFD; // should contains 0 or 1 IFD
+  std::vector<ZTiffIFD> m_gpsIFD; // should contains 0 or 1 IFD
+  std::vector<ZTiffIFD> m_interoperabilityIFD; // should contains 0 or 1 IFD
 };
 
 class ZTiff
@@ -162,19 +205,27 @@ public:
   ZTiff();
 
   inline void addIFD(const ZTiffIFD& ifd)
-  { m_ifds.push_back(ifd); }
+  {
+    m_ifds.push_back(ifd);
+  }
 
   [[nodiscard]] QString toQString() const;
 
   [[nodiscard]] const std::vector<ZTiffIFD>& ifds() const
-  { return m_ifds; }
+  {
+    return m_ifds;
+  }
 
   // default is true, call before load and readInfo
   void setUseColormap(bool v)
-  { m_useColormap = v; }
+  {
+    m_useColormap = v;
+  }
 
   [[nodiscard]] bool isUsingColormap() const
-  { return m_useColormap; }
+  {
+    return m_useColormap;
+  }
 
   // for tag only load, readImg* functions don't work
   void load(const QString& filename, bool tagOnly = false);
@@ -189,19 +240,25 @@ public:
   }
 
   [[nodiscard]] bool isValid() const
-  { return !m_ifds.empty(); }
+  {
+    return !m_ifds.empty();
+  }
 
   [[nodiscard]] bool isLsmFile() const;
 
   [[nodiscard]] bool isNativeEndianness() const
-  { return m_isNativeEndianness; }
+  {
+    return m_isNativeEndianness;
+  }
 
   // crash if file is not lsm
   [[nodiscard]] const ZImgMetatag& lsmInfoTag() const;
 
   // read
   inline void readInfoFromIFD(size_t ifdIdx, ZImgInfo& info)
-  { readInfoFromIFD(m_ifds[ifdIdx], info); }
+  {
+    readInfoFromIFD(m_ifds[ifdIdx], info);
+  }
 
   void readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info) const;
 
@@ -215,9 +272,14 @@ public:
 
   // write a 16 + 8 + 20 * 8 + 8 = 192 bytes tiff header to mem, mem+stripOffset is the start of image data
   // mem+stripOffset+stripByteCount is the end of image data, stripOffset should be bigger than 192
-  static void writeTiffHeader(uint8_t* mem, size_t width, size_t height, size_t bitsPerSample, size_t samplesPerPixel,
+  static void writeTiffHeader(uint8_t* mem,
+                              size_t width,
+                              size_t height,
+                              size_t bitsPerSample,
+                              size_t samplesPerPixel,
                               size_t compression,
-                              uint64_t stripOffset, uint64_t stripByteCount);
+                              uint64_t stripOffset,
+                              uint64_t stripByteCount);
 
 protected:
   uint64_t readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const;
@@ -241,13 +303,23 @@ protected:
   static void separateChannel(const ZImg& bufImg, ZImg& img);
 
   // copy tile to correct image locastatic tion
-  static void
-  copyOneChannelTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t voxelByteNumber,
-                          ZImg& img, size_t xStart, size_t yStart, size_t c);
+  static void copyOneChannelTileToImg(const uint8_t* tileBuf,
+                                      size_t tileWidth,
+                                      size_t tileHeight,
+                                      size_t voxelByteNumber,
+                                      ZImg& img,
+                                      size_t xStart,
+                                      size_t yStart,
+                                      size_t c);
 
-  static void
-  copyTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t numChannels, size_t voxelByteNumber,
-                ZImg& img, size_t xStart, size_t yStart);
+  static void copyTileToImg(const uint8_t* tileBuf,
+                            size_t tileWidth,
+                            size_t tileHeight,
+                            size_t numChannels,
+                            size_t voxelByteNumber,
+                            ZImg& img,
+                            size_t xStart,
+                            size_t yStart);
 
 private:
   std::vector<ZTiffIFD> m_ifds;
@@ -267,13 +339,19 @@ public:
   // write img(z,c,t,l) to next ifd, if c == -1, write all channels
   // z, t, l must be valid index
   // if writeThumbnails is false, thumbnails of img are ignored, otherwise they will be written to subifd
-  void writeIFD(const ZImg& img, size_t z, size_t t, index_t c = -1, bool writeThumbnails = true,
+  void writeIFD(const ZImg& img,
+                size_t z,
+                size_t t,
+                index_t c = -1,
+                bool writeThumbnails = true,
                 const std::vector<ZImgMetatag>& additionalTags = std::vector<ZImgMetatag>());
 
   // close file, destructor of ZTiffWriter will do the same thing.
   // use to clean the state when use one ZTiffWriter to write multiple tifs
   void finishWriting()
-  { m_tif.reset(); }
+  {
+    m_tif.reset();
+  }
 
 private:
   // return a valid default compression
@@ -289,4 +367,3 @@ private:
 };
 
 } // namespace nim
-

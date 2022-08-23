@@ -19,7 +19,8 @@ namespace nim {
 
 class ZImgAlgorithmBaseWithProgressReporter : public QObject
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZImgAlgorithmBaseWithProgressReporter();
 
@@ -38,7 +39,9 @@ public:
   // algorithm, but we must know it before the algorithm start to calculate correct progress
   // change this in the middle of operation will cause a little bump
   inline void setTotalSubOperationWeight(double w)
-  { m_weight = 1 - w; }
+  {
+    m_weight = 1 - w;
+  }
 
 Q_SIGNALS:
 
@@ -62,7 +65,9 @@ protected:
   void clearRegisteredSubOperations();
 
   [[nodiscard]] inline bool hasParent() const
-  { return m_parent; }
+  {
+    return m_parent;
+  }
 
 private:
   // calculate and send signal
@@ -79,10 +84,14 @@ private:
   CommandPointer m_CallbackCommand;
 
   inline void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
-  { m_parent = p; }
+  {
+    m_parent = p;
+  }
 
   inline void setNumberOfThreads(size_t n)
-  { m_numThreads = n; }
+  {
+    m_numThreads = n;
+  }
 
 protected:
   struct WeightProgress
@@ -108,30 +117,25 @@ public:
 protected:
   virtual ~ZImgAlgorithmBase() = default;
 
-  inline void setCancelFlag(bool* /*unused*/)
-  {}
+  inline void setCancelFlag(bool* /*unused*/) {}
 
-  inline void setProgressReportInterval(double /*unused*/)
-  {}
+  inline void setProgressReportInterval(double /*unused*/) {}
 
-  inline void setTotalSubOperationWeight(double /*unused*/)
-  {}
+  inline void setTotalSubOperationWeight(double /*unused*/) {}
 
-  inline void reportProgress(double /*unused*/)
-  {}
+  inline void reportProgress(double /*unused*/) {}
 
   // will change the progress interval of internal operation
-  inline void registerSubOperation(void* /*unused*/, double /*unused*/)
-  {}
+  inline void registerSubOperation(void* /*unused*/, double /*unused*/) {}
 
-  inline void registerSubOperation(itk::ProcessObject* /*unused*/, double /*unused*/)
-  {}
+  inline void registerSubOperation(itk::ProcessObject* /*unused*/, double /*unused*/) {}
 
-  inline void clearRegisteredSubOperations()
-  {}
+  inline void clearRegisteredSubOperations() {}
 
   inline void setNumberOfThreads(size_t n)
-  { m_numThreads = n; }
+  {
+    m_numThreads = n;
+  }
 
 protected:
   size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
@@ -139,13 +143,10 @@ protected:
 
 template<bool ReportProgress = false>
 class ZImgAlgorithm : public ZImgAlgorithmBase
-{
-};
+{};
 
 template<>
 class ZImgAlgorithm<true> : public ZImgAlgorithmBaseWithProgressReporter
-{
-};
+{};
 
 } // namespace nim
-

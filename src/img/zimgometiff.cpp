@@ -29,13 +29,13 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
   ZImgTiff::detectImgInfo(tiff);
 
   // overwrite some fields based on ome information
-  if (m_imgInfo[0].width != m_omeImgInfo.width ||
-      m_imgInfo[0].height != m_omeImgInfo.height ||
-      m_imgInfo[0].numChannels != 1 ||
-      m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
-      m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat)
-    throw ZIOException(QString("ome meta info <%1> doesn't match image data <%2>").
-      arg(m_omeImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
+  if (m_imgInfo[0].width != m_omeImgInfo.width || m_imgInfo[0].height != m_omeImgInfo.height ||
+      m_imgInfo[0].numChannels != 1 || m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
+      m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat) {
+    throw ZIOException(QString("ome meta info <%1> doesn't match image data <%2>")
+                         .arg(m_omeImgInfo.toQString())
+                         .arg(m_imgInfo[0].toQString()));
+  }
 
   m_imgInfo[0].numChannels = m_omeImgInfo.numChannels;
   m_imgInfo[0].depth = m_omeImgInfo.depth;
@@ -49,23 +49,24 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
   m_imgInfo[0].channelColors = m_omeImgInfo.channelColors;
   m_imgInfo[0].channelNames = m_omeImgInfo.channelNames;
   m_imgInfo[0].timeStamps = m_omeImgInfo.timeStamps;
-  //m_imgInfo.locations = m_omeImgInfo.locations;
+  // m_imgInfo.locations = m_omeImgInfo.locations;
 
   m_imgInfo[0].createDefaultDescriptions();
 
-  //LOG(INFO) << m_imgInfo.toQString() << " " << m_dimensionOrder;
+  // LOG(INFO) << m_imgInfo.toQString() << " " << m_dimensionOrder;
 }
 
 bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l)
 {
-  if (m_ifdIdxPosMap.find(ifdIdx) == m_ifdIdxPosMap.end())
+  if (m_ifdIdxPosMap.find(ifdIdx) == m_ifdIdxPosMap.end()) {
     return false;
+  }
   IFDPos pos = m_ifdIdxPosMap[ifdIdx];
   z = pos.z;
   c = pos.c;
   t = pos.t;
   l = 0;
-  //LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
+  // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
   return true;
 }
 
@@ -82,7 +83,8 @@ QString ZImgOmeTiff::fullName() const
 QStringList ZImgOmeTiff::extensions() const
 {
   QStringList res;
-  res << "ome.tif" << "ome.tiff";
+  res << "ome.tif"
+      << "ome.tiff";
   return res;
 }
 
@@ -91,7 +93,7 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, const ZImgW
   checkImgBeforeWriting(filename, img.info(), paras);
 
   ZTiffWriter tiffWriter;
-  int32_t extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
+  int32_t extraSample = img.info().lastChannelIsAlphaChannel ? 2 : -1; // EXTRASAMPLE_UNASSALPHA or none
   if (img.byteNumber() > 1024_uz * 1024 * 3600) {
     tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
@@ -102,23 +104,25 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImg& img, const ZImgW
   for (size_t t = 0; t < img.numTimes(); ++t) {
     for (size_t c = 0; c < img.numChannels(); ++c) {
       for (size_t z = 0; z < img.depth(); ++z) {
-        //LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
-        if (t == 0 && z == 0 && c == 0)
+        // LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
+        if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, z, t, c, false, tags);
-        else
+        } else {
           tiffWriter.writeIFD(img, z, t, c, false);
+        }
       }
     }
   }
 }
 
-void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+void ZImgOmeTiff::writeImg(const QString& filename,
+                           const ZImgSliceProvider& imgSliceProvider,
                            const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
 
   ZTiffWriter tiffWriter;
-  int32_t extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1;  //EXTRASAMPLE_UNASSALPHA or none
+  int32_t extraSample = imgSliceProvider.imgInfo().lastChannelIsAlphaChannel ? 2 : -1; // EXTRASAMPLE_UNASSALPHA or none
   if (imgSliceProvider.imgInfo().byteNumber() > 1024_uz * 1024 * 3600) {
     tiffWriter.startWriting(filename, paras.compression, extraSample, true);
   } else {
@@ -130,11 +134,12 @@ void ZImgOmeTiff::writeImg(const QString& filename, const ZImgSliceProvider& img
     for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
       ZImg img = imgSliceProvider.slice(z, t);
       for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
-        //LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
-        if (t == 0 && z == 0 && c == 0)
+        // LOG(INFO) << l << " " << t << " " << z << " " << c << " " << img.info().toQString();
+        if (t == 0 && z == 0 && c == 0) {
           tiffWriter.writeIFD(img, 0, 0, c, false, tags);
-        else
+        } else {
           tiffWriter.writeIFD(img, 0, 0, c, false);
+        }
       }
     }
   }
@@ -223,22 +228,25 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
   if (attributes.hasAttribute("PhysicalSizeX")) {
     bool ok;
     double ps = attributes.value("PhysicalSizeX").toString().toDouble(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome PhysicalSizeX");
+    }
     m_omeImgInfo.voxelSizeX = ps;
   }
   if (attributes.hasAttribute("PhysicalSizeY")) {
     bool ok;
     double ps = attributes.value("PhysicalSizeY").toString().toDouble(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome PhysicalSizeY");
+    }
     m_omeImgInfo.voxelSizeY = ps;
   }
   if (attributes.hasAttribute("PhysicalSizeZ")) {
     bool ok;
     double ps = attributes.value("PhysicalSizeZ").toString().toDouble(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome PhysicalSizeZ");
+    }
     m_omeImgInfo.voxelSizeZ = ps;
   }
   m_omeImgInfo.numTimes = 1;
@@ -249,47 +257,54 @@ void ZImgOmeTiff::parsePixels(QXmlStreamReader& xml, ZTiff& tiff)
   if (attributes.hasAttribute("SizeX")) {
     bool ok;
     auto sz = attributes.value("SizeX").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome SizeX");
+    }
     m_omeImgInfo.width = sz;
   }
   if (attributes.hasAttribute("SizeY")) {
     bool ok;
     auto sz = attributes.value("SizeY").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome SizeY");
+    }
     m_omeImgInfo.height = sz;
   }
   if (attributes.hasAttribute("SizeZ")) {
     bool ok;
     auto sz = attributes.value("SizeZ").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome SizeZ");
+    }
     m_omeImgInfo.depth = sz;
   }
   if (attributes.hasAttribute("SizeC")) {
     bool ok;
     auto sz = attributes.value("SizeC").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome SizeC");
+    }
     m_omeImgInfo.numChannels = sz;
   }
   if (attributes.hasAttribute("SizeT")) {
     bool ok;
     auto sz = attributes.value("SizeT").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome SizeT");
+    }
     m_omeImgInfo.numTimes = sz;
   }
   if (attributes.hasAttribute("TimeIncrement")) {
     bool ok;
     double ti = attributes.value("TimeIncrement").toString().toDouble(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TimeIncrement");
+    }
     m_omeImgInfo.timeStamps.resize(m_omeImgInfo.numTimes);
     m_omeImgInfo.timeStamps[0] = 0;
-    for (size_t i = 1; i < m_omeImgInfo.numTimes; ++i)
+    for (size_t i = 1; i < m_omeImgInfo.numTimes; ++i) {
       m_omeImgInfo.timeStamps[i] = ti + m_omeImgInfo.timeStamps[i - 1];
+    }
   }
   m_omeImgInfo.voxelFormat = VoxelFormat::Unsigned;
   QString type;
@@ -346,15 +361,17 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
   if (attributes.hasAttribute("IFD")) {
     bool ok;
     ifd = attributes.value("IFD").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TiffData IFD");
+    }
     planeCount = 1;
   }
   if (attributes.hasAttribute("PlaneCount")) {
     bool ok;
     planeCount = attributes.value("PlaneCount").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TiffData IFD");
+    }
   }
   size_t firstZ = 0;
   size_t firstT = 0;
@@ -362,20 +379,23 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
   if (attributes.hasAttribute("FirstZ")) {
     bool ok;
     firstZ = attributes.value("FirstZ").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TiffData FirstZ");
+    }
   }
   if (attributes.hasAttribute("FirstT")) {
     bool ok;
     firstT = attributes.value("FirstT").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TiffData FirstT");
+    }
   }
   if (attributes.hasAttribute("FirstC")) {
     bool ok;
     firstC = attributes.value("FirstC").toString().toULongLong(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome TiffData FirstC");
+    }
   }
 
   for (size_t i = ifd; i < ifd + planeCount; ++i) {
@@ -383,9 +403,8 @@ void ZImgOmeTiff::parseTiffData(QXmlStreamReader& xml, ZTiff& tiff)
     index_t c;
     index_t l;
     index_t z;
-    if (IFDToLoc(i, z, c, t, l, ifd, m_dimensionOrder, m_omeImgInfo, 1,
-                 firstZ, firstC, firstT, 0)) {
-      //LOG(INFO) << i << " " << z << " " << c << " " << t << " " << l << " " << m_dimensionOrder;
+    if (IFDToLoc(i, z, c, t, l, ifd, m_dimensionOrder, m_omeImgInfo, 1, firstZ, firstC, firstT, 0)) {
+      // LOG(INFO) << i << " " << z << " " << c << " " << t << " " << l << " " << m_dimensionOrder;
       m_ifdIdxPosMap[i] = IFDPos(z, c, t);
     }
   }
@@ -405,8 +424,9 @@ void ZImgOmeTiff::parseChannel(QXmlStreamReader& xml)
   if (attributes.hasAttribute("Color")) {
     bool ok;
     int32_t color = attributes.value("Color").toString().toInt(&ok);
-    if (!ok)
+    if (!ok) {
       throw ZIOException("Can not parse ome channel Color");
+    }
     col4 col;
     std::memcpy(static_cast<void*>(&col), &color, 3);
     std::swap(col.r, col.b);
@@ -433,8 +453,9 @@ QString ZImgOmeTiff::createOmeXml(const ZImgInfo& info, const QString& dimension
   xml.writeAttribute("xmlns:ROI", "http://www.openmicroscopy.org/Schemas/ROI/2013-06");
   xml.writeAttribute("xmlns:OME", "http://www.openmicroscopy.org/Schemas/OME/2013-06");
   xml.writeAttribute("xmlns:BIN", "http://www.openmicroscopy.org/Schemas/BinaryFile/2013-06");
-  xml.writeAttribute("xsi:schemaLocation",
-                     "http://www.openmicroscopy.org/Schemas/OME/2013-06 http://www.openmicroscopy.org/Schemas/OME/2013-06/ome.xsd");
+  xml.writeAttribute(
+    "xsi:schemaLocation",
+    "http://www.openmicroscopy.org/Schemas/OME/2013-06 http://www.openmicroscopy.org/Schemas/OME/2013-06/ome.xsd");
 
   xml.writeStartElement("Image");
   xml.writeAttribute("ID", "Image:0");

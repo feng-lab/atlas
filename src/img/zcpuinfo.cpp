@@ -33,14 +33,14 @@ namespace {
 #define cpuid __cpuid
 #define cpuidex __cpuidex
 
-using LPFN_GLPI = BOOL (WINAPI*)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
+using LPFN_GLPI = BOOL(WINAPI*)(PSYSTEM_LOGICAL_PROCESSOR_INFORMATION, PDWORD);
 
 // Helper function to count set bits in the processor mask.
 DWORD CountSetBits(ULONG_PTR bitMask)
 {
   DWORD LSHIFT = sizeof(ULONG_PTR) * 8 - 1;
   DWORD bitSetCount = 0;
-  ULONG_PTR bitTest = (ULONG_PTR) 1 << LSHIFT;
+  ULONG_PTR bitTest = (ULONG_PTR)1 << LSHIFT;
   DWORD i;
 
   for (i = 0; i <= LSHIFT; ++i) {
@@ -66,7 +66,7 @@ inline void cpuidex(int32_t cpu_info[4], int32_t info_type, int32_t info_index)
 inline uint64_t _xgetbv(uint32_t index)
 {
   uint32_t eax, edx;
-  __asm__ __volatile__ ("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
+  __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
   return (static_cast<uint64_t>(edx) << 32) | eax;
 }
 
@@ -92,9 +92,9 @@ void ZCpuInfo::logCpuInfo() const
 {
   LOG(INFO) << "CPU Vendor: " << vendor;
   LOG(INFO) << "CPU Brand: " << brand;
-  LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily << " Type: "
-            << nProcessorType
-            << " Ext.Model ID: " << nExtendedmodel << " Ext.Family ID: " << nExtendedfamily;
+  LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily
+            << " Type: " << nProcessorType << " Ext.Model ID: " << nExtendedmodel
+            << " Ext.Family ID: " << nExtendedfamily;
   LOG(INFO) << "Number of Cores: " << nPhysicalCores;
   LOG(INFO) << "Number of Threads: " << nLogicalCores;
   LOG(INFO) << "std thread hardware_concurrency: " << nStdHardwareConcurrency;
@@ -105,37 +105,21 @@ void ZCpuInfo::logCpuInfo() const
   LOG(INFO) << "L3Cache: " << nL3CacheSize;
   LOG(INFO) << "RAM: " << nPhysicalRAM;
 
-  QString instructions = QString(bXOP ? "XOP " : "") +
-                         QString(bFMA ? "FMA " : "") +
-                         QString(bFMA4 ? "FMA4 " : "") +
-                         QString(b3DNow ? "3Dnow! " : "") +
-                         QString(b3DNowExt ? "3Dnow ext " : "") +
-                         QString(bMMX ? "MMX " : "") +
-                         QString(bMMXExtensions ? "MMX ext " : "") +
-                         QString(bSSE ? "SSE " : "") +
-                         QString(bSSE2 ? "SSE2 " : "") +
-                         QString(bSSE3 ? "SSE3 " : "") +
-                         QString(bSSSE3 ? "SSSE3 " : "") +
-                         QString(bSSE41 ? "SSE41 " : "") +
-                         QString(bSSE42 ? "SSE42 " : "") +
-                         QString(bSSE4A ? "SSE4A " : "") +
-                         QString(bAVX ? "AVX " : "") +
-                         QString(bAVX2 ? "AVX2 " : "") +
-                         QString(bBMI ? "BMI " : "") +
-                         QString(bAVX512F ? "AVX512F " : "") +
-                         QString(bAVX512DQ ? "AVX512DQ " : "") +
-                         QString(bAVX512PF ? "AVX512PF " : "") +
-                         QString(bAVX512ER ? "AVX512ER " : "") +
-                         QString(bAVX512CD ? "AVX512CD " : "") +
-                         QString(bAVX512BW ? "AVX512BW " : "") +
-                         QString(bAVX512VL ? "AVX512VL " : "");
+  QString instructions =
+    QString(bXOP ? "XOP " : "") + QString(bFMA ? "FMA " : "") + QString(bFMA4 ? "FMA4 " : "") +
+    QString(b3DNow ? "3Dnow! " : "") + QString(b3DNowExt ? "3Dnow ext " : "") + QString(bMMX ? "MMX " : "") +
+    QString(bMMXExtensions ? "MMX ext " : "") + QString(bSSE ? "SSE " : "") + QString(bSSE2 ? "SSE2 " : "") +
+    QString(bSSE3 ? "SSE3 " : "") + QString(bSSSE3 ? "SSSE3 " : "") + QString(bSSE41 ? "SSE41 " : "") +
+    QString(bSSE42 ? "SSE42 " : "") + QString(bSSE4A ? "SSE4A " : "") + QString(bAVX ? "AVX " : "") +
+    QString(bAVX2 ? "AVX2 " : "") + QString(bBMI ? "BMI " : "") + QString(bAVX512F ? "AVX512F " : "") +
+    QString(bAVX512DQ ? "AVX512DQ " : "") + QString(bAVX512PF ? "AVX512PF " : "") +
+    QString(bAVX512ER ? "AVX512ER " : "") + QString(bAVX512CD ? "AVX512CD " : "") +
+    QString(bAVX512BW ? "AVX512BW " : "") + QString(bAVX512VL ? "AVX512VL " : "");
 
   LOG(INFO) << instructions;
 
-  instructions = QString(bCMPXCHG8B ? "CMPXCHG8B " : "") +
-                 QString(bCMPXCHG16B ? "CMPXCHG16B " : "") +
-                 QString(bPOPCNT ? "POPCNT " : "") +
-                 QString(bLZCNT ? "LZCNT " : "") +
+  instructions = QString(bCMPXCHG8B ? "CMPXCHG8B " : "") + QString(bCMPXCHG16B ? "CMPXCHG16B " : "") +
+                 QString(bPOPCNT ? "POPCNT " : "") + QString(bLZCNT ? "LZCNT " : "") +
                  QString(bRDTSCP ? "RDTSCP " : "");
 
   LOG(INFO) << instructions;
@@ -143,7 +127,9 @@ void ZCpuInfo::logCpuInfo() const
 
 void ZCpuInfo::detectCpuInfo()
 {
-  std::array<int, 4> cpui{{0, 0, 0, 0}};
+  std::array<int, 4> cpui{
+    {0, 0, 0, 0}
+  };
   uint32_t nIds = 0;
   uint32_t nExIds = 0;
   bool isIntel = false;
@@ -380,8 +366,7 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   DWORD byteOffset = 0;
   PCACHE_DESCRIPTOR Cache;
 
-  glpi = (LPFN_GLPI) GetProcAddress(GetModuleHandle(TEXT("kernel32")),
-                                    "GetLogicalProcessorInformation");
+  glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
   if (!glpi) {
     LOG(ERROR) << "GetLogicalProcessorInformation is not supported.";
     return;
@@ -392,10 +377,11 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
     if (FALSE == rc) {
       if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-        if (buffer)
+        if (buffer) {
           free(buffer);
+        }
 
-        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION) malloc(returnLength);
+        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(returnLength);
 
         if (!buffer) {
           LOG(ERROR) << "Allocation PSYSTEM_LOGICAL_PROCESSOR_INFORMATION failure";
@@ -535,18 +521,18 @@ void ZCpuInfo::detectCoreAndThreadNumber()
 
   if (lscpu.waitForFinished(-1)) {
     QString lscpuOutput(lscpu.readAllStandardOutput());
-    #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
     QStringList cpuInfos = lscpuOutput.split(QChar('\n'), Qt::SkipEmptyParts);
-    #else
+#else
     QStringList cpuInfos = lscpuOutput.split(QChar('\n'), QString::SkipEmptyParts);
-    #endif
+#endif
     int64_t threadsPerCore = 0;
     for (const auto& cpuInfo : cpuInfos) {
-      #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
       QStringList cInfo = cpuInfo.split(QChar(':'), Qt::SkipEmptyParts);
-      #else
+#else
       QStringList cInfo = cpuInfo.split(QChar(':'), QString::SkipEmptyParts);
-      #endif
+#endif
       if (cInfo.size() == 2) {
         bool ok = false;
         if (cInfo[0] == "CPU(s)") {

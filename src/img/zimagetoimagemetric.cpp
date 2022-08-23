@@ -1,5 +1,3 @@
 #include "zimagetoimagemetric.h"
 
-namespace nim {
-
-} // namespace nim
+namespace nim {} // namespace nim

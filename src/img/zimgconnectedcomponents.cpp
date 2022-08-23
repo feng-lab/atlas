@@ -23,10 +23,12 @@ private:
   size_t m_label;
 };
 
-}  // namespace impl
+} // namespace impl
 
 ConnComp::ConnComp()
-{ clear(); }
+{
+  clear();
+}
 
 void ConnComp::clear()
 {
@@ -43,11 +45,10 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
     voxelIdxList.clear();
     return;
   }
-  if (includeThre)
+  if (includeThre) {
     sizeThre++;
-  erase_if(voxelIdxList, [sizeThre](const auto& v) {
-    return v.size() < sizeThre;
-  });
+  }
+  erase_if(voxelIdxList, [sizeThre](const auto& v) { return v.size() < sizeThre; });
 }
 
 size_t ConnComp::toatalNumVoxels() const
@@ -189,14 +190,14 @@ ConnComp ZImgConnectedComponents<ReportProgress>::createRes(const ZImg& img, siz
 template<bool ReportProgress>
 void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& markerImg, ConnComp& res, size_t label)
 {
-  if (label > 255)
+  if (label > 255) {
     return;
+  }
 
-  std::stack<index_t , std::vector<index_t>> stk;
+  std::stack<index_t, std::vector<index_t>> stk;
   size_t conn = res.connectivity;
   size_t voxelNumber = markerImg.voxelNumber();
-  ZImgNeighborhoodConstIterator<uint8_t> nit =
-    ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
+  ZImgNeighborhoodConstIterator<uint8_t> nit = ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
   auto marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;
@@ -246,10 +247,8 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   this->reportProgress(1.0);
 }
 
-template
-class ZImgConnectedComponents<true>;
+template class ZImgConnectedComponents<true>;
 
-template
-class ZImgConnectedComponents<false>;
+template class ZImgConnectedComponents<false>;
 
 } // namespace nim

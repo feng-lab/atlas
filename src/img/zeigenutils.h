@@ -41,11 +41,15 @@ QString matrixToQString(const Eigen::DenseBase<Derived>& m)
 template<typename Scalar>
 struct CwiseClampOp
 {
-  CwiseClampOp(const Scalar& inf, const Scalar& sup) : m_inf(inf), m_sup(sup)
+  CwiseClampOp(const Scalar& inf, const Scalar& sup)
+    : m_inf(inf)
+    , m_sup(sup)
   {}
 
   Scalar operator()(const Scalar& x) const
-  { return x < m_inf ? m_inf : (x > m_sup ? m_sup : x); }
+  {
+    return x < m_inf ? m_inf : (x > m_sup ? m_sup : x);
+  }
 
   Scalar m_inf, m_sup;
 };
@@ -57,12 +61,13 @@ struct ZVectorCompare
   {
     if (v1.size() == v2.size()) {
       for (Eigen::Index i = 0; i < v1.size(); ++i) {
-        if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision())
+        if (std::abs(v1(i) - v2(i)) < Eigen::NumTraits<T>::dummy_precision()) {
           continue;
-        else
+        } else {
           return v1(i) < v2(i);
+        }
       }
-      return false;   //equal
+      return false; // equal
     }
     return v1.size() < v2.size();
   }
@@ -75,12 +80,13 @@ struct ZVectorCompare<T, true>
   {
     if (v1.size() == v2.size()) {
       for (Eigen::Index i = 0; i < v1.size(); ++i) {
-        if (v1(i) == v2(i))
+        if (v1(i) == v2(i)) {
           continue;
-        else
+        } else {
           return v1(i) < v2(i);
+        }
       }
-      return false;   //equal
+      return false; // equal
     }
     return v1.size() < v2.size();
   }
@@ -95,7 +101,8 @@ struct MaxFloatType
   // get larger type of two float type, use this type for all calculations
   using type = typename std::conditional<(std::numeric_limits<T1NonIntegerType>::digits10 >
                                           std::numeric_limits<T2NonIntegerType>::digits10),
-    T1NonIntegerType, T2NonIntegerType>::type;
+                                         T1NonIntegerType,
+                                         T2NonIntegerType>::type;
 };
 
 class ZEigenUtils
@@ -105,7 +112,9 @@ public:
   // the result matrix size will be smaller. Number of cols are detected from statrRow
   // By default consecutive delimiters are seen as one, unless you set strictDelimiter to true.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::MatrixXd readMatrix(const QString& filename, const char* uSep = "", bool strictDelimiter = false,
+  static Eigen::MatrixXd readMatrix(const QString& filename,
+                                    const char* uSep = "",
+                                    bool strictDelimiter = false,
                                     double fillValue = std::numeric_limits<double>::quiet_NaN(),
                                     const std::string& commentStart = "#");
 
@@ -115,28 +124,36 @@ public:
   // the rest will be filled with fillValue. If nData is -1, vector length will be same as nActualData.
   // If strictDelimiter is used, empty data will be filled with fillValue.
   // Strict delimiter should be given in uSep. It **can not** be empty or space or tab.
-  static Eigen::RowVectorXd readRowVector(const std::string& line, const char* uSep = "", Eigen::Index* nActualData = nullptr,
-                                          Eigen::Index nReadData = -1, bool strictDelimiter = false,
+  static Eigen::RowVectorXd readRowVector(const std::string& line,
+                                          const char* uSep = "",
+                                          Eigen::Index* nActualData = nullptr,
+                                          Eigen::Index nReadData = -1,
+                                          bool strictDelimiter = false,
                                           double fillValue = std::numeric_limits<double>::quiet_NaN(),
                                           const std::string& commentStart = "#");
 
-
   template<typename Derived>
-  static bool writeMatrix(const Eigen::DenseBase<Derived>& mat, const char* filename, const char* sep = " ",
-                          Eigen::Index startRow = 0, Eigen::Index startCol = 0,
-                          Eigen::Index endRow = -1, Eigen::Index endCol = -1)
+  static bool writeMatrix(const Eigen::DenseBase<Derived>& mat,
+                          const char* filename,
+                          const char* sep = " ",
+                          Eigen::Index startRow = 0,
+                          Eigen::Index startCol = 0,
+                          Eigen::Index endRow = -1,
+                          Eigen::Index endCol = -1)
   {
-    if (endRow == -1)
+    if (endRow == -1) {
       endRow = mat.rows();
-    if (endCol == -1)
+    }
+    if (endCol == -1) {
       endCol = mat.cols();
-    if (startRow < 0 || startCol < 0 || endRow <= startRow || endCol <= startCol || endRow > mat.rows()
-        || endCol > mat.cols()) {
+    }
+    if (startRow < 0 || startCol < 0 || endRow <= startRow || endCol <= startCol || endRow > mat.rows() ||
+        endCol > mat.cols()) {
       LOG(ERROR) << "writeMatrix: wrong matrix range";
       return false;
     }
 
-    //open file
+    // open file
     std::ofstream outFile;
     openFileStream(outFile, filename, std::ios_base::out);
 
@@ -163,12 +180,13 @@ public:
 
   // similar to matlab randn, if nCol == -1, nCol = nRow
   template<typename Real>
-  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> randn(Eigen::Index nRow, Eigen::Index nCol = -1,
-                                                            Real mean = 0, Real sigma = 1)
+  Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>
+  randn(Eigen::Index nRow, Eigen::Index nCol = -1, Real mean = 0, Real sigma = 1)
   {
     CHECK(nRow > 0);
-    if (nCol == -1)
+    if (nCol == -1) {
       nCol = nRow;
+    }
     CHECK(nCol > 0);
     std::normal_distribution<Real> dist(mean, sigma);
     auto& eng = ZRandom::instance().engine();
@@ -186,8 +204,9 @@ public:
   {
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> tmp = randn<Real>(dim);
     Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic> Mat = tmp * tmp.transpose();
-    while (!ZEigenUtils::matrixIsPositiveDefinite(Mat, 1e-5))
+    while (!ZEigenUtils::matrixIsPositiveDefinite(Mat, 1e-5)) {
       Mat += Eigen::Matrix<Real, Eigen::Dynamic, 1>::Constant(dim, 0.001).asDiagonal();
+    }
     return Mat;
   }
 
@@ -221,8 +240,9 @@ public:
           res(r, c) = 1.0;
         } else {
           res(r, c) = cov(r, c) / std::sqrt(cov(r, r) * cov(c, c));
-          if (std::abs(res(r, c)) > 1.0)
+          if (std::abs(res(r, c)) > 1.0) {
             res(r, c) = res(r, c) / std::abs(res(r, c));
+          }
           res(c, r) = res(r, c);
         }
       }
@@ -233,9 +253,8 @@ public:
   static Eigen::MatrixXd removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat);
 
   template<typename Derived>
-  inline static Derived clampMatrix(const Eigen::MatrixBase<Derived>& srcMat,
-                                    typename Derived::Scalar inf,
-                                    typename Derived::Scalar sup)
+  inline static Derived
+  clampMatrix(const Eigen::MatrixBase<Derived>& srcMat, typename Derived::Scalar inf, typename Derived::Scalar sup)
   {
     return srcMat.unaryExpr(CwiseClampOp<typename Derived::Scalar>(inf, sup));
   }
@@ -339,8 +358,9 @@ public:
   inline static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
   {
     Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> svd(x);
-    if (thre > 0)
+    if (thre > 0) {
       svd.setThreshold(thre);
+    }
     return svd.rank();
   }
 
@@ -390,24 +410,25 @@ public:
     Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic> newX;
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> res(x.cols());
     newX = x.template cast<ResultDataType>();
-    for (Eigen::Index i = 0; i < newX.cols(); ++i)
+    for (Eigen::Index i = 0; i < newX.cols(); ++i) {
       res(i) = newX.col(i).dot(weight);
+    }
     return res / weight.sum();
   }
 
   // sample covariance
   template<class T>
   static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>
-  featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                    bool bias = false)
+  featureCovariance(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, bool bias = false)
   {
     CHECK(x.rows() > 0);
     using ResultDataType = typename Eigen::NumTraits<T>::NonInteger;
     ResultDataType factor;
-    if (!bias && x.rows() > 1)
+    if (!bias && x.rows() > 1) {
       factor = 1.0 / (x.rows() - 1.0);
-    else
+    } else {
       factor = 1.0 / x.rows();
+    }
     // convert to result type
     const Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>& rtX = x.template cast<ResultDataType>();
     Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic> mean = featureMean(rtX);
@@ -447,7 +468,8 @@ public:
   }
 
   // The shrunk Ledoit-Wolf covariance, return invertible covariance matrix estimator
-  //"A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices", Journal of Multivariate Analysis, Volume 88,
+  //"A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices", Journal of Multivariate Analysis, Volume
+  //88,
   // Issue 2, February 2004, pages 365-411.
   // if inputShrink is specified, then this const. is used for shrinkage. inputShrink should be range [0 1]
   // shrink from biased sample covariance to I.*(trace(cov)/p)
@@ -469,14 +491,16 @@ public:
     ResultMatType prior = ResultMatType::Identity(ndim, ndim) * (samplecov.trace() / ndim);
 
     if (samplecov.isApprox(prior)) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = 0;
+      }
       return samplecov;
     }
 
     if (inputShrink != -1) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = inputShrink;
+      }
       return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
@@ -489,8 +513,9 @@ public:
     ResultDataType gamma = (samplecov - prior).squaredNorm();
     ResultDataType kappa = phi / gamma;
     ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa / nsample));
-    if (outputShrink)
+    if (outputShrink) {
       *outputShrink = shrinkage;
+    }
     return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
@@ -512,14 +537,16 @@ public:
     ResultMatType prior = samplecov.diagonal().asDiagonal();
 
     if (samplecov.isApprox(prior)) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = 0;
+      }
       return samplecov;
     }
 
     if (inputShrink != -1) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = inputShrink;
+      }
       return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
@@ -533,8 +560,9 @@ public:
     ResultDataType gamma = (samplecov - prior).squaredNorm();
     ResultDataType kappa = (phi - rho) / gamma;
     ResultDataType shrinkage = std::max(0.0, std::min(1.0, kappa / nsample));
-    if (outputShrink)
+    if (outputShrink) {
       *outputShrink = shrinkage;
+    }
     return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
@@ -558,14 +586,16 @@ public:
     ResultMatType prior = samplecov.diagonal().asDiagonal();
 
     if (samplecov.isApprox(prior)) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = 0;
+      }
       return samplecov;
     }
 
     if (inputShrink != -1) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = inputShrink;
+      }
       return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
@@ -582,8 +612,9 @@ public:
     ResultDataType num = varSup.sum();
     ResultDataType den = Sup.array().square().sum();
     ResultDataType shrinkage = std::max(0.0, std::min(1.0, num / den));
-    if (outputShrink)
+    if (outputShrink) {
       *outputShrink = shrinkage;
+    }
     return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
@@ -612,14 +643,16 @@ public:
     ResultMatType prior = ResultMatType::Identity(ndim, ndim) * (samplecov.trace() / ndim);
 
     if (samplecov.isApprox(prior)) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = 0;
+      }
       return samplecov;
     }
 
     if (inputShrink != -1) {
-      if (outputShrink)
+      if (outputShrink) {
         *outputShrink = inputShrink;
+      }
       return inputShrink * prior + (1 - inputShrink) * samplecov;
     }
 
@@ -631,14 +664,15 @@ public:
     ResultDataType traceS2 = traceS * traceS;
     ResultDataType traceSS = (samplecov * samplecov).trace();
     ResultDataType shrinkage = (traceS2 + traceSS) / ((nsample + 1.0) * (traceSS - traceS2 / ndim));
-    //NonInteger mu = samplecov.trace()/ndim;
-    //NonInteger alpha = samplecov.array().square().mean();
-    //NonInteger num = alpha + mu*mu;
-    //NonInteger den = (nsample+1.0)*(alpha-mu*mu/ndim);
-    //NonInteger shrinkage = num/den;
+    // NonInteger mu = samplecov.trace()/ndim;
+    // NonInteger alpha = samplecov.array().square().mean();
+    // NonInteger num = alpha + mu*mu;
+    // NonInteger den = (nsample+1.0)*(alpha-mu*mu/ndim);
+    // NonInteger shrinkage = num/den;
     shrinkage = std::min(1.0, shrinkage);
-    if (outputShrink)
+    if (outputShrink) {
       *outputShrink = shrinkage;
+    }
     return shrinkage * prior + (1 - shrinkage) * samplecov;
   }
 
@@ -657,8 +691,9 @@ public:
         uniqueMat.row(nUniqueData++) = x.row(r);
       }
     }
-    if (num)
+    if (num) {
       *num = nUniqueData;
+    }
     uniqueMat.conservativeResize(nUniqueData, Eigen::NoChange);
     return uniqueMat;
   }

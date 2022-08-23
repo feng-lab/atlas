@@ -1,12 +1,12 @@
 #include "zimgregistration.h"
 
-//#include <itkMattesMutualInformationImageToImageMetricv4.h>
-//#include <itkMeanSquaresImageToImageMetricv4.hxx>
-//#include <itkBSplineTransform.h>
-//#include <itkImageRegistrationMethodv4.h>
-//#include <itkBSplineTransformParametersAdaptor.h>
-//#include <itkRigid2DTransform.hxx>
-//#include <itkLBFGSBOptimizerv4.h>
+// #include <itkMattesMutualInformationImageToImageMetricv4.h>
+// #include <itkMeanSquaresImageToImageMetricv4.hxx>
+// #include <itkBSplineTransform.h>
+// #include <itkImageRegistrationMethodv4.h>
+// #include <itkBSplineTransformParametersAdaptor.h>
+// #include <itkRigid2DTransform.hxx>
+// #include <itkLBFGSBOptimizerv4.h>
 
 namespace nim {
 
@@ -70,112 +70,115 @@ double ZImgRegistration::run()
     dims[1] = sizeY;
     dims[2] = sizeZ;
 
-//    // rigid grid search
-//    if (i == m_numScales-1) {
-//      double bestCost = std::numeric_limits<double>::max();
-//      std::vector<double> bestParams(costFunction.numParameters(), 0);
-//      if (m_transform == "Affine") {
-//        bestParams[3] = 1.0;
-//        bestParams[4] = 1.0;
-//      }
-//      std::vector<double> params = bestParams;
-//      ZImg img(ZImgInfo(sizeX+1, sizeY+1, 1, 1, 1, 1, 8, VoxelFormat::Float));
-//      for (int transX = -(int)sizeX / 2; transX < (int)sizeX / 2; transX += 4) {
-//        for (int transY = -(int)sizeY / 2; transY < (int)sizeY / 2; transY += 4) {
-//          //for (double rot = -M_PI; rot < M_PI; rot += M_PI / 2) {
-//          double rot = 0;
-//            params[0] = transX;
-//            params[1] = transY;
-//            params[2] = rot;
-//            double cost;
-//            costFunction.evaluate(params.data(), &cost);
-//            if (cost < bestCost) {
-//              bestCost = cost;
-//              bestParams = params;
-//            }
-//            img.setValue(cost, (transX+(int)sizeX/2)/4, (transY+(int)sizeY/2)/4//, 0);
-//          //}
-//        }
-//      }
-//      img.save("/Users/feng/Downloads/gridres.tif");
-//      //parameters = bestParams;
-//      LOG(INFO) << bestParams[0] << " " << bestParams[1] << " " << bestParams[2];
-//    }
+    //    // rigid grid search
+    //    if (i == m_numScales-1) {
+    //      double bestCost = std::numeric_limits<double>::max();
+    //      std::vector<double> bestParams(costFunction.numParameters(), 0);
+    //      if (m_transform == "Affine") {
+    //        bestParams[3] = 1.0;
+    //        bestParams[4] = 1.0;
+    //      }
+    //      std::vector<double> params = bestParams;
+    //      ZImg img(ZImgInfo(sizeX+1, sizeY+1, 1, 1, 1, 1, 8, VoxelFormat::Float));
+    //      for (int transX = -(int)sizeX / 2; transX < (int)sizeX / 2; transX += 4) {
+    //        for (int transY = -(int)sizeY / 2; transY < (int)sizeY / 2; transY += 4) {
+    //          //for (double rot = -M_PI; rot < M_PI; rot += M_PI / 2) {
+    //          double rot = 0;
+    //            params[0] = transX;
+    //            params[1] = transY;
+    //            params[2] = rot;
+    //            double cost;
+    //            costFunction.evaluate(params.data(), &cost);
+    //            if (cost < bestCost) {
+    //              bestCost = cost;
+    //              bestParams = params;
+    //            }
+    //            img.setValue(cost, (transX+(int)sizeX/2)/4, (transY+(int)sizeY/2)/4//, 0);
+    //          //}
+    //        }
+    //      }
+    //      img.save("/Users/feng/Downloads/gridres.tif");
+    //      //parameters = bestParams;
+    //      LOG(INFO) << bestParams[0] << " " << bestParams[1] << " " << bestParams[2];
+    //    }
 
-//    // shift centers of two images to one point, make sure two imgs have overlap
-//    if (i == m_numScales-1) {
-//      if (i == 0) {
-//        double xMoment = 0;
-//        double yMoment = 0;
-//        double intenSum = 0;
-//        for (size_t y=0; y<sizeY; ++y) {
-//          for (size_t x=0; x<sizeX; ++x) {
-//            double inten = fixedData[x + y*sizeX];
-//            intenSum += inten;
-//            xMoment += x * inten;
-//            yMoment += y * inten;
-//          }
-//        }
-//        double xCenter = xMoment / intenSum;
-//        double yCenter = yMoment / intenSum;
+    //    // shift centers of two images to one point, make sure two imgs have overlap
+    //    if (i == m_numScales-1) {
+    //      if (i == 0) {
+    //        double xMoment = 0;
+    //        double yMoment = 0;
+    //        double intenSum = 0;
+    //        for (size_t y=0; y<sizeY; ++y) {
+    //          for (size_t x=0; x<sizeX; ++x) {
+    //            double inten = fixedData[x + y*sizeX];
+    //            intenSum += inten;
+    //            xMoment += x * inten;
+    //            yMoment += y * inten;
+    //          }
+    //        }
+    //        double xCenter = xMoment / intenSum;
+    //        double yCenter = yMoment / intenSum;
 
-//        xMoment = 0;
-//        yMoment = 0;
-//        intenSum = 0;
-//        for (size_t y=0; y<sizeY; ++y) {
-//          for (size_t x=0; x<sizeX; ++x) {
-//            double inten = movingData[x + y*sizeX];
-//            intenSum += inten;
-//            xMoment += x * inten;
-//            yMoment += y * inten;
-//          }
-//        }
-//        double xShift = xCenter - xMoment / intenSum;
-//        double yShift = yCenter - yMoment / intenSum;
-//        parameters[0] = -xShift;
-//        parameters[1] = -yShift;
-//      } else {
-//        double xMoment = 0;
-//        double yMoment = 0;
-//        double intenSum = 0;
-//        for (size_t y=0; y<sizeY; ++y) {
-//          for (size_t x=0; x<sizeX; ++x) {
-//            double inten = tfim[x + y*sizeX];
-//            intenSum += inten;
-//            xMoment += x * inten;
-//            yMoment += y * inten;
-//          }
-//        }
-//        double xCenter = xMoment / intenSum;
-//        double yCenter = yMoment / intenSum;
+    //        xMoment = 0;
+    //        yMoment = 0;
+    //        intenSum = 0;
+    //        for (size_t y=0; y<sizeY; ++y) {
+    //          for (size_t x=0; x<sizeX; ++x) {
+    //            double inten = movingData[x + y*sizeX];
+    //            intenSum += inten;
+    //            xMoment += x * inten;
+    //            yMoment += y * inten;
+    //          }
+    //        }
+    //        double xShift = xCenter - xMoment / intenSum;
+    //        double yShift = yCenter - yMoment / intenSum;
+    //        parameters[0] = -xShift;
+    //        parameters[1] = -yShift;
+    //      } else {
+    //        double xMoment = 0;
+    //        double yMoment = 0;
+    //        double intenSum = 0;
+    //        for (size_t y=0; y<sizeY; ++y) {
+    //          for (size_t x=0; x<sizeX; ++x) {
+    //            double inten = tfim[x + y*sizeX];
+    //            intenSum += inten;
+    //            xMoment += x * inten;
+    //            yMoment += y * inten;
+    //          }
+    //        }
+    //        double xCenter = xMoment / intenSum;
+    //        double yCenter = yMoment / intenSum;
 
-//        xMoment = 0;
-//        yMoment = 0;
-//        intenSum = 0;
-//        for (size_t y=0; y<sizeY; ++y) {
-//          for (size_t x=0; x<sizeX; ++x) {
-//            double inten = tmim[x + y*sizeX];
-//            intenSum += inten;
-//            xMoment += x * inten;
-//            yMoment += y * inten;
-//          }
-//        }
-//        double xShift = xCenter - xMoment / intenSum;
-//        double yShift = yCenter - yMoment / intenSum;
-//        parameters[0] = -xShift;
-//        parameters[1] = -yShift;
-//      }
-//    }
+    //        xMoment = 0;
+    //        yMoment = 0;
+    //        intenSum = 0;
+    //        for (size_t y=0; y<sizeY; ++y) {
+    //          for (size_t x=0; x<sizeX; ++x) {
+    //            double inten = tmim[x + y*sizeX];
+    //            intenSum += inten;
+    //            xMoment += x * inten;
+    //            yMoment += y * inten;
+    //          }
+    //        }
+    //        double xShift = xCenter - xMoment / intenSum;
+    //        double yShift = yCenter - yMoment / intenSum;
+    //        parameters[0] = -xShift;
+    //        parameters[1] = -yShift;
+    //      }
+    //    }
 
     LOG(INFO) << "";
-    LOG(INFO) << "  " << "MultiResolution Level: " << i;
+    LOG(INFO) << "  "
+              << "MultiResolution Level: " << i;
 
     if (i < m_numScales - 1) {
       m_transform->adaptParameters(i + 1, i);
     }
-    LOG(INFO) << "  " << "Initial Parameters: " << json::value_from(m_transform->parameters());
+    LOG(INFO) << "  "
+              << "Initial Parameters: " << json::value_from(m_transform->parameters());
     auto scales = m_transform->estimateParameterScales(dims);
-    LOG(INFO) << "  " << "Parameter Scales: " << json::value_from(scales);
+    LOG(INFO) << "  "
+              << "Parameter Scales: " << json::value_from(scales);
 
     m_optimizer.setParameterScales(scales);
     m_optimizer.setInitialParameters(m_transform->parameters());
@@ -184,7 +187,8 @@ double ZImgRegistration::run()
 
     m_transform->setParameters(m_optimizer.currentParameters());
 
-    LOG(INFO) << "  " << "Final Parameters: " << json::value_from(m_transform->parameters());
+    LOG(INFO) << "  "
+              << "Final Parameters: " << json::value_from(m_transform->parameters());
     LOG(INFO) << "Optimizer brief report: " << m_optimizer.briefReport();
   }
   return m_optimizer.finalCost();

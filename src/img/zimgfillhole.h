@@ -10,14 +10,17 @@ template<bool ReportProgress = false>
 class ZImgFillHole : public ZImgAlgorithm<ReportProgress>
 {
 public:
-
   // default true
   inline void setFullyConnected(bool v)
-  { m_fullyConnected = v; }
+  {
+    m_fullyConnected = v;
+  }
 
   // Defaults to maximum value of InputPixelType.
   inline void setForegroundValue(uint64_t v)
-  { m_foregroundValue = v; }
+  {
+    m_foregroundValue = v;
+  }
 
   ZImg run(const ZImg& img);
 

@@ -6,7 +6,8 @@
 namespace nim {
 
 // http://research.mssm.edu/cnic/swc.html
-struct SwcNode {
+struct SwcNode
+{
   explicit SwcNode(int64_t id_ = -1,
                    int64_t type_ = -1,
                    double x_ = 0,

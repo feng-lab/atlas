@@ -23,7 +23,6 @@ void Image2DRowFilterForOneBlock_SSE3(const double* padImg,
                                       size_t rangeStart,
                                       size_t rangeEnd);
 
-
 void Image3DFilterForOneBlock_SSE3(const double* padImg,
                                    size_t padImgWidth,
                                    size_t padImgHeight,
@@ -48,5 +47,4 @@ void Image3DRowFilterForOneBlock_SSE3(const double* padImg,
                                       size_t rangeStart,
                                       size_t rangeEnd);
 
-}  // namespace nim
-
+} // namespace nim

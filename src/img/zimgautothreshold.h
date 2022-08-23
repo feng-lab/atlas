@@ -22,7 +22,10 @@ public:
   // for big image
   // no mask if mask is empty
   template<typename TValue = double>
-  TValue triangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0,
+  TValue triangleThre(const QString& filename,
+                      size_t c = 0,
+                      size_t t = 0,
+                      size_t scene = 0,
                       const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>())
   {
     std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
@@ -38,13 +41,20 @@ public:
   TVoxel typedTriangleThre(const ZImg& imgIn, size_t c = 0, size_t t = 0);
 
   template<typename TVoxel = double>
-  TVoxel typedTriangleThre(const QString& filename, size_t c = 0, size_t t = 0, size_t scene = 0,
+  TVoxel typedTriangleThre(const QString& filename,
+                           size_t c = 0,
+                           size_t t = 0,
+                           size_t scene = 0,
                            const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>());
 
   // convert img to uint8_t with minValue and maxValue then threshold
   // minValue and maxValue are not used if img is uint8_t
-  uint8_t u8TriangleThre(const QString& filename, double minValue, double maxValue,
-                         size_t c = 0, size_t t = 0, size_t scene = 0,
+  uint8_t u8TriangleThre(const QString& filename,
+                         double minValue,
+                         double maxValue,
+                         size_t c = 0,
+                         size_t t = 0,
+                         size_t scene = 0,
                          const std::vector<ZVoxelCoordinate>& mask = std::vector<ZVoxelCoordinate>());
 
   template<typename TValue = double>
@@ -68,8 +78,6 @@ public:
 private:
   // assume hist is not empty
   void histNonZeroRange(std::vector<size_t>& hist, size_t& low, size_t& high);
-
 };
 
 } // namespace nim
-

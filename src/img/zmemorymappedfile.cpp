@@ -3,7 +3,8 @@
 #include <QFileInfo>
 #include <QDir>
 
-DEFINE_string(atlas_llfio_mapped_file_handle_flags, "none",
+DEFINE_string(atlas_llfio_mapped_file_handle_flags,
+              "none",
               "comma-separated list of flags for llfio mapped file handle, default is none, possible values are: "
               "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
               "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
@@ -47,8 +48,7 @@ ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
                                       llfio::mapped_file_handle::mode::read,
                                       llfio::mapped_file_handle::creation::open_existing,
                                       llfio::mapped_file_handle::caching::all,
-                                      flag
-  );
+                                      flag);
   if (mmfResult.has_value() && mmfResult.value().is_valid()) {
     m_mappedFileHandle = std::move(mmfResult.value());
     m_mappedFileHandleIsValid = true;

@@ -11,13 +11,13 @@ ZImageInterpolation::ZImageInterpolation(Interpolant interp, PadOption padOption
   , m_boundInBorder(false)
   , m_padOption(padOption)
   , m_fillValue(fillValue)
-{
-}
+{}
 
 double ZImageInterpolation::cubicInterpolate(double p[], double x) const
 {
-  return p[1] + 0.5 * x * (p[2] - p[0] +
-                           x * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] + x * (3.0 * (p[1] - p[2]) + p[3] - p[0])));
+  return p[1] +
+         0.5 * x *
+           (p[2] - p[0] + x * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] + x * (3.0 * (p[1] - p[2]) + p[3] - p[0])));
 }
 
 double ZImageInterpolation::bicubicInterpolate(double p[][4], double x, double y) const
@@ -58,11 +58,18 @@ double ZImageInterpolation::nCubicInterpolate(int32_t n, double* p, double coord
 template<typename TPixel>
 double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t height, double x, double y) const
 {
-  if (m_boundInBorder && m_padOption == PadOption::Replicate && !inBound(width, height, x, y))
+  if (m_boundInBorder && m_padOption == PadOption::Replicate && !inBound(width, height, x, y)) {
     return m_fillValue;
+  }
 
   if (m_interpolant == Interpolant::Nearest) {
-    return getImage2DPixelValue(img, width, height, roundTo<index_t>(x), roundTo<index_t>(y), m_padOption, TPixel(m_fillValue));
+    return getImage2DPixelValue(img,
+                                width,
+                                height,
+                                roundTo<index_t>(x),
+                                roundTo<index_t>(y),
+                                m_padOption,
+                                TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[4];
     double xCom, yCom;
@@ -142,16 +149,24 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
 }
 
 template<typename TPixel>
-double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t height, size_t depth,
-                                   double x, double y, double z) const
+double
+ZImageInterpolation::sample(const TPixel* img, size_t width, size_t height, size_t depth, double x, double y, double z)
+  const
 {
-  if (m_boundInBorder && m_padOption == PadOption::Replicate && !inBound(width, height, depth, x, y, z))
+  if (m_boundInBorder && m_padOption == PadOption::Replicate && !inBound(width, height, depth, x, y, z)) {
     return m_fillValue;
+  }
 
   if (m_interpolant == Interpolant::Nearest) {
-    return getImage3DPixelValue(img, width, height, depth,
-                                roundTo<index_t>(x), roundTo<index_t>(y), roundTo<index_t>(z),
-                                m_padOption, TPixel(m_fillValue));
+    return getImage3DPixelValue(img,
+                                width,
+                                height,
+                                depth,
+                                roundTo<index_t>(x),
+                                roundTo<index_t>(y),
+                                roundTo<index_t>(z),
+                                m_padOption,
+                                TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[8];
     double xCom, yCom, zCom;
@@ -183,22 +198,22 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
     perc[7] = perc[6] * zCom;
     perc[6] = perc[6] * zComi;
 
-    return perc[0] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas0, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
-           perc[1] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas0, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
-           perc[2] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas0, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
-           perc[3] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas0, yBas1, zBas1, m_padOption, TPixel(m_fillValue)) +
-           perc[4] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas1, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
-           perc[5] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas1, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
-           perc[6] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas1, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
-           perc[7] * getImage3DPixelValue(img, width, height, depth,
-                                          xBas1, yBas1, zBas1, m_padOption, TPixel(m_fillValue));
+    return perc[0] *
+             getImage3DPixelValue(img, width, height, depth, xBas0, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
+           perc[1] *
+             getImage3DPixelValue(img, width, height, depth, xBas0, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
+           perc[2] *
+             getImage3DPixelValue(img, width, height, depth, xBas0, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
+           perc[3] *
+             getImage3DPixelValue(img, width, height, depth, xBas0, yBas1, zBas1, m_padOption, TPixel(m_fillValue)) +
+           perc[4] *
+             getImage3DPixelValue(img, width, height, depth, xBas1, yBas0, zBas0, m_padOption, TPixel(m_fillValue)) +
+           perc[5] *
+             getImage3DPixelValue(img, width, height, depth, xBas1, yBas0, zBas1, m_padOption, TPixel(m_fillValue)) +
+           perc[6] *
+             getImage3DPixelValue(img, width, height, depth, xBas1, yBas1, zBas0, m_padOption, TPixel(m_fillValue)) +
+           perc[7] *
+             getImage3DPixelValue(img, width, height, depth, xBas1, yBas1, zBas1, m_padOption, TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Cubic) {
     // http://en.wikipedia.org/wiki/Bicubic_interpolation
     index_t xn[4], yn[4], zn[4];
@@ -262,18 +277,16 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
     for (auto j = 0; j < 4; ++j) {
       double Ipixelxy = 0.0;
       for (auto i = 0; i < 4; ++i) {
-        Ipixelxy += vecPTy[i] * (vecPTx[0] * getImage3DPixelValue(img, width, height, depth,
-                                                                  xn[0], yn[i], zn[j], m_padOption,
-                                                                  TPixel(m_fillValue)) +
-                                 vecPTx[1] * getImage3DPixelValue(img, width, height, depth,
-                                                                  xn[1], yn[i], zn[j], m_padOption,
-                                                                  TPixel(m_fillValue)) +
-                                 vecPTx[2] * getImage3DPixelValue(img, width, height, depth,
-                                                                  xn[2], yn[i], zn[j], m_padOption,
-                                                                  TPixel(m_fillValue)) +
-                                 vecPTx[3] * getImage3DPixelValue(img, width, height, depth,
-                                                                  xn[3], yn[i], zn[j], m_padOption,
-                                                                  TPixel(m_fillValue)));
+        Ipixelxy +=
+          vecPTy[i] *
+          (vecPTx[0] *
+             getImage3DPixelValue(img, width, height, depth, xn[0], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
+           vecPTx[1] *
+             getImage3DPixelValue(img, width, height, depth, xn[1], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
+           vecPTx[2] *
+             getImage3DPixelValue(img, width, height, depth, xn[2], yn[i], zn[j], m_padOption, TPixel(m_fillValue)) +
+           vecPTx[3] *
+             getImage3DPixelValue(img, width, height, depth, xn[3], yn[i], zn[j], m_padOption, TPixel(m_fillValue)));
       }
       res += vecPTz[j] * Ipixelxy;
     }
@@ -312,45 +325,84 @@ ZImageInterpolation::sample<float>(const float* img, size_t width, size_t height
 template double
 ZImageInterpolation::sample<double>(const double* img, size_t width, size_t height, double x, double y) const;
 
-template double
-ZImageInterpolation::sample<uint8_t>(const uint8_t* img, size_t width, size_t height, size_t depth, double x, double y,
-                                     double z) const;
+template double ZImageInterpolation::sample<uint8_t>(const uint8_t* img,
+                                                     size_t width,
+                                                     size_t height,
+                                                     size_t depth,
+                                                     double x,
+                                                     double y,
+                                                     double z) const;
 
-template double
-ZImageInterpolation::sample<uint16_t>(const uint16_t* img, size_t width, size_t height, size_t depth, double x,
-                                      double y, double z) const;
+template double ZImageInterpolation::sample<uint16_t>(const uint16_t* img,
+                                                      size_t width,
+                                                      size_t height,
+                                                      size_t depth,
+                                                      double x,
+                                                      double y,
+                                                      double z) const;
 
-template double
-ZImageInterpolation::sample<uint32_t>(const uint32_t* img, size_t width, size_t height, size_t depth, double x,
-                                      double y, double z) const;
+template double ZImageInterpolation::sample<uint32_t>(const uint32_t* img,
+                                                      size_t width,
+                                                      size_t height,
+                                                      size_t depth,
+                                                      double x,
+                                                      double y,
+                                                      double z) const;
 
-template double
-ZImageInterpolation::sample<uint64_t>(const uint64_t* img, size_t width, size_t height, size_t depth, double x,
-                                      double y, double z) const;
+template double ZImageInterpolation::sample<uint64_t>(const uint64_t* img,
+                                                      size_t width,
+                                                      size_t height,
+                                                      size_t depth,
+                                                      double x,
+                                                      double y,
+                                                      double z) const;
 
-template double
-ZImageInterpolation::sample<int8_t>(const int8_t* img, size_t width, size_t height, size_t depth, double x, double y,
-                                    double z) const;
+template double ZImageInterpolation::sample<int8_t>(const int8_t* img,
+                                                    size_t width,
+                                                    size_t height,
+                                                    size_t depth,
+                                                    double x,
+                                                    double y,
+                                                    double z) const;
 
-template double
-ZImageInterpolation::sample<int16_t>(const int16_t* img, size_t width, size_t height, size_t depth, double x, double y,
-                                     double z) const;
+template double ZImageInterpolation::sample<int16_t>(const int16_t* img,
+                                                     size_t width,
+                                                     size_t height,
+                                                     size_t depth,
+                                                     double x,
+                                                     double y,
+                                                     double z) const;
 
-template double
-ZImageInterpolation::sample<int32_t>(const int32_t* img, size_t width, size_t height, size_t depth, double x, double y,
-                                     double z) const;
+template double ZImageInterpolation::sample<int32_t>(const int32_t* img,
+                                                     size_t width,
+                                                     size_t height,
+                                                     size_t depth,
+                                                     double x,
+                                                     double y,
+                                                     double z) const;
 
-template double
-ZImageInterpolation::sample<int64_t>(const int64_t* img, size_t width, size_t height, size_t depth, double x, double y,
-                                     double z) const;
+template double ZImageInterpolation::sample<int64_t>(const int64_t* img,
+                                                     size_t width,
+                                                     size_t height,
+                                                     size_t depth,
+                                                     double x,
+                                                     double y,
+                                                     double z) const;
 
-template double
-ZImageInterpolation::sample<float>(const float* img, size_t width, size_t height, size_t depth, double x, double y,
-                                   double z) const;
+template double ZImageInterpolation::sample<float>(const float* img,
+                                                   size_t width,
+                                                   size_t height,
+                                                   size_t depth,
+                                                   double x,
+                                                   double y,
+                                                   double z) const;
 
-template double
-ZImageInterpolation::sample<double>(const double* img, size_t width, size_t height, size_t depth, double x, double y,
-                                    double z) const;
-
+template double ZImageInterpolation::sample<double>(const double* img,
+                                                    size_t width,
+                                                    size_t height,
+                                                    size_t depth,
+                                                    double x,
+                                                    double y,
+                                                    double z) const;
 
 } // namespace nim

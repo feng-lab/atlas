@@ -17,23 +17,22 @@
 namespace {
 
 // Carl Zeiss LSM
-#define TIFFTAG_CZ_LSMINFO           34412
-
+#define TIFFTAG_CZ_LSMINFO 34412
 
 /* tags 33550 is a private tag registered to SoftDesk, Inc */
-#define TIFFTAG_GEOPIXELSCALE        33550
+#define TIFFTAG_GEOPIXELSCALE 33550
 /* tags 33920-33921 are private tags registered to Intergraph, Inc */
-#define TIFFTAG_INTERGRAPH_MATRIX    33920   /* $use TIFFTAG_GEOTRANSMATRIX ! */
-#define TIFFTAG_GEOTIEPOINTS         33922
+#define TIFFTAG_INTERGRAPH_MATRIX 33920 /* $use TIFFTAG_GEOTRANSMATRIX ! */
+#define TIFFTAG_GEOTIEPOINTS 33922
 /* tags 34263-34264 are private tags registered to NASA-JPL Carto Group */
 #ifdef JPL_TAG_SUPPORT
-#define TIFFTAG_JPL_CARTO_IFD        34263    /* $use GeoProjectionInfo ! */
+#define TIFFTAG_JPL_CARTO_IFD 34263 /* $use GeoProjectionInfo ! */
 #endif
-#define TIFFTAG_GEOTRANSMATRIX       34264    /* New Matrix Tag replaces 33920 */
+#define TIFFTAG_GEOTRANSMATRIX 34264 /* New Matrix Tag replaces 33920 */
 /* tags 34735-3438 are private tags registered to SPOT Image, Inc */
-#define TIFFTAG_GEOKEYDIRECTORY      34735
-#define TIFFTAG_GEODOUBLEPARAMS      34736
-#define TIFFTAG_GEOASCIIPARAMS       34737
+#define TIFFTAG_GEOKEYDIRECTORY 34735
+#define TIFFTAG_GEODOUBLEPARAMS 34736
+#define TIFFTAG_GEOASCIIPARAMS 34737
 
 /*
  *  Define Printing method flags. These
@@ -42,194 +41,194 @@ namespace {
  *  be printed out in full, rather than just an indicator
  *  of whether they are present or not.
  */
-#define  TIFFPRINT_GEOKEYDIRECTORY  0x80000000
-#define  TIFFPRINT_GEOKEYPARAMS    0x40000000
+#define TIFFPRINT_GEOKEYDIRECTORY 0x80000000
+#define TIFFPRINT_GEOKEYPARAMS 0x40000000
 
 const struct tiftagname
 {
   uint32_t tag;
   const char* name;
 } tiftagnames[] = {
-  {TIFFTAG_SUBFILETYPE,                "SubfileType"},
-  {TIFFTAG_OSUBFILETYPE,               "OldSubfileType"},
-  {TIFFTAG_IMAGEWIDTH,                 "ImageWidth"},
-  {TIFFTAG_IMAGELENGTH,                "ImageLength"},
-  {TIFFTAG_BITSPERSAMPLE,              "BitsPerSample"},
-  {TIFFTAG_COMPRESSION,                "Compression"},
-  {TIFFTAG_PHOTOMETRIC,                "PhotometricInterpretation"},
-  {TIFFTAG_THRESHHOLDING,              "Threshholding"},
-  {TIFFTAG_CELLWIDTH,                  "CellWidth"},
-  {TIFFTAG_CELLLENGTH,                 "CellLength"},
-  {TIFFTAG_FILLORDER,                  "FillOrder"},
-  {TIFFTAG_DOCUMENTNAME,               "DocumentName"},
-  {TIFFTAG_IMAGEDESCRIPTION,           "ImageDescription"},
-  {TIFFTAG_MAKE,                       "Make"},
-  {TIFFTAG_MODEL,                      "Model"},
-  {TIFFTAG_STRIPOFFSETS,               "StripOffsets"},
-  {TIFFTAG_ORIENTATION,                "Orientation"},
-  {TIFFTAG_SAMPLESPERPIXEL,            "SamplesPerPixel"},
-  {TIFFTAG_ROWSPERSTRIP,               "RowsPerStrip"},
-  {TIFFTAG_STRIPBYTECOUNTS,            "StripByteCounts"},
-  {TIFFTAG_MINSAMPLEVALUE,             "MinSampleValue"},
-  {TIFFTAG_MAXSAMPLEVALUE,             "MaxSampleValue"},
-  {TIFFTAG_XRESOLUTION,                "XResolution"},
-  {TIFFTAG_YRESOLUTION,                "YResolution"},
-  {TIFFTAG_PLANARCONFIG,               "PlanarConfiguration"},
-  {TIFFTAG_PAGENAME,                   "PageName"},
-  {TIFFTAG_XPOSITION,                  "XPosition"},
-  {TIFFTAG_YPOSITION,                  "YPosition"},
-  {TIFFTAG_FREEOFFSETS,                "FreeOffsets"},
-  {TIFFTAG_FREEBYTECOUNTS,             "FreeByteCounts"},
-  {TIFFTAG_GRAYRESPONSEUNIT,           "GrayResponseUnit"},
-  {TIFFTAG_GRAYRESPONSECURVE,          "GrayResponseCurve"},
-  {TIFFTAG_RESOLUTIONUNIT,             "ResolutionUnit"},
-  {TIFFTAG_PAGENUMBER,                 "PageNumber"},
-  {TIFFTAG_COLORRESPONSEUNIT,          "ColorResponseUnit"},
-  {TIFFTAG_TRANSFERFUNCTION,           "TransferFunction"},
-  {TIFFTAG_SOFTWARE,                   "Software"},
-  {TIFFTAG_DATETIME,                   "DateTime"},
-  {TIFFTAG_ARTIST,                     "Artist"},
-  {TIFFTAG_HOSTCOMPUTER,               "HostComputer"},
-  {TIFFTAG_WHITEPOINT,                 "WhitePoint"},
-  {TIFFTAG_PRIMARYCHROMATICITIES,      "PrimaryChromaticities"},
-  {TIFFTAG_COLORMAP,                   "ColorMap"},
-  {TIFFTAG_HALFTONEHINTS,              "HalftoneHints"},
-  {TIFFTAG_TILEWIDTH,                  "TileWidth"},
-  {TIFFTAG_TILELENGTH,                 "TileLength"},
-  {TIFFTAG_TILEOFFSETS,                "TileOffsets"},
-  {TIFFTAG_TILEBYTECOUNTS,             "TileByteCounts"},
-  {TIFFTAG_SUBIFD,                     "SubIFD"},
-  {TIFFTAG_INKSET,                     "InkSet"},
-  {TIFFTAG_INKNAMES,                   "InkNames"},
-  {TIFFTAG_NUMBEROFINKS,               "NumberOfInks"},
-  {TIFFTAG_DOTRANGE,                   "DotRange"},
-  {TIFFTAG_TARGETPRINTER,              "TargetPrinter"},
-  {TIFFTAG_EXTRASAMPLES,               "ExtraSamples"},
-  {TIFFTAG_SAMPLEFORMAT,               "SampleFormat"},
-  {TIFFTAG_SMINSAMPLEVALUE,            "SMinSampleValue"},
-  {TIFFTAG_SMAXSAMPLEVALUE,            "SMaxSampleValue"},
-  {TIFFTAG_CLIPPATH,                   "ClipPath"},
-  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"},
-  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"},
-  {TIFFTAG_YCLIPPATHUNITS,             "YClipPathUnits"},
-  {TIFFTAG_YCBCRCOEFFICIENTS,          "YCbCrCoefficients"},
-  {TIFFTAG_YCBCRSUBSAMPLING,           "YCbCrSubsampling"},
-  {TIFFTAG_YCBCRPOSITIONING,           "YCbCrPositioning"},
-  {TIFFTAG_REFERENCEBLACKWHITE,        "ReferenceBlackWhite"},
-  {TIFFTAG_XMLPACKET,                  "XMLPacket"},
-/* begin SGI tags */
-  {TIFFTAG_MATTEING,                   "Matteing"},
-  {TIFFTAG_DATATYPE,                   "DataType"},
-  {TIFFTAG_IMAGEDEPTH,                 "ImageDepth"},
-  {TIFFTAG_TILEDEPTH,                  "TileDepth"},
-/* end SGI tags */
-/* begin Pixar tags */
-  {TIFFTAG_PIXAR_IMAGEFULLWIDTH,       "ImageFullWidth"},
-  {TIFFTAG_PIXAR_IMAGEFULLLENGTH,      "ImageFullLength"},
-  {TIFFTAG_PIXAR_TEXTUREFORMAT,        "TextureFormat"},
-  {TIFFTAG_PIXAR_WRAPMODES,            "TextureWrapModes"},
-  {TIFFTAG_PIXAR_FOVCOT,               "FieldOfViewCotangent"},
-  {TIFFTAG_PIXAR_MATRIX_WORLDTOSCREEN, "MatrixWorldToScreen"},
-  {TIFFTAG_PIXAR_MATRIX_WORLDTOCAMERA, "MatrixWorldToCamera"},
-  {TIFFTAG_COPYRIGHT,                  "Copyright"},
-/* end Pixar tags */
-  {TIFFTAG_RICHTIFFIPTC,               "RichTIFFIPTC"},
-  {TIFFTAG_PHOTOSHOP,                  "Photoshop"},
-  {TIFFTAG_EXIFIFD,                    "ExifIFD"},
-  {TIFFTAG_ICCPROFILE,                 "ICC Profile"},
-  {TIFFTAG_GPSIFD,                     "GPSIFDOffset"},
-  {TIFFTAG_FAXRECVPARAMS,              "FaxRecvParams"},
-  {TIFFTAG_FAXSUBADDRESS,              "FaxSubAddress"},
-  {TIFFTAG_FAXRECVTIME,                "FaxRecvTime"},
-  {TIFFTAG_FAXDCS,                     "FaxDcs"},
-  {TIFFTAG_STONITS,                    "StoNits"},
-  {TIFFTAG_INTEROPERABILITYIFD,        "InteroperabilityIFDOffset"},
-/* begin DNG tags */
-  {TIFFTAG_DNGVERSION,                 "DNGVersion"},
-  {TIFFTAG_DNGBACKWARDVERSION,         "DNGBackwardVersion"},
-  {TIFFTAG_UNIQUECAMERAMODEL,          "UniqueCameraModel"},
-  {TIFFTAG_LOCALIZEDCAMERAMODEL,       "LocalizedCameraModel"},
-  {TIFFTAG_CFAPLANECOLOR,              "CFAPlaneColor"},
-  {TIFFTAG_CFALAYOUT,                  "CFALayout"},
-  {TIFFTAG_LINEARIZATIONTABLE,         "LinearizationTable"},
-  {TIFFTAG_BLACKLEVELREPEATDIM,        "BlackLevelRepeatDim"},
-  {TIFFTAG_BLACKLEVEL,                 "BlackLevel"},
-  {TIFFTAG_BLACKLEVELDELTAH,           "BlackLevelDeltaH"},
-  {TIFFTAG_BLACKLEVELDELTAV,           "BlackLevelDeltaV"},
-  {TIFFTAG_WHITELEVEL,                 "WhiteLevel"},
-  {TIFFTAG_DEFAULTSCALE,               "DefaultScale"},
-  {TIFFTAG_BESTQUALITYSCALE,           "BestQualityScale"},
-  {TIFFTAG_DEFAULTCROPORIGIN,          "DefaultCropOrigin"},
-  {TIFFTAG_DEFAULTCROPSIZE,            "DefaultCropSize"},
-  {TIFFTAG_COLORMATRIX1,               "ColorMatrix1"},
-  {TIFFTAG_COLORMATRIX2,               "ColorMatrix2"},
-  {TIFFTAG_CAMERACALIBRATION1,         "CameraCalibration1"},
-  {TIFFTAG_CAMERACALIBRATION2,         "CameraCalibration2"},
-  {TIFFTAG_REDUCTIONMATRIX1,           "ReductionMatrix1"},
-  {TIFFTAG_REDUCTIONMATRIX2,           "ReductionMatrix2"},
-  {TIFFTAG_ANALOGBALANCE,              "AnalogBalance"},
-  {TIFFTAG_ASSHOTNEUTRAL,              "AsShotNeutral"},
-  {TIFFTAG_ASSHOTWHITEXY,              "AsShotWhiteXY"},
-  {TIFFTAG_BASELINEEXPOSURE,           "BaselineExposure"},
-  {TIFFTAG_BASELINENOISE,              "BaselineNoise"},
-  {TIFFTAG_BASELINESHARPNESS,          "BaselineSharpness"},
-  {TIFFTAG_BAYERGREENSPLIT,            "BayerGreenSplit"},
-  {TIFFTAG_LINEARRESPONSELIMIT,        "LinearResponseLimit"},
-  {TIFFTAG_CAMERASERIALNUMBER,         "CameraSerialNumber"},
-  {TIFFTAG_LENSINFO,                   "LensInfo"},
-  {TIFFTAG_CHROMABLURRADIUS,           "ChromaBlurRadius"},
-  {TIFFTAG_ANTIALIASSTRENGTH,          "AntiAliasStrength"},
-  {TIFFTAG_SHADOWSCALE,                "ShadowScale"},
-  {TIFFTAG_DNGPRIVATEDATA,             "DNGPrivateData"},
-  {TIFFTAG_MAKERNOTESAFETY,            "MakerNoteSafety"},
-  {TIFFTAG_CALIBRATIONILLUMINANT1,     "CalibrationIlluminant1"},
-  {TIFFTAG_CALIBRATIONILLUMINANT2,     "CalibrationIlluminant2"},
-  {TIFFTAG_RAWDATAUNIQUEID,            "RawDataUniqueID"},
-  {TIFFTAG_ORIGINALRAWFILENAME,        "OriginalRawFileName"},
-  {TIFFTAG_ORIGINALRAWFILEDATA,        "OriginalRawFileData"},
-  {TIFFTAG_ACTIVEAREA,                 "ActiveArea"},
-  {TIFFTAG_MASKEDAREAS,                "MaskedAreas"},
-  {TIFFTAG_ASSHOTICCPROFILE,           "AsShotICCProfile"},
-  {TIFFTAG_ASSHOTPREPROFILEMATRIX,     "AsShotPreProfileMatrix"},
-  {TIFFTAG_CURRENTICCPROFILE,          "CurrentICCProfile"},
-  {TIFFTAG_CURRENTPREPROFILEMATRIX,    "CurrentPreProfileMatrix"},
-  {TIFFTAG_PERSAMPLE,                  "PerSample"},
-/* end DNG tags */
-/* begin TIFF/FX tags */
-  {TIFFTAG_INDEXED,                    "Indexed"},
-  {TIFFTAG_GLOBALPARAMETERSIFD,        "GlobalParametersIFD"},
-  {TIFFTAG_PROFILETYPE,                "ProfileType"},
-  {TIFFTAG_FAXPROFILE,                 "FaxProfile"},
-  {TIFFTAG_CODINGMETHODS,              "CodingMethods"},
-  {TIFFTAG_VERSIONYEAR,                "VersionYear"},
-  {TIFFTAG_MODENUMBER,                 "ModeNumber"},
-  {TIFFTAG_DECODE,                     "Decode"},
-  {TIFFTAG_IMAGEBASECOLOR,             "ImageBaseColor"},
-  {TIFFTAG_T82OPTIONS,                 "T82Options"},
-  {TIFFTAG_STRIPROWCOUNTS,             "StripRowCounts"},
-  {TIFFTAG_IMAGELAYER,                 "ImageLayer"},
-/* end DNG tags */
-/* begin pseudo tags */
-// Carl Zeiss LSM
-  {TIFFTAG_CZ_LSMINFO,                 "CarlZeissLSMInfo"},
+  {TIFFTAG_SUBFILETYPE,                "SubfileType"                    },
+  {TIFFTAG_OSUBFILETYPE,               "OldSubfileType"                 },
+  {TIFFTAG_IMAGEWIDTH,                 "ImageWidth"                     },
+  {TIFFTAG_IMAGELENGTH,                "ImageLength"                    },
+  {TIFFTAG_BITSPERSAMPLE,              "BitsPerSample"                  },
+  {TIFFTAG_COMPRESSION,                "Compression"                    },
+  {TIFFTAG_PHOTOMETRIC,                "PhotometricInterpretation"      },
+  {TIFFTAG_THRESHHOLDING,              "Threshholding"                  },
+  {TIFFTAG_CELLWIDTH,                  "CellWidth"                      },
+  {TIFFTAG_CELLLENGTH,                 "CellLength"                     },
+  {TIFFTAG_FILLORDER,                  "FillOrder"                      },
+  {TIFFTAG_DOCUMENTNAME,               "DocumentName"                   },
+  {TIFFTAG_IMAGEDESCRIPTION,           "ImageDescription"               },
+  {TIFFTAG_MAKE,                       "Make"                           },
+  {TIFFTAG_MODEL,                      "Model"                          },
+  {TIFFTAG_STRIPOFFSETS,               "StripOffsets"                   },
+  {TIFFTAG_ORIENTATION,                "Orientation"                    },
+  {TIFFTAG_SAMPLESPERPIXEL,            "SamplesPerPixel"                },
+  {TIFFTAG_ROWSPERSTRIP,               "RowsPerStrip"                   },
+  {TIFFTAG_STRIPBYTECOUNTS,            "StripByteCounts"                },
+  {TIFFTAG_MINSAMPLEVALUE,             "MinSampleValue"                 },
+  {TIFFTAG_MAXSAMPLEVALUE,             "MaxSampleValue"                 },
+  {TIFFTAG_XRESOLUTION,                "XResolution"                    },
+  {TIFFTAG_YRESOLUTION,                "YResolution"                    },
+  {TIFFTAG_PLANARCONFIG,               "PlanarConfiguration"            },
+  {TIFFTAG_PAGENAME,                   "PageName"                       },
+  {TIFFTAG_XPOSITION,                  "XPosition"                      },
+  {TIFFTAG_YPOSITION,                  "YPosition"                      },
+  {TIFFTAG_FREEOFFSETS,                "FreeOffsets"                    },
+  {TIFFTAG_FREEBYTECOUNTS,             "FreeByteCounts"                 },
+  {TIFFTAG_GRAYRESPONSEUNIT,           "GrayResponseUnit"               },
+  {TIFFTAG_GRAYRESPONSECURVE,          "GrayResponseCurve"              },
+  {TIFFTAG_RESOLUTIONUNIT,             "ResolutionUnit"                 },
+  {TIFFTAG_PAGENUMBER,                 "PageNumber"                     },
+  {TIFFTAG_COLORRESPONSEUNIT,          "ColorResponseUnit"              },
+  {TIFFTAG_TRANSFERFUNCTION,           "TransferFunction"               },
+  {TIFFTAG_SOFTWARE,                   "Software"                       },
+  {TIFFTAG_DATETIME,                   "DateTime"                       },
+  {TIFFTAG_ARTIST,                     "Artist"                         },
+  {TIFFTAG_HOSTCOMPUTER,               "HostComputer"                   },
+  {TIFFTAG_WHITEPOINT,                 "WhitePoint"                     },
+  {TIFFTAG_PRIMARYCHROMATICITIES,      "PrimaryChromaticities"          },
+  {TIFFTAG_COLORMAP,                   "ColorMap"                       },
+  {TIFFTAG_HALFTONEHINTS,              "HalftoneHints"                  },
+  {TIFFTAG_TILEWIDTH,                  "TileWidth"                      },
+  {TIFFTAG_TILELENGTH,                 "TileLength"                     },
+  {TIFFTAG_TILEOFFSETS,                "TileOffsets"                    },
+  {TIFFTAG_TILEBYTECOUNTS,             "TileByteCounts"                 },
+  {TIFFTAG_SUBIFD,                     "SubIFD"                         },
+  {TIFFTAG_INKSET,                     "InkSet"                         },
+  {TIFFTAG_INKNAMES,                   "InkNames"                       },
+  {TIFFTAG_NUMBEROFINKS,               "NumberOfInks"                   },
+  {TIFFTAG_DOTRANGE,                   "DotRange"                       },
+  {TIFFTAG_TARGETPRINTER,              "TargetPrinter"                  },
+  {TIFFTAG_EXTRASAMPLES,               "ExtraSamples"                   },
+  {TIFFTAG_SAMPLEFORMAT,               "SampleFormat"                   },
+  {TIFFTAG_SMINSAMPLEVALUE,            "SMinSampleValue"                },
+  {TIFFTAG_SMAXSAMPLEVALUE,            "SMaxSampleValue"                },
+  {TIFFTAG_CLIPPATH,                   "ClipPath"                       },
+  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"                 },
+  {TIFFTAG_XCLIPPATHUNITS,             "XClipPathUnits"                 },
+  {TIFFTAG_YCLIPPATHUNITS,             "YClipPathUnits"                 },
+  {TIFFTAG_YCBCRCOEFFICIENTS,          "YCbCrCoefficients"              },
+  {TIFFTAG_YCBCRSUBSAMPLING,           "YCbCrSubsampling"               },
+  {TIFFTAG_YCBCRPOSITIONING,           "YCbCrPositioning"               },
+  {TIFFTAG_REFERENCEBLACKWHITE,        "ReferenceBlackWhite"            },
+  {TIFFTAG_XMLPACKET,                  "XMLPacket"                      },
+ /* begin SGI tags */
+  {TIFFTAG_MATTEING,                   "Matteing"                       },
+  {TIFFTAG_DATATYPE,                   "DataType"                       },
+  {TIFFTAG_IMAGEDEPTH,                 "ImageDepth"                     },
+  {TIFFTAG_TILEDEPTH,                  "TileDepth"                      },
+ /* end SGI tags */
+  /* begin Pixar tags */
+  {TIFFTAG_PIXAR_IMAGEFULLWIDTH,       "ImageFullWidth"                 },
+  {TIFFTAG_PIXAR_IMAGEFULLLENGTH,      "ImageFullLength"                },
+  {TIFFTAG_PIXAR_TEXTUREFORMAT,        "TextureFormat"                  },
+  {TIFFTAG_PIXAR_WRAPMODES,            "TextureWrapModes"               },
+  {TIFFTAG_PIXAR_FOVCOT,               "FieldOfViewCotangent"           },
+  {TIFFTAG_PIXAR_MATRIX_WORLDTOSCREEN, "MatrixWorldToScreen"            },
+  {TIFFTAG_PIXAR_MATRIX_WORLDTOCAMERA, "MatrixWorldToCamera"            },
+  {TIFFTAG_COPYRIGHT,                  "Copyright"                      },
+ /* end Pixar tags */
+  {TIFFTAG_RICHTIFFIPTC,               "RichTIFFIPTC"                   },
+  {TIFFTAG_PHOTOSHOP,                  "Photoshop"                      },
+  {TIFFTAG_EXIFIFD,                    "ExifIFD"                        },
+  {TIFFTAG_ICCPROFILE,                 "ICC Profile"                    },
+  {TIFFTAG_GPSIFD,                     "GPSIFDOffset"                   },
+  {TIFFTAG_FAXRECVPARAMS,              "FaxRecvParams"                  },
+  {TIFFTAG_FAXSUBADDRESS,              "FaxSubAddress"                  },
+  {TIFFTAG_FAXRECVTIME,                "FaxRecvTime"                    },
+  {TIFFTAG_FAXDCS,                     "FaxDcs"                         },
+  {TIFFTAG_STONITS,                    "StoNits"                        },
+  {TIFFTAG_INTEROPERABILITYIFD,        "InteroperabilityIFDOffset"      },
+ /* begin DNG tags */
+  {TIFFTAG_DNGVERSION,                 "DNGVersion"                     },
+  {TIFFTAG_DNGBACKWARDVERSION,         "DNGBackwardVersion"             },
+  {TIFFTAG_UNIQUECAMERAMODEL,          "UniqueCameraModel"              },
+  {TIFFTAG_LOCALIZEDCAMERAMODEL,       "LocalizedCameraModel"           },
+  {TIFFTAG_CFAPLANECOLOR,              "CFAPlaneColor"                  },
+  {TIFFTAG_CFALAYOUT,                  "CFALayout"                      },
+  {TIFFTAG_LINEARIZATIONTABLE,         "LinearizationTable"             },
+  {TIFFTAG_BLACKLEVELREPEATDIM,        "BlackLevelRepeatDim"            },
+  {TIFFTAG_BLACKLEVEL,                 "BlackLevel"                     },
+  {TIFFTAG_BLACKLEVELDELTAH,           "BlackLevelDeltaH"               },
+  {TIFFTAG_BLACKLEVELDELTAV,           "BlackLevelDeltaV"               },
+  {TIFFTAG_WHITELEVEL,                 "WhiteLevel"                     },
+  {TIFFTAG_DEFAULTSCALE,               "DefaultScale"                   },
+  {TIFFTAG_BESTQUALITYSCALE,           "BestQualityScale"               },
+  {TIFFTAG_DEFAULTCROPORIGIN,          "DefaultCropOrigin"              },
+  {TIFFTAG_DEFAULTCROPSIZE,            "DefaultCropSize"                },
+  {TIFFTAG_COLORMATRIX1,               "ColorMatrix1"                   },
+  {TIFFTAG_COLORMATRIX2,               "ColorMatrix2"                   },
+  {TIFFTAG_CAMERACALIBRATION1,         "CameraCalibration1"             },
+  {TIFFTAG_CAMERACALIBRATION2,         "CameraCalibration2"             },
+  {TIFFTAG_REDUCTIONMATRIX1,           "ReductionMatrix1"               },
+  {TIFFTAG_REDUCTIONMATRIX2,           "ReductionMatrix2"               },
+  {TIFFTAG_ANALOGBALANCE,              "AnalogBalance"                  },
+  {TIFFTAG_ASSHOTNEUTRAL,              "AsShotNeutral"                  },
+  {TIFFTAG_ASSHOTWHITEXY,              "AsShotWhiteXY"                  },
+  {TIFFTAG_BASELINEEXPOSURE,           "BaselineExposure"               },
+  {TIFFTAG_BASELINENOISE,              "BaselineNoise"                  },
+  {TIFFTAG_BASELINESHARPNESS,          "BaselineSharpness"              },
+  {TIFFTAG_BAYERGREENSPLIT,            "BayerGreenSplit"                },
+  {TIFFTAG_LINEARRESPONSELIMIT,        "LinearResponseLimit"            },
+  {TIFFTAG_CAMERASERIALNUMBER,         "CameraSerialNumber"             },
+  {TIFFTAG_LENSINFO,                   "LensInfo"                       },
+  {TIFFTAG_CHROMABLURRADIUS,           "ChromaBlurRadius"               },
+  {TIFFTAG_ANTIALIASSTRENGTH,          "AntiAliasStrength"              },
+  {TIFFTAG_SHADOWSCALE,                "ShadowScale"                    },
+  {TIFFTAG_DNGPRIVATEDATA,             "DNGPrivateData"                 },
+  {TIFFTAG_MAKERNOTESAFETY,            "MakerNoteSafety"                },
+  {TIFFTAG_CALIBRATIONILLUMINANT1,     "CalibrationIlluminant1"         },
+  {TIFFTAG_CALIBRATIONILLUMINANT2,     "CalibrationIlluminant2"         },
+  {TIFFTAG_RAWDATAUNIQUEID,            "RawDataUniqueID"                },
+  {TIFFTAG_ORIGINALRAWFILENAME,        "OriginalRawFileName"            },
+  {TIFFTAG_ORIGINALRAWFILEDATA,        "OriginalRawFileData"            },
+  {TIFFTAG_ACTIVEAREA,                 "ActiveArea"                     },
+  {TIFFTAG_MASKEDAREAS,                "MaskedAreas"                    },
+  {TIFFTAG_ASSHOTICCPROFILE,           "AsShotICCProfile"               },
+  {TIFFTAG_ASSHOTPREPROFILEMATRIX,     "AsShotPreProfileMatrix"         },
+  {TIFFTAG_CURRENTICCPROFILE,          "CurrentICCProfile"              },
+  {TIFFTAG_CURRENTPREPROFILEMATRIX,    "CurrentPreProfileMatrix"        },
+  {TIFFTAG_PERSAMPLE,                  "PerSample"                      },
+ /* end DNG tags */
+  /* begin TIFF/FX tags */
+  {TIFFTAG_INDEXED,                    "Indexed"                        },
+  {TIFFTAG_GLOBALPARAMETERSIFD,        "GlobalParametersIFD"            },
+  {TIFFTAG_PROFILETYPE,                "ProfileType"                    },
+  {TIFFTAG_FAXPROFILE,                 "FaxProfile"                     },
+  {TIFFTAG_CODINGMETHODS,              "CodingMethods"                  },
+  {TIFFTAG_VERSIONYEAR,                "VersionYear"                    },
+  {TIFFTAG_MODENUMBER,                 "ModeNumber"                     },
+  {TIFFTAG_DECODE,                     "Decode"                         },
+  {TIFFTAG_IMAGEBASECOLOR,             "ImageBaseColor"                 },
+  {TIFFTAG_T82OPTIONS,                 "T82Options"                     },
+  {TIFFTAG_STRIPROWCOUNTS,             "StripRowCounts"                 },
+  {TIFFTAG_IMAGELAYER,                 "ImageLayer"                     },
+ /* end DNG tags */
+  /* begin pseudo tags */
+  // Carl Zeiss LSM
+  {TIFFTAG_CZ_LSMINFO,                 "CarlZeissLSMInfo"               },
 
-// GEOTIFF
-  {TIFFTAG_GEOPIXELSCALE,              "GeoPixelScale"},
+ // GEOTIFF
+  {TIFFTAG_GEOPIXELSCALE,              "GeoPixelScale"                  },
   {TIFFTAG_INTERGRAPH_MATRIX,          "Intergraph TransformationMatrix"},
-  {TIFFTAG_GEOTRANSMATRIX,             "GeoTransformationMatrix"},
-  {TIFFTAG_GEOTIEPOINTS,               "GeoTiePoints"},
-  {TIFFTAG_GEOKEYDIRECTORY,            "GeoKeyDirectory"},
-  {TIFFTAG_GEODOUBLEPARAMS,            "GeoDoubleParams"},
-  {TIFFTAG_GEOASCIIPARAMS,             "GeoASCIIParams"},
-  {TIFFTAG_PREDICTOR,                  "Predictor"},
+  {TIFFTAG_GEOTRANSMATRIX,             "GeoTransformationMatrix"        },
+  {TIFFTAG_GEOTIEPOINTS,               "GeoTiePoints"                   },
+  {TIFFTAG_GEOKEYDIRECTORY,            "GeoKeyDirectory"                },
+  {TIFFTAG_GEODOUBLEPARAMS,            "GeoDoubleParams"                },
+  {TIFFTAG_GEOASCIIPARAMS,             "GeoASCIIParams"                 },
+  {TIFFTAG_PREDICTOR,                  "Predictor"                      },
 
-  {TIFFTAG_JPEGIFOFFSET,               "JpegInterchangeFormat"},
-  {TIFFTAG_JPEGIFBYTECOUNT,            "JpegInterchangeFormatLength"},
-  {TIFFTAG_JPEGQTABLES,                "JpegQTables"},
-  {TIFFTAG_JPEGDCTABLES,               "JpegDcTables"},
-  {TIFFTAG_JPEGACTABLES,               "JpegAcTables"},
-  {TIFFTAG_JPEGPROC,                   "JpegProc"},
-  {TIFFTAG_JPEGRESTARTINTERVAL,        "JpegRestartInterval"},
+  {TIFFTAG_JPEGIFOFFSET,               "JpegInterchangeFormat"          },
+  {TIFFTAG_JPEGIFBYTECOUNT,            "JpegInterchangeFormatLength"    },
+  {TIFFTAG_JPEGQTABLES,                "JpegQTables"                    },
+  {TIFFTAG_JPEGDCTABLES,               "JpegDcTables"                   },
+  {TIFFTAG_JPEGACTABLES,               "JpegAcTables"                   },
+  {TIFFTAG_JPEGPROC,                   "JpegProc"                       },
+  {TIFFTAG_JPEGRESTARTINTERVAL,        "JpegRestartInterval"            },
 };
 
 const struct exiftagname
@@ -237,66 +236,66 @@ const struct exiftagname
   uint32_t tag;
   const char* name;
 } exiftagnames[] = {
-  {EXIFTAG_EXPOSURETIME,             "ExposureTime"},
-  {EXIFTAG_FNUMBER,                  "FNumber"},
-  {EXIFTAG_EXPOSUREPROGRAM,          "ExposureProgram"},
-  {EXIFTAG_SPECTRALSENSITIVITY,      "SpectralSensitivity"},
-  {EXIFTAG_ISOSPEEDRATINGS,          "ISOSpeedRatings"},
+  {EXIFTAG_EXPOSURETIME,             "ExposureTime"                },
+  {EXIFTAG_FNUMBER,                  "FNumber"                     },
+  {EXIFTAG_EXPOSUREPROGRAM,          "ExposureProgram"             },
+  {EXIFTAG_SPECTRALSENSITIVITY,      "SpectralSensitivity"         },
+  {EXIFTAG_ISOSPEEDRATINGS,          "ISOSpeedRatings"             },
   {EXIFTAG_OECF,                     "OptoelectricConversionFactor"},
-  {EXIFTAG_EXIFVERSION,              "ExifVersion"},
-  {EXIFTAG_DATETIMEORIGINAL,         "DateTimeOriginal"},
-  {EXIFTAG_DATETIMEDIGITIZED,        "DateTimeDigitized"},
-  {EXIFTAG_COMPONENTSCONFIGURATION,  "ComponentsConfiguration"},
-  {EXIFTAG_COMPRESSEDBITSPERPIXEL,   "CompressedBitsPerPixel"},
-  {EXIFTAG_SHUTTERSPEEDVALUE,        "ShutterSpeedValue"},
-  {EXIFTAG_APERTUREVALUE,            "ApertureValue"},
-  {EXIFTAG_BRIGHTNESSVALUE,          "BrightnessValue"},
-  {EXIFTAG_EXPOSUREBIASVALUE,        "ExposureBiasValue"},
-  {EXIFTAG_MAXAPERTUREVALUE,         "MaxApertureValue"},
-  {EXIFTAG_SUBJECTDISTANCE,          "SubjectDistance"},
-  {EXIFTAG_METERINGMODE,             "MeteringMode"},
-  {EXIFTAG_LIGHTSOURCE,              "LightSource"},
-  {EXIFTAG_FLASH,                    "Flash"},
-  {EXIFTAG_FOCALLENGTH,              "FocalLength"},
-  {EXIFTAG_SUBJECTAREA,              "SubjectArea"},
-  {EXIFTAG_MAKERNOTE,                "MakerNote"},
-  {EXIFTAG_USERCOMMENT,              "UserComment"},
-  {EXIFTAG_SUBSECTIME,               "SubSecTime"},
-  {EXIFTAG_SUBSECTIMEORIGINAL,       "SubSecTimeOriginal"},
-  {EXIFTAG_SUBSECTIMEDIGITIZED,      "SubSecTimeDigitized"},
-  {EXIFTAG_FLASHPIXVERSION,          "FlashpixVersion"},
-  {EXIFTAG_COLORSPACE,               "ColorSpace"},
-  {EXIFTAG_PIXELXDIMENSION,          "PixelXDimension"},
-  {EXIFTAG_PIXELYDIMENSION,          "PixelYDimension"},
-  {EXIFTAG_RELATEDSOUNDFILE,         "RelatedSoundFile"},
-  {EXIFTAG_FLASHENERGY,              "FlashEnergy"},
-  {EXIFTAG_SPATIALFREQUENCYRESPONSE, "SpatialFrequencyResponse"},
-  {EXIFTAG_FOCALPLANEXRESOLUTION,    "FocalPlaneXResolution"},
-  {EXIFTAG_FOCALPLANEYRESOLUTION,    "FocalPlaneYResolution"},
-  {EXIFTAG_FOCALPLANERESOLUTIONUNIT, "FocalPlaneResolutionUnit"},
-  {EXIFTAG_SUBJECTLOCATION,          "SubjectLocation"},
-  {EXIFTAG_EXPOSUREINDEX,            "ExposureIndex"},
-  {EXIFTAG_SENSINGMETHOD,            "SensingMethod"},
-  {EXIFTAG_FILESOURCE,               "FileSource"},
-  {EXIFTAG_SCENETYPE,                "SceneType"},
-  {EXIFTAG_CFAPATTERN,               "CFAPattern"},
-  {EXIFTAG_CUSTOMRENDERED,           "CustomRendered"},
-  {EXIFTAG_EXPOSUREMODE,             "ExposureMode"},
-  {EXIFTAG_WHITEBALANCE,             "WhiteBalance"},
-  {EXIFTAG_DIGITALZOOMRATIO,         "DigitalZoomRatio"},
-  {EXIFTAG_FOCALLENGTHIN35MMFILM,    "FocalLengthIn35mmFilm"},
-  {EXIFTAG_SCENECAPTURETYPE,         "SceneCaptureType"},
-  {EXIFTAG_GAINCONTROL,              "GainControl"},
-  {EXIFTAG_CONTRAST,                 "Contrast"},
-  {EXIFTAG_SATURATION,               "Saturation"},
-  {EXIFTAG_SHARPNESS,                "Sharpness"},
-  {EXIFTAG_DEVICESETTINGDESCRIPTION, "DeviceSettingDescription"},
-  {EXIFTAG_SUBJECTDISTANCERANGE,     "SubjectDistanceRange"},
-  {EXIFTAG_IMAGEUNIQUEID,            "ImageUniqueID"},
-  {1,                                "GPSLatitudeRef"},
-  {2,                                "GPSLatitude"},
-  {3,                                "GPSLongitudeRef"},
-  {4,                                "GPSLongitude"},
+  {EXIFTAG_EXIFVERSION,              "ExifVersion"                 },
+  {EXIFTAG_DATETIMEORIGINAL,         "DateTimeOriginal"            },
+  {EXIFTAG_DATETIMEDIGITIZED,        "DateTimeDigitized"           },
+  {EXIFTAG_COMPONENTSCONFIGURATION,  "ComponentsConfiguration"     },
+  {EXIFTAG_COMPRESSEDBITSPERPIXEL,   "CompressedBitsPerPixel"      },
+  {EXIFTAG_SHUTTERSPEEDVALUE,        "ShutterSpeedValue"           },
+  {EXIFTAG_APERTUREVALUE,            "ApertureValue"               },
+  {EXIFTAG_BRIGHTNESSVALUE,          "BrightnessValue"             },
+  {EXIFTAG_EXPOSUREBIASVALUE,        "ExposureBiasValue"           },
+  {EXIFTAG_MAXAPERTUREVALUE,         "MaxApertureValue"            },
+  {EXIFTAG_SUBJECTDISTANCE,          "SubjectDistance"             },
+  {EXIFTAG_METERINGMODE,             "MeteringMode"                },
+  {EXIFTAG_LIGHTSOURCE,              "LightSource"                 },
+  {EXIFTAG_FLASH,                    "Flash"                       },
+  {EXIFTAG_FOCALLENGTH,              "FocalLength"                 },
+  {EXIFTAG_SUBJECTAREA,              "SubjectArea"                 },
+  {EXIFTAG_MAKERNOTE,                "MakerNote"                   },
+  {EXIFTAG_USERCOMMENT,              "UserComment"                 },
+  {EXIFTAG_SUBSECTIME,               "SubSecTime"                  },
+  {EXIFTAG_SUBSECTIMEORIGINAL,       "SubSecTimeOriginal"          },
+  {EXIFTAG_SUBSECTIMEDIGITIZED,      "SubSecTimeDigitized"         },
+  {EXIFTAG_FLASHPIXVERSION,          "FlashpixVersion"             },
+  {EXIFTAG_COLORSPACE,               "ColorSpace"                  },
+  {EXIFTAG_PIXELXDIMENSION,          "PixelXDimension"             },
+  {EXIFTAG_PIXELYDIMENSION,          "PixelYDimension"             },
+  {EXIFTAG_RELATEDSOUNDFILE,         "RelatedSoundFile"            },
+  {EXIFTAG_FLASHENERGY,              "FlashEnergy"                 },
+  {EXIFTAG_SPATIALFREQUENCYRESPONSE, "SpatialFrequencyResponse"    },
+  {EXIFTAG_FOCALPLANEXRESOLUTION,    "FocalPlaneXResolution"       },
+  {EXIFTAG_FOCALPLANEYRESOLUTION,    "FocalPlaneYResolution"       },
+  {EXIFTAG_FOCALPLANERESOLUTIONUNIT, "FocalPlaneResolutionUnit"    },
+  {EXIFTAG_SUBJECTLOCATION,          "SubjectLocation"             },
+  {EXIFTAG_EXPOSUREINDEX,            "ExposureIndex"               },
+  {EXIFTAG_SENSINGMETHOD,            "SensingMethod"               },
+  {EXIFTAG_FILESOURCE,               "FileSource"                  },
+  {EXIFTAG_SCENETYPE,                "SceneType"                   },
+  {EXIFTAG_CFAPATTERN,               "CFAPattern"                  },
+  {EXIFTAG_CUSTOMRENDERED,           "CustomRendered"              },
+  {EXIFTAG_EXPOSUREMODE,             "ExposureMode"                },
+  {EXIFTAG_WHITEBALANCE,             "WhiteBalance"                },
+  {EXIFTAG_DIGITALZOOMRATIO,         "DigitalZoomRatio"            },
+  {EXIFTAG_FOCALLENGTHIN35MMFILM,    "FocalLengthIn35mmFilm"       },
+  {EXIFTAG_SCENECAPTURETYPE,         "SceneCaptureType"            },
+  {EXIFTAG_GAINCONTROL,              "GainControl"                 },
+  {EXIFTAG_CONTRAST,                 "Contrast"                    },
+  {EXIFTAG_SATURATION,               "Saturation"                  },
+  {EXIFTAG_SHARPNESS,                "Sharpness"                   },
+  {EXIFTAG_DEVICESETTINGDESCRIPTION, "DeviceSettingDescription"    },
+  {EXIFTAG_SUBJECTDISTANCERANGE,     "SubjectDistanceRange"        },
+  {EXIFTAG_IMAGEUNIQUEID,            "ImageUniqueID"               },
+  {1,                                "GPSLatitudeRef"              },
+  {2,                                "GPSLatitude"                 },
+  {3,                                "GPSLongitudeRef"             },
+  {4,                                "GPSLongitude"                },
 };
 
 #ifdef _MSC_VER
@@ -325,19 +324,13 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* /*module*/, const char* 
   throw nim::ZIOException(str);
 }
 
-const uint8_t bitmasks1[] = {
-  0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01
-};
+const uint8_t bitmasks1[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
-const uint8_t bitmasks2[] = {
-  0xC0, 0x30, 0x0C, 0x03
-};
+const uint8_t bitmasks2[] = {0xC0, 0x30, 0x0C, 0x03};
 
-const uint8_t bitmasks4[] = {
-  0xF0, 0x0F
-};
+const uint8_t bitmasks4[] = {0xF0, 0x0F};
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
@@ -361,7 +354,7 @@ VoxelFormat ZTiffIFD::voxelFormat(size_t sample) const
   auto i = indexOf(TIFFTAG_SAMPLEFORMAT);
   if (i != -1) {
     auto vfn = m_entries[i].dataAt<uint16_t>(sample);
-    if (vfn == 4) {  // void
+    if (vfn == 4) { // void
       vfn = 1;
     } // unsigned
     if (vfn == 5 || vfn == 6) {
@@ -726,19 +719,18 @@ uint32_t ZTiffIFD::subfileTypeData() const
 
 ZTiff::ZTiff()
   : m_tif(nullptr, TIFFClose)
-{
-}
+{}
 
 QString ZTiff::toQString() const
 {
   QString res;
   for (size_t i = 0; i < m_ifds.size(); ++i) {
     res = res % QString("Directory %1: offset %2 (%3) next %4 (%5)\n")
-      .arg(i)
-      .arg(m_ifds[i].offset())
-      .arg(m_ifds[i].offset(), 0, 16)
-      .arg(m_ifds[i].nextIFDOffset())
-      .arg(m_ifds[i].nextIFDOffset(), 0, 16);
+                  .arg(i)
+                  .arg(m_ifds[i].offset())
+                  .arg(m_ifds[i].offset(), 0, 16)
+                  .arg(m_ifds[i].nextIFDOffset())
+                  .arg(m_ifds[i].nextIFDOffset(), 0, 16);
     res = res % m_ifds[i].toQString() % QString("\n");
   }
   return res;
@@ -869,10 +861,8 @@ void ZTiff::readInfoFromIFD(const ZTiffIFD& ifd, ZImgInfo& info) const
   }
 
   if (ifd.photometricInterpretation() == PHOTOMETRIC_MINISBLACK ||
-      ifd.photometricInterpretation() == PHOTOMETRIC_MINISWHITE ||
-      ifd.photometricInterpretation() == PHOTOMETRIC_RGB ||
+      ifd.photometricInterpretation() == PHOTOMETRIC_MINISWHITE || ifd.photometricInterpretation() == PHOTOMETRIC_RGB ||
       !m_useColormap) {
-
     info.numChannels = ifd.samplesPerPixel();
     size_t bps = ifd.bitsPerSample(0);
     info.validBitCount = bps;
@@ -930,7 +920,7 @@ void ZTiff::readImgFromIFD(size_t ifdIdx, ZImg& img)
   }
   readImg(img,
           m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_ASSOCALPHA ||
-          m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_UNSPECIFIED);
+            m_ifds[ifdIdx].extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
 void ZTiff::readImgFromIFD(const ZTiffIFD& ifd, ZImg& img)
@@ -938,9 +928,7 @@ void ZTiff::readImgFromIFD(const ZTiffIFD& ifd, ZImg& img)
   if (TIFFSetSubDirectory(m_tif.get(), ifd.offset()) != 1) {
     throw ZIOException(QString("Can not read ifd at offset %1").arg(ifd.offset()));
   }
-  readImg(img,
-          ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA ||
-          ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
+  readImg(img, ifd.extraSample() == EXTRASAMPLE_ASSOCALPHA || ifd.extraSample() == EXTRASAMPLE_UNSPECIFIED);
 }
 
 ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
@@ -1026,9 +1014,14 @@ struct ZTiffHeader
 
 #pragma pack(pop)
 
-void ZTiff::writeTiffHeader(uint8_t* mem, size_t width, size_t height, size_t bitsPerSample, size_t samplesPerPixel,
+void ZTiff::writeTiffHeader(uint8_t* mem,
+                            size_t width,
+                            size_t height,
+                            size_t bitsPerSample,
+                            size_t samplesPerPixel,
                             size_t compression,
-                            uint64_t stripOffset, uint64_t stripByteCount)
+                            uint64_t stripOffset,
+                            uint64_t stripByteCount)
 {
   static_assert(sizeof(ZTiffHeader) == 192, "wrong tiff header size");
   CHECK(stripOffset >= 192);
@@ -1047,7 +1040,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
 {
   uint64_t nextdiroff = 0;
 
-  if (off == 0) {      /* no more directories */
+  if (off == 0) { /* no more directories */
     return 0;
   }
   fs.seekg(off);
@@ -1078,8 +1071,7 @@ uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigt
   uint32_t n = fs.gcount();
   if (n != dirmemvector.size()) {
     n /= direntrysize;
-    LOG(WARNING) << "Could only read " << n << " of " << dircount
-                 << " entries in directory at offset " << off;
+    LOG(WARNING) << "Could only read " << n << " of " << dircount << " entries in directory at offset " << off;
     dircount = n;
     nextdiroff = 0;
   } else {
@@ -1303,11 +1295,10 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
   std::vector<ZTiffIFD> _ifds;
   readStream(fs, &hdr, sizeof(TIFFHeaderCommon));
 
-  if (hdr.common.tiff_magic != TIFF_BIGENDIAN
-      && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
-      hdr.common.tiff_magic != (boost::endian::order::native == boost::endian::order::little ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
-    throw ZIOException(QString("Not a TIFF or MDI file, bad magic number %1")
-                         .arg(hdr.common.tiff_magic, 0, 16));
+  if (hdr.common.tiff_magic != TIFF_BIGENDIAN && hdr.common.tiff_magic != TIFF_LITTLEENDIAN &&
+      hdr.common.tiff_magic !=
+        (boost::endian::order::native == boost::endian::order::little ? MDI_LITTLEENDIAN : MDI_BIGENDIAN)) {
+    throw ZIOException(QString("Not a TIFF or MDI file, bad magic number %1").arg(hdr.common.tiff_magic, 0, 16));
   }
 
   bool swabflag;
@@ -1317,13 +1308,14 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
     swabflag = boost::endian::order::native == boost::endian::order::big;
   }
   isNativeEndianness = !swabflag;
-  //LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
+  // LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN);
 
   if (swabflag) {
     boost::endian::endian_reverse_inplace(hdr.common.tiff_version);
   }
 
-  //LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " " << hdr.common.tiff_version;
+  // LOG(INFO) << swabflag << " " << hostIsLittleEndian() << " " << (hdr.common.tiff_magic == TIFF_LITTLEENDIAN) << " "
+  // << hdr.common.tiff_version;
 
   bool bigtiff = false;
   uint64_t diroff = 0;
@@ -1358,8 +1350,7 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
     }
     bigtiff = true;
   } else {
-    throw ZIOException(QString("Not a TIFF file, bad version number %1")
-                         .arg(hdr.common.tiff_version));
+    throw ZIOException(QString("Not a TIFF file, bad version number %1").arg(hdr.common.tiff_version));
   }
 
   std::set<uint64_t> visitedDiroffs;
@@ -1397,10 +1388,8 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
   }
 
   bool readAsRGBA = true;
-  if (photometric == PHOTOMETRIC_MINISBLACK ||
-      photometric == PHOTOMETRIC_MINISWHITE ||
-      photometric == PHOTOMETRIC_RGB ||
-      !m_useColormap) {
+  if (photometric == PHOTOMETRIC_MINISBLACK || photometric == PHOTOMETRIC_MINISWHITE ||
+      photometric == PHOTOMETRIC_RGB || !m_useColormap) {
     readAsRGBA = false;
   }
 
@@ -1418,7 +1407,6 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
   }
 
   if (readAsRGBA) {
-
     ZImg bufImg(img.infoRef());
     auto raster = bufImg.channelData<uint32_t>(0);
 
@@ -1429,7 +1417,6 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
     separateChannel(bufImg, img);
 
   } else {
-
     bool invertWhiteBlack = PHOTOMETRIC_MINISWHITE == photometric;
 
     if (TIFFIsTiled(m_tif.get())) {
@@ -1442,8 +1429,8 @@ void ZTiff::readImg(ZImg& img, bool divideByAlpha)
       if (separatePlane || img.numChannels() == 1) {
         uint32_t tilesPerChannel = TIFFNumberOfTiles(m_tif.get()) / img.numChannels();
 
-        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(
-          tileWidth * tileHeight * img.voxelByteNumber());
+        std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> tileBuf(tileWidth * tileHeight *
+                                                                                       img.voxelByteNumber());
 
         for (size_t c = 0; c < img.numChannels(); ++c) {
           for (uint32_t tile = c * tilesPerChannel; tile < (c + 1) * tilesPerChannel; tile++) {
@@ -1594,29 +1581,25 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint8_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 2: {
           auto pt = reinterpret_cast<uint16_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 4: {
           auto pt = reinterpret_cast<uint32_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 8: {
           auto pt = reinterpret_cast<uint64_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         default:
           throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample / 8));
       }
@@ -1631,12 +1614,15 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     size_t bytesPerRow = (width * nChannel + 7) / 8;
     if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height)
+                           .arg(nChannel)
+                           .arg(bitspersample)
+                           .arg(packedBuf.size()));
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
-        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0) :
-                ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
+        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0)
+                       : ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
         buf8++;
       }
     }
@@ -1649,12 +1635,15 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     size_t bytesPerRow = (width * nChannel + 3) / 4;
     if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height)
+                           .arg(nChannel)
+                           .arg(bitspersample)
+                           .arg(packedBuf.size()));
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
-        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2))) :
-                (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
+        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2)))
+                       : (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
         buf8++;
       }
     }
@@ -1667,12 +1656,15 @@ size_t ZTiff::readStrip(uint32_t strip, uint8_t* buf, size_t width, size_t heigh
     size_t bytesPerRow = (width * nChannel + 1) / 2;
     if (packedBuf.size() < bytesPerRow * height) {
       throw ZIOException(QString("Not enought strip data, nRows:%1, nChannel:%2, bitsPerSample:%3, strip data:%4")
-                           .arg(height).arg(nChannel).arg(bitspersample).arg(packedBuf.size()));
+                           .arg(height)
+                           .arg(nChannel)
+                           .arg(bitspersample)
+                           .arg(packedBuf.size()));
     }
     for (size_t r = 0; r < height; ++r) {
       for (size_t i = 0; i < width * nChannel; ++i) {
-        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4))) :
-                (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
+        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4)))
+                       : (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
         buf8++;
       }
     }
@@ -1695,29 +1687,25 @@ void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileH
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint8_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 2: {
           auto pt = reinterpret_cast<uint16_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint16_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 4: {
           auto pt = reinterpret_cast<uint32_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint32_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         case 8: {
           auto pt = reinterpret_cast<uint64_t*>(buf);
           for (size_t i = 0; i < read; ++i) {
             pt[i] = std::numeric_limits<uint64_t>::max() - pt[i];
           }
-        }
-          break;
+        } break;
         default:
           throw ZIOException(QString("do not support invert %1 bytes integer").arg(bitspersample / 8));
       }
@@ -1729,8 +1717,8 @@ void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileH
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r = 0; r < tileHeight; ++r) {
       for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
-        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0) :
-                ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
+        *buf8 = invert ? ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) == 0)
+                       : ((packedBuf[r * bytesPerRow + i / 8] & bitmasks1[i % 8]) > 0);
         buf8++;
       }
     }
@@ -1741,8 +1729,8 @@ void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileH
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r = 0; r < tileHeight; ++r) {
       for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
-        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2))) :
-                (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
+        *buf8 = invert ? (3 - ((packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4]) >> ((3 - i % 4) * 2)))
+                       : (packedBuf[r * bytesPerRow + i / 4] & bitmasks2[i % 4] >> ((3 - i % 4) * 2));
         buf8++;
       }
     }
@@ -1753,8 +1741,8 @@ void ZTiff::readTile(uint32_t tile, uint8_t* buf, size_t tileWidth, size_t tileH
     size_t bytesPerRow = packedBuf.size() / tileHeight;
     for (size_t r = 0; r < tileHeight; ++r) {
       for (size_t i = 0; i < tileWidth * tileChannel; ++i) {
-        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4))) :
-                (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
+        *buf8 = invert ? (15 - ((packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2]) >> ((1 - i % 2) * 4)))
+                       : (packedBuf[r * bytesPerRow + i / 2] & bitmasks4[i % 2] >> ((1 - i % 2) * 4));
         buf8++;
       }
     }
@@ -1774,8 +1762,7 @@ void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
           *des++ = *src;
           src += numCh;
         }
-      }
-        break;
+      } break;
       case 2: {
         auto* des = img.channelData<uint16_t>(c);
         const uint16_t* src = bufImg.channelData<uint16_t>(0) + c;
@@ -1785,8 +1772,7 @@ void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
           *des++ = *src;
           src += numCh;
         }
-      }
-        break;
+      } break;
       default: {
         auto* des = img.channelData<uint8_t>(c);
         const uint8_t* src = bufImg.channelData<uint8_t>(0) + c * img.voxelByteNumber();
@@ -1803,8 +1789,14 @@ void ZTiff::separateChannel(const ZImg& bufImg, ZImg& img)
   }
 }
 
-void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t voxelByteNumber,
-                                    ZImg& img, size_t xStart, size_t yStart, size_t c)
+void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf,
+                                    size_t tileWidth,
+                                    size_t tileHeight,
+                                    size_t voxelByteNumber,
+                                    ZImg& img,
+                                    size_t xStart,
+                                    size_t yStart,
+                                    size_t c)
 {
   size_t xEnd = std::min(xStart + tileWidth, img.width());
   size_t cpysize = (xEnd - xStart) * voxelByteNumber;
@@ -1814,9 +1806,14 @@ void ZTiff::copyOneChannelTileToImg(const uint8_t* tileBuf, size_t tileWidth, si
   }
 }
 
-void ZTiff::copyTileToImg(const uint8_t* tileBuf, size_t tileWidth, size_t tileHeight, size_t numChannels,
+void ZTiff::copyTileToImg(const uint8_t* tileBuf,
+                          size_t tileWidth,
+                          size_t tileHeight,
+                          size_t numChannels,
                           size_t voxelByteNumber,
-                          ZImg& img, size_t xStart, size_t yStart)
+                          ZImg& img,
+                          size_t xStart,
+                          size_t yStart)
 {
   for (size_t c = 0; c < numChannels; ++c) {
     size_t xEnd = std::min(xStart + tileWidth, img.width());
@@ -1844,8 +1841,8 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
     comp = defaultCompression(nullptr);
   } else {
     if (!checkCompression(nullptr, comp)) {
-      LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.").arg(
-        enumToUnderlyingType(comp));
+      LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.")
+                        .arg(enumToUnderlyingType(comp));
       comp = defaultCompression(nullptr);
     }
   }
@@ -1865,7 +1862,11 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
   }
 }
 
-void ZTiffWriter::writeIFD(const ZImg& img, size_t z, size_t t, index_t c, bool writeThumbnails,
+void ZTiffWriter::writeIFD(const ZImg& img,
+                           size_t z,
+                           size_t t,
+                           index_t c,
+                           bool writeThumbnails,
                            const std::vector<ZImgMetatag>& additionalTags)
 {
   CHECK(m_tif);
@@ -1877,7 +1878,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, size_t z, size_t t, index_t c, bool 
 
   bool planarconfigSeparate = true;
   if (c >= 0 || img.numChannels() == 1) {
-    planarconfigSeparate = false;  // only one channel
+    planarconfigSeparate = false; // only one channel
   }
 
   // for 2D image with 3 or 4 channel, save it without planarconfigSeparate so Pillow can read it correctly
@@ -1955,7 +1956,9 @@ void ZTiffWriter::writeIFD(const ZImg& img, size_t z, size_t t, index_t c, bool 
     TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, thumbnail.height());
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLEFORMAT, thumbnail.voxelFormat());
     for (size_t ch = 0; ch < thumbnail.numChannels(); ++ch) {
-      TIFFWriteEncodedStrip(m_tif.get(), ch, const_cast<uint8_t*>(thumbnail.planeData(0, ch, 0)),
+      TIFFWriteEncodedStrip(m_tif.get(),
+                            ch,
+                            const_cast<uint8_t*>(thumbnail.planeData(0, ch, 0)),
                             thumbnail.planeByteNumber());
     }
     TIFFWriteDirectory(m_tif.get());
@@ -1964,9 +1967,7 @@ void ZTiffWriter::writeIFD(const ZImg& img, size_t z, size_t t, index_t c, bool 
 
 Compression ZTiffWriter::defaultCompression(const ZImg* img)
 {
-  const Compression list[] = {
-    Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS
-  };
+  const Compression list[] = {Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS};
   for (auto comp : list) {
     if (checkCompression(img, comp)) {
       return comp;
@@ -1980,7 +1981,7 @@ bool ZTiffWriter::checkCompression(const ZImg* /*unused*/, Compression comp)
   if (comp == Compression::NONE) {
     return true;
   }
-  //check exist first
+  // check exist first
   if (TIFFIsCODECConfigured(enumToUnderlyingType(comp)) != 1) {
     return false;
   }

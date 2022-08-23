@@ -10,10 +10,18 @@ ZImageMatrix3DTransform::ZImageMatrix3DTransform()
   m_parameters[10] = 1;
 }
 
-void ZImageMatrix3DTransform::transformRange(double inXMin, double inXMax, double inYMin, double inYMax, double inZMin,
+void ZImageMatrix3DTransform::transformRange(double inXMin,
+                                             double inXMax,
+                                             double inYMin,
+                                             double inYMax,
+                                             double inZMin,
                                              double inZMax,
-                                             double& outXMin, double& outXMax, double& outYMin, double& outYMax,
-                                             double& outZMin, double& outZMax) const
+                                             double& outXMin,
+                                             double& outXMax,
+                                             double& outYMin,
+                                             double& outYMax,
+                                             double& outZMin,
+                                             double& outZMax) const
 {
   double outCoords[24];
   outCoords[0] = outCoords[3] = outCoords[6] = outCoords[9] = inXMin;
@@ -63,16 +71,26 @@ size_t ZImageMatrix3DTransform::numParameters() const
 void ZImageMatrix3DTransform::setParameters(const double* para)
 {
   m_tform.reset();
-  m_tform.setMatrix(para[0], para[1], para[2], para[3],
-                    para[4], para[5], para[6], para[7],
-                    para[8], para[9], para[10], para[11]);
+  m_tform.setMatrix(para[0],
+                    para[1],
+                    para[2],
+                    para[3],
+                    para[4],
+                    para[5],
+                    para[6],
+                    para[7],
+                    para[8],
+                    para[9],
+                    para[10],
+                    para[11]);
   m_parameters = std::vector<double>(para, para + 12);
 }
 
 void ZImageMatrix3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -134,8 +152,9 @@ void ZImageTranslation3DTransform::setParameters(const double* para)
 
 void ZImageTranslation3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -191,8 +210,9 @@ void ZImageRigid3DTransform::setParameters(const double* para)
 
 void ZImageRigid3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -240,8 +260,9 @@ void ZImageSimilarity3DTransform::setParameters(const double* para)
 
 void ZImageSimilarity3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;
@@ -292,8 +313,9 @@ void ZImageAffine3DTransform::setParameters(const double* para)
 
 void ZImageAffine3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
-  if (fromLevel == toLevel)
+  if (fromLevel == toLevel) {
     return;
+  }
   double scale = std::pow(2.0, double(fromLevel) - double(toLevel));
   m_centerX *= scale;
   m_centerY *= scale;

@@ -8,23 +8,33 @@ template<class T, class WeightT = float>
 class ZGMM
 {
 public:
-
   using ResultDataType = typename MaxFloatType<T, WeightT>::type;
-  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>;  // matrix of result data type
-  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>;  // vector of result data type
+  using MatrixXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, Eigen::Dynamic>; // matrix of result data type
+  using VectorXrt = Eigen::Matrix<ResultDataType, Eigen::Dynamic, 1>; // vector of result data type
   using RowVectorXrt = Eigen::Matrix<ResultDataType, 1, Eigen::Dynamic>; // row vector of result data type
 
   enum class CovarianceType
   {
-    Spherical, Diag, Full, PPCA
+    Spherical,
+    Diag,
+    Full,
+    PPCA
   };
 
   ZGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
-       size_t nclasses, bool checkCovars = true, CovarianceType covarType = CovarianceType::Full,
+       size_t nclasses,
+       bool checkCovars = true,
+       CovarianceType covarType = CovarianceType::Full,
        ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(),
        IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_checkCovars(checkCovars), m_covarType(covarType), m_termCriteria(termCriteria)
-    , m_logLevel(logLevel), m_hasWeight(false), m_labelsNeedUpdate(false), m_hasInitData(false)
+    : m_nclasses(nclasses)
+    , m_checkCovars(checkCovars)
+    , m_covarType(covarType)
+    , m_termCriteria(termCriteria)
+    , m_logLevel(logLevel)
+    , m_hasWeight(false)
+    , m_labelsNeedUpdate(false)
+    , m_hasInitData(false)
   {
     if constexpr (std::is_same_v<T, ResultDataType>) {
       // reinterpret_cast allowed (AliasedType is (possibly cv-qualified) DynamicType)
@@ -47,11 +57,19 @@ public:
 
   ZGMM(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& data,
        const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight,
-       size_t nclasses, bool checkCovars = true, CovarianceType covarType = CovarianceType::Full,
+       size_t nclasses,
+       bool checkCovars = true,
+       CovarianceType covarType = CovarianceType::Full,
        ZTermCriteria<ResultDataType> termCriteria = ZTermCriteria<ResultDataType>(),
        IterAlgorithmLogLevel logLevel = IterAlgorithmLogLevel::Off)
-    : m_nclasses(nclasses), m_checkCovars(checkCovars), m_covarType(covarType), m_termCriteria(termCriteria)
-    , m_logLevel(logLevel), m_hasWeight(true), m_labelsNeedUpdate(false), m_hasInitData(false)
+    : m_nclasses(nclasses)
+    , m_checkCovars(checkCovars)
+    , m_covarType(covarType)
+    , m_termCriteria(termCriteria)
+    , m_logLevel(logLevel)
+    , m_hasWeight(true)
+    , m_labelsNeedUpdate(false)
+    , m_hasInitData(false)
   {
     bool hasZeroWeight = false;
     for (Eigen::Index i = 0; i < data.rows(); ++i) {
@@ -126,10 +144,11 @@ public:
       return -1;
     }
 
-    if (m_hasInitData)
+    if (m_hasInitData) {
       initWithInitData();
-    else
+    } else {
       initWithKMeans();
+    }
 
     ResultDataType min_covar;
     std::vector<MatrixXrt> init_covars;
@@ -171,10 +190,11 @@ public:
       // calculate error value
       VectorXrt prob = act * m_priors.transpose();
       // Error value is negative log likelihood of data
-      if (m_hasWeight)
+      if (m_hasWeight) {
         e = -(prob.array().log() * m_pWeight->array()).sum();
-      else
+      } else {
         e = -prob.array().log().sum();
+      }
 
       if (m_logLevel == IterAlgorithmLogLevel::Iter) {
         LOG(INFO) << "GMM Iter: " << iter << " Negative Loglikelihood: " << e;
@@ -192,10 +212,10 @@ public:
         eold = e;
       }
 
-      if (m_hasWeight) {    //substitute responsibilities with responsibilities.*weight
+      if (m_hasWeight) { // substitute responsibilities with responsibilities.*weight
         // Adjust the new estimates for the parameters
-        RowVectorXrt new_pr = (m_responsibilities.cwiseProduct(
-          m_pWeight->rowwise().replicate(m_nclasses))).colwise().sum();
+        RowVectorXrt new_pr =
+          (m_responsibilities.cwiseProduct(m_pWeight->rowwise().replicate(m_nclasses))).colwise().sum();
         MatrixXrt new_c =
           m_responsibilities.cwiseProduct(m_pWeight->rowwise().replicate(m_nclasses)).transpose() * (*m_pData);
 
@@ -257,7 +277,6 @@ public:
             break;
           }
           case CovarianceType::PPCA: {
-
           }
         }
       } else {
@@ -322,7 +341,6 @@ public:
             break;
           }
           case CovarianceType::PPCA: {
-
           }
         }
       }
@@ -334,15 +352,14 @@ public:
     // calculate error value
     VectorXrt prob = act * m_priors.transpose();
     // Error value is negative log likelihood of data
-    if (m_hasWeight)
+    if (m_hasWeight) {
       e = -(prob.array().log() * m_pWeight->array()).sum();
-    else
+    } else {
       e = -prob.array().log().sum();
+    }
     if (m_logLevel == IterAlgorithmLogLevel::Iter || m_logLevel == IterAlgorithmLogLevel::Final) {
       if (iter >= m_termCriteria.maxIter()) {
-        LOG(INFO) << "GMM maximum number of iterations ("
-                  << m_termCriteria.maxIter()
-                  << ") has been exceeded.";
+        LOG(INFO) << "GMM maximum number of iterations (" << m_termCriteria.maxIter() << ") has been exceeded.";
       }
       LOG(INFO) << "GMM Final Centroids:\n" << m_centroids;
       LOG(INFO) << "GMM Final Negative Loglikelihood: " << e;
@@ -351,19 +368,29 @@ public:
   }
 
   inline size_t numOfClusters() const
-  { return m_nclasses; }
+  {
+    return m_nclasses;
+  }
 
   inline MatrixXrt centroids() const
-  { return m_centroids; }
+  {
+    return m_centroids;
+  }
 
   inline VectorXrt priors() const
-  { return m_priors.transpose(); }
+  {
+    return m_priors.transpose();
+  }
 
   inline MatrixXrt covar(size_t compIdx) const
-  { return m_covars[compIdx]; }
+  {
+    return m_covars[compIdx];
+  }
 
   inline std::vector<MatrixXrt> covars() const
-  { return m_covars; }
+  {
+    return m_covars;
+  }
 
   Eigen::VectorXi labels()
   {
@@ -379,7 +406,9 @@ public:
   }
 
   inline MatrixXrt responsiblities() const
-  { return m_responsibilities; }
+  {
+    return m_responsibilities;
+  }
 
   // return data belongs to class compIdx
   MatrixXrt data(size_t compIdx)
@@ -388,8 +417,9 @@ public:
     Eigen::VectorXi label = labels();
     Eigen::Index num = 0;
     for (Eigen::Index i = 0; i < label.size(); ++i) {
-      if (label(i) == static_cast<int>(compIdx))
+      if (label(i) == static_cast<int>(compIdx)) {
         res.row(num++) = m_pData->row(i);
+      }
     }
     res.conservativeResize(num, Eigen::NoChange);
     return res;
@@ -402,15 +432,15 @@ public:
     Eigen::VectorXi label = labels();
     Eigen::Index num = 0;
     for (Eigen::Index i = 0; i < label.size(); ++i) {
-      if (label(i) == static_cast<int>(compIdx))
+      if (label(i) == static_cast<int>(compIdx)) {
         res(num++) = (*m_pWeight)(i);
+      }
     }
     res.conservativeResize(num);
     return res;
   }
 
 protected:
-
   void initWithInitData()
   {
     // get labels
@@ -427,8 +457,9 @@ protected:
   //  The k-means algorithm is used to determine the initial centres.
   void initWithKMeans()
   {
-    if (!m_hasEnoughData)
+    if (!m_hasEnoughData) {
       return;
+    }
 
     if (m_hasWeight) {
       ZKMeans<ResultDataType, ResultDataType> km(*m_pData, *m_pWeight, m_nclasses, 10);
@@ -446,7 +477,7 @@ protected:
     initPriors();
   }
 
-  bool checkData()   // check if there are enough data points to make m_nclasses clusters
+  bool checkData() // check if there are enough data points to make m_nclasses clusters
   {
     if (m_nclasses == 0 || m_pData->rows() == 0) {
       m_hasEnoughData = false;
@@ -469,7 +500,7 @@ protected:
     m_uniqueDatas.row(nUniqueData++) = m_pData->row(0);
     for (Eigen::Index r = 1; r < m_pData->rows(); ++r) {
       MatrixXrt dist = m_dist2(m_uniqueDatas.topRows(nUniqueData), m_pData->row(r));
-      if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) {  // duplicate
+      if ((dist.array() <= Eigen::NumTraits<ResultDataType>::dummy_precision()).any()) { // duplicate
         continue;
       }
       m_uniqueDatas.row(nUniqueData++) = m_pData->row(r);
@@ -508,8 +539,9 @@ protected:
   MatrixXrt activations()
   {
     using namespace boost::math::double_constants;
-    if (!m_hasEnoughData)
+    if (!m_hasEnoughData) {
       return MatrixXrt();
+    }
 
     MatrixXrt a(m_pData->rows(), m_nclasses);
     switch (m_covarType) {
@@ -531,8 +563,11 @@ protected:
           ResultDataType s = m_covars[j].diagonal().cwiseSqrt().prod();
           MatrixXrt diffs = m_pData->rowwise() - m_centroids.row(j);
           diffs = diffs.array().square();
-          a.col(j) = exp(-0.5 * (diffs.cwiseQuotient(
-            VectorXrt::Ones(m_pData->rows()) * m_covars[j].diagonal())).rowwise().sum().array()) / (normal * s);
+          a.col(j) = exp(-0.5 * (diffs.cwiseQuotient(VectorXrt::Ones(m_pData->rows()) * m_covars[j].diagonal()))
+                                  .rowwise()
+                                  .sum()
+                                  .array()) /
+                     (normal * s);
         }
         break;
       }
@@ -556,13 +591,14 @@ protected:
     return a;
   }
 
-  //computes the posteriors responsibilities (i.e. the probability of
-  //each component conditioned on the data P(J|X)) for a Gaussian mixture
-  //model. need activations as input.
+  // computes the posteriors responsibilities (i.e. the probability of
+  // each component conditioned on the data P(J|X)) for a Gaussian mixture
+  // model. need activations as input.
   void posterior(MatrixXrt& a)
   {
-    if (!m_hasEnoughData)
+    if (!m_hasEnoughData) {
       return;
+    }
 
     m_responsibilities = a.cwiseProduct(VectorXrt::Ones(m_pData->rows()) * m_priors);
     VectorXrt s = m_responsibilities.rowwise().sum();
@@ -759,17 +795,17 @@ protected:
   }
 
 private:
-  size_t m_dimension;   //dimension of the space
-  size_t m_nclasses;    //number of mixture components
-  bool m_checkCovars;  // Ensure that covariances don't collapse
-  CovarianceType m_covarType;  // type of covariance model
-  RowVectorXrt m_priors;  // mixing coefficients
+  size_t m_dimension; // dimension of the space
+  size_t m_nclasses; // number of mixture components
+  bool m_checkCovars; // Ensure that covariances don't collapse
+  CovarianceType m_covarType; // type of covariance model
+  RowVectorXrt m_priors; // mixing coefficients
   MatrixXrt m_centroids; // means of Gaussians stored as rows of matrix
   Eigen::VectorXi m_labels;
 
-  std::vector<MatrixXrt> m_covars;  // covariances of Gaussians
-  MatrixXrt m_responsibilities; // nData*nclasses responsibilities matrix, entry ij represents class j's responsibility for data i
-
+  std::vector<MatrixXrt> m_covars; // covariances of Gaussians
+  MatrixXrt m_responsibilities; // nData*nclasses responsibilities matrix, entry ij represents class j's responsibility
+                                // for data i
 
   ZTermCriteria<ResultDataType> m_termCriteria;
   IterAlgorithmLogLevel m_logLevel;
@@ -781,9 +817,9 @@ private:
   const MatrixXrt* m_pData;
   const VectorXrt* m_pWeight;
 
-  bool m_hasEnoughData;      //
-  MatrixXrt m_uniqueDatas;    //This will be the centroids if we don't have enough data
-  Eigen::VectorXi m_uniqueLabels;   //see above
+  bool m_hasEnoughData; //
+  MatrixXrt m_uniqueDatas; // This will be the centroids if we don't have enough data
+  Eigen::VectorXi m_uniqueLabels; // see above
 
   ZDistanceEuclideanSquared<ResultDataType> m_dist2;
 
@@ -791,4 +827,3 @@ private:
 };
 
 } // namespace nim
-

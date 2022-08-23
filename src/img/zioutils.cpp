@@ -12,7 +12,7 @@ namespace nim {
 void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
 #ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
 #else
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
@@ -24,7 +24,7 @@ void openFileStream(std::ifstream& fs, const QString& filename, std::ios_base::o
 void openFileStream(std::ofstream& fs, const QString& filename, std::ios_base::openmode mode)
 {
 #ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
 #else
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif
@@ -71,7 +71,7 @@ void writeStream_impl(std::ostream& fs, const char* buf, size_t count)
 std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const QString& mode)
 {
   errno = 0;
-  std::FILE *tmpf = nullptr;
+  std::FILE* tmpf = nullptr;
   if (_wfopen_s(&tmpf, filename.toStdWString().c_str(), mode.toStdWString().c_str()) != 0) {
     throw ZIOException("Can not open file");
   }
@@ -114,11 +114,13 @@ std::string readFileIntoString(const QString& filename, std::ios_base::openmode 
 {
   std::string res;
   auto fileSize = QFileInfo(filename).size();
-  if (fileSize == 0) { return res; }
+  if (fileSize == 0) {
+    return res;
+  }
 
   std::ifstream fs;
 #ifdef _MSC_VER
-  fs.open(filename.toStdWString().c_str(), mode);   // use msvc extension
+  fs.open(filename.toStdWString().c_str(), mode); // use msvc extension
 #else
   fs.open(QFile::encodeName(filename).constData(), mode);
 #endif

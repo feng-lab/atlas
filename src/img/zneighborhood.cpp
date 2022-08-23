@@ -12,7 +12,12 @@ ZNeighborhood::ZNeighborhood(size_t xRadius, size_t yRadius, size_t zRadius, boo
   set(xRadius, yRadius, zRadius, includeCenter);
 }
 
-ZNeighborhood::ZNeighborhood(size_t left, size_t right, size_t up, size_t down, size_t front, size_t back,
+ZNeighborhood::ZNeighborhood(size_t left,
+                             size_t right,
+                             size_t up,
+                             size_t down,
+                             size_t front,
+                             size_t back,
                              bool includeCenter)
 {
   set(left, right, up, down, front, back, includeCenter);
@@ -134,8 +139,13 @@ void ZNeighborhood::set(size_t xRadius, size_t yRadius, size_t zRadius, bool inc
   set(xRadius, xRadius, yRadius, yRadius, zRadius, zRadius, includeCenter);
 }
 
-void ZNeighborhood::set(size_t left, size_t right, size_t up, size_t down,
-                        size_t front, size_t back, bool includeCenter)
+void ZNeighborhood::set(size_t left,
+                        size_t right,
+                        size_t up,
+                        size_t down,
+                        size_t front,
+                        size_t back,
+                        bool includeCenter)
 {
   m_leftExtend = left;
   m_rightExtend = right;
@@ -147,8 +157,9 @@ void ZNeighborhood::set(size_t left, size_t right, size_t up, size_t down,
   for (auto zoffset = -static_cast<index_t>(front); zoffset < 1 + static_cast<index_t>(back); ++zoffset) {
     for (auto yoffset = -static_cast<index_t>(up); yoffset < 1 + static_cast<index_t>(down); ++yoffset) {
       for (auto xoffset = -static_cast<index_t>(left); xoffset < 1 + static_cast<index_t>(right); ++xoffset) {
-        if (xoffset == 0 && yoffset == 0 && zoffset == 0 && !includeCenter)
+        if (xoffset == 0 && yoffset == 0 && zoffset == 0 && !includeCenter) {
           continue;
+        }
         m_offsets.emplace_back(xoffset, yoffset, zoffset);
       }
     }

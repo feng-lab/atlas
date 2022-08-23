@@ -10,8 +10,8 @@ namespace nim {
 class ZImgOmeTiff : public ZImgTiff
 {
 public:
-
   // ZImgFormat interface
+
 public:
   QString shortName() const override;
 
@@ -20,11 +20,14 @@ public:
   QStringList extensions() const override;
 
   FileFormat format() const override
-  { return FileFormat::OmeTiff; }
+  {
+    return FileFormat::OmeTiff;
+  }
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+  void writeImg(const QString& filename,
+                const ZImgSliceProvider& imgSliceProvider,
                 const ZImgWriteParameters& paras) override;
 
   bool supportRead() const override;
@@ -32,6 +35,7 @@ public:
   bool supportWrite() const override;
 
   // ZImgTiff interface
+
 protected:
   void readIntoInternalStructure(const QString& filename, ZTiff& tiff) override;
 
@@ -68,7 +72,9 @@ protected:
     {}
 
     IFDPos(size_t z_, size_t c_, size_t t_)
-      : z(z_), c(c_), t(t_)
+      : z(z_)
+      , c(c_)
+      , t(t_)
     {}
 
     size_t z, c, t;
@@ -78,5 +84,4 @@ protected:
   std::map<size_t, IFDPos> m_ifdIdxPosMap;
 };
 
-}  // namespace nim
-
+} // namespace nim

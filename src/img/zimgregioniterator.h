@@ -9,20 +9,24 @@ namespace impl {
 
 template<typename TImg, typename TVoxel>
 class img_region_iter
-  : public boost::stl_interfaces::iterator_interface<img_region_iter<TImg, TVoxel>,
-  std::random_access_iterator_tag, TVoxel>
+  : public boost::stl_interfaces::
+      iterator_interface<img_region_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>
 {
-  using base_type = boost::stl_interfaces::iterator_interface<img_region_iter<TImg, TVoxel>,
-    std::random_access_iterator_tag, TVoxel>;
+  using base_type =
+    boost::stl_interfaces::iterator_interface<img_region_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>;
 
-  template<typename, typename> friend
-  class img_region_iter;
+  template<typename, typename>
+  friend class img_region_iter;
+
 public:
   // empty constructor not useful
   constexpr img_region_iter() noexcept = default;
 
   explicit img_region_iter(TImg& img, const ZImgRegion& region = ZImgRegion())
-    : m_img(&img), m_region(region), m_idx(0), m_centerVoxelPtr(nullptr)
+    : m_img(&img)
+    , m_region(region)
+    , m_idx(0)
+    , m_centerVoxelPtr(nullptr)
   {
     if (!m_img->template isType<TVoxel>()) {
       throw ZImgException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
@@ -32,7 +36,8 @@ public:
     } else if (!m_region.isValid(m_img->info())) {
       throw ZImgException(
         QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
-          .arg(m_img->info().toQString()).arg(m_region.toQString()));
+          .arg(m_img->info().toQString())
+          .arg(m_region.toQString()));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {
@@ -47,29 +52,41 @@ public:
 
     // only need first 3
     m_wrapOffsets.resize(3);
-    for (size_t i = 0; i < 3; ++i)
+    for (size_t i = 0; i < 3; ++i) {
       m_wrapOffsets[i] = m_img->info().stride(i) * (m_img->info()[i] - m_regionInfo[i]);
+    }
   }
 
-  template<
-    typename OtherTImg,
-    typename OtherTVoxel,
-    typename E = std::enable_if_t<
-      std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
+  template<typename OtherTImg,
+           typename OtherTVoxel,
+           typename E =
+             std::enable_if_t<std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
   constexpr img_region_iter(const img_region_iter<OtherTImg, OtherTVoxel>& other) noexcept
-    : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo), m_endIdx(other.m_endIdx), m_idx(
-    other.m_idx), m_coord(other.m_coord), m_centerVoxelPtr(other.m_centerVoxelPtr), m_wrapOffsets(other.m_wrapOffsets)
+    : m_img(other.m_img)
+    , m_region(other.m_region)
+    , m_regionInfo(other.m_regionInfo)
+    , m_endIdx(other.m_endIdx)
+    , m_idx(other.m_idx)
+    , m_coord(other.m_coord)
+    , m_centerVoxelPtr(other.m_centerVoxelPtr)
+    , m_wrapOffsets(other.m_wrapOffsets)
   {}
 
   // return true if before first voxel
   __forceinline bool isBeforeBegin() const
-  { return m_idx < 0; }
+  {
+    return m_idx < 0;
+  }
   // return true if at first voxel
   __forceinline bool isAtBegin() const
-  { return m_idx == 0; }
+  {
+    return m_idx == 0;
+  }
   // return true if past last voxel, similar to stl "== container.end()"
   __forceinline bool isAtEnd() const
-  { return m_idx >= m_endIdx; }
+  {
+    return m_idx >= m_endIdx;
+  }
 
   // go to first voxel
   __forceinline void goToBegin()
@@ -111,22 +128,22 @@ public:
 
   // return voxel coord of this iterator
   __forceinline ZVoxelCoordinate coord() const
-  { return m_coord; }
+  {
+    return m_coord;
+  }
 
   // return index of current voxel of this region
   // negative index means before the region
   __forceinline index_t index() const
-  { return m_idx; }
+  {
+    return m_idx;
+  }
 
   template<typename OtherTImg, typename OtherTVoxel>
   __forceinline constexpr bool operator==(const img_region_iter<OtherTImg, OtherTVoxel>& other) const noexcept
   {
-    return this->m_img == other.m_img &&
-           this->m_region == other.m_region &&
-           this->m_regionInfo == other.m_regionInfo &&
-           this->m_endIdx == other.m_endIdx &&
-           this->m_idx == other.m_idx &&
-           this->m_coord == other.m_coord &&
+    return this->m_img == other.m_img && this->m_region == other.m_region && this->m_regionInfo == other.m_regionInfo &&
+           this->m_endIdx == other.m_endIdx && this->m_idx == other.m_idx && this->m_coord == other.m_coord &&
            this->m_wrapOffsets == other.m_wrapOffsets;
   }
 
@@ -233,7 +250,7 @@ private:
   ZImgInfo m_regionInfo;
   index_t m_endIdx;
   // dynamic info of current voxel
-  index_t m_idx;  // current voxel idx of region
+  index_t m_idx; // current voxel idx of region
   ZVoxelCoordinate m_coord; // current voxel coord of img
 
   TVoxel* m_centerVoxelPtr; // current voxel address
@@ -262,4 +279,3 @@ template<typename TVoxel>
 using ZImgRegionIterator = impl::img_region_iter<ZImg, TVoxel>;
 
 } // namespace nim
-

@@ -10,22 +10,31 @@ namespace impl {
 
 template<typename TImg, typename TVoxel>
 class img_neighborhood_with_ptr_iter
-  : public boost::stl_interfaces::iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>,
-  std::random_access_iterator_tag, TVoxel>
+  : public boost::stl_interfaces::
+      iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>
 {
-  using base_type = boost::stl_interfaces::iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>,
-    std::random_access_iterator_tag, TVoxel>;
+  using base_type = boost::stl_interfaces::
+    iterator_interface<img_neighborhood_with_ptr_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>;
 
-  template<typename, typename> friend
-  class img_neighborhood_with_ptr_iter;
+  template<typename, typename>
+  friend class img_neighborhood_with_ptr_iter;
+
 public:
   // empty constructor not useful
   constexpr img_neighborhood_with_ptr_iter() noexcept = default;
 
-  explicit img_neighborhood_with_ptr_iter(const ZNeighborhood& nb, TImg& img, const ZImgRegion& region = ZImgRegion(),
-                                          PadOption padOption = PadOption::Constant, TVoxel padValue = TVoxel(0))
-    : m_neighborhood(nb), m_img(&img), m_region(region), m_idx(0)
-    , m_padOption(padOption), m_padValue(padValue), m_centerVoxelPtr(nullptr)
+  explicit img_neighborhood_with_ptr_iter(const ZNeighborhood& nb,
+                                          TImg& img,
+                                          const ZImgRegion& region = ZImgRegion(),
+                                          PadOption padOption = PadOption::Constant,
+                                          TVoxel padValue = TVoxel(0))
+    : m_neighborhood(nb)
+    , m_img(&img)
+    , m_region(region)
+    , m_idx(0)
+    , m_padOption(padOption)
+    , m_padValue(padValue)
+    , m_centerVoxelPtr(nullptr)
   {
     if (!m_img->template isType<TVoxel>()) {
       throw ZImgException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
@@ -35,7 +44,8 @@ public:
     } else if (!m_region.isValid(m_img->info())) {
       throw ZImgException(
         QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
-          .arg(m_img->info().toQString()).arg(m_region.toQString()));
+          .arg(m_img->info().toQString())
+          .arg(m_region.toQString()));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {
@@ -52,47 +62,66 @@ public:
 
     // only need first 3
     m_wrapOffsets.resize(3);
-    for (size_t i = 0; i < 3; ++i)
+    for (size_t i = 0; i < 3; ++i) {
       m_wrapOffsets[i] = m_img->info().stride(i) * (m_img->info()[i] - m_regionInfo[i]);
+    }
   }
 
-  template<
-    typename OtherTImg,
-    typename OtherTVoxel,
-    typename E = std::enable_if_t<
-      std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
+  template<typename OtherTImg,
+           typename OtherTVoxel,
+           typename E =
+             std::enable_if_t<std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
   constexpr img_neighborhood_with_ptr_iter(const img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel>& other) noexcept
-    : m_img(other.m_img), m_region(other.m_region), m_regionInfo(other.m_regionInfo)
-    , m_endIdx(other.m_endIdx), m_idx(other.m_idx), m_coord(other.m_coord)
-    , m_padOption(other.m_padOption), m_padValue(other.m_padValue)
+    : m_img(other.m_img)
+    , m_region(other.m_region)
+    , m_regionInfo(other.m_regionInfo)
+    , m_endIdx(other.m_endIdx)
+    , m_idx(other.m_idx)
+    , m_coord(other.m_coord)
+    , m_padOption(other.m_padOption)
+    , m_padValue(other.m_padValue)
     , m_neighborhood(other.m_neighborhood)
     , m_nbIndexOffsets(other.m_nbIndexOffsets)
-    , m_innerBoundLow(other.m_innerBoundLow), m_innerBoundHigh(other.m_innerBoundHigh)
-    , m_allNbInBound(other.m_allNbInBound), m_nbCoords(other.m_nbCoords), m_nbCoordsIsValid(other.m_nbCoordsIsValid)
-    , m_isNbInBound(other.m_isNbInBound), m_nbValues(other.m_nbValues)
-    , m_centerVoxelPtr(other.m_centerVoxelPtr), m_wrapOffsets(other.m_wrapOffsets)
+    , m_innerBoundLow(other.m_innerBoundLow)
+    , m_innerBoundHigh(other.m_innerBoundHigh)
+    , m_allNbInBound(other.m_allNbInBound)
+    , m_nbCoords(other.m_nbCoords)
+    , m_nbCoordsIsValid(other.m_nbCoordsIsValid)
+    , m_isNbInBound(other.m_isNbInBound)
+    , m_nbValues(other.m_nbValues)
+    , m_centerVoxelPtr(other.m_centerVoxelPtr)
+    , m_wrapOffsets(other.m_wrapOffsets)
     , m_nbPtrOffsets(other.m_nbPtrOffsets)
   {}
 
   void setNeighborhood(const ZNeighborhood& nb)
   {
     m_neighborhood = nb;
-    if (m_endIdx > 0)
+    if (m_endIdx > 0) {
       initNbInfo();
+    }
   }
 
   const ZNeighborhood& neighborhood() const
-  { return m_neighborhood; }
+  {
+    return m_neighborhood;
+  }
 
   // return true if before first voxel
   __forceinline bool isBeforeBegin() const
-  { return m_idx < 0; }
+  {
+    return m_idx < 0;
+  }
   // return true if at first voxel
   __forceinline bool isAtBegin() const
-  { return m_idx == 0; }
+  {
+    return m_idx == 0;
+  }
   // return true if past last voxel, similar to stl "== container.end()"
   __forceinline bool isAtEnd() const
-  { return m_idx >= m_endIdx; }
+  {
+    return m_idx >= m_endIdx;
+  }
 
   // go to first voxel
   __forceinline void goToBegin()
@@ -135,65 +164,70 @@ public:
 
   // return center voxel coord of this iterator
   __forceinline ZVoxelCoordinate coord() const
-  { return m_coord; }
+  {
+    return m_coord;
+  }
 
   // return index of current voxel of this region
   // negative index means before the region
   __forceinline index_t index() const
-  { return m_idx; }
+  {
+    return m_idx;
+  }
 
   // access nb info
   __forceinline size_t numNeighbors() const
-  { return m_neighborhood.size(); }
+  {
+    return m_neighborhood.size();
+  }
 
   __forceinline bool isInBound(size_t n) const
-  { return m_allNbInBound || m_isNbInBound[n]; }
+  {
+    return m_allNbInBound || m_isNbInBound[n];
+  }
   // returned index is only meanlingful when that neighbor is within region since the index is idx of voxel in region
   __forceinline index_t index(size_t n) const
-  { return m_idx + m_nbIndexOffsets[n]; }
+  {
+    return m_idx + m_nbIndexOffsets[n];
+  }
 
   __forceinline ZVoxelCoordinate coord(size_t n)
   {
-    if (!m_nbCoordsIsValid)
+    if (!m_nbCoordsIsValid) {
       updateNbCoords();
+    }
     return m_nbCoords[n];
   }
 
   __forceinline TVoxel* valuePtr(size_t n)
   {
-    if (m_allNbInBound || m_isNbInBound[n])
+    if (m_allNbInBound || m_isNbInBound[n]) {
       return m_centerVoxelPtr + m_nbPtrOffsets[n];
-    else
+    } else {
       return &m_nbValues[n];
+    }
   }
 
   __forceinline TVoxel& valueRef(size_t n)
   {
-    if (m_allNbInBound || m_isNbInBound[n])
+    if (m_allNbInBound || m_isNbInBound[n]) {
       return *(m_centerVoxelPtr + m_nbPtrOffsets[n]);
-    else
+    } else {
       return m_nbValues[n];
+    }
   }
 
   template<typename OtherTImg, typename OtherTVoxel>
-  __forceinline constexpr bool operator==(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other) const noexcept
+  __forceinline constexpr bool
+  operator==(img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel> const& other) const noexcept
   {
-    return this->m_img == other.m_img &&
-           this->m_region == other.m_region &&
-           this->m_regionInfo == other.m_regionInfo &&
-           this->m_endIdx == other.m_endIdx &&
-           this->m_idx == other.m_idx &&
-           this->m_coord == other.m_coord &&
-           this->m_padOption == other.m_padOption &&
-           this->m_padValue == other.m_padValue &&
-           this->m_neighborhood == other.m_neighborhood &&
-           this->m_nbIndexOffsets == other.m_nbIndexOffsets &&
-           this->m_innerBoundLow == other.m_innerBoundLow &&
-           this->m_innerBoundHigh == other.m_innerBoundHigh &&
-           this->m_allNbInBound == other.m_allNbInBound &&
-           this->m_centerVoxelPtr == other.m_centerVoxelPtr &&
-           this->m_wrapOffsets == other.m_wrapOffsets &&
-           this->m_nbPtrOffsets == other.m_nbPtrOffsets;
+    return this->m_img == other.m_img && this->m_region == other.m_region && this->m_regionInfo == other.m_regionInfo &&
+           this->m_endIdx == other.m_endIdx && this->m_idx == other.m_idx && this->m_coord == other.m_coord &&
+           this->m_padOption == other.m_padOption && this->m_padValue == other.m_padValue &&
+           this->m_neighborhood == other.m_neighborhood && this->m_nbIndexOffsets == other.m_nbIndexOffsets &&
+           this->m_innerBoundLow == other.m_innerBoundLow && this->m_innerBoundHigh == other.m_innerBoundHigh &&
+           this->m_allNbInBound == other.m_allNbInBound && this->m_centerVoxelPtr == other.m_centerVoxelPtr &&
+           this->m_wrapOffsets == other.m_wrapOffsets && this->m_nbPtrOffsets == other.m_nbPtrOffsets;
   }
 
   __forceinline constexpr img_neighborhood_with_ptr_iter& operator++() noexcept
@@ -319,20 +353,18 @@ public:
     m_isNbInBound.resize(m_neighborhood.size());
     m_nbValues.resize(m_neighborhood.size());
     for (size_t i = 0; i < m_neighborhood.size(); ++i) {
-      m_nbIndexOffsets[i] = m_neighborhood[i].x +
-                            m_neighborhood[i].y * m_regionInfo.stride(1) +
+      m_nbIndexOffsets[i] = m_neighborhood[i].x + m_neighborhood[i].y * m_regionInfo.stride(1) +
                             m_neighborhood[i].z * m_regionInfo.stride(2);
-      m_nbPtrOffsets[i] = m_neighborhood[i].x +
-                          m_neighborhood[i].y * m_img->info().stride(1) +
+      m_nbPtrOffsets[i] = m_neighborhood[i].x + m_neighborhood[i].y * m_img->info().stride(1) +
                           m_neighborhood[i].z * m_img->info().stride(2);
     }
 
     // bound
-    m_innerBoundLow = ZVoxelCoordinate(m_neighborhood.leftExtend(), m_neighborhood.upExtend(),
-                                       m_neighborhood.frontExtend());
-    m_innerBoundHigh = m_img->maxCoord() -
-                       ZVoxelCoordinate(m_neighborhood.rightExtend(), m_neighborhood.downExtend(),
-                                        m_neighborhood.backExtend());
+    m_innerBoundLow =
+      ZVoxelCoordinate(m_neighborhood.leftExtend(), m_neighborhood.upExtend(), m_neighborhood.frontExtend());
+    m_innerBoundHigh =
+      m_img->maxCoord() -
+      ZVoxelCoordinate(m_neighborhood.rightExtend(), m_neighborhood.downExtend(), m_neighborhood.backExtend());
 
     updateNbInfoOfCurrentVoxel();
   }
@@ -349,8 +381,7 @@ public:
       for (size_t i = 0; i < m_nbCoords.size(); ++i) {
         m_nbCoords[i] = m_coord + m_neighborhood[i];
         if (m_nbCoords[i].x >= 0 && m_nbCoords[i].y >= 0 && m_nbCoords[i].z >= 0 &&
-            m_nbCoords[i].x < static_cast<int>(m_img->width()) &&
-            m_nbCoords[i].y < static_cast<int>(m_img->height()) &&
+            m_nbCoords[i].x < static_cast<int>(m_img->width()) && m_nbCoords[i].y < static_cast<int>(m_img->height()) &&
             m_nbCoords[i].z < static_cast<int>(m_img->depth())) {
           m_isNbInBound[i] = true;
         } else {
@@ -377,11 +408,11 @@ protected:
   ZImgInfo m_regionInfo;
   index_t m_endIdx;
   // dynamic info of current voxel
-  index_t m_idx;  // current voxel idx of region
+  index_t m_idx; // current voxel idx of region
   ZVoxelCoordinate m_coord; // current voxel coord of img
 
   // img info fixed
-  PadOption m_padOption;  // how to get out of bound voxel value
+  PadOption m_padOption; // how to get out of bound voxel value
   TVoxel m_padValue;
 
   // neighborhood info fixed
@@ -394,7 +425,8 @@ protected:
   std::vector<ZVoxelCoordinate> m_nbCoords;
   bool m_nbCoordsIsValid;
   std::vector<bool> m_isNbInBound;
-  std::vector<typename std::remove_cv<TVoxel>::type> m_nbValues; // out of bound data are stored here so we can provide a reference when needed
+  std::vector<typename std::remove_cv<TVoxel>::type>
+    m_nbValues; // out of bound data are stored here so we can provide a reference when needed
 
   TVoxel* m_centerVoxelPtr; // current voxel address
 
@@ -415,4 +447,3 @@ template<typename TVoxel>
 using ZImgNeighborhoodWithPtrIterator = impl::img_neighborhood_with_ptr_iter<ZImg, TVoxel>;
 
 } // namespace nim
-

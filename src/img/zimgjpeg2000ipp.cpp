@@ -27,17 +27,21 @@ bool IsJP2(BaseStreamInput& in)
   unsigned char buf[4];
   UIC::BaseStream::TSize cnt;
 
-  if (UIC::BaseStream::StatusOk != in.Seek(4, UIC::BaseStreamInput::Beginning))
+  if (UIC::BaseStream::StatusOk != in.Seek(4, UIC::BaseStreamInput::Beginning)) {
     throw ZIOException("unsupported Image format");
+  }
 
-  if (UIC::BaseStream::StatusOk != in.Read(buf, 4 * sizeof(char), cnt))
+  if (UIC::BaseStream::StatusOk != in.Read(buf, 4 * sizeof(char), cnt)) {
     throw ZIOException("unsupported Image format");
+  }
 
-  if (UIC::BaseStream::StatusOk != in.Seek(0, UIC::BaseStreamInput::Beginning))
+  if (UIC::BaseStream::StatusOk != in.Seek(0, UIC::BaseStreamInput::Beginning)) {
     throw ZIOException("unsupported Image format");
+  }
 
-  if (buf[0] == 0x6a && buf[1] == 0x50 && buf[2] == 0x20 && buf[3] == 0x20)
+  if (buf[0] == 0x6a && buf[1] == 0x50 && buf[2] == 0x20 && buf[3] == 0x20) {
     return true;
+  }
 
   return false;
 } // IsJP2()
@@ -62,18 +66,21 @@ BaseImageDecoder*
 initDecoder(CStdFileInput& in, JP2Decoder& JP2decoder, JPEG2000Decoder& JP2Kdecoder, LogDiagn& diagnOutput)
 {
   BaseImageDecoder* decoder = nullptr;
-  if (IsJP2(in))
+  if (IsJP2(in)) {
     decoder = &JP2decoder;
-  else
+  } else {
     decoder = &JP2Kdecoder;
+  }
 
-  if (ExcStatusOk != decoder->Init())
+  if (ExcStatusOk != decoder->Init()) {
     throw ZIOException("can not initialize codec");
+  }
 
   decoder->SetNOfThreads(ZCpuInfoInstance.nPhysicalCores);
 
-  if (ExcStatusOk != decoder->AttachStream(in))
+  if (ExcStatusOk != decoder->AttachStream(in)) {
     throw ZIOException("can not attach stream");
+  }
 
   decoder->AttachDiagnOut(diagnOutput);
 
@@ -95,17 +102,13 @@ ZImgInfo infoFromHead(const ImageColorSpec& colorSpec, const ImageSamplingGeomet
   return info;
 }
 
-}
+} // namespace
 
 namespace nim {
 
-ZImgJpeg2000::ZImgJpeg2000()
-{
-}
+ZImgJpeg2000::ZImgJpeg2000() {}
 
-ZImgJpeg2000::~ZImgJpeg2000()
-{
-}
+ZImgJpeg2000::~ZImgJpeg2000() {}
 
 QString ZImgJpeg2000::shortName() const
 {
@@ -120,7 +123,8 @@ QString ZImgJpeg2000::fullName() const
 QStringList ZImgJpeg2000::extensions() const
 {
   QStringList res;
-  res << "jp2" << "j2c";
+  res << "jp2"
+      << "j2c";
   return res;
 }
 
@@ -136,19 +140,16 @@ void ZImgJpeg2000::readInfo(const QString& filename, ZImgInfo& info)
   BaseImageDecoder* decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
-  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
+  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry)) {
     throw ZIOException("can not read head");
+  }
   geometry.ReduceByGCD();
   info = infoFromHead(colorSpec, geometry);
 }
 
-void ZImgJpeg2000::readMetadata(const QString&, ZImgMetadata&)
-{
-}
+void ZImgJpeg2000::readMetadata(const QString&, ZImgMetadata&) {}
 
-void ZImgJpeg2000::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&)
-{
-}
+void ZImgJpeg2000::readThumbnail(const QString&, ZImgThumbernail&, const ZImgRegion&) {}
 
 void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion& region)
 {
@@ -162,8 +163,9 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   BaseImageDecoder* decoder = initDecoder(in, JP2decoder, JP2Kdecoder, diagnOutput);
   ImageColorSpec colorSpec;
   ImageSamplingGeometry geometry;
-  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry))
+  if (ExcStatusOk != decoder->ReadHeader(colorSpec, geometry)) {
     throw ZIOException("can not read head");
+  }
   geometry.ReduceByGCD();
   ZImgInfo info = infoFromHead(colorSpec, geometry);
 
@@ -175,17 +177,20 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   Image imagePn;
 
   J2KPRECISION j2kArithmetic = J2K_16;
-  if (colorSpec.DataRange()->BitDepth() + 1 >= 14)
+  if (colorSpec.DataRange()->BitDepth() + 1 >= 14) {
     j2kArithmetic = J2K_32;
+  }
 
-  if (J2K_32 == j2kArithmetic)
+  if (J2K_32 == j2kArithmetic) {
     imagePn.Buffer().ReAlloc(T32s, Plane, geometry);
-  else //J2K_16 == j2kArithmetic)
+  } else { // J2K_16 == j2kArithmetic)
     imagePn.Buffer().ReAlloc(T16s, Plane, geometry);
+  }
 
   const ImageDataOrder& dataOrderPn = imagePn.Buffer().BufferFormat().DataOrder();
-  //LINFO() << colorSpec.DataRange()->BitDepth() << colorSpec.DataRange()->DataType() << colorSpec.DataRange()->Max().v32u << dataOrderPn.ComponentOrder()
-  //           << geometry.NOfComponents();
+  // LINFO() << colorSpec.DataRange()->BitDepth() << colorSpec.DataRange()->DataType() <<
+  // colorSpec.DataRange()->Max().v32u << dataOrderPn.ComponentOrder()
+  //            << geometry.NOfComponents();
 
   geometry.SetEnumSampling(S444);
 
@@ -194,8 +199,9 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   imagePn.ColorSpec().SetComponentToColorMap(Direct);
   imagePn.ColorSpec().SetEnumColorSpace(colorSpec.EnumColorSpace());
 
-  if (ExcStatusOk != decoder->ReadData(imagePn.Buffer().DataPtr(), dataOrderPn))
+  if (ExcStatusOk != decoder->ReadData(imagePn.Buffer().DataPtr(), dataOrderPn)) {
     throw ZIOException("can not read data");
+  }
 
   ZImg res(info);
 
@@ -207,11 +213,17 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
   for (size_t c = 0; c < res.numChannels(); ++c) {
     if (res.bytesPerVoxel() <= 1) {
       if (J2K_32 == j2kArithmetic) {
-        checkIPPError(ippiConvert_32s8u_C1R(imagePn.Buffer().DataPtr()[c].p32s, dataOrderPn.LineStep()[c],
-                                            res.channelData<uint8_t>(c), res.rowByteNumber(), size));
+        checkIPPError(ippiConvert_32s8u_C1R(imagePn.Buffer().DataPtr()[c].p32s,
+                                            dataOrderPn.LineStep()[c],
+                                            res.channelData<uint8_t>(c),
+                                            res.rowByteNumber(),
+                                            size));
       } else { // J2K_16 == j2kArithmetic
-        checkIPPError(ippiConvert_16s8u_C1R(imagePn.Buffer().DataPtr()[c].p16s, dataOrderPn.LineStep()[c],
-                                            res.channelData<uint8_t>(c), res.rowByteNumber(), size));
+        checkIPPError(ippiConvert_16s8u_C1R(imagePn.Buffer().DataPtr()[c].p16s,
+                                            dataOrderPn.LineStep()[c],
+                                            res.channelData<uint8_t>(c),
+                                            res.rowByteNumber(),
+                                            size));
       }
     } else {
       if (J2K_32 == j2kArithmetic) {
@@ -219,13 +231,17 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         auto* pDst = res.channelData<uint16_t>(c);
 
         for (int i = 0; i < size.height; ++i) {
-          auto* pSrc = (int32_t*) ((uint8_t*) src + i * dataOrderPn.LineStep()[c]);
-          for (int j = 0; j < size.width; ++j)
+          auto* pSrc = (int32_t*)((uint8_t*)src + i * dataOrderPn.LineStep()[c]);
+          for (int j = 0; j < size.width; ++j) {
             *pDst++ = saturate_cast<uint16_t>(*pSrc++);
+          }
         }
       } else { // J2K_16 == j2kArithmetic
-        checkIPPError(ippiCopy_16s_C1R(imagePn.Buffer().DataPtr()[c].p16s, dataOrderPn.LineStep()[c],
-                                       res.channelData<int16_t>(c), res.rowByteNumber(), size));
+        checkIPPError(ippiCopy_16s_C1R(imagePn.Buffer().DataPtr()[c].p16s,
+                                       dataOrderPn.LineStep()[c],
+                                       res.channelData<int16_t>(c),
+                                       res.rowByteNumber(),
+                                       size));
       }
     }
   }
@@ -244,14 +260,15 @@ void ZImgJpeg2000::readImg(const QString& filename, ZImg& img, const ZImgRegion&
     pDes[2] = tmpImg.channelData<uint8_t>(2);
 
     checkIPPError(ippiYCbCrToRGB_8u_P3R(pSrc, res.rowByteNumber(), pDes, tmpImg.rowByteNumber(), size));
-    //LINFO() << "convert";
+    // LINFO() << "convert";
     res.swap(tmpImg);
   }
 
-  if (region.containsWholeImg(info))
+  if (region.containsWholeImg(info)) {
     img.swap(res);
-  else
+  } else {
     img = res.crop(region);
+  }
 }
 
 void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compression)
@@ -269,13 +286,15 @@ void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compressio
   roi.width = img.width();
 
   JP2Encoder jp2enc;
-  if (ExcStatusOk != jp2enc.Init())
+  if (ExcStatusOk != jp2enc.Init()) {
     throw ZIOException("can not init codec");
+  }
 
   jp2enc.SetNOfThreads(ZCpuInfoInstance.nPhysicalCores);
 
-  if (ExcStatusOk != jp2enc.AttachStream(out))
+  if (ExcStatusOk != jp2enc.AttachStream(out)) {
     throw ZIOException("can not attach stream");
+  }
 
   RectSize size;
   size.SetWidth(img.width());
@@ -323,28 +342,41 @@ void ZImgJpeg2000::writeImg(const QString& filename, const ZImg& img, Compressio
 
   for (size_t c = 0; c < img.numChannels(); ++c) {
     if (img.bytesPerVoxel() <= 1) {
-      checkIPPError(ippiConvert_8u32s_C1R(img.channelData<uint8_t>(c), img.rowByteNumber(),
-                                          imagePn.Buffer().DataPtr()[c].p32s, dataOrder.LineStep()[c], roi));
+      checkIPPError(ippiConvert_8u32s_C1R(img.channelData<uint8_t>(c),
+                                          img.rowByteNumber(),
+                                          imagePn.Buffer().DataPtr()[c].p32s,
+                                          dataOrder.LineStep()[c],
+                                          roi));
     } else if (img.voxelFormat() == VF_Unsigned) {
-      checkIPPError(ippiConvert_16u32s_C1R(img.channelData<uint16_t>(c), img.rowByteNumber(),
-                                           imagePn.Buffer().DataPtr()[c].p32s, dataOrder.LineStep()[c], roi));
+      checkIPPError(ippiConvert_16u32s_C1R(img.channelData<uint16_t>(c),
+                                           img.rowByteNumber(),
+                                           imagePn.Buffer().DataPtr()[c].p32s,
+                                           dataOrder.LineStep()[c],
+                                           roi));
     } else {
-      checkIPPError(ippiConvert_16s32s_C1R(img.channelData<int16_t>(c), img.rowByteNumber(),
-                                           imagePn.Buffer().DataPtr()[c].p32s, dataOrder.LineStep()[c], roi));
+      checkIPPError(ippiConvert_16s32s_C1R(img.channelData<int16_t>(c),
+                                           img.rowByteNumber(),
+                                           imagePn.Buffer().DataPtr()[c].p32s,
+                                           dataOrder.LineStep()[c],
+                                           roi));
     }
   }
 
-  if (ExcStatusOk != jp2enc.AttachImage(imagePn))
+  if (ExcStatusOk != jp2enc.AttachImage(imagePn)) {
     throw ZIOException("can not attach image");
+  }
 
-  if (ExcStatusOk != jp2enc.SetParams(5, false, true, false, 0, 0, img.byteNumber()))
+  if (ExcStatusOk != jp2enc.SetParams(5, false, true, false, 0, 0, img.byteNumber())) {
     throw ZIOException("can not set parameters");
+  }
 
-  if (ExcStatusOk != jp2enc.WriteHeader())
+  if (ExcStatusOk != jp2enc.WriteHeader()) {
     throw ZIOException("can not write header");
+  }
 
-  if (ExcStatusOk != jp2enc.WriteData())
+  if (ExcStatusOk != jp2enc.WriteData()) {
     throw ZIOException("can not write data");
+  }
 }
 
 bool ZImgJpeg2000::supportRead() const
@@ -357,5 +389,4 @@ bool ZImgJpeg2000::supportWrite() const
   return true;
 }
 
-} // namespace
-
+} // namespace nim

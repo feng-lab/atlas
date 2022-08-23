@@ -23,8 +23,7 @@ __forceinline double cubic_kernel(double x)
   double absx3 = absx2 * absx;
 
   return (1.5 * absx3 - 2.5 * absx2 + 1) * static_cast<double>(absx <= 1) +
-         (-0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2) *
-         static_cast<double>((1 < absx) && (absx <= 2));
+         (-0.5 * absx3 + 2.5 * absx2 - 4 * absx + 2) * static_cast<double>((1 < absx) && (absx <= 2));
 }
 
 __forceinline double lanczos2_kernel(double x)
@@ -41,12 +40,11 @@ __forceinline double lanczos3_kernel(double x)
          ((pi * pi * x * x / 3) + std::numeric_limits<double>::epsilon());
 }
 
-}  // namespace
+} // namespace
 
 namespace nim {
 
-bool seperate2DKernel(const double* kernel, size_t width, size_t height,
-                      double* rowKernel, double* colKernel)
+bool seperate2DKernel(const double* kernel, size_t width, size_t height, double* rowKernel, double* colKernel)
 {
   if (height == 1) {
     std::memcpy(rowKernel, kernel, sizeof(double) * width);
@@ -62,17 +60,18 @@ bool seperate2DKernel(const double* kernel, size_t width, size_t height,
     Map<const Matrix<double, Dynamic, Dynamic, RowMajor>> knl(kernel, height, width);
     JacobiSVD<Matrix<double, Dynamic, Dynamic, RowMajor>> svd(knl, ComputeThinU | ComputeThinV);
     VectorXd s = svd.singularValues();
-    //LOG(INFO) << s;
+    // LOG(INFO) << s;
     double tol = std::numeric_limits<double>::epsilon() * s(0) * std::max(width, height);
     auto rank = 1;
     for (Eigen::Index i = 1; i < s.size(); ++i) {
-      if (s(i) > tol)
+      if (s(i) > tol) {
         ++rank;
+      }
     }
     if (rank == 1) {
-      //LOG(INFO) << "rank " << rank;
-      //LOG(INFO) << svd.matrixU();
-      //LOG(INFO) << svd.matrixV();
+      // LOG(INFO) << "rank " << rank;
+      // LOG(INFO) << svd.matrixU();
+      // LOG(INFO) << svd.matrixV();
       Map<VectorXd>(colKernel, height) = svd.matrixU().col(0) * std::sqrt(s(0));
       Map<VectorXd>(rowKernel, width) = svd.matrixV().col(0) * std::sqrt(s(0));
       //      std::vector<double> show;
@@ -98,8 +97,9 @@ void wrapCoordToImage<size_t>(size_t* coord, const size_t* imgSize, size_t numDi
     }
   } else if (padOption == PadOption::Replicate) {
     for (size_t i = 0; i < numDimensions; ++i) {
-      if (coord[i] + 1 > imgSize[i])
+      if (coord[i] + 1 > imgSize[i]) {
         coord[i] = imgSize[i] - 1;
+      }
     }
   } else if (padOption == PadOption::Circular) {
     for (size_t i = 0; i < numDimensions; ++i) {
@@ -108,8 +108,13 @@ void wrapCoordToImage<size_t>(size_t* coord, const size_t* imgSize, size_t numDi
   }
 }
 
-void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpolant, bool antialiasing,
-                          std::vector<double>& weightsOut, std::vector<size_t>& indicesOut, size_t& kernelWidthOut)
+void _resizeContributions(size_t inLength,
+                          size_t outLength,
+                          Interpolant interpolant,
+                          bool antialiasing,
+                          std::vector<double>& weightsOut,
+                          std::vector<size_t>& indicesOut,
+                          size_t& kernelWidthOut)
 {
   CHECK(outLength > 0 && inLength > 0);
   double scale = double(outLength) / inLength;
@@ -147,8 +152,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
     indices.col(i) = indices.col(i - 1) + 1;
   }
 
-  //LOG(INFO) << "incoord " << inCoord;
-  //LOG(INFO) << "indices " << indices;
+  // LOG(INFO) << "incoord " << inCoord;
+  // LOG(INFO) << "indices " << indices;
 
   ArrayXXd weights = -indices;
   weights.colwise() += inCoord;
@@ -193,8 +198,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
 
   weights.colwise() /= weights.rowwise().sum();
 
-  //LOG(INFO) << "weights " << weights;
-  //LOG(INFO) << "indices " << indices;
+  // LOG(INFO) << "weights " << weights;
+  // LOG(INFO) << "indices " << indices;
 
   auto validCols = (weights != 0).colwise().any();
 
@@ -213,8 +218,8 @@ void _resizeContributions(size_t inLength, size_t outLength, Interpolant interpo
   }
   CHECK(idx == weightsOut.size());
 
-  //logContainer(INFO, weightsOut.begin(), weightsOut.end(), kernelWidthOut, "weights");
-  //logContainer(INFO, indicesOut.begin(), indicesOut.end(), kernelWidthOut, "indices");
+  // logContainer(INFO, weightsOut.begin(), weightsOut.end(), kernelWidthOut, "weights");
+  // logContainer(INFO, indicesOut.begin(), indicesOut.end(), kernelWidthOut, "indices");
 }
 
 } // namespace nim

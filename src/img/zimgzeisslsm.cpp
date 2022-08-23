@@ -39,7 +39,7 @@ void ZImgZeissLsm::readIntoInternalStructure(const QString& filename, ZTiff& tif
   ZImgTiff::readIntoInternalStructure(filename, tiff);
   if (tiff.isLsmFile()) {
     readLsmInfo(filename, tiff);
-    //logLsmInfo(filename);
+    // logLsmInfo(filename);
   } else {
     throw ZIOException("Not lsm file");
   }
@@ -59,15 +59,16 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
   ZImgTiff::detectImgInfo(tiff);
 
   // overwrite some fields based on lsm information
-  if (m_imgInfo[0].width != m_lsmImgInfo.width ||
-      m_imgInfo[0].height != m_lsmImgInfo.height ||
+  if (m_imgInfo[0].width != m_lsmImgInfo.width || m_imgInfo[0].height != m_lsmImgInfo.height ||
       m_imgInfo[0].numChannels != m_lsmImgInfo.numChannels ||
       (m_imgInfo[0].depth != m_lsmImgInfo.depth * m_lsmImgInfo.numTimes * m_numScenes &&
        m_imgInfo[0].depth % (m_lsmImgInfo.depth * m_lsmImgInfo.numTimes) != 0) ||
       m_imgInfo[0].bytesPerVoxel != m_lsmImgInfo.bytesPerVoxel ||
-      m_imgInfo[0].voxelFormat != m_lsmImgInfo.voxelFormat)
-    throw ZIOException(QString("lsm meta info <%1> doesn't match image data <%2>").
-      arg(m_lsmImgInfo.toQString()).arg(m_imgInfo[0].toQString()));
+      m_imgInfo[0].voxelFormat != m_lsmImgInfo.voxelFormat) {
+    throw ZIOException(QString("lsm meta info <%1> doesn't match image data <%2>")
+                         .arg(m_lsmImgInfo.toQString())
+                         .arg(m_imgInfo[0].toQString()));
+  }
 
   size_t numLocations;
   if (m_numScenes > 0) {
@@ -89,13 +90,14 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
   m_imgInfo[0].channelColors = m_lsmImgInfo.channelColors;
   m_imgInfo[0].channelNames = m_lsmImgInfo.channelNames;
   m_imgInfo[0].timeStamps = m_lsmImgInfo.timeStamps;
-  //m_imgInfo.locations = m_lsmImgInfo.locations;
+  // m_imgInfo.locations = m_lsmImgInfo.locations;
 
   m_imgInfo[0].validBitCount = m_lsmImgInfo.validBitCount;
 
   m_imgInfo[0].createDefaultDescriptions();
-  for (size_t i = 1; i < numLocations; ++i)
+  for (size_t i = 1; i < numLocations; ++i) {
     m_imgInfo.push_back(m_imgInfo[0]);
+  }
 }
 
 void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
@@ -103,8 +105,8 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
   const ZImgMetatag& lsmInfoTag = tiff.lsmInfoTag();
   std::memcpy(&m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
 
-  if (m_lsmInfo.u16ScanType == 3 || m_lsmInfo.u16ScanType == 5 ||
-      m_lsmInfo.u16ScanType == 7 || m_lsmInfo.u16ScanType == 9) {
+  if (m_lsmInfo.u16ScanType == 3 || m_lsmInfo.u16ScanType == 5 || m_lsmInfo.u16ScanType == 7 ||
+      m_lsmInfo.u16ScanType == 9) {
     setDimensionOrder("TZL");
   } else {
     setDimensionOrder("ZTL");
@@ -121,13 +123,14 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
     readStream(inputFileStream, chStruct.data(), chStruct.size());
     m_lsmImgInfo.channelColors.resize(m_lsmChannelColors.s32NumberColors);
-    std::memcpy(m_lsmImgInfo.channelColors.data(), chStruct.data() + m_lsmChannelColors.s32ColorsOffset,
+    std::memcpy(m_lsmImgInfo.channelColors.data(),
+                chStruct.data() + m_lsmChannelColors.s32ColorsOffset,
                 sizeof(uint32_t) * m_lsmChannelColors.s32NumberColors);
 
     size_t offset = m_lsmChannelColors.s32NamesOffset;
     int32_t nameIdx = 0;
     while (nameIdx < m_lsmChannelColors.s32NumberNames) {
-      offset += 4;  // skip uint32_t name length
+      offset += 4; // skip uint32_t name length
       QString str(&chStruct[offset]);
       m_lsmImgInfo.channelNames.push_back(str);
       ++nameIdx;
@@ -178,11 +181,13 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
   m_lsmImgInfo.voxelSizeZ = m_lsmInfo.f64VoxelSizeZ * 1e6;
 
   if (m_lsmInfo.s32DataType == 0) {
-    if (m_channelDataTypes.size() < m_lsmImgInfo.numChannels)
+    if (m_channelDataTypes.size() < m_lsmImgInfo.numChannels) {
       throw ZIOException("lsm channel data type is not complete");
+    }
     for (size_t i = 1; i < m_lsmImgInfo.numChannels; ++i) {
-      if (m_channelDataTypes[i] != m_channelDataTypes[0])
+      if (m_channelDataTypes[i] != m_channelDataTypes[0]) {
         throw ZIOException("lsm different channel data type is not supported");
+      }
     }
     switch (m_channelDataTypes[0]) {
       case 1:
@@ -239,26 +244,33 @@ void ZImgZeissLsm::logLsmInfo(const QString& filename)
   LOG(INFO) << "DimensionM: " << m_lsmInfo.s32DimensionM;
   switch (m_lsmInfo.s32DataType) {
     case 1:
-      LOG(INFO) << "DataType: " << "8-bit unsigned integer";
+      LOG(INFO) << "DataType: "
+                << "8-bit unsigned integer";
       break;
     case 2:
-      LOG(INFO) << "DataType: " << "12-bit unsigned integer";
+      LOG(INFO) << "DataType: "
+                << "12-bit unsigned integer";
       break;
     case 5:
-      LOG(INFO) << "DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")";
+      LOG(INFO) << "DataType: "
+                << "32-bit float(for \"Time Series Mean-of-ROIs\")";
       break;
-      //case 0: LOG(INFO) << "DataType: " << "different data types for different channels, see 32OffsetChannelDataTypes"; break;
+      // case 0: LOG(INFO) << "DataType: " << "different data types for different channels, see
+      // 32OffsetChannelDataTypes"; break;
   }
   for (size_t i = 0; i < m_channelDataTypes.size(); ++i) {
     switch (m_channelDataTypes[i]) {
       case 1:
-        LOG(INFO) << "Channel " << i + 1 << " DataType: " << "8-bit unsigned integer";
+        LOG(INFO) << "Channel " << i + 1 << " DataType: "
+                  << "8-bit unsigned integer";
         break;
       case 2:
-        LOG(INFO) << "Channel " << i + 1 << " DataType: " << "12-bit unsigned integer";
+        LOG(INFO) << "Channel " << i + 1 << " DataType: "
+                  << "12-bit unsigned integer";
         break;
       case 5:
-        LOG(INFO) << "Channel " << i + 1 << " DataType: " << "32-bit float(for \"Time Series Mean-of-ROIs\")";
+        LOG(INFO) << "Channel " << i + 1 << " DataType: "
+                  << "32-bit float(for \"Time Series Mean-of-ROIs\")";
         break;
     }
   }
@@ -269,42 +281,54 @@ void ZImgZeissLsm::logLsmInfo(const QString& filename)
   LOG(INFO) << "VoxelSizeZ in meter: " << m_lsmInfo.f64VoxelSizeZ;
   switch (m_lsmInfo.u16ScanType) {
     case 0:
-      LOG(INFO) << "ScanType: " << "normal x-y-z-scan";
+      LOG(INFO) << "ScanType: "
+                << "normal x-y-z-scan";
       break;
     case 1:
-      LOG(INFO) << "ScanType: " << "z-Scan (x-z-plane)";
+      LOG(INFO) << "ScanType: "
+                << "z-Scan (x-z-plane)";
       break;
     case 2:
-      LOG(INFO) << "ScanType: " << "line scan";
+      LOG(INFO) << "ScanType: "
+                << "line scan";
       break;
     case 3:
-      LOG(INFO) << "ScanType: " << "time series x-y";
+      LOG(INFO) << "ScanType: "
+                << "time series x-y";
       break;
     case 4:
-      LOG(INFO) << "ScanType: " << "time series x-z (release 2.0 or later)";
+      LOG(INFO) << "ScanType: "
+                << "time series x-z (release 2.0 or later)";
       break;
     case 5:
-      LOG(INFO) << "ScanType: " << "time series \"Mean of ROIs\" (release 2.0 or later)";
+      LOG(INFO) << "ScanType: "
+                << "time series \"Mean of ROIs\" (release 2.0 or later)";
       break;
     case 6:
-      LOG(INFO) << "ScanType: " << "time series x-y-z (release 2.3 or later)";
+      LOG(INFO) << "ScanType: "
+                << "time series x-y-z (release 2.3 or later)";
       break;
     case 7:
-      LOG(INFO) << "ScanType: " << "spline scan (release 2.5 or later)";
+      LOG(INFO) << "ScanType: "
+                << "spline scan (release 2.5 or later)";
       break;
     case 8:
-      LOG(INFO) << "ScanType: " << "spline plane x-z (release 2.5 or later)";
+      LOG(INFO) << "ScanType: "
+                << "spline plane x-z (release 2.5 or later)";
       break;
     case 9:
-      LOG(INFO) << "ScanType: " << "time series spline plane x-z (release 2.5 or later)";
+      LOG(INFO) << "ScanType: "
+                << "time series spline plane x-z (release 2.5 or later)";
       break;
     case 10:
-      LOG(INFO) << "ScanType: " << "point mode (release 3.0 or later)";
+      LOG(INFO) << "ScanType: "
+                << "point mode (release 3.0 or later)";
       break;
   }
   switch (m_lsmInfo.u16SpectralScan) {
     case 0:
-      LOG(INFO) << "SpectralScan: " << "no spectral scan";
+      LOG(INFO) << "SpectralScan: "
+                << "no spectral scan";
       break;
     case 1:
       LOG(INFO) << "SpectralScan: "
@@ -313,13 +337,16 @@ void ZImgZeissLsm::logLsmInfo(const QString& filename)
   }
   switch (m_lsmInfo.u32DataType) {
     case 0:
-      LOG(INFO) << "DataType: " << "Original scan data";
+      LOG(INFO) << "DataType: "
+                << "Original scan data";
       break;
     case 1:
-      LOG(INFO) << "DataType: " << "Calculated data";
+      LOG(INFO) << "DataType: "
+                << "Calculated data";
       break;
     case 2:
-      LOG(INFO) << "DataType: " << "Animation";
+      LOG(INFO) << "DataType: "
+                << "Animation";
       break;
   }
   if (m_lsmInfo.f64TimeInterval != 0) {
@@ -343,13 +370,11 @@ void ZImgZeissLsm::logLsmInfo(const QString& filename)
   LOG(INFO) << "DisplayAspectTime: " << m_lsmInfo.f64DisplayAspectTime;
   LOG(INFO) << "ObjectiveSphereCorrection: " << m_lsmInfo.f64ObjectiveSphereCorrection;
   for (size_t i = 0; i < m_lsmImgInfo.channelColors.size(); ++i) {
-    LOG(INFO) << "Channel " << i + 1 << " Name: " << m_lsmImgInfo.channelNames[i] << " Color(RGB): "
-              << m_lsmImgInfo.channelColors[i].r << " "
-              << m_lsmImgInfo.channelColors[i].g << " " << m_lsmImgInfo.channelColors[i].b << " "
-              << m_lsmImgInfo.channelColors[i].a;
+    LOG(INFO) << "Channel " << i + 1 << " Name: " << m_lsmImgInfo.channelNames[i]
+              << " Color(RGB): " << m_lsmImgInfo.channelColors[i].r << " " << m_lsmImgInfo.channelColors[i].g << " "
+              << m_lsmImgInfo.channelColors[i].b << " " << m_lsmImgInfo.channelColors[i].a;
   }
   LOG(INFO) << "End LSM Info for " << filename;
 }
-
 
 } // namespace nim

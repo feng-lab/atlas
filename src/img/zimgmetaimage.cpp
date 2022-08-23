@@ -23,11 +23,13 @@ QString ZImgMetaImage::fullName() const
 QStringList ZImgMetaImage::extensions() const
 {
   QStringList res;
-  res << "mhd" << "mha";
+  res << "mhd"
+      << "mha";
   return res;
 }
 
-void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgMetaImage::readInfo(const QString& filename,
+                             std::vector<ZImgInfo>& infos,
                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   MetaImage metaImage;
@@ -41,14 +43,13 @@ void ZImgMetaImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
   createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
-void ZImgMetaImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
-{
-}
+void ZImgMetaImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/) {}
 
-void ZImgMetaImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                                  const ZImgRegion& /*region*/, size_t /*scene*/)
-{
-}
+void ZImgMetaImage::readThumbnail(const QString& /*filename*/,
+                                  ZImgThumbernail& /*thumbnail*/,
+                                  const ZImgRegion& /*region*/,
+                                  size_t /*scene*/)
+{}
 
 void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
@@ -59,7 +60,7 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   if (!metaImage.Read(QFile::encodeName(filename).constData(), false, nullptr)) {
     throw ZIOException("Can not read metaImage");
   }
-  //metaImage.PrintInfo();
+  // metaImage.PrintInfo();
   ZImgInfo imgInfo;
   parseInfo(metaImage, imgInfo);
   if (imgInfo.isEmpty()) {
@@ -99,7 +100,10 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
     indexMax[0] = rgn.end.x - 1;
     indexMax[1] = rgn.end.y - 1;
     indexMax[2] = rgn.end.z - 1;
-    metaImage.ReadROI(indexMin, indexMax, QFile::encodeName(filename).constData(), true,
+    metaImage.ReadROI(indexMin,
+                      indexMax,
+                      QFile::encodeName(filename).constData(),
+                      true,
                       tmpImg.channelData<uint8_t>(0));
     if (clipInfo.numChannels > 1) {
       ZImg tpImg(clipInfo);
@@ -118,12 +122,12 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
   }
 }
 
-void ZImgMetaImage::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info,
+void ZImgMetaImage::checkImgBeforeWriting(const QString& filename,
+                                          const ZImgInfo& info,
                                           const ZImgWriteParameters& paras)
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
-  if (!(paras.compression == Compression::AUTO ||
-        paras.compression == Compression::NONE ||
+  if (!(paras.compression == Compression::AUTO || paras.compression == Compression::NONE ||
         paras.compression == Compression::DEFLATE)) {
     throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
   }
@@ -218,7 +222,11 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZIm
       }
   }
 
-  MetaImage metaImage(nDims, dimSize, elementSpacing, elementType, img.numChannels(),
+  MetaImage metaImage(nDims,
+                      dimSize,
+                      elementSpacing,
+                      elementType,
+                      img.numChannels(),
                       multipleChannel ? const_cast<uint8_t*>(tmpImg.channelData(0))
                                       : const_cast<uint8_t*>(img.channelData(0)));
 
@@ -320,7 +328,7 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
       break;
   }
 
-  if (true || metaImage.ElementSizeValid()) { //todo: why?
+  if (true || metaImage.ElementSizeValid()) { // todo: why?
     switch (metaImage.DistanceUnits()) {
       case MET_DISTANCE_UNITS_CM:
         info.voxelSizeUnit = VoxelSizeUnit::cm;
@@ -328,7 +336,7 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
       case MET_DISTANCE_UNITS_MM:
         info.voxelSizeUnit = VoxelSizeUnit::mm;
         break;
-      default:   // todo: should we default to um ?
+      default: // todo: should we default to um ?
         info.voxelSizeUnit = VoxelSizeUnit::um;
         break;
     }
@@ -347,4 +355,3 @@ void ZImgMetaImage::parseInfo(const MetaImage& metaImage, ZImgInfo& info)
 }
 
 } // namespace nim
-

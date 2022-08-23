@@ -16,35 +16,58 @@ public:
     : m_img(img)
   {
     m_info = img.readInfo();
-    if (m_info.isEmpty()) throw ZImgException("No max coord for empty img");
-    ZVoxelCoordinate maxCoord(m_info.width - 1, m_info.height - 1, m_info.depth - 1, m_info.numChannels - 1,
+    if (m_info.isEmpty()) {
+      throw ZImgException("No max coord for empty img");
+    }
+    ZVoxelCoordinate maxCoord(m_info.width - 1,
+                              m_info.height - 1,
+                              m_info.depth - 1,
+                              m_info.numChannels - 1,
                               m_info.numTimes - 1);
     m_box = BoxType(loc, loc + maxCoord);
   }
 
   void createImgCache() const
-  { if (!m_imgCache) m_imgCache = m_img.read(); }
+  {
+    if (!m_imgCache) {
+      m_imgCache = m_img.read();
+    }
+  }
 
   void clearImgCache() const
-  { m_imgCache.reset(); }
+  {
+    m_imgCache.reset();
+  }
 
   inline const ZImgSubBlock& imgBlock() const
-  { return m_img; }
+  {
+    return m_img;
+  }
 
   inline const ZImg& img() const
-  { return *m_imgCache; }
+  {
+    return *m_imgCache;
+  }
 
   inline const ZImgInfo& imgInfo() const
-  { return m_info; }
+  {
+    return m_info;
+  }
 
   inline const ZVoxelCoordinate& location() const
-  { return m_box.minCorner; }
+  {
+    return m_box.minCorner;
+  }
 
   inline const ZVoxelCoordinate& maxCoord() const
-  { return m_box.maxCorner; }
+  {
+    return m_box.maxCorner;
+  }
 
   inline bool contains(const ZVoxelCoordinate& v) const
-  { return m_box.contains(v); }
+  {
+    return m_box.contains(v);
+  }
 
   // this function does not check whether coordinate or type of voxel is valid
   template<typename TVoxel>
@@ -64,5 +87,3 @@ private:
 };
 
 } // namespace nim
-
-

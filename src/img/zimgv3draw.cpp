@@ -21,11 +21,13 @@ QString ZImgV3DRaw::fullName() const
 QStringList ZImgV3DRaw::extensions() const
 {
   QStringList res;
-  res << "v3draw" << "raw";
+  res << "v3draw"
+      << "raw";
   return res;
 }
 
-void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgV3DRaw::readInfo(const QString& filename,
+                          std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   std::ifstream inputFileStream;
@@ -78,10 +80,11 @@ void ZImgV3DRaw::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   infos[0].numChannels = sz[3];
   infos[0].numTimes = 1;
   infos[0].bytesPerVoxel = dataType;
-  if (dataType == 4 || dataType == 8)
+  if (dataType == 4 || dataType == 8) {
     infos[0].voxelFormat = VoxelFormat::Float;
-  else
+  } else {
     infos[0].voxelFormat = VoxelFormat::Unsigned;
+  }
   infos[0].createDefaultDescriptions();
 
   LOG(INFO) << infos[0].toQString();
@@ -104,8 +107,10 @@ void ZImgV3DRaw::readMetadata(const QString& filename, ZImgMetadata& /*meta*/, s
   }
 }
 
-void ZImgV3DRaw::readThumbnail(const QString& filename, ZImgThumbernail& /*thumbnail*/,
-                               const ZImgRegion& /*region*/, size_t scene)
+void ZImgV3DRaw::readThumbnail(const QString& filename,
+                               ZImgThumbernail& /*thumbnail*/,
+                               const ZImgRegion& /*region*/,
+                               size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -192,7 +197,7 @@ void ZImgV3DRaw::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   }
 }
 
-void ZImgV3DRaw::checkImgBeforeWriting(const QString &filename, const ZImgInfo &info, const ZImgWriteParameters &paras)
+void ZImgV3DRaw::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
@@ -229,7 +234,8 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWr
   writeStream(outputFileStream, img.timeData<char>(0), img.timeByteNumber());
 }
 
-void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+void ZImgV3DRaw::writeImg(const QString& filename,
+                          const ZImgSliceProvider& imgSliceProvider,
                           const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
@@ -254,7 +260,7 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImgSliceProvider& imgS
   writeStream(outputFileStream, sz, 16);
 
   if (imgSliceProvider.imgInfo().numChannels > 1 && imgSliceProvider.imgInfo().depth > 1) {
-    //writeImg(filename, imgSliceProvider.allSlices(0), comp);
+    // writeImg(filename, imgSliceProvider.allSlices(0), comp);
     for (size_t c = 0; c < imgSliceProvider.imgInfo().numChannels; ++c) {
       for (size_t z = 0; z < imgSliceProvider.imgInfo().depth; ++z) {
         ZImg img = imgSliceProvider.slice(z, 0);

@@ -69,8 +69,9 @@ void ZSectionsRegistration::doWork()
   double progress = 0;
   for (size_t i = 0; i < srcImg.depth(); ++i) {
     for (size_t j = i + 1; j < i + 1 + m_numNeighbors; ++j) {
-      if (j >= srcImg.depth())
+      if (j >= srcImg.depth()) {
         break;
+      }
       double cost;
       ZImageTransform* tfm = nullptr;
       IMG_TYPED_CALL(alignSection, srcImg.info(), srcImg, i, j, cost, tfm)
@@ -135,7 +136,10 @@ void ZSectionsRegistration::write(json::object& jo) const
 }
 
 template<typename ImagePixelType>
-void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIndex, size_t movingImageIndex, double& cost,
+void ZSectionsRegistration::alignSection(const ZImg& srcImg,
+                                         size_t fixedImageIndex,
+                                         size_t movingImageIndex,
+                                         double& cost,
                                          ZImageTransform*& transform)
 {
   LOG(INFO) << "";
@@ -164,8 +168,8 @@ void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIn
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
     LOG(INFO) << "At least one image is empty, skip registratering.";
-    cost = 1e10;  // a large cost
-    transform = new ZImageRigid2DTransform();  // no transform
+    cost = 1e10; // a large cost
+    transform = new ZImageRigid2DTransform(); // no transform
     return;
   }
 
@@ -224,8 +228,8 @@ void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIn
 
   if (fixedMin == fixedMax || movingMin == movingMax) {
     LOG(INFO) << "At least one image is empty, skip registratering.";
-    cost = 1e10;  // a large cost
-    transform = new ZImageRigid2DTransform();  // no transform
+    cost = 1e10; // a large cost
+    transform = new ZImageRigid2DTransform(); // no transform
     return;
   }
 
@@ -243,10 +247,27 @@ void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIn
   std::vector<double> filteredFixedImageData(length);
   std::vector<double> filteredMovingImageData(length);
 
-  image2DGaussianFilter(fixedImageData.data(), srcImg.width(), srcImg.height(),
-                        2.5, 2.5, filteredFixedImageData.data(), 11, 11, PadOption::Constant, 0.0, m_useMultithreading);
-  image2DGaussianFilter(movingImageData.data(), srcImg.width(), srcImg.height(),
-                        2.5, 2.5, filteredMovingImageData.data(), 11, 11, PadOption::Constant, 0.0,
+  image2DGaussianFilter(fixedImageData.data(),
+                        srcImg.width(),
+                        srcImg.height(),
+                        2.5,
+                        2.5,
+                        filteredFixedImageData.data(),
+                        11,
+                        11,
+                        PadOption::Constant,
+                        0.0,
+                        m_useMultithreading);
+  image2DGaussianFilter(movingImageData.data(),
+                        srcImg.width(),
+                        srcImg.height(),
+                        2.5,
+                        2.5,
+                        filteredMovingImageData.data(),
+                        11,
+                        11,
+                        PadOption::Constant,
+                        0.0,
                         m_useMultithreading);
 
   //  image2DWrite(fixedImageData.data(), m_stack.width(), m_stack.height(), "/Users/feng/Downloads/fim.tif");
@@ -312,18 +333,20 @@ void ZSectionsRegistration::alignSection(const ZImg& srcImg, size_t fixedImageIn
 }
 
 template<typename ImagePixelType>
-void
-ZSectionsRegistration::transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform> >& tfmmap,
-                                         const ZImg& srcImg, const QString& outImgFilename) const
+void ZSectionsRegistration::transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>& tfmmap,
+                                              const ZImg& srcImg,
+                                              const QString& outImgFilename) const
 {
   ZImg outImg = srcImg;
   for (size_t i = 0; i < srcImg.depth(); ++i) {
     auto& tfm = tfmmap.at(i);
-    tfm->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic, PadOption::Constant,
+    tfm->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic,
+                                                   PadOption::Constant,
                                                    m_brightBackground ? m_sectionInfos[i].max : m_sectionInfos[i].min));
     for (size_t c = 0; c < srcImg.numChannels(); ++c) {
       tfm->transformImage(srcImg.planeData<ImagePixelType>(i, c),
-                          srcImg.width(), srcImg.height(),
+                          srcImg.width(),
+                          srcImg.height(),
                           outImg.planeData<ImagePixelType>(i, c));
     }
   }
@@ -340,8 +363,7 @@ void ZSectionsRegistration::calcRefCh(const ZImg& srcImg)
   for (size_t i = 1; i < srcImg.numChannels(); ++i) {
     data = srcImg.planeData<ImagePixelType>(m_fixedSliceIndex, i);
     double sum = std::accumulate(data, data + length, 0.0);
-    if ((!m_brightBackground && sum > maxsum) ||
-        (m_brightBackground && sum < maxsum)) {
+    if ((!m_brightBackground && sum > maxsum) || (m_brightBackground && sum < maxsum)) {
       maxsum = sum;
       m_referenceChannel = i;
     }
@@ -357,23 +379,25 @@ void ZSectionsRegistration::calcSecInfs(const ZImg& srcImg)
   size_t length = srcImg.planeVoxelNumber();
   for (size_t i = 0; i < srcImg.depth(); ++i) {
     const ImagePixelType* data = srcImg.planeData<ImagePixelType>(i, m_referenceChannel);
-    std::pair<const ImagePixelType*, const ImagePixelType*> minmax =
-      minMaxElement(data, data + length);
+    std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
     m_sectionInfos[i].min = *minmax.first;
     m_sectionInfos[i].max = *minmax.second;
     m_minValue = std::min(m_minValue, m_sectionInfos[i].min);
     m_maxValue = std::max(m_maxValue, m_sectionInfos[i].max);
     std::vector<ImagePixelType> dataWithoutZero;
     for (size_t j = 0; j < length; ++j) {
-      if (data[j] > 0)
+      if (data[j] > 0) {
         dataWithoutZero.push_back(data[j]);
+      }
     }
     if (dataWithoutZero.empty()) {
       m_sectionInfos[i].mean = 0;
       m_sectionInfos[i].std = 0;
       m_sectionInfos[i].median = 0;
     } else {
-      meanAndStandardDeviation(dataWithoutZero.begin(), dataWithoutZero.end(), m_sectionInfos[i].mean,
+      meanAndStandardDeviation(dataWithoutZero.begin(),
+                               dataWithoutZero.end(),
+                               m_sectionInfos[i].mean,
                                m_sectionInfos[i].std);
       m_sectionInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
     }

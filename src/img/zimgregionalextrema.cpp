@@ -23,17 +23,16 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
   }
 
   ZImg res;
-  if (img.isEmpty())
+  if (img.isEmpty()) {
     return res;
+  }
   ZImgInfo info = img.info();
   info.bytesPerVoxel = 1;
   info.voxelFormat = VoxelFormat::Unsigned;
   res = ZImg(info);
   res.fill(1);
 
-  IMG_TYPED_CALL_FIX2NDTYPE(regionalExtrema_Impl, img.info(),
-                            Compare,
-                            res, img, conn)
+  IMG_TYPED_CALL_FIX2NDTYPE(regionalExtrema_Impl, img.info(), Compare, res, img, conn)
 
   return res;
 }
@@ -42,7 +41,7 @@ template<bool ReportProgress>
 template<typename TVoxel, template<typename> class Compare>
 void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const ZImg& img, size_t conn)
 {
-  Compare <TVoxel> compare;
+  Compare<TVoxel> compare;
   for (size_t t = 0; t < img.numTimes(); ++t) {
     TVoxel extreme;
     if (compare(1, 0)) {
@@ -55,8 +54,7 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
     double voxelNumber = img.timeVoxelNumber();
 
     std::stack<size_t, std::vector<size_t>> stk;
-    ZImgNeighborhoodConstIterator<TVoxel> nit =
-      ZImgNeighborhoodConstIterator<TVoxel>(ZNeighborhood(conn), img);
+    ZImgNeighborhoodConstIterator<TVoxel> nit = ZImgNeighborhoodConstIterator<TVoxel>(ZNeighborhood(conn), img);
 
     TVoxel centerValue;
     size_t idx;
@@ -82,7 +80,6 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
           }
         }
       }
-
     }
 
     while (!stk.empty()) {
@@ -106,11 +103,9 @@ void ZImgRegionalExtrema<ReportProgress>::regionalExtrema_Impl(ZImg& res, const 
   this->reportProgress(1.0);
 }
 
-template
-class ZImgRegionalExtrema<true>;
+template class ZImgRegionalExtrema<true>;
 
-template
-class ZImgRegionalExtrema<false>;
+template class ZImgRegionalExtrema<false>;
 
 template ZImg ZImgRegionalExtrema<true>::regionalExtrema<std::greater>(const ZImg&, size_t);
 

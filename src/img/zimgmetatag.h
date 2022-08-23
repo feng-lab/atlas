@@ -38,19 +38,29 @@ public:
   [[nodiscard]] QString toQString() const;
 
   [[nodiscard]] inline const QString& name() const
-  { return m_name; }
+  {
+    return m_name;
+  }
 
   inline void setName(const QString& n)
-  { m_name = n; }
+  {
+    m_name = n;
+  }
 
   [[nodiscard]] inline uint32_t tag() const
-  { return m_tag; }
+  {
+    return m_tag;
+  }
 
   inline void setTag(uint32_t t)
-  { m_tag = t; }
+  {
+    m_tag = t;
+  }
 
   [[nodiscard]] inline DataType dataType() const
-  { return m_dataType; }
+  {
+    return m_dataType;
+  }
 
   inline void setDataType(DataType dt)
   {
@@ -59,7 +69,9 @@ public:
   }
 
   [[nodiscard]] inline uint64_t count() const
-  { return m_count; }
+  {
+    return m_count;
+  }
 
   inline void setCount(uint64_t c)
   {
@@ -68,7 +80,9 @@ public:
   }
 
   [[nodiscard]] inline size_t dataByteNumber() const
-  { return byteNumber(m_dataType) * m_count; }
+  {
+    return byteNumber(m_dataType) * m_count;
+  }
 
   // read data as array of T, you need to know the correct dataType before calling this
   template<typename T = uint8_t>
@@ -97,7 +111,9 @@ public:
 
 private:
   inline void allocateData()
-  { m_data.resize(dataByteNumber()); }
+  {
+    m_data.resize(dataByteNumber());
+  }
 
 private:
   QString m_name;
@@ -107,5 +123,4 @@ private:
   std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> m_data;
 };
 
-}  // namespace nim
-
+} // namespace nim

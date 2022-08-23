@@ -38,7 +38,9 @@ public:
   ~ZException() noexcept override;
 
   [[nodiscard]] inline const char* what() const noexcept override
-  { return m_what.c_str(); }
+  {
+    return m_what.c_str();
+  }
 
 protected:
   std::string m_what;

@@ -9,10 +9,13 @@ namespace nim {
 void ZImgProcess::run()
 {
   LogSinkPtr fileDestination = createFileLogSink(m_logFile);
-  if (fileDestination)
+  if (fileDestination) {
     addLogSink(fileDestination);
+  }
   [[maybe_unused]] auto guard1 = folly::makeGuard([&fileDestination]() {
-    if (fileDestination) { removeLogSink(fileDestination); }
+    if (fileDestination) {
+      removeLogSink(fileDestination);
+    }
   });
 
   try {
@@ -25,7 +28,7 @@ void ZImgProcess::run()
     Q_EMIT canceled();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
-      throw;  // notify parent
+      throw; // notify parent
     }
   }
   catch (itk::ExceptionObject const& excp) {
@@ -33,7 +36,7 @@ void ZImgProcess::run()
     Q_EMIT processError(QString(excp.what()));
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
-      throw;  // notify parent
+      throw; // notify parent
     }
   }
   catch (ZProcessAbortException const& e) {
@@ -41,7 +44,7 @@ void ZImgProcess::run()
     Q_EMIT canceled();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
-      throw;  // notify parent
+      throw; // notify parent
     }
   }
   catch (ZException const& e) {
@@ -49,7 +52,7 @@ void ZImgProcess::run()
     Q_EMIT processError(e.what());
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
-      throw;  // notify parent
+      throw; // notify parent
     }
   }
 }
@@ -57,10 +60,13 @@ void ZImgProcess::run()
 void ZImgProcess::runInPython()
 {
   LogSinkPtr fileDestination = createFileLogSink(m_logFile);
-  if (fileDestination)
+  if (fileDestination) {
     addLogSink(fileDestination);
+  }
   [[maybe_unused]] auto guard1 = folly::makeGuard([&fileDestination]() {
-    if (fileDestination) { removeLogSink(fileDestination); }
+    if (fileDestination) {
+      removeLogSink(fileDestination);
+    }
   });
 
   try {

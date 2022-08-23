@@ -2,7 +2,6 @@
 
 #define USE_MKL
 
-#include "zimginterface.h"
 #include "zlog.h"
 #ifdef USE_MKL
 #include "zmkl.h"
@@ -17,8 +16,7 @@ ZComplexImg::ZComplexImg(size_t width, size_t height, size_t depth)
   , m_width(width)
   , m_height(height)
   , m_depth(depth)
-{
-}
+{}
 
 void ZComplexImg::swap(ZComplexImg& other) noexcept
 {
@@ -51,8 +49,9 @@ ZComplexImg& ZComplexImg::conj()
 #ifdef USE_MKL
   vzConj(m_data.size(), m_data.data(), m_data.data());
 #else
-  for (auto& v : m_data)
+  for (auto& v : m_data) {
     v = std::conj(v);
+  }
 #endif
   return *this;
 }
@@ -65,8 +64,9 @@ ZComplexImg ZComplexImg::conj(const ZComplexImg& img)
 
 ZComplexImg& ZComplexImg::operator+=(const std::complex<double>& rhs)
 {
-  for (auto& v : m_data)
+  for (auto& v : m_data) {
     v += rhs;
+  }
   return *this;
 }
 
@@ -74,7 +74,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img addition requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString(), rhs.toQString()));
   }
 #ifdef USE_MKL
   vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -100,8 +100,9 @@ ZComplexImg ZComplexImg::operator+(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator-=(const std::complex<double>& rhs)
 {
-  for (auto& v : m_data)
+  for (auto& v : m_data) {
     v -= rhs;
+  }
   return *this;
 }
 
@@ -109,7 +110,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img subtraction requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString(), rhs.toQString()));
   }
 #ifdef USE_MKL
   vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -136,15 +137,15 @@ ZComplexImg ZComplexImg::operator-(const ZComplexImg& rhs) const
 ZComplexImg ZComplexImg::operator-() const
 {
   ZComplexImg res(*this);
-  std::transform(res.m_data.begin(), res.m_data.end(), res.m_data.begin(),
-                 std::negate<>());
+  std::transform(res.m_data.begin(), res.m_data.end(), res.m_data.begin(), std::negate<>());
   return res;
 }
 
 ZComplexImg& ZComplexImg::operator*=(const std::complex<double>& rhs)
 {
-  for (auto& v : m_data)
+  for (auto& v : m_data) {
     v *= rhs;
+  }
   return *this;
 }
 
@@ -152,7 +153,7 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img multiplies requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString(), rhs.toQString()));
   }
 #ifdef USE_MKL
   vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -178,8 +179,9 @@ ZComplexImg ZComplexImg::operator*(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::operator/=(const std::complex<double>& rhs)
 {
-  for (auto& v : m_data)
+  for (auto& v : m_data) {
     v /= rhs;
+  }
   return *this;
 }
 
@@ -187,7 +189,7 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
     throw ZImgException(QString("complex img divides requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString()).arg(rhs.toQString()));
+                          .arg(toQString(), rhs.toQString()));
   }
 #ifdef USE_MKL
   vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());

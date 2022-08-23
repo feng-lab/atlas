@@ -66,9 +66,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
   info.height = pDecoder->WMP.wmiI.cHeight;
   info.depth = 1;
   info.numChannels = PI.cChannel;
-  if (PI.cfColorFormat != Y_ONLY &&
-      PI.cfColorFormat != NCOMPONENT &&
-      PI.cfColorFormat != CF_RGB &&
+  if (PI.cfColorFormat != Y_ONLY && PI.cfColorFormat != NCOMPONENT && PI.cfColorFormat != CF_RGB &&
       PI.cfColorFormat != CF_RGBE) {
     throw ZIOException("Not supported color type");
   }
@@ -148,11 +146,14 @@ QString ZImgJpegXR::fullName() const
 QStringList ZImgJpegXR::extensions() const
 {
   QStringList res;
-  res << "jxr" << "wdp" << "hdp";
+  res << "jxr"
+      << "wdp"
+      << "hdp";
   return res;
 }
 
-void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgJpegXR::readInfo(const QString& filename,
+                          std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
   ERR err = WMP_errSuccess;
@@ -164,16 +165,18 @@ void ZImgJpegXR::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
   Call(pCodecFactory->CreateDecoderFromFile(QFile::encodeName(filename).constData(), &pDecoder));
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
-  //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
+  // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   infos.resize(1);
   readInfoFromDecoder(pDecoder, PI, infos[0]);
 
-  Cleanup:
-  if (pDecoder)
+Cleanup:
+  if (pDecoder) {
     pDecoder->Release(&pDecoder);
-  if (pCodecFactory)
+  }
+  if (pCodecFactory) {
     pCodecFactory->Release(&pCodecFactory);
+  }
 
   reportError(err);
 
@@ -187,9 +190,10 @@ void ZImgJpegXR::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*
   }
 }
 
-void
-ZImgJpegXR::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
-                          const ZImgRegion& /*region*/, size_t scene)
+void ZImgJpegXR::readThumbnail(const QString& /*filename*/,
+                               ZImgThumbernail& /*thumbnail*/,
+                               const ZImgRegion& /*region*/,
+                               size_t scene)
 {
   if (scene != 0) {
     throw ZIOException("invalid scene");
@@ -214,7 +218,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   Call(pCodecFactory->CreateDecoderFromFile(QFile::encodeName(filename).constData(), &pDecoder));
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
-  //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
+  // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
 
@@ -228,7 +232,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   } else {
     pDecoder->WMP.wmiSCP.uAlphaMode = 0;
   }
-  //pDecoder->WMP.wmiSCP.bVerbose = true;
+  // pDecoder->WMP.wmiSCP.bVerbose = true;
 
   tmpRegion.start.c = 0;
   tmpRegion.end.c = -1;
@@ -266,11 +270,13 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
     img = img.crop(tmpRegion);
   }
 
-  Cleanup:
-  if (pDecoder)
+Cleanup:
+  if (pDecoder) {
     pDecoder->Release(&pDecoder);
-  if (pCodecFactory)
+  }
+  if (pCodecFactory) {
     pCodecFactory->Release(&pCodecFactory);
+  }
 
   reportError(err);
 }
@@ -290,7 +296,7 @@ void ZImgJpegXR::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
 
   // Create decoder
-  Call(PKCodecFactory_CreateCodec(pIID, (void**) &pDecoder));
+  Call(PKCodecFactory_CreateCodec(pIID, (void**)&pDecoder));
 
   // attach stream to decoder
   Call(pDecoder->Initialize(pDecoder, pStream));
@@ -298,15 +304,17 @@ void ZImgJpegXR::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
 
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
-  //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
+  // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
 
-  Cleanup:
-  if (pDecoder)
+Cleanup:
+  if (pDecoder) {
     pDecoder->Release(&pDecoder);
-  if (pFactory)
+  }
+  if (pFactory) {
     pFactory->Release(&pFactory);
+  }
 
   reportError(err);
 }
@@ -328,7 +336,7 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
   Call(pFactory->CreateStreamFromMemory(&pStream, mem, size));
 
   // Create decoder
-  Call(PKCodecFactory_CreateCodec(pIID, (void**) &pDecoder));
+  Call(PKCodecFactory_CreateCodec(pIID, (void**)&pDecoder));
 
   // attach stream to decoder
   Call(pDecoder->Initialize(pDecoder, pStream));
@@ -336,7 +344,7 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
 
   PI.pGUIDPixFmt = &pDecoder->guidPixFormat;
   Call(PixelFormatLookup(&PI, LOOKUP_FORWARD));
-  //Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
+  // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
 
@@ -349,7 +357,7 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
   } else {
     pDecoder->WMP.wmiSCP.uAlphaMode = 0;
   }
-  //pDecoder->WMP.wmiSCP.bVerbose = true;
+  // pDecoder->WMP.wmiSCP.bVerbose = true;
 
   rect = {0, 0, 0, 0};
   rect.Width = info.width;
@@ -374,11 +382,13 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
     }
   }
 
-  Cleanup:
-  if (pDecoder)
+Cleanup:
+  if (pDecoder) {
     pDecoder->Release(&pDecoder);
-  if (pFactory)
+  }
+  if (pFactory) {
     pFactory->Release(&pFactory);
+  }
 
   reportError(err);
 }

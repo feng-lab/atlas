@@ -11,11 +11,11 @@ namespace nim {
 QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showLastSeg)
 {
   QPainterPath res;
-  if (spline.size() < 2)
+  if (spline.size() < 2) {
     return res;
+  }
   bool isClosed = spline.isClosed();
-  if ((isClosed && spline.size() < 4) ||
-      (!isClosed && spline.size() < 3)) {
+  if ((isClosed && spline.size() < 4) || (!isClosed && spline.size() < 3)) {
     res.moveTo(spline[0]);
     res.lineTo(spline[1]);
     return res;
@@ -28,7 +28,9 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
     times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
   }
 
-  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed, spline.size(), (gte::Vector<2, double> const*) spline.data(),
+  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
+                                                 spline.size(),
+                                                 (gte::Vector<2, double> const*)spline.data(),
                                                  times.data());
   res.moveTo(spline[0]);
   auto endSeg = showLastSeg ? numSegments : numSegments - 1;
@@ -41,10 +43,14 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
     gte::Vector<2, double>& m1 = values1[1];
     m0 *= times[i + 1] - times[i];
     m1 *= times[i + 1] - times[i];
-    //LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " << cspline[i+1];
-    res.cubicTo(spline[i].x() + 1. / 3. * m0[0], spline[i].y() + 1. / 3. * m0[1],
-                spline[i + 1].x() - 1. / 3. * m1[0], spline[i + 1].y() - 1. / 3. * m1[1],
-                spline[i + 1].x(), spline[i + 1].y());
+    // LOG(INFO) << m0.X() << " " << m0.Y() << " " << m1.X() << " " << m1.Y() << " " << cspline[i] << " " <<
+    // cspline[i+1];
+    res.cubicTo(spline[i].x() + 1. / 3. * m0[0],
+                spline[i].y() + 1. / 3. * m0[1],
+                spline[i + 1].x() - 1. / 3. * m1[0],
+                spline[i + 1].y() - 1. / 3. * m1[1],
+                spline[i + 1].x(),
+                spline[i + 1].y());
   }
 
   return res;
@@ -73,7 +79,7 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToMask(const QPainterP
     img = ZImg(ZImgInfo(maxX - minX + 1, maxY - minY + 1));
     for (auto y = minY; y <= maxY; ++y) {
       for (auto x = minX; x <= maxX; ++x) {
-        if (path.contains(QPointF(x, y))) {       // not accurate for some spline
+        if (path.contains(QPointF(x, y))) { // not accurate for some spline
           *img.data<uint8_t>(x - minX, y - minY, 0) = 1;
         }
       }
@@ -115,7 +121,7 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainte
     return std::make_tuple(img, 0_z, 0_z);
   }
 
-  QImage imageOut((maxX - minX + 1) , (maxY - minY + 1), QImage::Format_Mono);
+  QImage imageOut((maxX - minX + 1), (maxY - minY + 1), QImage::Format_Mono);
   imageOut.fill(0);
   QPainter painter(&imageOut);
   painter.setBrush(Qt::NoBrush);
@@ -134,19 +140,19 @@ std::tuple<ZImg, index_t, index_t> ZROIUtils::qPainterPathToStroke(const QPainte
   return std::make_tuple(img, minX, minY);
 }
 
-//std::tuple<ZROIUtils::RowMatrixXb, index_t, index_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
+// std::tuple<ZROIUtils::RowMatrixXb, index_t, index_t> ZROIUtils::qPainterPathToMask_Python(const QPainterPath& path)
 //{
-//  RowMatrixXb res;
-//  auto [img, x_start, y_start] = qPainterPathToMask(path);
-//  if (!img.isEmpty()) {
-//    res = RowMatrixXb(img.height(), img.width());
-//    for (size_t y = 0; y < img.height(); ++y) {
-//      for (size_t x = 0; x < img.width(); ++x) {
-//        res(y, x) = *img.data<uint8_t>(x, y, 0);
-//      }
-//    }
-//  }
-//  return std::make_tuple(res, x_start, y_start);
-//}
+//   RowMatrixXb res;
+//   auto [img, x_start, y_start] = qPainterPathToMask(path);
+//   if (!img.isEmpty()) {
+//     res = RowMatrixXb(img.height(), img.width());
+//     for (size_t y = 0; y < img.height(); ++y) {
+//       for (size_t x = 0; x < img.width(); ++x) {
+//         res(y, x) = *img.data<uint8_t>(x, y, 0);
+//       }
+//     }
+//   }
+//   return std::make_tuple(res, x_start, y_start);
+// }
 
 } // namespace nim

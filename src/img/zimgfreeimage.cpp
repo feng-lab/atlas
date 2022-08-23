@@ -48,7 +48,7 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
           break;
         case 32:
           if (fipImg.getColorType() == FIC_CMYK) {
-            info.numChannels = 3;  // to RGB
+            info.numChannels = 3; // to RGB
           } else {
             info.numChannels = 4;
             info.lastChannelIsAlphaChannel = true;
@@ -165,21 +165,94 @@ QString ZImgFreeImage::fullName() const
 QStringList ZImgFreeImage::extensions() const
 {
   QStringList res;
-  res << "bmp" << "cut" << "dds" << "exr" << "g3" << "gif" << "hdr" << "ico"
-      << "iff" << "lbm" << "j2k" << "j2c" << "jng" << "jp2" /*<< "jpg"*/ << "jif"
-      /*<< "jpeg"*/ << "jpe" << "jxr" << "wdp" << "hdp" << "koa" << "mng" << "pbm"
-      << "pcd" << "pcx" << "pfm" << "pgm" << "pct" << "pict" << "pic" /*<< "png"*/
-      << "ppm" << "psd" << "ras" << "sgi" << "tga" << "targa" << "wap" << "wbmp" << "wbm"
-      << "webp" << "xbm" << "xpm" << "3fr" << "arw" << "bay" << "bmq" << "cap" << "cine"
-      << "cr2" << "crw" << "cs1" << "dc2" << "dcr" << "dng" << "drf" << "dsc"
-      << "erf" << "fff" << "ia" << "iiq" << "k25" << "kc2" << "kdc" << "mdc"
-      << "mef" << "mos" << "mrw" << "nef" << "nrw" << "orf" << "pef" << "ptx"
-      << "pxn" << "qtk" << "raf" << "raw" << "rdc" << "rw2" << "rwz" << "sr2"
-      << "srf" << "sti" << "x3f";
+  res << "bmp"
+      << "cut"
+      << "dds"
+      << "exr"
+      << "g3"
+      << "gif"
+      << "hdr"
+      << "ico"
+      << "iff"
+      << "lbm"
+      << "j2k"
+      << "j2c"
+      << "jng"
+      << "jp2" /*<< "jpg"*/
+      << "jif"
+      /*<< "jpeg"*/
+      << "jpe"
+      << "jxr"
+      << "wdp"
+      << "hdp"
+      << "koa"
+      << "mng"
+      << "pbm"
+      << "pcd"
+      << "pcx"
+      << "pfm"
+      << "pgm"
+      << "pct"
+      << "pict"
+      << "pic" /*<< "png"*/
+      << "ppm"
+      << "psd"
+      << "ras"
+      << "sgi"
+      << "tga"
+      << "targa"
+      << "wap"
+      << "wbmp"
+      << "wbm"
+      << "webp"
+      << "xbm"
+      << "xpm"
+      << "3fr"
+      << "arw"
+      << "bay"
+      << "bmq"
+      << "cap"
+      << "cine"
+      << "cr2"
+      << "crw"
+      << "cs1"
+      << "dc2"
+      << "dcr"
+      << "dng"
+      << "drf"
+      << "dsc"
+      << "erf"
+      << "fff"
+      << "ia"
+      << "iiq"
+      << "k25"
+      << "kc2"
+      << "kdc"
+      << "mdc"
+      << "mef"
+      << "mos"
+      << "mrw"
+      << "nef"
+      << "nrw"
+      << "orf"
+      << "pef"
+      << "ptx"
+      << "pxn"
+      << "qtk"
+      << "raf"
+      << "raw"
+      << "rdc"
+      << "rw2"
+      << "rwz"
+      << "sr2"
+      << "srf"
+      << "sti"
+      << "x3f";
   return res;
 }
 
-void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+void ZImgFreeImage::readInfo(const QString& filename,
+                             std::vector<ZImgInfo>& infos,
                              std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
 #if defined(_WIN32) || defined(_WIN64)
@@ -193,9 +266,9 @@ void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
     LOG(INFO) << FreeImage_GetFIFDescription(fmt);
   }*/
   fipMultiPage fipMp(true);
-  bool multipage = fmt == FIF_GIF
-                   && fipMp.open(QFile::encodeName(filename).constData(), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK)
-                   && fipMp.getPageCount() > 1;
+  bool multipage = fmt == FIF_GIF &&
+                   fipMp.open(QFile::encodeName(filename).constData(), false, true, FIF_LOAD_NOPIXELS | GIF_PLAYBACK) &&
+                   fipMp.getPageCount() > 1;
   if (multipage) {
     fipImage fipImg;
     fipImg = fipMp.lockPage(0);
@@ -218,15 +291,13 @@ void ZImgFreeImage::readInfo(const QString& filename, std::vector<ZImgInfo>& inf
   createDefaultSubBlocks(filename, infos, subBlocks);
 }
 
-void ZImgFreeImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/)
-{
-}
+void ZImgFreeImage::readMetadata(const QString& /*filename*/, ZImgMetadata& /*meta*/, size_t /*scene*/) {}
 
-void ZImgFreeImage::readThumbnail(const QString& /*filename*/, ZImgThumbernail& /*thumbnail*/,
+void ZImgFreeImage::readThumbnail(const QString& /*filename*/,
+                                  ZImgThumbernail& /*thumbnail*/,
                                   const ZImgRegion& /*region*/,
                                   size_t /*scene*/)
-{
-}
+{}
 
 void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene)
 {
@@ -299,8 +370,9 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
       fipImage fipImg;
       fipImg = fipMp.lockPage(t);
 
-      if (t == 0)
+      if (t == 0) {
         isBGA = fipImg.getImageType() == FIT_BITMAP;
+      }
 
       switch (fipImg.getColorType()) {
         case FIC_CMYK:

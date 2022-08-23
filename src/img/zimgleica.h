@@ -61,8 +61,8 @@ struct DimensionInfo
 class ZImgLeica : public ZImgFormat
 {
 public:
-
   // ZImgFormat interface
+
 public:
   bool supportRead() const override;
 
@@ -75,9 +75,12 @@ public:
   QStringList extensions() const override;
 
   FileFormat format() const override
-  { return FileFormat::Leica; }
+  {
+    return FileFormat::Leica;
+  }
 
-  void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+  void readInfo(const QString& filename,
+                std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
@@ -90,9 +93,10 @@ public:
 private:
   void clearInternalState();
 
-  static int parseLIFVersion(const QString& xmlString) ;
+  static int parseLIFVersion(const QString& xmlString);
 
-  void readXml(const QString& filename, QString& xml,
+  void readXml(const QString& filename,
+               QString& xml,
                std::vector<std::tuple<size_t, QString, size_t>>& memoryOffsetNameLength) const;
 
   void readLeicaInfo(const QString& xmlString, const QDir& xmlDir, std::vector<ImageInfo>& imageInfos);
@@ -115,7 +119,4 @@ private:
 private:
 };
 
-} // namespace
-
-
-
+} // namespace nim

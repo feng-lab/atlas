@@ -11,7 +11,9 @@ public:
   explicit ZRegistrationNumericDiffCostFunction(double relativeStepSize = 1e-6);
 
   void setRelativeStepSize(double v)
-  { m_relativeStepSize = v; }
+  {
+    m_relativeStepSize = v;
+  }
 
   void setMetric(ZImageToImageMetric& metric);
 
@@ -29,4 +31,3 @@ private:
 };
 
 } // namespace nim
-

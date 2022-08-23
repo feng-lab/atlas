@@ -11,11 +11,12 @@ size_t bitsetRangeToValue(const std::bitset<N>& bitSet, size_t startBit, size_t 
   size_t res = 0;
   endBit = std::min(endBit, bitSet.size());
   for (size_t i = startBit; i < endBit; ++i) {
-    if (bitSet[i])
+    if (bitSet[i]) {
       res |= mask;
+    }
     mask <<= 1;
   }
   return res;
 }
 
-}  // namespace nim
+} // namespace nim

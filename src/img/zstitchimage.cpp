@@ -20,11 +20,11 @@ namespace {
 
 using namespace nim;
 
-void buildFullConnection(size_t nStacks,
-                         std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
+void buildFullConnection(size_t nStacks, std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& conn)
 {
-  if (nStacks <= 1)
+  if (nStacks <= 1) {
     return;
+  }
 
   for (size_t f = 0; f < nStacks; ++f) {
     for (size_t m = f + 1; m < nStacks; ++m) {
@@ -43,9 +43,11 @@ size_t buildConnectionFromTextFile(const QString& filename,
   }
 
   QStringList header;
-  header << "# img1" << "img2" << "position";
+  header << "# img1"
+         << "img2"
+         << "position";
 
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); //RegEx for ' ' or ',' or '[' or ']' or ';'
+  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
   QFile inputFile(filename);
   if (inputFile.open(QIODevice::ReadOnly)) {
     QTextStream in(&inputFile);
@@ -61,19 +63,21 @@ size_t buildConnectionFromTextFile(const QString& filename,
         continue;
       }
       if (list.size() < header.size()) {
-        throw ZImgException(
-          QString("Wrong number of items in line (%1), expected format: <%2>").arg(list.join(',')).arg(
-            header.join(',')));
+        throw ZImgException(QString("Wrong number of items in line (%1), expected format: <%2>")
+                              .arg(list.join(','))
+                              .arg(header.join(',')));
       }
       bool ok = false;
       auto idx1 = list[0].toInt(&ok);
-      if (!ok || idx1 <= 0)
+      if (!ok || idx1 <= 0) {
         throw ZImgException(
           QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      }
       auto idx2 = list[1].toInt(&ok);
-      if (!ok || idx2 <= 0)
+      if (!ok || idx2 <= 0) {
         throw ZImgException(
           QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+      }
       auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
       nStacks = std::max<size_t>(nStacks, idx1);
       nStacks = std::max<size_t>(nStacks, idx2);
@@ -124,7 +128,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
         if (grid.value<int32_t>(x, y, z) > 0) {
           size_t idx1 = grid.value<int32_t>(x, y, z) - 1;
 
-          if (x + 1 < grid.width() && grid.value<int32_t>(x + 1, y, z) > 0) { //right
+          if (x + 1 < grid.width() && grid.value<int32_t>(x + 1, y, z) > 0) { // right
             size_t idx2 = grid.value<int32_t>(x + 1, y, z) - 1;
             std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
             conn[stackPair] = ZImgNCCMatch::PositionHint::Right;
@@ -132,7 +136,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
             idxToMinConnDist[idx2] = std::min(1, idxToMinConnDist[idx2]);
             connDist[stackPair] = 1;
           }
-          if (y + 1 < grid.height() && grid.value<int32_t>(x, y + 1, z) > 0) { //down
+          if (y + 1 < grid.height() && grid.value<int32_t>(x, y + 1, z) > 0) { // down
             size_t idx2 = grid.value<int32_t>(x, y + 1, z) - 1;
             std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
             conn[stackPair] = ZImgNCCMatch::PositionHint::Down;
@@ -140,7 +144,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
             idxToMinConnDist[idx2] = std::min(1, idxToMinConnDist[idx2]);
             connDist[stackPair] = 1;
           }
-          if (z + 1 < grid.depth() && grid.value<int32_t>(x, y, z + 1) > 0) { //back
+          if (z + 1 < grid.depth() && grid.value<int32_t>(x, y, z + 1) > 0) { // back
             size_t idx2 = grid.value<int32_t>(x, y, z + 1) - 1;
             std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
             conn[stackPair] = ZImgNCCMatch::PositionHint::Back;
@@ -149,7 +153,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
             connDist[stackPair] = 1;
           }
 
-          if (x + 1 < grid.width() && y + 1 < grid.height() && grid.value<int32_t>(x + 1, y + 1, z) > 0) { //right down
+          if (x + 1 < grid.width() && y + 1 < grid.height() && grid.value<int32_t>(x + 1, y + 1, z) > 0) { // right down
             size_t idx2 = grid.value<int32_t>(x + 1, y + 1, z) - 1;
             std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
             conn[stackPair] = ZImgNCCMatch::PositionHint::Right | ZImgNCCMatch::PositionHint::Down;
@@ -157,7 +161,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
             idxToMinConnDist[idx2] = std::min(2, idxToMinConnDist[idx2]);
             connDist[stackPair] = 2;
           }
-          if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z) > 0) { //left down
+          if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z) > 0) { // left down
             size_t idx2 = grid.value<int32_t>(x - 1, y + 1, z) - 1;
             std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
             conn[stackPair] = ZImgNCCMatch::PositionHint::Left | ZImgNCCMatch::PositionHint::Down;
@@ -200,7 +204,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
 
           if (z + 1 < grid.depth()) {
             if (x + 1 < grid.width() && y + 1 < grid.height() &&
-                grid.value<int32_t>(x + 1, y + 1, z + 1) > 0) { //right down back
+                grid.value<int32_t>(x + 1, y + 1, z + 1) > 0) { // right down back
               size_t idx2 = grid.value<int32_t>(x + 1, y + 1, z + 1) - 1;
               std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
               conn[stackPair] =
@@ -209,7 +213,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
               idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
               connDist[stackPair] = 3;
             }
-            if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z + 1) > 0) { //left down back
+            if (x > 0 && y + 1 < grid.height() && grid.value<int32_t>(x - 1, y + 1, z + 1) > 0) { // left down back
               size_t idx2 = grid.value<int32_t>(x - 1, y + 1, z + 1) - 1;
               std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
               conn[stackPair] =
@@ -218,7 +222,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
               idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
               connDist[stackPair] = 3;
             }
-            if (x + 1 < grid.width() && y > 0 && grid.value<int32_t>(x + 1, y - 1, z + 1) > 0) { //right up back
+            if (x + 1 < grid.width() && y > 0 && grid.value<int32_t>(x + 1, y - 1, z + 1) > 0) { // right up back
               size_t idx2 = grid.value<int32_t>(x + 1, y - 1, z + 1) - 1;
               std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
               conn[stackPair] =
@@ -227,7 +231,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
               idxToMinConnDist[idx2] = std::min(3, idxToMinConnDist[idx2]);
               connDist[stackPair] = 3;
             }
-            if (x > 0 && y > 0 && grid.value<int32_t>(x - 1, y - 1, z + 1) > 0) { //left up back
+            if (x > 0 && y > 0 && grid.value<int32_t>(x - 1, y - 1, z + 1) > 0) { // left up back
               size_t idx2 = grid.value<int32_t>(x - 1, y - 1, z + 1) - 1;
               std::pair<size_t, size_t> stackPair = std::make_pair(idx1, idx2);
               conn[stackPair] =
@@ -242,16 +246,15 @@ size_t buildConnectionFromGrid(const ZImg& grid,
     }
   }
 
-  for (const auto&[key, val] : idxToMinConnDist) {
+  for (const auto& [key, val] : idxToMinConnDist) {
     if (val > 3) {
       throw ZImgException(QString("Can not stitch because images are not connected. Abort."));
     }
   }
 
   // prune
-  for (const auto&[key, val] : conn) {
-    if (connDist[key] == idxToMinConnDist[key.first] ||
-        connDist[key] == idxToMinConnDist[key.second]) {
+  for (const auto& [key, val] : conn) {
+    if (connDist[key] == idxToMinConnDist[key.first] || connDist[key] == idxToMinConnDist[key.second]) {
       connRes[key] = val;
       nStacks = std::max(nStacks, key.first + 1);
       nStacks = std::max(nStacks, key.second + 1);
@@ -273,8 +276,8 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
     double areaf = (rgnf.end.y - rgnf.start.y) * 1.0 * (rgnf.end.x - rgnf.start.x);
     for (size_t m = f + 1; m < rgns.size(); ++m) {
       const ZImgRegion& rgnm = rgns[m];
-      if (rgnm.start.x >= rgnf.end.x || rgnm.end.x <= rgnf.start.x ||
-          rgnm.start.y >= rgnf.end.y || rgnm.end.y <= rgnf.start.y) {
+      if (rgnm.start.x >= rgnf.end.x || rgnm.end.x <= rgnf.start.x || rgnm.start.y >= rgnf.end.y ||
+          rgnm.end.y <= rgnf.start.y) {
         continue; // no overlap
       }
       double aream = (rgnm.end.y - rgnm.start.y) * 1.0 * (rgnm.end.x - rgnm.start.x);
@@ -302,7 +305,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
   }
 
   std::map<size_t, std::set<size_t>> idxToPrunedConn;
-  for (const auto&[key, val] : idxToConn) {
+  for (const auto& [key, val] : idxToConn) {
     if (val.empty()) {
       throw ZImgException(QString("Can not do restitching because images are not connected. Abort."));
     }
@@ -327,7 +330,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
   }
 
   // prune
-  for (const auto&[key, val] : conn) {
+  for (const auto& [key, val] : conn) {
     if (idxToPrunedConn[key.first].find(key.second) != idxToPrunedConn[key.first].end() ||
         idxToPrunedConn[key.second].find(key.first) != idxToPrunedConn[key.second].end()) {
       connRes[key] = val.first;
@@ -335,15 +338,13 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
   }
 }
 
-}  // anonymous namespace
-
+} // anonymous namespace
 
 namespace nim {
 
 ZStitchImage::ZStitchImage()
   : ZImgProcess()
-{
-}
+{}
 
 void ZStitchImage::setTileGridFromTileSelectionImage(const QString& fn)
 {
@@ -427,7 +428,7 @@ void ZStitchImage::doWork()
   }
 
   if (hasStack2) {
-    for (const auto&[key, val] : conn) {
+    for (const auto& [key, val] : conn) {
       conn[std::make_pair(key.first, key.first + nStacks)] = ZImgNCCMatch::PositionHint::None;
       conn[std::make_pair(key.second, key.second + nStacks)] = ZImgNCCMatch::PositionHint::None;
       conn[std::make_pair(key.first + nStacks, key.second + nStacks)] = val;
@@ -446,14 +447,18 @@ void ZStitchImage::doWork()
       auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[0]);
       if (!tmpInfo.isSameType(info)) {
         throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                              .arg(inputStackSources[0].toQString()).arg(info.toQString())
-                              .arg(input2ndStackSources[0].toQString()).arg(tmpInfo.toQString()));
+                              .arg(inputStackSources[0].toQString())
+                              .arg(info.toQString())
+                              .arg(input2ndStackSources[0].toQString())
+                              .arg(tmpInfo.toQString()));
       }
     } else {
       if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
         ZImg img(m_inputFilenames[0], ZImgRegion(), m_scene);
         LOG(INFO) << "Downsampling ...";
-        img.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+        img.blockDownsample(m_downsampleBlockWidth,
+                            m_downsampleBlockHeight,
+                            m_downsampleBlockDepth,
                             m_downsampleMergeMode);
 
         img.save(m_resFileName);
@@ -474,8 +479,10 @@ void ZStitchImage::doWork()
         auto tmpInfo = ZImg::readImgInfo(inputStackSources[i]);
         if (!tmpInfo.isSameType(info)) {
           throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                                .arg(inputStackSources[0].toQString()).arg(info.toQString())
-                                .arg(inputStackSources[i].toQString()).arg(tmpInfo.toQString()));
+                                .arg(inputStackSources[0].toQString())
+                                .arg(info.toQString())
+                                .arg(inputStackSources[i].toQString())
+                                .arg(tmpInfo.toQString()));
         }
       }
       if (hasStack2) {
@@ -486,8 +493,10 @@ void ZStitchImage::doWork()
           auto tmpInfo = ZImg::readImgInfo(input2ndStackSource);
           if (!tmpInfo.isSameType(info)) {
             throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                                  .arg(inputStackSources[0].toQString()).arg(info.toQString())
-                                  .arg(input2ndStackSource.toQString()).arg(tmpInfo.toQString()));
+                                  .arg(inputStackSources[0].toQString())
+                                  .arg(info.toQString())
+                                  .arg(input2ndStackSource.toQString())
+                                  .arg(tmpInfo.toQString()));
           }
         }
       }
@@ -544,9 +553,9 @@ void ZStitchImage::doWork()
         throw ZImgException(QString("do not know how to split the input image to %1 parts.").arg(nStacks));
       }
     } else {
-      throw ZImgException(
-        QString("number of inputs %1 does not match number of stacks %2 to stitch.").arg(
-          m_inputFilenames.size()).arg(nStacks));
+      throw ZImgException(QString("number of inputs %1 does not match number of stacks %2 to stitch.")
+                            .arg(m_inputFilenames.size())
+                            .arg(nStacks));
     }
 
     LOG(INFO) << QString("Stitching %1 images ...").arg(nStacks);
@@ -557,16 +566,16 @@ void ZStitchImage::doWork()
       for (const auto& ss : input2ndStackSources) {
         LOG(INFO) << ss.toQString();
       }
-      inputStackSources.insert(inputStackSources.end(),
-                               input2ndStackSources.begin(),
-                               input2ndStackSources.end());
+      inputStackSources.insert(inputStackSources.end(), input2ndStackSources.begin(), input2ndStackSources.end());
     }
   }
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>,
-      boost::hash<std::pair<size_t, size_t>>> offsets;
+    tbb::concurrent_unordered_map<std::pair<size_t, size_t>,
+                                  std::pair<ZVoxelCoordinate, double>,
+                                  boost::hash<std::pair<size_t, size_t>>>
+      offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZImgNCCMatch::PositionHint>> allPairs;
@@ -582,9 +591,13 @@ void ZStitchImage::doWork()
       }
       ZImg fixedImg(inputStackSources[f]);
       ZImg movingImg(inputStackSources[m]);
-      fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      fixedImg.blockDownsample(m_downsampleBlockWidth,
+                               m_downsampleBlockHeight,
+                               m_downsampleBlockDepth,
                                m_downsampleMergeMode);
-      movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      movingImg.blockDownsample(m_downsampleBlockWidth,
+                                m_downsampleBlockHeight,
+                                m_downsampleBlockDepth,
                                 m_downsampleMergeMode);
 
       ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
@@ -627,8 +640,11 @@ void ZStitchImage::doWork()
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
           QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-            maxNCC);
+                           .arg(f + 1)
+                           .arg(m + 1)
+                           .arg(imgNCCMatch.positionHintToQString())
+                           .arg(movingImgOffset.toQString())
+                           .arg(maxNCC);
 
           LOG(INFO) << info;
         } else {
@@ -650,8 +666,11 @@ void ZStitchImage::doWork()
           offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
           QString info = QString("img %1 -- img %2, img %2 position hint: %3, offset: %4, NCC: %5")
-            .arg(f + 1).arg(m + 1).arg(imgNCCMatch.positionHintToQString()).arg(movingImgOffset.toQString()).arg(
-            maxNCC);
+                           .arg(f + 1)
+                           .arg(m + 1)
+                           .arg(imgNCCMatch.positionHintToQString())
+                           .arg(movingImgOffset.toQString())
+                           .arg(maxNCC);
 
           LOG(INFO) << info;
         }
@@ -660,23 +679,20 @@ void ZStitchImage::doWork()
 
     if (m_useMultithreading) {
       fftw_plan_with_nthreads(1);
-//      int nthread =
-//        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-//                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      //      int nthread =
+      //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+      //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
       size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch.";
       // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
-      tbb::parallel_for(
-        tbb::blocked_range<size_t>(0, allPairs.size()),
-        [&](const tbb::blocked_range<size_t>& r) {
-          for (size_t i = r.begin(); i != r.end(); ++i) {
-            stitch_pair(i);
-          }
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, allPairs.size()), [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          stitch_pair(i);
         }
-      );
+      });
 
       fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
@@ -688,15 +704,21 @@ void ZStitchImage::doWork()
     ZImgMerge imgMerge;
     std::vector<ZImgTileSubBlock> imgs;
     for (const auto& ss : inputStackSources) {
-      imgs.emplace_back(ss, m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      imgs.emplace_back(ss,
+                        m_downsampleBlockWidth,
+                        m_downsampleBlockHeight,
+                        m_downsampleBlockDepth,
                         m_downsampleMergeMode);
     }
     for (const auto& fixedMovingOffsetCost : offsets) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
-      imgMerge.addImgPair(imgs[f], imgs[m], fixedMovingOffsetCost.second.first,
+      imgMerge.addImgPair(imgs[f],
+                          imgs[m],
+                          fixedMovingOffsetCost.second.first,
                           -(fixedMovingOffsetCost.second.second),
-                          QString::number(f + 1), QString::number(m + 1));
+                          QString::number(f + 1),
+                          QString::number(m + 1));
     }
 
     imgMerge.setMergeMode(m_mergeMode);
@@ -761,7 +783,8 @@ void ZStitchImage::read(const json::object& jo)
     }
     set2ndInput(json::value_to<QStringList>(jo.at("input_2_files")),
                 json::value_to<size_t>(jo.at("input_2_files_scene")),
-                chsToUse, chsToRB,
+                chsToUse,
+                chsToRB,
                 json::value_to<size_t>(jo.at("input_common_channel")),
                 json::value_to<size_t>(jo.at("input_2_common_channel")));
   }
@@ -806,7 +829,8 @@ void ZStitchImage::write(json::object& jo) const
     jo["channels_to_use"] = json::value_from(m_channelsToUse);
   }
   if (!m_channelsToRemoveBackground.empty()) {
-    jo["channels_to_remove_background"] = json::value_from(m_channelsToRemoveBackground);;
+    jo["channels_to_remove_background"] = json::value_from(m_channelsToRemoveBackground);
+    ;
   }
   if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
     jo["downsample_block_width"] = m_downsampleBlockWidth;
@@ -865,8 +889,9 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
       }
       pre = img.value<double>(w, h, 0);
     }
-    if (numCols > 0)
+    if (numCols > 0) {
       break;
+    }
   }
   for (size_t w = 0; w < img.width(); w++) {
     auto pre = minvalue;
@@ -876,8 +901,9 @@ void ZStitchImage::getTileMatrixFromConnImage(ZImg& img)
       }
       pre = img.value<double>(w, h, 0);
     }
-    if (numRows > 0)
+    if (numRows > 0) {
       break;
+    }
   }
   if (numCols == 0 || numRows == 0) {
     m_tileGrid.clear();
@@ -940,8 +966,10 @@ void ZStitchImage::doRestitch()
 
   {
     // for every pair of img
-    tbb::concurrent_unordered_map<std::pair<size_t, size_t>, std::pair<ZVoxelCoordinate, double>,
-      boost::hash<std::pair<size_t, size_t>>> offsets;
+    tbb::concurrent_unordered_map<std::pair<size_t, size_t>,
+                                  std::pair<ZVoxelCoordinate, double>,
+                                  boost::hash<std::pair<size_t, size_t>>>
+      offsets;
     ZImgInfo oneImgInfo = ZImg::readImgInfo(inputStackSources[0]);
 
     std::vector<std::tuple<size_t, size_t, ZVoxelCoordinate>> allPairs;
@@ -957,9 +985,13 @@ void ZStitchImage::doRestitch()
       }
       ZImg fixedImg(inputStackSources[f]);
       ZImg movingImg(inputStackSources[m]);
-      fixedImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      fixedImg.blockDownsample(m_downsampleBlockWidth,
+                               m_downsampleBlockHeight,
+                               m_downsampleBlockDepth,
                                m_downsampleMergeMode);
-      movingImg.blockDownsample(m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      movingImg.blockDownsample(m_downsampleBlockWidth,
+                                m_downsampleBlockHeight,
+                                m_downsampleBlockDepth,
                                 m_downsampleMergeMode);
 
       ZImgNCCMatch imgNCCMatch(fixedImg, movingImg);
@@ -984,7 +1016,10 @@ void ZStitchImage::doRestitch()
       LOG(INFO) << QString("radius: %1, %2, %3").arg(radiusX).arg(radiusY).arg(radiusZ);
 
       double maxNCC;
-      ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset, radiusX, radiusY, radiusZ,
+      ZVoxelCoordinate movingImgOffset = imgNCCMatch.refineMovingImgOffsetMR(initOffset,
+                                                                             radiusX,
+                                                                             radiusY,
+                                                                             radiusZ,
                                                                              m_startResolutionIntvX,
                                                                              m_startResolutionIntvY,
                                                                              m_startResolutionIntvZ,
@@ -992,31 +1027,33 @@ void ZStitchImage::doRestitch()
       offsets[std::make_pair(f, m)] = std::make_pair(movingImgOffset, maxNCC);
 
       QString info = QString("tile %1 (%2) -- tile %3 (%4), tile %3 initial offset: %5, final offset: %6, NCC: %7")
-        .arg(f + 1).arg(rgns[f].start.toQString()).arg(m + 1).arg(rgns[m].start.toQString()).arg(
-        initOffset.toQString()).arg(movingImgOffset.toQString()).arg(maxNCC);
+                       .arg(f + 1)
+                       .arg(rgns[f].start.toQString())
+                       .arg(m + 1)
+                       .arg(rgns[m].start.toQString())
+                       .arg(initOffset.toQString())
+                       .arg(movingImgOffset.toQString())
+                       .arg(maxNCC);
 
       LOG(INFO) << info;
     };
 
     if (m_useMultithreading) {
       fftw_plan_with_nthreads(1);
-//      int nthread =
-//        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
-//                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
+      //      int nthread =
+      //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
+      //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
       size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch " << rgns.size() << " regions.";
       // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
-      tbb::parallel_for(
-        tbb::blocked_range<size_t>(0, allPairs.size()),
-        [&](const tbb::blocked_range<size_t>& r) {
-          for (size_t i = r.begin(); i != r.end(); ++i) {
-            stitch_pair(i);
-          }
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, allPairs.size()), [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+          stitch_pair(i);
         }
-      );
+      });
       fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
       for (size_t i = 0; i < allPairs.size(); ++i) {
@@ -1027,15 +1064,21 @@ void ZStitchImage::doRestitch()
     ZImgMerge imgMerge;
     std::vector<ZImgTileSubBlock> imgs;
     for (const auto& ss : inputStackSources) {
-      imgs.emplace_back(ss, m_downsampleBlockWidth, m_downsampleBlockHeight, m_downsampleBlockDepth,
+      imgs.emplace_back(ss,
+                        m_downsampleBlockWidth,
+                        m_downsampleBlockHeight,
+                        m_downsampleBlockDepth,
                         m_downsampleMergeMode);
     }
     for (const auto& fixedMovingOffsetCost : offsets) {
       size_t f = fixedMovingOffsetCost.first.first;
       size_t m = fixedMovingOffsetCost.first.second;
-      imgMerge.addImgPair(imgs[f], imgs[m], fixedMovingOffsetCost.second.first,
+      imgMerge.addImgPair(imgs[f],
+                          imgs[m],
+                          fixedMovingOffsetCost.second.first,
                           -(fixedMovingOffsetCost.second.second),
-                          QString::number(f + 1), QString::number(m + 1));
+                          QString::number(f + 1),
+                          QString::number(m + 1));
     }
 
     imgMerge.setMergeMode(m_mergeMode);
@@ -1071,5 +1114,3 @@ void ZStitchImage::doRestitch()
 }
 
 } // namespace nim
-
-

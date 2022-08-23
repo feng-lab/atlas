@@ -43,7 +43,8 @@ ZImgIO::ZImgIO()
   m_ioFormats[FileFormat::Leica] = std::make_unique<ZImgLeica>();
 }
 
-void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
+void ZImgIO::readInfos(const QString& filename,
+                       std::vector<ZImgInfo>& res,
                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
                        FileFormat format)
 {
@@ -58,8 +59,9 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
       for (auto reader : readers) {
         try {
           std::vector<ZImgInfo> tmpInfo;
-          if (subBlocks)
+          if (subBlocks) {
             subBlocks->clear();
+          }
           reader->readInfo(filename, tmpInfo, subBlocks);
           if (!tmpInfo.empty()) {
             tmpInfo.swap(res);
@@ -69,8 +71,10 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
           }
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            reader->fullName()).arg(e.what());
+          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
+                     .arg(filename)
+                     .arg(reader->fullName())
+                     .arg(e.what());
         }
       }
     }
@@ -79,8 +83,9 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
   } else {
     try {
       std::vector<ZImgInfo> tmpInfo;
-      if (subBlocks)
+      if (subBlocks) {
         subBlocks->clear();
+      }
       m_ioFormats[format]->readInfo(filename, tmpInfo, subBlocks);
       if (!tmpInfo.empty()) {
         tmpInfo.swap(res);
@@ -89,17 +94,23 @@ void ZImgIO::readInfos(const QString& filename, std::vector<ZImgInfo>& res,
       throw ZIOException("empty image");
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try read file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
   throw ZIOException(error);
 }
 
-void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catScenes, std::vector<ZImgInfo>& res,
+void ZImgIO::readInfos(const QStringList& fileList,
+                       Dimension catDim,
+                       bool catScenes,
+                       std::vector<ZImgInfo>& res,
                        std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks,
-                       FileFormat format, bool expandXY)
+                       FileFormat format,
+                       bool expandXY)
 {
   if (fileList.size() == 1 && !catScenes) {
     readInfos(fileList[0], res, subBlocks, format);
@@ -132,24 +143,25 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
     for (size_t s = 1; s < res.size(); ++s) {
       // check whether type match
       if (!res[s].isSameType(res[0])) {
-        throw ZIOException(
-          QString("Read sequence failed: image type don't match, can not cat Img <%1> to Img 0 <%2>")
-            .arg(res[s].toQString()).arg(res[0].toQString()));
+        throw ZIOException(QString("Read sequence failed: image type don't match, can not cat Img <%1> to Img 0 <%2>")
+                             .arg(res[s].toQString())
+                             .arg(res[0].toQString()));
       }
       // check whether dimension size match
       for (auto dim : res[0].dimensions()) {
         if (expandXY) {
-          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
-              res[s].size(dim) != res[0].size(dim)) {
+          if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
             throw ZIOException(
               QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                .arg(res[s].toQString()).arg(res[0].toQString()));
+                .arg(res[s].toQString())
+                .arg(res[0].toQString()));
           }
         } else {
           if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
             throw ZIOException(
               QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                .arg(res[s].toQString()).arg(res[0].toQString()));
+                .arg(res[s].toQString())
+                .arg(res[0].toQString()));
           }
         }
         if (dim == catDim) {
@@ -204,7 +216,9 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
         if (!tmpInfo[s].isSameType(res[s])) {
           throw ZIOException(
             QString("Read sequence failed: image type don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-              .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
+              .arg(i)
+              .arg(tmpInfo[s].toQString())
+              .arg(res[s].toQString()));
         }
         // check whether dimension size match
         for (auto dim : res[s].dimensions()) {
@@ -213,13 +227,17 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
                 res[s].size(dim) != tmpInfo[s].size(dim)) {
               throw ZIOException(
                 QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                  .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
+                  .arg(i)
+                  .arg(tmpInfo[s].toQString())
+                  .arg(res[s].toQString()));
             }
           } else {
             if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
               throw ZIOException(
                 QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                  .arg(i).arg(tmpInfo[s].toQString()).arg(res[s].toQString()));
+                  .arg(i)
+                  .arg(tmpInfo[s].toQString())
+                  .arg(res[s].toQString()));
             }
           }
           if (dim == catDim) {
@@ -276,7 +294,8 @@ void ZImgIO::readInfos(const QStringList& fileList, Dimension catDim, bool catSc
   }
 }
 
-void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info,
+void ZImgIO::readInfo(const ZImgSource& imgSource,
+                      ZImgInfo& info,
                       std::vector<std::shared_ptr<ZImgSubBlock>>* subBlocks)
 {
   if (imgSource.filenames.size() == 1 && !imgSource.catScenes) {
@@ -294,8 +313,13 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info,
   } else if (!imgSource.filenames.empty()) {
     std::vector<ZImgInfo> res;
     std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-    readInfos(imgSource.filenames, imgSource.catDim, imgSource.catScenes, res,
-              subBlocks ? &tmpSubBlocks : nullptr, imgSource.format, imgSource.expandXY);
+    readInfos(imgSource.filenames,
+              imgSource.catDim,
+              imgSource.catScenes,
+              res,
+              subBlocks ? &tmpSubBlocks : nullptr,
+              imgSource.format,
+              imgSource.expandXY);
     if (imgSource.scene >= res.size()) {
       throw ZIOException("invalid scene");
     }
@@ -309,8 +333,7 @@ void ZImgIO::readInfo(const ZImgSource& imgSource, ZImgInfo& info,
   }
 }
 
-std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString& filename,
-                                                                   FileFormat format)
+std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString& filename, FileFormat format)
 {
   std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
@@ -324,14 +347,17 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       if (block->xRatio != 1 || block->yRatio != 1 || block->zRatio != 1) {
         continue;
       }
-      tiles.insert(
-        std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->t, block->x, block->y,
-                                                                           block->width,
-                                                                           block->height, block->z, block->depth));
+      tiles.insert(std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>(block->t,
+                                                                                      block->x,
+                                                                                      block->y,
+                                                                                      block->width,
+                                                                                      block->height,
+                                                                                      block->z,
+                                                                                      block->depth));
     }
     auto lastTile = std::tuple<size_t, size_t, size_t, size_t, size_t, size_t, size_t>();
     for (const auto& tile : tiles) {
-      auto[t, x, y, width, height, z, depth] = tile;
+      auto [t, x, y, width, height, z, depth] = tile;
       if (res[i].empty()) {
         ZVoxelCoordinate startC(x, y, z, 0, t);
         ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
@@ -339,7 +365,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
         lastTile = tile;
         continue;
       }
-      auto[lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
+      auto [lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
         auto& rgn = res[i][res[i].size() - 1];
         if (z != size_t(rgn.end.z)) {
@@ -377,8 +403,10 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
             return;
           }
           catch (const ZIOException& e) {
-            error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-              reader->fullName()).arg(e.what());
+            error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
+                       .arg(filename)
+                       .arg(reader->fullName())
+                       .arg(e.what());
           }
         }
       }
@@ -394,8 +422,10 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
         return;
       }
       catch (const ZIOException& e) {
-        error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
-          m_ioFormats[imgSource.format]->fullName()).arg(e.what());
+        error = QString("Try read file %1 as '%2' format, failed: %3")
+                  .arg(filename)
+                  .arg(m_ioFormats[imgSource.format]->fullName())
+                  .arg(e.what());
       }
     }
   }
@@ -403,7 +433,10 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
   throw ZIOException(error);
 }
 
-void ZImgIO::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene,
+void ZImgIO::readThumbnail(const QString& filename,
+                           ZImgThumbernail& thumbnail,
+                           const ZImgRegion& region,
+                           size_t scene,
                            FileFormat format)
 {
   thumbnail.clear();
@@ -422,8 +455,10 @@ void ZImgIO::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, 
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            reader->fullName()).arg(e.what());
+          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
+                     .arg(filename)
+                     .arg(reader->fullName())
+                     .arg(e.what());
         }
       }
     }
@@ -437,16 +472,23 @@ void ZImgIO::readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, 
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try read file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
   throw ZIOException(error);
 }
 
-void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
-                     size_t xRatio, size_t yRatio, size_t zRatio,
+void ZImgIO::readImg(const QString& filename,
+                     ZImg& img,
+                     const ZImgRegion& region,
+                     size_t scene,
+                     size_t xRatio,
+                     size_t yRatio,
+                     size_t zRatio,
                      FileFormat format)
 {
   img.clear();
@@ -465,8 +507,10 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename).arg(
-            reader->fullName()).arg(e.what());
+          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
+                     .arg(filename)
+                     .arg(reader->fullName())
+                     .arg(e.what());
         }
       }
     }
@@ -480,17 +524,27 @@ void ZImgIO::readImg(const QString& filename, ZImg& img, const ZImgRegion& regio
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try read file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
   throw ZIOException(error);
 }
 
-void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScenes, ZImg& img, size_t scene,
-                     size_t xRatio, size_t yRatio, size_t zRatio,
-                     FileFormat format, bool expandXY, bool expandWithMaxValue)
+void ZImgIO::readImg(const QStringList& fileList,
+                     Dimension catDim,
+                     bool catScenes,
+                     ZImg& img,
+                     size_t scene,
+                     size_t xRatio,
+                     size_t yRatio,
+                     size_t zRatio,
+                     FileFormat format,
+                     bool expandXY,
+                     bool expandWithMaxValue)
 {
   if (fileList.size() == 1 && !catScenes) {
     readImg(fileList[0], img, ZImgRegion(), scene, xRatio, yRatio, zRatio, format);
@@ -534,25 +588,27 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
         imgs[i].computeMinMax(min, max);
         imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore, -heightPadBefore, 0, 0, 0),
                                       imgs[i].endCoord() + ZVoxelCoordinate(widthPadAfter, heightPadAfter),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       } else if (info.voxelFormat == VoxelFormat::Unsigned) {
         uint64_t min;
         uint64_t max;
         imgs[i].computeMinMax(min, max);
         imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore, -heightPadBefore, 0, 0, 0),
                                       imgs[i].endCoord() + ZVoxelCoordinate(widthPadAfter, heightPadAfter),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       } else {
         int64_t min;
         int64_t max;
         imgs[i].computeMinMax(min, max);
         imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore, -heightPadBefore, 0, 0, 0),
                                       imgs[i].endCoord() + ZVoxelCoordinate(widthPadAfter, heightPadAfter),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+                                      PadOption::Constant,
+                                      expandWithMaxValue ? max : min);
       }
     }
   }
-
 
   if (imgs.size() == 1) {
     img.swap(imgs[0]);
@@ -567,9 +623,18 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
   }
 }
 
-void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScenes, const ZImgRegion& regionIn, ZImg& img, size_t scene,
-                     size_t xRatio, size_t yRatio, size_t zRatio,
-                     FileFormat format, bool expandXY, bool expandWithMaxValue)
+void ZImgIO::readImg(const QStringList& fileList,
+                     Dimension catDim,
+                     bool catScenes,
+                     const ZImgRegion& regionIn,
+                     ZImg& img,
+                     size_t scene,
+                     size_t xRatio,
+                     size_t yRatio,
+                     size_t zRatio,
+                     FileFormat format,
+                     bool expandXY,
+                     bool expandWithMaxValue)
 {
   if (fileList.size() == 1 && !catScenes) {
     readImg(fileList[0], img, regionIn, scene, xRatio, yRatio, zRatio, format);
@@ -655,35 +720,29 @@ void ZImgIO::readImg(const QStringList& fileList, Dimension catDim, bool catScen
         double min;
         double max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x,
-                                                       -heightPadBefore + sliceRegion.start.y,
-                                                       0),
-                                      ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x,
-                                                       -heightPadBefore + sliceRegion.end.y,
-                                                       imgs[i].depth()),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
+          PadOption::Constant,
+          expandWithMaxValue ? max : min);
       } else if (info.voxelFormat == VoxelFormat::Unsigned) {
         uint64_t min;
         uint64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x,
-                                                       -heightPadBefore + sliceRegion.start.y,
-                                                       0),
-                                      ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x,
-                                                       -heightPadBefore + sliceRegion.end.y,
-                                                       imgs[i].depth()),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
+          PadOption::Constant,
+          expandWithMaxValue ? max : min);
       } else {
         int64_t min;
         int64_t max;
         imgs[i].computeMinMax(min, max);
-        imgs[i] = imgs[i].cropWithPad(ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x,
-                                                       -heightPadBefore + sliceRegion.start.y,
-                                                       0),
-                                      ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x,
-                                                       -heightPadBefore + sliceRegion.end.y,
-                                                       imgs[i].depth()),
-                                      PadOption::Constant, expandWithMaxValue ? max : min);
+        imgs[i] = imgs[i].cropWithPad(
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.start.x, -heightPadBefore + sliceRegion.start.y, 0),
+          ZVoxelCoordinate(-widthPadBefore + sliceRegion.end.x, -heightPadBefore + sliceRegion.end.y, imgs[i].depth()),
+          PadOption::Constant,
+          expandWithMaxValue ? max : min);
       }
     } else {
       auto imgSource = imgSources[i];
@@ -711,16 +770,24 @@ void ZImgIO::readImg(const ZImgSource& imgSource, ZImg& img, size_t xRatio, size
   if (imgSource.filenames.size() == 1 && !imgSource.catScenes) {
     readImg(imgSource.filenames[0], img, imgSource.region, imgSource.scene, xRatio, yRatio, zRatio, imgSource.format);
   } else if (!imgSource.filenames.empty()) {
-    readImg(imgSource.filenames, imgSource.catDim, imgSource.catScenes, imgSource.region, img, imgSource.scene,
-            xRatio, yRatio, zRatio,
-            imgSource.format, imgSource.expandXY, imgSource.expandWithMaxValue);
+    readImg(imgSource.filenames,
+            imgSource.catDim,
+            imgSource.catScenes,
+            imgSource.region,
+            img,
+            imgSource.scene,
+            xRatio,
+            yRatio,
+            zRatio,
+            imgSource.format,
+            imgSource.expandXY,
+            imgSource.expandWithMaxValue);
   } else {
     throw ZIOException("invalid image source");
   }
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format,
-                      const ZImgWriteParameters& paras)
+void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat format, const ZImgWriteParameters& paras)
 {
   if (img.isEmpty()) {
     throw ZIOException("Can not write empty image.");
@@ -744,8 +811,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("Try write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
-            e.what());
+          error +=
+            QString("Try write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
         }
       }
     }
@@ -763,15 +830,19 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try write file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
   throw ZIOException(error);
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, FileFormat format,
+void ZImgIO::writeImg(const QString& filename,
+                      const ZImgSliceProvider& img,
+                      FileFormat format,
                       const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
@@ -796,8 +867,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
-            e.what());
+          error +=
+            QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
         }
       }
     }
@@ -815,15 +886,19 @@ void ZImgIO::writeImg(const QString& filename, const ZImgSliceProvider& img, Fil
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try write file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
   throw ZIOException(error);
 }
 
-void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, FileFormat format,
+void ZImgIO::writeImg(const QString& filename,
+                      const ZImgBlockProvider& img,
+                      FileFormat format,
                       const ZImgWriteParameters& paras)
 {
   if (img.imgInfo().isEmpty()) {
@@ -848,8 +923,8 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(
-            e.what());
+          error +=
+            QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
         }
       }
     }
@@ -867,8 +942,10 @@ void ZImgIO::writeImg(const QString& filename, const ZImgBlockProvider& img, Fil
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try write file %1 as '%2' format, failed: %3").arg(filename).arg(
-        m_ioFormats[format]->fullName()).arg(e.what());
+      error = QString("Try write file %1 as '%2' format, failed: %3")
+                .arg(filename)
+                .arg(m_ioFormats[format]->fullName())
+                .arg(e.what());
     }
   }
 
@@ -879,7 +956,7 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& 
 {
   filters.clear();
   formats.clear();
-  formats.push_back(FileFormat::Unknown);  // for filter 'all'
+  formats.push_back(FileFormat::Unknown); // for filter 'all'
 
   QString all = "Images";
   QStringList lst;
@@ -888,8 +965,7 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& 
       QString filter = QString("*.") + fmt.second->extensions().join(" *.");
       lst.push_back(filter);
 
-      filter = fmt.second->fullName() + QString(" (*.") +
-               fmt.second->extensions().join(" *.") + QString(")");
+      filter = fmt.second->fullName() + QString(" (*.") + fmt.second->extensions().join(" *.") + QString(")");
       filters.push_back(filter);
       formats.push_back(fmt.first);
     }
@@ -900,17 +976,18 @@ void ZImgIO::getQtReadNameFilter(QStringList& filters, std::vector<FileFormat>& 
   filters.prepend(all);
 }
 
-void ZImgIO::getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>& formats, std::vector<Compression>& comps) const
+void ZImgIO::getQtWriteNameFilter(QStringList& filters,
+                                  std::vector<FileFormat>& formats,
+                                  std::vector<Compression>& comps) const
 {
   filters.clear();
   formats.clear();
   comps.clear();
   for (const auto& fmt : m_ioFormats) {
     if (fmt.second->supportWrite()) {
-      QString filter = fmt.second->fullName() + QString(" (*.") +
-                       fmt.second->extensions().join(" *.") + QString(")");
+      QString filter = fmt.second->fullName() + QString(" (*.") + fmt.second->extensions().join(" *.") + QString(")");
       if (fmt.first == FileFormat::OmeTiff || fmt.first == FileFormat::Tiff) {
-        QString flt = QString("LZW Compressed ") + filter;  // todo: use custom dialog and set compression as option
+        QString flt = QString("LZW Compressed ") + filter; // todo: use custom dialog and set compression as option
         filters.push_back(flt);
         formats.push_back(fmt.first);
         comps.push_back(Compression::LZW);
@@ -920,7 +997,7 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>&
         comps.push_back(Compression::ADOBE_DEFLATE);
       }
       if (fmt.first == FileFormat::MetaImage) {
-        QString flt = QString("Compressed ") + filter;  // todo: use custom dialog and set compression as option
+        QString flt = QString("Compressed ") + filter; // todo: use custom dialog and set compression as option
         filters.push_back(flt);
         formats.push_back(fmt.first);
         comps.push_back(Compression::AUTO);
@@ -939,8 +1016,9 @@ void ZImgIO::getQtWriteNameFilter(QStringList& filters, std::vector<FileFormat>&
 bool ZImgIO::fileExtensionReadSupported(const QString& filename) const
 {
   for (const auto& fmt : m_ioFormats) {
-    if (fmt.second->canRead(filename))
+    if (fmt.second->canRead(filename)) {
       return true;
+    }
   }
   return false;
 }
@@ -948,8 +1026,9 @@ bool ZImgIO::fileExtensionReadSupported(const QString& filename) const
 bool ZImgIO::fileExtensionWriteSupported(const QString& filename) const
 {
   for (const auto& fmt : m_ioFormats) {
-    if (fmt.second->canWrite(filename))
+    if (fmt.second->canWrite(filename)) {
       return true;
+    }
   }
   return false;
 }
@@ -958,8 +1037,9 @@ std::vector<ZImgFormat*> ZImgIO::getSupportedReader(const QString& filename) con
 {
   std::vector<ZImgFormat*> res;
   for (const auto& fmt : m_ioFormats) {
-    if (fmt.second->canRead(filename))
+    if (fmt.second->canRead(filename)) {
       res.push_back(fmt.second.get());
+    }
   }
   return res;
 }
@@ -968,8 +1048,9 @@ std::vector<ZImgFormat*> ZImgIO::getSupportedWriter(const QString& filename) con
 {
   std::vector<ZImgFormat*> res;
   for (const auto& fmt : m_ioFormats) {
-    if (fmt.second->canWrite(filename))
+    if (fmt.second->canWrite(filename)) {
       res.push_back(fmt.second.get());
+    }
   }
   return res;
 }

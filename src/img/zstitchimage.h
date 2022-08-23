@@ -11,7 +11,8 @@ namespace nim {
 
 class ZStitchImage : public ZImgProcess
 {
-Q_OBJECT
+  Q_OBJECT
+
 public:
   ZStitchImage();
 
@@ -24,20 +25,29 @@ public:
 
   // if set, result will be saved to these files
   void setResultFilename(const QString& fn)
-  { m_resFileName = fn; }
+  {
+    m_resFileName = fn;
+  }
 
   // default use all channels (empty input)
   void setUseChannels(const std::vector<size_t>& chs = std::vector<size_t>())
-  { m_channelsToUse = chs; }
+  {
+    m_channelsToUse = chs;
+  }
 
   // default apply to no channel
   void setRemoveBackgroundForChannels(const std::vector<size_t>& chs = std::vector<size_t>())
-  { m_channelsToRemoveBackground = chs; }
+  {
+    m_channelsToRemoveBackground = chs;
+  }
 
   // for stitching two sets of images with one common channel and same tile cofigurations
-  void set2ndInput(const QStringList& fns, size_t scene, const std::vector<size_t>& useChs,
+  void set2ndInput(const QStringList& fns,
+                   size_t scene,
+                   const std::vector<size_t>& useChs,
                    const std::vector<size_t>& chsForBackgroundRemove,
-                   size_t commonChannelOfInput, size_t commonChannelof2ndInput)
+                   size_t commonChannelOfInput,
+                   size_t commonChannelof2ndInput)
   {
     m_2ndInputFilenames = fns;
     std::sort(m_2ndInputFilenames.begin(), m_2ndInputFilenames.end(), naturalSortLessThan);
@@ -50,9 +60,13 @@ public:
 
   // default Max
   void setMergeMode(ImgMergeMode mode)
-  { m_mergeMode = mode; }
+  {
+    m_mergeMode = mode;
+  }
 
-  void setDownsampleBeforeStitching(size_t blockWidth, size_t blockHeight, size_t blockDepth,
+  void setDownsampleBeforeStitching(size_t blockWidth,
+                                    size_t blockHeight,
+                                    size_t blockDepth,
                                     ImgMergeMode mode = ImgMergeMode::Mean)
   {
     m_downsampleBlockWidth = blockWidth;
@@ -78,7 +92,9 @@ public:
 
   // default 0.15
   void setMaxOverlapRate(double maxOverlapRate)
-  { m_maxOverlapRate = maxOverlapRate; }
+  {
+    m_maxOverlapRate = maxOverlapRate;
+  }
 
   // set Tile configuration to be one of grid, conn text file, blind, czi restitching
 
@@ -119,7 +135,9 @@ public:
 
   // default is true
   void setUseMultithreading(bool v)
-  { m_useMultithreading = v; }
+  {
+    m_useMultithreading = v;
+  }
 
 Q_SIGNALS:
 
@@ -145,7 +163,7 @@ private:
   QString m_resFileName;
 
   // parameters
-  std::vector<size_t> m_channelsToUse;  //empty means all channel
+  std::vector<size_t> m_channelsToUse; // empty means all channel
   std::vector<size_t> m_channelsToRemoveBackground;
   ImgMergeMode m_mergeMode = ImgMergeMode::Max;
   size_t m_downsampleBlockWidth = 1;
@@ -153,20 +171,20 @@ private:
   size_t m_downsampleBlockDepth = 1;
   ImgMergeMode m_downsampleMergeMode = ImgMergeMode::Mean;
   bool m_concatenateOnly = false;
-  size_t m_startResolutionIntvX = 1;  // start from image downsampled by (m_startResolutionIntvX+1)
-  size_t m_startResolutionIntvY = 1;  // start from image downsampled by (m_startResolutionIntvY+1)
-  size_t m_startResolutionIntvZ = 1;  // start from image downsampled by (m_startResolutionIntvZ+1)
+  size_t m_startResolutionIntvX = 1; // start from image downsampled by (m_startResolutionIntvX+1)
+  size_t m_startResolutionIntvY = 1; // start from image downsampled by (m_startResolutionIntvY+1)
+  size_t m_startResolutionIntvZ = 1; // start from image downsampled by (m_startResolutionIntvZ+1)
   double m_maxOverlapRate = 0.15;
 
   // one of the configuration will be valid:
-  ZImg m_tileGrid;  // a 2d or 3d img contains the tile grid
+  ZImg m_tileGrid; // a 2d or 3d img contains the tile grid
   QString m_connTextFile;
   bool m_restitch = false; // only works for czi now
 
   // another set of stacks that have common channel and same tile configuraton with the main inputs
   QStringList m_2ndInputFilenames;
   size_t m_2ndScene = 0;
-  std::vector<size_t> m_2ndChannelsToUse;  //empty means all channel
+  std::vector<size_t> m_2ndChannelsToUse; // empty means all channel
   std::vector<size_t> m_2ndChannelsToRemoveBackground;
   size_t m_commonChannelOfInput = 0;
   size_t m_commonChannelOf2ndInput = 0;
@@ -175,4 +193,3 @@ private:
 };
 
 } // namespace nim
-

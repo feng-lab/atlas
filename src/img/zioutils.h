@@ -8,10 +8,12 @@
 namespace nim {
 
 // safe io functions, throw exceptions if error
-void openFileStream(std::ifstream& fs, const QString& filename,
+void openFileStream(std::ifstream& fs,
+                    const QString& filename,
                     std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
 
-void openFileStream(std::ofstream& fs, const QString& filename,
+void openFileStream(std::ofstream& fs,
+                    const QString& filename,
                     std::ios_base::openmode mode = std::ios_base::out | std::ios_base::binary);
 
 // mac: if count >= 2G, fs.read() will fail, this is a workaround
@@ -53,8 +55,6 @@ void renameFile(const QString& oldName, const QString& newName);
 std::string readFileIntoString(const QString& filename,
                                std::ios_base::openmode mode = std::ios_base::in | std::ios_base::binary);
 
-QByteArray readFileIntoByteArray(const QString& filename,
-                                 QIODevice::OpenMode openMode = QIODevice::ReadOnly);
+QByteArray readFileIntoByteArray(const QString& filename, QIODevice::OpenMode openMode = QIODevice::ReadOnly);
 
 } // namespace nim
-

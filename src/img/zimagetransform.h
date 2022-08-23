@@ -33,38 +33,60 @@ public:
   [[nodiscard]] virtual bool is2DTransform() const = 0;
 
   [[nodiscard]] const std::vector<double>& parameters() const
-  { return m_parameters; }
+  {
+    return m_parameters;
+  }
 
   virtual void adaptParameters(size_t fromLevel, size_t toLevel) = 0;
 
   virtual std::vector<double> estimateParameterScales(const double* dims) const;
 
   void setUseMultithreading(bool v)
-  { m_useMultithreading = v; }
+  {
+    m_useMultithreading = v;
+  }
 
-  // inoutCoords can not be nullptr, 2d transform cahnge first 2 elements of outCoords, 3d transform change first 3 elements of outCoords
+  // inoutCoords can not be nullptr, 2d transform cahnge first 2 elements of outCoords, 3d transform change first 3
+  // elements of outCoords
   virtual void transformPoint(double* inoutCoords) const = 0;
 
   //  void setPadOption(PadOption po, double fillValue = 0.0, bool boundInBorder = false)
-  //  { m_imageInterpolation.setPadOption(po); m_imageInterpolation.setFillValue(fillValue); m_imageInterpolation.setBoundInBorder(boundInBorder); }
-  //  void setInterpolant(Interpolant met) { m_imageInterpolation.setInterpolant(met); }
+  //  { m_imageInterpolation.setPadOption(po); m_imageInterpolation.setFillValue(fillValue);
+  //  m_imageInterpolation.setBoundInBorder(boundInBorder); } void setInterpolant(Interpolant met) {
+  //  m_imageInterpolation.setInterpolant(met); }
   void setImageInterpolation(const ZImageInterpolation& inter)
-  { m_imageInterpolation = inter; }
+  {
+    m_imageInterpolation = inter;
+  }
 
   // output image size is [xend-xstart] x [yend-ystart] x [zend-zstart]
   // if end < start, then end = start + size(input, dim)
   // must be 3d transform
   template<typename TPixel, typename TPixelOut = TPixel>
-  void transformImage(const TPixel* Iin, size_t width, size_t height, size_t depth,
-                      TPixelOut* Iout, index_t xstart = 0, index_t xend = -1, index_t ystart = 0, index_t yend = -1,
-                      index_t zstart = 0, index_t zend = -1) const;
+  void transformImage(const TPixel* Iin,
+                      size_t width,
+                      size_t height,
+                      size_t depth,
+                      TPixelOut* Iout,
+                      index_t xstart = 0,
+                      index_t xend = -1,
+                      index_t ystart = 0,
+                      index_t yend = -1,
+                      index_t zstart = 0,
+                      index_t zend = -1) const;
 
   // output image size is [xend-xstart] x [yend-ystart] x [zend-zstart]
   // if end < start, then end = start + size(input, dim)
   // must be 2d transform
   template<typename TPixel, typename TPixelOut = TPixel>
-  void transformImage(const TPixel* Iin, size_t width, size_t height,
-                      TPixelOut* Iout, index_t xstart = 0, index_t xend = -1, index_t ystart = 0, index_t yend = -1) const;
+  void transformImage(const TPixel* Iin,
+                      size_t width,
+                      size_t height,
+                      TPixelOut* Iout,
+                      index_t xstart = 0,
+                      index_t xend = -1,
+                      index_t ystart = 0,
+                      index_t yend = -1) const;
 
   [[nodiscard]] virtual QString toQString() const = 0;
 
@@ -84,15 +106,31 @@ std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm);
 template<typename TPixel, typename TPixelOut>
 struct AffineTransform3DForOneBlock
 {
-  AffineTransform3DForOneBlock(const TPixel* img, size_t width, size_t height, size_t depth,
+  AffineTransform3DForOneBlock(const TPixel* img,
+                               size_t width,
+                               size_t height,
+                               size_t depth,
                                const ZImageTransform& tfm,
                                const ZImageInterpolation& sampler,
-                               TPixelOut* imgOut, index_t xstart, index_t xend, index_t ystart, index_t yend, index_t zstart)
-    : m_img(img), m_width(width), m_height(height), m_depth(depth), m_tfm(tfm)
+                               TPixelOut* imgOut,
+                               index_t xstart,
+                               index_t xend,
+                               index_t ystart,
+                               index_t yend,
+                               index_t zstart)
+    : m_img(img)
+    , m_width(width)
+    , m_height(height)
+    , m_depth(depth)
+    , m_tfm(tfm)
     , m_sampler(sampler)
-    , m_imgOut(imgOut), m_xstart(xstart), m_xend(xend), m_ystart(ystart), m_yend(yend), m_zstart(zstart)
-  {
-  }
+    , m_imgOut(imgOut)
+    , m_xstart(xstart)
+    , m_xend(xend)
+    , m_ystart(ystart)
+    , m_yend(yend)
+    , m_zstart(zstart)
+  {}
 
   void operator()(const tbb::blocked_range<index_t>& range) const
   {
@@ -111,8 +149,8 @@ struct AffineTransform3DForOneBlock
           // interpolate the intensities
           double value = m_sampler.sample(m_img, m_width, m_height, m_depth, outCoords[0], outCoords[1], outCoords[2]);
 
-          m_imgOut[(z - m_zstart) * outWidth * outHeight + (y - m_ystart) * outWidth +
-                   (x - m_xstart)] = saturate_cast<TPixelOut>(value);
+          m_imgOut[(z - m_zstart) * outWidth * outHeight + (y - m_ystart) * outWidth + (x - m_xstart)] =
+            saturate_cast<TPixelOut>(value);
         }
       }
     }
@@ -133,21 +171,30 @@ struct AffineTransform3DForOneBlock
 };
 
 template<typename TPixel, typename TPixelOut>
-void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t height, size_t depth,
-                                     TPixelOut* Iout, index_t xstart, index_t xend, index_t ystart, index_t yend,
-                                     index_t zstart, index_t zend) const
+void ZImageTransform::transformImage(const TPixel* Iin,
+                                     size_t width,
+                                     size_t height,
+                                     size_t depth,
+                                     TPixelOut* Iout,
+                                     index_t xstart,
+                                     index_t xend,
+                                     index_t ystart,
+                                     index_t yend,
+                                     index_t zstart,
+                                     index_t zend) const
 {
-  if (xend < xstart)
+  if (xend < xstart) {
     xend = xstart + index_t(width);
-  if (yend < ystart)
+  }
+  if (yend < ystart) {
     yend = ystart + index_t(height);
-  if (zend < zstart)
+  }
+  if (zend < zstart) {
     zend = zstart + index_t(depth);
+  }
 
-  AffineTransform3DForOneBlock<TPixel, TPixelOut> func(Iin, width, height, depth,
-                                                       *this,
-                                                       this->m_imageInterpolation,
-                                                       Iout, xstart, xend, ystart, yend, zstart);
+  AffineTransform3DForOneBlock<TPixel, TPixelOut>
+    func(Iin, width, height, depth, *this, this->m_imageInterpolation, Iout, xstart, xend, ystart, yend, zstart);
   if (!this->m_useMultithreading) {
     func(tbb::blocked_range(zstart, zend));
   } else {
@@ -158,15 +205,25 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
 template<typename TPixel, typename TPixelOut>
 struct AffineTransform2DForOneBlock
 {
-  AffineTransform2DForOneBlock(const TPixel* img, size_t width, size_t height,
+  AffineTransform2DForOneBlock(const TPixel* img,
+                               size_t width,
+                               size_t height,
                                const ZImageTransform& tfm,
                                const ZImageInterpolation& sampler,
-                               TPixelOut* imgOut, index_t xstart, index_t xend, index_t ystart)
-    : m_img(img), m_width(width), m_height(height), m_tfm(tfm)
-    , m_sampler(sampler), m_imgOut(imgOut)
-    , m_xstart(xstart), m_xend(xend), m_ystart(ystart)
-  {
-  }
+                               TPixelOut* imgOut,
+                               index_t xstart,
+                               index_t xend,
+                               index_t ystart)
+    : m_img(img)
+    , m_width(width)
+    , m_height(height)
+    , m_tfm(tfm)
+    , m_sampler(sampler)
+    , m_imgOut(imgOut)
+    , m_xstart(xstart)
+    , m_xend(xend)
+    , m_ystart(ystart)
+  {}
 
   void operator()(const tbb::blocked_range<index_t>& range) const
   {
@@ -198,19 +255,25 @@ struct AffineTransform2DForOneBlock
 };
 
 template<typename TPixel, typename TPixelOut>
-void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t height,
-                                     TPixelOut* Iout, index_t xstart, index_t xend, index_t ystart, index_t yend) const
+void ZImageTransform::transformImage(const TPixel* Iin,
+                                     size_t width,
+                                     size_t height,
+                                     TPixelOut* Iout,
+                                     index_t xstart,
+                                     index_t xend,
+                                     index_t ystart,
+                                     index_t yend) const
 {
   CHECK(is2DTransform());
-  if (xend < xstart)
+  if (xend < xstart) {
     xend = xstart + index_t(width);
-  if (yend < ystart)
+  }
+  if (yend < ystart) {
     yend = ystart + index_t(height);
+  }
 
-  AffineTransform2DForOneBlock<TPixel, TPixelOut> func(Iin, width, height,
-                                                       *this,
-                                                       this->m_imageInterpolation,
-                                                       Iout, xstart, xend, ystart);
+  AffineTransform2DForOneBlock<TPixel, TPixelOut>
+    func(Iin, width, height, *this, this->m_imageInterpolation, Iout, xstart, xend, ystart);
   if (!this->m_useMultithreading) {
     func(tbb::blocked_range(ystart, yend));
   } else {
@@ -219,4 +282,3 @@ void ZImageTransform::transformImage(const TPixel* Iin, size_t width, size_t hei
 }
 
 } // namespace nim
-

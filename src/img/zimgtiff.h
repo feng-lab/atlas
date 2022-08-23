@@ -9,8 +9,8 @@ class ZTiff;
 class ZImgTiff : public ZImgFormat
 {
 public:
-
   // ZImgFormat interface
+
 public:
   QString shortName() const override;
 
@@ -19,9 +19,12 @@ public:
   QStringList extensions() const override;
 
   FileFormat format() const override
-  { return FileFormat::Tiff; }
+  {
+    return FileFormat::Tiff;
+  }
 
-  void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+  void readInfo(const QString& filename,
+                std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
@@ -33,7 +36,8 @@ public:
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  void writeImg(const QString& filename, const ZImgSliceProvider& imgSliceProvider,
+  void writeImg(const QString& filename,
+                const ZImgSliceProvider& imgSliceProvider,
                 const ZImgWriteParameters& paras) override;
 
   bool supportRead() const override;
@@ -59,7 +63,9 @@ protected:
   // image order
   // default is 0
   void setStartIFDIndex(size_t s)
-  { m_startIFDIndex = s; }
+  {
+    m_startIFDIndex = s;
+  }
 
   // must be 3 or 4 characters. default is "ZTL". if it contains "C" then channels are in different IFD.
   void setDimensionOrder(const QString& order);
@@ -73,10 +79,19 @@ protected:
   // utils function
   static bool isDimensionOrderValid(const QString& order);
 
-  static bool IFDToLoc(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l,
-                       size_t startIFDIndex, const QString& dimensionOrder, const ZImgInfo& imgInfo,
+  static bool IFDToLoc(size_t ifdIdx,
+                       index_t& z,
+                       index_t& c,
+                       index_t& t,
+                       index_t& l,
+                       size_t startIFDIndex,
+                       const QString& dimensionOrder,
+                       const ZImgInfo& imgInfo,
                        size_t numScenes,
-                       index_t startZ = 0, index_t startC = 0, index_t startT = 0, index_t startL = 0);
+                       index_t startZ = 0,
+                       index_t startC = 0,
+                       index_t startT = 0,
+                       index_t startL = 0);
 
 private:
   // img2D contains a 2D image, use x,y,and optional c range to cut it then copy it to img at location (z,c,t)
@@ -95,4 +110,3 @@ private:
 };
 
 } // namespace nim
-

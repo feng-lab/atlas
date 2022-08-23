@@ -5,7 +5,7 @@
 #include <QXmlStreamReader>
 #include <array>
 
-//todo : support multiple files czi
+// todo : support multiple files czi
 
 namespace nim {
 
@@ -46,7 +46,7 @@ struct FileHeader
 // SID = ZISRAWMETADATA  256 bytes
 struct MetaDataSegment
 {
-  int32_t xmlSize;  // Size of the XML data.
+  int32_t xmlSize; // Size of the XML data.
   int32_t attachmentSize; // Size of the the (binary) attachments. NOT USED CURRENTLY.
   uint8_t spare[248];
 };
@@ -143,7 +143,8 @@ struct FocusPositions
 struct EventListEntry
 {
   int32_t size; // Size of the entry in bytes.
-  double time; // Time of the event in seconds relative to the start time of the LSM electronic module controller program.
+  double
+    time; // Time of the event in seconds relative to the start time of the LSM electronic module controller program.
   // Can be one of the following values:
   //  EV_TYPE_MARKER (= 0)
   //  - Experimental annotation
@@ -190,18 +191,18 @@ struct CZITile
     sceneIdx[5] = std::numeric_limits<int32_t>::max();
   }
 
-  size_t ratio = 0;  // size / storedsize
+  size_t ratio = 0; // size / storedsize
   ZVoxelCoordinate start = ZVoxelCoordinate(std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max(),
                                             std::numeric_limits<int32_t>::max());
-  ZVoxelCoordinate size = ZVoxelCoordinate(1, 1, 1, 1, 1);  // all 1
-  ZVoxelCoordinate storedSize = ZVoxelCoordinate(1, 1, 1, 1, 1);  // all 1
+  ZVoxelCoordinate size = ZVoxelCoordinate(1, 1, 1, 1, 1); // all 1
+  ZVoxelCoordinate storedSize = ZVoxelCoordinate(1, 1, 1, 1, 1); // all 1
   int32_t pixelType; // The type of the image pixels, see PixelTypes.
   int64_t filePosition; // Seek offset of the referenced SubBlockSegment relative to the first byte of the file
   int32_t compression; // See Compression Constants
-  std::array<int32_t, 6> sceneIdx;   // V, H, I, S, R, C
+  std::array<int32_t, 6> sceneIdx; // V, H, I, S, R, C
   QString dimensionOrder;
 };
 
@@ -220,8 +221,12 @@ class ZImgCZISubBlock : public ZImgSubBlock
 {
 public:
   // mixed tiles has different x and y location
-  ZImgCZISubBlock(QString  fileName, std::vector<CZITile>& tiles, bool mixedTiles = false,
-                  size_t numChannels = 0, size_t bytePerVoxel = 0, VoxelFormat vf = VoxelFormat::Unsigned);
+  ZImgCZISubBlock(QString fileName,
+                  std::vector<CZITile>& tiles,
+                  bool mixedTiles = false,
+                  size_t numChannels = 0,
+                  size_t bytePerVoxel = 0,
+                  VoxelFormat vf = VoxelFormat::Unsigned);
 
   [[nodiscard]] std::shared_ptr<ZImg> read() const override;
 
@@ -229,7 +234,7 @@ public:
 
 protected:
   QString m_filename;
-  std::vector<CZITile> m_tiles;  // cat in Dimension::C or mixed
+  std::vector<CZITile> m_tiles; // cat in Dimension::C or mixed
   bool m_mixedTiles;
   ZVoxelCoordinate m_mixedTilesStart;
   size_t m_numChannels;
@@ -247,19 +252,29 @@ public:
 
   enum class CorrectionMode
   {
-    ZeroLightPreserved, IntensityRangeCorrected, Direct
+    ZeroLightPreserved,
+    IntensityRangeCorrected,
+    Direct
   };
 
   // stack tiles to make a 3d stack
   ZImg stackTiles(const QString& filename, size_t ch, size_t scene, std::vector<ZVoxelCoordinate>& coords);
 
-  ZImg stackTiles(const QString& filename, size_t ch, size_t scene, const QString& inverseMaskFile,
+  ZImg stackTiles(const QString& filename,
+                  size_t ch,
+                  size_t scene,
+                  const QString& inverseMaskFile,
                   size_t maskFilePyramidalLevel = 0);
 
-  ZImg correctShading(const QString& filename, size_t ch, size_t scene, const ZImg& modelZ, const ZImg& modelV,
+  ZImg correctShading(const QString& filename,
+                      size_t ch,
+                      size_t scene,
+                      const ZImg& modelZ,
+                      const ZImg& modelV,
                       CorrectionMode cm);
 
   // ZImgFormat interface
+
 public:
   bool supportRead() const override;
 
@@ -272,9 +287,12 @@ public:
   QStringList extensions() const override;
 
   FileFormat format() const override
-  { return FileFormat::ZeissCZI; }
+  {
+    return FileFormat::ZeissCZI;
+  }
 
-  void readInfo(const QString& filename, std::vector<ZImgInfo>& infos,
+  void readInfo(const QString& filename,
+                std::vector<ZImgInfo>& infos,
                 std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks) override;
 
   void readMetadata(const QString& filename, ZImgMetadata& meta, size_t scene) override;
@@ -282,8 +300,13 @@ public:
   void
   readThumbnail(const QString& filename, ZImgThumbernail& thumbnail, const ZImgRegion& region, size_t scene) override;
 
-  void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene,
-               size_t xRatio, size_t yRatio, size_t zRatio) override;
+  void readImg(const QString& filename,
+               ZImg& img,
+               const ZImgRegion& region,
+               size_t scene,
+               size_t xRatio,
+               size_t yRatio,
+               size_t zRatio) override;
 
 private:
   void clearInternalState();
@@ -306,7 +329,8 @@ private:
 
   QString dump(const QString& filename);
 
-  void dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, index_t indent = 0);
+  void
+  dumpCZIStream(std::ifstream& inputFileStream, int64_t filesize, int64_t offset, QString& str, index_t indent = 0);
 
   void dumpSegmentInfo(const SegmentHeader& sh, std::ifstream& inputFileStream, QString& str, index_t indent = 0);
 
@@ -353,5 +377,4 @@ private:
   std::vector<ZVoxelCoordinate> m_sceneEnd;
 };
 
-} // namespace
-
+} // namespace nim

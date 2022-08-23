@@ -12,9 +12,13 @@ struct ZImgInfo
 {
   ZImgInfo() = default;
 
-  ZImgInfo(size_t w, size_t h, size_t d = 1,
-           size_t c = 1, size_t t = 1,
-           size_t bytePerVox = 1, VoxelFormat vf = VoxelFormat::Unsigned);
+  ZImgInfo(size_t w,
+           size_t h,
+           size_t d = 1,
+           size_t c = 1,
+           size_t t = 1,
+           size_t bytePerVox = 1,
+           VoxelFormat vf = VoxelFormat::Unsigned);
 
   void clear();
 
@@ -29,15 +33,21 @@ struct ZImgInfo
   ZImgInfo& operator=(const ZImgInfo&) = default;
 
   [[nodiscard]] inline QString toQString() const
-  { return jsonToQString(*this); }
+  {
+    return jsonToQString(*this);
+  }
 
   [[nodiscard]] inline std::string toString() const
-  { return jsonToString(*this); }
+  {
+    return jsonToString(*this);
+  }
 
   // return img data type as string "float32", "int8" ...
   [[nodiscard]] QString typeAsQString() const
   {
-    return (voxelFormat == VoxelFormat::Float ? "float" : voxelFormat == VoxelFormat::Signed ? "int" : "uint") +
+    return (voxelFormat == VoxelFormat::Float    ? "float"
+            : voxelFormat == VoxelFormat::Signed ? "int"
+                                                 : "uint") +
            QString::number(bytesPerVoxel * 8);
   }
 
@@ -52,34 +62,46 @@ struct ZImgInfo
 
   void createDefaultTimeStamps();
 
-  //void createDefaultLocations();
-  // call above all
+  // void createDefaultLocations();
+  //  call above all
   void createDefaultDescriptions();
 
   // return true if one dimension is zero
   [[nodiscard]] inline bool isEmpty() const
-  { return width == 0 || height == 0 || depth == 0 || numChannels == 0 || numTimes == 0; }
+  {
+    return width == 0 || height == 0 || depth == 0 || numChannels == 0 || numTimes == 0;
+  }
 
   [[nodiscard]] inline bool isSameSize(const ZImgInfo& other) const
   {
-    return width == other.width && height == other.height && depth == other.depth &&
-           numChannels == other.numChannels && numTimes == other.numTimes;
+    return width == other.width && height == other.height && depth == other.depth && numChannels == other.numChannels &&
+           numTimes == other.numTimes;
   }
 
   [[nodiscard]] inline bool isSameType(const ZImgInfo& other) const
-  { return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel; }
+  {
+    return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel;
+  }
 
   static constexpr size_t numDimensions()
-  { return 5; }
+  {
+    return 5;
+  }
 
   static constexpr std::array<Dimension, 5> dimensions()
-  { return {{Dimension::X, Dimension::Y, Dimension::Z, Dimension::C, Dimension::T}}; };
+  {
+    return {
+      {Dimension::X, Dimension::Y, Dimension::Z, Dimension::C, Dimension::T}
+    };
+  };
 
   // access
   inline void setSize(Dimension dim, size_t size)
   {
     (&width)[enumToUnderlyingType(dim)] = size;
-    if (dim >= Dimension::C) createDefaultDescriptions();
+    if (dim >= Dimension::C) {
+      createDefaultDescriptions();
+    }
   }
 
   // sz should have at least numDimensions() elements
@@ -90,40 +112,58 @@ struct ZImgInfo
   }
 
   [[nodiscard]] inline size_t size(Dimension dim) const
-  { return (&width)[enumToUnderlyingType(dim)]; }
+  {
+    return (&width)[enumToUnderlyingType(dim)];
+  }
 
   [[nodiscard]] inline size_t size(size_t dim) const
-  { return (&width)[dim]; }
+  {
+    return (&width)[dim];
+  }
 
   // note: time stride is meaningless since the memory is not contiguous
   [[nodiscard]] inline size_t stride(Dimension dim) const
   {
     size_t res = 1;
-    for (std::underlying_type<Dimension>::type i = 0; i < enumToUnderlyingType(dim); ++i) res *= (&width)[i];
+    for (std::underlying_type<Dimension>::type i = 0; i < enumToUnderlyingType(dim); ++i) {
+      res *= (&width)[i];
+    }
     return res;
   }
 
   [[nodiscard]] inline size_t stride(size_t dim) const
   {
     size_t res = 1;
-    for (size_t i = 0; i < dim; ++i) res *= (&width)[i];
+    for (size_t i = 0; i < dim; ++i) {
+      res *= (&width)[i];
+    }
     return res;
   }
 
   inline size_t& operator[](size_t i)
-  { return (&width)[i]; }
+  {
+    return (&width)[i];
+  }
 
   inline const size_t& operator[](size_t i) const
-  { return (&width)[i]; }
+  {
+    return (&width)[i];
+  }
 
   inline size_t& operator[](Dimension i)
-  { return (&width)[enumToUnderlyingType(i)]; }
+  {
+    return (&width)[enumToUnderlyingType(i)];
+  }
 
   inline const size_t& operator[](Dimension i) const
-  { return (&width)[enumToUnderlyingType(i)]; }
+  {
+    return (&width)[enumToUnderlyingType(i)];
+  }
 
   [[nodiscard]] inline bool isAlphaChannel(size_t ch) const
-  { return lastChannelIsAlphaChannel && ch + 1 == numChannels; }
+  {
+    return lastChannelIsAlphaChannel && ch + 1 == numChannels;
+  }
 
   // if current or result voxelSizeUnit is Voxel, throw exception
   [[nodiscard]] double voxelSizeXInUnit(VoxelSizeUnit unit) const;
@@ -133,13 +173,19 @@ struct ZImgInfo
   [[nodiscard]] double voxelSizeZInUnit(VoxelSizeUnit unit) const;
 
   [[nodiscard]] inline double voxelSizeXInUm() const
-  { return voxelSizeXInUnit(VoxelSizeUnit::um); }
+  {
+    return voxelSizeXInUnit(VoxelSizeUnit::um);
+  }
 
   [[nodiscard]] inline double voxelSizeYInUm() const
-  { return voxelSizeYInUnit(VoxelSizeUnit::um); }
+  {
+    return voxelSizeYInUnit(VoxelSizeUnit::um);
+  }
 
   [[nodiscard]] inline double voxelSizeZInUm() const
-  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
+  {
+    return voxelSizeZInUnit(VoxelSizeUnit::um);
+  }
 
   // set voxel format from template argument, don't accept const type
   template<typename TVoxel>
@@ -150,7 +196,8 @@ struct ZImgInfo
 
   // property of img type
   // intensity range of current img type, for float img, range is [0.0 1.0]
-  // use template return type because img can be any type, and even double type can not represent all 64-bit integer type value
+  // use template return type because img can be any type, and even double type can not represent all 64-bit integer
+  // type value
   template<typename TValue = double>
   [[nodiscard]] TValue dataRangeMin() const;
 
@@ -162,11 +209,12 @@ struct ZImgInfo
   size_t depth = 0;
   size_t numChannels = 0;
   size_t numTimes = 0;
-  //size_t numLocations;  // not used
+  // size_t numLocations;  // not used
 
-  size_t bytesPerVoxel = 1;   // for one channel
+  size_t bytesPerVoxel = 1; // for one channel
   VoxelFormat voxelFormat = VoxelFormat::Unsigned;
-  size_t validBitCount = 0;    // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
+  size_t validBitCount =
+    0; // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
 
   VoxelSizeUnit voxelSizeUnit = VoxelSizeUnit::none;
   double voxelSizeX = 1.;
@@ -176,44 +224,67 @@ struct ZImgInfo
   std::vector<double> timeStamps;
   std::vector<QString> channelNames;
   std::vector<col4> channelColors;
-  //std::vector<Location> locations;
+  // std::vector<Location> locations;
   std::vector<double> position;
   bool lastChannelIsAlphaChannel = false;
 
   [[nodiscard]] inline size_t voxelByteNumber() const
-  { return bytesPerVoxel; } // voxel of one channel
+  {
+    return bytesPerVoxel;
+  } // voxel of one channel
 
   [[nodiscard]] inline size_t rowVoxelNumber() const
-  { return width; }
+  {
+    return width;
+  }
 
   [[nodiscard]] inline size_t rowByteNumber() const
-  { return width * bytesPerVoxel; }
+  {
+    return width * bytesPerVoxel;
+  }
 
   [[nodiscard]] inline size_t planeVoxelNumber() const
-  { return width * height; }
+  {
+    return width * height;
+  }
 
   [[nodiscard]] inline size_t planeByteNumber() const
-  { return width * height * bytesPerVoxel; }
+  {
+    return width * height * bytesPerVoxel;
+  }
 
   [[nodiscard]] inline size_t channelVoxelNumber() const
-  { return width * height * depth; }
+  {
+    return width * height * depth;
+  }
 
   [[nodiscard]] inline size_t channelByteNumber() const
-  { return width * height * depth * bytesPerVoxel; }
+  {
+    return width * height * depth * bytesPerVoxel;
+  }
 
   [[nodiscard]] inline size_t timeVoxelNumber() const
-  { return width * height * depth * numChannels; }
+  {
+    return width * height * depth * numChannels;
+  }
 
   [[nodiscard]] inline size_t timeByteNumber() const
-  { return width * height * depth * numChannels * bytesPerVoxel; }
+  {
+    return width * height * depth * numChannels * bytesPerVoxel;
+  }
 
-  //inline size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
-  //inline size_t locationByteNumber() const { return width * height * depth * numChannels * numTimes * bytesPerVoxel; }
+  // inline size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
+  // inline size_t locationByteNumber() const { return width * height * depth * numChannels * numTimes * bytesPerVoxel;
+  // }
   [[nodiscard]] inline size_t voxelNumber() const
-  { return width * height * depth * numChannels * numTimes; }
+  {
+    return width * height * depth * numChannels * numTimes;
+  }
 
   [[nodiscard]] inline size_t byteNumber() const
-  { return width * height * depth * numChannels * numTimes * bytesPerVoxel; }
+  {
+    return width * height * depth * numChannels * numTimes * bytesPerVoxel;
+  }
 
   template<typename TVoxel>
   [[nodiscard]] bool isType() const;
@@ -232,7 +303,8 @@ struct ZImgInfo
   }
 
   template<typename TRange>
-  [[nodiscard]] std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  [[nodiscard]] std::pair<double, double>
+  binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
   {
     if (nbins == 0) {
       nbins = bytesPerVoxel > 1 ? 65536 : 256;
@@ -303,5 +375,4 @@ inline ZImgInfo tag_invoke(const json::value_to_tag<ZImgInfo>&, const json::valu
   return info;
 }
 
-}  // namespace nim
-
+} // namespace nim

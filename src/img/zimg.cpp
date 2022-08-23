@@ -1172,8 +1172,7 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
     resInfo.setSize(dim, resInfo.size(dim) + info.size(dim));
     info.setSize(dim, 0);
     if (!info.isSameType(firstInfo) || !info.isSameSize(firstInfo)) {
-      throw ZImgException(
-        QString("Can not concat img <%1> and img <%2>").arg(info.toQString(), firstInfo.toQString()));
+      throw ZImgException(QString("Can not concat img <%1> and img <%2>").arg(info.toQString(), firstInfo.toQString()));
     }
   }
   if (dim == Dimension::C) {

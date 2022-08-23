@@ -16,31 +16,48 @@ public:
   ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t = 0);
 
   // for big image, minValue and maxValue are used to convert image into uint8_t if it is not
-  ZAssignPuncta(QString  filename, double minValue, double maxValue,
-                size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
+  ZAssignPuncta(QString filename,
+                double minValue,
+                double maxValue,
+                size_t dendriteChannel = 0,
+                size_t t = 0,
+                size_t scene = 0);
 
   // only image resolution in imgInfo is used
-  ZAssignPuncta(QString filename, const ZImgInfo& imgInfo, double minValue, double maxValue,
-                size_t dendriteChannel = 0, size_t t = 0, size_t scene = 0);
+  ZAssignPuncta(QString filename,
+                const ZImgInfo& imgInfo,
+                double minValue,
+                double maxValue,
+                size_t dendriteChannel = 0,
+                size_t t = 0,
+                size_t scene = 0);
 
   ~ZAssignPuncta() override;
 
   void setPuncta(const ZPuncta& puncta)
-  { m_puncta = puncta; }
+  {
+    m_puncta = puncta;
+  }
 
   void setSomaPuncta(const ZPuncta& somaPuncta)
-  { m_somaPuncta = somaPuncta; }
+  {
+    m_somaPuncta = somaPuncta;
+  }
 
   // default is 2.5um, valid range of puncta
   // puncta within this distance to branch are considered as belong to
   // this dendrite branch
   void setMaxDistToBranchInUm(double d)
-  { m_maxDistToBranch = d; }
+  {
+    m_maxDistToBranch = d;
+  }
 
   // default is 1.0, Punctum is considered as ambiguous if it is within valid range
   // of many branches and (secondMinDistance < MinDistance * ambiguousFactor)
   void setAmbiguousFactor(double f)
-  { m_ambiguousFactor = f; }
+  {
+    m_ambiguousFactor = f;
+  }
 
   void clearAllSwcTrees();
 
@@ -53,16 +70,16 @@ public:
   ZPuncta getSomaPunctaOfTree(const ZSwc* tree) const;
 
   [[nodiscard]] ZPuncta getAmbiguousPuncta() const
-  { return m_ambiguousPuncta; }
+  {
+    return m_ambiguousPuncta;
+  }
 
 protected:
   void doWork() override;
 
-  void read(const json::object&) override
-  {}
+  void read(const json::object&) override {}
 
-  void write(json::object&) const override
-  {}
+  void write(json::object&) const override {}
 
 private:
   void separatePuncta();
@@ -75,10 +92,15 @@ private:
 
   double punctaSomaDist(const ZPunctum& punctum, const ZSwc* tree) const;
 
-  [[nodiscard]] double pointFrustumConeDist(double x, double y, double z, const ZSwc::ConstSwcTreeNode& tn,
+  [[nodiscard]] double pointFrustumConeDist(double x,
+                                            double y,
+                                            double z,
+                                            const ZSwc::ConstSwcTreeNode& tn,
                                             const ZSwc::ConstSwcTreeNode& ptn) const;
 
-  ZSwc::ConstSwcTreeNode intensityWeightedNearestNode(double x, double y, double z,
+  ZSwc::ConstSwcTreeNode intensityWeightedNearestNode(double x,
+                                                      double y,
+                                                      double z,
                                                       const std::vector<ZSwc::ConstSwcTreeNode>& nodes,
                                                       bool& isAmbiguous);
 
@@ -110,4 +132,3 @@ private:
 };
 
 } // namespace nim
-

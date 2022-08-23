@@ -34,8 +34,8 @@ void ZPunctum::updateFromVoxelsList(double conf)
   m_volSize = m_voxelLocations.rows();
   m_mass = m_voxelIntensities.sum();
   m_meanIntensity = m_mass / m_volSize;
-  m_sDevOfIntensity = standardDeviation(m_voxelIntensities.data(),
-                                        m_voxelIntensities.data() + m_voxelIntensities.size());
+  m_sDevOfIntensity =
+    standardDeviation(m_voxelIntensities.data(), m_voxelIntensities.data() + m_voxelIntensities.size());
   m_maxIntensity = m_voxelIntensities.maxCoeff();
 
   Eigen::MatrixXd locs = m_voxelLocations.cast<double>();
@@ -57,11 +57,11 @@ void ZPunctum::updateFromVoxelsList(double conf)
   // This version only uses voxels belong to punctum. It is different from matlab version.
   // In matlab version, original image and all voxels inside conf region are used.
   if (m_volSize < 5) {
-    m_score = 1.0;   //too small
+    m_score = 1.0; // too small
   } else {
-    //double confRegion = 0.90;  // for detection score
-    //double k2 = boost::math::quantile(dist, confRegion);
-    // move origin to centroid
+    // double confRegion = 0.90;  // for detection score
+    // double k2 = boost::math::quantile(dist, confRegion);
+    //  move origin to centroid
     locs.rowwise() -= centroid.transpose();
     Eigen::MatrixXd cvs(locs.rows(), 2);
     cvs.col(0) = m_voxelIntensities;
@@ -75,14 +75,14 @@ void ZPunctum::updateFromVoxelsList(double conf)
 
 void ZPunctum::mergeWith(const ZPunctum& other, double conf)
 {
-  if (containsSignal() && !other.containsSignal())
+  if (containsSignal() && !other.containsSignal()) {
     return;
+  }
 
   if (containsSignal()) {
     m_voxelIntensities.conservativeResize(m_voxelIntensities.size() + other.m_voxelIntensities.size());
     m_voxelIntensities.tail(other.m_voxelIntensities.size()) = other.m_voxelIntensities;
-    m_voxelLocations.conservativeResize(m_voxelLocations.rows() + other.m_voxelLocations.rows(),
-                                        Eigen::NoChange);
+    m_voxelLocations.conservativeResize(m_voxelLocations.rows() + other.m_voxelLocations.rows(), Eigen::NoChange);
     m_voxelLocations.bottomRows(other.m_voxelLocations.rows()) = other.m_voxelLocations;
     updateFromVoxelsList(conf);
   } else {
@@ -91,7 +91,7 @@ void ZPunctum::mergeWith(const ZPunctum& other, double conf)
     m_z *= m_volSize;
 
     m_volSize += other.m_volSize;
-    m_sDevOfIntensity = std::max(other.m_sDevOfIntensity, m_sDevOfIntensity);  // no better way..
+    m_sDevOfIntensity = std::max(other.m_sDevOfIntensity, m_sDevOfIntensity); // no better way..
     m_x += other.m_x * other.m_volSize;
     m_y += other.m_y * other.m_volSize;
     m_z += other.m_z * other.m_volSize;
@@ -112,8 +112,13 @@ std::list<ZPunctum> ZPunctum::split(size_t num, double conf) const
   std::list<ZPunctum> res;
   if (containsSignal()) {
     Eigen::MatrixXd locs = m_voxelLocations.cast<double>();
-    ZGMM<double, double> gmm(locs, m_voxelIntensities, num, true, ZGMM<double, double>::CovarianceType::Full,
-                             ZTermCriteria<double>(200, 1e-5), IterAlgorithmLogLevel::Off);
+    ZGMM<double, double> gmm(locs,
+                             m_voxelIntensities,
+                             num,
+                             true,
+                             ZGMM<double, double>::CovarianceType::Full,
+                             ZTermCriteria<double>(200, 1e-5),
+                             IterAlgorithmLogLevel::Off);
     gmm.runEM();
     for (size_t i = 0; i < gmm.numOfClusters(); ++i) {
       ZPunctum p(*this);

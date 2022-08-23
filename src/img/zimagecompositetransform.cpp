@@ -36,8 +36,9 @@ void ZImageCompositeTransform::setParameters(const double* para)
 bool ZImageCompositeTransform::is2DTransform() const
 {
   for (const auto& tfm : m_tfms) {
-    if (!tfm->is2DTransform())
+    if (!tfm->is2DTransform()) {
       return false;
+    }
   }
   return true;
 }

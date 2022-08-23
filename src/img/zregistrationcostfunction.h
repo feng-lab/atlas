@@ -11,7 +11,9 @@ public:
   virtual ~ZRegistrationCostFunction() = default;
 
   [[nodiscard]] size_t numParameters() const
-  { return m_transform ? m_transform->numParameters() : 0; }
+  {
+    return m_transform ? m_transform->numParameters() : 0;
+  }
 
   void setTransform(ZImageTransform& transform);
 
@@ -36,4 +38,3 @@ protected:
 };
 
 } // namespace nim
-

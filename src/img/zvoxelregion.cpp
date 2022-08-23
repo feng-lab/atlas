@@ -16,16 +16,18 @@ void ZVoxelRegion::getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& max
 bool ZVoxelRegion::containsVoxel(const ZVoxelCoordinate& v)
 {
   for (auto& box : m_boxes) {
-    if (box.contains(v))
+    if (box.contains(v)) {
       return true;
+    }
   }
   return false;
 }
 
 ZVoxelRegion& ZVoxelRegion::unite(const ZVoxelRegion& other)
 {
-  for (const auto& box : other.m_boxes)
+  for (const auto& box : other.m_boxes) {
     addBox(box);
+  }
   return *this;
 }
 

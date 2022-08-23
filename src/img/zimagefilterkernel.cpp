@@ -10,12 +10,14 @@ std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX, index_t width, size_t*
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
-    if (width % 2 == 0)
+    if (width % 2 == 0) {
       ++width;
+    }
   }
 
-  if (kWidth)
+  if (kWidth) {
     *kWidth = width;
+  }
 
   std::vector<TFloat> res(width);
   TFloat sum = 0.0;
@@ -30,7 +32,6 @@ std::vector<TFloat> create1DGaussianKernel(TFloat sigmaX, index_t width, size_t*
     sum += res[idx - 1];
   }
 
-
   for (auto i = 0; i < width; ++i) {
     res[i] /= sum;
   }
@@ -42,26 +43,28 @@ template std::vector<float> create1DGaussianKernel(float, index_t, size_t*);
 
 template std::vector<double> create1DGaussianKernel(double, index_t, size_t*);
 
-
 template<typename TFloat>
-std::vector<TFloat> create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY,
-                                           index_t width, index_t height,
-                                           size_t* kWidth, size_t* kHeight)
+std::vector<TFloat>
+create2DGaussianKernel(TFloat sigmaX, TFloat sigmaY, index_t width, index_t height, size_t* kWidth, size_t* kHeight)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
-    if (width % 2 == 0)
+    if (width % 2 == 0) {
       ++width;
+    }
   }
   if (height < 0) {
     height = std::ceil(sigmaY * 6.0);
-    if (height % 2 == 0)
+    if (height % 2 == 0) {
       ++height;
+    }
   }
-  if (kWidth)
+  if (kWidth) {
     *kWidth = width;
-  if (kHeight)
+  }
+  if (kHeight) {
     *kHeight = height;
+  }
   std::vector<TFloat> res(width * height);
   TFloat sum = 0.0;
   double sigmaX22 = 2.0 * sigmaX * sigmaX;
@@ -90,33 +93,44 @@ template std::vector<float> create2DGaussianKernel(float, float, index_t, index_
 
 template std::vector<double> create2DGaussianKernel(double, double, index_t, index_t, size_t*, size_t*);
 
-
 template<typename TFloat>
-std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat sigmaZ,
-                                           index_t width, index_t height, index_t depth,
-                                           size_t* kWidth, size_t* kHeight, size_t* kDepth)
+std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX,
+                                           TFloat sigmaY,
+                                           TFloat sigmaZ,
+                                           index_t width,
+                                           index_t height,
+                                           index_t depth,
+                                           size_t* kWidth,
+                                           size_t* kHeight,
+                                           size_t* kDepth)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
-    if (width % 2 == 0)
+    if (width % 2 == 0) {
       ++width;
+    }
   }
   if (height < 0) {
     height = std::ceil(sigmaY * 6.0);
-    if (height % 2 == 0)
+    if (height % 2 == 0) {
       ++height;
+    }
   }
   if (depth < 0) {
     depth = std::ceil(sigmaZ * 6.0);
-    if (depth % 2 == 0)
+    if (depth % 2 == 0) {
       ++depth;
+    }
   }
-  if (kWidth)
+  if (kWidth) {
     *kWidth = width;
-  if (kHeight)
+  }
+  if (kHeight) {
     *kHeight = height;
-  if (kDepth)
+  }
+  if (kDepth) {
     *kDepth = depth;
+  }
   std::vector<TFloat> res(width * height * depth);
   TFloat sum = 0.0;
   double sigmaX22 = 2.0 * sigmaX * sigmaX;
@@ -146,24 +160,25 @@ std::vector<TFloat> create3DGaussianKernel(TFloat sigmaX, TFloat sigmaY, TFloat 
   return res;
 }
 
-template std::vector<float> create3DGaussianKernel(float, float, float, index_t, index_t, index_t, size_t*, size_t*, size_t*);
+template std::vector<float>
+create3DGaussianKernel(float, float, float, index_t, index_t, index_t, size_t*, size_t*, size_t*);
 
-template std::vector<double> create3DGaussianKernel(double, double, double, index_t, index_t, index_t, size_t*, size_t*, size_t*);
-
+template std::vector<double>
+create3DGaussianKernel(double, double, double, index_t, index_t, index_t, size_t*, size_t*, size_t*);
 
 template<typename TFloat>
-std::vector<TFloat> create1DLoGKernel(TFloat sigmaX,
-                                      index_t width,
-                                      size_t* kWidth)
+std::vector<TFloat> create1DLoGKernel(TFloat sigmaX, index_t width, size_t* kWidth)
 {
   if (width < 0) {
     width = std::ceil(sigmaX * 6.0);
-    if (width % 2 == 0)
+    if (width % 2 == 0) {
       ++width;
+    }
   }
 
-  if (kWidth)
+  if (kWidth) {
     *kWidth = width;
+  }
 
   std::vector<TFloat> res(width);
   TFloat sum = 0.0;
@@ -194,4 +209,4 @@ template std::vector<float> create1DLoGKernel(float, index_t, size_t*);
 
 template std::vector<double> create1DLoGKernel(double, index_t, size_t*);
 
-}  // namespace nim
+} // namespace nim

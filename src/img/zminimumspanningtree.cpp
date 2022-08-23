@@ -21,14 +21,12 @@ struct edge_in_MST
 
   explicit edge_in_MST(const std::vector<Edge>& mstEdges)
     : m_MSTEdges(&mstEdges)
-  {
-  }
+  {}
 
   explicit edge_in_MST(const std::vector<Vertex>& predecessorMap, const Graph& g)
     : m_predecessorMap(&predecessorMap)
     , m_graph(&g)
-  {
-  }
+  {}
 
   bool operator()(const Edge& e) const
   {
@@ -91,13 +89,17 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
   }
   CHECK(m_numVertices >= 3) << m_numVertices;
 
-  enum MSTMethod {Kruskal, Prim};
+  enum MSTMethod
+  {
+    Kruskal,
+    Prim
+  };
   MSTMethod mstMethod;
 
   double graphDensity = 2.0 * m_edges.size() / (m_numVertices * (m_numVertices - 1.0));
   bool graphIsSparse = graphDensity < 0.4;
-  bool startVertexIsValid = startVertexOfPreOrderResult >= 0 &&
-        startVertexOfPreOrderResult < static_cast<index_t>(m_numVertices);
+  bool startVertexIsValid =
+    startVertexOfPreOrderResult >= 0 && startVertexOfPreOrderResult < static_cast<index_t>(m_numVertices);
 
   if (startVertexIsValid) {
     allowDisconnectedGraph = false;
@@ -118,10 +120,13 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
 
   // LOG(INFO) << "running " << (mstMethod == Kruskal ? "Kruskal" : "Prim") << " minimum spanning tree...";
 
-  typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS,
+  typedef boost::adjacency_list<
+    boost::setS,
+    boost::vecS,
+    boost::undirectedS,
     boost::property<boost::vertex_distance_t, double>,
-    boost::property<boost::edge_weight_t, double,
-      boost::property<boost::edge_color_t, boost::default_color_type>>> Graph;
+    boost::property<boost::edge_weight_t, double, boost::property<boost::edge_color_t, boost::default_color_type>>>
+    Graph;
   typedef boost::graph_traits<Graph>::edge_descriptor Edge;
   typedef boost::graph_traits<Graph>::vertex_descriptor Vertex;
 
@@ -151,9 +156,10 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
 
       std::vector<Edge> sortedEdges;
       dfs_edge_visitor<Edge> vis(sortedEdges);
-      boost::undirected_dfs(fg, boost::visitor(vis).
-        root_vertex(static_cast<size_t>(startVertexOfPreOrderResult)).
-        edge_color_map(boost::get(boost::edge_color, g)));
+      boost::undirected_dfs(fg,
+                            boost::visitor(vis)
+                              .root_vertex(static_cast<size_t>(startVertexOfPreOrderResult))
+                              .edge_color_map(boost::get(boost::edge_color, g)));
 
       spanning_tree.swap(sortedEdges);
     }
@@ -169,9 +175,10 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
 
       std::vector<Edge> sortedEdges;
       dfs_edge_visitor<Edge> vis(sortedEdges);
-      boost::undirected_dfs(fg, boost::visitor(vis).
-              root_vertex(static_cast<size_t>(startVertexOfPreOrderResult)).
-              edge_color_map(boost::get(boost::edge_color, g)));
+      boost::undirected_dfs(fg,
+                            boost::visitor(vis)
+                              .root_vertex(static_cast<size_t>(startVertexOfPreOrderResult))
+                              .edge_color_map(boost::get(boost::edge_color, g)));
 
       for (auto& sortedEdge : sortedEdges) {
         res.emplace_back(boost::source(sortedEdge, g), boost::target(sortedEdge, g));
@@ -192,4 +199,3 @@ std::vector<std::pair<size_t, size_t>> ZMinimumSpanningTree::runMST(index_t star
 }
 
 } // namespace nim
-

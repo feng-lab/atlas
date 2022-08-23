@@ -11,8 +11,7 @@ using namespace nim;
 
 struct ScalarCostFunctor
 {
-  ScalarCostFunctor(const ZRegistrationCostFunction& costFunction,
-                    std::vector<double> scales)
+  ScalarCostFunctor(const ZRegistrationCostFunction& costFunction, std::vector<double> scales)
     : m_costFunc(costFunction)
     , m_scales(std::move(scales))
   {}
@@ -20,8 +19,9 @@ struct ScalarCostFunctor
   bool operator()(const double* const x, double* residuals) const
   {
     std::vector<double> parameters(m_costFunc.numParameters());
-    for (size_t i = 0; i < parameters.size(); ++i)
+    for (size_t i = 0; i < parameters.size(); ++i) {
       parameters[i] = x[i] * m_scales[i];
+    }
     m_costFunc.evaluate(parameters.data(), residuals);
     return true;
   }
@@ -48,9 +48,7 @@ public:
     set_num_residuals(1);
   }
 
-  bool Evaluate(double const* const* para,
-                double* residuals,
-                double** jacobians) const override
+  bool Evaluate(double const* const* para, double* residuals, double** jacobians) const override
   {
     std::vector<double> parameters(m_costFunc.numParameters());
     double fallbackdelta = 0.0;
@@ -66,8 +64,9 @@ public:
       std::vector<double> paraPlusDelta = parameters;
       for (size_t i = 0; i < parameters.size(); ++i) {
         double delta = std::abs(para[0][i]) * m_relativeStepSize;
-        if (delta == 0.0)
+        if (delta == 0.0) {
           delta = fallbackdelta;
+        }
         paraPlusDelta[i] += delta * m_scales[i];
         double newValue;
         m_costFunc.evaluate(paraPlusDelta.data(), &newValue);
@@ -92,21 +91,21 @@ public:
     , m_costFun(costFun)
   {}
 
-  bool Evaluate(const double* const parameters,
-                double* cost,
-                double* gradient) const override
+  bool Evaluate(const double* const parameters, double* cost, double* gradient) const override
   {
     return m_costFun.evaluate(parameters, cost, gradient);
   }
 
   [[nodiscard]] int NumParameters() const override
-  { return m_costFun.numParameters(); }
+  {
+    return m_costFun.numParameters();
+  }
 
 private:
   const ZRegistrationCostFunction& m_costFun;
 };
 
-}  // namespace
+} // namespace
 
 namespace nim {
 

@@ -18,7 +18,9 @@ protected:
   struct _AttachPoint
   {
     _AttachPoint(index_t z_, index_t c_, index_t t_)
-      : z(z_), c(c_), t(t_)
+      : z(z_)
+      , c(c_)
+      , t(t_)
     {}
 
     index_t z = -1;
@@ -27,9 +29,7 @@ protected:
 
     bool operator<(const _AttachPoint& rhs) const
     {
-      return t < rhs.t ||
-             (t == rhs.t && c < rhs.c) ||
-             (t == rhs.t && c == rhs.c && z < rhs.z);
+      return t < rhs.t || (t == rhs.t && c < rhs.c) || (t == rhs.t && c == rhs.c && z < rhs.z);
     }
   };
 
@@ -47,20 +47,26 @@ public:
   ZImgMetadataBase& operator=(const ZImgMetadataBase&) = default;
 
   inline void swap(ZImgMetadataBase& other) noexcept
-  { m_data.swap(other.m_data); }
+  {
+    m_data.swap(other.m_data);
+  }
 
   inline void merge(const ZImgMetadataBase& other) noexcept
   {
-    for (auto & [k, v] : other.m_data) {
+    for (auto& [k, v] : other.m_data) {
       m_data[k].insert(m_data[k].end(), v.begin(), v.end());
     }
   }
 
   inline void clear()
-  { m_data.clear(); }
+  {
+    m_data.clear();
+  }
 
   [[nodiscard]] inline bool isEmpty() const
-  { return m_data.empty(); }
+  {
+    return m_data.empty();
+  }
 
   inline void attachToTopLevel(const T& d)
   {
@@ -123,19 +129,29 @@ public:
   }
 
   inline void clearTopLevelAttachments()
-  { m_data.erase(_AttachPoint(-1, -1, -1)); }
+  {
+    m_data.erase(_AttachPoint(-1, -1, -1));
+  }
 
   inline void clearTimeAttachments(size_t t)
-  { m_data.erase(_AttachPoint(-1, -1, t)); }
+  {
+    m_data.erase(_AttachPoint(-1, -1, t));
+  }
 
   inline void clearChannelAttachments(size_t c, size_t t)
-  { m_data.erase(_AttachPoint(-1, c, t)); }
+  {
+    m_data.erase(_AttachPoint(-1, c, t));
+  }
 
   inline void clearPlaneAttachments(size_t z, size_t t)
-  { m_data.erase(_AttachPoint(z, -1, t)); }
+  {
+    m_data.erase(_AttachPoint(z, -1, t));
+  }
 
   inline void clearSingleChannelPlaneAttachments(size_t z, size_t c, size_t t)
-  { m_data.erase(_AttachPoint(z, c, t)); }
+  {
+    m_data.erase(_AttachPoint(z, c, t));
+  }
 
   [[nodiscard]] inline bool hasTopLevelAttachment() const
   {
@@ -202,5 +218,4 @@ protected:
   std::vector<T> m_empty;
 };
 
-}  // namespace nim
-
+} // namespace nim

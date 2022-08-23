@@ -12,6 +12,7 @@ public:
   ~ZImgJpeg2000();
 
   // ZImgFormat interface
+
 public:
   virtual QString shortName() const;
 
@@ -36,5 +37,4 @@ public:
 protected:
 };
 
-} // namespace
-
+} // namespace nim

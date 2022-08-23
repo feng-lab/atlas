@@ -42,15 +42,15 @@ void initLogging(const char* argv0, const QString& filename)
   FLAGS_minloglevel = google::GLOG_INFO;
   // If specified, logfiles are written into this directory instead of the
   // default logging directory.
-  //DECLARE_string(log_dir);
+  // DECLARE_string(log_dir);
   // Set the log file mode.
-  //DECLARE_int32(logfile_mode);
+  // DECLARE_int32(logfile_mode);
   // Sets the path of the directory into which to put additional links
   // to the log files.
-  //DECLARE_string(log_link);
+  // DECLARE_string(log_link);
 
   // verbose
-  FLAGS_v = 0;  // in vlog_is_on.cc
+  FLAGS_v = 0; // in vlog_is_on.cc
   // Sets the maximum log file size (in MB).
   FLAGS_max_log_size = 1800;
   // Sets whether to avoid logging to the disk if the disk is full.
@@ -69,6 +69,7 @@ void shutdownLogging()
 class FileLogSink : public LogSink
 {
   QFile m_file;
+
 public:
   explicit FileLogSink(const QString& filename)
   {
@@ -79,17 +80,24 @@ public:
   }
 
   [[nodiscard]] inline bool isValid() const
-  { return m_file.isOpen(); }
+  {
+    return m_file.isOpen();
+  }
 
   // LogSink interface
+
 public:
-  void send(LogSeverity, const char*,
-            const char*, int,
-            const google::LogMessageTime&, const char* message,
-            size_t message_len, size_t prefix_len) override
+  void send(LogSeverity,
+            const char*,
+            const char*,
+            int,
+            const google::LogMessageTime&,
+            const char* message,
+            size_t message_len,
+            size_t prefix_len) override
   {
     if (isValid()) {
-      m_file.write(message - prefix_len, message_len + prefix_len + 1);  // glog: after message_len is '\n'
+      m_file.write(message - prefix_len, message_len + prefix_len + 1); // glog: after message_len is '\n'
       m_file.flush();
     }
   }
@@ -98,24 +106,32 @@ public:
 class FunctionLogSink : public LogSink
 {
   LogFunction m_logFunction;
+
 public:
   explicit FunctionLogSink(LogFunction f)
     : m_logFunction(std::move(f))
   {}
 
   [[nodiscard]] inline bool isValid() const
-  { return m_logFunction.operator bool(); }
+  {
+    return m_logFunction.operator bool();
+  }
 
   // LogSink interface
+
 public:
-  void send(LogSeverity severity, const char* full_filename,
-            const char* base_filename, int line,
-            const google::LogMessageTime& logmsgtime, const char* message,
-            size_t message_len, size_t prefix_len) override
+  void send(LogSeverity severity,
+            const char* full_filename,
+            const char* base_filename,
+            int line,
+            const google::LogMessageTime& logmsgtime,
+            const char* message,
+            size_t message_len,
+            size_t prefix_len) override
   {
     if (isValid()) {
-      m_logFunction(LogData(severity, full_filename, base_filename, line, logmsgtime.tm(),
-                            message, message_len, prefix_len));
+      m_logFunction(
+        LogData(severity, full_filename, base_filename, line, logmsgtime.tm(), message, message_len, prefix_len));
     }
   }
 };

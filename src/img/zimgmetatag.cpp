@@ -5,7 +5,8 @@
 namespace nim {
 
 ZImgMetatag::ZImgMetatag(QString name, const QString& value)
-  : m_name(std::move(name)), m_dataType(DataType::Ascii)
+  : m_name(std::move(name))
+  , m_dataType(DataType::Ascii)
 {
   auto utf8array = value.toUtf8();
   setCount(utf8array.size() + 1);
@@ -15,8 +16,9 @@ ZImgMetatag::ZImgMetatag(QString name, const QString& value)
 QString ZImgMetatag::toQString() const
 {
   QString res = m_name;
-  if (m_tag != 0)
+  if (m_tag != 0) {
     res = res % QString(" (tag:%1)").arg(m_tag);
+  }
   res = res % QString(" %1 %2<").arg(enumToQString(m_dataType)).arg(m_count);
   QString sep;
   uint64_t ct = m_count;
@@ -24,49 +26,62 @@ QString ZImgMetatag::toQString() const
   switch (m_dataType) {
     case DataType::Undefined:
     case DataType::Byte:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(static_cast<int>(dataAt<uint8_t>(i)), 0, 16), sep = " ";
+      }
       break;
     case DataType::SByte:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(static_cast<int>(dataAt<char>(i))), sep = " ";
+      }
       break;
     case DataType::Ascii:
-      if (!m_data.empty())
+      if (!m_data.empty()) {
         res = res % QString::fromUtf8(dataArray<char>(), m_data.size() - 1);
+      }
       break;
     case DataType::Short:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<uint16_t>(i)), sep = " ";
+      }
       break;
     case DataType::SShort:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<int16_t>(i)), sep = " ";
+      }
       break;
     case DataType::Long:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<uint32_t>(i)), sep = " ";
+      }
       break;
     case DataType::SLong:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<int32_t>(i)), sep = " ";
+      }
       break;
     case DataType::Long8:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<uint64_t>(i)), sep = " ";
+      }
       break;
     case DataType::SLong8:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<int64_t>(i)), sep = " ";
+      }
       break;
     case DataType::Rational: {
       const auto* lp = dataArray<uint32_t>();
       while (ct-- > 0) {
-        if (lp[1] == 0)
+        if (lp[1] == 0) {
           res = res % QString("%1Nan (%2/0)").arg(sep).arg(lp[0]);
-        else
-          res = res % QString("%1%2 (%3/%4)").arg(sep).arg((static_cast<double>(lp[0]) / static_cast<double>(lp[1])))
-            .arg(lp[0]).arg(lp[1]);
+        } else {
+          res = res % QString("%1%2 (%3/%4)")
+                        .arg(sep)
+                        .arg((static_cast<double>(lp[0]) / static_cast<double>(lp[1])))
+                        .arg(lp[0])
+                        .arg(lp[1]);
+        }
         sep = " ";
         lp += 2;
       }
@@ -75,31 +90,39 @@ QString ZImgMetatag::toQString() const
     case DataType::SRational: {
       const auto* lp = dataArray<int32_t>();
       while (ct-- > 0) {
-        if (lp[1] == 0)
+        if (lp[1] == 0) {
           res = res % QString("%1Nan (%2/0)").arg(sep).arg(lp[0]);
-        else
-          res = res % QString("%1%2 (%3/%4)").arg(sep).arg((static_cast<double>(lp[0]) / static_cast<double>(lp[1])))
-            .arg(lp[0]).arg(lp[1]);
+        } else {
+          res = res % QString("%1%2 (%3/%4)")
+                        .arg(sep)
+                        .arg((static_cast<double>(lp[0]) / static_cast<double>(lp[1])))
+                        .arg(lp[0])
+                        .arg(lp[1]);
+        }
         sep = " ";
         lp += 2;
       }
       break;
     }
     case DataType::Float:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<float>(i)), sep = " ";
+      }
       break;
     case DataType::Double:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<double>(i)), sep = " ";
+      }
       break;
     case DataType::IFD:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<uint32_t>(i), 0, 16), sep = " ";
+      }
       break;
     case DataType::IFD8:
-      for (size_t i = 0; i < m_count; ++i)
+      for (size_t i = 0; i < m_count; ++i) {
         res = res % QString("%1%2").arg(sep).arg(dataAt<uint64_t>(i), 0, 16), sep = " ";
+      }
       break;
     default:
       break;
