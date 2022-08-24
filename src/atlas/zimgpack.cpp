@@ -16,6 +16,10 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             false,
             "Whether readRegionToImg uses multithreaded_resize, default is false");
 
+DEFINE_bool(atlas_readRegionToImg_use_iothreadpool,
+            false,
+            "Whether readRegionToImg uses iothreadpool, default is false");
+
 namespace {
 
 struct MaxOp
@@ -449,7 +453,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
   ZImgRegion rgn = region;
   if (!rgn.isValid(m_imgInfo)) {
     throw ZImgException(
-      QString("Try to crop img <%1> with invalid region <%2>").arg(m_imgInfo.toQString()).arg(rgn.toQString()));
+      QString("Try to crop img <%1> with invalid region <%2>").arg(m_imgInfo.toQString(), rgn.toQString()));
   }
 
   rgn.resolveRegionEnd(m_imgInfo);
@@ -670,27 +674,58 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
       auto res = new ZImg(tmpResInfo); // will be used as return value
       std::vector<folly::Future<folly::Unit>> tileFutures;
-      for (auto& i : queryResult) {
-        const ZImgSubBlock* tile = m_allTiles[i.second].get();
-        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
-          ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
-                                 std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
-                                 std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
-                                 -ZVoxelCoordinate::value_type(sc),
-                                 0);
-          auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile);
-          if (imgPtr->isSameType(*res)) {
-            if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
-              ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
-              res->pasteImg(tmp, start);
+      if (FLAGS_atlas_readRegionToImg_use_iothreadpool) {
+        auto ioExecutor = folly::getGlobalIOExecutor();
+        for (auto& i : queryResult) {
+          const ZImgSubBlock* tile = m_allTiles[i.second].get();
+          tileFutures.push_back(
+            folly::via(ioExecutor,
+                       [=]() {
+                         return ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile);
+                       })
+              .via(cpuExecutor)
+              .thenValue([=](auto imgPtr) {
+                ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                       std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                       std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                       -ZVoxelCoordinate::value_type(sc),
+                                       0);
+                if (imgPtr->isSameType(*res)) {
+                  if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+                    ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+                    res->pasteImg(tmp, start);
+                  } else {
+                    res->pasteImg(*imgPtr, start);
+                  }
+                } else {
+                  ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, *res);
+                  res->pasteImg(tmp, start);
+                }
+              }));
+        }
+      } else {
+        for (auto& i : queryResult) {
+          const ZImgSubBlock* tile = m_allTiles[i.second].get();
+          tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
+            auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile);
+            ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                   std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                   std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                   -ZVoxelCoordinate::value_type(sc),
+                                   0);
+            if (imgPtr->isSameType(*res)) {
+              if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+                ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+                res->pasteImg(tmp, start);
+              } else {
+                res->pasteImg(*imgPtr, start);
+              }
             } else {
-              res->pasteImg(*imgPtr, start);
+              ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, *res);
+              res->pasteImg(tmp, start);
             }
-          } else {
-            ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, *res);
-            res->pasteImg(tmp, start);
-          }
-        }));
+          }));
+        }
       }
 
       return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {

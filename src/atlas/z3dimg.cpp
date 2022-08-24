@@ -594,13 +594,12 @@ void Z3DImg::uploadImageCache(size_t channel)
       --remainingBlocksToUpload;
     } else {
       auto poolStats = p->getPoolStats();
-      LOG(INFO) << fmt::format(
-        "pending task count: {}, total task count: {}, active/idle thread counts: {}/{}, maxIdleTime: {}",
-        poolStats.pendingTaskCount,
-        poolStats.totalTaskCount,
-        poolStats.activeThreadCount,
-        poolStats.idleThreadCount,
-        poolStats.maxIdleTime);
+      LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}",
+                               poolStats.pendingTaskCount,
+                               poolStats.totalTaskCount,
+                               poolStats.activeThreadCount,
+                               poolStats.idleThreadCount,
+                               poolStats.maxIdleTime);
     }
   }
   STOP_AND_LOG(bt_async)

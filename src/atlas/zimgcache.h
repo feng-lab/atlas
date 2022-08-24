@@ -288,7 +288,10 @@ public:
       if (find(ca, key, findStategy)) {
         return folly::makeFuture(*ca);
       } else {
-        return folly::via(ioExecutor, [&imgBlock]() { return imgBlock.read(); })
+        return folly::via(ioExecutor,
+                          [&imgBlock]() {
+                            return imgBlock.read();
+                          })
           .via(cpuExecutor)
           .then([=](folly::Try<std::shared_ptr<ZImg>> res) {
             insert(key, res.value());
