@@ -15,5 +15,5 @@
 # Whether readRegionToImg uses multithreaded_resize, default is false
 --atlas_readRegionToImg_use_multithreaded_resize=false
 
-# Whether readRegionToImg uses iothreadpool, default is false
---atlas_readRegionToImg_use_iothreadpool=false
+# Whether readRegionToImg uses iothreadpool, default is 0
+--atlas_readRegionToImg_use_iothreadpool=0
