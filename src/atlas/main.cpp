@@ -31,7 +31,6 @@ DEFINE_bool(run_unit_tests, false, "run unit tests");
 DEFINE_bool(run_benchmarks, false, "run benchmarks");
 #endif
 DECLARE_string(flagfile);
-DECLARE_uint32(folly_global_cpu_executor_threads);
 
 using namespace nim;
 
@@ -135,7 +134,7 @@ int main(int argc, char* argv[])
     } else {
       LOG(INFO) << "no user setting file";
     }
-    LOG(INFO) << "folly_global_cpu_executor_threads: " << FLAGS_folly_global_cpu_executor_threads;
+    LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
 
     ZTheme::instance();
 
