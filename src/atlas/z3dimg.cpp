@@ -500,7 +500,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
     auto blockCachePos = glm::uvec3(imageBlockCachePos);
     for (auto& pu : m_channelPendingUpdates) {
-      if (auto it = std::find_if(pu.begin(), pu.end(), [&](const auto& pr) { return pr.first == blockCachePos; });
+      if (auto it = std::find_if(pu.begin(),
+                                 pu.end(),
+                                 [&](const auto& pr) {
+                                   return pr.first == blockCachePos;
+                                 });
           it != pu.end()) {
         pu.erase(it);
       }
@@ -554,7 +558,9 @@ void Z3DImg::uploadImageCache(size_t channel)
                          channel,
                          0,
                          resInfo)
-        .thenValue([=, &imgQueue](ZImg&& img) { imgQueue.enqueue(std::make_tuple(i, std::move(img))); });
+        .thenValue([=, &imgQueue](ZImg&& img) {
+          imgQueue.enqueue(std::make_tuple(i, std::move(img)));
+        });
     });
   }
   std::tuple<size_t, ZImg> elem;

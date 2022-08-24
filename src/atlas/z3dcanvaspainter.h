@@ -72,6 +72,8 @@ private:
   int m_tileStartY;
   QString m_renderToImageError;
   Z3DScreenShotType m_renderToImageType;
+
+  mutable bool m_locked = false;
 };
 
 } // namespace nim

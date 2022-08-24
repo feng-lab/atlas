@@ -1,4 +1,4 @@
---folly_global_cpu_executor_threads=24
+# --folly_global_cpu_executor_threads=24
 
 # comma-separated list of flags for llfio mapped file handle, default is none, possible values are:
 # none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,
