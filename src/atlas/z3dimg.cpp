@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <fmt/chrono.h>
 #include <folly/concurrency/UnboundedQueue.h>
+#include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <boost/functional/hash.hpp>
 #include <tbb/parallel_for.h>
@@ -523,6 +524,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   return count == int(missingBlockIDs.size());
 }
 
+// #define ATLAS_uploadImageCache_USE_MPMCQueue
+
 void Z3DImg::uploadImageCache(size_t channel)
 {
   if (m_channelPendingUpdates[channel].empty()) {
@@ -535,13 +538,18 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
+  CHECK(p);
 
   //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
   //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
   //  }
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+  folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+#else
   folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
+#endif
   ZImgInfo resInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
                    m_imageBlockSize.y + m_imageBlockSizePad.y,
                    m_imageBlockSize.z + m_imageBlockSizePad.z,
@@ -559,25 +567,36 @@ void Z3DImg::uploadImageCache(size_t channel)
                          0,
                          resInfo)
         .thenValue([=, &imgQueue](ZImg&& img) {
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+          imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
+#else
           imgQueue.enqueue(std::make_tuple(i, std::move(img)));
+#endif
         });
     });
   }
   std::tuple<size_t, ZImg> elem;
-  using namespace std::chrono_literals;
-  for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
-    if (imgQueue.try_dequeue_for(elem,
-                                 std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s))) {
+  int remainingBlocksToUpload = static_cast<int>(m_channelPendingUpdates[channel].size());
+  while (remainingBlocksToUpload > 0) {
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+    if (imgQueue.tryReadUntil(std::chrono::steady_clock::now() +
+                                std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s),
+                              elem)) {
+#else
+    if (imgQueue.try_dequeue_until(
+          elem,
+          std::chrono::steady_clock::now() +
+            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s))) {
+#endif
       m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
                                                     m_imageBlockSize + m_imageBlockSizePad,
                                                     std::get<1>(elem).channelData(0));
+      --remainingBlocksToUpload;
     } else {
-      if (p) {
-        LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
-                                 p->getPendingTaskCount(),
-                                 p->getTaskQueueSize(),
-                                 p->getUsedCpuTime());
-      }
+      LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
+                               p->getPendingTaskCount(),
+                               p->getTaskQueueSize(),
+                               p->getUsedCpuTime());
     }
   }
   STOP_AND_LOG(bt_async)
