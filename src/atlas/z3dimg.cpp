@@ -599,6 +599,10 @@ void Z3DImg::uploadImageCache(size_t channel)
                                p->getUsedCpuTime());
     }
   }
+  LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
+                           p->getPendingTaskCount(),
+                           p->getTaskQueueSize(),
+                           p->getUsedCpuTime());
   STOP_AND_LOG(bt_async)
 
   m_channelPendingUpdates[channel].clear();
