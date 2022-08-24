@@ -593,16 +593,16 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                     std::get<1>(elem).channelData(0));
       --remainingBlocksToUpload;
     } else {
-      LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
-                               p->getPendingTaskCount(),
-                               p->getTaskQueueSize(),
-                               p->getUsedCpuTime());
+      auto poolStats = p->getPoolStats();
+      LOG(INFO) << fmt::format(
+        "pending task count: {}, total task count: {}, active/idle thread counts: {}/{}, maxIdleTime: {}",
+        poolStats.pendingTaskCount,
+        poolStats.totalTaskCount,
+        poolStats.activeThreadCount,
+        poolStats.idleThreadCount,
+        poolStats.maxIdleTime);
     }
   }
-  LOG(INFO) << fmt::format("pending task count: {}, task queue size: {}, used cpu time: {}",
-                           p->getPendingTaskCount(),
-                           p->getTaskQueueSize(),
-                           p->getUsedCpuTime());
   STOP_AND_LOG(bt_async)
 
   m_channelPendingUpdates[channel].clear();
