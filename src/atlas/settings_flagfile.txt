@@ -1,13 +1,13 @@
 # --folly_global_cpu_executor_threads=24
 
-# comma-separated list of flags for llfio mapped file handle, default is none, possible values are:
+# comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are:
 # none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,
 # maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,
 # win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode
---atlas_llfio_mapped_file_handle_flags=none
+--atlas_llfio_mapped_file_handle_flags=multiplexable
 
 # Proportion of RAM that will be used for image cache, default is 0.5
 --atlas_image_cache_memory_proportion=0.5
 
 # Interval in seconds for logging folly global executor status during waiting, default is 5
---atlas_log_folly_global_executor_status_interval_in_s=5
+--atlas_log_folly_global_executor_status_interval_in_seconds=5

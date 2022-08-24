@@ -19,7 +19,7 @@
 #include <chrono>
 #include <memory>
 
-DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_s,
+DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
               5,
               "Interval in seconds for logging folly global executor status during waiting, default is 5");
 
@@ -586,7 +586,7 @@ void Z3DImg::uploadImageCache(size_t channel)
     if (imgQueue.try_dequeue_until(
           elem,
           std::chrono::steady_clock::now() +
-            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s))) {
+            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
 #endif
       m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
                                                     m_imageBlockSize + m_imageBlockSizePad,

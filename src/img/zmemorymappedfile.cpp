@@ -3,12 +3,13 @@
 #include <QFileInfo>
 #include <QDir>
 
-DEFINE_string(atlas_llfio_mapped_file_handle_flags,
-              "none",
-              "comma-separated list of flags for llfio mapped file handle, default is none, possible values are: "
-              "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
-              "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
-              "win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode");
+DEFINE_string(
+  atlas_llfio_mapped_file_handle_flags,
+  "multiplexable",
+  "comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are: "
+  "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
+  "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
+  "win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode");
 
 namespace nim {
 
