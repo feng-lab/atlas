@@ -1535,18 +1535,22 @@ ZImg ZImg::resized(size_t desWidth,
 
   res = ZImg(info);
 
-  if (desWidth == width() && desHeight == height() && numTimes() == 1) {
+  if (desWidth == width() && desDepth != depth()) {
     ZImgInfo transposedInfo = m_info;
     // XYZ to ZYX
-    transposedInfo.width = depth();
-    transposedInfo.depth = width();
+    std::swap(transposedInfo.width, transposedInfo.depth);
     ZImg transposedImg(transposedInfo);
-    ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "ZYXCT", transposedImg);
+    if (numTimes() == 1) {
+      ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "ZYXCT", transposedImg);
+    } else {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto timeView = transposedImg.createView(-1, t);
+        ZImgFormat::fixDimensionOrder(timeData<uint8_t>(t), "ZYXCT", timeView);
+      }
+    }
 
-    ZImgInfo transposedResInfo = m_info;
-    transposedResInfo.width = desDepth;
-    transposedResInfo.height = desHeight;
-    transposedResInfo.depth = desWidth;
+    ZImgInfo transposedResInfo = info;
+    std::swap(transposedResInfo.width, transposedResInfo.depth);
     ZImg transposedRes(transposedResInfo);
     // LOG(INFO) << transposedImg.info().toString();
     // LOG(INFO) << transposedRes.info().toString();
@@ -1558,7 +1562,49 @@ ZImg ZImg::resized(size_t desWidth,
                    antialiasingForNearest,
                    useMultithreading)
     // ZYX to XYZ
-    ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "ZYXCT", res);
+    if (numTimes() == 1) {
+      ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "ZYXCT", res);
+    } else {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto timeView = res.createView(-1, t);
+        ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(t), "ZYXCT", timeView);
+      }
+    }
+  } else if (desHeight == height() && desDepth != depth()) {
+    ZImgInfo transposedInfo = m_info;
+    // XYZ to XZY
+    std::swap(transposedInfo.height, transposedInfo.depth);
+    ZImg transposedImg(transposedInfo);
+    if (numTimes() == 1) {
+      ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "XZYCT", transposedImg);
+    } else {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto timeView = transposedImg.createView(-1, t);
+        ZImgFormat::fixDimensionOrder(timeData<uint8_t>(t), "XZYCT", timeView);
+      }
+    }
+
+    ZImgInfo transposedResInfo = info;
+    std::swap(transposedResInfo.height, transposedResInfo.depth);
+    ZImg transposedRes(transposedResInfo);
+    // LOG(INFO) << transposedImg.info().toString();
+    // LOG(INFO) << transposedRes.info().toString();
+    IMG_TYPED_CALL(transposedImg.resize_Impl,
+                   m_info,
+                   transposedRes,
+                   interpolant,
+                   antialiasing,
+                   antialiasingForNearest,
+                   useMultithreading)
+    // XZY to XYZ
+    if (numTimes() == 1) {
+      ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "XZYCT", res);
+    } else {
+      for (size_t t = 0; t < numTimes(); ++t) {
+        auto timeView = res.createView(-1, t);
+        ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(t), "XZYCT", timeView);
+      }
+    }
   } else {
     IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
   }
