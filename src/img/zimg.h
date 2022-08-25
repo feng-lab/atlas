@@ -1406,6 +1406,10 @@ public:
                              bool antialiasingForNearest = false,
                              bool useMultithreading = true) const;
 
+  // intel ipp version, will crash if interpolant or data type is not supported
+  [[nodiscard]] ZImg
+  resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic) const;
+
   [[nodiscard]] ZImg zoomed(double scaleX,
                             double scaleY,
                             double scaleZ,
@@ -1426,6 +1430,18 @@ public:
                bool antialiasing = true,
                bool antialiasingForNearest = false,
                bool useMultithreading = true);
+
+  // intel ipp version, will crash if interpolant or data type is not supported
+  inline ZImg&
+  resizeIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic)
+  {
+    if (width() == desWidth && height() == desHeight && depth() == desDepth) {
+      return *this;
+    }
+    ZImg res = resizedIPP(desWidth, desHeight, desDepth, interpolant);
+    swap(res);
+    return *this;
+  }
 
   ZImg& zoom(double scaleX,
              double scaleY,

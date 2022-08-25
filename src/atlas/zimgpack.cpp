@@ -14,7 +14,11 @@
 
 DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             false,
-            "Whether readRegionToImg uses multithreaded_resize, default is false");
+            "Whether readRegionToImg uses multithreaded resize, default is false");
+
+DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
+            true,
+            "Whether readRegionToImg uses ipp resize, default is true");
 
 DEFINE_uint32(atlas_readRegionToImg_use_iothreadpool,
               0,
@@ -507,7 +511,11 @@ ZImg ZImgPack::resizedImg(size_t width, size_t height, size_t depth, size_t t) c
 
   res = assembleImg(ratio, t);
   if (res.width() != width || res.height() != height || res.depth() != depth) {
-    res.resize(width, height, depth);
+    if (FLAGS_atlas_readRegionToImg_use_ipp_resize) {
+      res.resizeIPP(width, height, depth);
+    } else {
+      res.resize(width, height, depth);
+    }
   }
   return res;
 }
@@ -564,13 +572,17 @@ void ZImgPack::readRegionToImg(index_t xyRatio,
   }
   // bt_read.pause();
   if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
-    res.resize(resInfo.width,
-               resInfo.height,
-               resInfo.depth,
-               Interpolant::Cubic,
-               true,
-               false,
-               FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+    if (FLAGS_atlas_readRegionToImg_use_ipp_resize) {
+      res.resizeIPP(resInfo.width, resInfo.height, resInfo.depth, Interpolant::Cubic);
+    } else {
+      res.resize(resInfo.width,
+                 resInfo.height,
+                 resInfo.depth,
+                 Interpolant::Cubic,
+                 true,
+                 false,
+                 FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+    }
   }
   // bt_read.resume();
   // STOP_AND_LOG(bt_read)
@@ -639,13 +651,17 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
           }
         }
         if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
-          res.resize(resInfo.width,
-                     resInfo.height,
-                     resInfo.depth,
-                     Interpolant::Cubic,
-                     true,
-                     false,
-                     FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          if (FLAGS_atlas_readRegionToImg_use_ipp_resize) {
+            res->resizeIPP(resInfo.width, resInfo.height, resInfo.depth, Interpolant::Cubic);
+          } else {
+            res->resize(resInfo.width,
+                        resInfo.height,
+                        resInfo.depth,
+                        Interpolant::Cubic,
+                        true,
+                        false,
+                        FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          }
         }
       } else {
         res = ZImg(resInfo);
@@ -754,13 +770,17 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
 
       return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
-          res->resize(resInfo.width,
-                      resInfo.height,
-                      resInfo.depth,
-                      Interpolant::Cubic,
-                      true,
-                      false,
-                      FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          if (FLAGS_atlas_readRegionToImg_use_ipp_resize) {
+            res->resizeIPP(resInfo.width, resInfo.height, resInfo.depth, Interpolant::Cubic);
+          } else {
+            res->resize(resInfo.width,
+                        resInfo.height,
+                        resInfo.depth,
+                        Interpolant::Cubic,
+                        true,
+                        false,
+                        FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          }
         }
         ZImg rres;
         rres.swap(*res);
