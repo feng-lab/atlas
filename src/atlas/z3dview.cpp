@@ -1,16 +1,13 @@
 #include "z3dview.h"
 
 #include "z3dcanvas.h"
-#include "z3daxisfilter.h"
 #include "z3dcompositor.h"
 #include "z3dcanvaspainter.h"
 #include "z3dcameraparameter.h"
 #include "z3dinteractionhandler.h"
 #include "z3dnetworkevaluator.h"
-#include "zsysteminfo.h"
 #include "zwidgetsgroup.h"
 #include "ztakescreenshotwidget.h"
-#include "z3dgpuinfo.h"
 #include "zimgdoc.h"
 #include "z3dimgview.h"
 #include "zpunctadoc.h"
@@ -25,7 +22,6 @@
 #include "z3dmainwindow.h"
 #include "ztheme.h"
 #include <QMessageBox>
-#include <QProgressDialog>
 #include <QPlainTextEdit>
 #include <memory>
 
@@ -76,7 +72,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
       }
     }
   }
-  return std::shared_ptr<ZWidgetsGroup>();
+  return {};
 }
 
 QWidget* Z3DView::globalParasWidget()

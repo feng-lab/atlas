@@ -881,7 +881,7 @@ QLayout* Z3DTransferFunctionEditor::createMappingLayout()
   hboxDomain->addWidget(m_fitDomainToDataButton);
   hboxDomain->addWidget(m_rescaleKeys);
 
-  QPushButton* resetButton = new QPushButton("Reset", this);
+  auto resetButton = new QPushButton("Reset", this);
   connect(resetButton, &QPushButton::clicked, this, &Z3DTransferFunctionEditor::reset);
 
   m_transferFunctionTexture = new ZClickableTransferFunctionLabel(m_transferFunction);

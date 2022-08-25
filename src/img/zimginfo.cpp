@@ -178,7 +178,7 @@ void ZImgInfo::createDefaultDescriptions()
 double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException(QString("no resolution info"));
+    throw ZIOException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeX;
@@ -189,7 +189,7 @@ double ZImgInfo::voxelSizeXInUnit(VoxelSizeUnit unit) const
 double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException(QString("no resolution info"));
+    throw ZIOException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeY;
@@ -200,7 +200,7 @@ double ZImgInfo::voxelSizeYInUnit(VoxelSizeUnit unit) const
 double ZImgInfo::voxelSizeZInUnit(VoxelSizeUnit unit) const
 {
   if (voxelSizeUnit == VoxelSizeUnit::none || unit == VoxelSizeUnit::none) {
-    throw ZIOException(QString("no resolution info"));
+    throw ZIOException("no resolution info");
   }
   if (voxelSizeUnit == unit) {
     return voxelSizeZ;

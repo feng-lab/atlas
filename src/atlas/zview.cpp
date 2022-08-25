@@ -274,7 +274,7 @@ void ZView::registerObjView(std::unique_ptr<ZObjView>&& v)
 std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1 || id == 2 || id == 3) {
-    return std::shared_ptr<ZWidgetsGroup>();
+    return {};
   }
   for (const auto& view : m_objViews) {
     std::shared_ptr<ZWidgetsGroup> wg = view->viewSettingWidgetsGroupOf(id);
@@ -282,7 +282,7 @@ std::shared_ptr<ZWidgetsGroup> ZView::viewSettingWidgetsGroupOf(size_t id)
       return wg;
     }
   }
-  return std::shared_ptr<ZWidgetsGroup>();
+  return {};
 }
 
 QWidget* ZView::globalParasWidget()

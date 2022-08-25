@@ -132,7 +132,8 @@ void ZParameter::setEnabled(bool s)
 
 void ZParameter::updateFromSender()
 {
-  auto para = static_cast<ZParameter*>(sender());
+  auto para = dynamic_cast<ZParameter*>(sender());
+  CHECK(para);
   if (isSameType(*para)) {
     setValueSameAs(*para);
   } else {
@@ -176,7 +177,7 @@ QWidget* ZBoolParameter::actualCreateWidget(QWidget* parent)
 void ZBoolParameter::setSameAs(const ZParameter& rhs)
 {
   CHECK(this->isSameType(rhs));
-  set(static_cast<const ZBoolParameter*>(&rhs)->get());
+  set(dynamic_cast<const ZBoolParameter*>(&rhs)->get());
   ZSingleValueParameter<bool>::setSameAs(rhs);
 }
 

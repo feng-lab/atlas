@@ -1090,7 +1090,6 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
     if (success) {
       fpos3D = get3DPosition(pos2D, 1.0, width, height);
       des = glm::round(glm::applyMatrix(inverseCoordTransform(), fpos3D));
-      // LWARN() << "start" << res << "to" << des;
       if (glm::length(des - res) <= 1.f) { // res is last pixel along current ray direction
         return res;
       }
@@ -1118,7 +1117,6 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
         res = roundP;
       }
     }
-    // LWARN() << "res" << res << "maxInten" << maxInten;
   }
   return res;
 }

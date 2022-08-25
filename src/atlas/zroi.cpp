@@ -449,7 +449,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
         } else if (strBuf == "Line") {
           type = ROIType::Line;
         } else {
-          throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
+          throw ZIOException(fmt::format("invalid shape type {}", strBuf));
         }
 
         H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");
@@ -545,7 +545,7 @@ size_t ZSliceROI::load(H5::Group& sliceGrp, size_t id, int roiVer)
           } else if (strBuf == "Line") {
             type = ROIType::Line;
           } else {
-            throw ZIOException(QString("invalid shape type %1").arg(QString::fromStdString(strBuf)));
+            throw ZIOException(fmt::format("invalid shape type {}", strBuf));
           }
 
           H5::Attribute isAddAttr = shapeGrp.openAttribute("IsAdd");

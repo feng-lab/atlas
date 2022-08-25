@@ -1076,7 +1076,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
     QApplication::processEvents();
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not load animation %1: %2").arg(fn).arg(e.what()));
+    throw ZIOException(QString("Can not load animation %1: %2").arg(fn, e.what()));
   }
 }
 
@@ -1151,7 +1151,7 @@ void ZAnimation::writeContent(const QString& fn, const QString& jsonKey)
     }
   }
   catch (const ZException& e) {
-    throw ZIOException(QString("Can not save animation %1: %2").arg(fn).arg(e.what()));
+    throw ZIOException(QString("Can not save animation %1: %2").arg(fn, e.what()));
   }
 }
 
