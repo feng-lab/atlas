@@ -29,9 +29,7 @@ ZImgCache& ZImgCache::instance()
 ZImgCache::ZImgCache()
   : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
                                   ZCpuInfo::instance().nLogicalCores * 4)
-{
-  LOG(INFO) << "FLAGS_atlas_image_cache_memory_proportion: " << FLAGS_atlas_image_cache_memory_proportion;
-}
+{}
 #endif
 
 } // namespace nim

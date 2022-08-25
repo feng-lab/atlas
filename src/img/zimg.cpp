@@ -1534,7 +1534,34 @@ ZImg ZImg::resized(size_t desWidth,
   info.depth = desDepth;
 
   res = ZImg(info);
-  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
+
+  if (desWidth == width() && desHeight == height() && numTimes() == 1) {
+    ZImgInfo transposedInfo = m_info;
+    // XYZ to ZYX
+    transposedInfo.width = depth();
+    transposedInfo.depth = width();
+    ZImg transposedImg(transposedInfo);
+    ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "ZYXCT", transposedImg);
+
+    ZImgInfo transposedResInfo = m_info;
+    transposedResInfo.width = desDepth;
+    transposedResInfo.height = desHeight;
+    transposedResInfo.depth = desWidth;
+    ZImg transposedRes(transposedResInfo);
+    // LOG(INFO) << transposedImg.info().toString();
+    // LOG(INFO) << transposedRes.info().toString();
+    IMG_TYPED_CALL(transposedImg.resize_Impl,
+                   m_info,
+                   transposedRes,
+                   interpolant,
+                   antialiasing,
+                   antialiasingForNearest,
+                   useMultithreading)
+    // ZYX to XYZ
+    ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "ZYXCT", res);
+  } else {
+    IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
+  }
 
   return res;
 }

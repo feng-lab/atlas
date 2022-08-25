@@ -557,7 +557,7 @@ void ZImgFormat::fixDimensionOrder(const uint8_t* buf, const QString& dimensionO
                   desC = 0;
                 }
               }
-              auto* desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
+              auto desLoc = img.data<uint8_t>(desLocs[0], desLocs[1], desLocs[2], desC, desLocs[4]);
               std::memcpy(desLoc, srcLoc, srcStride);
               srcLoc += srcStride;
             }
