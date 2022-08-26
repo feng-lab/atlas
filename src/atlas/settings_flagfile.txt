@@ -20,3 +20,6 @@
 
 # Whether readRegionToImg uses iothreadpool, default is 0
 --atlas_readRegionToImg_use_iothreadpool=0
+
+# Whether to optimize resize with dimension shuffle, default is false
+--atlas_optimize_resize_with_dimension_shuffle=false
