@@ -40,7 +40,7 @@
 #define DATATYPE_IEEEFP		3       /* !IEEE floating point data */
 
 static void
-setByteArray(void** vpp, void* vp, size_t nmemb, size_t elem_size)
+setByteArray(void** vpp, const void* vp, size_t nmemb, size_t elem_size)
 {
 	if (*vpp) {
 		_TIFFfree(*vpp);
@@ -54,22 +54,20 @@ setByteArray(void** vpp, void* vp, size_t nmemb, size_t elem_size)
 			_TIFFmemcpy(*vpp, vp, bytes);
 	}
 }
-void _TIFFsetByteArray(void** vpp, void* vp, uint32_t n)
+void _TIFFsetByteArray(void** vpp, const void* vp, uint32_t n)
     { setByteArray(vpp, vp, n, 1); }
-void _TIFFsetString(char** cpp, char* cp)
-    { setByteArray((void**) cpp, (void*) cp, strlen(cp)+1, 1); }
-static void _TIFFsetNString(char** cpp, char* cp, uint32_t n)
-    { setByteArray((void**) cpp, (void*) cp, n, 1); }
-void _TIFFsetShortArray(uint16_t** wpp, uint16_t* wp, uint32_t n)
-    { setByteArray((void**) wpp, (void*) wp, n, sizeof (uint16_t)); }
-void _TIFFsetLongArray(uint32_t** lpp, uint32_t* lp, uint32_t n)
-    { setByteArray((void**) lpp, (void*) lp, n, sizeof (uint32_t)); }
-static void _TIFFsetLong8Array(uint64_t** lpp, uint64_t* lp, uint32_t n)
-    { setByteArray((void**) lpp, (void*) lp, n, sizeof (uint64_t)); }
-void _TIFFsetFloatArray(float** fpp, float* fp, uint32_t n)
-    { setByteArray((void**) fpp, (void*) fp, n, sizeof (float)); }
-void _TIFFsetDoubleArray(double** dpp, double* dp, uint32_t n)
-    { setByteArray((void**) dpp, (void*) dp, n, sizeof (double)); }
+static void _TIFFsetNString(char** cpp, const char* cp, uint32_t n)
+    { setByteArray((void**) cpp, cp, n, 1); }
+void _TIFFsetShortArray(uint16_t** wpp, const uint16_t* wp, uint32_t n)
+    { setByteArray((void**) wpp, wp, n, sizeof (uint16_t)); }
+void _TIFFsetLongArray(uint32_t** lpp, const uint32_t* lp, uint32_t n)
+    { setByteArray((void**) lpp, lp, n, sizeof (uint32_t)); }
+static void _TIFFsetLong8Array(uint64_t** lpp, const uint64_t* lp, uint32_t n)
+    { setByteArray((void**) lpp, lp, n, sizeof (uint64_t)); }
+void _TIFFsetFloatArray(float** fpp, const float* fp, uint32_t n)
+    { setByteArray((void**) fpp, fp, n, sizeof (float)); }
+void _TIFFsetDoubleArray(double** dpp, const double* dp, uint32_t n)
+    { setByteArray((void**) dpp, dp, n, sizeof (double)); }
 
 static void
 setDoubleArrayOneValue(double** vpp, double value, size_t nmemb)
@@ -174,7 +172,7 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 
 	TIFFDirectory* td = &tif->tif_dir;
 	int status = 1;
-	uint32_t v32, i, v;
+	uint32_t v32, v;
     double dblval;
 	char* s;
 	const TIFFField *fip = TIFFFindField(tif, tag, TIFF_ANY);
@@ -228,7 +226,7 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 	case TIFFTAG_COMPRESSION:
 		v = (uint16_t) va_arg(ap, uint16_vap);
 		/*
-		 * If we're changing the compression scheme, the notify the
+		 * If we're changing the compression scheme, notify the
 		 * previous module so that it can cleanup any state it's
 		 * setup.
 		 */
@@ -335,13 +333,13 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 		break;
 	case TIFFTAG_XRESOLUTION:
         dblval = va_arg(ap, double);
-        if( dblval < 0 )
+        if( dblval != dblval || dblval < 0 )
             goto badvaluedouble;
 		td->td_xresolution = _TIFFClampDoubleToFloat( dblval );
 		break;
 	case TIFFTAG_YRESOLUTION:
         dblval = va_arg(ap, double);
-        if( dblval < 0 )
+        if( dblval != dblval || dblval < 0 )
             goto badvaluedouble;
 		td->td_yresolution = _TIFFClampDoubleToFloat( dblval );
 		break;
@@ -467,11 +465,14 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 		td->td_ycbcrsubsampling[1] = (uint16_t) va_arg(ap, uint16_vap);
 		break;
 	case TIFFTAG_TRANSFERFUNCTION:
+	{
+		uint32_t i;
 		v = (td->td_samplesperpixel - td->td_extrasamples) > 1 ? 3 : 1;
 		for (i = 0; i < v; i++)
 			_TIFFsetShortArray(&td->td_transferfunction[i],
                                va_arg(ap, uint16_t*), 1U << td->td_bitspersample);
 		break;
+	}
 	case TIFFTAG_REFERENCEBLACKWHITE:
 		/* XXX should check for null range */
 		_TIFFsetFloatArray(&td->td_refblackwhite, va_arg(ap, float*), 6);
@@ -559,11 +560,8 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 		/*
 		 * Set custom value ... save a copy of the custom tag value.
 		 */
-		tv_size = _TIFFDataSize(fip->field_type);
 		/*--: Rational2Double: For Rationals evaluate "set_field_type" to determine internal storage size. */
-		if (fip->field_type == TIFF_RATIONAL || fip->field_type == TIFF_SRATIONAL) {
-			tv_size = _TIFFSetGetFieldSize(fip->set_field_type);
-		}
+		tv_size = TIFFFieldSetGetSize(fip);
 		if (tv_size == 0) {
 			status = 0;
 			TIFFErrorExt(tif->tif_clientdata, module,
@@ -576,17 +574,28 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 		if (fip->field_type == TIFF_ASCII)
 		{
 			uint32_t ma;
-			char* mb;
+			const char* mb;
 			if (fip->field_passcount)
 			{
 				assert(fip->field_writecount==TIFF_VARIABLE2);
 				ma=(uint32_t)va_arg(ap, uint32_t);
-				mb=(char*)va_arg(ap,char*);
+				mb=(const char*)va_arg(ap,const char*);
 			}
 			else
 			{
-				mb=(char*)va_arg(ap,char*);
-				ma=(uint32_t)(strlen(mb) + 1);
+				mb=(const char*)va_arg(ap,const char*);
+				size_t len = strlen(mb) + 1;
+				if( len >= 0x80000000U )
+				{
+					status = 0;
+					TIFFErrorExt(tif->tif_clientdata, module,
+					    "%s: Too long string value for \"%s\". "
+					    "Maximum supported is 2147483647 bytes",
+					    tif->tif_name,
+					    fip->field_name);
+					goto end;
+				}
+				ma=(uint32_t)len;
 			}
 			tv->count=ma;
 			setByteArray(&tv->value,mb,ma,1);
@@ -646,6 +655,30 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 			  /*--: Rational2Double: For Rationals tv_size is set above to 4 or 8 according to fip->set_field_type! */
 				_TIFFmemcpy(tv->value, va_arg(ap, void *),
 				    tv->count * tv_size);
+				/* Test here for too big values for LONG8, SLONG8 in ClassicTIFF and delete custom field from custom list */
+				if (!(tif->tif_flags & TIFF_BIGTIFF)) {
+					if (tv->info->field_type == TIFF_LONG8) {
+						uint64_t *pui64 = (uint64_t *)tv->value;
+						for (int i = 0; i < tv->count; i++) {
+							if (pui64[i] > 0xffffffffu) {
+								TIFFErrorExt(tif->tif_clientdata, module,
+									"%s: Bad LONG8 value %"PRIu64" at %d. array position for \"%s\" tag %d in ClassicTIFF. Tag won't be written to file",
+									tif->tif_name, pui64[i], i, fip->field_name, tag);
+								goto badvalueifd8long8;
+							}
+						}
+					} else if (tv->info->field_type == TIFF_SLONG8) {
+						int64_t *pi64 = (int64_t *)tv->value;
+						for (int i = 0; i < tv->count; i++) {
+							if (pi64[i] > 2147483647 || pi64[i] < (-2147483647 - 1)) {
+								TIFFErrorExt(tif->tif_clientdata, module,
+									"%s: Bad SLONG8 value %"PRIi64" at %d. array position for \"%s\" tag %d in ClassicTIFF. Tag won't be written to file",
+									tif->tif_name, pi64[i], i, fip->field_name, tag);
+								goto badvalueifd8long8;
+							}
+						}
+					}
+				}
 			} else {
 				char *val = (char *)tv->value;
 				assert( tv->count == 1 );
@@ -694,12 +727,26 @@ _TIFFVSetField(TIFF* tif, uint32_t tag, va_list ap)
 					{
 						uint64_t v2 = va_arg(ap, uint64_t);
 						_TIFFmemcpy(val, &v2, tv_size);
+						/* Test here for too big values for ClassicTIFF and delete custom field from custom list */
+						if (!(tif->tif_flags & TIFF_BIGTIFF) && (v2 > 0xffffffffu)) {
+							TIFFErrorExt(tif->tif_clientdata, module,
+								"%s: Bad LONG8 or IFD8 value %"PRIu64" for \"%s\" tag %d in ClassicTIFF. Tag won't be written to file",
+								tif->tif_name, v2, fip->field_name, tag);
+							goto badvalueifd8long8;
+						}
 					}
 					break;
 				case TIFF_SLONG8:
 					{
 						int64_t v2 = va_arg(ap, int64_t);
 						_TIFFmemcpy(val, &v2, tv_size);
+						/* Test here for too big values for ClassicTIFF and delete custom field from custom list */
+						if (!(tif->tif_flags & TIFF_BIGTIFF) && ((v2 > 2147483647) || (v2 < (-2147483647 - 1)))) {
+							TIFFErrorExt(tif->tif_clientdata, module,
+								"%s: Bad SLONG8 value %"PRIi64" for \"%s\" tag %d in ClassicTIFF. Tag won't be written to file",
+								tif->tif_name, v2, fip->field_name, tag);
+								goto badvalueifd8long8;
+						}
 					}
 					break;
 				case TIFF_RATIONAL:
@@ -781,7 +828,37 @@ badvaluedouble:
         va_end(ap);
         }
     return (0);
-}
+badvalueifd8long8:
+		{
+			/* Error message issued already above. */
+			TIFFTagValue *tv2 = NULL;
+			int iCustom2, iC2;
+			/* Find the existing entry for this custom value. */
+			for (iCustom2 = 0; iCustom2 < td->td_customValueCount; iCustom2++) {
+				if (td->td_customValues[iCustom2].info->field_tag == tag) {
+					tv2 = td->td_customValues + (iCustom2);
+					break;
+				}
+			}
+			if (tv2 != NULL) {
+				/* Remove custom field from custom list */
+				if (tv2->value != NULL) {
+					_TIFFfree(tv2->value);
+					tv2->value = NULL;
+				}
+				/* Shorten list and close gap in customValues list.
+				 * Re-allocation of td_customValues not necessary here. */
+				td->td_customValueCount--;
+				for (iC2 = iCustom2; iC2 < td->td_customValueCount; iC2++) {
+					td->td_customValues[iC2] = td->td_customValues[iC2+1];
+				}
+			} else {
+				assert(0);
+			}
+			va_end(ap);
+		}
+	return (0);
+} /*-- _TIFFVSetField() --*/
 
 /*
  * Return 1/0 according to whether or not
@@ -1041,11 +1118,15 @@ _TIFFVGetField(TIFF* tif, uint32_t tag, va_list ap)
 		case TIFFTAG_TILEOFFSETS:
 			_TIFFFillStriles( tif );
 			*va_arg(ap, const uint64_t**) = td->td_stripoffset_p;
+			if( td->td_stripoffset_p == NULL )
+				ret_val = 0;
 			break;
 		case TIFFTAG_STRIPBYTECOUNTS:
 		case TIFFTAG_TILEBYTECOUNTS:
 			_TIFFFillStriles( tif );
 			*va_arg(ap, const uint64_t**) = td->td_stripbytecount_p;
+			if( td->td_stripbytecount_p == NULL )
+				ret_val = 0;
 			break;
 		case TIFFTAG_MATTEING:
 			*va_arg(ap, uint16_t*) =
@@ -1224,7 +1305,7 @@ _TIFFVGetField(TIFF* tif, uint32_t tag, va_list ap)
 							case TIFF_SRATIONAL:
 								{
 									/*-- Rational2Double: For Rationals evaluate "set_field_type" to determine internal storage size and return value size. */
-									int tv_size = _TIFFSetGetFieldSize(fip->set_field_type);
+									int tv_size = TIFFFieldSetGetSize(fip);
 									if (tv_size == 8) {
 										*va_arg(ap, double*) = *(double *)val;
 										ret_val = 1;
@@ -1450,6 +1531,17 @@ TIFFDefaultDirectory(TIFF* tif)
 	tif->tif_tagmethods.vsetfield = _TIFFVSetField;  
 	tif->tif_tagmethods.vgetfield = _TIFFVGetField;
 	tif->tif_tagmethods.printdir = NULL;
+	/* additional default values */
+	td->td_planarconfig = PLANARCONFIG_CONTIG;
+	td->td_compression = COMPRESSION_NONE;
+	td->td_subfiletype = 0;
+	td->td_minsamplevalue = 0;
+	/* td_bitspersample=1 is always set in TIFFDefaultDirectory(). 
+	 * Therefore, td_maxsamplevalue has to be re-calculated in TIFFGetFieldDefaulted(). */
+	td->td_maxsamplevalue = 1;  /* Default for td_bitspersample=1 */
+	td->td_extrasamples = 0;
+	td->td_sampleinfo = NULL;
+
 	/*
 	 *  Give client code a chance to install their own
 	 *  tag extensions & methods, prior to compression overloads,
@@ -1819,6 +1911,7 @@ TIFFUnlinkDirectory(TIFF* tif, uint16_t dirn)
 	TIFFDefaultDirectory(tif);
 	tif->tif_diroff = 0;			/* force link on next write */
 	tif->tif_nextdiroff = 0;		/* next write must be at end */
+	tif->tif_lastdiroff = 0;		/* will be updated on next link */
 	tif->tif_curoff = 0;
 	tif->tif_row = (uint32_t) -1;
 	tif->tif_curstrip = (uint32_t) -1;

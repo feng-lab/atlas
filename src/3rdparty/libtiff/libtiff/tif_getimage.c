@@ -194,7 +194,7 @@ TIFFRGBAImageOK(TIFF* tif, char emsg[1024])
                         }
 			break;
 		case PHOTOMETRIC_CIELAB:
-                        if ( td->td_samplesperpixel != 3 || colorchannels != 3 || td->td_bitspersample != 8 ) {
+                        if ( td->td_samplesperpixel != 3 || colorchannels != 3 || (td->td_bitspersample != 8 && td->td_bitspersample != 16) ) {
                                 sprintf(emsg,
                                         "Sorry, can not handle image with %s=%"PRIu16", %s=%d and %s=%"PRIu16,
                                         "Samples/pixel", td->td_samplesperpixel,
@@ -1784,7 +1784,7 @@ DECLARESepPutFunc(putRGBUAseparate16bittile)
 /*
  * 8-bit packed CIE L*a*b 1976 samples => RGB
  */
-DECLAREContigPutFunc(putcontig8bitCIELab)
+DECLAREContigPutFunc(putcontig8bitCIELab8)
 {
 	float X, Y, Z;
 	uint32_t r, g, b;
@@ -1807,6 +1807,32 @@ DECLAREContigPutFunc(putcontig8bitCIELab)
 }
 
 /*
+ * 16-bit packed CIE L*a*b 1976 samples => RGB
+ */
+DECLAREContigPutFunc(putcontig8bitCIELab16)
+{
+	float X, Y, Z;
+	uint32_t r, g, b;
+	uint16_t *wp = (uint16_t *)pp;
+	(void) y;
+	fromskew *= 3;
+	for( ; h > 0; --h) {
+		for (x = w; x > 0; --x) {
+			TIFFCIELab16ToXYZ(img->cielab,
+					  (uint16_t)wp[0],
+					  (int16_t)wp[1],
+					  (int16_t)wp[2],
+					  &X, &Y, &Z);
+			TIFFXYZToRGB(img->cielab, X, Y, Z, &r, &g, &b);
+			*cp++ = PACK(r, g, b);
+			wp += 3;
+		}
+		cp += toskew;
+		wp += fromskew;
+	}
+}
+
+/*
  * YCbCr -> RGB conversion and packing routines.
  */
 
@@ -1815,82 +1841,6 @@ DECLAREContigPutFunc(putcontig8bitCIELab)
 	TIFFYCbCrtoRGB(img->ycbcr, (Y), Cb, Cr, &r, &g, &b);		\
 	dst = PACK(r, g, b);						\
 }
-
-/*
- * 8-bit packed YCbCr samples => RGB 
- * This function is generic for different sampling sizes, 
- * and can handle blocks sizes that aren't multiples of the
- * sampling size.  However, it is substantially less optimized
- * than the specific sampling cases.  It is used as a fallback
- * for difficult blocks.
- */
-#ifdef notdef
-static void putcontig8bitYCbCrGenericTile( 
-    TIFFRGBAImage* img, 
-    uint32_t* cp,
-    uint32_t x, uint32_t y,
-    uint32_t w, uint32_t h,
-    int32_t fromskew, int32_t toskew,
-    unsigned char* pp,
-    int h_group, 
-    int v_group )
-
-{
-    uint32_t* cp1 = cp+w+toskew;
-    uint32_t* cp2 = cp1+w+toskew;
-    uint32_t* cp3 = cp2+w+toskew;
-    int32_t incr = 3*w+4*toskew;
-    int32_t   Cb, Cr;
-    int     group_size = v_group * h_group + 2;
-
-    (void) y;
-    fromskew = (fromskew * group_size) / h_group;
-
-    for( yy = 0; yy < h; yy++ )
-    {
-        unsigned char *pp_line;
-        int     y_line_group = yy / v_group;
-        int     y_remainder = yy - y_line_group * v_group;
-
-        pp_line = pp + v_line_group * 
-
-        
-        for( xx = 0; xx < w; xx++ )
-        {
-            Cb = pp
-        }
-    }
-    for (; h >= 4; h -= 4) {
-	x = w>>2;
-	do {
-	    Cb = pp[16];
-	    Cr = pp[17];
-
-	    YCbCrtoRGB(cp [0], pp[ 0]);
-	    YCbCrtoRGB(cp [1], pp[ 1]);
-	    YCbCrtoRGB(cp [2], pp[ 2]);
-	    YCbCrtoRGB(cp [3], pp[ 3]);
-	    YCbCrtoRGB(cp1[0], pp[ 4]);
-	    YCbCrtoRGB(cp1[1], pp[ 5]);
-	    YCbCrtoRGB(cp1[2], pp[ 6]);
-	    YCbCrtoRGB(cp1[3], pp[ 7]);
-	    YCbCrtoRGB(cp2[0], pp[ 8]);
-	    YCbCrtoRGB(cp2[1], pp[ 9]);
-	    YCbCrtoRGB(cp2[2], pp[10]);
-	    YCbCrtoRGB(cp2[3], pp[11]);
-	    YCbCrtoRGB(cp3[0], pp[12]);
-	    YCbCrtoRGB(cp3[1], pp[13]);
-	    YCbCrtoRGB(cp3[2], pp[14]);
-	    YCbCrtoRGB(cp3[3], pp[15]);
-
-	    cp += 4, cp1 += 4, cp2 += 4, cp3 += 4;
-	    pp += 18;
-	} while (--x);
-	cp += incr, cp1 += incr, cp2 += incr, cp3 += incr;
-	pp += fromskew;
-    }
-}
-#endif
 
 /*
  * 8-bit packed YCbCr samples w/ 4,4 subsampling => RGB
@@ -2395,7 +2345,11 @@ initCIELabConversion(TIFFRGBAImage* img)
 		return NULL;
 	}
 
-	return putcontig8bitCIELab;
+	if (img->bitspersample == 8)
+		return putcontig8bitCIELab8;
+	else if (img->bitspersample == 16)
+		return putcontig8bitCIELab16;
+	return NULL;
 }
 
 /*
@@ -2777,7 +2731,7 @@ PickContigCase(TIFFRGBAImage* img)
 			break;
 		case PHOTOMETRIC_CIELAB:
 			if (img->samplesperpixel == 3 && buildMap(img)) {
-				if (img->bitspersample == 8)
+				if (img->bitspersample == 8 || img->bitspersample == 16)
 					img->put.contig = initCIELabConversion(img);
 				break;
 			}
