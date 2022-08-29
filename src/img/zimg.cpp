@@ -19,8 +19,8 @@
 #include <algorithm>
 
 DEFINE_bool(atlas_optimize_resize_with_dimension_shuffle,
-            false,
-            "Whether to optimize resize with dimension shuffle, default is false");
+            true,
+            "Whether to optimize resize with dimension shuffle, default is true");
 
 namespace {
 
@@ -1539,7 +1539,8 @@ ZImg ZImg::resized(size_t desWidth,
 
   res = ZImg(info);
 
-  if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && desWidth == width() && desDepth != depth()) {
+  if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && !useMultithreading && desWidth == width() &&
+      desDepth != depth()) {
     ZImgInfo transposedInfo = m_info;
     // XYZ to ZYX
     std::swap(transposedInfo.width, transposedInfo.depth);
@@ -1574,7 +1575,8 @@ ZImg ZImg::resized(size_t desWidth,
         ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(t), "ZYXCT", timeView);
       }
     }
-  } else if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && desHeight == height() && desDepth != depth()) {
+  } else if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && !useMultithreading && desHeight == height() &&
+             desDepth != depth()) {
     ZImgInfo transposedInfo = m_info;
     // XYZ to XZY
     std::swap(transposedInfo.height, transposedInfo.depth);

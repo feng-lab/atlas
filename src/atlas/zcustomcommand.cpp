@@ -1924,13 +1924,44 @@ void createEeumIndexImages()
   }
 }
 
+void imgResizeBenchmark()
+{
+  ZImg img = ZImg(ZImgInfo(64, 64, 75));
+  img.fillRandom();
+  ZBenchTimer bt;
+  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+  LOG(INFO) << img.depth();
+  STOP_AND_LOG(bt)
+
+  img = ZImg(ZImgInfo(64, 64, 175));
+  img.fillRandom();
+  bt.resetAndStart();
+  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+  LOG(INFO) << img.depth();
+  STOP_AND_LOG(bt)
+
+  img = ZImg(ZImgInfo(64, 64, 275));
+  img.fillRandom();
+  bt.resetAndStart();
+  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+  LOG(INFO) << img.depth();
+  STOP_AND_LOG(bt)
+
+  img = ZImg(ZImgInfo(64, 64, 375));
+  img.fillRandom();
+  bt.resetAndStart();
+  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+  LOG(INFO) << img.depth();
+  STOP_AND_LOG(bt)
+}
+
 } // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  createEeumIndexImages();
+  imgResizeBenchmark();
   LOG(INFO) << "done";
 }
 
