@@ -14,3 +14,6 @@
 
 # Whether readRegionToImg uses multithreaded resize, default is false
 --atlas_readRegionToImg_use_multithreaded_resize=false
+
+# Whether to optimize resize with dimension shuffle, default is true
+--atlas_optimize_resize_with_dimension_shuffle=true
