@@ -597,24 +597,24 @@ void Z3DImg::uploadImageCache(size_t channel)
           std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
         auto poolStats = p->getPoolStats();
         LOG(INFO) << fmt::format(
-          "pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}, remaining blocks: {}",
+          "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",
           poolStats.pendingTaskCount,
           poolStats.totalTaskCount,
           poolStats.activeThreadCount,
           poolStats.idleThreadCount,
-          poolStats.maxIdleTime,
+          imgQueue.size(),
           remainingBlocksToUpload);
         lastLogTime = std::chrono::steady_clock::now();
       }
     } else {
       auto poolStats = p->getPoolStats();
       LOG(INFO) << fmt::format(
-        "pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}, remaining blocks: {}",
+        "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",
         poolStats.pendingTaskCount,
         poolStats.totalTaskCount,
         poolStats.activeThreadCount,
         poolStats.idleThreadCount,
-        poolStats.maxIdleTime,
+        imgQueue.size(),
         remainingBlocksToUpload);
       lastLogTime = std::chrono::steady_clock::now();
     }
