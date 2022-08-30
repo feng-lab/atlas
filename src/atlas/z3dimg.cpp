@@ -608,12 +608,14 @@ void Z3DImg::uploadImageCache(size_t channel)
       }
     } else {
       auto poolStats = p->getPoolStats();
-      LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}",
-                               poolStats.pendingTaskCount,
-                               poolStats.totalTaskCount,
-                               poolStats.activeThreadCount,
-                               poolStats.idleThreadCount,
-                               poolStats.maxIdleTime);
+      LOG(INFO) << fmt::format(
+        "pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}, remaining blocks: {}",
+        poolStats.pendingTaskCount,
+        poolStats.totalTaskCount,
+        poolStats.activeThreadCount,
+        poolStats.idleThreadCount,
+        poolStats.maxIdleTime,
+        remainingBlocksToUpload);
       lastLogTime = std::chrono::steady_clock::now();
     }
   }
