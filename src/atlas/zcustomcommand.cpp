@@ -35,6 +35,8 @@
 #include <tbb/global_control.h>
 #include <grpcpp/grpcpp.h>
 
+DECLARE_bool(atlas_optimize_resize_with_dimension_shuffle);
+
 namespace nim {
 
 void zoomPVRawImages()
@@ -1926,33 +1928,33 @@ void createEeumIndexImages()
 
 void imgResizeBenchmark()
 {
-  ZImg img = ZImg(ZImgInfo(64, 64, 75));
-  img.fillRandom();
-  ZBenchTimer bt;
-  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-  LOG(INFO) << img.depth();
-  STOP_AND_LOG(bt)
+  bool oldValue = FLAGS_atlas_optimize_resize_with_dimension_shuffle;
+  for (auto depth : std::vector({75, 175, 275, 375, 475, 600, 800, 1200, 1400, 2000, 2500, 5000, 10000})) {
+    ZImg img = ZImg(ZImgInfo(64, 64, depth));
+    img.fillRandom();
+    ZBenchTimer bt;
 
-  img = ZImg(ZImgInfo(64, 64, 175));
-  img.fillRandom();
-  bt.resetAndStart();
-  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-  LOG(INFO) << img.depth();
-  STOP_AND_LOG(bt)
+    FLAGS_atlas_optimize_resize_with_dimension_shuffle = false;
+    img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+    bt.stop();
+    if (img.depth() < 24) {
+      LOG(INFO) << img.depth();
+    }
+    auto time = bt.time();
 
-  img = ZImg(ZImgInfo(64, 64, 275));
-  img.fillRandom();
-  bt.resetAndStart();
-  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-  LOG(INFO) << img.depth();
-  STOP_AND_LOG(bt)
+    img = ZImg(ZImgInfo(64, 64, depth));
+    img.fillRandom();
+    bt.resetAndStart();
+    FLAGS_atlas_optimize_resize_with_dimension_shuffle = true;
+    img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
+    bt.stop();
+    if (img.depth() < 24) {
+      LOG(INFO) << img.depth();
+    }
+    LOG(INFO) << "depth " << depth <<  " elasped time ratio: " << bt.time() / time;
+  }
 
-  img = ZImg(ZImgInfo(64, 64, 375));
-  img.fillRandom();
-  bt.resetAndStart();
-  img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-  LOG(INFO) << img.depth();
-  STOP_AND_LOG(bt)
+  FLAGS_atlas_optimize_resize_with_dimension_shuffle = oldValue;
 }
 
 } // namespace nim

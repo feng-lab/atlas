@@ -566,7 +566,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                          channel,
                          0,
                          resInfo)
-        .thenValue([=, &imgQueue](ZImg&& img) {
+        .thenValueInline([=, &imgQueue](ZImg&& img) {
 #ifdef ATLAS_uploadImageCache_USE_MPMCQueue
           imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
 #else

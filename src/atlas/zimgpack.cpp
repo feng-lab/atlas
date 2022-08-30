@@ -703,7 +703,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).thenInline([=, &resInfo](auto&&) {
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width,
                       resInfo.height,
