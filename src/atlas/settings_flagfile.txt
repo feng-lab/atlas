@@ -14,12 +14,3 @@
 
 # Whether readRegionToImg uses multithreaded resize, default is false
 --atlas_readRegionToImg_use_multithreaded_resize=false
-
-# Whether readRegionToImg uses ipp resize, default is false
---atlas_readRegionToImg_use_ipp_resize=false
-
-# Whether readRegionToImg uses iothreadpool, default is 0
---atlas_readRegionToImg_use_iothreadpool=0
-
-# Whether to optimize resize with dimension shuffle, default is true
---atlas_optimize_resize_with_dimension_shuffle=true

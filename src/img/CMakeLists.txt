@@ -317,7 +317,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor)
   target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
-  target_compile_options(${LIBRARY_NAME} PUBLIC /Zi)
+  # target_compile_options(${LIBRARY_NAME} PUBLIC /Zi)
 
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
