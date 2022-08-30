@@ -136,7 +136,7 @@ public:
   /**
    * Create a container with a given maximum size
    */
-  explicit ZThreadSafeLRUCache(size_t maxSize);
+  explicit ZThreadSafeLRUCache(size_t maxSize, bool canSkipDestructor = false);
 
   ZThreadSafeLRUCache(const ZThreadSafeLRUCache& other) = delete;
 
@@ -144,7 +144,9 @@ public:
 
   ~ZThreadSafeLRUCache()
   {
-    clear();
+    if (!m_canSkipDestructor) {
+      clear();
+    }
   }
 
   enum class FindStrategy
@@ -243,6 +245,8 @@ private:
   ListNode m_tail;
   typedef std::mutex ListMutex;
   ListMutex m_listMutex;
+
+  bool m_canSkipDestructor;
 };
 
 template<class TKey, class TValue, class THash>
@@ -250,10 +254,11 @@ typename ZThreadSafeLRUCache<TKey, TValue, THash>::ListNode* const
   ZThreadSafeLRUCache<TKey, TValue, THash>::OutOfListMarker = (ListNode*)-1;
 
 template<class TKey, class TValue, class THash>
-ZThreadSafeLRUCache<TKey, TValue, THash>::ZThreadSafeLRUCache(size_t maxSize)
+ZThreadSafeLRUCache<TKey, TValue, THash>::ZThreadSafeLRUCache(size_t maxSize, bool canSkipDestructor)
   : m_maxSize(maxSize)
   , m_size(0)
   , m_map(std::thread::hardware_concurrency() * 4) // it will automatically grow
+  , m_canSkipDestructor(canSkipDestructor)
 {
   m_head.m_prev = nullptr;
   m_head.m_next = &m_tail;

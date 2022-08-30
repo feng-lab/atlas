@@ -34,7 +34,7 @@ struct ZThreadSafeScalableCache
    *     "hardware concurrency" will be used (typically the logical processor
    *     count).
    */
-  explicit ZThreadSafeScalableCache(size_t maxSize, size_t numShards = 0);
+  explicit ZThreadSafeScalableCache(size_t maxSize, size_t numShards = 0, bool canSkipDestructor = false);
 
   ZThreadSafeScalableCache(const ZThreadSafeScalableCache&) = delete;
 
@@ -102,7 +102,9 @@ private:
 };
 
 template<class TKey, class TValue, class THash>
-ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t maxSize, size_t numShards)
+ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t maxSize,
+                                                                        size_t numShards,
+                                                                        bool canSkipDestructor)
   : m_maxSize(maxSize)
   , m_numShards(numShards)
 {
@@ -114,7 +116,7 @@ ZThreadSafeScalableCache<TKey, TValue, THash>::ZThreadSafeScalableCache(size_t m
     if (i == 0) {
       s += maxSize % m_numShards;
     }
-    m_shards.emplace_back(std::make_shared<Shard>(s));
+    m_shards.emplace_back(std::make_shared<Shard>(s, canSkipDestructor));
   }
 }
 

@@ -22,13 +22,14 @@ ZImgCache::ZImgCache()
 #else
 ZImgCache& ZImgCache::instance()
 {
-  static ZImgCache imgCache;
+  static ZImgCache imgCache(true);
   return imgCache;
 }
 
-ZImgCache::ZImgCache()
+ZImgCache::ZImgCache(bool canSkipDestructor)
   : ZThreadSafeScalableImageCache(ZCpuInfo::instance().nPhysicalRAM * FLAGS_atlas_image_cache_memory_proportion,
-                                  ZCpuInfo::instance().nLogicalCores * 4)
+                                  ZCpuInfo::instance().nLogicalCores * 4,
+                                  canSkipDestructor)
 {}
 #endif
 

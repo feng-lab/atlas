@@ -254,7 +254,7 @@ public:
 
   static ZImgCache& instance();
 
-  ZImgCache();
+  explicit ZImgCache(bool canSkipDestructor = false);
 
   inline void insert(const ImageCacheHashKeyType& key, std::shared_ptr<ZImg> object)
   {
