@@ -576,6 +576,7 @@ void Z3DImg::uploadImageCache(size_t channel)
     });
   }
   std::tuple<size_t, ZImg> elem;
+  auto lastLogTime = std::chrono::steady_clock::now();
   int remainingBlocksToUpload = static_cast<int>(m_channelPendingUpdates[channel].size());
   while (remainingBlocksToUpload > 0) {
 #ifdef ATLAS_uploadImageCache_USE_MPMCQueue
@@ -592,6 +593,19 @@ void Z3DImg::uploadImageCache(size_t channel)
                                                     m_imageBlockSize + m_imageBlockSizePad,
                                                     std::get<1>(elem).channelData(0));
       --remainingBlocksToUpload;
+      if (std::chrono::steady_clock::now() - lastLogTime >=
+          std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
+        auto poolStats = p->getPoolStats();
+        LOG(INFO) << fmt::format(
+          "pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}, remaining blocks: {}",
+          poolStats.pendingTaskCount,
+          poolStats.totalTaskCount,
+          poolStats.activeThreadCount,
+          poolStats.idleThreadCount,
+          poolStats.maxIdleTime,
+          remainingBlocksToUpload);
+        lastLogTime = std::chrono::steady_clock::now();
+      }
     } else {
       auto poolStats = p->getPoolStats();
       LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}, maxIdleTime: {}",
@@ -600,6 +614,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                                poolStats.activeThreadCount,
                                poolStats.idleThreadCount,
                                poolStats.maxIdleTime);
+      lastLogTime = std::chrono::steady_clock::now();
     }
   }
   STOP_AND_LOG(bt_async)
