@@ -282,7 +282,7 @@ private:
   using TileCornerType = bg::model::point<index_t, 3, bg::cs::cartesian>;
   using TileBoxType = bg::model::box<TileCornerType>;
   using RTreeValueType = std::pair<TileBoxType, size_t>;
-  using RTreeType = bgi::rtree<RTreeValueType, bgi::quadratic<16>>;
+  using RTreeType = bgi::rtree<RTreeValueType, bgi::rstar<16>>;
   using RTToTileBoxRTreeType = std::map<RTType, std::unique_ptr<RTreeType>>;
   RTToTileBoxRTreeType m_rtToTileBoxRTree{};
 
