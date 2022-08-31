@@ -6,6 +6,7 @@
 #include "zioutils.h"
 #include "zlog.h"
 #include "zmemorymappedfilecache.h"
+#include "zbenchtimer.h"
 #include <QFile>
 #include <QMutexLocker>
 #include <QProcess>
@@ -582,7 +583,9 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
         return res;
       }
 
+      // ZBenchTimer bt;
       auto codec = folly::io::getCodec(folly::io::CodecType::ZLIB, folly::io::COMPRESSION_LEVEL_DEFAULT);
+      // STOP_AND_LOG(bt);
       res = std::make_shared<ZImg>(m_chunkImgInfo);
       if (m_mmf) {
         for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
@@ -592,6 +595,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
           }
           if (hdf5Tile.compressed) {
             m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
+            // bt.pause();
             auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
             // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
             // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
@@ -601,6 +605,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             // auto decompressedBuf = codec->uncompress(ioBuf.get());
             // LOG(INFO) << decompressedBuf->length();
             auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
+            // STOP_AND_LOG(bt)
             std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
           } else {
             CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;

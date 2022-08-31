@@ -17,8 +17,8 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             "Whether readRegionToImg uses multithreaded resize, default is true");
 
 DEFINE_uint32(atlas_readRegionToImg_version,
-              1,
-              "Which version of readRegionToImg to use, value can be 0 or 1, default is 1");
+              0,
+              "Which version of readRegionToImg to use, value can be 0 or 1, default is 0");
 
 // DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
 //             false,
@@ -629,15 +629,16 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                         }
                         return folly::collect(tileFutures);
                       })
-      .thenValueInline([=](const auto& tiles) {
+      .via(cpuExecutor)
+      .then([=](const auto& tiles) {
         ZImg res;
-        if (!tiles.empty()) {
+        if (tiles.hasValue() && !tiles.value().empty()) {
           auto tmpResInfo = resInfo;
           tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
           tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
           tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
           res = ZImg(tmpResInfo);
-          for (const auto& [start, imgPtr] : tiles) {
+          for (const auto& [start, imgPtr] : tiles.value()) {
             if (imgPtr->isSameType(res)) {
               if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
                 ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
@@ -714,7 +715,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).thenInline([=, &resInfo](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width,
                       resInfo.height,
