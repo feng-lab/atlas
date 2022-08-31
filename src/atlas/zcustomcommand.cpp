@@ -35,8 +35,6 @@
 #include <tbb/global_control.h>
 #include <grpcpp/grpcpp.h>
 
-DECLARE_bool(atlas_optimize_resize_with_dimension_shuffle);
-
 namespace nim {
 
 void zoomPVRawImages()
@@ -1928,55 +1926,25 @@ void createEeumIndexImages()
 
 void imgResizeBenchmark()
 {
-  bool oldValue = FLAGS_atlas_optimize_resize_with_dimension_shuffle;
   for (auto depth : std::vector({75, 175, 275, 375, 475, 600, 800, 1200, 1400, 2000, 2500, 5000, 10000})) {
     ZImg img = ZImg(ZImgInfo(64, 64, depth));
     img.fillRandom();
     ZBenchTimer bt;
-
-    FLAGS_atlas_optimize_resize_with_dimension_shuffle = false;
     img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-    bt.stop();
+    STOP_AND_LOG(bt)
     if (img.depth() < 24) {
       LOG(INFO) << img.depth();
     }
-    auto time = bt.time();
 
     img = ZImg(ZImgInfo(64, 64, depth));
     img.fillRandom();
     bt.resetAndStart();
-    FLAGS_atlas_optimize_resize_with_dimension_shuffle = true;
-    img.resize(64, 64, 64, Interpolant::Cubic, true, false, false);
-    bt.stop();
-    if (img.depth() < 24) {
-      LOG(INFO) << img.depth();
-    }
-    LOG(INFO) << "depth " << depth <<  " elasped time ratio: " << bt.time() / time;
-
-    img = ZImg(ZImgInfo(64, 64, depth));
-    img.fillRandom();
-    bt.resetAndStart();
-    FLAGS_atlas_optimize_resize_with_dimension_shuffle = false;
     img.resize(64, 64, 64);
-    bt.stop();
+    STOP_AND_LOG(bt)
     if (img.depth() < 24) {
       LOG(INFO) << img.depth();
     }
-    time = bt.time();
-
-    img = ZImg(ZImgInfo(64, 64, depth));
-    img.fillRandom();
-    bt.resetAndStart();
-    FLAGS_atlas_optimize_resize_with_dimension_shuffle = true;
-    img.resize(64, 64, 64);
-    bt.stop();
-    if (img.depth() < 24) {
-      LOG(INFO) << img.depth();
-    }
-    LOG(INFO) << "depth " << depth <<  " mt elasped time ratio: " << bt.time() / time;
   }
-
-  FLAGS_atlas_optimize_resize_with_dimension_shuffle = oldValue;
 }
 
 } // namespace nim

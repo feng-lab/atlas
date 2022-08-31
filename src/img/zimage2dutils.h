@@ -906,6 +906,28 @@ struct Resize2DForOneBlock
           m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(m_img[m_yIndices[y] * m_width + m_xIndices[x]]);
         }
       }
+    } else if (m_xKernelWidth == 1) {
+      for (size_t y = range.begin(); y != range.end(); ++y) {
+        for (size_t x = 0; x < m_outWidth; ++x) {
+          double valxy = 0;
+          for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+            valxy += m_yWeights[y * m_yKernelWidth + ky] *
+                     m_img[m_yIndices[y * m_yKernelWidth + ky] * m_width + m_xIndices[x]];
+          }
+          m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(valxy);
+        }
+      }
+    } else if (m_yKernelWidth == 1) {
+      for (size_t y = range.begin(); y != range.end(); ++y) {
+        for (size_t x = 0; x < m_outWidth; ++x) {
+          double valx = 0;
+          for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+            valx += m_xWeights[x * m_xKernelWidth + kx] *
+                    m_img[m_yIndices[y] * m_width + m_xIndices[x * m_xKernelWidth + kx]];
+          }
+          m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(valx);
+        }
+      }
     } else {
       for (size_t y = range.begin(); y != range.end(); ++y) {
         for (size_t x = 0; x < m_outWidth; ++x) {

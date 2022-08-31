@@ -161,37 +161,57 @@ void _resizeContributions(size_t inLength,
   switch (interpolant) {
     case Interpolant::Nearest:
       if (scale < 1 && antialiasing) {
-        weights = weights.unaryExpr([scale](double x) -> double { return scale * nearest_kernel(x * scale); });
+        weights = weights.unaryExpr([scale](double x) -> double {
+          return scale * nearest_kernel(x * scale);
+        });
       } else {
-        weights = weights.unaryExpr([](double x) -> double { return nearest_kernel(x); });
+        weights = weights.unaryExpr([](double x) -> double {
+          return nearest_kernel(x);
+        });
       }
       break;
     case Interpolant::Linear:
       if (scale < 1 && antialiasing) {
-        weights = weights.unaryExpr([scale](double x) -> double { return scale * linear_kernel(x * scale); });
+        weights = weights.unaryExpr([scale](double x) -> double {
+          return scale * linear_kernel(x * scale);
+        });
       } else {
-        weights = weights.unaryExpr([](double x) -> double { return linear_kernel(x); });
+        weights = weights.unaryExpr([](double x) -> double {
+          return linear_kernel(x);
+        });
       }
       break;
     case Interpolant::Cubic:
       if (scale < 1 && antialiasing) {
-        weights = weights.unaryExpr([scale](double x) -> double { return scale * cubic_kernel(x * scale); });
+        weights = weights.unaryExpr([scale](double x) -> double {
+          return scale * cubic_kernel(x * scale);
+        });
       } else {
-        weights = weights.unaryExpr([](double x) -> double { return cubic_kernel(x); });
+        weights = weights.unaryExpr([](double x) -> double {
+          return cubic_kernel(x);
+        });
       }
       break;
     case Interpolant::Lanczos2:
       if (scale < 1 && antialiasing) {
-        weights = weights.unaryExpr([scale](double x) -> double { return scale * lanczos2_kernel(x * scale); });
+        weights = weights.unaryExpr([scale](double x) -> double {
+          return scale * lanczos2_kernel(x * scale);
+        });
       } else {
-        weights = weights.unaryExpr([](double x) -> double { return lanczos2_kernel(x); });
+        weights = weights.unaryExpr([](double x) -> double {
+          return lanczos2_kernel(x);
+        });
       }
       break;
     case Interpolant::Lanczos3:
       if (scale < 1 && antialiasing) {
-        weights = weights.unaryExpr([scale](double x) -> double { return scale * lanczos3_kernel(x * scale); });
+        weights = weights.unaryExpr([scale](double x) -> double {
+          return scale * lanczos3_kernel(x * scale);
+        });
       } else {
-        weights = weights.unaryExpr([](double x) -> double { return lanczos3_kernel(x); });
+        weights = weights.unaryExpr([](double x) -> double {
+          return lanczos3_kernel(x);
+        });
       }
       break;
   }
@@ -218,8 +238,9 @@ void _resizeContributions(size_t inLength,
   }
   CHECK(idx == weightsOut.size());
 
-  // logContainer(INFO, weightsOut.begin(), weightsOut.end(), kernelWidthOut, "weights");
-  // logContainer(INFO, indicesOut.begin(), indicesOut.end(), kernelWidthOut, "indices");
+  //  LOG(INFO) << kernelWidthOut;
+  //  LOG(INFO) << qtTypeToQString(weightsOut);
+  //  LOG(INFO) << qtTypeToQString(indicesOut);
 }
 
 } // namespace nim

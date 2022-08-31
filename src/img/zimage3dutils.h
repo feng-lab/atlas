@@ -981,6 +981,102 @@ struct Resize3DForOneBlock
           }
         }
       }
+    } else if (m_xKernelWidth == 1 && m_yKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              valxyz +=
+                m_zWeights[z * m_zKernelWidth + kz] * m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height +
+                                                            m_yIndices[y] * m_width + m_xIndices[x]];
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_xKernelWidth == 1 && m_zKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+              valxyz += m_yWeights[y * m_yKernelWidth + ky] *
+                        m_img[m_zIndices[z] * m_width * m_height + m_yIndices[y * m_yKernelWidth + ky] * m_width +
+                              m_xIndices[x]];
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_yKernelWidth == 1 && m_zKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+              valxyz += m_xWeights[x * m_xKernelWidth + kx] *
+                        m_img[m_zIndices[z] * m_width * m_height + m_yIndices[y] * m_width +
+                              m_xIndices[x * m_xKernelWidth + kx]];
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_xKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              double valxy = 0;
+              for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+                valxy += m_yWeights[y * m_yKernelWidth + ky] *
+                         m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height +
+                               m_yIndices[y * m_yKernelWidth + ky] * m_width + m_xIndices[x]];
+              }
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] * valxy;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_yKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              double valx = 0;
+              for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+                valx += m_xWeights[x * m_xKernelWidth + kx] *
+                        m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height + m_yIndices[y] * m_width +
+                              m_xIndices[x * m_xKernelWidth + kx]];
+              }
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] * valx;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_zKernelWidth == 1) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxy = 0;
+            for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+              double valx = 0;
+              for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+                valx += m_xWeights[x * m_xKernelWidth + kx] *
+                        m_img[m_zIndices[z] * m_width * m_height + m_yIndices[y * m_yKernelWidth + ky] * m_width +
+                              m_xIndices[x * m_xKernelWidth + kx]];
+              }
+              valxy += m_yWeights[y * m_yKernelWidth + ky] * valx;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxy);
+          }
+        }
+      }
     } else {
       for (size_t z = range.begin(); z != range.end(); ++z) {
         for (size_t y = 0; y < m_outHeight; ++y) {

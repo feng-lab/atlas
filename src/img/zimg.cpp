@@ -18,10 +18,6 @@
 #include <ippi.h>
 #include <algorithm>
 
-DEFINE_bool(atlas_optimize_resize_with_dimension_shuffle,
-            true,
-            "Whether to optimize resize with dimension shuffle, default is true");
-
 namespace {
 
 struct MinOp
@@ -1538,82 +1534,7 @@ ZImg ZImg::resized(size_t desWidth,
   info.depth = desDepth;
 
   res = ZImg(info);
-
-  if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && !useMultithreading && desWidth == width() &&
-      desDepth != depth()) {
-    ZImgInfo transposedInfo = m_info;
-    // XYZ to ZYX
-    std::swap(transposedInfo.width, transposedInfo.depth);
-    ZImg transposedImg(transposedInfo);
-    if (numTimes() == 1) {
-      ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "ZYXCT", transposedImg);
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        auto timeView = transposedImg.createView(-1, t);
-        ZImgFormat::fixDimensionOrder(timeData<uint8_t>(t), "ZYXCT", timeView);
-      }
-    }
-
-    ZImgInfo transposedResInfo = info;
-    std::swap(transposedResInfo.width, transposedResInfo.depth);
-    ZImg transposedRes(transposedResInfo);
-    // LOG(INFO) << transposedImg.info().toString();
-    // LOG(INFO) << transposedRes.info().toString();
-    IMG_TYPED_CALL(transposedImg.resize_Impl,
-                   m_info,
-                   transposedRes,
-                   interpolant,
-                   antialiasing,
-                   antialiasingForNearest,
-                   useMultithreading)
-    // ZYX to XYZ
-    if (numTimes() == 1) {
-      ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "ZYXCT", res);
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        auto timeView = res.createView(-1, t);
-        ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(t), "ZYXCT", timeView);
-      }
-    }
-  } else if (FLAGS_atlas_optimize_resize_with_dimension_shuffle && !useMultithreading && desHeight == height() &&
-             desDepth != depth()) {
-    ZImgInfo transposedInfo = m_info;
-    // XYZ to XZY
-    std::swap(transposedInfo.height, transposedInfo.depth);
-    ZImg transposedImg(transposedInfo);
-    if (numTimes() == 1) {
-      ZImgFormat::fixDimensionOrder(timeData<uint8_t>(0), "XZYCT", transposedImg);
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        auto timeView = transposedImg.createView(-1, t);
-        ZImgFormat::fixDimensionOrder(timeData<uint8_t>(t), "XZYCT", timeView);
-      }
-    }
-
-    ZImgInfo transposedResInfo = info;
-    std::swap(transposedResInfo.height, transposedResInfo.depth);
-    ZImg transposedRes(transposedResInfo);
-    // LOG(INFO) << transposedImg.info().toString();
-    // LOG(INFO) << transposedRes.info().toString();
-    IMG_TYPED_CALL(transposedImg.resize_Impl,
-                   m_info,
-                   transposedRes,
-                   interpolant,
-                   antialiasing,
-                   antialiasingForNearest,
-                   useMultithreading)
-    // XZY to XYZ
-    if (numTimes() == 1) {
-      ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(0), "XZYCT", res);
-    } else {
-      for (size_t t = 0; t < numTimes(); ++t) {
-        auto timeView = res.createView(-1, t);
-        ZImgFormat::fixDimensionOrder(transposedRes.timeData<uint8_t>(t), "XZYCT", timeView);
-      }
-    }
-  } else {
-    IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
-  }
+  IMG_TYPED_CALL(resize_Impl, m_info, res, interpolant, antialiasing, antialiasingForNearest, useMultithreading)
 
   return res;
 }

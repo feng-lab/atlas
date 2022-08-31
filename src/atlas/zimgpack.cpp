@@ -17,8 +17,8 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             "Whether readRegionToImg uses multithreaded resize, default is true");
 
 DEFINE_uint32(atlas_readRegionToImg_version,
-              0,
-              "Which version of readRegionToImg to use, value can be 0 or 1, default is 0");
+              1,
+              "Which version of readRegionToImg to use, value can be 0 or 1, default is 1");
 
 // DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
 //             false,
