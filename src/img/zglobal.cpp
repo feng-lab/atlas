@@ -1,15 +1,14 @@
 #include "zglobal.h"
 
-#include "zcpuinfo.h"
 #include <folly/executors/CPUThreadPoolExecutor.h>
+#include <thread>
 
 namespace nim {
 
 folly::Executor::KeepAlive<> getGlobalCPUExecutor()
 {
-  size_t nthreads = ZCpuInfo::instance().nLogicalCores * 2;
-  static folly::CPUThreadPoolExecutor cpuExecutor(nthreads,
-                                                  16,
+  static folly::CPUThreadPoolExecutor cpuExecutor(std::thread::hardware_concurrency(),
+                                                  8,
                                                   std::make_shared<folly::NamedThreadFactory>("GlobalCPUThreadPool"));
   return folly::getKeepAliveToken(&cpuExecutor);
 }
