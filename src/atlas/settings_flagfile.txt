@@ -15,8 +15,8 @@
 # Which version of readRegionToImg to use, value can be 0 or 1, default is 0
 --atlas_readRegionToImg_version=0
 
-# Whether readRegionToImg uses multithreaded resize, default is false
---atlas_readRegionToImg_use_multithreaded_resize=false
+# Whether readRegionToImg uses multithreaded resize, default is true
+--atlas_readRegionToImg_use_multithreaded_resize=true
 
 # Whether to optimize resize with dimension shuffle, default is true
 --atlas_optimize_resize_with_dimension_shuffle=true
