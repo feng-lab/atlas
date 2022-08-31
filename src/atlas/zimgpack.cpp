@@ -16,6 +16,10 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
             false,
             "Whether readRegionToImg uses multithreaded resize, default is false");
 
+DEFINE_uint32(atlas_readRegionToImg_version,
+              0,
+              "Which version of readRegionToImg to use, value can be 0 or 1, default is 0");
+
 // DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
 //             false,
 //             "Whether readRegionToImg uses ipp resize, default is false");
@@ -535,20 +539,23 @@ void ZImgPack::readRegionToImg(index_t xyRatio,
   res = ZImg(tmpResInfo);
   auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
   if (tiit != m_rtToTileBoxRTree.end()) {
-    std::vector<RTreeValueType> queryResult;
+    std::vector<size_t> queryResult;
     TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
                          TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
                                         (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
                                         (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
-    tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-    for (auto& i : queryResult) {
-      const ZImgSubBlock& tile = *m_allTiles[i.second].get();
+    tiit->second->query(bgi::intersects(queryBox),
+                        boost::make_function_output_iterator([&queryResult](const auto& value) {
+                          queryResult.push_back(value.second);
+                        }));
+    for (auto& tileIndex : queryResult) {
+      const ZImgSubBlock& tile = *m_allTiles[tileIndex].get();
       ZVoxelCoordinate start(std::round((tile.x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                              std::round((tile.y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
                              std::round((tile.z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                              -ZVoxelCoordinate::value_type(sc),
                              0);
-      auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second),
+      auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex),
                                                     tile,
                                                     ZImgCache::FindStategy::NoUpdateLRUList);
       if (imgPtr->isSameType(res)) {
@@ -587,92 +594,96 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                               size_t t,
                                               const ZImgInfo& resInfo) const
 {
-#if 0
-  CHECK(xyRatio >= 1 && zRatio >= 1);
-  auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
-  auto cpuExecutor = folly::getGlobalCPUExecutor();
-  return folly::via(cpuExecutor,
-                    [=]() {
-                      auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
-                      std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
-                      if (tiit != m_rtToTileBoxRTree.end()) {
-                        std::vector<RTreeValueType> queryResult;
-                        TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
-                                             TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
-                                                            (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
-                                                            (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
-                        tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
-
-                        for (auto& i : queryResult) {
-                          const ZImgSubBlock* tile = m_allTiles[i.second].get();
-                          tileFutures.push_back(folly::via(cpuExecutor, [=]() {
-                            return std::make_tuple(
-                              ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
-                                               std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
-                                               std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
-                                               -ZVoxelCoordinate::value_type(sc),
-                                               0),
-                              ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, i.second), *tile));
-                          }));
-                        }
-                      }
-                      return folly::collect(tileFutures);
-                    })
-    .via(cpuExecutor)
-    .thenValue([=](const std::vector<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>& tiles) {
-      ZImg res;
-      if (!tiles.empty()) {
-        auto tmpResInfo = resInfo;
-        tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
-        tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
-        tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
-        res = ZImg(tmpResInfo);
-        for (const auto& [start, imgPtr] : tiles) {
-          if (imgPtr->isSameType(res)) {
-            if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
-              ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
-              res.pasteImg(tmp, start);
-            } else {
-              res.pasteImg(*imgPtr, start);
-            }
-          } else {
-            ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
-            res.pasteImg(tmp, start);
-          }
-        }
-        if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
-          res->resize(resInfo.width,
-                        resInfo.height,
-                        resInfo.depth,
-                        Interpolant::Cubic,
-                        true,
-                        false,
-                        FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
-        }
-      } else {
-        res = ZImg(resInfo);
-      }
-      return res;
-    });
-#else
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  return folly::via(cpuExecutor, [=, &resInfo]() {
+  if (FLAGS_atlas_readRegionToImg_version == 0) {
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
-    std::vector<size_t> queryResult;
-    if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
-        tiit != m_rtToTileBoxRTree.end()) {
-      TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
-                           TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
-                                          (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
-                                          (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
-      tiit->second->query(bgi::intersects(queryBox),
-                          boost::make_function_output_iterator([&queryResult](const auto& value) {
-                            queryResult.push_back(value.second);
-                          }));
-    }
+    return folly::via(cpuExecutor,
+                      [=]() {
+                        std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
+                        if (auto tiit =
+                              m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+                            tiit != m_rtToTileBoxRTree.end()) {
+                          std::vector<size_t> queryResult;
+                          TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
+                                               TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                                              (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                                              (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+                          tiit->second->query(bgi::intersects(queryBox),
+                                              boost::make_function_output_iterator([&queryResult](const auto& value) {
+                                                queryResult.push_back(value.second);
+                                              }));
 
-    if (!queryResult.empty()) {
+                          for (auto tileIndex : queryResult) {
+                            const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
+                            tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+                              return std::make_tuple(
+                                ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                                 std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                                 std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                                 -ZVoxelCoordinate::value_type(sc),
+                                                 0),
+                                ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile));
+                            }));
+                          }
+                        }
+                        return folly::collect(tileFutures);
+                      })
+      .thenValueInline([=](const auto& tiles) {
+        ZImg res;
+        if (!tiles.empty()) {
+          auto tmpResInfo = resInfo;
+          tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+          tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+          tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+          res = ZImg(tmpResInfo);
+          for (const auto& [start, imgPtr] : tiles) {
+            if (imgPtr->isSameType(res)) {
+              if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
+                ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+                res.pasteImg(tmp, start);
+              } else {
+                res.pasteImg(*imgPtr, start);
+              }
+            } else {
+              ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+              res.pasteImg(tmp, start);
+            }
+          }
+          if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
+            res.resize(resInfo.width,
+                       resInfo.height,
+                       resInfo.depth,
+                       Interpolant::Cubic,
+                       true,
+                       false,
+                       FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          }
+        } else {
+          res = ZImg(resInfo);
+        }
+        return res;
+      });
+  } else {
+    return folly::via(cpuExecutor, [=, &resInfo]() {
+      auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+      std::vector<size_t> queryResult;
+      if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+          tiit != m_rtToTileBoxRTree.end()) {
+        TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
+                             TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                            (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                            (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+        tiit->second->query(bgi::intersects(queryBox),
+                            boost::make_function_output_iterator([&queryResult](const auto& value) {
+                              queryResult.push_back(value.second);
+                            }));
+      }
+
+      if (queryResult.empty()) {
+        return folly::makeFuture(ZImg(resInfo));
+      }
+
       auto tmpResInfo = resInfo;
       tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
       tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
@@ -718,10 +729,8 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
         delete res;
         return rres;
       });
-    }
-    return folly::makeFuture(ZImg(resInfo));
-  });
-#endif
+    });
+  }
 }
 
 std::set<ImageCacheHashKeyType> ZImgPack::collectCacheKeysForReadRegionToImg(index_t xyRatio,

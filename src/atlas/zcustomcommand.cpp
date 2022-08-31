@@ -1952,6 +1952,28 @@ void imgResizeBenchmark()
       LOG(INFO) << img.depth();
     }
     LOG(INFO) << "depth " << depth <<  " elasped time ratio: " << bt.time() / time;
+
+    img = ZImg(ZImgInfo(64, 64, depth));
+    img.fillRandom();
+    bt.resetAndStart();
+    FLAGS_atlas_optimize_resize_with_dimension_shuffle = false;
+    img.resize(64, 64, 64);
+    bt.stop();
+    if (img.depth() < 24) {
+      LOG(INFO) << img.depth();
+    }
+    time = bt.time();
+
+    img = ZImg(ZImgInfo(64, 64, depth));
+    img.fillRandom();
+    bt.resetAndStart();
+    FLAGS_atlas_optimize_resize_with_dimension_shuffle = true;
+    img.resize(64, 64, 64);
+    bt.stop();
+    if (img.depth() < 24) {
+      LOG(INFO) << img.depth();
+    }
+    LOG(INFO) << "depth " << depth <<  " mt elasped time ratio: " << bt.time() / time;
   }
 
   FLAGS_atlas_optimize_resize_with_dimension_shuffle = oldValue;
