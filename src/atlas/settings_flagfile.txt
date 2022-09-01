@@ -12,8 +12,11 @@
 # Interval in seconds for logging folly global executor status during waiting, default is 5
 --atlas_log_folly_global_executor_status_interval_in_seconds=5
 
-# Which version of readRegionToImg to use, value can be 0, 1, or 2, default is 0
+# Which version of readRegionToImg to use, value can be 0-3, default is 0
 --atlas_readRegionToImg_version=0
 
 # Whether readRegionToImg uses multithreaded resize, default is true
 --atlas_readRegionToImg_use_multithreaded_resize=true
+
+# Use PBO when number of blocks to upload is larger than this threashold, default is 10
+--atlas_number_of_blocks_to_use_PBO_threashold=10
