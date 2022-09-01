@@ -5,6 +5,7 @@
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
 #include "z3dvolume.h"
+#include "zvertexbufferobject.h"
 #include "zbbox.h"
 #include <QObject>
 #include <set>
@@ -204,6 +205,8 @@ private:
 
   std::vector<std::vector<std::pair<glm::uvec3, glm::uvec4>>>
     m_channelPendingUpdates; // block cache pos and block image pos
+
+  ZVertexBufferObject m_PBO;
 };
 
 } // namespace nim

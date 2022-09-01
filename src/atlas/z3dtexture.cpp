@@ -114,7 +114,7 @@ void Z3DTexture::uploadImage(const GLvoid* data) const
 
 void Z3DTexture::uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const
 {
-  CHECK(data);
+  // CHECK(data);  should not check when we use PBO
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();
