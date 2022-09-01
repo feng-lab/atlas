@@ -551,16 +551,15 @@ void Z3DImg::uploadImageCache(size_t channel)
 
   ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
 
-  ZImgInfo resInfo(m_imageBlockSize.x + m_imageBlockSizePad.x,
-                   m_imageBlockSize.y + m_imageBlockSizePad.y,
-                   m_imageBlockSize.z + m_imageBlockSizePad.z,
-                   1);
+  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
+  ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
+  auto blockSizeInByte = resInfo.byteNumber();
 
   uint8_t* pboPtr = nullptr;
   if (m_channelPendingUpdates[channel].size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
     m_PBO.bind(GL_PIXEL_UNPACK_BUFFER);
     glBufferData(GL_PIXEL_UNPACK_BUFFER,
-                 resInfo.byteNumber() * m_channelPendingUpdates[channel].size(),
+                 blockSizeInByte * m_channelPendingUpdates[channel].size(),
                  nullptr,
                  GL_STREAM_DRAW);
     pboPtr = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
@@ -592,7 +591,7 @@ void Z3DImg::uploadImageCache(size_t channel)
 #ifdef ATLAS_uploadImageCache_USE_MPMCQueue
             imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
 #else
-          imgQueue.enqueue(std::make_tuple(i, std::move(img)));
+            imgQueue.enqueue(std::make_tuple(i, std::move(img)));
 #endif
           });
       });
@@ -612,7 +611,7 @@ void Z3DImg::uploadImageCache(size_t channel)
               std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
 #endif
         m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
-                                                      m_imageBlockSize + m_imageBlockSizePad,
+                                                      imageBlockSize,
                                                       std::get<1>(elem).channelData(0));
         --remainingBlocksToUpload;
         if (std::chrono::steady_clock::now() - lastLogTime >=
@@ -655,8 +654,8 @@ void Z3DImg::uploadImageCache(size_t channel)
                            channel,
                            0,
                            resInfo)
-          .thenValueInline([=, &latch, &resInfo](ZImg&& img) {
-            memcpy(pboPtr + i * resInfo.byteNumber(), img.channelData(0), resInfo.byteNumber());
+          .thenValueInline([=, &latch](ZImg&& img) {
+            memcpy(pboPtr + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
             latch.count_down();
           });
       });
@@ -676,8 +675,8 @@ void Z3DImg::uploadImageCache(size_t channel)
     ZBenchTimer bt_pboUpload("PBO uploading");
     for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
       m_imageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
-                                                    m_imageBlockSize + m_imageBlockSizePad,
-                                                    (const void*)(i * resInfo.byteNumber()));
+                                                    imageBlockSize,
+                                                    (const void*)(i * blockSizeInByte));
     }
     STOP_AND_LOG(bt_pboUpload)
 
