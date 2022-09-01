@@ -556,6 +556,7 @@ void Z3DImg::uploadImageCache(size_t channel)
   auto blockSizeInByte = resInfo.byteNumber();
 
   uint8_t* pboPtr = nullptr;
+  std::vector<uint8_t> pboLocalBuffer;
   if (m_channelPendingUpdates[channel].size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
     m_PBO.bind(GL_PIXEL_UNPACK_BUFFER);
     glBufferData(GL_PIXEL_UNPACK_BUFFER,
@@ -567,6 +568,7 @@ void Z3DImg::uploadImageCache(size_t channel)
       LOG(WARNING) << "glMapBuffer failed on PBO";
       m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
     }
+    pboLocalBuffer.resize(blockSizeInByte * m_channelPendingUpdates[channel].size());
   }
 
   if (!pboPtr) {
@@ -644,7 +646,7 @@ void Z3DImg::uploadImageCache(size_t channel)
     folly::Latch latch(m_channelPendingUpdates[channel].size());
     for (int i = 0; i < static_cast<int>(m_channelPendingUpdates[channel].size()); ++i) {
       const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-      auto f = folly::via(cpuExecutor, [=, &latch, &resInfo]() {
+      auto f = folly::via(cpuExecutor, [=, &latch, &resInfo, &pboLocalBuffer]() {
         return m_imgPack
           .readRegionToImg(m_levelScales[blockImagePos.x].x,
                            m_levelScales[blockImagePos.x].z,
@@ -654,8 +656,8 @@ void Z3DImg::uploadImageCache(size_t channel)
                            channel,
                            0,
                            resInfo)
-          .thenValueInline([=, &latch](ZImg&& img) {
-            memcpy(pboPtr + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
+          .thenValueInline([=, &latch, &pboLocalBuffer](ZImg&& img) {
+            memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
             latch.count_down();
           });
       });
@@ -670,6 +672,7 @@ void Z3DImg::uploadImageCache(size_t channel)
                                poolStats.activeThreadCount,
                                poolStats.idleThreadCount);
     }
+    memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
     glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
     ZBenchTimer bt_pboUpload("PBO uploading");
