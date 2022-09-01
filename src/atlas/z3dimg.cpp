@@ -567,8 +567,9 @@ void Z3DImg::uploadImageCache(size_t channel)
     if (!pboPtr) {
       LOG(WARNING) << "glMapBuffer failed on PBO";
       m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
+    } else {
+      pboLocalBuffer.resize(blockSizeInByte * m_channelPendingUpdates[channel].size());
     }
-    pboLocalBuffer.resize(blockSizeInByte * m_channelPendingUpdates[channel].size());
   }
 
   if (!pboPtr) {
