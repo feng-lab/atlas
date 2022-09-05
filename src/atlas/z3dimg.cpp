@@ -578,9 +578,11 @@ void Z3DImg::uploadImageCache(size_t channel)
 #else
     folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
 #endif
+    std::vector<folly::Future<folly::Unit>> blockFutures;
+    blockFutures.reserve(m_channelPendingUpdates[channel].size());
     for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
       const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-      auto f = folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
+      blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
         return m_imgPack
           .readRegionToImg(m_levelScales[blockImagePos.x].x,
                            m_levelScales[blockImagePos.x].z,
@@ -597,8 +599,12 @@ void Z3DImg::uploadImageCache(size_t channel)
             imgQueue.enqueue(std::make_tuple(i, std::move(img)));
 #endif
           });
-      });
+      }));
     }
+    auto f = folly::collect(blockFutures).via(cpuExecutor).then([](auto&&) {
+      LOG(INFO) << "image blocks reading finished.";
+    });
+
     std::tuple<size_t, ZImg> elem;
     auto lastLogTime = std::chrono::steady_clock::now();
     int remainingBlocksToUpload = static_cast<int>(m_channelPendingUpdates[channel].size());
@@ -644,10 +650,11 @@ void Z3DImg::uploadImageCache(size_t channel)
       }
     }
   } else {
-    folly::Latch latch(m_channelPendingUpdates[channel].size());
+    std::vector<folly::Future<folly::Unit>> blockFutures;
+    blockFutures.reserve(m_channelPendingUpdates[channel].size());
     for (int i = 0; i < static_cast<int>(m_channelPendingUpdates[channel].size()); ++i) {
       const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-      auto f = folly::via(cpuExecutor, [=, &latch, &resInfo, &pboLocalBuffer]() {
+      blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer]() {
         return m_imgPack
           .readRegionToImg(m_levelScales[blockImagePos.x].x,
                            m_levelScales[blockImagePos.x].z,
@@ -657,15 +664,17 @@ void Z3DImg::uploadImageCache(size_t channel)
                            channel,
                            0,
                            resInfo)
-          .thenValueInline([=, &latch, &pboLocalBuffer](ZImg&& img) {
+          .thenValueInline([=, &pboLocalBuffer](ZImg&& img) {
             memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
-            latch.count_down();
           });
-      });
+      }));
     }
-    while (
-      !latch.try_wait_until(std::chrono::steady_clock::now() +
-                            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
+    auto f = folly::collect(blockFutures).via(cpuExecutor).then([=, &pboLocalBuffer](auto&&) {
+      memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
+      LOG(INFO) << "image blocks reading finished.";
+    });
+
+    while (!f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
       auto poolStats = p->getPoolStats();
       LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
                                poolStats.pendingTaskCount,
@@ -673,7 +682,6 @@ void Z3DImg::uploadImageCache(size_t channel)
                                poolStats.activeThreadCount,
                                poolStats.idleThreadCount);
     }
-    memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
     glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
     ZBenchTimer bt_pboUpload("PBO uploading");
