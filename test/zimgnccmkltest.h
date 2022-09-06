@@ -177,8 +177,8 @@ TEST(ZImgNCC, fft_mkl_pocketfft)
         ZVoxelCoordinate::random(std::array<size_t, 5>({cimg_mkl.width(), cimg_mkl.height(), cimg_mkl.depth(), 1, 1}));
       auto mkl = cimg_mkl.rawData()[coord.x + coord.y * cimg_mkl.width() + coord.z * cimg_mkl.width() * cimg_mkl.height()];
       auto pfft = cimg_pocketfft.rawData()[coord.x + coord.y * cimg_mkl.width() + coord.z * cimg_mkl.width() * cimg_mkl.height()];
-      EXPECT_NEAR(mkl.real(), pfft.real(), 1e-8);
-      EXPECT_NEAR(mkl.imag(), pfft.imag(), 1e-8);
+      EXPECT_NEAR(mkl.real(), pfft.real(), 1e-7);
+      EXPECT_NEAR(mkl.imag(), pfft.imag(), 1e-7);
       // LOG(INFO) << "1";
     }
   }

@@ -223,8 +223,8 @@ void initImgLib(const char* argv0,
   itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
   mt.Print(std::cout);
 
-  if (!ZCpuInfo::instance().bSSE3) {
-    LOG(FATAL) << "CPU not supported. This program requires CPU with SSE3 support.";
+  if (!ZCpuInfo::instance().bAVX) {
+    LOG(FATAL) << "CPU not supported. This program requires CPU with AVX support.";
   }
 }
 
