@@ -11,8 +11,8 @@ DEFINE_uint32(zimg_global_fft_number_of_threads,
               "Number of threads fft will use, default is 0 which is hardware concurrency.");
 
 DEFINE_bool(zimg_use_mkl_for_fft_if_available,
-            true,
-            "Whether to use mkl for fft computation if available, default is true");
+            false,
+            "Whether to use mkl for fft computation if available, default is false");
 
 namespace nim {
 

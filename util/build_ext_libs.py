@@ -1199,6 +1199,27 @@ def build_eigen(src_dir: str, install_dir: str):
         #     os.replace(bak_file_2, orig_file_2)
 
 
+def build_pocketfft(src_dir: str, install_dir: str):
+    shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
+    orig_file_1 = os.path.join(install_dir, 'include', 'pocketfft_hdronly.h')
+    msvc_workaround = r"""#elif __cplusplus >= 201703L && defined(_MSC_VER)
+inline void *aligned_alloc(size_t align, size_t size)
+  {
+  // aligned_alloc() requires that the requested size is a multiple of "align"
+  void *ptr = _aligned_malloc((size+align-1)&(~(align-1)), align);
+  if (!ptr) throw std::bad_alloc();
+  return ptr;
+  }
+inline void aligned_dealloc(void *ptr)
+    { _aligned_free(ptr); }
+#else // portable emulation"""
+    bak_file_1 = patch_file(orig_file_1,
+                            from_texts=[r'#else // portable emulation',
+                                        ],
+                            to_texts=[msvc_workaround,
+                                      ])
+
+
 def build_suitesparse(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -2270,8 +2291,10 @@ def build_libs(libs: OrderedDict, update_src: bool):
                 update_git_submodule(os.path.join(ext_dir(), 'magic_enum'))
 
         if lib_name == 'pocketfft':
+            src_dir = os.path.join(ext_dir(), 'pocketfft')
             if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'pocketfft'))
+                update_git_submodule(src_dir)
+            build_pocketfft(src_dir, ext_build_dir())
 
         if lib_name == 'googletest':
             if update_src:
