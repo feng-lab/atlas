@@ -1,6 +1,18 @@
 #include "zfft.h"
 
+#ifdef ZIMG_USE_MKL
 #include <fftw3.h>
+#endif
+#include <pocketfft_hdronly.h>
+#include <thread>
+
+DEFINE_uint32(zimg_global_fft_number_of_threads,
+              0,
+              "Number of threads fft will use, default is 0 which is hardware concurrency.");
+
+DEFINE_bool(zimg_use_mkl_for_fft_if_available,
+            true,
+            "Whether to use mkl for fft computation if available, default is true");
 
 namespace nim {
 
@@ -19,24 +31,50 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
   ZComplexImg tmp(width, outHeight, outDepth);
   res.swap(tmp);
 
-  // from fftw benchmark, 3d inplace is faster than outofplace, so we
-  // first copy real data to complex img
-  ZImg wrapImg;
-  // reinterpret_cast allowed (section "Complex numbers")
-  wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
-  wrapImg.pasteImg(img);
-  wrapImg.clear(); // copy data finished
+  auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
+  nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
 
-  // do fft
-  fftw_plan p = fftw_plan_dft_r2c_3d(outDepth,
-                                     outHeight,
-                                     outWidth,
-                                     reinterpret_cast<double*>(res.rawData()),
-                                     reinterpret_cast<fftw_complex*>(res.rawData()),
-                                     FFTW_ESTIMATE);
-  fftw_execute(p);
-  fftw_destroy_plan(p);
+#ifdef ZIMG_USE_MKL
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    // from fftw benchmark, 3d inplace is faster than outofplace, so we
+    // first copy real data to complex img
+    ZImg wrapImg;
+    // reinterpret_cast allowed (section "Complex numbers")
+    wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
+    wrapImg.pasteImg(img);
+    wrapImg.clear(); // copy data finished
 
+    // do fft
+    fftw_plan_with_nthreads(nthreads);
+    fftw_plan p = fftw_plan_dft_r2c_3d(outDepth,
+                                       outHeight,
+                                       outWidth,
+                                       reinterpret_cast<double*>(res.rawData()),
+                                       reinterpret_cast<fftw_complex*>(res.rawData()),
+                                       FFTW_ESTIMATE);
+    fftw_execute(p);
+    fftw_destroy_plan(p);
+
+    return res;
+  }
+#endif
+
+  ZImgInfo expandedInfo(outWidth, outHeight, outDepth, 1, 1, 8, VoxelFormat::Float);
+  ZImg expandedImg(expandedInfo);
+  expandedImg.pasteImg(img);
+  pocketfft::r2c({expandedInfo.depth, expandedInfo.height, expandedInfo.width},
+                 {static_cast<ptrdiff_t>(expandedInfo.planeByteNumber()),
+                  static_cast<ptrdiff_t>(expandedInfo.rowByteNumber()),
+                  static_cast<ptrdiff_t>(expandedInfo.voxelByteNumber())},
+                 {static_cast<ptrdiff_t>(res.planeByteNumber()),
+                  static_cast<ptrdiff_t>(res.rowByteNumber()),
+                  static_cast<ptrdiff_t>(res.voxelByteNumber())},
+                 {0, 1, 2},
+                 true,
+                 expandedImg.channelData<double>(0),
+                 res.rawData(),
+                 1.,
+                 nthreads);
   return res;
 }
 
@@ -47,23 +85,50 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
     return res;
   }
 
-  fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
-                                     cimg.height(),
-                                     width,
-                                     reinterpret_cast<fftw_complex*>(cimg.rawData()),
-                                     reinterpret_cast<double*>(cimg.rawData()),
-                                     FFTW_ESTIMATE);
-  fftw_execute(p);
-  fftw_destroy_plan(p);
+  auto nthreads = FLAGS_zimg_global_fft_number_of_threads;
+  nthreads = nthreads ? nthreads : std::thread::hardware_concurrency();
 
-  ZImg wrapImg;
-  wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width() * 2, cimg.height(), cimg.depth());
+#ifdef ZIMG_USE_MKL
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    fftw_plan_with_nthreads(nthreads);
+    fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
+                                       cimg.height(),
+                                       width,
+                                       reinterpret_cast<fftw_complex*>(cimg.rawData()),
+                                       reinterpret_cast<double*>(cimg.rawData()),
+                                       FFTW_ESTIMATE);
+    fftw_execute(p);
+    fftw_destroy_plan(p);
 
+    ZImg wrapImg;
+    wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width() * 2, cimg.height(), cimg.depth());
+
+    ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
+    res = wrapImg.crop(region);
+    res /= static_cast<uint64_t>(width * cimg.height() * cimg.depth());
+    cimg.clear();
+
+    return res;
+  }
+#endif
+
+  ZImgInfo outImgInfo(width, cimg.height(), cimg.depth(), 1, 1, 8, VoxelFormat::Float);
+  ZImg outImg(outImgInfo);
+  pocketfft::c2r({outImgInfo.depth, outImgInfo.height, outImgInfo.width},
+                 {static_cast<ptrdiff_t>(cimg.planeByteNumber()),
+                  static_cast<ptrdiff_t>(cimg.rowByteNumber()),
+                  static_cast<ptrdiff_t>(cimg.voxelByteNumber())},
+                 {static_cast<ptrdiff_t>(outImgInfo.planeByteNumber()),
+                  static_cast<ptrdiff_t>(outImgInfo.rowByteNumber()),
+                  static_cast<ptrdiff_t>(outImgInfo.voxelByteNumber())},
+                 {0, 1, 2},
+                 false,
+                 cimg.rawData(),
+                 outImg.channelData<double>(0),
+                 1. / outImgInfo.voxelNumber(),
+                 nthreads);
   ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
-  res = wrapImg.crop(region);
-  res /= static_cast<uint64_t>(width * cimg.height() * cimg.depth());
-  cimg.clear();
-
+  res = outImg.crop(region);
   return res;
 }
 

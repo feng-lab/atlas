@@ -12,7 +12,7 @@ void ZImgProcess::run()
   if (fileDestination) {
     addLogSink(fileDestination);
   }
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&fileDestination]() {
+  auto guard1 = folly::makeGuard([&fileDestination]() {
     if (fileDestination) {
       removeLogSink(fileDestination);
     }
@@ -63,7 +63,7 @@ void ZImgProcess::runInPython()
   if (fileDestination) {
     addLogSink(fileDestination);
   }
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&fileDestination]() {
+  auto guard1 = folly::makeGuard([&fileDestination]() {
     if (fileDestination) {
       removeLogSink(fileDestination);
     }

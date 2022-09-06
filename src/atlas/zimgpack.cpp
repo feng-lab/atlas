@@ -13,8 +13,8 @@
 #include <zbenchtimer.h>
 
 DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
-            true,
-            "Whether readRegionToImg uses multithreaded resize, default is true");
+            false,
+            "Whether readRegionToImg uses multithreaded resize, default is false");
 
 DEFINE_uint32(atlas_readRegionToImg_version,
               0,

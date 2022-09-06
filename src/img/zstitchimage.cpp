@@ -8,13 +8,15 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <folly/ScopeGuard.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
 #include <tbb/global_control.h>
 #include <boost/container_hash/hash.hpp>
-#include <fftw3.h>
 #include <algorithm>
 #include <limits>
+
+DECLARE_uint32(zimg_global_fft_number_of_threads);
 
 namespace {
 
@@ -678,7 +680,10 @@ void ZStitchImage::doWork()
     };
 
     if (m_useMultithreading) {
-      fftw_plan_with_nthreads(1);
+      FLAGS_zimg_global_fft_number_of_threads = 1;
+      auto guard = folly::makeGuard([]() {
+        FLAGS_zimg_global_fft_number_of_threads = 0;
+      });
       //      int nthread =
       //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
       //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
@@ -693,8 +698,6 @@ void ZStitchImage::doWork()
           stitch_pair(i);
         }
       });
-
-      fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
       for (size_t i = 0; i < allPairs.size(); ++i) {
         stitch_pair(i);
@@ -1039,7 +1042,10 @@ void ZStitchImage::doRestitch()
     };
 
     if (m_useMultithreading) {
-      fftw_plan_with_nthreads(1);
+      FLAGS_zimg_global_fft_number_of_threads = 1;
+      auto guard = folly::makeGuard([]() {
+        FLAGS_zimg_global_fft_number_of_threads = 0;
+      });
       //      int nthread =
       //        std::min<int>(tbb::task_scheduler_init::default_num_threads(),
       //                      std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0));
@@ -1054,7 +1060,6 @@ void ZStitchImage::doRestitch()
           stitch_pair(i);
         }
       });
-      fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
     } else {
       for (size_t i = 0; i < allPairs.size(); ++i) {
         stitch_pair(i);

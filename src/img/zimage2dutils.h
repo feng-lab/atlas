@@ -867,7 +867,8 @@ void _resizeContributions(size_t inLength,
                           bool antialiasing,
                           std::vector<double>& weights,
                           std::vector<size_t>& indices,
-                          size_t& kernelWidth);
+                          size_t& kernelWidth,
+                          bool& kernelIsTrivial);
 
 template<typename TPixel, typename TPixelOut>
 struct Resize2DForOneBlock
@@ -881,9 +882,11 @@ struct Resize2DForOneBlock
                       const std::vector<double>& xWeights,
                       const std::vector<size_t>& xIndices,
                       size_t xKernelWidth,
+                      bool xKernelIsTrivial,
                       const std::vector<double>& yWeights,
                       const std::vector<size_t>& yIndices,
-                      size_t yKernelWidth)
+                      size_t yKernelWidth,
+                      bool yKernelIsTrivial)
     : m_img(img)
     , m_width(width)
     , m_height(height)
@@ -893,14 +896,42 @@ struct Resize2DForOneBlock
     , m_xWeights(xWeights)
     , m_xIndices(xIndices)
     , m_xKernelWidth(xKernelWidth)
+    , m_xKernelIsTrivial(xKernelIsTrivial)
     , m_yWeights(yWeights)
     , m_yIndices(yIndices)
     , m_yKernelWidth(yKernelWidth)
+    , m_yKernelIsTrivial(yKernelIsTrivial)
   {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_xKernelWidth == 1 && m_yKernelWidth == 1) {
+    if (m_xKernelIsTrivial && m_yKernelIsTrivial) {
+      for (size_t y = range.begin(); y != range.end(); ++y) {
+        for (size_t x = 0; x < m_outWidth; ++x) {
+          m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(m_img[y * m_width + x]);
+        }
+      }
+    } else if (m_xKernelIsTrivial) {
+      for (size_t y = range.begin(); y != range.end(); ++y) {
+        for (size_t x = 0; x < m_outWidth; ++x) {
+          double valxy = 0;
+          for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+            valxy += m_yWeights[y * m_yKernelWidth + ky] * m_img[m_yIndices[y * m_yKernelWidth + ky] * m_width + x];
+          }
+          m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(valxy);
+        }
+      }
+    } else if (m_yKernelIsTrivial) {
+      for (size_t y = range.begin(); y != range.end(); ++y) {
+        for (size_t x = 0; x < m_outWidth; ++x) {
+          double valx = 0;
+          for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+            valx += m_xWeights[x * m_xKernelWidth + kx] * m_img[y * m_width + m_xIndices[x * m_xKernelWidth + kx]];
+          }
+          m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(valx);
+        }
+      }
+    } else if (m_xKernelWidth == 1 && m_yKernelWidth == 1) {
       for (size_t y = range.begin(); y != range.end(); ++y) {
         for (size_t x = 0; x < m_outWidth; ++x) {
           m_imgOut[y * m_outWidth + x] = saturate_cast<TPixelOut>(m_img[m_yIndices[y] * m_width + m_xIndices[x]]);
@@ -955,9 +986,11 @@ struct Resize2DForOneBlock
   const std::vector<double>& m_xWeights;
   const std::vector<size_t>& m_xIndices;
   size_t m_xKernelWidth;
+  bool m_xKernelIsTrivial;
   const std::vector<double>& m_yWeights;
   const std::vector<size_t>& m_yIndices;
   size_t m_yKernelWidth;
+  bool m_yKernelIsTrivial;
 };
 
 //((scale-1)/2) in output image maps to 0 in input image, and ((3*scale-1)/2) in output
@@ -979,23 +1012,27 @@ void image2DResize(const TPixel* img,
   std::vector<double> xWeights;
   std::vector<size_t> xIndices;
   size_t xKernelWidth;
+  bool xKernelIsTrivial;
   std::vector<double> yWeights;
   std::vector<size_t> yIndices;
   size_t yKernelWidth;
+  bool yKernelIsTrivial;
   _resizeContributions(width,
                        outWidth,
                        interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        xWeights,
                        xIndices,
-                       xKernelWidth);
+                       xKernelWidth,
+                       xKernelIsTrivial);
   _resizeContributions(height,
                        outHeight,
                        interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        yWeights,
                        yIndices,
-                       yKernelWidth);
+                       yKernelWidth,
+                       yKernelIsTrivial);
 
   Resize2DForOneBlock<TPixel, TPixelOut> func(img,
                                               width,
@@ -1006,9 +1043,11 @@ void image2DResize(const TPixel* img,
                                               xWeights,
                                               xIndices,
                                               xKernelWidth,
+                                              xKernelIsTrivial,
                                               yWeights,
                                               yIndices,
-                                              yKernelWidth);
+                                              yKernelWidth,
+                                              yKernelIsTrivial);
   if (!useMultithreading) {
     func(tbb::blocked_range<size_t>(0, outHeight));
   } else {

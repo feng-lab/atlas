@@ -2,8 +2,10 @@
 #include "zcpuinfo.h"
 #include "zglobal.h"
 #include "zlogcache.h"
+#ifdef ZIMG_USE_MKL
 #include <fftw3.h>
 #include <mkl_service.h>
+#endif
 #include <itkMultiThreaderBase.h>
 #include <QDir>
 
@@ -105,6 +107,7 @@ void initImgLib(const char* argv0,
   }
   ZGlobal::resourcesDIR = resourcesDIR;
 
+#ifdef ZIMG_USE_MKL
   fftw_init_threads();
   fftw_plan_with_nthreads(ZCpuInfo::instance().nPhysicalCores);
 
@@ -113,6 +116,7 @@ void initImgLib(const char* argv0,
   MKL_Get_Version(&mklVer);
   LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " " << mklVer.MajorVersion << "."
             << mklVer.MinorVersion << "." << mklVer.UpdateVersion << ".b" << mklVer.Build;
+#endif
 
 #ifdef ZIMG_USE_IPP
   // todo: check this for amd cpu
@@ -226,7 +230,9 @@ void shutdownImgLib(bool isApp)
     LOG(INFO) << "--- App Log End ---";
   }
 
+#ifdef ZIMG_USE_MKL
   fftw_cleanup_threads();
+#endif
 
   shutdownLogging();
 }

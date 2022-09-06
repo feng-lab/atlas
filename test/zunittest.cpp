@@ -52,6 +52,8 @@ QDir getTestDataDir()
 #include "zimageutilstest.h"
 #include "zimageaffinetransformtest.h"
 #include "zimgncctest.h"
+#include "zimgnccpocketffttest.h"
+#include "zimgnccmkltest.h"
 #include "ztreetest.h"
 
 namespace nim {

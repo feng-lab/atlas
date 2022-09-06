@@ -53,6 +53,21 @@ public:
     return m_data.data();
   }
 
+  [[nodiscard]] static constexpr inline size_t voxelByteNumber()
+  {
+    return sizeof(std::complex<double>);
+  }
+
+  [[nodiscard]] inline size_t rowByteNumber()
+  {
+    return voxelByteNumber() * m_width;
+  }
+
+  [[nodiscard]] inline size_t planeByteNumber()
+  {
+    return voxelByteNumber() * m_width * m_height;
+  }
+
   [[nodiscard]] inline QString toQString() const
   {
     return QString("width:%1, height:%2, depth:%3").arg(m_width).arg(m_height).arg(m_depth);

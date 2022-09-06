@@ -108,3 +108,7 @@
 	path = src/3rdparty/llfio
 	url = https://github.com/ned14/llfio.git
 	branch = develop
+[submodule "src/3rdparty/pocketfft"]
+	path = src/3rdparty/pocketfft
+	url = https://github.com/mreineck/pocketfft
+	branch = cpp

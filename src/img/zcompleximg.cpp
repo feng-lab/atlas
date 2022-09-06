@@ -1,9 +1,7 @@
 #include "zcompleximg.h"
 
-#define USE_MKL
-
 #include "zlog.h"
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
 #include "zmkl.h"
 #endif
 #include <algorithm>
@@ -46,7 +44,7 @@ bool ZComplexImg::isSameSize(const ZComplexImg& rhs) const
 
 ZComplexImg& ZComplexImg::conj()
 {
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
   vzConj(m_data.size(), m_data.data(), m_data.data());
 #else
   for (auto& v : m_data) {
@@ -76,7 +74,7 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
     throw ZImgException(QString("complex img addition requires same size img as input: this <1>, other <%2>")
                           .arg(toQString(), rhs.toQString()));
   }
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
   vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
 #else
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::plus<>());
@@ -112,7 +110,7 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
     throw ZImgException(QString("complex img subtraction requires same size img as input: this <1>, other <%2>")
                           .arg(toQString(), rhs.toQString()));
   }
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
   vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
 #else
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::minus<>());
@@ -155,7 +153,7 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
     throw ZImgException(QString("complex img multiplies requires same size img as input: this <1>, other <%2>")
                           .arg(toQString(), rhs.toQString()));
   }
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
   vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
 #else
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::multiplies<>());
@@ -191,7 +189,7 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
     throw ZImgException(QString("complex img divides requires same size img as input: this <1>, other <%2>")
                           .arg(toQString(), rhs.toQString()));
   }
-#ifdef USE_MKL
+#ifdef ZIMG_USE_MKL
   vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
 #else
   std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::divides<>());

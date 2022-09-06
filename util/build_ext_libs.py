@@ -2269,6 +2269,10 @@ def build_libs(libs: OrderedDict, update_src: bool):
             if update_src:
                 update_git_submodule(os.path.join(ext_dir(), 'magic_enum'))
 
+        if lib_name == 'pocketfft':
+            if update_src:
+                update_git_submodule(os.path.join(ext_dir(), 'pocketfft'))
+
         if lib_name == 'googletest':
             if update_src:
                 update_git_submodule(os.path.join(ext_dir(), 'googletest'))
@@ -2605,7 +2609,7 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
-                'pybind11', 'glm', 'magic_enum', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
+                'pybind11', 'glm', 'magic_enum', 'pocketfft', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
                 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',

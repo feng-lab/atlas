@@ -945,12 +945,15 @@ struct Resize3DForOneBlock
                       const std::vector<double>& xWeights,
                       const std::vector<size_t>& xIndices,
                       size_t xKernelWidth,
+                      bool xKernelIsTrivial,
                       const std::vector<double>& yWeights,
                       const std::vector<size_t>& yIndices,
                       size_t yKernelWidth,
+                      bool yKernelIsTrivial,
                       const std::vector<double>& zWeights,
                       const std::vector<size_t>& zIndices,
-                      size_t zKernelWidth)
+                      size_t zKernelWidth,
+                      bool zKernelIsTrivial)
     : m_img(img)
     , m_width(width)
     , m_height(height)
@@ -962,17 +965,124 @@ struct Resize3DForOneBlock
     , m_xWeights(xWeights)
     , m_xIndices(xIndices)
     , m_xKernelWidth(xKernelWidth)
+    , m_xKernelIsTrivial(xKernelIsTrivial)
     , m_yWeights(yWeights)
     , m_yIndices(yIndices)
     , m_yKernelWidth(yKernelWidth)
+    , m_yKernelIsTrivial(yKernelIsTrivial)
     , m_zWeights(zWeights)
     , m_zIndices(zIndices)
     , m_zKernelWidth(zKernelWidth)
+    , m_zKernelIsTrivial(zKernelIsTrivial)
   {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const
   {
-    if (m_xKernelWidth == 1 && m_yKernelWidth == 1 && m_zKernelWidth == 1) {
+    if (m_xKernelIsTrivial && m_yKernelIsTrivial && m_zKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] =
+              saturate_cast<TPixelOut>(m_img[z * m_width * m_height + y * m_width + x]);
+          }
+        }
+      }
+    } else if (m_xKernelIsTrivial && m_yKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] *
+                        m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height + y * m_width + x];
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_xKernelIsTrivial && m_zKernelIsTrivial) {
+      {
+        for (size_t z = range.begin(); z != range.end(); ++z) {
+          for (size_t y = 0; y < m_outHeight; ++y) {
+            for (size_t x = 0; x < m_outWidth; ++x) {
+              double valxyz = 0;
+              for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+                valxyz += m_yWeights[y * m_yKernelWidth + ky] *
+                          m_img[z * m_width * m_height + m_yIndices[y * m_yKernelWidth + ky] * m_width + x];
+              }
+              m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+            }
+          }
+        }
+      }
+    } else if (m_yKernelIsTrivial && m_zKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+              valxyz += m_xWeights[x * m_xKernelWidth + kx] *
+                        m_img[z * m_width * m_height + y * m_width + m_xIndices[x * m_xKernelWidth + kx]];
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_xKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              double valxy = 0;
+              for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+                valxy +=
+                  m_yWeights[y * m_yKernelWidth + ky] * m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height +
+                                                              m_yIndices[y * m_yKernelWidth + ky] * m_width + x];
+              }
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] * valxy;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_yKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxyz = 0;
+            for (size_t kz = 0; kz < m_zKernelWidth; ++kz) {
+              double valx = 0;
+              for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+                valx +=
+                  m_xWeights[x * m_xKernelWidth + kx] * m_img[m_zIndices[z * m_zKernelWidth + kz] * m_width * m_height +
+                                                              y * m_width + m_xIndices[x * m_xKernelWidth + kx]];
+              }
+              valxyz += m_zWeights[z * m_zKernelWidth + kz] * valx;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxyz);
+          }
+        }
+      }
+    } else if (m_zKernelIsTrivial) {
+      for (size_t z = range.begin(); z != range.end(); ++z) {
+        for (size_t y = 0; y < m_outHeight; ++y) {
+          for (size_t x = 0; x < m_outWidth; ++x) {
+            double valxy = 0;
+            for (size_t ky = 0; ky < m_yKernelWidth; ++ky) {
+              double valx = 0;
+              for (size_t kx = 0; kx < m_xKernelWidth; ++kx) {
+                valx += m_xWeights[x * m_xKernelWidth + kx] *
+                        m_img[z * m_width * m_height + m_yIndices[y * m_yKernelWidth + ky] * m_width +
+                              m_xIndices[x * m_xKernelWidth + kx]];
+              }
+              valxy += m_yWeights[y * m_yKernelWidth + ky] * valx;
+            }
+            m_imgOut[z * m_outWidth * m_outHeight + y * m_outWidth + x] = saturate_cast<TPixelOut>(valxy);
+          }
+        }
+      }
+    } else if (m_xKernelWidth == 1 && m_yKernelWidth == 1 && m_zKernelWidth == 1) {
       for (size_t z = range.begin(); z != range.end(); ++z) {
         for (size_t y = 0; y < m_outHeight; ++y) {
           for (size_t x = 0; x < m_outWidth; ++x) {
@@ -1113,12 +1223,15 @@ struct Resize3DForOneBlock
   const std::vector<double>& m_xWeights;
   const std::vector<size_t>& m_xIndices;
   size_t m_xKernelWidth;
+  bool m_xKernelIsTrivial;
   const std::vector<double>& m_yWeights;
   const std::vector<size_t>& m_yIndices;
   size_t m_yKernelWidth;
+  bool m_yKernelIsTrivial;
   const std::vector<double>& m_zWeights;
   const std::vector<size_t>& m_zIndices;
   size_t m_zKernelWidth;
+  bool m_zKernelIsTrivial;
 };
 
 //((scale-1)/2) in output image maps to 0 in input image, and ((3*scale-1)/2) in output
@@ -1142,33 +1255,39 @@ void image3DResize(const TPixel* img,
   std::vector<double> xWeights;
   std::vector<size_t> xIndices;
   size_t xKernelWidth;
+  bool xKernelIsTrivial;
   std::vector<double> yWeights;
   std::vector<size_t> yIndices;
   size_t yKernelWidth;
+  bool yKernelIsTrivial;
   std::vector<double> zWeights;
   std::vector<size_t> zIndices;
   size_t zKernelWidth;
+  bool zKernelIsTrivial;
   _resizeContributions(width,
                        outWidth,
                        interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        xWeights,
                        xIndices,
-                       xKernelWidth);
+                       xKernelWidth,
+                       xKernelIsTrivial);
   _resizeContributions(height,
                        outHeight,
                        interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        yWeights,
                        yIndices,
-                       yKernelWidth);
+                       yKernelWidth,
+                       yKernelIsTrivial);
   _resizeContributions(depth,
                        outDepth,
                        interpolant,
                        interpolant == Interpolant::Nearest ? antialiasingForNearest : antialiasing,
                        zWeights,
                        zIndices,
-                       zKernelWidth);
+                       zKernelWidth,
+                       zKernelIsTrivial);
 
   Resize3DForOneBlock<TPixel, TPixelOut> func(img,
                                               width,
@@ -1181,12 +1300,15 @@ void image3DResize(const TPixel* img,
                                               xWeights,
                                               xIndices,
                                               xKernelWidth,
+                                              xKernelIsTrivial,
                                               yWeights,
                                               yIndices,
                                               yKernelWidth,
+                                              yKernelIsTrivial,
                                               zWeights,
                                               zIndices,
-                                              zKernelWidth);
+                                              zKernelWidth,
+                                              zKernelIsTrivial);
   if (!useMultithreading) {
     func(tbb::blocked_range<size_t>(0, outDepth));
   } else {

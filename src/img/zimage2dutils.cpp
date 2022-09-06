@@ -114,7 +114,8 @@ void _resizeContributions(size_t inLength,
                           bool antialiasing,
                           std::vector<double>& weightsOut,
                           std::vector<size_t>& indicesOut,
-                          size_t& kernelWidthOut)
+                          size_t& kernelWidthOut,
+                          bool& kernelIsTrivial)
 {
   CHECK(outLength > 0 && inLength > 0);
   double scale = double(outLength) / inLength;
@@ -226,13 +227,17 @@ void _resizeContributions(size_t inLength,
   kernelWidthOut = validCols.count();
   weightsOut.resize(kernelWidthOut * outLength);
   indicesOut.resize(weightsOut.size());
-  size_t idx = 0;
+  kernelIsTrivial = kernelWidthOut == 1;
 
+  size_t idx = 0;
   for (Index r = 0; r < weights.rows(); ++r) {
     for (Index c = 0; c < weights.cols(); ++c) {
       if (validCols(c)) {
         weightsOut[idx] = weights(r, c);
         indicesOut[idx++] = std::max(0_z, std::min<index_t>(inLength - 1, indices(r, c)));
+        if (kernelIsTrivial) {
+          kernelIsTrivial = indicesOut[idx - 1] == idx - 1;
+        }
       }
     }
   }

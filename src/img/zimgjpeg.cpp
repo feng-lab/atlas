@@ -358,7 +358,7 @@ void ZImgJpeg::readInfo(const QString& filename,
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -383,7 +383,7 @@ void ZImgJpeg::readMetadata(const QString& filename, ZImgMetadata& meta, size_t 
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -428,7 +428,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -460,7 +460,7 @@ void ZImgJpeg::readThumbnail(const QString& filename,
               struct jpeg_decompress_struct thumbCinfo;
               my_error_mgr thumbJerr;
               createcinfo(thumbCinfo, thumbJerr);
-              [[maybe_unused]] auto guard2 = folly::makeGuard([&thumbCinfo]() {
+              auto guard2 = folly::makeGuard([&thumbCinfo]() {
                 /* Step 8: Release JPEG decompression object */
 
                 /* This is an important step since it will release a good deal of memory. */
@@ -506,7 +506,7 @@ void ZImgJpeg::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -576,7 +576,7 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
   if ((tjInstance = tjInitCompress()) == nullptr) {
     throw ZIOException(QString("libjpeg-turbo: initializing compressor: %1").arg(tjGetErrorStr2(tjInstance)));
   }
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&tjInstance]() {
+  auto guard1 = folly::makeGuard([&tjInstance]() {
     if (tjInstance) {
       tjDestroy(tjInstance);
     }
@@ -586,7 +586,7 @@ void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
   CHECK(tmp.channelData<uint8_t>(0) != img.channelData<uint8_t>(0)) << img.info().toQString();
   ZImgFormat::XYZCtoCXYZ(img, tmp);
   unsigned char* jpegBuf = nullptr; /* Dynamically allocate the JPEG buffer */
-  [[maybe_unused]] auto guard2 = folly::makeGuard([&jpegBuf]() {
+  auto guard2 = folly::makeGuard([&jpegBuf]() {
     if (jpegBuf) {
       tjFree(jpegBuf);
     }
@@ -627,7 +627,7 @@ void ZImgJpeg::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */
@@ -644,7 +644,7 @@ void ZImgJpeg::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSiz
   struct jpeg_decompress_struct cinfo;
   my_error_mgr jerr;
   createcinfo(cinfo, jerr);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([&cinfo]() {
+  auto guard1 = folly::makeGuard([&cinfo]() {
     /* Step 8: Release JPEG decompression object */
 
     /* This is an important step since it will release a good deal of memory. */

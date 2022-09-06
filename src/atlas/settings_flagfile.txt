@@ -1,5 +1,3 @@
-# --folly_global_cpu_executor_threads=24
-
 # comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are:
 # none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,
 # maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,
@@ -15,8 +13,14 @@
 # Which version of readRegionToImg to use, value can be 0-1, default is 0
 --atlas_readRegionToImg_version=0
 
-# Whether readRegionToImg uses multithreaded resize, default is true
---atlas_readRegionToImg_use_multithreaded_resize=true
+# Whether readRegionToImg uses multithreaded resize, default is false
+--atlas_readRegionToImg_use_multithreaded_resize=false
 
 # Use PBO when number of blocks to upload is larger than this threashold, default is 10
 --atlas_number_of_blocks_to_use_PBO_threashold=10
+
+# Number of threads fft will use, default is 0 which is hardware concurrency.
+--zimg_global_fft_number_of_threads=0
+
+# Whether to use mkl for fft computation if available, default is true
+--zimg_use_mkl_for_fft_if_available=true

@@ -63,9 +63,9 @@ void xCorrPart_Impl(const ZImg& fixedImg,
                     size_t zEnd,
                     ZImg& res)
 {
-  const TVoxel1* fixedData = fixedImg.channelData<TVoxel1>(0, 0);
-  const TVoxel2* movingData = movingImg.channelData<TVoxel2>(0, 0);
-  double* desData = res.channelData<double>(0, 0);
+  const auto fixedData = fixedImg.channelData<TVoxel1>(0, 0);
+  const auto movingData = movingImg.channelData<TVoxel2>(0, 0);
+  auto desData = res.channelData<double>(0, 0);
   size_t fixedPlaneNum = fixedImg.planeVoxelNumber();
   size_t fixedRowNum = fixedImg.rowVoxelNumber();
   size_t movingPlaneNum = movingImg.planeVoxelNumber();

@@ -1584,7 +1584,7 @@ ZImg ZImg::resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interp
   auto ippStatus = ipprResizeGetBufSize(srcVoi, dstVoi, 1, interpolation, &pSize);
   CHECK(ippStatus == ippStsNoErr && pSize >= 0) << ippStatus << " " << pSize;
   auto buffer = ippsMalloc_8u(pSize);
-  [[maybe_unused]] auto guard1 = folly::makeGuard([=]() {
+  auto guard1 = folly::makeGuard([=]() {
     ippsFree(buffer);
   });
 
