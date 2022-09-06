@@ -1202,7 +1202,7 @@ def build_eigen(src_dir: str, install_dir: str):
 def build_pocketfft(src_dir: str, install_dir: str):
     shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
     orig_file_1 = os.path.join(install_dir, 'include', 'pocketfft_hdronly.h')
-    msvc_workaround = r"""#elif __cplusplus >= 201703L && defined(_MSC_VER)
+    msvc_workaround = r"""#if __cplusplus >= 201703L && defined(_MSC_VER)
 inline void *aligned_alloc(size_t align, size_t size)
   {
   // aligned_alloc() requires that the requested size is a multiple of "align"
@@ -1212,9 +1212,9 @@ inline void *aligned_alloc(size_t align, size_t size)
   }
 inline void aligned_dealloc(void *ptr)
     { _aligned_free(ptr); }
-#else // portable emulation"""
+#elif __cplusplus >= 201703L"""
     bak_file_1 = patch_file(orig_file_1,
-                            from_texts=[r'#else // portable emulation',
+                            from_texts=[r'#if __cplusplus >= 201703L',
                                         ],
                             to_texts=[msvc_workaround,
                                       ])
