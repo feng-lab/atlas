@@ -690,7 +690,6 @@ void ZStitchImage::doWork()
       size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch.";
-      // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
       tbb::parallel_for(tbb::blocked_range<size_t>(0, allPairs.size()), [&](const tbb::blocked_range<size_t>& r) {
@@ -1052,7 +1051,6 @@ void ZStitchImage::doRestitch()
       size_t nthread = std::floor(ZCpuInfo::instance().nPhysicalRAM * 1.0 / oneImgInfo.byteNumber() / 3.0);
       nthread = std::max(1_uz, nthread);
       LOG(INFO) << "using maximum " << nthread << " threads to stitch " << rgns.size() << " regions.";
-      // tbb::task_scheduler_init init(nthread);
       tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthread);
 
       tbb::parallel_for(tbb::blocked_range<size_t>(0, allPairs.size()), [&](const tbb::blocked_range<size_t>& r) {

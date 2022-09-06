@@ -1,9 +1,15 @@
 #include "zfft.h"
 
 #ifdef ZIMG_USE_MKL
+#include <mkl.h>
+#include <mkl_dfti.h>
+#ifdef ZIMG_USE_FFTW_INTERFACE
 #include <fftw3.h>
 #endif
+#endif
 #include <pocketfft_hdronly.h>
+#include <folly/ScopeGuard.h>
+#include <tbb/global_control.h>
 #include <thread>
 
 DEFINE_uint32(zimg_global_fft_number_of_threads,
@@ -13,6 +19,21 @@ DEFINE_uint32(zimg_global_fft_number_of_threads,
 DEFINE_bool(zimg_use_mkl_for_fft_if_available,
             false,
             "Whether to use mkl for fft computation if available, default is false");
+
+namespace {
+
+#ifdef ZIMG_USE_MKL
+
+inline void MKL_DFTI_CHECK(MKL_LONG status)
+{
+  if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) {
+    throw nim::ZException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));
+  }
+}
+
+#endif
+
+} // namespace
 
 namespace nim {
 
@@ -44,6 +65,26 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
     wrapImg.pasteImg(img);
     wrapImg.clear(); // copy data finished
 
+    mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
+    MKL_LONG dims[] = {static_cast<MKL_LONG>(outDepth),
+                       static_cast<MKL_LONG>(outHeight),
+                       static_cast<MKL_LONG>(outWidth)};
+    DFTI_DESCRIPTOR_HANDLE descHandle;
+    MKL_DFTI_CHECK(DftiCreateDescriptor(&descHandle, DFTI_DOUBLE, DFTI_REAL, 3, dims));
+    auto descHandleGuard = folly::makeGuard([&descHandle]() {
+      DftiFreeDescriptor(&descHandle);
+    });
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, FLAGS_zimg_global_fft_number_of_threads));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
+    MKL_LONG rstrides[] = {0, 2 * dims[1] * (dims[2] / 2 + 1), 2 * (dims[2] / 2 + 1), 1};
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_INPUT_STRIDES, rstrides));
+    MKL_LONG cstrides[] = {0, dims[1] * (dims[2] / 2 + 1), dims[2] / 2 + 1, 1};
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_OUTPUT_STRIDES, cstrides));
+    MKL_DFTI_CHECK(DftiCommitDescriptor(descHandle));
+    MKL_DFTI_CHECK(DftiComputeForward(descHandle, res.rawData()));
+
+#ifdef ZIMG_USE_FFTW_INTERFACE
     // do fft
     fftw_plan_with_nthreads(nthreads);
     fftw_plan p = fftw_plan_dft_r2c_3d(outDepth,
@@ -54,6 +95,7 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
                                        FFTW_ESTIMATE);
     fftw_execute(p);
     fftw_destroy_plan(p);
+#endif
 
     return res;
   }
@@ -90,6 +132,7 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+#ifdef ZIMG_USE_FFTW_INTERFACE
     fftw_plan_with_nthreads(nthreads);
     fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
                                        cimg.height(),
@@ -99,13 +142,36 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
                                        FFTW_ESTIMATE);
     fftw_execute(p);
     fftw_destroy_plan(p);
+#endif
+
+    mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
+    MKL_LONG dims[] = {static_cast<MKL_LONG>(cimg.depth()),
+                       static_cast<MKL_LONG>(cimg.height()),
+                       static_cast<MKL_LONG>(width)};
+    DFTI_DESCRIPTOR_HANDLE descHandle;
+    MKL_DFTI_CHECK(DftiCreateDescriptor(&descHandle, DFTI_DOUBLE, DFTI_REAL, 3, dims));
+    auto descHandleGuard = folly::makeGuard([&descHandle]() {
+      DftiFreeDescriptor(&descHandle);
+    });
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_BACKWARD_SCALE, 1. / (width * cimg.height() * cimg.depth())));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_THREAD_LIMIT, FLAGS_zimg_global_fft_number_of_threads));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_CONJUGATE_EVEN_STORAGE, DFTI_COMPLEX_COMPLEX));
+    MKL_LONG rstrides[] = {0, 2 * dims[1] * (dims[2] / 2 + 1), 2 * (dims[2] / 2 + 1), 1};
+    MKL_LONG cstrides[] = {0, dims[1] * (dims[2] / 2 + 1), dims[2] / 2 + 1, 1};
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_INPUT_STRIDES, cstrides));
+    MKL_DFTI_CHECK(DftiSetValue(descHandle, DFTI_OUTPUT_STRIDES, rstrides));
+    MKL_DFTI_CHECK(DftiCommitDescriptor(descHandle));
+    MKL_DFTI_CHECK(DftiComputeBackward(descHandle, cimg.rawData()));
 
     ZImg wrapImg;
     wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width() * 2, cimg.height(), cimg.depth());
 
     ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
     res = wrapImg.crop(region);
+#ifdef ZIMG_USE_FFTW_INTERFACE
     res /= static_cast<uint64_t>(width * cimg.height() * cimg.depth());
+#endif
     cimg.clear();
 
     return res;
