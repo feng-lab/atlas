@@ -1,7 +1,7 @@
 #include "zfft.h"
 
 #ifdef ZIMG_USE_MKL
-#include <mkl.h>
+// #include <mkl.h>
 #include <mkl_dfti.h>
 #endif
 #ifdef ZIMG_USE_FFTW
@@ -31,7 +31,7 @@ namespace {
 inline void MKL_DFTI_CHECK(MKL_LONG status)
 {
   if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) {
-    throw nim::ZException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));
+    throw nim::ZImgException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));
   }
 }
 
@@ -44,7 +44,7 @@ namespace nim {
 ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   if (img.isEmpty() || img.numChannels() != 1 || img.numTimes() != 1) {
-    throw ZImgException(QString("fft: input img dimension is not supported: <%1>").arg(img.info().toQString()));
+    throw ZImgException(fmt::format("fft: input img dimension is not supported: <{}>", img.info().toString()));
   }
 
   ZComplexImg res;
@@ -67,7 +67,7 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
     wrapImg.pasteImg(img);
     wrapImg.clear(); // copy data finished
 
-    // mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    // mkl_domain_set_num_threads(FLAGS_zimg_global_fft_number_of_threads, MKL_DOMAIN_FFT);
     // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(outDepth),
                        static_cast<MKL_LONG>(outHeight),
@@ -146,7 +146,7 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
-    // mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    // mkl_domain_set_num_threads(FLAGS_zimg_global_fft_number_of_threads, MKL_DOMAIN_FFT);
     // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(cimg.depth()),
                        static_cast<MKL_LONG>(cimg.height()),

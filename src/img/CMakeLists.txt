@@ -251,7 +251,11 @@ set(IMG_SOURCES
     zmesh.h zmesh.cpp
     zmeshio.h zmeshio.cpp
     zmeshutils.h zmeshutils.cpp
-    zimginterpolate.h zimginterpolate.cpp zimgblockprovider.cpp zmemorymappedfile.cpp zmemorymappedfile.h zmemorymappedfilecache.cpp zmemorymappedfilecache.h zglobal.cpp)
+    zimginterpolate.h zimginterpolate.cpp
+    zimgblockprovider.cpp
+    zmemorymappedfile.cpp zmemorymappedfile.h
+    zmemorymappedfilecache.cpp zmemorymappedfilecache.h
+    zglobal.cpp)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -267,10 +271,10 @@ add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURC
 if (BUILD_WITH_CONDA)
   set(IPP_LIBRARIES "")
 else ()
-  target_compile_definitions(${LIBRARY_NAME} PRIVATE ZIMG_USE_IPP)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_IPP)
   set(IPP_LIBRARIES IPP::ippi)
 endif ()
-target_compile_definitions(${LIBRARY_NAME} PRIVATE ZIMG_USE_MKL)
+target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_MKL)
 
 if (WIN32)
   target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
