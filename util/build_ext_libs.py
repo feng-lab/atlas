@@ -1791,6 +1791,7 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file = orig_file = None
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
+    bak_file4 = orig_file4 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -1805,8 +1806,8 @@ def build_vtk(src_dir: str, install_dir: str):
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            ],
-                               to_texts=[r'-std=c++14',
-                                         r'set(CMAKE_CXX_STANDARD 14)',
+                               to_texts=[r'-std=c++17',
+                                         r'set(CMAKE_CXX_STANDARD 17)',
                                          ])
 
         orig_file3 = os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake')
@@ -1814,8 +1815,8 @@ def build_vtk(src_dir: str, install_dir: str):
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            ],
-                               to_texts=[r'-std=c++14',
-                                         r'set(CMAKE_CXX_STANDARD 14)',
+                               to_texts=[r'-std=c++17',
+                                         r'set(CMAKE_CXX_STANDARD 17)',
                                          ])
 
         orig_file4 = os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt')
@@ -1823,11 +1824,11 @@ def build_vtk(src_dir: str, install_dir: str):
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            ],
-                               to_texts=[r'-std=c++14',
-                                         r'set(CMAKE_CXX_STANDARD 14)',
+                               to_texts=[r'-std=c++17',
+                                         r'set(CMAKE_CXX_STANDARD 17)',
                                          ])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_standard=14)
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -1850,13 +1851,6 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
                          '-DKWSYS_CXX_STANDARD=14',
                          ])
-
-        # if is_windows():
-        #     cmakecmd.extend([
-        #         # '-DZLIB_INCLUDE_DIR:PATH=' + ext_dir() + '\\zlib\\include',
-        #         # '-DZLIB_LIBRARY_RELEASE:FILEPATH=' + ext_dir() + '\\zlib\\lib\\zlibstatic.lib',
-        #         '-DHDF5_ROOT:PATH=' + ext_build_dir(),
-        #     ])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, env=get_tbb_env())
