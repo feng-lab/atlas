@@ -36,7 +36,7 @@ TEST(ZImgNCC, normXCorr_S_mkl)
 
     FLAGS_zimg_global_fft_number_of_threads = 1;
     FLAGS_zimg_use_mkl_for_fft_if_available = false;
-    ZBenchTimer bt("normXCorr_S_packetfft_one_thread");
+    ZBenchTimer bt("normXCorr_S_pocketfft_one_thread");
     normXCorr_S(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
@@ -51,7 +51,7 @@ TEST(ZImgNCC, normXCorr_S_mkl)
     FLAGS_zimg_use_mkl_for_fft_if_available = false;
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
-    bt.resetAndStart("normXCorr_S_packetfft");
+    bt.resetAndStart("normXCorr_S_pocketfft");
     normXCorr_S(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
@@ -111,7 +111,7 @@ TEST(ZImgNCC, normXCorr_mkl)
 
     FLAGS_zimg_global_fft_number_of_threads = 1;
     FLAGS_zimg_use_mkl_for_fft_if_available = false;
-    ZBenchTimer bt("normXCorr_packetfft_one_thread");
+    ZBenchTimer bt("normXCorr_pocketfft_one_thread");
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 
@@ -126,7 +126,7 @@ TEST(ZImgNCC, normXCorr_mkl)
     FLAGS_zimg_use_mkl_for_fft_if_available = false;
     fixedImgView = fixedImg.createView();
     movingImgView = movingImg.createView();
-    bt.resetAndStart("normXCorr_packetfft");
+    bt.resetAndStart("normXCorr_pocketfft");
     normXCorr(fixedImgView, movingImgView, nccImg, numberOfOverlapVoxelsImg);
     STOP_AND_LOG(bt)
 

@@ -24,7 +24,7 @@ find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)
 
 if (BUILD_WITH_CONDA)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include ${CONDA_LIB_DIR}/include/fftw)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include)
   find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
                PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
   find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread mkl_sequential_dll
@@ -39,7 +39,7 @@ else ()
   else (WIN32)
     set(MKL_PATH ${INTEL_PATH}/mkl/latest)
   endif (WIN32)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include ${MKL_PATH}/include/fftw)
+  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
   if (WIN32)
     # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
     set(MKL_LIBRARIES ${MKL_LIBRARIES}

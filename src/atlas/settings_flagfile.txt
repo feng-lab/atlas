@@ -22,5 +22,8 @@
 # Number of threads fft will use, default is 0 which is hardware concurrency.
 --zimg_global_fft_number_of_threads=0
 
-# Whether to use mkl for fft computation if available, default is false
---zimg_use_mkl_for_fft_if_available=false
+# Whether to use mkl for fft computation if available, default is true
+--zimg_use_mkl_for_fft_if_available=true
+
+# Whether to use fftw for fft computation if available, default is true
+--zimg_use_fftw_for_fft_if_available=true

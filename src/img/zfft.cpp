@@ -3,13 +3,13 @@
 #ifdef ZIMG_USE_MKL
 #include <mkl.h>
 #include <mkl_dfti.h>
-#ifdef ZIMG_USE_FFTW_INTERFACE
-#include <fftw3.h>
 #endif
+#ifdef ZIMG_USE_FFTW
+#include <fftw3.h>
 #endif
 #include <pocketfft_hdronly.h>
 #include <folly/ScopeGuard.h>
-#include <tbb/global_control.h>
+// #include <tbb/global_control.h>
 #include <thread>
 
 DEFINE_uint32(zimg_global_fft_number_of_threads,
@@ -17,8 +17,12 @@ DEFINE_uint32(zimg_global_fft_number_of_threads,
               "Number of threads fft will use, default is 0 which is hardware concurrency.");
 
 DEFINE_bool(zimg_use_mkl_for_fft_if_available,
-            false,
-            "Whether to use mkl for fft computation if available, default is false");
+            true,
+            "Whether to use mkl for fft computation if available, default is true");
+
+DEFINE_bool(zimg_use_fftw_for_fft_if_available,
+            true,
+            "Whether to use fftw for fft computation if available, default is true");
 
 namespace {
 
@@ -57,16 +61,14 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
 
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
-    // from fftw benchmark, 3d inplace is faster than outofplace, so we
-    // first copy real data to complex img
     ZImg wrapImg;
     // reinterpret_cast allowed (section "Complex numbers")
     wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
     wrapImg.pasteImg(img);
     wrapImg.clear(); // copy data finished
 
-    mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
-    tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
+    // mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(outDepth),
                        static_cast<MKL_LONG>(outHeight),
                        static_cast<MKL_LONG>(outWidth)};
@@ -84,7 +86,20 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
     MKL_DFTI_CHECK(DftiCommitDescriptor(descHandle));
     MKL_DFTI_CHECK(DftiComputeForward(descHandle, res.rawData()));
 
-#ifdef ZIMG_USE_FFTW_INTERFACE
+    return res;
+  }
+#endif
+
+#ifdef ZIMG_USE_FFTW
+  if (FLAGS_zimg_use_fftw_for_fft_if_available) {
+    // from fftw benchmark, 3d inplace is faster than outofplace, so we
+    // first copy real data to complex img
+    ZImg wrapImg;
+    // reinterpret_cast allowed (section "Complex numbers")
+    wrapImg.wrapData(reinterpret_cast<double*>(res.rawData()), width * 2, outHeight, outDepth);
+    wrapImg.pasteImg(img);
+    wrapImg.clear(); // copy data finished
+
     // do fft
     fftw_plan_with_nthreads(nthreads);
     fftw_plan p = fftw_plan_dft_r2c_3d(outDepth,
@@ -95,7 +110,6 @@ ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDe
                                        FFTW_ESTIMATE);
     fftw_execute(p);
     fftw_destroy_plan(p);
-#endif
 
     return res;
   }
@@ -132,20 +146,8 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 
 #ifdef ZIMG_USE_MKL
   if (FLAGS_zimg_use_mkl_for_fft_if_available) {
-#ifdef ZIMG_USE_FFTW_INTERFACE
-    fftw_plan_with_nthreads(nthreads);
-    fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
-                                       cimg.height(),
-                                       width,
-                                       reinterpret_cast<fftw_complex*>(cimg.rawData()),
-                                       reinterpret_cast<double*>(cimg.rawData()),
-                                       FFTW_ESTIMATE);
-    fftw_execute(p);
-    fftw_destroy_plan(p);
-#endif
-
-    mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
-    tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
+    // mkl_domain_set_num_threads(nthreads, MKL_DOMAIN_FFT);
+    // tbb::global_control gc(tbb::global_control::max_allowed_parallelism, nthreads);
     MKL_LONG dims[] = {static_cast<MKL_LONG>(cimg.depth()),
                        static_cast<MKL_LONG>(cimg.height()),
                        static_cast<MKL_LONG>(width)};
@@ -169,9 +171,30 @@ ZImg ifft(ZComplexImg& cimg, size_t width, size_t outWidth, size_t outHeight, si
 
     ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
     res = wrapImg.crop(region);
-#ifdef ZIMG_USE_FFTW_INTERFACE
-    res /= static_cast<uint64_t>(width * cimg.height() * cimg.depth());
+    cimg.clear();
+
+    return res;
+  }
 #endif
+
+#ifdef ZIMG_USE_FFTW
+  if (FLAGS_zimg_use_fftw_for_fft_if_available) {
+    fftw_plan_with_nthreads(nthreads);
+    fftw_plan p = fftw_plan_dft_c2r_3d(cimg.depth(),
+                                       cimg.height(),
+                                       width,
+                                       reinterpret_cast<fftw_complex*>(cimg.rawData()),
+                                       reinterpret_cast<double*>(cimg.rawData()),
+                                       FFTW_ESTIMATE);
+    fftw_execute(p);
+    fftw_destroy_plan(p);
+
+    ZImg wrapImg;
+    wrapImg.wrapData(reinterpret_cast<double*>(cimg.rawData()), cimg.width() * 2, cimg.height(), cimg.depth());
+
+    ZImgRegion region(0, outWidth, 0, outHeight, 0, outDepth);
+    res = wrapImg.crop(region);
+    res *= 1. / (width * cimg.height() * cimg.depth());
     cimg.clear();
 
     return res;
