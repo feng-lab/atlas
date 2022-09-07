@@ -910,13 +910,6 @@ def build_zstd(src_dir: str, install_dir: str):
 
     bak_file = orig_file = None
     try:
-        # if is_windows():
-        #     orig_file = os.path.join(src_dir, 'build', 'cmake', 'lib', 'CMakeLists.txt')
-        #     bak_file = patch_file(orig_file,
-        #                           from_texts=[r'${LIBRARY_DIR}/decompress/*.S',
-        #                                       ],
-        #                           to_texts=[r'',
-        #                                     ])
         if is_mac():
             orig_file = os.path.join(src_dir, 'lib', 'zstd.h')
             bak_file = patch_file(orig_file,
@@ -934,7 +927,7 @@ def build_zstd(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_windows() or is_mac():
+        if is_mac():
             os.replace(bak_file, orig_file)
 
 
