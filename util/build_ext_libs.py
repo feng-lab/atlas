@@ -895,6 +895,8 @@ def build_xz(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DCREATE_XZ_SYMLINKS:BOOL=OFF',
+                         '-DCREATE_LZMA_SYMLINKS:BOOL=OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
