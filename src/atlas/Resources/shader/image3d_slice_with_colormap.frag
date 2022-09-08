@@ -34,7 +34,7 @@ out vec4 FragData0;  // call glBindFragDataLocation before linking
 
 #define UNMAPPED 0
 #define EMPTY 40000
-#define UINTMAX 4294967295
+#define UINTMAX 4294967295U
 
 void main()
 {

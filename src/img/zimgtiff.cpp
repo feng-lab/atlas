@@ -82,7 +82,7 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (m_isImageJTiff && m_onlyOneIFDInImageJTiff) {
-    if (!ifds[0].isNormalImage() || ifds[0].compression() != enumToUnderlyingType(Compression::NONE) ||
+    if (!ifds[0].isNormalImage() || ifds[0].compression() != to_underlying(Compression::NONE) ||
         ifds[0].isTiledImage() || ifds[0].stripsPerImage() != 1) {
       throw ZIOException("Wrong ImageJ Tiff file");
     }

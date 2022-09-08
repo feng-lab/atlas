@@ -687,22 +687,22 @@ void ZImgIO::readImg(const QStringList& fileList,
     ZImgInfo& sliceInfo = sliceInfos[i];
     sliceCatDimStart = i == 0 ? 0 : sliceCatDimEnd;
     sliceCatDimEnd = sliceCatDimStart + sliceInfo.size(catDim);
-    if (sliceCatDimStart >= static_cast<size_t>(region.end[enumToUnderlyingType(catDim)]) ||
-        sliceCatDimEnd <= static_cast<size_t>(region.start[enumToUnderlyingType(catDim)])) {
+    if (sliceCatDimStart >= static_cast<size_t>(region.end[to_underlying(catDim)]) ||
+        sliceCatDimEnd <= static_cast<size_t>(region.start[to_underlying(catDim)])) {
       continue;
     }
     ZImgRegion sliceRegion = region;
-    if (static_cast<size_t>(region.start[enumToUnderlyingType(catDim)]) > sliceCatDimStart) {
-      sliceRegion.start[enumToUnderlyingType(catDim)] =
-        static_cast<size_t>(region.start[enumToUnderlyingType(catDim)]) - sliceCatDimStart;
+    if (static_cast<size_t>(region.start[to_underlying(catDim)]) > sliceCatDimStart) {
+      sliceRegion.start[to_underlying(catDim)] =
+        static_cast<size_t>(region.start[to_underlying(catDim)]) - sliceCatDimStart;
     } else {
-      sliceRegion.start[enumToUnderlyingType(catDim)] = 0;
+      sliceRegion.start[to_underlying(catDim)] = 0;
     }
-    if (static_cast<size_t>(region.end[enumToUnderlyingType(catDim)]) < sliceCatDimEnd) {
-      sliceRegion.end[enumToUnderlyingType(catDim)] =
-        sliceInfo.size(catDim) - (sliceCatDimEnd - static_cast<size_t>(region.end[enumToUnderlyingType(catDim)]));
+    if (static_cast<size_t>(region.end[to_underlying(catDim)]) < sliceCatDimEnd) {
+      sliceRegion.end[to_underlying(catDim)] =
+        sliceInfo.size(catDim) - (sliceCatDimEnd - static_cast<size_t>(region.end[to_underlying(catDim)]));
     } else {
-      sliceRegion.end[enumToUnderlyingType(catDim)] = sliceInfo.size(catDim);
+      sliceRegion.end[to_underlying(catDim)] = sliceInfo.size(catDim);
     }
 
     if (expandXY && (sliceInfo.width < info.width || sliceInfo.height < info.height)) {

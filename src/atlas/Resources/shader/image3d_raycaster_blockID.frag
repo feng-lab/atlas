@@ -54,7 +54,7 @@ varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
 
 #define UNMAPPED 0
 #define EMPTY 40000
-#define UINTMAX 4294967295
+#define UINTMAX 4294967295U
 
 void main()
 {

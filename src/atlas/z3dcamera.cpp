@@ -347,68 +347,68 @@ void Z3DCamera::updateFrustum()
 void Z3DCamera::makeViewMatrices()
 {
   glm::vec3 adjust = m_strafeVector * -m_eyeSeparation / 2.f;
-  m_viewMatrices[enumToUnderlyingType(Z3DEye::Left)] = glm::lookAt(m_eye + adjust, m_center + adjust, m_upVector);
-  m_viewMatrices[enumToUnderlyingType(Z3DEye::Mono)] = glm::lookAt(m_eye, m_center, m_upVector);
+  m_viewMatrices[to_underlying(Z3DEye::Left)] = glm::lookAt(m_eye + adjust, m_center + adjust, m_upVector);
+  m_viewMatrices[to_underlying(Z3DEye::Mono)] = glm::lookAt(m_eye, m_center, m_upVector);
   adjust = m_strafeVector * m_eyeSeparation / 2.f;
-  m_viewMatrices[enumToUnderlyingType(Z3DEye::Right)] = glm::lookAt(m_eye + adjust, m_center + adjust, m_upVector);
+  m_viewMatrices[to_underlying(Z3DEye::Right)] = glm::lookAt(m_eye + adjust, m_center + adjust, m_upVector);
 
-  m_inverseViewMatrices[enumToUnderlyingType(Z3DEye::Left)] =
-    glm::inverse(m_viewMatrices[enumToUnderlyingType(Z3DEye::Left)]);
-  m_inverseViewMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
-    glm::inverse(m_viewMatrices[enumToUnderlyingType(Z3DEye::Mono)]);
-  m_inverseViewMatrices[enumToUnderlyingType(Z3DEye::Right)] =
-    glm::inverse(m_viewMatrices[enumToUnderlyingType(Z3DEye::Right)]);
+  m_inverseViewMatrices[to_underlying(Z3DEye::Left)] =
+    glm::inverse(m_viewMatrices[to_underlying(Z3DEye::Left)]);
+  m_inverseViewMatrices[to_underlying(Z3DEye::Mono)] =
+    glm::inverse(m_viewMatrices[to_underlying(Z3DEye::Mono)]);
+  m_inverseViewMatrices[to_underlying(Z3DEye::Right)] =
+    glm::inverse(m_viewMatrices[to_underlying(Z3DEye::Right)]);
 
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Left)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Left)];
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Mono)];
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Right)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Right)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Right)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Left)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Left)] * m_viewMatrices[to_underlying(Z3DEye::Left)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Mono)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Mono)] * m_viewMatrices[to_underlying(Z3DEye::Mono)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Right)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Right)] * m_viewMatrices[to_underlying(Z3DEye::Right)];
 
-  m_normalMatrices[enumToUnderlyingType(Z3DEye::Left)] =
-    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[enumToUnderlyingType(Z3DEye::Left)])));
-  m_normalMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
-    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[enumToUnderlyingType(Z3DEye::Mono)])));
-  m_normalMatrices[enumToUnderlyingType(Z3DEye::Right)] =
-    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[enumToUnderlyingType(Z3DEye::Right)])));
+  m_normalMatrices[to_underlying(Z3DEye::Left)] =
+    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[to_underlying(Z3DEye::Left)])));
+  m_normalMatrices[to_underlying(Z3DEye::Mono)] =
+    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[to_underlying(Z3DEye::Mono)])));
+  m_normalMatrices[to_underlying(Z3DEye::Right)] =
+    glm::transpose(glm::inverse(glm::mat3(m_viewMatrices[to_underlying(Z3DEye::Right)])));
 }
 
 void Z3DCamera::makeProjectionMatrices()
 {
   if (m_projectionType == ProjectionType::Orthographic) {
     glm::mat4 pmat = glm::ortho(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)] = pmat;
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] = pmat;
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Right)] = pmat;
+    m_projectionMatrices[to_underlying(Z3DEye::Left)] = pmat;
+    m_projectionMatrices[to_underlying(Z3DEye::Mono)] = pmat;
+    m_projectionMatrices[to_underlying(Z3DEye::Right)] = pmat;
     pmat = glm::inverse(pmat);
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Left)] = pmat;
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] = pmat;
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Right)] = pmat;
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Left)] = pmat;
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Mono)] = pmat;
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Right)] = pmat;
   } else {
     // LOG(INFO) << m_left << m_right << m_bottom << m_top;
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Mono)] =
       glm::frustum(m_left, m_right, m_bottom, m_top, m_nearDist, m_farDist);
     float frustumShift = 0.5f * m_eyeSeparation * m_nearDist / m_focusDistance;
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Left)] =
       glm::frustum(m_left + frustumShift, m_right + frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Right)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Right)] =
       glm::frustum(m_left - frustumShift, m_right - frustumShift, m_bottom, m_top, m_nearDist, m_farDist);
 
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Left)] =
-      glm::inverse(m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)]);
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
-      glm::inverse(m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)]);
-    m_inverseProjectionMatrices[enumToUnderlyingType(Z3DEye::Right)] =
-      glm::inverse(m_projectionMatrices[enumToUnderlyingType(Z3DEye::Right)]);
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Left)] =
+      glm::inverse(m_projectionMatrices[to_underlying(Z3DEye::Left)]);
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Mono)] =
+      glm::inverse(m_projectionMatrices[to_underlying(Z3DEye::Mono)]);
+    m_inverseProjectionMatrices[to_underlying(Z3DEye::Right)] =
+      glm::inverse(m_projectionMatrices[to_underlying(Z3DEye::Right)]);
   }
 
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Left)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Left)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Left)];
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Mono)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Mono)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Mono)];
-  m_projectionViewMatrices[enumToUnderlyingType(Z3DEye::Right)] =
-    m_projectionMatrices[enumToUnderlyingType(Z3DEye::Right)] * m_viewMatrices[enumToUnderlyingType(Z3DEye::Right)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Left)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Left)] * m_viewMatrices[to_underlying(Z3DEye::Left)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Mono)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Mono)] * m_viewMatrices[to_underlying(Z3DEye::Mono)];
+  m_projectionViewMatrices[to_underlying(Z3DEye::Right)] =
+    m_projectionMatrices[to_underlying(Z3DEye::Right)] * m_viewMatrices[to_underlying(Z3DEye::Right)];
 }
 
 } // namespace nim

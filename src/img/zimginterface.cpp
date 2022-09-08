@@ -37,7 +37,7 @@ size_t byteNumber(DataType dt)
     case DataType::IFD8:
       return 8;
     default:
-      throw ZException(QString("Invalid DataType %1").arg(enumToUnderlyingType(dt)));
+      throw ZException(QString("Invalid DataType %1").arg(to_underlying(dt)));
   }
 }
 
@@ -63,7 +63,7 @@ double unitSizeInMeter(VoxelSizeUnit vsu)
     case VoxelSizeUnit::km:
       return 1e3;
     default:
-      throw ZException(QString("Invalid VoxelSizeUnit %1").arg(enumToUnderlyingType(vsu)));
+      throw ZException(QString("Invalid VoxelSizeUnit %1").arg(to_underlying(vsu)));
   }
 }
 
@@ -73,7 +73,7 @@ std::string_view enumToString(TEnum e)
   static_assert(std::is_enum_v<remove_cvref_t<TEnum>>, "Need Enum Type");
   auto res = magic_enum::enum_name(e);
   if (res.empty()) {
-    throw ZIOException(fmt::format("invalid enum value: {}", enumToUnderlyingType(e)));
+    throw ZIOException(fmt::format("invalid enum value: {}", to_underlying(e)));
   }
   return res;
 }
@@ -122,7 +122,7 @@ std::string_view enumToString<Compression>(Compression e)
     case Compression::WEBP:
       return "WEBP";
     default:
-      throw ZIOException(fmt::format("invalid Compression: {}", enumToUnderlyingType(e)));
+      throw ZIOException(fmt::format("invalid Compression: {}", to_underlying(e)));
   }
 }
 

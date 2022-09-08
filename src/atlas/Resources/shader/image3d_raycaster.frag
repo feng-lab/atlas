@@ -152,7 +152,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 
 #define UNMAPPED 0
 #define EMPTY 40000
-#define UINTMAX 4294967295
+#define UINTMAX 4294967295U
 
 void main()
 {

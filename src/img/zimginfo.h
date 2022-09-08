@@ -98,7 +98,7 @@ struct ZImgInfo
   // access
   inline void setSize(Dimension dim, size_t size)
   {
-    (&width)[enumToUnderlyingType(dim)] = size;
+    (&width)[to_underlying(dim)] = size;
     if (dim >= Dimension::C) {
       createDefaultDescriptions();
     }
@@ -113,7 +113,7 @@ struct ZImgInfo
 
   [[nodiscard]] inline size_t size(Dimension dim) const
   {
-    return (&width)[enumToUnderlyingType(dim)];
+    return (&width)[to_underlying(dim)];
   }
 
   [[nodiscard]] inline size_t size(size_t dim) const
@@ -125,7 +125,7 @@ struct ZImgInfo
   [[nodiscard]] inline size_t stride(Dimension dim) const
   {
     size_t res = 1;
-    for (std::underlying_type<Dimension>::type i = 0; i < enumToUnderlyingType(dim); ++i) {
+    for (std::underlying_type<Dimension>::type i = 0; i < to_underlying(dim); ++i) {
       res *= (&width)[i];
     }
     return res;
@@ -152,12 +152,12 @@ struct ZImgInfo
 
   inline size_t& operator[](Dimension i)
   {
-    return (&width)[enumToUnderlyingType(i)];
+    return (&width)[to_underlying(i)];
   }
 
   inline const size_t& operator[](Dimension i) const
   {
-    return (&width)[enumToUnderlyingType(i)];
+    return (&width)[to_underlying(i)];
   }
 
   [[nodiscard]] inline bool isAlphaChannel(size_t ch) const

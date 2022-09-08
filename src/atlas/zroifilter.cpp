@@ -909,7 +909,7 @@ void ZROIFilter::mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modif
           double minDist = 15.;
           for (auto item : itemList) {
             if (item->isSelected() || !item->isVisible() ||
-                item->type() != enumToUnderlyingType(GraphicsItemType::ROICtrlPtGraphicsItem)) {
+                item->type() != to_underlying(GraphicsItemType::ROICtrlPtGraphicsItem)) {
               continue;
             }
             auto* ctlPtItem = dynamic_cast<ROICtrlPtGraphicsItem*>(item);

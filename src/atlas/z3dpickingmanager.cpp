@@ -3,6 +3,7 @@
 #include "z3dgl.h"
 #include "z3dtexture.h"
 #include "zlog.h"
+#include <folly/Bits.h>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -138,10 +139,10 @@ void Z3DPickingManager::clearTarget()
 
 void Z3DPickingManager::increaseColor()
 {
-  auto col = bit_cast<uint32_t>(m_currentColor);
+  auto col = folly::bit_cast<uint32_t>(m_currentColor);
   if (col != 0xffffffff) {
     ++col;
-    m_currentColor = bit_cast<glm::col4>(col);
+    m_currentColor = folly::bit_cast<glm::col4>(col);
   } else {
     m_currentColor = glm::col4(0, 0, 0, 128);
     // LOG(ERROR) << "Out of colors...";

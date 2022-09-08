@@ -960,52 +960,52 @@ struct ZTiffHeader
   uint64_t dircount = 8;
 
   uint16_t tag1 = TIFFTAG_IMAGEWIDTH;
-  uint16_t type1 = enumToUnderlyingType(DataType::Long);
+  uint16_t type1 = to_underlying(DataType::Long);
   uint64_t count1 = 1;
   uint32_t width = 0;
   uint32_t fill1 = 0;
 
   uint16_t tag2 = TIFFTAG_IMAGELENGTH;
-  uint16_t type2 = enumToUnderlyingType(DataType::Long);
+  uint16_t type2 = to_underlying(DataType::Long);
   uint64_t count2 = 1;
   uint32_t height = 0;
   uint32_t fill2 = 0;
 
   uint16_t tag3 = TIFFTAG_BITSPERSAMPLE;
-  uint16_t type3 = enumToUnderlyingType(DataType::Short);
+  uint16_t type3 = to_underlying(DataType::Short);
   uint64_t count3 = 1;
   uint16_t bitPerSample = 0;
   uint16_t fill31 = 0;
   uint32_t fill32 = 0;
 
   uint16_t tag4 = TIFFTAG_SAMPLESPERPIXEL;
-  uint16_t type4 = enumToUnderlyingType(DataType::Short);
+  uint16_t type4 = to_underlying(DataType::Short);
   uint64_t count4 = 1;
   uint16_t samplesPerPixel = 0;
   uint16_t fill41 = 0;
   uint32_t fill42 = 0;
 
   uint16_t tag5 = TIFFTAG_COMPRESSION;
-  uint16_t type5 = enumToUnderlyingType(DataType::Short);
+  uint16_t type5 = to_underlying(DataType::Short);
   uint64_t count5 = 1;
   uint16_t compression = 0;
   uint16_t fill51 = 0;
   uint32_t fill52 = 0;
 
   uint16_t tag6 = TIFFTAG_PHOTOMETRIC;
-  uint16_t type6 = enumToUnderlyingType(DataType::Short);
+  uint16_t type6 = to_underlying(DataType::Short);
   uint64_t count6 = 1;
   uint16_t photoMetric = 1;
   uint16_t fill61 = 0;
   uint32_t fill62 = 0;
 
   uint16_t tag7 = TIFFTAG_STRIPOFFSETS;
-  uint16_t type7 = enumToUnderlyingType(DataType::Long8);
+  uint16_t type7 = to_underlying(DataType::Long8);
   uint64_t count7 = 1;
   uint64_t stripOffset = 0;
 
   uint16_t tag8 = TIFFTAG_STRIPBYTECOUNTS;
-  uint16_t type8 = enumToUnderlyingType(DataType::Long8);
+  uint16_t type8 = to_underlying(DataType::Long8);
   uint64_t count8 = 1;
   uint64_t stripByteCount = 0;
 
@@ -1842,7 +1842,7 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
   } else {
     if (!checkCompression(nullptr, comp)) {
       LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.")
-                        .arg(enumToUnderlyingType(comp));
+                        .arg(to_underlying(comp));
       comp = defaultCompression(nullptr);
     }
   }
@@ -1982,7 +1982,7 @@ bool ZTiffWriter::checkCompression(const ZImg* /*unused*/, Compression comp)
     return true;
   }
   // check exist first
-  if (TIFFIsCODECConfigured(enumToUnderlyingType(comp)) != 1) {
+  if (TIFFIsCODECConfigured(to_underlying(comp)) != 1) {
     return false;
   }
   //  if (comp == Compression::CCITTFAX3 ||

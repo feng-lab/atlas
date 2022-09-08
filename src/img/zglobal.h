@@ -15,12 +15,12 @@
 
 namespace nim {
 
+// c++20 feature
 template<class T>
 struct remove_cvref
 {
   typedef std::remove_cv_t<std::remove_reference_t<T>> type;
 };
-
 template<class T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 
@@ -29,50 +29,11 @@ using remove_cvref_t = typename remove_cvref<T>::type;
 #define __forceinline inline __attribute__((always_inline))
 #endif
 
-template<typename TEnum>
-constexpr typename std::underlying_type<TEnum>::type enumToUnderlyingType(TEnum e) noexcept
+// c++23 feature
+template<typename Enum>
+constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept
 {
-  return static_cast<typename std::underlying_type<TEnum>::type>(e);
-}
-
-template<typename TEnum>
-std::string_view enumToString(TEnum e);
-
-template<typename TEnum>
-TEnum stringToEnum(std::string_view s);
-
-template<typename TEnum>
-inline QString enumToQString(TEnum e)
-{
-  auto str = enumToString(e);
-  return QString::fromUtf8(str.data(), str.size());
-}
-
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
-template<typename TEnum>
-inline TEnum stringToEnum(QStringView s)
-{
-  auto str = s.toUtf8();
-  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
-}
-#else
-template<typename TEnum>
-inline TEnum stringToEnum(const QString& s)
-{
-  return stringToEnum<TEnum>(s.toStdString());
-}
-#endif
-
-// https://chromium.googlesource.com/chromium/src/+/master/base/bit_cast.h
-template<class Dest, class Source>
-__forceinline Dest bit_cast(const Source& source)
-{
-  static_assert(sizeof(Dest) == sizeof(Source), "bit_cast requires source and destination to be the same size");
-  static_assert(std::is_trivially_copyable_v<Dest>, "bit_cast requires the destination type to be copyable");
-  static_assert(std::is_trivially_copyable_v<Source>, "bit_cast requires the source type to be copyable");
-  Dest dest;
-  std::memcpy(&dest, &source, sizeof(dest));
-  return dest;
+  return static_cast<std::underlying_type_t<Enum>>(e);
 }
 
 template<typename Type>
@@ -185,7 +146,9 @@ __forceinline std::vector<size_t> argSort(RAIter first, RAIter last, Compare com
   std::vector<size_t> idx(last - first);
   std::iota(idx.begin(), idx.end(), 0);
 
-  auto idxComp = [&first, comp](size_t i1, size_t i2) { return comp(first[i1], first[i2]); };
+  auto idxComp = [&first, comp](size_t i1, size_t i2) {
+    return comp(first[i1], first[i2]);
+  };
 
   std::stable_sort(idx.begin(), idx.end(), idxComp);
 
@@ -199,7 +162,9 @@ __forceinline std::vector<size_t> argSort(RAIter first, RAIter last)
   std::iota(idx.begin(), idx.end(), 0);
 
   // sort indexes based on comparing values in v
-  std::stable_sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) { return first[i1] < first[i2]; });
+  std::stable_sort(idx.begin(), idx.end(), [&first](size_t i1, size_t i2) {
+    return first[i1] < first[i2];
+  });
 
   return idx;
 }
@@ -234,19 +199,6 @@ public:
   inline static QString jarsDIR;
   inline static QString resourcesDIR;
 };
-
-// std::visit(overloaded {
-//   [](auto arg) { std::cout << arg << ' '; },
-//   [](double arg) { std::cout << std::fixed << arg << ' '; },
-//   [](const std::string& arg) { std::cout << std::quoted(arg) << ' '; },
-// }, v);
-template<class... Ts>
-struct overloaded : Ts...
-{
-  using Ts::operator()...;
-};
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>; // not needed as of C++20
 
 // some c++20 lib functions
 template<class Container, class T>
@@ -286,5 +238,18 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
 }
 
 folly::Executor::KeepAlive<> getGlobalCPUExecutor();
+
+// c++23 utility
+[[noreturn]] __forceinline void unreachable()
+{
+  // Uses compiler specific extensions if possible.
+  // Even if no extension is used, undefined behavior is still raised by
+  // an empty function body and the noreturn attribute.
+#ifdef __GNUC__ // GCC, Clang, ICC
+  __builtin_unreachable();
+#elif defined(_MSC_VER) // MSVC
+  __assume(false);
+#endif
+}
 
 } // namespace nim
