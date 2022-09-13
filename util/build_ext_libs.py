@@ -2085,7 +2085,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
     bak_file = orig_file = None
     bak_file1 = orig_file1 = None
     try:
-        if is_mac():
+        if is_mac() or is_windows():
             orig_file = os.path.join(src_dir, 'CMakeLists.txt')
             bak_file = patch_file(orig_file,
                                   from_texts=[
@@ -2095,15 +2095,14 @@ def build_rocksdb(src_dir: str, install_dir: str):
                                       r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
                                       ])
 
-        if is_mac() or is_linux():
-            orig_file1 = os.path.join(install_dir, 'lib', 'cmake', 'folly', 'folly-targets.cmake')
-            bak_file1 = patch_file(orig_file1,
-                                   from_texts=[
-                                       r';gflags_static;',
-                                   ],
-                                   to_texts=[
-                                       r';',
-                                   ])
+        orig_file1 = os.path.join(install_dir, 'lib', 'cmake', 'folly', 'folly-targets.cmake')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[
+                                   r';gflags_static;',
+                               ],
+                               to_texts=[
+                                   r';gflags::gflags_static;',
+                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -2125,10 +2124,9 @@ def build_rocksdb(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
-        if is_mac():
+        if is_mac() or is_windows():
             os.replace(bak_file, orig_file)
-        if is_mac() or is_linux():
-            os.replace(bak_file1, orig_file1)
+        os.replace(bak_file1, orig_file1)
         print()
 
 
