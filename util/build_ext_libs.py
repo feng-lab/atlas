@@ -2101,7 +2101,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                                    r';gflags_static;',
                                ],
                                to_texts=[
-                                   r';gflags::gflags_static;',
+                                   r';' if is_windows() else r';gflags::gflags_static;',
                                ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
