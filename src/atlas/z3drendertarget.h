@@ -29,7 +29,7 @@ public:
 
   void bind();
 
-  void release();
+  void release() const;
 
   [[nodiscard]] bool isBound() const;
 

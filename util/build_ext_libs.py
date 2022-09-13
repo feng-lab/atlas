@@ -179,7 +179,8 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
         res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
-        res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
+        res[
+            'CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
     return res
 
 
@@ -313,7 +314,7 @@ def build_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja())
 
 
 def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja(), use_cmake=False,
-                               ninja_para: str='install'):
+                               ninja_para: str = 'install'):
     if is_windows():
         if env is None:
             env = get_vcvars_environment()
@@ -687,14 +688,13 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         shutil.rmtree(sub_build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
 
-
     sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
     try:
         cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
         cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
-                         '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE',])
+                         '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE', ])
 
         cmakecmd.extend([sub_src_dir])
         build_and_install_cmakecmd(cmakecmd, sub_build_dir)
@@ -1039,7 +1039,7 @@ def build_folly(src_dir: str, install_dir: str):
                                to_texts=[
                                    r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
                                    r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
-                                   ])
+                               ])
 
         orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file4 = patch_file(orig_file4,
@@ -1161,7 +1161,6 @@ def build_eigen(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
-
 
         # if is_linux():
         #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
@@ -1307,7 +1306,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                ],
                    to_texts=[r';\$<LINK_ONLY:METIS::METIS>',
                              ]
-                             )
+                   )
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -1862,7 +1861,7 @@ def build_vtk(src_dir: str, install_dir: str):
         os.replace(bak_file4, orig_file4)
 
 
-def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool=False):
+def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
@@ -1892,8 +1891,9 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             bak_file = patch_file(orig_file,
                                   from_texts=[r'ocv_add_perf_tests()',
                                               ],
-                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode('unicode_escape').decode() + '/include)\n'
-                                            'ocv_add_perf_tests()\n',
+                                  to_texts=['include_directories(BEFORE SYSTEM ' + ext_build_dir().encode(
+                                      'unicode_escape').decode() + '/include)\n'
+                                                                   'ocv_add_perf_tests()\n',
                                             ])
 
             if is_windows():
@@ -1905,7 +1905,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             cmakecmd.extend([
                 '-DMKL_ROOT_DIR=' + os.path.join(intel_sw_dir(), 'mkl', 'latest'),
                 '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
-                ])
+            ])
 
             orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
             bak_file = patch_file(orig_file,
@@ -1964,7 +1964,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DWITH_OPENCLAMDBLAS:BOOL=OFF',
             '-DWITH_LAPACK:BOOL=ON',
             '-DWITH_MKL:BOOL=ON',
-            '-DMKL_WITH_TBB:BOOL=' + ('OFF' if is_windows() else 'ON'),   # mkl_tbb link with static run lib (/MT)
+            '-DMKL_WITH_TBB:BOOL=' + ('OFF' if is_windows() else 'ON'),  # mkl_tbb link with static run lib (/MT)
             '-DMKL_WITH_OPENMP:BOOL=OFF',
             # '-DMKL_LIBRARIES_DONT_HACK:BOOL=' + ('OFF' if conda_build else 'ON'),  # if on lapack check fails
             '-DWITH_PROTOBUF:BOOL=ON',
@@ -2076,6 +2076,56 @@ def build_llfio(src_dir: str, install_dir: str):
                             dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        print()
+
+
+def build_rocksdb(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    bak_file = orig_file = None
+    bak_file1 = orig_file1 = None
+    try:
+        if is_mac():
+            orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[
+                                      r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                                      ],
+                                  to_texts=[
+                                      r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                                      ])
+
+            orig_file1 = os.path.join(install_dir, 'lib', 'cmake', 'folly', 'folly-targets.cmake')
+            bak_file1 = patch_file(orig_file1,
+                                   from_texts=[
+                                       r';gflags_static;',
+                                   ],
+                                   to_texts=[
+                                       r';',
+                                   ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir)
+
+        cmakecmd.extend(['-DWITH_SNAPPY:BOOL=ON',
+                         '-DWITH_LZ4:BOOL=ON',
+                         '-DWITH_ZSTD:BOOL=ON',
+                         '-DROCKSDB_BUILD_SHARED:BOOL=OFF',
+                         '-DROCKSDB_SKIP_THIRDPARTY:BOOL=ON',
+                         '-DWITH_GFLAGS:BOOL=ON',
+                         '-DPORTABLE:BOOL=ON',
+                         '-DFORCE_AVX:BOOL=ON',
+                         '-DWITH_TBB:BOOL=OFF',
+                         '-DUSE_COROUTINES:BOOL=OFF',
+                         '-DUSE_FOLLY:BOOL=ON',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        if is_mac():
+            os.replace(bak_file, orig_file)
+            os.replace(bak_file1, orig_file1)
         print()
 
 
@@ -2374,19 +2424,19 @@ def build_libs(libs: OrderedDict, update_src: bool):
                 update_git_submodule(le_src_dir)
             build_libevent(le_src_dir, ext_build_dir())
 
-        if lib_name == 'folly-deps':
-            bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
-            # jm_src_dir = os.path.join(ext_dir(), 'jemalloc')
+        if lib_name == 'snappy':
             snappy_src_dir = os.path.join(ext_dir(), 'snappy')
             if update_src:
-                update_git_submodule(bz2_src_dir)
-                # update_git_submodule(jm_src_dir)
                 update_git_submodule(snappy_src_dir)
-            build_bzip2(bz2_src_dir, ext_build_dir())
-            # if is_linux():
-            #     build_jemalloc(jm_src_dir, ext_build_dir())
             build_snappy(snappy_src_dir, ext_build_dir())
-            #
+
+        if lib_name == 'bzip2':
+            bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
+            if update_src:
+                update_git_submodule(bz2_src_dir)
+            build_bzip2(bz2_src_dir, ext_build_dir())
+
+        if lib_name == 'libsodium':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'libsodium*'))
             src_dir = get_package_top_level_folder(package_name, ext_dir())
             if not os.path.exists(src_dir):
@@ -2619,15 +2669,21 @@ def build_libs(libs: OrderedDict, update_src: bool):
                 update_git_submodule(src_dir)
             build_llfio(src_dir, ext_build_dir())
 
+        if lib_name == 'rocksdb':
+            src_dir = os.path.join(ext_dir(), 'rocksdb')
+            if update_src:
+                update_git_submodule(src_dir)
+            build_rocksdb(src_dir, ext_build_dir())
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'eigen',
                 'pybind11', 'glm', 'magic_enum', 'pocketfft', 'googletest', 'cpuinfo', 'gflags', 'glog', 'benchmark',
-                'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'folly-deps',
-                'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
+                'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
+                'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
                 'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
-                'neuTube', 'llfio',
+                'neuTube', 'llfio', 'rocksdb',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
@@ -2644,18 +2700,21 @@ def parse_inputs(argv: list):
                             'openssl': ['grpc', 'folly'],
                             'hdf5': ['itk', 'vtk'],
                             'suitesparse': ['ceres-solver'],
-                            'ceres-solver': ['opencv'],   # only if we need opencv sfm
+                            'ceres-solver': ['opencv'],  # only if we need opencv sfm
                             'boost': ['folly'],
                             'libevent': ['folly'],
-                            'folly-deps': ['folly'],
                             'double-conversion': ['folly', 'itk', 'vtk'],
-                            'lz4': ['vtk', 'folly'],
+                            'lz4': ['vtk', 'folly', 'rocksdb'],
                             'xz': ['vtk', 'folly'],
-                            'zstd': ['folly'],
+                            'zstd': ['folly', 'rocksdb'],
                             'fmt': ['folly'],
                             'openjpeg': ['opencv'],
                             'libwebp': ['opencv'],
                             'opencv': ['conda-opencv'],
+                            'snappy': ['folly', 'rocksdb'],
+                            'bzip2': ['folly'],
+                            'libsodium': ['folly'],
+                            'folly': ['rocksdb'],
                             }
 
     print('current interpreter: ' + sys.executable)

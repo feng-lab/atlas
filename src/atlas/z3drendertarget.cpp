@@ -117,7 +117,7 @@ void Z3DRenderTarget::bind()
   // glBindFramebuffer(GL_FRAMEBUFFER, m_multisampleFBOID);
 }
 
-void Z3DRenderTarget::release()
+void Z3DRenderTarget::release() const
 {
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
   CHECK(m_context == Z3DContext());
