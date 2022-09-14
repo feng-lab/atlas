@@ -271,7 +271,7 @@ else (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
   print_target_properties(Boost::headers)
 endif (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
 
-find_package(snappy REQUIRED
+find_package(Snappy REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Snappy::snappy)
 
