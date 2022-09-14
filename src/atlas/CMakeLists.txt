@@ -88,7 +88,7 @@ print_target_properties(Qt6::SvgWidgets)
 print_target_properties(Qt6::Concurrent)
 print_target_properties(Qt6::OpenGLWidgets)
 
-find_package(rocksdb REQUIRED
+find_package(RocksDB REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(RocksDB::rocksdb)
 
@@ -611,7 +611,11 @@ set(SOURCES
     zroipack.cpp
     zroipack.h
     zregionannotationpack.cpp
-    zregionannotationpack.h zswccolorparameters.cpp zswccolorparameters.h zthreadsafelrucache.h zthreadsafescalablecache.h)
+    zregionannotationpack.h
+    zswccolorparameters.cpp
+    zswccolorparameters.h 
+    zthreadsafelrucache.h
+    zthreadsafescalablecache.h)
 
 # our target
 set(APP_NAME Atlas)
