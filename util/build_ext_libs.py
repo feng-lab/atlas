@@ -986,8 +986,8 @@ def build_folly(src_dir: str, install_dir: str):
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r'find_dependency(fmt)'],
                                to_texts=['find_dependency(fmt)\n'
-                                         'find_dependency(gflags)\n'
-                                         'find_dependency(glog)'])
+                                         'find_dependency(gflags CONFIG)\n'
+                                         'find_dependency(glog CONFIG)'])
 
         orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
         bak_file2 = patch_file(orig_file2,
