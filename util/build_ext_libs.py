@@ -2128,6 +2128,15 @@ def build_rocksdb(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        file1 = os.path.join(install_dir, 'lib', 'cmake', 'rocksdb', 'RocksDBTargets.cmake')
+        patch_file(file1,
+                   from_texts=[
+                       r'<LINK_ONLY:zstd::zstd>',
+                   ],
+                   to_texts=[
+                       r'<LINK_ONLY:zstd::libzstd_static>',
+                   ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
         if is_mac() or is_windows():
