@@ -613,7 +613,7 @@ set(SOURCES
     zregionannotationpack.cpp
     zregionannotationpack.h
     zswccolorparameters.cpp
-    zswccolorparameters.h 
+    zswccolorparameters.h
     zthreadsafelrucache.h
     zthreadsafescalablecache.h)
 
