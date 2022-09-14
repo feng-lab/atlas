@@ -216,10 +216,11 @@ print_target_properties(ITKIONRRD)
 print_target_properties(ITKIOGDCM)
 print_target_properties(ITKBinaryMathematicalMorphology)
 
+# Config with namespace available since gflags 2.2.2
+option(GFLAGS_USE_TARGET_NAMESPACE "Use gflags import target with namespace." ON)
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-print_target_properties(gflags)
-print_target_properties(gflags_static)
+print_target_properties(gflags::gflags)
 find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(glog::glog)

@@ -514,17 +514,8 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
                          ])
-
-        # if is_windows():
-        #     patch_file(os.path.join(src_dir, 'src', 'logging_unittest.cc'),
-        #                from_texts=[r'google::ERROR'],
-        #                to_texts=[r'GLOG_ERROR'],
-        #                keep_bak_file=False)
-        #
-        #     cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/CMake'])
-        # else:
-        #     cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -971,10 +962,10 @@ def build_folly(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     orig_file = bak_file = None
+    orig_file1 = bak_file1 = None
     orig_file5 = bak_file5 = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
-    orig_file4 = bak_file4 = None
     orig_file6 = bak_file6 = None
     try:
         if is_mac():
@@ -991,6 +982,13 @@ def build_folly(src_dir: str, install_dir: str):
                                    to_texts=[r'#check_symbol_exists(preadv',
                                              r'#check_symbol_exists(pwritev'])
 
+        orig_file1 = os.path.join(src_dir, 'CMake', 'folly-config.cmake.in')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'find_dependency(fmt)'],
+                               to_texts=['find_dependency(fmt)\n'
+                                         'find_dependency(gflags)\n'
+                                         'find_dependency(glog)'])
+
         orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
         bak_file2 = patch_file(orig_file2,
                                from_texts=[r'${ZLIB_INCLUDE_DIRS}',
@@ -1002,6 +1000,8 @@ def build_folly(src_dir: str, install_dir: str):
                                            r'find_package(Zstd MODULE)',
                                            r'find_package(Snappy MODULE)',
                                            r'find_package(Libsodium)',
+                                           r'find_package(Gflags MODULE)',
+                                           r'list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
                                            r'find_package(Glog MODULE)',
                                            r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
                                            r'find_package(LibDwarf)' + '' if is_mac() else '_NONONO',
@@ -1023,8 +1023,10 @@ def build_folly(src_dir: str, install_dir: str):
                                          f'find_package({"ZSTD" if is_mac() else "Zstd"} MODULE REQUIRED)',
                                          f'find_package({"SNAPPY" if is_mac() else "Snappy"} MODULE REQUIRED)',
                                          f'find_package({"LIBSODIUM" if is_mac() else "Libsodium"} REQUIRED)',
+                                         r'find_package(Gflags MODULE REQUIRED)',
+                                         r'#list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
                                          r'find_package(Glog MODULE REQUIRED)',
-                                         r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY} ${LIBGFLAGS_LIBRARY})',
+                                         r'list(APPEND FOLLY_LINK_LIBRARIES glog::glog)',
                                          r'find_package(LIBDWARF)',
                                          r'find_package(LIBIBERTY)',
                                          r'find_package(LIBAIO)',
@@ -1043,14 +1045,6 @@ def build_folly(src_dir: str, install_dir: str):
                                    r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
                                ])
 
-        orig_file4 = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[r'project(${PACKAGE_NAME} CXX C)',
-                                           ],
-                               to_texts=['project(${PACKAGE_NAME} CXX C)\n'
-                                         'set(CMAKE_FIND_LIBRARY_SUFFIXES .lib .a ${CMAKE_FIND_LIBRARY_SUFFIXES})\n',
-                                         ])
-
         if is_windows():
             orig_file6 = os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake')
             bak_file6 = patch_file(orig_file6,
@@ -1065,17 +1059,18 @@ def build_folly(src_dir: str, install_dir: str):
                          '-DPYTHON_EXTENSIONS:BOOL=OFF',
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
+                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
             os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
         if is_mac() and macos_min_version().startswith('10.'):
             os.replace(bak_file5, orig_file5)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
-        os.replace(bak_file4, orig_file4)
         if is_windows():
             os.replace(bak_file6, orig_file6)
 
@@ -1245,9 +1240,11 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
                               from_texts=[r'if (HOMEBREW_EXECUTABLE)',
-                                          r'EIGEN3_FOUND'],
+                                          r'EIGEN3_FOUND',
+                                          r'if (TARGET gflags)'],
                               to_texts=[r'if (FALSE)',
-                                        r'Eigen3_FOUND'])
+                                        r'Eigen3_FOUND',
+                                        r'if (TARGET gflags::gflags)'])
         orig_file1 = os.path.join(src_dir, 'cmake', 'FindSuiteSparse.cmake')
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r'if (HOMEBREW_EXECUTABLE)',
@@ -1272,10 +1269,12 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         bak_file4 = patch_file(orig_file4,
                                from_texts=[r' ${LAPACK_LIBRARIES}',
                                            r'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")',
+                                           r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags)',
                                            ],
                                to_texts=[r' ',
                                          'add_definitions(-DCERES_SUITESPARSE_VERSION="${SuiteSparse_VERSION}")\n'
                                          'add_definitions(-DCERES_METIS_VERSION="${METIS_VERSION}")',
+                                         r'list(APPEND CERES_LIBRARY_PUBLIC_DEPENDENCIES gflags::gflags)',
                                          ])
         orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
         bak_file5 = patch_file(orig_file5,
@@ -1293,6 +1292,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                          '-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_BENCHMARKS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
                          ])
 
         cmakecmd.extend([src_dir])
@@ -2006,6 +2006,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_opencv_freetype:BOOL=OFF',
 
             '-DCPU_BASELINE=AVX',
+            '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
         ])
 
         if is_windows():
@@ -2085,7 +2086,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
-    bak_file1 = orig_file1 = None
     try:
         if is_mac() or is_windows():
             orig_file = os.path.join(src_dir, 'CMakeLists.txt')
@@ -2096,15 +2096,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
                                   to_texts=[
                                       r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
                                       ])
-
-        orig_file1 = os.path.join(install_dir, 'lib', 'cmake', 'folly', 'folly-targets.cmake')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[
-                                   r';gflags_static;',
-                               ],
-                               to_texts=[
-                                   r';' if is_windows() else r';gflags::gflags_static;',
-                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -2120,6 +2111,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                          '-DUSE_COROUTINES:BOOL=OFF',
                          '-DUSE_FOLLY:BOOL=ON',
                          '-DROCKSDB_INSTALL_ON_WINDOWS:BOOL=ON',
+                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
                          ])
 
         cmakecmd.extend([src_dir])
@@ -2128,7 +2120,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
         if is_mac() or is_windows():
             os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
         print()
 
 
