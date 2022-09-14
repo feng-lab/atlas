@@ -88,6 +88,10 @@ print_target_properties(Qt6::SvgWidgets)
 print_target_properties(Qt6::Concurrent)
 print_target_properties(Qt6::OpenGLWidgets)
 
+find_package(rocksdb REQUIRED
+             PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(RocksDB::rocksdb)
+
 print_target_properties(img NO_LOCATION)
 
 # get_cmake_property(_variableNames VARIABLES)
@@ -791,7 +795,7 @@ endif (WIN32)
 target_link_libraries(${APP_NAME} PUBLIC glbinding::glbinding-aux glbinding::glbinding
                       img ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::OpenGLWidgets Qt6::CorePrivate
-                      gRPC::grpc++ protobuf::libprotobuf)
+                      gRPC::grpc++ protobuf::libprotobuf RocksDB::rocksdb)
 if (BUILD_TESTING)
   target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
 endif (BUILD_TESTING)

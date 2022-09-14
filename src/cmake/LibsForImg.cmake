@@ -221,6 +221,7 @@ option(GFLAGS_USE_TARGET_NAMESPACE "Use gflags import target with namespace." ON
 find_package(gflags REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(gflags::gflags)
+print_target_properties(gflags::gflags_static)
 find_package(glog REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(glog::glog)
@@ -269,6 +270,14 @@ else (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
                )
   print_target_properties(Boost::headers)
 endif (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+
+find_package(snappy REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(Snappy::snappy)
+
+find_package(lz4 REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
+print_target_properties(LZ4::lz4_static)
 
 find_package(folly REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

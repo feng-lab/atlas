@@ -1278,8 +1278,10 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                          ])
         orig_file5 = os.path.join(src_dir, 'cmake', 'CeresConfig.cmake.in')
         bak_file5 = patch_file(orig_file5,
-                               from_texts=[r'EIGEN3_FOUND'],
-                               to_texts=[r'Eigen3_FOUND'])
+                               from_texts=[r'EIGEN3_FOUND',
+                                           r'if (gflags_FOUND AND TARGET gflags)'],
+                               to_texts=[r'Eigen3_FOUND',
+                                         r'if (gflags_FOUND AND TARGET gflags::gflags)'])
 
         os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
 
