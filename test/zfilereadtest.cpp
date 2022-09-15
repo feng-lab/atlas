@@ -1,9 +1,5 @@
-#pragma once
-
-#include "gtest/gtest.h"
-
 #include "zeigenutils.h"
-#include "zexception.h"
+#include "ztest.h"
 
 TEST(fileread, text)
 {

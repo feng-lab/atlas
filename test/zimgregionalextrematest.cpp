@@ -1,8 +1,6 @@
-#pragma once
-
 #include "zimgregionalextrema.h"
-#include "zbenchtimer.h"
-#include "gtest/gtest.h"
+#include "zimgregioniterator.h"
+#include "ztest.h"
 
 TEST(ZImgRegionalExtrema, max)
 {

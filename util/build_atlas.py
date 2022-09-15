@@ -77,6 +77,9 @@ def build_atlas():
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True)
 
+    subprocess.run([get_ctest_binary(), '--extra-verbose'],
+                   cwd=atlas_build_dir(), shell=False, check=True)
+
 
 if __name__ == "__main__":
     build_atlas()

@@ -3,6 +3,7 @@
 #include "zglobal.h"
 #include "zrandom.h"
 #include "zjson.h"
+#include "zlog.h"
 #include <sstream>
 #include <utility>
 #include <type_traits>

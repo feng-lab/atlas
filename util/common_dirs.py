@@ -443,6 +443,18 @@ def get_cmake_binary() -> str:
         return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'cmake')
 
 
+def get_ctest_binary() -> str:
+    if is_windows():
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*windows*'))
+        return os.path.join(cmake_folder, 'bin', 'ctest')
+    elif is_linux():
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*linux*_64'))
+        return os.path.join(cmake_folder, 'bin', 'ctest')
+    else:
+        cmake_folder = find_src_package_with_glob(os.path.join(ext_build_dir(), 'cmake-*macos*'))
+        return os.path.join(cmake_folder, 'CMake.app', 'Contents', 'bin', 'ctest')
+
+
 def get_ninja_binary() -> str:
     if is_windows():
         return os.path.join(ext_build_dir(), 'ninja.exe')

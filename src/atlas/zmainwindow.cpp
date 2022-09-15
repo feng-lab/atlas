@@ -5,13 +5,7 @@
 #include "zdoc.h"
 #include "zview.h"
 
-#ifdef ATLAS_WITH_TESTS
-
-#include "../../test/zrunbenchmark.h"
-#include "../../test/zunittest.h"
-
-#endif
-
+#include "zrunbenchmark.h"
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
 #include "z3dmainwindow.h"
@@ -394,23 +388,10 @@ void ZMainWindow::generateConfigFile()
   }
 }
 
-#ifdef ATLAS_WITH_TESTS
-
 void ZMainWindow::runBenchmark()
 {
   ZRunBenchmark::run();
 }
-
-void ZMainWindow::runUnitTest()
-{
-  if (ZUnitTest::run() == 0) {
-    LOG(INFO) << "Unit Test Passed.";
-  } else {
-    LOG(ERROR) << "Unit Test Failed!";
-  }
-}
-
-#endif
 
 void ZMainWindow::runCustomCommand()
 {
@@ -672,15 +653,9 @@ void ZMainWindow::createActions()
   m_generateConfigFileAction->setStatusTip(tr("Generate Config File"));
   connect(m_generateConfigFileAction, &QAction::triggered, this, &ZMainWindow::generateConfigFile);
 
-#ifdef ATLAS_WITH_TESTS
   m_runBenchmarkAction = new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Benchmark"), this);
   m_runBenchmarkAction->setStatusTip(tr("Run Benchmark"));
   connect(m_runBenchmarkAction, &QAction::triggered, this, &ZMainWindow::runBenchmark);
-
-  m_testAction = new QAction(ZTheme::instance().icon(ZTheme::RunTestIcon), tr("&UnitTest"), this);
-  m_testAction->setStatusTip(tr("Run Unit Test"));
-  connect(m_testAction, &QAction::triggered, this, &ZMainWindow::runUnitTest);
-#endif
 
   m_runCustomCommandAction =
     new QAction(ZTheme::instance().icon(ZTheme::RunCommandIcon), tr("&Run Custom Command"), this);
@@ -759,10 +734,7 @@ void ZMainWindow::createMenus()
   m_helpMenu->addAction(m_openLogFolderAction);
   m_helpMenu->addAction(m_openConfigFolderAction);
   m_helpMenu->addAction(m_generateConfigFileAction);
-#ifdef ATLAS_WITH_TESTS
   m_helpMenu->addAction(m_runBenchmarkAction);
-  m_helpMenu->addAction(m_testAction);
-#endif
   m_helpMenu->addAction(m_runCustomCommandAction);
 
   m_dockMenu = new QMenu(this);
@@ -810,9 +782,6 @@ void ZMainWindow::createToolBars()
 
   m_helpToolBar = addToolBar(tr("Help"));
   m_helpToolBar->addAction(m_helpAction);
-  //  #ifdef ATLAS_WITH_TESTS
-  //    m_helpToolBar->addAction(m_testAction);
-  //  #endif
   //    m_helpToolBar->addAction(m_runCustomCommandAction);
   m_helpToolBar->setIconSize(iconSize);
 }

@@ -1,12 +1,9 @@
-#pragma once
-
-#include "gtest/gtest.h"
-
 #include "zsaturateoperation.h"
-
 #include "zioutils.h"
+#include "ztest.h"
 #include <iostream>
 #include <vector>
+#include <immintrin.h>
 
 namespace {
 

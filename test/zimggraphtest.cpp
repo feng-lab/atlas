@@ -1,8 +1,6 @@
-#pragma once
-
 #ifdef _NEUTUBE_
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include "zimggraph.h"
 #include "zimgautothreshold.h"

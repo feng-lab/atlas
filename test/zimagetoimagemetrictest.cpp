@@ -1,7 +1,5 @@
-#pragma once
-
 #include "zimagetoimagemetric.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 
 TEST(ZImageToImageMetric, test)
 {

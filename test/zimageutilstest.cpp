@@ -1,10 +1,8 @@
-#pragma once
-
 #include "zimage2dutils.h"
 #include "zimage3dutils.h"
 #include "zimg.h"
 #include "zimgregioniterator.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 
 TEST(ZImageUtils, GaussianKernel2D)
 {

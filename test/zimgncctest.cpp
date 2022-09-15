@@ -1,8 +1,6 @@
-#pragma once
-
 #include "zimgncc.h"
 #include "zrandom.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 
 TEST(ZImgNCC, normXCorr_S)
 {

@@ -1,7 +1,6 @@
-#pragma once
-
 #include "zimgsigneddistancemap.h"
-#include "gtest/gtest.h"
+#include "zimgregioniterator.h"
+#include "ztest.h"
 
 TEST(ZImgSignedDistanceMap, test1)
 {

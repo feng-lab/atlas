@@ -131,13 +131,7 @@ private:
 
   static void generateConfigFile();
 
-#ifdef ATLAS_WITH_TESTS
-
   static void runBenchmark();
-
-  static void runUnitTest();
-
-#endif
 
   static void runCustomCommand();
 
@@ -215,10 +209,7 @@ private:
   QAction* m_openLogFolderAction = nullptr;
   QAction* m_openConfigFolderAction = nullptr;
   QAction* m_generateConfigFileAction = nullptr;
-#ifdef ATLAS_WITH_TESTS
   QAction* m_runBenchmarkAction = nullptr;
-  QAction* m_testAction = nullptr;
-#endif
   QAction* m_runCustomCommandAction = nullptr;
 
   QAction* m_separatorAction = nullptr;

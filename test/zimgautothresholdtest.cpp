@@ -1,7 +1,5 @@
-#pragma once
-
 #include "zimgautothreshold.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 
 TEST(ZImgAutoThreshold, img0515)
 {

@@ -71,3 +71,8 @@ include(LibsForImg)
 add_subdirectory(src/img)
 # add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)
+
+option(BUILD_TESTING "Enable tests" ON)
+if (BUILD_TESTING)
+  include(test/test.cmake)
+endif (BUILD_TESTING)

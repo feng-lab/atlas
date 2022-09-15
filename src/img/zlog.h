@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zexception.h"
+#include "zglobal.h"
 
 #ifdef _WIN32
 #undef ERROR

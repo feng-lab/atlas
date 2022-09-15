@@ -1,9 +1,5 @@
-#pragma once
-
-#include "gtest/gtest.h"
-
 #include "zswc.h"
-#include "zexception.h"
+#include "ztest.h"
 
 namespace {
 

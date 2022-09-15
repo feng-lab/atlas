@@ -1,11 +1,9 @@
-#pragma once
-
 #include "zpunctadetection.h"
 #include "zeigenutils.h"
 #include "zkmeans.h"
 #include "zgmm.h"
 #include "zvbgmm.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 #include <boost/math/distributions/chi_squared.hpp>
 
 namespace {

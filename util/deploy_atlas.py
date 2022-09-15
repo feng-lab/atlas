@@ -53,8 +53,8 @@ def build_atlas_package():
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
 
-            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
-                            '--run_unit_tests'], shell=False, check=True)
+            # subprocess.run([os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas'),
+            #                 '--run_unit_tests'], shell=False, check=True)
             subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
                             os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
 
@@ -74,8 +74,8 @@ def build_atlas_package():
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir())
-            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Atlas'),
-                            '--run_unit_tests'], shell=False, check=True)
+            # subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir', 'Atlas'),
+            #                 '--run_unit_tests'], shell=False, check=True)
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
@@ -115,9 +115,9 @@ def build_atlas_package():
             env = build_ext_libs.get_vcvars_environment()
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
-            subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Atlas'),
-                            '--run_unit_tests'], shell=True,
-                           check=True)
+            # subprocess.run([os.path.join(common_dirs.deploy_target_dir(), 'Atlas', 'Atlas'),
+            #                 '--run_unit_tests'], shell=True,
+            #                check=True)
 
             shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
                                 'zip',

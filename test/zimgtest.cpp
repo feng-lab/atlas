@@ -1,9 +1,5 @@
-#pragma once
-
-#include "gtest/gtest.h"
-
-#include "zbenchtimer.h"
 #include "zimgregioniterator.h"
+#include "ztest.h"
 
 namespace {
 

@@ -1,8 +1,5 @@
-#pragma once
-
 #include "zimgconnectedcomponents.h"
-#include "zbenchtimer.h"
-#include "gtest/gtest.h"
+#include "ztest.h"
 
 TEST(ZImgConnectedComponents, text)
 {

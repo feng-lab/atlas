@@ -1,9 +1,6 @@
-#pragma once
-
 #include "zimgncc.h"
-#include "zrandom.h"
 #include "zfft.h"
-#include <gtest/gtest.h>
+#include "ztest.h"
 #include <folly/ScopeGuard.h>
 
 DECLARE_bool(zimg_use_mkl_for_fft_if_available);

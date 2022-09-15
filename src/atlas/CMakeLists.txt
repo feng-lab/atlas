@@ -190,11 +190,6 @@ set(RESOURCES
     atlas.qrc
     )
 
-option(BUILD_TESTING "Enable tests" ON)
-if (BUILD_TESTING)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/../../test/test.cmake)
-endif (BUILD_TESTING)
-
 set(SOURCES
     zimgdisplay.h
     zsectionsregistrationdialog.h
@@ -615,7 +610,8 @@ set(SOURCES
     zswccolorparameters.cpp
     zswccolorparameters.h
     zthreadsafelrucache.h
-    zthreadsafescalablecache.h)
+    zthreadsafescalablecache.h
+    zrunbenchmark.cpp zrunbenchmark.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -624,7 +620,6 @@ add_executable(${APP_NAME} WIN32 MACOSX_BUNDLE
                ${QTCSV_SOURCES}
                ${LIBQXT_HEADERS} ${LIBQXT_SOURCES}
                ${SOURCES} ${FORMS} ${RESOURCES} ${ASSETS}
-               ${TESTS}
                ${PROTO_SRCS} ${GRPC_SRCS})
 
 target_include_directories(${APP_NAME} SYSTEM PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -798,8 +793,5 @@ endif (WIN32)
 
 target_link_libraries(${APP_NAME} PUBLIC glbinding::glbinding-aux glbinding::glbinding
                       img ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-                      Qt6::OpenGLWidgets Qt6::CorePrivate
+                      Qt6::OpenGLWidgets Qt6::CorePrivate benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf RocksDB::rocksdb)
-if (BUILD_TESTING)
-  target_link_libraries(${APP_NAME} PUBLIC benchmark::benchmark)
-endif (BUILD_TESTING)

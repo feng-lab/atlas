@@ -1,12 +1,9 @@
-#pragma once
-
-#include "gtest/gtest.h"
-
 #include "zimg.h"
 #include "zimgregioniterator.h"
 #include "zimgneighborhooditerator.h"
 #include "zimgneighborhoodwithcoorditerator.h"
 #include "zimgneighborhoodwithptriterator.h"
+#include "ztest.h"
 
 TEST(ImgIterator, region)
 {

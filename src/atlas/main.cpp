@@ -8,13 +8,7 @@
 #include "zservicemanager.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
-
-#ifdef ATLAS_WITH_TESTS
-
-#include "../../test/zrunbenchmark.h"
-#include "../../test/zunittest.h"
-
-#endif
+#include "zrunbenchmark.h"
 
 #include <QSurfaceFormat>
 // #include <QOpenGLContext>
@@ -26,10 +20,7 @@
 #include <gflags/gflags.h>
 #include <iostream>
 
-#ifdef ATLAS_WITH_TESTS
-DEFINE_bool(run_unit_tests, false, "run unit tests");
 DEFINE_bool(run_benchmarks, false, "run benchmarks");
-#endif
 DECLARE_string(flagfile);
 
 using namespace nim;
@@ -68,8 +59,7 @@ int main(int argc, char* argv[])
     // format.setStereo(true);
     QSurfaceFormat::setDefaultFormat(format);
 
-#ifdef ATLAS_WITH_TESTS
-    if (FLAGS_run_unit_tests || FLAGS_run_benchmarks) {
+    if (FLAGS_run_benchmarks) {
       QCoreApplication app(argc, argv);
 #ifdef _WIN32
       QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/Resources";
@@ -86,14 +76,10 @@ int main(int argc, char* argv[])
 #endif
       initImgLib(argv[0], resourcesDIR, jdkDIR, jarsDIR, "", false);
       [[maybe_unused]] auto guardimglib = folly::makeGuard([]() { nim::shutdownImgLib(false); });
-      if (FLAGS_run_unit_tests) {
-        return ZUnitTest::run();
-      }
       if (FLAGS_run_benchmarks) {
         return ZRunBenchmark::run();
       }
     }
-#endif
 
     QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
 #ifdef Q_OS_LINUX
