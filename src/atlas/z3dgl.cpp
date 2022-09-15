@@ -18,6 +18,10 @@ bool GLVersionGE(int majorVersion, int minorVersion)
 
 void CheckGLError_Impl(const char* file, int line)
 {
+  if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
+    return;
+  }
+
   GLenum err = glGetError();
 
   if (err != GL_NO_ERROR) {

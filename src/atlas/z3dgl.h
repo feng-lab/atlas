@@ -5,10 +5,14 @@
 #include "zmesh.h"
 #include <glbinding/gl/gl.h>
 
+DEFINE_bool(
+  atlas_check_opengl_error_for_all_gl_calls,
+  true,
+  "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
+
 namespace nim {
 
 using namespace gl;
-#define ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
 
 enum class Z3DEye
 {
@@ -28,11 +32,7 @@ bool GLVersionGE(int majorVersion, int minorVersion);
 
 void CheckGLError_Impl(const char* file, int line);
 
-#ifdef ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
-#define CHECK_GL_ERROR
-#else
 #define CHECK_GL_ERROR CheckGLError_Impl(__FILE__, __LINE__);
-#endif
 
 bool checkGLState(GLenum pname, bool value);
 

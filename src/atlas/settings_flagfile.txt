@@ -27,3 +27,6 @@
 
 # Whether to use fftw for fft computation if available, default is true
 --zimg_use_fftw_for_fft_if_available=true
+
+# Whether to check opengl error after all gl calls, default is true, can set to false for better performance
+--atlas_check_opengl_error_for_all_gl_calls=true

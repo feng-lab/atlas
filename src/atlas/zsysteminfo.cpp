@@ -74,70 +74,45 @@ bool ZSystemInfo::initializeGL()
     return false;
   }
 
-  glbinding::initialize([](const char* name) { return Z3DContext().getProcAddress(name); });
+  glbinding::initialize([](const char* name) {
+    return Z3DContext().getProcAddress(name);
+  });
   Z3DGpuInfo::instance().logGpuInfo();
-#if defined(ATLAS_CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS)
-  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After | glbinding::CallbackMask::ParametersAndReturnValue |
-                                     glbinding::CallbackMask::Unresolved,
-                                   {"glGetError"});
-  glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-      std::ostringstream os;
+  if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
+    glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
+                                       glbinding::CallbackMask::ParametersAndReturnValue |
+                                       glbinding::CallbackMask::Unresolved,
+                                     {"glGetError"});
+    glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
+      GLenum error = glGetError();
+      if (error != GL_NO_ERROR) {
+        std::ostringstream os;
 
-      os << call.function->name() << "(";
-      for (size_t i = 0; i < call.parameters.size(); ++i) {
-        os << call.parameters[i].get();
-        if (i + 1 < call.parameters.size()) {
-          os << ", ";
+        os << call.function->name() << "(";
+        for (size_t i = 0; i < call.parameters.size(); ++i) {
+          os << call.parameters[i].get();
+          if (i + 1 < call.parameters.size()) {
+            os << ", ";
+          }
         }
+        os << ")";
+
+        if (call.returnValue) {
+          os << " -> " << call.returnValue.get();
+        }
+
+        LOG(ERROR) << "OpenGL error: " << glbinding::aux::Meta::getString(error) << " with " << os.str();
       }
-      os << ")";
-
-      if (call.returnValue) {
-        os << " -> " << call.returnValue.get();
-      }
-
-      LOG(ERROR) << "OpenGL error: " << glbinding::aux::Meta::getString(error) << " with " << os.str();
-    }
-  });
-#elif 0
-  glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After | glbinding::CallbackMask::ParametersAndReturnValue |
-                                     glbinding::CallbackMask::Unresolved,
-                                   {"glGetError"});
-  glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
-    std::cout << call.function->name() << "(";
-
-    for (size_t i = 0; i < call.parameters.size(); ++i) {
-      std::cout << call.parameters[i]->asString();
-      if (i < call.parameters.size() - 1) {
-        std::cout << ", ";
-      }
-    }
-
-    std::cout << ")";
-
-    if (call.returnValue) {
-      std::cout << " -> " << call.returnValue->asString();
-    }
-
-    std::cout << "\n";
-
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-      std::cout << "OpenGL error: " << glbinding::Meta::getString(error) << "\n";
-    }
-
-    std::cout.flush();
-  });
-#else
-  glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
-#endif
+    });
+  } else {
+    glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
+  }
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
-  glbinding::addContextSwitchCallback(
-    [](glbinding::ContextHandle handle) { LOG(INFO) << "Switching to OpenGL context " << handle; });
+  glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
+    LOG(INFO) << "Switching to OpenGL context " << handle;
+  });
   if (Z3DGpuInfo::instance().isSupported()) {
     m_glInitialized = true;
     return m_glInitialized;
