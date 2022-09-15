@@ -5,11 +5,6 @@
 #include "zmesh.h"
 #include <glbinding/gl/gl.h>
 
-DEFINE_bool(
-  atlas_check_opengl_error_for_all_gl_calls,
-  true,
-  "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
-
 namespace nim {
 
 using namespace gl;

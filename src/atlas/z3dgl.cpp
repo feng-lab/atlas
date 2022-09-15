@@ -5,6 +5,8 @@
 #include <glbinding/Version.h>
 #include <glbinding-aux/Meta.h>
 
+DECLARE_bool(atlas_check_opengl_error_for_all_gl_calls);
+
 namespace nim {
 
 static_assert(std::is_same_v<GLuint, uint32_t>, "should fix indices type to whatever GLuint is");
