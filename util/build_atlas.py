@@ -54,12 +54,13 @@ def build_atlas():
 
     if is_windows():
         env = build_ext_libs.get_vcvars_environment()
-        print(env['PATH'])
         env['caexcludepath'] = ';'.join([os.path.join(atlas_repository_dir(), 'src', '3rdparty'),
                                          intel_sw_dir(),
                                          r'C:\Program Files (x86)\Windows Kits',
                                          os.path.join(atlas_repository_dir(), 'test'),
                                          ])
+        env['PATH'] = f'{env["PATH"]};{tbb_redist_dir()};{qt_bin_dir()};{freeimage_redist_dir()}'
+        print(env['PATH'])
         subprocess.run(cmakecmd,
                        cwd=atlas_build_dir(), shell=False, check=True, env=env)
         if use_ninja():
@@ -68,6 +69,9 @@ def build_atlas():
         else:
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=atlas_build_dir(), shell=True, check=True, env=env)
+
+        subprocess.run([get_ctest_binary(), '--extra-verbose'],
+                       cwd=atlas_build_dir(), shell=False, check=True, env=env)
     else:
         subprocess.run(cmakecmd, cwd=atlas_build_dir(), shell=False, check=True)
         if use_ninja():
@@ -77,8 +81,8 @@ def build_atlas():
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True)
 
-    subprocess.run([get_ctest_binary(), '--extra-verbose'],
-                   cwd=atlas_build_dir(), shell=False, check=True)
+        subprocess.run([get_ctest_binary(), '--extra-verbose'],
+                       cwd=atlas_build_dir(), shell=False, check=True)
 
 
 if __name__ == "__main__":
