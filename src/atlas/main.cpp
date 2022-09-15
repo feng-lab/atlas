@@ -8,7 +8,6 @@
 #include "zservicemanager.h"
 #include "zsysteminfo.h"
 #include "ztheme.h"
-#include "zrunbenchmark.h"
 
 #include <QSurfaceFormat>
 // #include <QOpenGLContext>
@@ -20,7 +19,6 @@
 #include <gflags/gflags.h>
 #include <iostream>
 
-DEFINE_bool(run_benchmarks, false, "run benchmarks");
 DECLARE_string(flagfile);
 
 using namespace nim;
@@ -58,28 +56,6 @@ int main(int argc, char* argv[])
 #endif
     // format.setStereo(true);
     QSurfaceFormat::setDefaultFormat(format);
-
-    if (FLAGS_run_benchmarks) {
-      QCoreApplication app(argc, argv);
-#ifdef _WIN32
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/Resources";
-      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/Resources/jdk";
-      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/Resources/jars";
-#elif defined(__APPLE__)
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/../Resources";
-      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/../Resources/jdk";
-      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/../Resources/jars";
-#else
-      QString resourcesDIR = QCoreApplication::applicationDirPath() + u"/Resources";
-      QString jdkDIR = QCoreApplication::applicationDirPath() + u"/Resources/jdk";
-      QString jarsDIR = QCoreApplication::applicationDirPath() + u"/Resources/jars";
-#endif
-      initImgLib(argv[0], resourcesDIR, jdkDIR, jarsDIR, "", false);
-      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() { nim::shutdownImgLib(false); });
-      if (FLAGS_run_benchmarks) {
-        return ZRunBenchmark::run();
-      }
-    }
 
     QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings, true);
 #ifdef Q_OS_LINUX

@@ -52,7 +52,6 @@ void ZSystemInfo::logOSInfo() const
   // LOG(INFO) << "Product Type: " << QSysInfo::productType();
   // LOG(INFO) << "Product Version: " << QSysInfo::productVersion();
 
-#ifdef ATLAS_WITH_TESTS
   // time
   LOG(INFO) << "system_clock res: "
             << 1e9 * std::chrono::system_clock::period::num / std::chrono::system_clock::period::den << " ns";
@@ -66,7 +65,6 @@ void ZSystemInfo::logOSInfo() const
             << 1e9 * std::chrono::high_resolution_clock::period::num / std::chrono::high_resolution_clock::period::den
             << " ns";
   LOG(INFO) << "high_resolution_clock is_steady = " << std::boolalpha << std::chrono::high_resolution_clock::is_steady;
-#endif
 }
 
 bool ZSystemInfo::initializeGL()
