@@ -650,22 +650,13 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
-    orig_file = bak_file = None  # tmp fix until grpc update protobuf
     try:
-        orig_file = os.path.join(sub_src_dir, 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>)',
-                                          ],
-                              to_texts=[r'set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded$<$<CONFIG:Debug>:Debug>DLL)',
-                                        ])
-
         cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
         cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
                          '-Dprotobuf_WITH_ZLIB:BOOL=ON',
                          '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF',
                          '-Dprotobuf_BUILD_SHARED_LIBS:BOOL=OFF'])
-        # if is_windows():
-        #     cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib'])
+
         cmakecmd.extend([sub_src_dir])
         build_and_install_cmakecmd(cmakecmd, sub_build_dir)
 
@@ -677,7 +668,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                    to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
 
     sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
     sub_install_dir = ext_build_dir()
@@ -708,17 +698,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_ABSL_PROVIDER:STRING=package',
                          '-DgRPC_RE2_PROVIDER:STRING=module',
                          ])
-        # if is_windows():
-        #     cmakecmd.extend([f'-DZLIB_ROOT:PATH={ext_dir()}/zlib',
-        #                      f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
-        #                      f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/lib/cmake/benchmark',
-        #                      f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/cmake',
-        #                      f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/lib/cmake/c-ares'])
-        # else:
-        #     cmakecmd.extend([f'-Dgflags_DIR:PATH={ext_dir()}/gflags/lib/cmake/gflags',
-        #                      f'-Dbenchmark_DIR:PATH={ext_dir()}/benchmark/lib/cmake/benchmark',
-        #                      f'-DProtobuf_DIR:PATH={ext_dir()}/protobuf/lib/cmake/protobuf',
-        #                      f'-Dc-ares_DIR:PATH={ext_dir()}/c-ares/lib/cmake/c-ares'])
+
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
