@@ -2068,32 +2068,26 @@ def build_rocksdb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
-    bak_file1 = orig_file1 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
                               from_texts=[
-                                  r'set(NONONOCMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                                  r'NONONO___CMAKE_EXE_LINKER_FLAGS' if is_linux() else r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
                                   r'find_package(TBB REQUIRED)',
+                                  r'find_package(zstd REQUIRED)',
                               ],
                               to_texts=[
                                   r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
                                   'find_package(TBB REQUIRED)\n'
                                   r'add_library(TBB::TBB ALIAS TBB::tbb)',
+                                  'find_package(zstd REQUIRED)\n'
+                                  r'add_library(zstd::zstd ALIAS zstd::libzstd_static)',
                               ])
 
-        orig_file1 = os.path.join(src_dir, 'cmake', 'RocksDBConfig.cmake.in')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[
-                                   r'find_dependency(zstd)',
-                                   r'find_dependency(TBB)',
-                               ],
-                               to_texts=[
-                                   r'find_dependency(zstd CONFIG)',
-                                   r'find_dependency(TBB CONFIG)',
-                               ])
         os.rename(os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'))
+        os.rename(os.path.join(src_dir, 'cmake', 'modules', 'Findzstd.cmake'),
+                  os.path.join(src_dir, 'cmake', 'modules', '__Findzstd.cmake'))
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -2114,21 +2108,13 @@ def build_rocksdb(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
-
-        file1 = os.path.join(install_dir, 'lib', 'cmake', 'rocksdb', 'RocksDBTargets.cmake')
-        patch_file(file1,
-                   from_texts=[
-                       r'<LINK_ONLY:zstd::zstd>',
-                   ],
-                   to_texts=[
-                       r'<LINK_ONLY:zstd::libzstd_static>',
-                   ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
         os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
         os.rename(os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'))
+        os.rename(os.path.join(src_dir, 'cmake', 'modules', '__Findzstd.cmake'),
+                  os.path.join(src_dir, 'cmake', 'modules', 'Findzstd.cmake'))
         print()
 
 
