@@ -303,7 +303,6 @@ void Z3DMainWindow::createMenus()
   m_helpMenu->addAction(m_2dWindow.checkForUpdatesAction());
   m_helpMenu->addAction(m_helpAction);
   m_helpMenu->addSeparator();
-  m_helpMenu->addAction(m_2dWindow.viewLogAction());
   m_helpMenu->addAction(m_2dWindow.openLogFolderAction());
   m_helpMenu->addAction(m_2dWindow.openConfigFolderAction());
 }

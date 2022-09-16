@@ -73,11 +73,6 @@ public:
     return m_checkForUpdatesAction;
   }
 
-  QAction* viewLogAction()
-  {
-    return m_viewLogAction;
-  }
-
   QAction* openLogFolderAction()
   {
     return m_openLogFolderAction;
@@ -122,8 +117,6 @@ private:
   void raiseViewSettingDockWidget();
 
   void raiseGlobalSettingDockWidget();
-
-  static void viewLog();
 
   static void openLogFolder();
 
@@ -205,7 +198,6 @@ private:
   QAction* m_createDesktopEntryAction = nullptr;
 #endif
 
-  QAction* m_viewLogAction = nullptr;
   QAction* m_openLogFolderAction = nullptr;
   QAction* m_openConfigFolderAction = nullptr;
   QAction* m_generateConfigFileAction = nullptr;
