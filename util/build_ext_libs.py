@@ -2087,9 +2087,11 @@ def build_rocksdb(src_dir: str, install_dir: str):
         bak_file1 = patch_file(orig_file1,
                                from_texts=[
                                    r'find_dependency(zstd)',
+                                   r'find_dependency(TBB)',
                                ],
                                to_texts=[
                                    r'find_dependency(zstd CONFIG)',
+                                   r'find_dependency(TBB CONFIG)',
                                ])
         os.rename(os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'),
                   os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'))
