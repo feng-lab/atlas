@@ -2075,9 +2075,12 @@ def build_rocksdb(src_dir: str, install_dir: str):
             bak_file = patch_file(orig_file,
                                   from_texts=[
                                       r'set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                                      r'find_package(TBB REQUIRED)',
                                   ],
                                   to_texts=[
                                       r'#set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")',
+                                      'find_package(TBB REQUIRED)\n'
+                                      r'add_library(TBB::TBB ALIAS TBB::tbb)',
                                   ])
 
         orig_file1 = os.path.join(src_dir, 'cmake', 'RocksDBConfig.cmake.in')
@@ -2088,6 +2091,8 @@ def build_rocksdb(src_dir: str, install_dir: str):
                                to_texts=[
                                    r'find_dependency(zstd CONFIG)',
                                ])
+        os.rename(os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'),
+                  os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'))
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
@@ -2099,7 +2104,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                          '-DWITH_GFLAGS:BOOL=ON',
                          '-DPORTABLE:BOOL=ON',
                          '-DFORCE_AVX:BOOL=ON',
-                         '-DWITH_TBB:BOOL=OFF',
+                         '-DWITH_TBB:BOOL=ON',
                          '-DUSE_COROUTINES:BOOL=OFF',
                          '-DUSE_FOLLY:BOOL=ON',
                          '-DROCKSDB_INSTALL_ON_WINDOWS:BOOL=ON',
@@ -2122,6 +2127,8 @@ def build_rocksdb(src_dir: str, install_dir: str):
         if is_mac() or is_windows():
             os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
+        os.rename(os.path.join(src_dir, 'cmake', 'modules', '__FindTBB.cmake'),
+                  os.path.join(src_dir, 'cmake', 'modules', 'FindTBB.cmake'))
         print()
 
 
