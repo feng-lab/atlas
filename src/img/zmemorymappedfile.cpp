@@ -4,7 +4,7 @@
 #include <QDir>
 
 DEFINE_string(
-  atlas_llfio_mapped_file_handle_flags,
+  zimg_llfio_mapped_file_handle_flags,
   "multiplexable",
   "comma-separated list of flags for llfio mapped file handle, default is multiplexable, possible values are: "
   "none,unlink_on_first_close,disable_safety_barriers,disable_safety_unlinks,disable_prefetching,"
@@ -15,9 +15,9 @@ namespace nim {
 
 ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
 {
-  LOG(INFO) << "mapped file handle flags: " << FLAGS_atlas_llfio_mapped_file_handle_flags;
+  LOG(INFO) << "mapped file handle flags: " << FLAGS_zimg_llfio_mapped_file_handle_flags;
   llfio::mapped_file_handle::flag flag = llfio::mapped_file_handle::flag::none;
-  if (QString flagString = QString::fromStdString(FLAGS_atlas_llfio_mapped_file_handle_flags);
+  if (QString flagString = QString::fromStdString(FLAGS_zimg_llfio_mapped_file_handle_flags);
       flagString.contains("unlink_on_first_close")) {
     flag |= llfio::mapped_file_handle::flag::unlink_on_first_close;
   } else if (flagString.contains("disable_safety_barriers")) {

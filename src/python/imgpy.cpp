@@ -2,7 +2,7 @@
 #include "typecast.h"
 #include "zimg.h"
 #include "zpuncta.h"
-#include "zglobalinit.h"
+#include "zimginit.h"
 #include "zstitchimage.h"
 #include "zimgnccmatch.h"
 #include "zimgblockprovider.h"

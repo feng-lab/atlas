@@ -448,17 +448,17 @@ parseHDF5Chunks(const QString& filename)
   // level, t, c, z, y, x
   std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> res;
 
-  if (ZGlobal::resourcesDIR.isEmpty()) {
+  if (ZImgGlobal::instance().resourcesDIR.isEmpty()) {
     return res;
   }
 
 #ifdef _WIN32
-  QString program = ZGlobal::resourcesDIR + QString("/h5ls.exe");
+  QString program = ZImgGlobal::instance().resourcesDIR + QString("/h5ls.exe");
 #else
-  QString program = ZGlobal::resourcesDIR + QString("/h5ls");
+  QString program = ZImgGlobal::instance().resourcesDIR + QString("/h5ls");
 #endif
   if (!QFile::exists(program)) {
-    LOG(ERROR) << "can not find h5ls in resources folder " << ZGlobal::resourcesDIR;
+    LOG(ERROR) << "can not find h5ls in resources folder " << ZImgGlobal::instance().resourcesDIR;
     return res;
   }
   QStringList arguments;

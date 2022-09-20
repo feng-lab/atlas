@@ -1,6 +1,6 @@
 #include "zlog.h"
 #include "zcpuinfo.h"
-#include "zglobal.h"
+#include "zimginterface.h"
 #include "zlogcache.h"
 #ifdef ZIMG_USE_MKL
 #include <mkl_service.h>
@@ -59,8 +59,8 @@ void initImgLib(const char* argv0,
   ZCpuInfo::instance().logCpuInfo();
 
   // if jarsDIR exist and is valid, try jdkDIR first, then try JAVA_HOME
-  ZGlobal::jarsDIR = "";
-  ZGlobal::jdkDIR = "";
+  ZImgGlobal::instance().jarsDIR = "";
+  ZImgGlobal::instance().jdkDIR = "";
   if (jarsDIR.isEmpty()) {
     LOG(INFO) << "no java support";
   } else {
@@ -77,8 +77,8 @@ void initImgLib(const char* argv0,
       javahome = qgetenv("JAVA_HOME");
 #endif
       if (javahome.isEmpty()) {
-        ZGlobal::jarsDIR = jarsD.absolutePath();
-        LOG(INFO) << "jarsDIR: " << ZGlobal::jarsDIR;
+        ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
+        LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
         LOG(INFO) << "no jdkDIR and enviroment variable JAVA_HOME, will try to use java in system path";
       } else {
         LOG(INFO) << "try java from JAVA_HOME: " << javahome << ", note: might crash if the java version is too low";
@@ -101,13 +101,14 @@ void initImgLib(const char* argv0,
         throw ZIOException(QString("no java in jdkDIR: %1").arg(jdkD.absolutePath()));
       }
 
-      ZGlobal::jarsDIR = jarsD.absolutePath();
-      LOG(INFO) << "jarsDIR: " << ZGlobal::jarsDIR;
-      ZGlobal::jdkDIR = jdkD.absolutePath();
-      LOG(INFO) << "jdkDIR: " << ZGlobal::jdkDIR;
+      ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
+      LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+      ZImgGlobal::instance().jdkDIR = jdkD.absolutePath();
+      LOG(INFO) << "jdkDIR: " << ZImgGlobal::instance().jdkDIR;
     }
   }
-  ZGlobal::resourcesDIR = resourcesDIR;
+  ZImgGlobal::instance().resourcesDIR = resourcesDIR;
+  LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
 
 #ifdef ZIMG_USE_MKL
   // todo: check this for amd cpu

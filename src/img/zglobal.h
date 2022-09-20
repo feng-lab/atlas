@@ -192,14 +192,6 @@ __forceinline void removeAt(C& iterable, size_t idx)
   iterable.erase(iterable.begin() + idx);
 }
 
-class ZGlobal
-{
-public:
-  inline static QString jdkDIR;
-  inline static QString jarsDIR;
-  inline static QString resourcesDIR;
-};
-
 // some c++20 lib functions
 template<class Container, class T>
 __forceinline Container& erase(Container& on, const T& val)

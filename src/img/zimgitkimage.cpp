@@ -470,7 +470,7 @@ void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, nim::ZImgMetad
 
 bool ZImgITKImage::hasSCIFIOSupport() const
 {
-  return !ZGlobal::jarsDIR.isEmpty();
+  return !ZImgGlobal::instance().jarsDIR.isEmpty();
 }
 
 } // namespace nim

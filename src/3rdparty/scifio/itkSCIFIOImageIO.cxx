@@ -22,7 +22,7 @@
 #include "itkMetaDataObject.h"
 
 #include "zlog.h"
-#include "zglobal.h"
+#include "zimginterface.h"
 
 #include <cstdio>
 
@@ -256,7 +256,7 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(nullptr)
   this->m_FileType = IOFileEnum::Binary;
 
   // determine Java classpath from SCIFIO_PATH environment variable
-  std::string scifioPath = nim::ZGlobal::jarsDIR.toStdString();
+  std::string scifioPath = nim::ZImgGlobal::instance().jarsDIR.toStdString();
   if (!itksys::SystemTools::FileExists(scifioPath.c_str(), false)) {
     itkExceptionMacro("SCIFIO_PATH is not set. " << "This environment variable must point to the "
                                                  << "directory containing the SCIFIO JAR files");
@@ -274,7 +274,7 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(nullptr)
 #else
   std::string javaCmd = "java";
 #endif
-  std::string javaHome = nim::ZGlobal::jdkDIR.toStdString();
+  std::string javaHome = nim::ZImgGlobal::instance().jdkDIR.toStdString();
   if (!CheckJavaPath(javaHome, javaCmd)) {
     javaHome = "";
   }

@@ -6,7 +6,6 @@
 #include "zkmeans.h"
 #include "zbenchtimer.h"
 #include "zexception.h"
-#include "zlog.h"
 #include <QApplication>
 #include <QMessageBox>
 #include <fmt/chrono.h>
@@ -30,11 +29,17 @@ DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
 
 namespace nim {
 
-Z3DImg::Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent)
+Z3DImg::Z3DImg(const ZImgPack& imgPack,
+               const glm::vec3& scale,
+               const std::vector<glm::dvec2>& displayRanges,
+               QObject* parent)
   : QObject(parent)
   , m_imgPack(imgPack)
   , m_isVolumeDownsampled(false)
+  , m_displayRanges(displayRanges)
 {
+  CHECK(m_imgPack.imgInfo().numChannels == m_displayRanges.size())
+    << m_imgPack.imgInfo().numChannels << " " << m_displayRanges.size();
   readVolumes();
 
   if (m_isVolumeDownsampled) {
@@ -115,9 +120,9 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
       croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped = croped.convertTo<uint8_t>(m_displayRanges[c].x, m_displayRanges[c].y);
     } else {
-      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped.normalize(m_displayRanges[c].x, m_displayRanges[c].y);
     }
     auto vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
@@ -140,9 +145,9 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeYSliceVolume(size_t y)
       croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped = croped.convertTo<uint8_t>(m_displayRanges[c].x, m_displayRanges[c].y);
     } else {
-      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped.normalize(m_displayRanges[c].x, m_displayRanges[c].y);
     }
     auto vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
@@ -163,9 +168,9 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeZSliceVolume(size_t z)
       croped = croped.resize(std::min(maxTextureSize, croped.width()), std::min(maxTextureSize, croped.height()), 1);
     }
     if (!croped.isType<uint8_t>()) {
-      croped = croped.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped = croped.convertTo<uint8_t>(m_displayRanges[c].x, m_displayRanges[c].y);
     } else {
-      croped.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
+      croped.normalize(m_displayRanges[c].x, m_displayRanges[c].y);
     }
     auto vh = new Z3DVolume(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
@@ -183,7 +188,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
   }
 
   glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
-
   m_pageTableCacheManager =
     std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
   m_imageCacheManager = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
@@ -294,9 +298,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                         glm::uvec3(m_pageDirectorySize),
                                                         GL_RGBA_INTEGER,
                                                         GL_UNSIGNED_INT);
+  m_pageDirectoryTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_pageDirectory.resize(m_pageDirectoryTexture->numPixels());
   std::memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::uvec4));
-  m_pageDirectoryTexture->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
 
   std::memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::uvec4));
@@ -309,6 +313,29 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_voxelWorldSizes[l] =
       std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
   }
+}
+
+void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRanges)
+{
+  m_displayRanges = displayRanges;
+  CHECK(m_imgPack.imgInfo().numChannels == m_displayRanges.size())
+    << m_imgPack.imgInfo().numChannels << " " << m_displayRanges.size();
+
+  glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
+  m_pageTableCacheManager =
+    std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
+  m_imageCacheManager = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
+                                                                    m_imageCacheNumBlocks,
+                                                                    invalidKey);
+  for (auto& pu : m_channelPendingUpdates) {
+    pu.clear();
+  }
+
+  std::memset(m_pageDirectory.data(), 0, m_pageDirectory.size() * sizeof(glm::uvec4));
+  m_pageDirectoryTexture->uploadImage(m_pageDirectory.data());
+
+  std::memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::uvec4));
+  m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
 }
 
 void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader) const
@@ -591,7 +618,9 @@ void Z3DImg::uploadImageCache(size_t channel)
                            index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
                            channel,
                            0,
-                           resInfo)
+                           resInfo,
+                           m_displayRanges[channel].x,
+                           m_displayRanges[channel].y)
           .thenValueInline([=, &imgQueue](ZImg&& img) {
 #ifdef ATLAS_uploadImageCache_USE_MPMCQueue
             imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
@@ -652,7 +681,9 @@ void Z3DImg::uploadImageCache(size_t channel)
                            index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
                            channel,
                            0,
-                           resInfo)
+                           resInfo,
+                           m_displayRanges[channel].x,
+                           m_displayRanges[channel].y)
           .thenValueInline([=, &pboLocalBuffer](ZImg&& img) {
             memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
           });
@@ -731,18 +762,25 @@ void Z3DImg::readVolumes()
   }
 
   ZImg img = m_imgPack.resizedImg(info.width * widthScale, info.height * heightScale, info.depth * depthScale, 0);
-  if (!img.isType<uint8_t>()) {
-    img = img.convertTo<uint8_t>(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-  } else if (img.validBitCount() != 0 && img.validBitCount() != 8 && img.validBitCount() != 16) {
-    img.normalize(m_imgPack.minIntensity(), m_imgPack.maxIntensity());
-  }
+
   if (m_nChannels == 1) {
+    if (!img.isType<uint8_t>()) {
+      img = img.convertTo<uint8_t>(m_displayRanges[0].x, m_displayRanges[0].y);
+    } else if (img.validBitCount() != 0 && img.validBitCount() != 8 && img.validBitCount() != 16) {
+      img.normalize(m_displayRanges[0].x, m_displayRanges[0].y);
+    }
+
     auto vh = new Z3DVolume(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
     m_volumes.emplace_back(vh);
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
       ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
+      if (!cImg.isType<uint8_t>()) {
+        cImg = cImg.convertTo<uint8_t>(m_displayRanges[i].x, m_displayRanges[i].y);
+      } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
+        cImg.normalize(m_displayRanges[i].x, m_displayRanges[i].y);
+      }
       auto vh = new Z3DVolume(cImg, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
       m_volumes.emplace_back(vh);

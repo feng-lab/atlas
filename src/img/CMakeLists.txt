@@ -236,8 +236,8 @@ set(IMG_SOURCES
     zsectionsregistration.cpp
     zstitchimage.cpp
     zstitchimage.h
-    zglobalinit.h
-    zglobalinit.cpp
+    zimginit.h
+    zimginit.cpp
     zjson.h
     zjson.cpp
     zroiutils.cpp

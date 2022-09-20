@@ -2,7 +2,7 @@
 #include "zapplication.h"
 #include "zcpuinfo.h"
 #include "zexception.h"
-#include "zglobalinit.h"
+#include "zimginit.h"
 #include "zlog.h"
 #include "zmainwindow.h"
 #include "zservicemanager.h"
@@ -86,10 +86,14 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::logDir();
     nim::ZSystemInfo::removeOldLogs();
 
-    QString jdkDIR = ZApplication::resourcesDirPath() + u"/jdk";
-    QString jarsDIR = ZApplication::resourcesDirPath() + u"/jars";
-    initImgLib(argv[0], ZApplication::resourcesDirPath(), jdkDIR, jarsDIR, logDir.filePath("atlas"));
-    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() { nim::shutdownImgLib(); });
+    initImgLib(argv[0],
+               ZApplication::resourcesDirPath(),
+               ZApplication::jdkDirPath(),
+               ZApplication::jarsDirPath(),
+               logDir.filePath("atlas"));
+    [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
+      nim::shutdownImgLib();
+    });
 
     if (!FLAGS_flagfile.empty()) {
       LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;

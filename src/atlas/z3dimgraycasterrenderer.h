@@ -113,6 +113,8 @@ public:
 
   void compile() override;
 
+  void updateDisplayRanges();
+
 protected:
   void adjustWidgets();
 

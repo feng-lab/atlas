@@ -131,8 +131,6 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
       connect(m_channelVisibleParas[i].get(), &ZBoolParameter::valueChanged, this, &Z3DImgRaycasterRenderer::compile);
       m_transferFuncParas.emplace_back(
         std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
-      m_transferFuncParas[m_transferFuncParas.size() - 1]->setMinMaxIntensity(m_img->minIntensity(),
-                                                                              m_img->maxsIntensity());
       // m_transferFuncParas[i]->setVolume(m_img->volumes()[i].get());
       m_texFilterModeParas.emplace_back(
         std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
@@ -143,6 +141,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
   }
   compile();
   resetTransferFunctions();
+  updateDisplayRanges();
 }
 
 void Z3DImgRaycasterRenderer::addQuad(const ZMesh& quad)
@@ -905,6 +904,13 @@ void Z3DImgRaycasterRenderer::resetTransferFunctions()
       // m_transferFuncParas[i]->get().addKey(ZColorMapKey(0.1, glm::vec4(m_volumes[i]->volColor(), 1.f) *
       //                                                   glm::vec4(.1f,.1f,.1f,0.f)));
     }
+  }
+}
+
+void Z3DImgRaycasterRenderer::updateDisplayRanges()
+{
+  for (size_t i = 0; i < m_transferFuncParas.size(); ++i) {
+    m_transferFuncParas[i]->setMinMaxIntensity(m_img->displayRange(i).x, m_img->displayRange(i).y);
   }
 }
 

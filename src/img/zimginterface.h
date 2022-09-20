@@ -5,6 +5,19 @@
 
 namespace nim {
 
+class ZImgGlobal
+{
+public:
+  static ZImgGlobal& instance();
+
+  QString jdkDIR;
+  QString jarsDIR;
+  QString resourcesDIR;
+
+private:
+  ZImgGlobal() = default;
+};
+
 template<typename TEnum>
 std::string_view enumToString(TEnum e);
 

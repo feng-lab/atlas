@@ -3,7 +3,6 @@
 #include "z3dtransferfunction.h"
 #include "zclickablelabel.h"
 #include "z3dvolume.h"
-#include "z3dshaderprogram.h"
 #include "zlog.h"
 #include <QMouseEvent>
 #include <QPainter>
@@ -31,14 +30,14 @@ Z3DTransferFunctionWidget::Z3DTransferFunctionWidget(Z3DTransferFunctionParamete
                                                      QWidget* parent)
   : QWidget(parent)
   , m_transferFunction(tf)
+  , m_xRange(0., 1.)
+  , m_yRange(0., 1.)
   , m_xAxisText(std::move(xAxisText))
   , m_yAxisText(std::move(yAxisText))
   , m_showHistogram(showHistogram)
   , m_histogramNormalizeMethod(std::move(histogramNormalizeMethod))
   , m_volume(tf->volume())
 {
-  m_xRange = glm::dvec2(0., 1.);
-  m_yRange = glm::dvec2(0., 1.);
   m_padding = 36;
   m_keyCircleRadius = 5;
   m_selectedLeftPart = true;
@@ -194,7 +193,7 @@ void Z3DTransferFunctionWidget::paintEvent(QPaintEvent* event)
   paint.setPen(Qt::gray);
   paint.setBrush(Qt::gray);
 
-  // draw axes independently from visible range
+  // draw axes independently of visible range
   double oldx0 = m_xRange[0];
   double oldx1 = m_xRange[1];
   m_xRange[0] = 0.;

@@ -526,6 +526,8 @@ void ZImgPack::readRegionToImg(index_t xyRatio,
                                size_t sc,
                                size_t t,
                                const ZImgInfo& resInfo,
+                               double displayRangeMin,
+                               double displayRangeMax,
                                ZImg& res) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
@@ -559,14 +561,14 @@ void ZImgPack::readRegionToImg(index_t xyRatio,
                                                     tile,
                                                     ZImgCache::FindStategy::NoUpdateLRUList);
       if (imgPtr->isSameType(res)) {
-        if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
-          ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+        if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+          ZImg tmp = imgPtr->normalized(displayRangeMin, displayRangeMax);
           res.pasteImg(tmp, start);
         } else {
           res.pasteImg(*imgPtr, start);
         }
       } else {
-        ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+        ZImg tmp = imgPtr->convertTo(displayRangeMin, displayRangeMax, res);
         res.pasteImg(tmp, start);
       }
     }
@@ -592,7 +594,9 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                               index_t sz,
                                               size_t sc,
                                               size_t t,
-                                              const ZImgInfo& resInfo) const
+                                              const ZImgInfo& resInfo,
+                                              double displayRangeMin,
+                                              double displayRangeMax) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
@@ -640,14 +644,14 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
           res = ZImg(tmpResInfo);
           for (const auto& [start, imgPtr] : tiles.value()) {
             if (imgPtr->isSameType(res)) {
-              if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
-                ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+              if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+                ZImg tmp = imgPtr->normalized(displayRangeMin, displayRangeMax);
                 res.pasteImg(tmp, start);
               } else {
                 res.pasteImg(*imgPtr, start);
               }
             } else {
-              ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, res);
+              ZImg tmp = imgPtr->convertTo(displayRangeMin, displayRangeMax, res);
               res.pasteImg(tmp, start);
             }
           }
@@ -702,14 +706,14 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
           if (imgPtr->isSameType(*res)) {
-            if (m_imgInfo.validBitCount != 0 && m_imgInfo.validBitCount != 8 && m_imgInfo.validBitCount != 16) {
-              ZImg tmp = imgPtr->normalized(m_minIntensity, m_maxIntensity);
+            if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+              ZImg tmp = imgPtr->normalized(displayRangeMin, displayRangeMax);
               res->pasteImg(tmp, start);
             } else {
               res->pasteImg(*imgPtr, start);
             }
           } else {
-            ZImg tmp = imgPtr->convertTo(m_minIntensity, m_maxIntensity, *res);
+            ZImg tmp = imgPtr->convertTo(displayRangeMin, displayRangeMax, *res);
             res->pasteImg(tmp, start);
           }
         }));

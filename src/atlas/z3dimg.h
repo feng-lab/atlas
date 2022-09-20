@@ -26,7 +26,10 @@ class Z3DImg : public QObject
 
 public:
   // Z3DVolume will take ownership of the img
-  Z3DImg(const ZImgPack& imgPack, const glm::vec3& scale, QObject* parent = nullptr);
+  Z3DImg(const ZImgPack& imgPack,
+         const glm::vec3& scale,
+         const std::vector<glm::dvec2>& displayRanges,
+         QObject* parent = nullptr);
 
   [[nodiscard]] const ZImgPack& imgPack() const
   {
@@ -43,14 +46,9 @@ public:
     return m_imgPack.imgInfo().depth > 1;
   }
 
-  [[nodiscard]] double minIntensity() const
+  [[nodiscard]] glm::dvec2 displayRange(size_t ch) const
   {
-    return m_imgPack.minIntensity();
-  }
-
-  [[nodiscard]] double maxsIntensity() const
-  {
-    return m_imgPack.maxIntensity();
+    return m_displayRanges.at(ch);
   }
 
   [[nodiscard]] glm::uvec3 dimensions() const
@@ -96,32 +94,32 @@ public:
 
   [[nodiscard]] glm::vec3 physicalLDF() const
   {
-    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalLUF().z);
+    return {physicalLUF().x, physicalRDB().y, physicalLUF().z};
   }
 
   [[nodiscard]] glm::vec3 physicalRDF() const
   {
-    return glm::vec3(physicalRDB().x, physicalRDB().y, physicalLUF().z);
+    return {physicalRDB().x, physicalRDB().y, physicalLUF().z};
   }
 
   [[nodiscard]] glm::vec3 physicalRUF() const
   {
-    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalLUF().z);
+    return {physicalRDB().x, physicalLUF().y, physicalLUF().z};
   }
 
   [[nodiscard]] glm::vec3 physicalLUB() const
   {
-    return glm::vec3(physicalLUF().x, physicalLUF().y, physicalRDB().z);
+    return {physicalLUF().x, physicalLUF().y, physicalRDB().z};
   }
 
   [[nodiscard]] glm::vec3 physicalLDB() const
   {
-    return glm::vec3(physicalLUF().x, physicalRDB().y, physicalRDB().z);
+    return {physicalLUF().x, physicalRDB().y, physicalRDB().z};
   }
 
   [[nodiscard]] glm::vec3 physicalRUB() const
   {
-    return glm::vec3(physicalRDB().x, physicalLUF().y, physicalRDB().z);
+    return {physicalRDB().x, physicalLUF().y, physicalRDB().z};
   }
 
   std::vector<std::unique_ptr<Z3DVolume>> makeXSliceVolume(size_t x);
@@ -136,6 +134,8 @@ public:
   }
 
   void setScale(const glm::vec3& scale);
+
+  void setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRanges);
 
   [[nodiscard]] size_t numLevels() const
   {
@@ -207,6 +207,8 @@ private:
     m_channelPendingUpdates; // block cache pos and block image pos
 
   ZVertexBufferObject m_PBO;
+
+  std::vector<glm::dvec2> m_displayRanges;
 };
 
 } // namespace nim

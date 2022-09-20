@@ -462,7 +462,7 @@ void ZImgFilter::channelVisibleChanged()
 
 void ZImgFilter::channelRangeChanged()
 {
-  if (ZDoubleSpanParameter* para = qobject_cast<ZDoubleSpanParameter*>(sender())) {
+  if (auto para = qobject_cast<ZDoubleSpanParameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_doubleChannelRangeParas.size(); ++c) {

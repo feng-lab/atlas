@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QList>
 #include <QUrl>
+#include <QDir>
 
 namespace nim {
 
@@ -17,7 +18,13 @@ public:
 
   bool event(QEvent* event) override;
 
+  static QDir resourcesDir();
+
   static QString resourcesDirPath();
+
+  static QString jdkDirPath();
+
+  static QString jarsDirPath();
 
   static QString applicationInstallDirPath();
 

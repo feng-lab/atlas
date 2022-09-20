@@ -251,6 +251,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       m_widgetsGroup->removeChild(*para);
     }
+    for (const auto& para : m_doubleChannelRangeParas) {
+      m_widgetsGroup->removeChild(*para);
+    }
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->removeChild(*para);
     }
@@ -266,7 +269,14 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   }
 
   try {
-    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale());
+    std::vector<glm::dvec2> drs;
+    if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
+      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(imgPack.minIntensity(), imgPack.maxIntensity()));
+    } else {
+      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(imgPack.rangeMin(), imgPack.rangeMax()));
+    }
+
+    m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale(), drs);
 
     updateBlockIDTarget();
 
@@ -286,6 +296,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_smoothInteraction.setVisible(m_3dImg->isVolumeDownsampled());
 
     m_sliceColormaps.clear();
+    m_doubleChannelRangeParas.clear();
     for (size_t c = 0; c < m_3dImg->numChannels(); ++c) {
       m_sliceColormaps.emplace_back(
         std::make_unique<ZColorMapParameter>(QString("Slice Channel %1 Colormap").arg(c + 1)));
@@ -294,6 +305,19 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
         1.0,
         QColor(0, 0, 0),
         QColor(m_3dImg->channelColor(c).r, m_3dImg->channelColor(c).g, m_3dImg->channelColor(c).b));
+      m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(
+        QString("Channel %1 Display Range").arg(c + 1),
+        drs[c],
+        imgPack.rangeMin(),
+        imgPack.rangeMax()));
+      if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
+        m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setDecimal(0);
+        m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setSingleStep(1);
+      }
+      connect(m_doubleChannelRangeParas[c].get(),
+              &ZDoubleSpanParameter::valueChanged,
+              this,
+              &Z3DImgFilter::channelRangeChanged);
     }
 
     bool is2DImage = m_3dImg->is2DData();
@@ -339,6 +363,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       addParameter(*para);
     }
+    for (const auto& para : m_doubleChannelRangeParas) {
+      addParameter(*para);
+    }
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       addParameter(*para);
     }
@@ -352,6 +379,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     if (m_widgetsGroup) {
       for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
         m_widgetsGroup->addChild(*para, 2);
+      }
+      for (const auto& para : m_doubleChannelRangeParas) {
+        m_widgetsGroup->addChild(*para, 3);
       }
       for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
         m_widgetsGroup->addChild(*para, 3);
@@ -388,6 +418,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
     for (const auto& para : m_imgRaycasterRenderer.channelVisibleParas()) {
       m_widgetsGroup->addChild(*para, 2);
+    }
+    for (const auto& para : m_doubleChannelRangeParas) {
+      m_widgetsGroup->addChild(*para, 3);
     }
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->addChild(*para, 3);
@@ -1051,6 +1084,18 @@ void Z3DImgFilter::updateBlockIDTarget()
 // }
 
 void Z3DImgFilter::volumeChanged() {}
+
+void Z3DImgFilter::channelRangeChanged()
+{
+  if (m_3dImg) {
+    std::vector<glm::dvec2> channelDisplayRanges;
+    for (const auto& para : m_doubleChannelRangeParas) {
+      channelDisplayRanges.push_back(para->get());
+    }
+    m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
+    m_imgRaycasterRenderer.updateDisplayRanges();
+  }
+}
 
 glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool& success)
 {

@@ -5,6 +5,12 @@
 
 namespace nim {
 
+ZImgGlobal& ZImgGlobal::instance()
+{
+  static ZImgGlobal singleInstance;
+  return singleInstance;
+}
+
 size_t byteNumber(DataType dt)
 {
   switch (dt) {

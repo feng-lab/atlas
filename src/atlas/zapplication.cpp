@@ -47,13 +47,28 @@ bool ZApplication::event(QEvent* event)
   return QApplication::event(event);
 }
 
-QString ZApplication::resourcesDirPath()
+QDir ZApplication::resourcesDir()
 {
 #ifdef Q_OS_MACOS
-  return applicationDirPath() + u"/../Resources";
+  return QDir(applicationDirPath() + u"/../Resources");
 #else
-  return applicationDirPath() + u"/Resources";
+  return QDir(applicationDirPath() + u"/Resources");
 #endif
+}
+
+QString ZApplication::resourcesDirPath()
+{
+  return resourcesDir().absolutePath();
+}
+
+QString ZApplication::jdkDirPath()
+{
+  return resourcesDir().absoluteFilePath("jdk");
+}
+
+QString ZApplication::jarsDirPath()
+{
+  return resourcesDir().absoluteFilePath("jars");
 }
 
 QString ZApplication::applicationInstallDirPath()

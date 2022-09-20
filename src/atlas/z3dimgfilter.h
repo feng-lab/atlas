@@ -109,6 +109,8 @@ private:
 
   void volumeChanged();
 
+  void channelRangeChanged();
+
   // check success before using the returned value
   // if first hit 3d position is in volume, success will be true,
   // otherwise don't use the returned value
@@ -164,6 +166,8 @@ private:
   Z3DRenderOutputPort m_opaqueOutport;
   Z3DRenderOutputPort m_opaqueLeftEyeOutport;
   Z3DRenderOutputPort m_opaqueRightEyeOutport;
+
+  std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
 
   // static const size_t m_maxNumOfFullResolutionVolumeSlice;
   //  each channel is represented by a Z3DVolume

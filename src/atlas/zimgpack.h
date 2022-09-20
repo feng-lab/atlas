@@ -51,7 +51,7 @@ public:
 
   explicit ZImgPack(ZImgSource imgSource);
 
-  virtual ~ZImgPack() = default;
+  ~ZImgPack() override = default;
 
   const QString& sizeInfo() const;
 
@@ -175,6 +175,8 @@ public:
                        size_t sc,
                        size_t t,
                        const ZImgInfo& resInfo,
+                       double displayRangeMin,
+                       double displayRangeMax,
                        ZImg& res) const;
 
   folly::Future<ZImg> readRegionToImg(index_t xyRatio,
@@ -184,7 +186,9 @@ public:
                                       index_t sz,
                                       size_t sc,
                                       size_t t,
-                                      const ZImgInfo& resInfo) const;
+                                      const ZImgInfo& resInfo,
+                                      double displayRangeMin,
+                                      double displayRangeMax) const;
 
   std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                      index_t zRatio,
