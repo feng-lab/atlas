@@ -740,6 +740,8 @@ void ZImgHDF5::readInfo(const QString& filename,
     ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
     hdf5Chunks = parseHDF5Chunks(filename);
   }
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     HDF5ChunkInfo defaultChunk; // no actual chunk in hdf5, value is filled with data_type_min
 
@@ -861,6 +863,8 @@ void ZImgHDF5::readImg(const QString& filename,
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -941,6 +945,8 @@ void ZImgHDF5::readImg(const QString& filename,
 void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, img.info(), paras);
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -999,6 +1005,8 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1063,6 +1071,8 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgBlockrovider.imgInfo(), paras);
+  static QMutex mutex;
+  QMutexLocker lock(&mutex);
   try {
     H5::Exception::dontPrint();
 

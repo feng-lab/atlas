@@ -1,7 +1,7 @@
 #pragma once
 
 #include "zmemorymappedfile.h"
-#include <map>
+#include <folly/concurrency/ConcurrentHashMap.h>
 
 namespace nim {
 
@@ -16,7 +16,7 @@ public:
   ZMemoryMappedFileCache& operator=(const ZMemoryMappedFileCache&) = delete; // Copy assign
   ZMemoryMappedFileCache& operator=(ZMemoryMappedFileCache&&) = delete; // Move assign
 
-  ZMemoryMappedFile* getMemoryMappedFile(const QString& filename) const;
+  [[nodiscard]] ZMemoryMappedFile* getMemoryMappedFile(const QString& filename) const;
 
   ZMemoryMappedFile* getOrCreateMemoryMappedFile(const QString& filename);
 
@@ -24,7 +24,7 @@ protected:
   ZMemoryMappedFileCache() = default;
 
 private:
-  std::map<QString, std::unique_ptr<ZMemoryMappedFile>> m_mmfs;
+  folly::ConcurrentHashMap<QString, std::unique_ptr<ZMemoryMappedFile>> m_mmfs;
 };
 
 } // namespace nim
