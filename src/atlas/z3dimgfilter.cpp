@@ -310,9 +310,10 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
         drs[c],
         imgPack.rangeMin(),
         imgPack.rangeMax()));
+      m_doubleChannelRangeParas.back()->setStyle("SPINBOX");
       if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
-        m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setDecimal(0);
-        m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setSingleStep(1);
+        m_doubleChannelRangeParas.back()->setDecimal(0);
+        m_doubleChannelRangeParas.back()->setSingleStep(1);
       }
       connect(m_doubleChannelRangeParas[c].get(),
               &ZDoubleSpanParameter::valueChanged,

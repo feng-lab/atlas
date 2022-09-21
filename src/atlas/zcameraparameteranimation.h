@@ -117,7 +117,7 @@ protected:
 
     [[nodiscard]] float endTime() const
     {
-      return keys[keys.size() - 1]->time();
+      return keys.back()->time();
     }
 
     void swap(SplineRange& rhs) noexcept;

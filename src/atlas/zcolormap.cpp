@@ -339,7 +339,7 @@ double ZColorMap::domainMin() const
 
 double ZColorMap::domainMax() const
 {
-  return m_keys[m_keys.size() - 1].first.intensity();
+  return m_keys.back().first.intensity();
 }
 
 bool ZColorMap::isValidDomainMin(double min) const

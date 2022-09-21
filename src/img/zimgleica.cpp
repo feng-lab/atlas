@@ -881,7 +881,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
         res.push_back(info);
 
         // advance to next scene
-        ++dimCurrIdx[dimCurrIdx.size() - 1];
+        ++dimCurrIdx.back();
         for (size_t i = dimCurrIdx.size() - 1; i > 0 && dimCurrIdx[i] == dims[sceneDimIdxReverseOrder[i]].end; --i) {
           dimCurrIdx[i] = 0;
           ++dimCurrIdx[i - 1];
@@ -923,7 +923,7 @@ ZImgLeica::getMemoryRangeFromDimensionInfo(const std::vector<DimensionInfo>& dim
                        dimensionInfos[startDim].stride * dimensionInfos[startDim].end + offset);
 
       // advance to next memory block
-      ++dimCurrIdx[dimCurrIdx.size() - 1];
+      ++dimCurrIdx.back();
       for (size_t i = dimCurrIdx.size() - 1; i > 0 && dimCurrIdx[i] == dimEnds[i]; --i) {
         dimCurrIdx[i] = 0;
         ++dimCurrIdx[i - 1];

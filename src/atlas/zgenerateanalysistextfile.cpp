@@ -1215,7 +1215,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
       }
     }
     for (auto& branch : MTTBranches) {
-      ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size() - 1];
+      ConstSwcTreeNode tmptn = branch.nodes.back();
       size_t nodeSubclass = nodeToSubclass.at(tmptn);
 
       QDir* currentBranchFolder = nullptr;
@@ -1293,7 +1293,7 @@ void ZGenerateAnalysisTextFile::generateAnalysisFiles(const ZSwc& tree,
 
     // other not main trunk and not tuft branches
     for (auto& branch : branches) {
-      ConstSwcTreeNode tmptn = branch.nodes[branch.nodes.size() - 1];
+      ConstSwcTreeNode tmptn = branch.nodes.back();
       size_t nodeSubclass = nodeToSubclass.at(tmptn);
       size_t nodeType = tmptn->type;
       bool nodeIsLeaf = ZSwc::isLeaf(tmptn);

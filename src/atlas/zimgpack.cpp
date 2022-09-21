@@ -1159,18 +1159,20 @@ void ZImgPack::updateDerivedData()
   }
 
   CHECK(m_minMaxState != MinMaxState::Invalid);
-  if (m_imgInfo.validBitCount != 12 && m_imgInfo.voxelByteNumber() == 2 &&
-      m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 4096) {
-    m_imgInfo.validBitCount = 12;
-    if (!m_diskCached) {
-      m_img.infoRef().validBitCount = 12;
+  if (m_minMaxState == MinMaxState::Complete) {
+    if (m_imgInfo.validBitCount != 12 && m_imgInfo.voxelByteNumber() == 2 &&
+        m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 4096) {
+      m_imgInfo.validBitCount = 12;
+      if (!m_diskCached) {
+        m_img.infoRef().validBitCount = 12;
+      }
     }
-  }
-  if (m_imgInfo.validBitCount != 1 && m_imgInfo.voxelByteNumber() == 1 &&
-      m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 2) {
-    m_imgInfo.validBitCount = 1;
-    if (!m_diskCached) {
-      m_img.infoRef().validBitCount = 1;
+    if (m_imgInfo.validBitCount != 1 && m_imgInfo.voxelByteNumber() == 1 &&
+        m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 2) {
+      m_imgInfo.validBitCount = 1;
+      if (!m_diskCached) {
+        m_img.infoRef().validBitCount = 1;
+      }
     }
   }
   m_rangeMin = m_imgInfo.dataRangeMin<double>();

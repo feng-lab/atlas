@@ -221,7 +221,7 @@ void ZSliceROI::rotateCtrlPoints(const std::map<size_t, std::vector<ZROIControlP
           shapeOp.poly[controlPoint.pointIndex] = resPt;
           CHECK(controlPoint.pointIndex < static_cast<size_t>(shapeOp.poly.size()) - 1);
           if (controlPoint.pointIndex == 0) {
-            shapeOp.poly[shapeOp.poly.size() - 1] = resPt;
+            shapeOp.poly.back() = resPt;
           }
         }
         if ((shapeOp.type == ROIType::Line) && shapeOp.poly.size() > 1) {

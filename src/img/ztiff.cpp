@@ -1360,9 +1360,9 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
     }
     visitedDiroffs.insert(diroff);
     _ifds.emplace_back();
-    diroff = readIFD(fs, _ifds[_ifds.size() - 1], diroff, bigtiff, swabflag);
+    diroff = readIFD(fs, _ifds.back(), diroff, bigtiff, swabflag);
     // workaround zeiss axio scanner exporter bug
-    if (!_ifds[_ifds.size() - 1].containsTag(TIFFTAG_IMAGEWIDTH)) {
+    if (!_ifds.back().containsTag(TIFFTAG_IMAGEWIDTH)) {
       _ifds.pop_back();
     }
   }

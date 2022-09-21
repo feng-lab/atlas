@@ -233,7 +233,7 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& d
     ZAnalysisTextFileInput* input;
     if (m_rowToInput.find(index.row()) == m_rowToInput.end()) {
       m_inputs.push_back(ZAnalysisTextFileInput());
-      input = &(m_inputs[m_inputs.size() - 1]);
+      input = &m_inputs.back();
       m_rowToInput[index.row()] = input;
     } else {
       input = m_rowToInput[index.row()];

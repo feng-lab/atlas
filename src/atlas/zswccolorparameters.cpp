@@ -195,13 +195,13 @@ glm::vec4 ZSwcColorParameters::colorByType(const ZSwc::ConstSwcTreeNode& n)
     if (static_cast<size_t>(n->type) + 1 < colorsForDifferentType.size()) {
       return colorsForDifferentType[n->type]->get();
     } else {
-      return colorsForDifferentType[colorsForDifferentType.size() - 1]->get();
+      return colorsForDifferentType.back()->get();
     }
   } else if (colorMode.isSelected("Subclass")) {
     if (subclassTypeColorMapper.find(n->type) != subclassTypeColorMapper.end()) {
       return colorsForSubclassType[subclassTypeColorMapper[n->type]]->get();
     } else {
-      return colorsForSubclassType[colorsForSubclassType.size() - 1]->get();
+      return colorsForSubclassType.back()->get();
     }
   } else /*if (colorMode.get() == "ColorMap Branch Type")*/ {
     return colorMapBranchType.get().mappedFColor(n->type);

@@ -56,8 +56,8 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
     para->setValueSameAs(m_keys[0]->value());
     return;
   }
-  if (secs >= m_keys[m_keys.size() - 1]->time()) {
-    para->setValueSameAs(m_keys[m_keys.size() - 1]->value());
+  if (secs >= m_keys.back()->time()) {
+    para->setValueSameAs(m_keys.back()->value());
     return;
   }
   float centerDist = 1.f;
@@ -96,9 +96,9 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
         break;
       }
     }
-    if (secs >= m_pathSegments[m_pathSegments.size() - 1].startTime()) {
+    if (secs >= m_pathSegments.back().startTime()) {
       // belongs to last segment
-      pos = m_pathSegments[m_pathSegments.size() - 1].position(secs);
+      pos = m_pathSegments.back().position(secs);
     }
     // update camera
     glm::mat3 rotMat = glm::mat3_cast(rot);
@@ -115,10 +115,10 @@ void ZCameraParameterAnimation::updateParaToTime(double secs, ZParameter* para) 
         break;
       }
     }
-    if (secs >= m_pathSegments[m_pathSegments.size() - 1].startTime()) {
+    if (secs >= m_pathSegments.back().startTime()) {
       // belongs to last segment
-      pos = m_pathSegments[m_pathSegments.size() - 1].position(secs);
-      rot = m_pathSegments[m_pathSegments.size() - 1].rotation(secs);
+      pos = m_pathSegments.back().position(secs);
+      rot = m_pathSegments.back().rotation(secs);
     }
     // update camera
     glm::mat3 rotMat = glm::mat3_cast(rot);
@@ -151,7 +151,7 @@ void ZCameraParameterAnimation::buildSpline()
       }
       m_pathSegments.emplace_back();
       SplineRange sr(res);
-      m_pathSegments[m_pathSegments.size() - 1].swap(sr);
+      m_pathSegments.back().swap(sr);
 
       start = i;
     }
@@ -167,7 +167,7 @@ void ZCameraParameterAnimation::buildSpline()
   }
   m_pathSegments.emplace_back();
   SplineRange sr(res);
-  m_pathSegments[m_pathSegments.size() - 1].swap(sr);
+  m_pathSegments.back().swap(sr);
 }
 
 glm::vec3 ZCameraParameterAnimation::Poly::Position(float fU) const
@@ -213,7 +213,7 @@ ZCameraParameterAnimation::SplineRange::SplineRange(std::vector<ZCameraParameter
   keys.swap(kys);
   if (m_hasSpline) {
     firstKey = std::make_unique<ZCameraParameterKey>(*keys[0]);
-    lastKey = std::make_unique<ZCameraParameterKey>(*keys[keys.size() - 1]);
+    lastKey = std::make_unique<ZCameraParameterKey>(*keys.back());
     keys.insert(keys.begin(), firstKey.get());
     keys.push_back(lastKey.get());
     buildPosSpline();

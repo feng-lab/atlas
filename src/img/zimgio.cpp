@@ -367,7 +367,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       }
       auto [lt, lx, ly, lwidth, lheight, lz, ldepth] = lastTile;
       if (lt == t && lx == x && ly == y && lwidth == width && lheight == height) {
-        auto& rgn = res[i][res[i].size() - 1];
+        auto& rgn = res[i].back();
         if (z != size_t(rgn.end.z)) {
           throw ZIOException("z jumping");
         } else {

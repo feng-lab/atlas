@@ -208,7 +208,7 @@ void Z3DAnimationFilter::prepareColor()
       m_lineColors.push_back(m_colorMap.get().mappedFColor(0));
     } else if (m_times.size() > 1) {
       double startTime = m_times[0];
-      double endTime = m_times[m_times.size() - 1];
+      double endTime = m_times.back();
       for (auto time : m_times) {
         m_lineColors.push_back(m_colorMap.get().mappedFColor((time - startTime) / (endTime - startTime)));
       }
@@ -243,7 +243,7 @@ void Z3DAnimationFilter::prepareColor()
         }
       } else if (keys.size() > 1) {
         double startTime = keys[0]->time();
-        double endTime = std::max(startTime + 0.01, keys[keys.size() - 1]->time());
+        double endTime = std::max(startTime + 0.01, keys.back()->time());
         for (const auto& key : keys) {
           glm::vec4 color = m_colorMap.get().mappedFColor((key->time() - startTime) / (endTime - startTime));
           colors.push_back(color);
@@ -288,7 +288,7 @@ void Z3DAnimationFilter::updateData()
       double currentKeyTime = keys[i]->time();
       double nextKeyTime = keys[i + 1]->time();
       for (double t = currentKeyTime; t < nextKeyTime; t += m_timeInterval.get()) {
-        if (m_times.empty() || t > m_times[m_times.size() - 1] + 0.0001) { // make sure no overlap
+        if (m_times.empty() || t > m_times.back() + 0.0001) { // make sure no overlap
           m_times.push_back(t);
         }
       }
@@ -297,8 +297,8 @@ void Z3DAnimationFilter::updateData()
         m_cameraDirectionTimes.push_back(t);
       }
     }
-    if (!keys.empty() && (m_times.empty() || keys[keys.size() - 1]->time() > m_times[m_times.size() - 1] + 0.0001)) {
-      m_times.push_back(keys[keys.size() - 1]->time());
+    if (!keys.empty() && (m_times.empty() || keys.back()->time() > m_times.back() + 0.0001)) {
+      m_times.push_back(keys.back()->time());
     }
 
     if (m_times.size() <= 1) {

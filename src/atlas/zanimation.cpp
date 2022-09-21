@@ -155,7 +155,7 @@ void ZAnimation::addKeyFrame(double time)
       aO->boundId = id;
       objChange = true;
       m_objList.push_back(std::move(aO));
-      aniObj = m_objList[m_objList.size() - 1].get();
+      aniObj = m_objList.back().get();
     }
     auto& paraAnimationList = aniObj->objParaAnimations;
 

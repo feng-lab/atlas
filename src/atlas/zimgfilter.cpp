@@ -148,8 +148,8 @@ void ZImgFilter::setData(ZImgPack& pack)
       m_imgPack->rangeMin(),
       m_imgPack->rangeMax()));
     if (m_imgPack->imgInfo().voxelFormat != VoxelFormat::Float) {
-      m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setDecimal(0);
-      m_doubleChannelRangeParas[m_doubleChannelRangeParas.size() - 1]->setSingleStep(1);
+      m_doubleChannelRangeParas.back()->setDecimal(0);
+      m_doubleChannelRangeParas.back()->setSingleStep(1);
     }
     m_channelColorParas.emplace_back(
       std::make_unique<ZVec3Parameter>(QString("%1 Color").arg(m_imgPack->imgInfo().displayChannelName(c)),

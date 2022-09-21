@@ -213,8 +213,8 @@ struct ZImgInfo
 
   size_t bytesPerVoxel = 1; // for one channel
   VoxelFormat voxelFormat = VoxelFormat::Unsigned;
-  size_t validBitCount =
-    0; // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
+  // used with 8-bits or 16-bits images to indicate the maximum possible valid bits, 0 if default
+  size_t validBitCount = 0;
 
   VoxelSizeUnit voxelSizeUnit = VoxelSizeUnit::none;
   double voxelSizeX = 1.;

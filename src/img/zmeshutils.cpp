@@ -1086,7 +1086,7 @@ void vtkCCSJoinLooseEnds(std::vector<std::vector<int64_t>>& polys,
   size_t n;
   while ((n = incompletePolys.size())) {
     vtkCCSPoly& poly1 = polys[incompletePolys[n - 1]];
-    int64_t pt1 = poly1[poly1.size() - 1];
+    int64_t pt1 = poly1.back();
     glm::dvec3 p2;
     glm::dvec3 p1 = vertices[pt1];
 
@@ -1366,7 +1366,7 @@ int vtkCCSSplitAtPinchPoints(std::vector<std::vector<int64_t>>& polys,
       // make a group with one entry for the new poly
       polyGroups.resize(polys.size());
       if (polyGroups[i].size()) {
-        polyGroups[polys.size() - 1].push_back(polys.size() - 1);
+        polyGroups.back().push_back(polys.size() - 1);
       }
     }
   }
@@ -1466,7 +1466,7 @@ void vtkCCSFindTrueEdges(std::vector<std::vector<int64_t>>& polys,
         // will be greater than two
         if (cellCount > 1) {
           if (pointId != oldOriginalId) {
-            originalEdges[originalEdges.size() - 1].push_back(pointId);
+            originalEdges.back().push_back(pointId);
             cellCount++;
           }
           newEdges.push_back(originalEdges.size() - 1);
@@ -1493,10 +1493,10 @@ void vtkCCSFindTrueEdges(std::vector<std::vector<int64_t>>& polys,
           // First check to see if we have to add cornerPointId
           if (cellCount == 1) {
             originalEdges.push_back(std::vector<int64_t>());
-            originalEdges[originalEdges.size() - 1].push_back(cornerPointId);
+            originalEdges.back().push_back(cornerPointId);
           }
           // Then add the new point
-          originalEdges[originalEdges.size() - 1].push_back(pointId);
+          originalEdges.back().push_back(pointId);
           oldOriginalId = pointId;
           cellCount++;
         } else {
@@ -1520,9 +1520,9 @@ void vtkCCSFindTrueEdges(std::vector<std::vector<int64_t>>& polys,
       if (pointId != oldOriginalId) {
         if (cellCount == 1) {
           originalEdges.push_back(std::vector<int64_t>());
-          originalEdges[originalEdges.size() - 1].push_back(cornerPointId);
+          originalEdges.back().push_back(cornerPointId);
         }
-        originalEdges[originalEdges.size() - 1].push_back(pointId);
+        originalEdges.back().push_back(pointId);
         oldOriginalId = pointId;
         cellCount++;
       }
@@ -2579,7 +2579,7 @@ ZMesh ZMeshUtils::clipClosedSurface(const ZMesh& mesh, const std::vector<glm::ve
     bool needClip2 = false;
     for (auto& vertex : vertices) {
       vertexDists.push_back(-vertexPlaneDistance(vertex, plane, 0.0));
-      if (vertexDists[vertexDists.size() - 1] < 0) {
+      if (vertexDists.back() < 0) {
         needClip2 = true;
       }
     }

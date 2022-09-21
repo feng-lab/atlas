@@ -120,7 +120,7 @@ protected:
 
   [[nodiscard]] inline const ZParameterKey& lastKey() const
   {
-    return *m_keys[m_keys.size() - 1];
+    return *m_keys.back();
   }
 
 protected:

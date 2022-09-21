@@ -336,6 +336,8 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
 
   std::memset(m_pageTableCache.data(), 0, m_pageTableCache.size() * sizeof(glm::uvec4));
   m_pageTableCacheTexture->uploadImage(m_pageTableCache.data());
+
+  readVolumes();
 }
 
 void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader) const

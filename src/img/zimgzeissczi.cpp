@@ -1760,14 +1760,14 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
         }
       }
       tile.start -= start;
-      m_sceneTiles[m_sceneTiles.size() - 1].insert(tile);
+      m_sceneTiles.back().insert(tile);
     }
 
 #ifdef DUMP_CZI_INFO
     for (size_t j = 0; j < 20; ++j) {
       LOG(INFO) << "";
     }
-    for (const auto& tile : m_sceneTiles[m_sceneTiles.size() - 1]) {
+    for (const auto& tile : m_sceneTiles.back()) {
       LOG(INFO) << tile.ratio << " " << tile.start << " " << tile.size << " " << tile.storedSize;
     }
 #endif
