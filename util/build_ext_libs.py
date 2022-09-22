@@ -174,6 +174,7 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+        res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
         res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
@@ -442,6 +443,7 @@ def build_boost(src_dir: str, install_dir: str):
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
                                 f'linkflags={cbf["LDFLAGS"]}',
+                                f'asmflags={cbf["ASMFLAGS"]}',
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True)
