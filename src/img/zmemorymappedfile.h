@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include <llfio.hpp>
-#include <QString>
 
 namespace nim {
 

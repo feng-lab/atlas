@@ -320,3 +320,17 @@ inline std::ostream& operator<<(std::ostream& s, QKeyCombination combination)
 #endif
 
 } // namespace nim
+
+#if (QT_VERSION < QT_VERSION_CHECK(5, 14, 0))
+namespace std {
+
+template <>
+struct hash<QString> {
+  size_t operator()(const QString& s) const noexcept
+  {
+    return qHash(s, qHash(std::hash<int>{}(0)));
+  }
+};
+
+} // namespace std
+#endif

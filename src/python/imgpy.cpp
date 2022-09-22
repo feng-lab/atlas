@@ -637,7 +637,7 @@ PYBIND11_MODULE(_imgpy, m)
                            })
     .def("resize", &ZImg::resize,
          "desWidth"_a, "desHeight"_a, "desDepth"_a, "interpolant"_a = Interpolant::Cubic, "antialiasing"_a = true,
-         "antialiasingForNearest"_a = false)
+         "antialiasingForNearest"_a = false, "useMultithreading"_a = true)
     .def("zoom", &ZImg::zoom,
          "scaleX"_a, "scaleY"_a, "scaleZ"_a = 1.0, "interpolant"_a = Interpolant::Cubic, "antialiasing"_a = true,
          "antialiasingForNearest"_a = false)

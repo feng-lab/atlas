@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include <QObject>
-#include <QMutexLocker>
 #include <deque>
 #include <limits>
 
@@ -42,7 +41,6 @@ public:
                                              bool receiveOldMessages = true) const
   {
     CHECK(this->thread() == receiver->thread()) << "receiver must be in main gui thread";
-    QMutexLocker lock(&m_mutex);
     if (receiveOldMessages && m_unsendLogDataStart > 0) {
       (receiver->*slot)(&m_logDatas, 0, m_unsendLogDataStart);
     }
@@ -61,7 +59,7 @@ private:
 
 private:
   std::deque<LogData> m_logDatas;
-  mutable QMutex m_mutex;
+  std::mutex m_mutex;
   size_t m_maxNumItems;
   QTimer* m_timer;
   size_t m_unsendLogDataStart = 0;

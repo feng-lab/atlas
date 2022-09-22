@@ -19,7 +19,7 @@ void ZLogCache::send(LogSeverity severity,
                      size_t message_len,
                      size_t prefix_len)
 {
-  QMutexLocker lock(&m_mutex);
+  std::lock_guard<std::mutex> lock(m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
     m_logDatas.pop_front();
     if (m_unsendLogDataStart > 0) {
@@ -41,7 +41,7 @@ ZLogCache::ZLogCache(size_t maxNumItems)
 
 void ZLogCache::sendLogData()
 {
-  QMutexLocker lock(&m_mutex);
+  std::lock_guard<std::mutex> lock(m_mutex);
   auto start = m_unsendLogDataStart;
   m_unsendLogDataStart = m_logDatas.size();
   if (m_unsendLogDataStart > start) {

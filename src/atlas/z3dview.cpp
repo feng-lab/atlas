@@ -283,8 +283,8 @@ bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
     ++w;
   }
   if (m_canvas->width() % 2 == 1 || m_canvas->height() % 2 == 1) {
-    LOG(INFO) << "Resize canvas size from (" << m_canvas->width() << ", " << m_canvas->height() << ") to (" << w << ", "
-              << h << ").";
+    LOG(INFO)
+      << fmt::format("Resize canvas size from ({}, {}) to ({}, {}).", m_canvas->width(), m_canvas->height(), w, h);
     m_canvas->resize(w, h);
   }
   bool res = true;

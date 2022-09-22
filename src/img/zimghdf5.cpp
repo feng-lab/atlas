@@ -8,7 +8,6 @@
 #include "zmemorymappedfilecache.h"
 #include "zbenchtimer.h"
 #include <QFile>
-#include <QMutexLocker>
 #include <QProcess>
 #include <QRegularExpression>
 #include <folly/compression/Compression.h>
@@ -653,8 +652,8 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   }
 
   LOG(WARNING) << "fall back to single thread hdf5 image reading!";
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
   try {
     res = std::make_shared<ZImg>(m_info);
 
@@ -747,8 +746,8 @@ void ZImgHDF5::readInfo(const QString& filename,
     size_t chunkHeight = chunkSize();
     size_t chunkWidth = chunkSize();
     {
-      static QMutex mutex;
-      QMutexLocker lock(&mutex);
+      static std::mutex mutex;
+      std::lock_guard<std::mutex> lock(mutex);
 
       H5::Exception::dontPrint();
 
@@ -873,8 +872,8 @@ void ZImgHDF5::readImg(const QString& filename,
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -955,8 +954,8 @@ void ZImgHDF5::readImg(const QString& filename,
 void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, img.info(), paras);
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1015,8 +1014,8 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgSliceProvider.imgInfo(), paras);
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
   try {
     H5::Exception::dontPrint();
 
@@ -1081,8 +1080,8 @@ void ZImgHDF5::writeImg(const QString& filename,
                         const ZImgWriteParameters& paras)
 {
   checkImgBeforeWriting(filename, imgBlockrovider.imgInfo(), paras);
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+  static std::mutex mutex;
+  std::lock_guard<std::mutex> lock(mutex);
   try {
     H5::Exception::dontPrint();
 

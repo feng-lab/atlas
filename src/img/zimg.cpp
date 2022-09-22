@@ -12,10 +12,12 @@
 #include <QRegularExpression>
 #include <folly/ScopeGuard.h>
 #include <boost/endian/conversion.hpp>
+#ifdef ZIMG_USE_IPP
 #include <ippcore.h>
 #include <ippvm.h>
 #include <ipps.h>
 #include <ippi.h>
+#endif
 #include <algorithm>
 
 namespace {
@@ -1572,6 +1574,7 @@ ZImg ZImg::resized(size_t desWidth,
 
 ZImg ZImg::resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant) const
 {
+#ifdef ZIMG_USE_IPP
   CHECK(desWidth > 0 && desHeight > 0 && desDepth > 0);
   CHECK(interpolant == Interpolant::Nearest || interpolant == Interpolant::Linear || interpolant == Interpolant::Cubic);
   int interpolation;
@@ -1701,6 +1704,13 @@ ZImg ZImg::resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interp
   }
 
   return res;
+#else
+  LOG(FATAL) << "ipp not supported";
+  Q_UNUSED(desWidth)
+  Q_UNUSED(desHeight)
+  Q_UNUSED(desDepth)
+  Q_UNUSED(interpolant)
+#endif
 }
 
 ZImg ZImg::zoomed(double scaleX,
