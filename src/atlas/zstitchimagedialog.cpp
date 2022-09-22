@@ -1,13 +1,11 @@
 #include "zstitchimagedialog.h"
 
 #include "zimg.h"
-#include "zimgio.h"
 #include "zimgdisplay.h"
 #include "zstringutils.h"
 #include "zsysteminfo.h"
 #include "zlog.h"
 #include "zfileutils.h"
-#include "zcpuinfo.h"
 #include "zlogwidget.h"
 #include "ztheme.h"
 #include <QtWidgets>
@@ -29,14 +27,12 @@ ZTileImageWidget::ZTileImageWidget(QWidget* parent,
   m_filenames = filenames;
   if (static_cast<size_t>(filenames.size()) == pTiles->size()) {
     for (auto& filename : m_filenames) {
-      std::vector<ZImgInfo> infos;
-      ZImgIO().readInfos(filename, infos);
+      std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
       if (infos.size() != 1) {
         m_tileimages.clear();
         break;
       }
-      ZImgThumbernail tn;
-      ZImgIO().readThumbnail(filename, tn);
+      ZImgThumbernail tn = ZImg::readImgThumbnail(filename);
       bool sbreak = false;
       std::vector<ZImg> imgs;
       for (size_t z = 0; z < infos[0].depth; ++z) {

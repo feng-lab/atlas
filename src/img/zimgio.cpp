@@ -28,7 +28,7 @@ namespace nim {
 
 ZImgIO& ZImgIO::instance()
 {
-  static ZImgIO imgIO;
+  thread_local static ZImgIO imgIO;
   return imgIO;
 }
 
@@ -146,7 +146,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
       blockFutures.push_back(folly::via(cpuExecutor, [=]() {
         std::vector<ZImgInfo> tmpInfo;
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
-        ZImgIO().readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
+        ZImgIO::instance().readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
           throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
         }

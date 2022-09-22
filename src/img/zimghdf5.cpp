@@ -740,41 +740,51 @@ void ZImgHDF5::readInfo(const QString& filename,
     ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
     hdf5Chunks = parseHDF5Chunks(filename);
   }
-  static QMutex mutex;
-  QMutexLocker lock(&mutex);
+
   try {
+    std::set<size_t> levels;
     HDF5ChunkInfo defaultChunk; // no actual chunk in hdf5, value is filled with data_type_min
+    size_t chunkHeight = chunkSize();
+    size_t chunkWidth = chunkSize();
+    {
+      static QMutex mutex;
+      QMutexLocker lock(&mutex);
 
-    H5::Exception::dontPrint();
+      H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(filename).constData(),
-                    H5F_ACC_RDONLY,
-                    H5::FileCreatPropList::DEFAULT,
-                    accPropList());
+      H5::H5File file(QFile::encodeName(filename).constData(),
+                      H5F_ACC_RDONLY,
+                      H5::FileCreatPropList::DEFAULT,
+                      accPropList());
 
-    H5::Group allGrp = file.openGroup("Img");
+      H5::Group allGrp = file.openGroup("Img");
 
-    infos.resize(1);
-    infos[0] = ZImgInfoIO::load(allGrp);
+      infos.resize(1);
+      infos[0] = ZImgInfoIO::load(allGrp);
 
-    // createDefaultSubBlocks(filename, infos, subBlocks);
+      // createDefaultSubBlocks(filename, infos, subBlocks);
 
-    std::set<size_t> levels = loadRatiosFromH5Grp(allGrp);
+      levels = loadRatiosFromH5Grp(allGrp);
+
+      //      if (subBlocks) {
+      //        if (!infos[0].isEmpty()) {
+      //          H5::DataSet ds0 = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
+      //          H5::DSetCreatPropList pList = ds0.getCreatePlist();
+      //          hsize_t chunk_dims[2];
+      //          auto rank_chunk = pList.getChunk(2, chunk_dims);
+      //          if (rank_chunk != 2) {
+      //            throw ZIOException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
+      //          }
+      //          chunkHeight = chunk_dims[0];
+      //          chunkWidth = chunk_dims[1];
+      //        }
+      //      }
+    }
 
     if (subBlocks) {
       subBlocks->resize(infos.size());
       auto& subBlock = subBlocks->at(0);
       if (!infos[0].isEmpty()) {
-        H5::DataSet ds0 = allGrp.openDataSet("TimePoint0/Channel0/Z0/Data");
-        H5::DSetCreatPropList pList = ds0.getCreatePlist();
-        hsize_t chunk_dims[2];
-        auto rank_chunk = pList.getChunk(2, chunk_dims);
-        if (rank_chunk != 2) {
-          throw ZIOException(QString("invalid rank of chunk dim %1").arg(rank_chunk));
-        }
-        size_t chunkHeight = chunk_dims[0];
-        size_t chunkWidth = chunk_dims[1];
-
         for (auto level : levels) {
           size_t width = std::ceil(infos[0].width * 1.0 / level);
           size_t height = std::ceil(infos[0].height * 1.0 / level);

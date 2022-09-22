@@ -4,7 +4,7 @@
 #include <fstream>
 #include <set>
 
-// don't use ZImgFormat and derived class directly, use ZImgIOInstance instead
+// don't use ZImgFormat and derived class directly, use ZImgIO::instance() instead
 
 namespace nim {
 

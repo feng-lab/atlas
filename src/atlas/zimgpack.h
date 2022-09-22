@@ -277,7 +277,7 @@ private:
   QString m_tooltip;
 
   size_t m_tileSize = 512;
-  size_t m_fastReadSizeThreshold = 2_i64 * 1024 * 1024 * 1024; // 2000MB
+  size_t m_fastReadSizeThreshold = 1_i64 * 1024 * 1024 * 1024; // 1000MB
 
   std::vector<std::shared_ptr<ZImgSubBlock>> m_allTiles;
   std::set<std::array<size_t, 3>> m_pyramidalRatios;

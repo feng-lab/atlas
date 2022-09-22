@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "zstatisticsutils.h"
-#include "zimgio.h"
 #include "zlog.h"
 #include "zstringutils.h"
 #include "zcpuinfo.h"
@@ -485,7 +484,7 @@ void ZImgMerge::save(const QString& fileName, FileFormat format, const ZImgWrite
 {
   if (imgInfo().byteNumber() * 3 > ZCpuInfo::instance().nPhysicalRAM &&
       (m_mergeMode == ImgMergeMode::Max || m_overlapRegion.isEmpty())) {
-    ZImgIO().writeImg(fileName, *this, format, paras);
+    ZImg::writeImg(fileName, *this, format, paras);
   } else {
     wholeImg().save(fileName, format, paras);
   }

@@ -13,6 +13,10 @@ class QImage;
 
 namespace nim {
 
+class ZImgSliceProvider;
+
+class ZImgBlockProvider;
+
 // Macro to call the correct version of typed function
 // To work with img of different type,
 // write a function:
@@ -630,6 +634,16 @@ public:
             FileFormat format = FileFormat::Unknown,
             const ZImgWriteParameters& paras = ZImgWriteParameters()) const;
 
+  static void writeImg(const QString& filename,
+                       const ZImgSliceProvider& img,
+                       FileFormat format = FileFormat::Unknown,
+                       const ZImgWriteParameters& paras = ZImgWriteParameters());
+
+  static void writeImg(const QString& filename,
+                       const ZImgBlockProvider& img,
+                       FileFormat format = FileFormat::Unknown,
+                       const ZImgWriteParameters& paras = ZImgWriteParameters());
+
   // convenient function to get img information from file, throw ZIOException if read error or empty image
   static std::vector<ZImgInfo>
   readImgInfos(const QString& filename,
@@ -661,6 +675,13 @@ public:
 
   static std::vector<std::vector<ZImgRegion>> getInternalSubRegions(const QString& filename,
                                                                     FileFormat format = FileFormat::Unknown);
+
+  static ZImgMetadata readImgMetadata(const ZImgSource& imgSource);
+
+  static ZImgThumbernail readImgThumbnail(const QString& filename,
+                                          const ZImgRegion& region = ZImgRegion(),
+                                          size_t scene = 0,
+                                          FileFormat format = FileFormat::Unknown);
 
   // wrap exist raw data as ZImg, ZImg will **not** free the memory after using
   // only accept non-const data pointer (link error if input is const)

@@ -14,9 +14,10 @@ class ZImgBlockProvider;
 class ZImgIO
 {
 public:
-  // do not use this from more than 1 thread
+  // instance is thread_local so safe to use in multiple threads
   static ZImgIO& instance();
 
+  // use new instance in case of nested call in the same thread
   ZImgIO();
 
   // if FileFormat is FileFormat::Unknown, use extension of filename to match correct reader or writer

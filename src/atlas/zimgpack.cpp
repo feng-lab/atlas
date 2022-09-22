@@ -1,7 +1,6 @@
 #include "zimgpack.h"
 
 #include "zcpuinfo.h"
-#include "zimgio.h"
 #include "z3dgpuinfo.h"
 #include "zlog.h"
 #include <QFileInfo>
@@ -69,8 +68,8 @@ ZImgPack::ZImgPack(ZImgSource imgSource)
   , m_diskCached(true)
 {
   std::vector<std::shared_ptr<ZImgSubBlock>> sceneSubBlock;
-  ZImgIO::instance().readInfo(m_imgSource, m_imgInfo, &sceneSubBlock);
-  ZImgIO::instance().readMetadata(m_imgSource, m_imgMetaData);
+  m_imgInfo = ZImg::readImgInfo(m_imgSource, &sceneSubBlock);
+  m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
 
   m_minMaxState = MinMaxState::Invalid;
 
@@ -84,13 +83,16 @@ ZImgPack::ZImgPack(ZImgSource imgSource)
 
   bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
+    LOG(INFO) << "read all";
     m_diskCached = false;
-    ZImgIO::instance().readImg(m_imgSource, m_img);
+    m_img = ZImg(m_imgSource);
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
   } else if (hasPyramidal || !needScale) {
+    LOG(INFO) << fmt::format("has pyramidal: {}, need scale: {}", hasPyramidal, needScale);
     buildFastReadIndex(sceneSubBlock);
   } else {
+    LOG(INFO) << "building pyramidal";
     buildPyramidal();
   }
 
@@ -159,7 +161,7 @@ void ZImgPack::setChannelColor(size_t c, col4 col)
 void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteParameters& paras)
 {
   if (m_diskCached) {
-    ZImgIO::instance().writeImg(fileName, *this, format, paras);
+    ZImg::writeImg(fileName, *this, format, paras);
   } else {
     m_img.save(fileName, format, paras);
     m_diskCached = true;
@@ -170,12 +172,11 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
     ZImgCache::instance().remove(ImageCacheHashKeyType(this, i));
   }
-  std::vector<ZImgInfo> infos;
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
-  ZImgIO::instance().readInfos(m_imgSource.filenames[0], infos, &subBlocks, m_imgSource.format);
+  std::vector<ZImgInfo> infos = ZImg::readImgInfos(m_imgSource.filenames[0], &subBlocks, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());
   m_imgInfo = infos[0];
-  ZImgIO::instance().readMetadata(m_imgSource, m_imgMetaData);
+  m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
   buildFastReadIndex(subBlocks[0]);
 
   updateDerivedData();

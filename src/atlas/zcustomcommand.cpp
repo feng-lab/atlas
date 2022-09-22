@@ -6,7 +6,6 @@
 #include "zimgregistration.h"
 #include "zregistrationnumericdiffcostfunction.h"
 #include "zswc.h"
-#include "zimgio.h"
 #include "zimgnccmatch.h"
 #include "zmesh.h"
 #include "zimgautothreshold.h"

@@ -7,7 +7,6 @@
 #include "zimgnccmatch.h"
 #include "zimgblockprovider.h"
 #include "zimgsliceprovider.h"
-#include "zimgio.h"
 #include "zimgmerge.h"
 #include "zpunctadetection.h"
 #include "zsectionsregistration.h"
@@ -609,6 +608,10 @@ PYBIND11_MODULE(_imgpy, m)
     .def("isEmpty", &ZImg::isEmpty)
     .def("save", &ZImg::save,
          "filename"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
+    .def_static("writeImg", py::overload_cast<const QString&, const ZImgSliceProvider&, FileFormat, const ZImgWriteParameters&>(&ZImg::writeImg),
+                "filename"_a, "sliceProvider"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
+    .def_static("writeImg", py::overload_cast<const QString&, const ZImgBlockProvider&, FileFormat, const ZImgWriteParameters&>(&ZImg::writeImg),
+                "filename"_a, "blockProvider"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
     .def_property("info",
                   [](const ZImg& v) {
                     return v.info();
@@ -991,18 +994,6 @@ PYBIND11_MODULE(_imgpy, m)
     .def("wholeImg", &ZImgBlockProvider::wholeImg)
     .def("__repr__", [](const ZImgBlockProvider&) {
       return fmt::format("<_imgpy.ZImgBlockProvider>");
-    });
-
-  py::class_<ZImgIO>(m, "ZImgIO")
-    .def(py::init<>())
-    .def("writeImg", py::overload_cast<const QString&, const ZImg&, FileFormat, const ZImgWriteParameters&>(&ZImgIO::writeImg),
-         "filename"_a, "img"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
-    .def("writeImg", py::overload_cast<const QString&, const ZImgSliceProvider&, FileFormat, const ZImgWriteParameters&>(&ZImgIO::writeImg),
-         "filename"_a, "sliceProvider"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
-    .def("writeImg", py::overload_cast<const QString&, const ZImgBlockProvider&, FileFormat, const ZImgWriteParameters&>(&ZImgIO::writeImg),
-         "filename"_a, "blockProvider"_a, "format"_a = FileFormat::Unknown, "paras"_a = ZImgWriteParameters())
-    .def("__repr__", [](const ZImgIO&) {
-      return fmt::format("<_imgpy.ZImgIO>");
     });
 
   py::class_<ZImgMerge>(m, "ZImgMerge")
