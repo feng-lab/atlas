@@ -4,7 +4,7 @@
 #include "zlog.h"
 #include "zsaturateoperation_avx2.h"
 #include "zsaturateoperation_avx512.h"
-#include <immintrin.h>
+#include <simde/x86/sse2.h>
 
 namespace nim {
 

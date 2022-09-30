@@ -1,7 +1,7 @@
 #include "zimagesse3.h"
 
 #include "zglobal.h"
-#include <immintrin.h>
+#include <simde/x86/sse3.h>
 
 namespace {
 

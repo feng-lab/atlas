@@ -3,7 +3,7 @@
 #include "zsaturateoperation.h"
 #include "zglobal.h"
 #include "zlog.h"
-#include <immintrin.h>
+#include <simde/x86/avx512.h>
 
 namespace nim {
 

@@ -1,7 +1,7 @@
 #include "zimageavx.h"
 
 #include "zglobal.h"
-#include <immintrin.h>
+#include <simde/x86/avx512.h>
 
 namespace nim {
 

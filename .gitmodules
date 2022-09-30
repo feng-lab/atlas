@@ -115,3 +115,6 @@
 [submodule "src/3rdparty/rocksdb"]
 	path = src/3rdparty/rocksdb
 	url = https://github.com/facebook/rocksdb
+[submodule "src/3rdparty/simde"]
+	path = src/3rdparty/simde
+	url = https://github.com/simd-everywhere/simde.git
