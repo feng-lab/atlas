@@ -2,9 +2,8 @@
 
 #include "zbitset.h"
 #include "zlog.h"
-#include "cpuinfo.h"
+#include <cpuinfo.h>
 #include <QProcess>
-#include <QThread>
 #include <array>
 #include <cstring>
 #include <thread>
@@ -90,6 +89,115 @@ ZCpuInfo::ZCpuInfo()
 
 void ZCpuInfo::logCpuInfo() const
 {
+  for (uint32_t i = 0; i < cpuinfo_get_packages_count(); ++i) {
+    auto package = cpuinfo_get_package(i);
+    LOG(INFO) << fmt::format("Package {} (name:{}), cluster {}-{}, core {}-{}, processor {}-{}",
+                             i,
+                             package->name,
+                             package->cluster_start,
+                             package->cluster_start + package->cluster_count - 1,
+                             package->core_start,
+                             package->core_start + package->core_count - 1,
+                             package->processor_start,
+                             package->processor_start + package->processor_count - 1);
+    for (uint32_t ci = package->cluster_start; ci < package->cluster_start + package->cluster_count; ++ci) {
+      auto cluster = cpuinfo_get_cluster(ci);
+      LOG(INFO) << fmt::format("    Cluster {} (id:{}), core {}-{}, processor {}-{}, frequency {}",
+                               ci,
+                               cluster->cluster_id,
+                               cluster->core_start,
+                               cluster->core_start + cluster->core_count - 1,
+                               cluster->processor_start,
+                               cluster->processor_start + cluster->processor_count - 1,
+                               cluster->frequency);
+      for (uint32_t cci = cluster->core_start; cci < cluster->core_start + cluster->core_count; ++cci) {
+        auto core = cpuinfo_get_core(cci);
+        LOG(INFO) << fmt::format("        Core {} (id:{}), processor {}-{}, frequency {}",
+                                 cci,
+                                 core->core_id,
+                                 core->processor_start,
+                                 core->processor_start + core->processor_count - 1,
+                                 core->frequency);
+        for (uint32_t pi = core->processor_start; pi < core->processor_start + core->processor_count; ++pi) {
+          auto processor = cpuinfo_get_processor(pi);
+          LOG(INFO) << fmt::format("            Processor {} (smt id:{}), cache l1i:{} l1d:{} l2:{} l3:{} l4:{}",
+                                   pi,
+                                   processor->smt_id,
+                                   processor->cache.l1i ? processor->cache.l1i->size : 0,
+                                   processor->cache.l1d ? processor->cache.l1d->size : 0,
+                                   processor->cache.l2 ? processor->cache.l2->size : 0,
+                                   processor->cache.l3 ? processor->cache.l3->size : 0,
+                                   processor->cache.l4 ? processor->cache.l4->size : 0);
+        }
+      }
+    }
+  }
+  for (uint32_t i = 0; i < cpuinfo_get_l1d_caches_count(); ++i) {
+    auto cache = cpuinfo_get_l1d_cache(i);
+    LOG(INFO) << fmt::format(
+      "L1d cache {}, size:{}, associativity:{}, sets:{}, partitions:{}, line size:{}, processor {}-{}",
+      i,
+      cache->size,
+      cache->associativity,
+      cache->sets,
+      cache->partitions,
+      cache->line_size,
+      cache->processor_start,
+      cache->processor_start + cache->processor_count - 1);
+  }
+  for (uint32_t i = 0; i < cpuinfo_get_l1i_caches_count(); ++i) {
+    auto cache = cpuinfo_get_l1i_cache(i);
+    LOG(INFO) << fmt::format(
+      "L1i cache {}, size:{}, associativity:{}, sets:{}, partitions:{}, line size:{}, processor {}-{}",
+      i,
+      cache->size,
+      cache->associativity,
+      cache->sets,
+      cache->partitions,
+      cache->line_size,
+      cache->processor_start,
+      cache->processor_start + cache->processor_count - 1);
+  }
+  for (uint32_t i = 0; i < cpuinfo_get_l2_caches_count(); ++i) {
+    auto cache = cpuinfo_get_l2_cache(i);
+    LOG(INFO) << fmt::format(
+      "L2 cache {}, size:{}, associativity:{}, sets:{}, partitions:{}, line size:{}, processor {}-{}",
+      i,
+      cache->size,
+      cache->associativity,
+      cache->sets,
+      cache->partitions,
+      cache->line_size,
+      cache->processor_start,
+      cache->processor_start + cache->processor_count - 1);
+  }
+  for (uint32_t i = 0; i < cpuinfo_get_l3_caches_count(); ++i) {
+    auto cache = cpuinfo_get_l3_cache(i);
+    LOG(INFO) << fmt::format(
+      "L3 cache {}, size:{}, associativity:{}, sets:{}, partitions:{}, line size:{}, processor {}-{}",
+      i,
+      cache->size,
+      cache->associativity,
+      cache->sets,
+      cache->partitions,
+      cache->line_size,
+      cache->processor_start,
+      cache->processor_start + cache->processor_count - 1);
+  }
+  for (uint32_t i = 0; i < cpuinfo_get_l4_caches_count(); ++i) {
+    auto cache = cpuinfo_get_l4_cache(i);
+    LOG(INFO) << fmt::format(
+      "L4 cache {}, size:{}, associativity:{}, sets:{}, partitions:{}, line size:{}, processor {}-{}",
+      i,
+      cache->size,
+      cache->associativity,
+      cache->sets,
+      cache->partitions,
+      cache->line_size,
+      cache->processor_start,
+      cache->processor_start + cache->processor_count - 1);
+  }
+
   LOG(INFO) << "CPU Vendor: " << vendor;
   LOG(INFO) << "CPU Brand: " << brand;
   LOG(INFO) << "Stepping ID: " << nSteppingID << " Model ID: " << nModel << " Family ID: " << nFamily
@@ -336,13 +444,8 @@ void ZCpuInfo::detectCpuInfo()
 
 void ZCpuInfo::detectCoreAndThreadNumber()
 {
-  nPhysicalCores = QThread::idealThreadCount();
-  if (nPhysicalCores <= 0) {
-    nPhysicalCores = 1;
-    nLogicalCores = 1;
-  } else {
-    nLogicalCores = nPhysicalCores;
-  }
+  nPhysicalCores = cpuinfo_get_cores_count();
+  nLogicalCores = cpuinfo_get_processors_count();
 
 #ifdef _WIN32
   MEMORYSTATUSEX memInfo;
