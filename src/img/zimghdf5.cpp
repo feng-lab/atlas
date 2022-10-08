@@ -14,6 +14,10 @@
 #include <folly/io/IOBuf.h>
 #include <utility>
 
+DEFINE_bool(zimg_use_mmap_file_for_hdf5,
+            false,
+            "Whether to create mmap file for nim format, default is false");
+
 namespace {
 
 inline size_t chunkSize()
@@ -566,7 +570,9 @@ ZImgHDF5SubBlock::ZImgHDF5SubBlock(QString fileName,
   m_chunkImgInfo = m_info;
   m_chunkImgInfo.width = chunkWidth;
   m_chunkImgInfo.height = chunkHeight;
-  m_mmf = ZMemoryMappedFileCache::instance().getMemoryMappedFile(m_filename);
+  if (FLAGS_zimg_use_mmap_file_for_hdf5) {
+    m_mmf = ZMemoryMappedFileCache::instance().getMemoryMappedFile(m_filename);
+  }
 }
 
 std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
@@ -736,7 +742,9 @@ void ZImgHDF5::readInfo(const QString& filename,
 {
   std::map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> hdf5Chunks;
   if (subBlocks) {
-    ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
+    if (FLAGS_zimg_use_mmap_file_for_hdf5) {
+      ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);
+    }
     hdf5Chunks = parseHDF5Chunks(filename);
   }
 
