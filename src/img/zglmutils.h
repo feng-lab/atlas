@@ -320,7 +320,7 @@ inline QString toQString(const glm::vec<L, T, Q>& v)
 template<size_t L, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
+  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else
@@ -353,7 +353,7 @@ inline QString toQString(const glm::mat<C, R, T, Q>& m)
 template<size_t C, size_t R, typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
+  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else
@@ -373,7 +373,7 @@ inline QString toQString(const glm::tquat<T, Q>& v)
 template<typename T, glm::qualifier Q>
 inline void toVal(const QString& str, glm::tquat<T, Q>& q)
 {
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
+  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   QStringList numList = str.split(rx, Qt::SkipEmptyParts);
 #else

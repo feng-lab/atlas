@@ -9,7 +9,6 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QImage>
-#include <QRegularExpression>
 #include <folly/ScopeGuard.h>
 #include <boost/endian/conversion.hpp>
 #ifdef ZIMG_USE_IPP

@@ -480,12 +480,9 @@ parseHDF5Chunks(const QString& filename)
     return res;
   }
 
-  QRegularExpression dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
-  dataset.optimize();
-  QRegularExpression dsDataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
-  dsDataset.optimize();
-  QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
-  chunk.optimize();
+  static QRegularExpression dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
+  static QRegularExpression dsDataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
+  static QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
 
   auto result = printChunkInfos.readAllStandardOutput();
   QTextStream in(result, QIODevice::ReadOnly);

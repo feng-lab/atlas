@@ -49,7 +49,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
          << "img2"
          << "position";
 
-  QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
+  static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
   QFile inputFile(filename);
   if (inputFile.open(QIODevice::ReadOnly)) {
     QTextStream in(&inputFile);
