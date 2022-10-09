@@ -860,10 +860,9 @@ def build_xz(src_dir: str, install_dir: str):
 
         orig_file1 = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'src/liblzma/common/stream_encoder_mt.c',
+                               from_texts=[r'target_compile_definitions(liblzma PRIVATE HAVE_SYMBOL_VERSIONS_LINUX)',
                                            ],
-                               to_texts=['src/liblzma/common/stream_encoder_mt.c\n'
-                                         'src/liblzma/common/stream_decoder_mt.c',
+                               to_texts=[r'#target_compile_definitions(liblzma PRIVATE HAVE_SYMBOL_VERSIONS_LINUX)',
                                          ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
