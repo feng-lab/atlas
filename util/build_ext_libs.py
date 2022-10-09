@@ -1111,26 +1111,6 @@ def build_eigen(src_dir: str, install_dir: str):
                               to_texts=[r'set(blas',
                                         r'set(lapack'])
 
-        # if is_mac():
-        #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX512',
-        #                                'TrsmUnrolls.inc')
-        #     bak_file_1 = patch_file(orig_file_1,
-        #                             from_texts=[r'std::min(EIGEN_AVX_MAX_NUM_ROW,endN)',
-        #                                         r'std::min(3*EIGEN_AVX_MAX_NUM_ROW, U3)',
-        #                                         r'std::min(3*EIGEN_AVX_MAX_NUM_ROW, U2)'
-        #                                         ],
-        #                             to_texts=[r'std::min<int64_t>(EIGEN_AVX_MAX_NUM_ROW,endN)',
-        #                                       r'std::min<int64_t>(3*EIGEN_AVX_MAX_NUM_ROW, U3)',
-        #                                       r'std::min<int64_t>(3*EIGEN_AVX_MAX_NUM_ROW, U2)',
-        #                                       ])
-        #
-        #     orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'misc', 'lapacke_helpers.h')
-        #     bak_file_2 = patch_file(orig_file_2,
-        #                             from_texts=[r'template<> constexpr char translate_mode<Lower>',
-        #                                         ],
-        #                             to_texts=[r'template<> constexpr const char translate_mode<Lower>',
-        #                                       ])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
@@ -1139,6 +1119,26 @@ def build_eigen(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_windows():
+            orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'Default',
+                                       'GenericPacketMathFunctions.h')
+            patch_file(orig_file_1,
+                       from_texts=[r'(M_PI_2)',
+                                   r'(M_PI_4)',
+                                   ],
+                       to_texts=[r'(EIGEN_PI/2.)',
+                                 r'(EIGEN_PI/4.)',
+                                 ])
+
+            orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'functors', 'BinaryFunctors.h')
+            patch_file(orig_file_2,
+                       from_texts=[r'(M_PI_2)',
+                                   r'(M_PI_4)',
+                                   ],
+                       to_texts=[r'(EIGEN_PI/2.)',
+                                 r'(EIGEN_PI/4.)',
+                                 ])
 
         # if is_linux():
         #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
