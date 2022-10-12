@@ -7,6 +7,8 @@
 #include "zlog.h"
 #include "zmemorymappedfilecache.h"
 #include "zbenchtimer.h"
+#include "zh5zjpegxr.h"
+#include "zimgjpegxr.h"
 #include <QFile>
 #include <QProcess>
 #include <QRegularExpression>
@@ -14,9 +16,7 @@
 #include <folly/io/IOBuf.h>
 #include <utility>
 
-DEFINE_bool(zimg_use_mmap_file_for_hdf5,
-            false,
-            "Whether to create mmap file for nim format, default is false");
+DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
 
 namespace {
 
@@ -143,8 +143,20 @@ void writeFixedValueImgSliceToH5Grp(H5::Group& zGrp,
   hsize_t chunkDim[2] = {std::min(img.height(), chunkSize()), std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
-  pList.setDeflate(paras.zlibCompressionLevel);
   pList.setChunk(2, chunkDim);
+  if (paras.compression == nim::Compression::JPEGXR) {
+    if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
+      throw nim::ZIOException("image can not be compressed with jpegxr");
+    }
+    size_t nelements = 4;
+    unsigned int values[] = {folly::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
+                             (unsigned int)img.bytesPerVoxel(),
+                             (unsigned int)chunkDim[0],
+                             (unsigned int)chunkDim[1]};
+    H5Pset_filter(pList.getId(), H5Z_FILTER_JPEGXR, H5Z_FLAG_OPTIONAL, nelements, values);
+  } else {
+    pList.setDeflate(paras.zlibCompressionLevel);
+  }
 
   H5::DataSet imgData;
 
@@ -226,8 +238,20 @@ void writeImgSliceToH5Grp(H5::Group& zGrp,
   hsize_t chunkDim[2] = {std::min(img.height(), chunkSize()), std::min(img.width(), chunkSize())};
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
-  pList.setDeflate(paras.zlibCompressionLevel);
   pList.setChunk(2, chunkDim);
+  if (paras.compression == nim::Compression::JPEGXR || true) {
+    if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
+      throw nim::ZIOException("image can not be compressed with jpegxr");
+    }
+    size_t nelements = 4;
+    unsigned int values[] = {folly::bit_cast<unsigned int>(float(paras.jpegXRQuality)),
+                             (unsigned int)img.bytesPerVoxel(),
+                             (unsigned int)chunkDim[0],
+                             (unsigned int)chunkDim[1]};
+    H5Pset_filter(pList.getId(), H5Z_FILTER_JPEGXR, H5Z_FLAG_OPTIONAL, nelements, values);
+  } else {
+    pList.setDeflate(paras.zlibCompressionLevel);
+  }
 
   H5::DataSet imgData;
 
@@ -481,7 +505,9 @@ parseHDF5Chunks(const QString& filename)
   }
 
   static QRegularExpression dataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/Data\s+Dataset\s+.*)");
-  static QRegularExpression dsDataset(R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
+  static QRegularExpression dsDataset(
+    R"(^/Img/TimePoint(\d+)/Channel(\d+)/Z(\d+)/DownsampledBy(\d+)Data\s+Dataset\s+.*)");
+  static QRegularExpression filter(R"(^\s*Filter-(\d+)\:\s+(.*))");
   static QRegularExpression chunk(R"(^\s*([xa-fA-F0-9]+)\s+(\d+)\s+(\d+)\s+\[(\d+)[,\s]+(\d+)[,\s]+(\d+)[,\s]*\])");
 
   auto result = printChunkInfos.readAllStandardOutput();
@@ -490,6 +516,7 @@ parseHDF5Chunks(const QString& filename)
   QString line;
   bool dataSetStarted = false;
   std::tuple<size_t, size_t, size_t, size_t> currentDataset;
+  Compression currentCompression = Compression::AUTO;
   bool ok1, ok2, ok3, ok4;
   while (in.readLineInto(&line)) {
     auto match = dataset.match(line);
@@ -512,6 +539,15 @@ parseHDF5Chunks(const QString& filename)
       CHECK(ok1 && ok2 && ok3 && ok4) << line << ok1 << ok2 << ok3 << ok4;
       continue;
     }
+    match = filter.match(line);
+    if (match.hasMatch()) {
+      if (match.captured(2).contains("jpegxr")) {
+        currentCompression = Compression::JPEGXR;
+      } else {
+        currentCompression = Compression::AUTO;
+      }
+      continue;
+    }
     match = chunk.match(line);
     if (match.hasMatch()) {
       if (!dataSetStarted) {
@@ -522,7 +558,8 @@ parseHDF5Chunks(const QString& filename)
       uint32_t filterMask = match.captured(1).toUInt(&ok1, 0);
       CHECK(ok1) << match.captured(0);
       HDF5ChunkInfo info;
-      info.compressed = ~filterMask & H5Z_FILTER_DEFLATE;
+      info.compressed = ~filterMask & uint32_t(1); // check if the first filter, i.e. the compression filter, is skipped
+      info.compression = currentCompression;
       info.length = match.captured(2).toULongLong(&ok1);
       info.offset = match.captured(3).toULongLong(&ok2);
       size_t y = match.captured(4).toULongLong(&ok3);
@@ -598,17 +635,23 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
           if (hdf5Tile.compressed) {
             m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
             // bt.pause();
-            auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
-            // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
-            // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
-            // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
-            // LOG(INFO) << m_info.toQString();
-            // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
-            // auto decompressedBuf = codec->uncompress(ioBuf.get());
-            // LOG(INFO) << decompressedBuf->length();
-            auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
-            // STOP_AND_LOG(bt)
-            std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+            if (hdf5Tile.compression == Compression::JPEGXR) {
+              std::vector<uint8_t> memBuf(res->channelByteNumber());
+              ZImgJpegXR::readMemImg(res->channelData(c), hdf5Tile.length, memBuf.data(), memBuf.size());
+              std::memcpy(res->channelData(c), memBuf.data(), memBuf.size());
+            } else {
+              auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
+              // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+              // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+              // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
+              // LOG(INFO) << m_info.toQString();
+              // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+              // auto decompressedBuf = codec->uncompress(ioBuf.get());
+              // LOG(INFO) << decompressedBuf->length();
+              auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
+              // STOP_AND_LOG(bt)
+              std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+            }
           } else {
             CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
             m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
@@ -625,16 +668,24 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
           inputFileStream.seekg(hdf5Tile.offset);
           if (hdf5Tile.compressed) {
             readStream(inputFileStream, res->channelData(c), hdf5Tile.length);
-            auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
-            // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
-            // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
-            // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
-            // LOG(INFO) << m_info.toQString();
-            // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
-            // auto decompressedBuf = codec->uncompress(ioBuf.get());
-            // LOG(INFO) << decompressedBuf->length();
-            auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
-            std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+            if (hdf5Tile.compression == Compression::JPEGXR) {
+              std::vector<uint8_t> memBuf(res->channelByteNumber());
+              ZImgJpegXR::readMemImg(res->channelData(c), hdf5Tile.length, memBuf.data(), memBuf.size());
+              LOG(INFO) << "1";
+              std::memcpy(res->channelData(c), memBuf.data(), memBuf.size());
+              LOG(INFO) << "1";
+            } else {
+              auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
+              // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();
+              // LOG(INFO) << codec->canUncompress(ioBuf.get(), res->channelByteNumber());
+              // LOG(INFO) << m_x << " " << m_y << " " << m_ratio;
+              // LOG(INFO) << m_info.toQString();
+              // LOG(INFO) << codec->getUncompressedLength(ioBuf.get(), res->channelByteNumber()).value_or(0);
+              // auto decompressedBuf = codec->uncompress(ioBuf.get());
+              // LOG(INFO) << decompressedBuf->length();
+              auto decompressedBuf = codec->uncompress(ioBuf.get(), res->channelByteNumber());
+              std::memcpy(res->channelData(c), decompressedBuf->data(), res->channelByteNumber());
+            }
           } else {
             CHECK(res->channelByteNumber() == hdf5Tile.length) << res->channelByteNumber() << " " << hdf5Tile.length;
             readStream(inputFileStream, res->channelData(c), hdf5Tile.length);
@@ -763,6 +814,11 @@ void ZImgHDF5::readInfo(const QString& filename,
 
       H5::Group allGrp = file.openGroup("Img");
 
+      H5::IntType int32Type(H5::PredType::STD_I32LE);
+      H5::Attribute verattr = allGrp.openAttribute("Version");
+      int32_t ver;
+      verattr.read(int32Type, &ver);
+
       infos.resize(1);
       infos[0] = ZImgInfoIO::load(allGrp);
 
@@ -889,6 +945,11 @@ void ZImgHDF5::readImg(const QString& filename,
 
     H5::Group allGrp = file.openGroup("Img");
 
+    H5::IntType int32Type(H5::PredType::STD_I32LE);
+    H5::Attribute verattr = allGrp.openAttribute("Version");
+    int32_t ver;
+    verattr.read(int32Type, &ver);
+
     ZImgInfo info = ZImgInfoIO::load(allGrp);
 
     if (region.isEmpty() || !region.isValid(info)) {
@@ -971,6 +1032,12 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 
     H5::Group allGrp = file.createGroup("Img");
 
+    H5::IntType int32Type(H5::PredType::STD_I32LE);
+    H5::DataSpace attrDataSpace(H5S_SCALAR);
+    H5::Attribute ver = allGrp.createAttribute("Version", int32Type, attrDataSpace);
+    int32_t h5ImagVer = 100;
+    ver.write(int32Type, &h5ImagVer);
+
     ZImgInfoIO::save(allGrp, img.info());
 
     uint64_t numLevels = 1;
@@ -1032,6 +1099,12 @@ void ZImgHDF5::writeImg(const QString& filename,
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
 
     H5::Group allGrp = file.createGroup("Img");
+
+    H5::IntType int32Type(H5::PredType::STD_I32LE);
+    H5::DataSpace attrDataSpace(H5S_SCALAR);
+    H5::Attribute ver = allGrp.createAttribute("Version", int32Type, attrDataSpace);
+    int32_t h5ImagVer = 100;
+    ver.write(int32Type, &h5ImagVer);
 
     const ZImgInfo& info = imgSliceProvider.imgInfo();
     ZImgInfoIO::save(allGrp, info);
@@ -1098,6 +1171,12 @@ void ZImgHDF5::writeImg(const QString& filename,
     H5::IntType uint64Type(H5::PredType::STD_U64LE);
 
     H5::Group allGrp = file.createGroup("Img");
+
+    H5::IntType int32Type(H5::PredType::STD_I32LE);
+    H5::DataSpace attrDataSpace(H5S_SCALAR);
+    H5::Attribute ver = allGrp.createAttribute("Version", int32Type, attrDataSpace);
+    int32_t h5ImagVer = 100;
+    ver.write(int32Type, &h5ImagVer);
 
     const ZImgInfo& info = imgBlockrovider.imgInfo();
     ZImgInfoIO::save(allGrp, info);

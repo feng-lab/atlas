@@ -255,7 +255,7 @@ set(IMG_SOURCES
     zimgblockprovider.cpp
     zmemorymappedfile.cpp zmemorymappedfile.h
     zmemorymappedfilecache.cpp zmemorymappedfilecache.h
-    zglobal.cpp)
+    zglobal.cpp zh5zjpegxr.cpp zh5zjpegxr.h)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 

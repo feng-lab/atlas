@@ -12,6 +12,7 @@ struct HDF5ChunkInfo
   size_t offset = 0;
   size_t length = 0;
   bool compressed = true;
+  Compression compression = Compression::AUTO;
 };
 
 class ZImgHDF5SubBlock : public ZImgSubBlock

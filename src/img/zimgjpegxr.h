@@ -12,17 +12,17 @@ public:
   // ZImgFormat interface
 
 public:
-  bool supportRead() const override;
+  [[nodiscard]] bool supportRead() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] bool supportWrite() const override;
 
-  QString shortName() const override;
+  [[nodiscard]] QString shortName() const override;
 
-  QString fullName() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  QStringList extensions() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   {
     return FileFormat::JpegXR;
   }
@@ -38,9 +38,18 @@ public:
 
   void readImg(const QString& filename, ZImg& img, const ZImgRegion& region, size_t scene) override;
 
+  void checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras) override;
+
+  void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
+
   static void readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info);
 
   static void readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
+
+  static size_t writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, uint8_t* mem, size_t size);
+
+protected:
+  static void checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras);
 };
 
 } // namespace nim

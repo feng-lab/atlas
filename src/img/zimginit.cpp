@@ -2,6 +2,7 @@
 #include "zcpuinfo.h"
 #include "zimginterface.h"
 #include "zlogcache.h"
+#include "zh5zjpegxr.h"
 #ifdef ZIMG_USE_MKL
 #include <mkl_service.h>
 #endif
@@ -227,6 +228,8 @@ void initImgLib(const char* argv0,
   if (!ZCpuInfo::instance().bAVX) {
     LOG(FATAL) << "CPU not supported. This program requires CPU with AVX support.";
   }
+
+  jpegxr_register_h5filter();
 }
 
 void shutdownImgLib(bool isApp)

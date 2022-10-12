@@ -22,41 +22,41 @@ void reportError(ERR err)
     case WMP_errSuccess:
       return;
     case WMP_errFail:
-      throw nim::ZIOException("Fail");
+      throw ZIOException("Fail");
     case WMP_errNotYetImplemented:
-      throw nim::ZIOException("Not yet implemented");
+      throw ZIOException("Not yet implemented");
     case WMP_errAbstractMethod:
-      throw nim::ZIOException("Abstract method");
+      throw ZIOException("Abstract method");
     case WMP_errOutOfMemory:
-      throw nim::ZIOException("Out of memory");
+      throw ZIOException("Out of memory");
     case WMP_errFileIO:
-      throw nim::ZIOException("File I/O error");
+      throw ZIOException("File I/O error");
     case WMP_errBufferOverflow:
-      throw nim::ZIOException("Buffer overflow");
+      throw ZIOException("Buffer overflow");
     case WMP_errInvalidParameter:
-      throw nim::ZIOException("Invalid parameter");
+      throw ZIOException("Invalid parameter");
     case WMP_errInvalidArgument:
-      throw nim::ZIOException("Invalid argument");
+      throw ZIOException("Invalid argument");
     case WMP_errUnsupportedFormat:
-      throw nim::ZIOException("Unsupported format");
+      throw ZIOException("Unsupported format");
     case WMP_errIncorrectCodecVersion:
-      throw nim::ZIOException("Incorrect codec version");
+      throw ZIOException("Incorrect codec version");
     case WMP_errIndexNotFound:
-      throw nim::ZIOException("Index not found");
+      throw ZIOException("Index not found");
     case WMP_errOutOfSequence:
-      throw nim::ZIOException("Out of sequence");
+      throw ZIOException("Out of sequence");
     case WMP_errNotInitialized:
-      throw nim::ZIOException("Not Initialized");
+      throw ZIOException("Not Initialized");
     case WMP_errMustBeMultipleOf16LinesUntilLastCall:
-      throw nim::ZIOException("Must be multiple of 16 lines until last call");
+      throw ZIOException("Must be multiple of 16 lines until last call");
     case WMP_errPlanarAlphaBandedEncRequiresTempFile:
-      throw nim::ZIOException("Planar alpha banded encoder requires temp files");
+      throw ZIOException("Planar alpha banded encoder requires temp files");
     case WMP_errAlphaModeCannotBeTranscoded:
-      throw nim::ZIOException("Alpha mode cannot be transcoded");
+      throw ZIOException("Alpha mode cannot be transcoded");
     case WMP_errIncorrectCodecSubVersion:
-      throw nim::ZIOException("Incorrect codec subversion");
+      throw ZIOException("Incorrect codec subversion");
     default:
-      throw nim::ZIOException("Unknown error");
+      throw ZIOException("Unknown error");
   }
 }
 
@@ -113,6 +113,52 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
   info.createDefaultDescriptions();
 }
 
+// Y, U, V, YHP, UHP, VHP
+// optimized for PSNR
+int DPK_QPS_420[11][6] = {
+  // for 8 bit only
+  {66, 65, 70, 72, 72, 77},
+  {59, 58, 63, 64, 63, 68},
+  {52, 51, 57, 56, 56, 61},
+  {48, 48, 54, 51, 50, 55},
+  {43, 44, 48, 46, 46, 49},
+  {37, 37, 42, 38, 38, 43},
+  {26, 28, 31, 27, 28, 31},
+  {16, 17, 22, 16, 17, 21},
+  {10, 11, 13, 10, 10, 13},
+  {5,  5,  6,  5,  5,  6 },
+  {2,  2,  3,  2,  2,  2 }
+};
+
+int DPK_QPS_8[12][6] = {
+  {67, 79, 86, 72, 90, 98},
+  {59, 74, 80, 64, 83, 89},
+  {53, 68, 75, 57, 76, 83},
+  {49, 64, 71, 53, 70, 77},
+  {45, 60, 67, 48, 67, 74},
+  {40, 56, 62, 42, 59, 66},
+  {33, 49, 55, 35, 51, 58},
+  {27, 44, 49, 28, 45, 50},
+  {20, 36, 42, 20, 38, 44},
+  {13, 27, 34, 13, 28, 34},
+  {7,  17, 21, 8,  17, 21}, // Photoshop 100%
+  {2,  5,  6,  2,  5,  6 }
+};
+
+int DPK_QPS_16[11][6] = {
+  {197, 203, 210, 202, 207, 213},
+  {174, 188, 193, 180, 189, 196},
+  {152, 167, 173, 156, 169, 174},
+  {135, 152, 157, 137, 153, 158},
+  {119, 137, 141, 119, 138, 142},
+  {102, 120, 125, 100, 120, 124},
+  {82,  98,  104, 79,  98,  103},
+  {60,  76,  81,  58,  76,  81 },
+  {39,  52,  58,  36,  52,  58 },
+  {16,  27,  33,  14,  27,  33 },
+  {5,   8,   9,   4,   7,   8  }
+};
+
 } // namespace
 
 namespace nim {
@@ -130,7 +176,7 @@ bool ZImgJpegXR::supportRead() const
 
 bool ZImgJpegXR::supportWrite() const
 {
-  return false;
+  return true;
 }
 
 QString ZImgJpegXR::shortName() const
@@ -347,6 +393,7 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
   // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
+  LOG(INFO) << info.toQString();
 
   if (desSize < info.byteNumber()) {
     throw ZIOException("buffer space is not enough");
@@ -391,6 +438,275 @@ Cleanup:
   }
 
   reportError(err);
+}
+
+void ZImgJpegXR::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)
+{
+  ZImgFormat::checkImgBeforeWriting(filename, info, paras);
+  checkBeforeWriting(info, paras);
+}
+
+void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)
+{
+  checkImgBeforeWriting(filename, img.info(), paras);
+
+  auto jpegXRQuality = static_cast<float>(paras.jpegXRQuality);
+
+  CWMIStrCodecParam wmiSCP;
+  memset(&wmiSCP, 0, sizeof(wmiSCP));
+
+  wmiSCP.bVerbose = FALSE;
+  if (img.numChannels() == 1) {
+    wmiSCP.cfColorFormat = Y_ONLY;
+  } else if (jpegXRQuality >= 0.5f || img.info().bytesPerVoxel > 1) {
+    wmiSCP.cfColorFormat = YUV_444;
+  } else {
+    wmiSCP.cfColorFormat = YUV_420;
+  }
+  wmiSCP.bdBitDepth = BD_LONG;
+  wmiSCP.bfBitstreamFormat = FREQUENCY;
+  wmiSCP.bProgressiveMode = TRUE;
+  wmiSCP.olOverlap = OL_ONE;
+  wmiSCP.cNumOfSliceMinus1H = wmiSCP.cNumOfSliceMinus1V = 0;
+  wmiSCP.sbSubband = SB_ALL;
+  if (img.info().lastChannelIsAlphaChannel) {
+    wmiSCP.uAlphaMode = 2;
+  } else {
+    wmiSCP.uAlphaMode = 0;
+  }
+  wmiSCP.uiDefaultQPIndex = 1;
+  wmiSCP.uiDefaultQPIndexAlpha = 1;
+
+  ERR err = WMP_errSuccess;
+  PKFactory* pFactory = nullptr;
+  struct WMPStream* pEncodeStream = nullptr;
+  PKCodecFactory* pCodecFactory = nullptr;
+  PKImageEncode* pEncoder = nullptr;
+
+  Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
+  Call(pFactory->CreateStreamFromFilename(&pEncodeStream, QFile::encodeName(filename).constData(), "wb"));
+  Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
+  Call(pCodecFactory->CreateCodec(&IID_PKImageWmpEncode, (void**)&pEncoder));
+
+  Call(pEncoder->Initialize(pEncoder, pEncodeStream, &wmiSCP, sizeof(wmiSCP)));
+
+  {
+    // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
+    //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
+    //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
+    //[1.0, 1.0]    1          1           1           1           4:4:4       0
+    if (jpegXRQuality < 1.0F) {
+      // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
+      // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
+      if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
+          pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
+        jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
+      }
+
+      int qi = (int)(10.f * jpegXRQuality);
+      float qf = 10.f * jpegXRQuality - (float)qi;
+
+      int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
+                    ? DPK_QPS_420[qi]
+                    : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
+
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
+    } else {
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
+    }
+    if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
+      pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
+    }
+
+    PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
+    if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat16bppGray;
+    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
+      guidPixFormat = GUID_PKPixelFormat24bppRGB;
+    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
+      guidPixFormat = GUID_PKPixelFormat32bppRGBA;
+    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat48bppRGB;
+    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat64bppRGBA;
+    }
+
+    Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
+    Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
+    if (img.info().numChannels == 1) {
+      Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
+    } else {
+      ZImg imgTmp(img.info());
+      XYZCtoCXYZ(img, imgTmp);
+      Call(pEncoder->WritePixels(pEncoder,
+                                 img.height(),
+                                 const_cast<U8*>(imgTmp.channelData(0)),
+                                 imgTmp.rowByteNumber() * imgTmp.numChannels()));
+    }
+  }
+
+Cleanup:
+  if (pEncoder) {
+    pEncoder->Release(&pEncoder);
+  }
+  if (pCodecFactory) {
+    pCodecFactory->Release(&pCodecFactory);
+  }
+  if (pFactory) {
+    pFactory->Release(&pFactory);
+  }
+
+  reportError(err);
+}
+
+size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, uint8_t* mem, size_t size)
+{
+  checkBeforeWriting(img.info(), paras);
+  if (size < img.byteNumber()) {
+    throw ZIOException("target buffer space is not enough");
+  }
+  size_t byteWritten = 0;
+
+  auto jpegXRQuality = static_cast<float>(paras.jpegXRQuality);
+
+  CWMIStrCodecParam wmiSCP;
+  memset(&wmiSCP, 0, sizeof(wmiSCP));
+
+  wmiSCP.bVerbose = FALSE;
+  if (img.numChannels() == 1) {
+    wmiSCP.cfColorFormat = Y_ONLY;
+  } else if (jpegXRQuality >= 0.5f || img.info().bytesPerVoxel > 1) {
+    wmiSCP.cfColorFormat = YUV_444;
+  } else {
+    wmiSCP.cfColorFormat = YUV_420;
+  }
+  wmiSCP.bdBitDepth = BD_LONG;
+  wmiSCP.bfBitstreamFormat = FREQUENCY;
+  wmiSCP.bProgressiveMode = TRUE;
+  wmiSCP.olOverlap = OL_ONE;
+  wmiSCP.cNumOfSliceMinus1H = wmiSCP.cNumOfSliceMinus1V = 0;
+  wmiSCP.sbSubband = SB_ALL;
+  if (img.info().lastChannelIsAlphaChannel) {
+    wmiSCP.uAlphaMode = 2;
+  } else {
+    wmiSCP.uAlphaMode = 0;
+  }
+  wmiSCP.uiDefaultQPIndex = 1;
+  wmiSCP.uiDefaultQPIndexAlpha = 1;
+
+  ERR err = WMP_errSuccess;
+  PKFactory* pFactory = nullptr;
+  struct WMPStream* pEncodeStream = nullptr;
+  PKCodecFactory* pCodecFactory = nullptr;
+  PKImageEncode* pEncoder = nullptr;
+
+  Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
+  Call(pFactory->CreateStreamFromMemory(&pEncodeStream, mem, size));
+  Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
+  Call(pCodecFactory->CreateCodec(&IID_PKImageWmpEncode, (void**)&pEncoder));
+
+  Call(pEncoder->Initialize(pEncoder, pEncodeStream, &wmiSCP, sizeof(wmiSCP)));
+
+  {
+    // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
+    //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
+    //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
+    //[1.0, 1.0]    1          1           1           1           4:4:4       0
+    if (jpegXRQuality < 1.0F) {
+      // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
+      // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
+      if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
+          pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
+        jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
+      }
+
+      int qi = (int)(10.f * jpegXRQuality);
+      float qf = 10.f * jpegXRQuality - (float)qi;
+
+      int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
+                    ? DPK_QPS_420[qi]
+                    : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
+
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
+    } else {
+      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
+    }
+    if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
+      pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
+    }
+
+    PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
+    if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat16bppGray;
+    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
+      guidPixFormat = GUID_PKPixelFormat24bppRGB;
+    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
+      guidPixFormat = GUID_PKPixelFormat32bppRGBA;
+    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat48bppRGB;
+    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
+      guidPixFormat = GUID_PKPixelFormat64bppRGBA;
+    }
+
+    Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
+    Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
+    if (img.info().numChannels == 1) {
+      Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
+    } else {
+      ZImg imgTmp(img.info());
+      XYZCtoCXYZ(img, imgTmp);
+      Call(pEncoder->WritePixels(pEncoder,
+                                 img.height(),
+                                 const_cast<U8*>(imgTmp.channelData(0)),
+                                 imgTmp.rowByteNumber() * imgTmp.numChannels()));
+    }
+
+    Call(pEncodeStream->GetPos(pEncodeStream, &byteWritten));
+    LOG(INFO) << byteWritten;
+  }
+
+Cleanup:
+  if (pEncoder) {
+    pEncoder->Release(&pEncoder);
+  }
+  if (pCodecFactory) {
+    pCodecFactory->Release(&pCodecFactory);
+  }
+  if (pFactory) {
+    pFactory->Release(&pFactory);
+  }
+
+  reportError(err);
+
+  return byteWritten;
+}
+
+void ZImgJpegXR::checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras)
+{
+  if (paras.compression != Compression::AUTO) {
+    throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
+  }
+  if (info.numTimes != 1 || info.depth != 1) {
+    throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));
+  }
+  if (!(info.numChannels == 1 || (info.numChannels == 4 && info.lastChannelIsAlphaChannel) ||
+        (info.numChannels == 3 && !info.lastChannelIsAlphaChannel)) ||
+      info.voxelFormat != VoxelFormat::Unsigned || info.bytesPerVoxel > 2) {
+    throw ZIOException(QString("image type currently not supported: %1").arg(info.toQString()));
+  }
+  if (paras.jpegXRQuality < 0.01 || paras.jpegXRQuality > 1.) {
+    throw ZIOException(QString("invalid jpeg xr quality: %1").arg(paras.jpegXRQuality));
+  }
 }
 
 } // namespace nim

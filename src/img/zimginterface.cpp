@@ -127,6 +127,8 @@ std::string_view enumToString<Compression>(Compression e)
       return "ZSTD";
     case Compression::WEBP:
       return "WEBP";
+    case Compression::JPEGXR:
+      return "JPEGXR";
     default:
       throw ZIOException(fmt::format("invalid Compression: {}", to_underlying(e)));
   }
@@ -150,6 +152,7 @@ Compression stringToEnum<Compression>(std::string_view s)
     {"LZMA",          Compression::LZMA         },
     {"ZSTD",          Compression::ZSTD         },
     {"WEBP",          Compression::WEBP         },
+    {"JPEGXR",        Compression::JPEGXR       },
   };
   auto it = compressionMap.find(s);
   if (it == compressionMap.end()) {

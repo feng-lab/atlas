@@ -539,6 +539,9 @@ void ZImgJpeg::checkImgBeforeWriting(const QString& filename, const ZImgInfo& in
       paras.jpegChrominanceSubsampling != 420) {
     throw ZIOException(QString("unsupported chrominance subsampling: %1").arg(paras.jpegChrominanceSubsampling));
   }
+  if (paras.jpegQuality < 1 || paras.jpegQuality > 100) {
+    throw ZIOException(fmt::format("invalid jpeg quality: {}", paras.jpegQuality));
+  }
 }
 
 void ZImgJpeg::writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras)

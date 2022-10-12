@@ -356,7 +356,8 @@ PYBIND11_MODULE(_imgpy, m)
     .value("JP2000", Compression::JP2000)
     .value("LZMA", Compression::LZMA)
     .value("ZSTD", Compression::ZSTD)
-    .value("WEBP", Compression::WEBP);
+    .value("WEBP", Compression::WEBP)
+    .value("JPEGXR", Compression::JPEGXR);
 
   py::class_<col4>(m, "col4")
     .def(py::init<>())
@@ -409,7 +410,8 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("jpegQuality", &ZImgWriteParameters::jpegQuality)
     .def_readwrite("jpegProgressive", &ZImgWriteParameters::jpegProgressive)
     .def_readwrite("jpegAccurateDCT", &ZImgWriteParameters::jpegAccurateDCT)
-    .def_readwrite("jpegChrominanceSubsampling", &ZImgWriteParameters::jpegChrominanceSubsampling);
+    .def_readwrite("jpegChrominanceSubsampling", &ZImgWriteParameters::jpegChrominanceSubsampling)
+    .def_readwrite("jpegXRQuality", &ZImgWriteParameters::jpegXRQuality);
 
   py::class_<ZImgInfo>(m, "ZImgInfo")
     .def(py::init<>())

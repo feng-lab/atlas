@@ -300,6 +300,7 @@ enum class Compression : std::uint16_t
   LZMA = 34925, /* LZMA2 */
   ZSTD = 50000, /* ZSTD: WARNING not registered in Adobe-maintained registry */
   WEBP = 50001, /* WEBP: WARNING not registered in Adobe-maintained registry */
+  JPEGXR = 60000,
 };
 
 enum class PadOption
