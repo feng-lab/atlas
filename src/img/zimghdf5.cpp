@@ -239,7 +239,7 @@ void writeImgSliceToH5Grp(H5::Group& zGrp,
   H5::DataSpace imgDataspace(2, imgDim);
   H5::DSetCreatPropList pList;
   pList.setChunk(2, chunkDim);
-  if (paras.compression == nim::Compression::JPEGXR || true) {
+  if (paras.compression == nim::Compression::JPEGXR) {
     if (img.voxelFormat() != nim::VoxelFormat::Unsigned || img.bytesPerVoxel() > 2) {
       throw nim::ZIOException("image can not be compressed with jpegxr");
     }
