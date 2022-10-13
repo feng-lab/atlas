@@ -361,8 +361,8 @@ struct ZImgWriteParameters
   bool jpegAccurateDCT = true;
   // 444 (no subsampling) or 422 or 420, only apply to RGB
   uint32_t jpegChrominanceSubsampling = 444;
-  // jpeg xr quality, [0.0 - 1.0] Default = 1.0, lossless
-  double jpegXRQuality = 1.0;
+  // jpeg xr quality, [0.0 - 1.0] 1.0 is lossless
+  double jpegXRQuality = 0.8;
 };
 
 class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>
