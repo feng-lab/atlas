@@ -671,9 +671,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             if (hdf5Tile.compression == Compression::JPEGXR) {
               std::vector<uint8_t> memBuf(res->channelByteNumber());
               ZImgJpegXR::readMemImg(res->channelData(c), hdf5Tile.length, memBuf.data(), memBuf.size());
-              LOG(INFO) << "1";
               std::memcpy(res->channelData(c), memBuf.data(), memBuf.size());
-              LOG(INFO) << "1";
             } else {
               auto ioBuf = folly::IOBuf::wrapBuffer(res->channelData(c), hdf5Tile.length);
               // LOG(INFO) << hdf5Tile.length << " " << res->channelByteNumber() << " " << ioBuf->empty();

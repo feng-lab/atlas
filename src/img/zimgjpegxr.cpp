@@ -547,6 +547,10 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
                                  img.height(),
                                  const_cast<U8*>(imgTmp.channelData(0)),
                                  imgTmp.rowByteNumber() * imgTmp.numChannels()));
+//      LOG(INFO) << pEncoder->WMP.nOffImage;
+//      LOG(INFO) << pEncoder->WMP.nCbImage;
+//      LOG(INFO) << pEncoder->WMP.nOffAlpha;
+//      LOG(INFO) << pEncoder->WMP.nCbAlpha;
     }
   }
 
@@ -660,8 +664,12 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 
     Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
     Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
-    if (img.info().numChannels == 1) {
+    if (img.numChannels() == 1) {
       Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
+      //      LOG(INFO) << pEncoder->WMP.nOffImage;
+      //      LOG(INFO) << pEncoder->WMP.nCbImage;
+      //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
+      //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
     } else {
       ZImg imgTmp(img.info());
       XYZCtoCXYZ(img, imgTmp);
@@ -671,8 +679,11 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
                                  imgTmp.rowByteNumber() * imgTmp.numChannels()));
     }
 
-    Call(pEncodeStream->GetPos(pEncodeStream, &byteWritten));
-    LOG(INFO) << byteWritten;
+    if (pEncoder->WMP.nOffAlpha > 0) {
+      byteWritten = pEncoder->WMP.nOffAlpha + pEncoder->WMP.nCbAlpha;
+    } else {
+      byteWritten = pEncoder->WMP.nOffImage + pEncoder->WMP.nCbImage;
+    }
   }
 
 Cleanup:

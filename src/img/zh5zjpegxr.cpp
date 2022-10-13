@@ -2,6 +2,7 @@
 
 #include "zimgjpegxr.h"
 #include <folly/Bits.h>
+#include <QTemporaryFile>
 
 #define H5Z_class_t_vers 2
 #include "hdf5.h"
@@ -46,13 +47,20 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       }
       ZImg img;
       img.wrapData(*buf, info);
+
+      //      QTemporaryFile tempFile("XXXXXX.jxr");
+      //      if (tempFile.open()) {
+      //        ZImgJpegXR::instance().writeImg(tempFile.fileName(), img, paras);
+      //        LOG(INFO) << QFile(tempFile.fileName()).size();
+      //      }
+
       std::vector<uint8_t> memBuf(info.byteNumber());
       auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.data(), memBuf.size());
+      // LOG(INFO) << byteWritten;
       if (byteWritten > memBuf.size()) {
-        throw ZIOException("impossible");
+        throw ZIOException("compression overflow");
       }
       memcpy(*buf, memBuf.data(), byteWritten);
-      *buf_size = byteWritten;
       retValue = byteWritten;
     }
   }
