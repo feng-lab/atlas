@@ -2705,6 +2705,7 @@ def parse_inputs(argv: list):
                             'bzip2': ['folly'],
                             'libsodium': ['folly'],
                             'folly': ['rocksdb'],
+                            'qt': ['make-cmake-pathlist'],
                             }
 
     print('current interpreter: ' + sys.executable)
