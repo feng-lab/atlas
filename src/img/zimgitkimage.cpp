@@ -188,12 +188,12 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, img.numTimes());
       imageIO->SetIORegion(ioRegion);
       if (imgInfo.numTimes > 1) {
-        std::vector<uint8_t> buf(img.byteNumber());
-        imageIO->Read(buf.data());
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[img.byteNumber()]);
+        imageIO->Read(buf.get());
         if (isNd2) {
-          fixDimensionOrder(buf.data(), "XYZTC", img);
+          fixDimensionOrder(buf.get(), "XYZTC", img);
         } else {
-          fixDimensionOrder(buf.data(), "CXYZT", img);
+          fixDimensionOrder(buf.get(), "CXYZT", img);
         }
       } else {
         imageIO->Read(img.channelData(0));
@@ -232,12 +232,12 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
       imageIO->SetIORegion(ioRegion);
       if (clipInfo.numTimes > 1) {
-        std::vector<uint8_t> buf(tmpImg.byteNumber());
-        imageIO->Read(buf.data());
+        std::unique_ptr<uint8_t[]> buf(new uint8_t[tmpImg.byteNumber()]);
+        imageIO->Read(buf.get());
         if (isNd2) {
-          fixDimensionOrder(buf.data(), "XYZTC", tmpImg);
+          fixDimensionOrder(buf.get(), "XYZTC", tmpImg);
         } else {
-          fixDimensionOrder(buf.data(), "CXYZT", tmpImg);
+          fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
         }
       } else {
         imageIO->Read(tmpImg.channelData(0));

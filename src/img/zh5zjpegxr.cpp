@@ -23,11 +23,11 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
     if (flags & H5Z_FLAG_REVERSE) {
       // read data, e.g., decompress data
       ZImgInfo info;
-      ZImgJpegXR::readMemInfo((uint8_t*)*buf, *buf_size, info);
+      ZImgJpegXR::readMemInfo(*buf, *buf_size, info);
       if (nullptr == (outBuf = H5allocate_memory(info.byteNumber(), false))) {
         throw ZIOException("error calling H5allocate_memory");
       }
-      ZImgJpegXR::readMemImg((uint8_t*)*buf, nbytes, (uint8_t*)outBuf, info.byteNumber());
+      ZImgJpegXR::readMemImg(*buf, nbytes, outBuf, info.byteNumber());
 
       H5free_memory(*buf);
       *buf = outBuf;
@@ -54,13 +54,13 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       //        LOG(INFO) << QFile(tempFile.fileName()).size();
       //      }
 
-      std::vector<uint8_t> memBuf(info.byteNumber());
-      auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.data(), memBuf.size());
+      std::unique_ptr<std::byte[]> memBuf(new std::byte[info.byteNumber()]);
+      auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
       // LOG(INFO) << byteWritten;
-      if (byteWritten > memBuf.size()) {
+      if (byteWritten > info.byteNumber()) {
         throw ZIOException("compression overflow");
       }
-      memcpy(*buf, memBuf.data(), byteWritten);
+      memcpy(*buf, memBuf.get(), byteWritten);
       retValue = byteWritten;
     }
   }

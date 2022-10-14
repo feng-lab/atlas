@@ -42,11 +42,11 @@ public:
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  static void readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info);
+  static void readMemInfo(void* mem, size_t size, ZImgInfo& info);
 
-  static void readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize);
+  static void readMemImg(void* mem, size_t size, void* des, size_t desSize);
 
-  static size_t writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, uint8_t* mem, size_t size);
+  static size_t writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, void* mem, size_t size);
 
 protected:
   static void checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras);

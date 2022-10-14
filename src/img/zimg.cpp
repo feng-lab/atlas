@@ -1807,14 +1807,14 @@ ZImg& ZImg::flip(Dimension dim)
     std::reverse(m_data.begin(), m_data.end());
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
-      std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> buf(channelByteNumber());
+      std::unique_ptr<std::byte[]> buf(new std::byte[channelByteNumber()]);
       for (size_t t = 0; t < numTimes(); ++t) {
         size_t j = numChannels() - 1;
         for (size_t i = 0; i < numChannels() / 2; ++i, --j) {
           // swap channel i,j
-          std::memcpy(buf.data(), channelData(i, t), channelByteNumber());
+          std::memcpy(buf.get(), channelData(i, t), channelByteNumber());
           std::memcpy(channelData(i, t), channelData(j, t), channelByteNumber());
-          std::memcpy(channelData(j, t), buf.data(), channelByteNumber());
+          std::memcpy(channelData(j, t), buf.get(), channelByteNumber());
         }
       }
     }

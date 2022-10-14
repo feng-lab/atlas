@@ -389,8 +389,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString& filename)
   try {
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    auto colorBuffer =
-      std::make_unique<uint8_t[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * m_size.x * m_size.y);
+    std::unique_ptr<uint8_t[]>colorBuffer(new uint8_t[Z3DTexture::bypePerPixel(dataFormat, dataType) * m_size.x * m_size.y]);
     glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, colorBuffer.get());
     QImage upsideDownImage(colorBuffer.get(), m_size.x, m_size.y, QImage::Format_ARGB32);
     QImage image = upsideDownImage.mirrored(false, true);

@@ -2,7 +2,16 @@
 
 #include <QFile>
 #include <JXRGlue.h>
+#include <folly/ScopeGuard.h>
 #include <cmath>
+
+#ifdef Call
+#undef Call
+#endif
+#define Call(exp)                  \
+  if (auto err = (exp); err < 0) { \
+    reportError(err);              \
+  }
 
 namespace {
 
@@ -22,7 +31,7 @@ void reportError(ERR err)
     case WMP_errSuccess:
       return;
     case WMP_errFail:
-      throw ZIOException("Fail");
+      throw ZIOException("JXR Fail");
     case WMP_errNotYetImplemented:
       throw ZIOException("Not yet implemented");
     case WMP_errAbstractMethod:
@@ -56,7 +65,7 @@ void reportError(ERR err)
     case WMP_errIncorrectCodecSubVersion:
       throw ZIOException("Incorrect codec subversion");
     default:
-      throw ZIOException("Unknown error");
+      throw ZIOException("Unknown JXR error");
   }
 }
 
@@ -91,7 +100,7 @@ void readInfoFromDecoder(const PKImageDecode* pDecoder, const PKPixelInfo& PI, Z
   }
 
   if (PI.cbitUnit != info.bytesPerVoxel * info.numChannels * 8) {
-    // might caused by empty channel, try increase channel number
+    // might be caused by empty channel, try increase channel number
     info.numChannels += 1;
     if (PI.cbitUnit != info.bytesPerVoxel * info.numChannels * 8) {
       throw ZIOException("Not supported bit unit");
@@ -202,9 +211,18 @@ void ZImgJpegXR::readInfo(const QString& filename,
                           std::vector<ZImgInfo>& infos,
                           std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  ERR err = WMP_errSuccess;
   PKCodecFactory* pCodecFactory = nullptr;
+  auto pCodecFactoryGuard = folly::makeGuard([&pCodecFactory]() {
+    if (pCodecFactory) {
+      pCodecFactory->Release(&pCodecFactory);
+    }
+  });
   PKImageDecode* pDecoder = nullptr;
+  auto pDecoderGuard = folly::makeGuard([&pDecoder]() {
+    if (pDecoder) {
+      pDecoder->Release(&pDecoder);
+    }
+  });
   PKPixelInfo PI;
 
   Call(PKCreateCodecFactory(&pCodecFactory, WMP_SDK_VERSION));
@@ -215,16 +233,6 @@ void ZImgJpegXR::readInfo(const QString& filename,
 
   infos.resize(1);
   readInfoFromDecoder(pDecoder, PI, infos[0]);
-
-Cleanup:
-  if (pDecoder) {
-    pDecoder->Release(&pDecoder);
-  }
-  if (pCodecFactory) {
-    pCodecFactory->Release(&pCodecFactory);
-  }
-
-  reportError(err);
 
   createDefaultSubBlocks(filename, infos, subBlocks);
 }
@@ -251,9 +259,19 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
   if (scene != 0) {
     throw ZIOException("invalid scene");
   }
-  ERR err = WMP_errSuccess;
+
   PKCodecFactory* pCodecFactory = nullptr;
+  auto pCodecFactoryGuard = folly::makeGuard([&pCodecFactory]() {
+    if (pCodecFactory) {
+      pCodecFactory->Release(&pCodecFactory);
+    }
+  });
   PKImageDecode* pDecoder = nullptr;
+  auto pDecoderGuard = folly::makeGuard([&pDecoder]() {
+    if (pDecoder) {
+      pDecoder->Release(&pDecoder);
+    }
+  });
   PKPixelInfo PI;
   ZImgInfo resInfo;
   ZImgRegion tmpRegion = region;
@@ -315,23 +333,22 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
     tmpRegion.end.c = region.end.c;
     img = img.crop(tmpRegion);
   }
-
-Cleanup:
-  if (pDecoder) {
-    pDecoder->Release(&pDecoder);
-  }
-  if (pCodecFactory) {
-    pCodecFactory->Release(&pCodecFactory);
-  }
-
-  reportError(err);
 }
 
-void ZImgJpegXR::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
+void ZImgJpegXR::readMemInfo(void* mem, size_t size, ZImgInfo& info)
 {
-  ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
+  auto pFactoryGuard = folly::makeGuard([&pFactory]() {
+    if (pFactory) {
+      pFactory->Release(&pFactory);
+    }
+  });
   PKImageDecode* pDecoder = nullptr;
+  auto pDecoderGuard = folly::makeGuard([&pDecoder]() {
+    if (pDecoder) {
+      pDecoder->Release(&pDecoder);
+    }
+  });
   PKPixelInfo PI;
 
   const PKIID* pIID = &IID_PKImageWmpDecode;
@@ -353,23 +370,22 @@ void ZImgJpegXR::readMemInfo(uint8_t* mem, size_t size, ZImgInfo& info)
   // Call(PixelFormatLookup(&PI, LOOKUP_BACKWARD_TIF));
 
   readInfoFromDecoder(pDecoder, PI, info);
-
-Cleanup:
-  if (pDecoder) {
-    pDecoder->Release(&pDecoder);
-  }
-  if (pFactory) {
-    pFactory->Release(&pFactory);
-  }
-
-  reportError(err);
 }
 
-void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desSize)
+void ZImgJpegXR::readMemImg(void* mem, size_t size, void* des, size_t desSize)
 {
-  ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
+  auto pFactoryGuard = folly::makeGuard([&pFactory]() {
+    if (pFactory) {
+      pFactory->Release(&pFactory);
+    }
+  });
   PKImageDecode* pDecoder = nullptr;
+  auto pDecoderGuard = folly::makeGuard([&pDecoder]() {
+    if (pDecoder) {
+      pDecoder->Release(&pDecoder);
+    }
+  });
   PKPixelInfo PI;
   PKRect rect;
   ZImgInfo info;
@@ -415,7 +431,7 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
   pDecoder->WMP.wmiI.cROIWidth = rect.Width;
   pDecoder->WMP.wmiI.cROIHeight = rect.Height;
 
-  Call(pDecoder->Copy(pDecoder, &rect, des, info.rowByteNumber() * info.numChannels));
+  Call(pDecoder->Copy(pDecoder, &rect, (U8*)des, info.rowByteNumber() * info.numChannels));
 
   if (info.numChannels > 1) {
     ZImg img;
@@ -428,16 +444,6 @@ void ZImgJpegXR::readMemImg(uint8_t* mem, size_t size, uint8_t* des, size_t desS
       img.correctPreMultipliedColor();
     }
   }
-
-Cleanup:
-  if (pDecoder) {
-    pDecoder->Release(&pDecoder);
-  }
-  if (pFactory) {
-    pFactory->Release(&pFactory);
-  }
-
-  reportError(err);
 }
 
 void ZImgJpegXR::checkImgBeforeWriting(const QString& filename, const ZImgInfo& info, const ZImgWriteParameters& paras)
@@ -477,11 +483,25 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
   wmiSCP.uiDefaultQPIndex = 1;
   wmiSCP.uiDefaultQPIndexAlpha = 1;
 
-  ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
+  auto pFactoryGuard = folly::makeGuard([&pFactory]() {
+    if (pFactory) {
+      pFactory->Release(&pFactory);
+    }
+  });
   struct WMPStream* pEncodeStream = nullptr;
   PKCodecFactory* pCodecFactory = nullptr;
+  auto pCodecFactoryGuard = folly::makeGuard([&pCodecFactory]() {
+    if (pCodecFactory) {
+      pCodecFactory->Release(&pCodecFactory);
+    }
+  });
   PKImageEncode* pEncoder = nullptr;
+  auto pEncoderGuard = folly::makeGuard([&pEncoder]() {
+    if (pEncoder) {
+      pEncoder->Release(&pEncoder);
+    }
+  });
 
   Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
   Call(pFactory->CreateStreamFromFilename(&pEncodeStream, QFile::encodeName(filename).constData(), "wb"));
@@ -490,85 +510,70 @@ void ZImgJpegXR::writeImg(const QString& filename, const ZImg& img, const ZImgWr
 
   Call(pEncoder->Initialize(pEncoder, pEncodeStream, &wmiSCP, sizeof(wmiSCP)));
 
-  {
-    // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
-    //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
-    //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
-    //[1.0, 1.0]    1          1           1           1           4:4:4       0
-    if (jpegXRQuality < 1.0F) {
-      // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
-      // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
-      if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
-          pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
-        jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
-      }
-
-      int qi = (int)(10.f * jpegXRQuality);
-      float qf = 10.f * jpegXRQuality - (float)qi;
-
-      int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
-                    ? DPK_QPS_420[qi]
-                    : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
-
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
-    } else {
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
-    }
-    if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
-      pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
+  // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
+  //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
+  //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
+  //[1.0, 1.0]    1          1           1           1           4:4:4       0
+  if (jpegXRQuality < 1.0F) {
+    // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
+    // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
+    if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
+        pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
+      jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
     }
 
-    PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
-    if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat16bppGray;
-    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
-      guidPixFormat = GUID_PKPixelFormat24bppRGB;
-    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
-      guidPixFormat = GUID_PKPixelFormat32bppRGBA;
-    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat48bppRGB;
-    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat64bppRGBA;
-    }
+    int qi = (int)(10.f * jpegXRQuality);
+    float qf = 10.f * jpegXRQuality - (float)qi;
 
-    Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
-    Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
-    if (img.info().numChannels == 1) {
-      Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
-    } else {
-      ZImg imgTmp(img.info());
-      XYZCtoCXYZ(img, imgTmp);
-      Call(pEncoder->WritePixels(pEncoder,
-                                 img.height(),
-                                 const_cast<U8*>(imgTmp.channelData(0)),
-                                 imgTmp.rowByteNumber() * imgTmp.numChannels()));
-//      LOG(INFO) << pEncoder->WMP.nOffImage;
-//      LOG(INFO) << pEncoder->WMP.nCbImage;
-//      LOG(INFO) << pEncoder->WMP.nOffAlpha;
-//      LOG(INFO) << pEncoder->WMP.nCbAlpha;
-    }
+    int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
+                  ? DPK_QPS_420[qi]
+                  : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
+
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
+  } else {
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
+  }
+  if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
+    pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
   }
 
-Cleanup:
-  if (pEncoder) {
-    pEncoder->Release(&pEncoder);
-  }
-  if (pCodecFactory) {
-    pCodecFactory->Release(&pCodecFactory);
-  }
-  if (pFactory) {
-    pFactory->Release(&pFactory);
+  PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
+  if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat16bppGray;
+  } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
+    guidPixFormat = GUID_PKPixelFormat24bppRGB;
+  } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
+    guidPixFormat = GUID_PKPixelFormat32bppRGBA;
+  } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat48bppRGB;
+  } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat64bppRGBA;
   }
 
-  reportError(err);
+  Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
+  Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
+  if (img.info().numChannels == 1) {
+    Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
+  } else {
+    ZImg imgTmp(img.info());
+    XYZCtoCXYZ(img, imgTmp);
+    Call(pEncoder->WritePixels(pEncoder,
+                               img.height(),
+                               const_cast<U8*>(imgTmp.channelData(0)),
+                               imgTmp.rowByteNumber() * imgTmp.numChannels()));
+    //      LOG(INFO) << pEncoder->WMP.nOffImage;
+    //      LOG(INFO) << pEncoder->WMP.nCbImage;
+    //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
+    //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
+  }
 }
 
-size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, uint8_t* mem, size_t size)
+size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& paras, void* mem, size_t size)
 {
   checkBeforeWriting(img.info(), paras);
   if (size < img.byteNumber()) {
@@ -603,11 +608,25 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
   wmiSCP.uiDefaultQPIndex = 1;
   wmiSCP.uiDefaultQPIndexAlpha = 1;
 
-  ERR err = WMP_errSuccess;
   PKFactory* pFactory = nullptr;
+  auto pFactoryGuard = folly::makeGuard([&pFactory]() {
+    if (pFactory) {
+      pFactory->Release(&pFactory);
+    }
+  });
   struct WMPStream* pEncodeStream = nullptr;
   PKCodecFactory* pCodecFactory = nullptr;
+  auto pCodecFactoryGuard = folly::makeGuard([&pCodecFactory]() {
+    if (pCodecFactory) {
+      pCodecFactory->Release(&pCodecFactory);
+    }
+  });
   PKImageEncode* pEncoder = nullptr;
+  auto pEncoderGuard = folly::makeGuard([&pEncoder]() {
+    if (pEncoder) {
+      pEncoder->Release(&pEncoder);
+    }
+  });
 
   Call(PKCreateFactory(&pFactory, PK_SDK_VERSION));
   Call(pFactory->CreateStreamFromMemory(&pEncodeStream, mem, size));
@@ -616,88 +635,73 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 
   Call(pEncoder->Initialize(pEncoder, pEncodeStream, &wmiSCP, sizeof(wmiSCP)));
 
-  {
-    // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
-    //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
-    //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
-    //[1.0, 1.0]    1          1           1           1           4:4:4       0
-    if (jpegXRQuality < 1.0F) {
-      // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
-      // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
-      if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
-          pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
-        jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
-      }
-
-      int qi = (int)(10.f * jpegXRQuality);
-      float qf = 10.f * jpegXRQuality - (float)qi;
-
-      int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
-                    ? DPK_QPS_420[qi]
-                    : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
-
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
-    } else {
-      pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
-    }
-    if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
-      pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
+  // ImageQuality  Q (BD==1)  Q (BD==8)   Q (BD==16)  Q (BD==32F) Subsample   Overlap
+  //[0.0, 0.5)    8-IQ*5     (see table) (see table) (see table) 4:2:0       2
+  //[0.5, 1.0)    8-IQ*5     (see table) (see table) (see table) 4:4:4       1
+  //[1.0, 1.0]    1          1           1           1           4:4:4       0
+  if (jpegXRQuality < 1.0F) {
+    // remap [0.8, 0.866, 0.933, 1.0] to [0.8, 0.9, 1.0, 1.1]
+    // to use 8-bit DPK QP table (0.933 == Photoshop JPEG 100)
+    if (jpegXRQuality > 0.8f && img.info().bytesPerVoxel == 1 && pEncoder->WMP.wmiSCP.cfColorFormat != YUV_420 &&
+        pEncoder->WMP.wmiSCP.cfColorFormat != YUV_422) {
+      jpegXRQuality = 0.8f + (jpegXRQuality - 0.8f) * 1.5f;
     }
 
-    PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
-    if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat16bppGray;
-    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
-      guidPixFormat = GUID_PKPixelFormat24bppRGB;
-    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
-      guidPixFormat = GUID_PKPixelFormat32bppRGBA;
-    } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat48bppRGB;
-    } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
-      guidPixFormat = GUID_PKPixelFormat64bppRGBA;
-    }
+    int qi = (int)(10.f * jpegXRQuality);
+    float qf = 10.f * jpegXRQuality - (float)qi;
 
-    Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
-    Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
-    if (img.numChannels() == 1) {
-      Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
-      //      LOG(INFO) << pEncoder->WMP.nOffImage;
-      //      LOG(INFO) << pEncoder->WMP.nCbImage;
-      //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
-      //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
-    } else {
-      ZImg imgTmp(img.info());
-      XYZCtoCXYZ(img, imgTmp);
-      Call(pEncoder->WritePixels(pEncoder,
-                                 img.height(),
-                                 const_cast<U8*>(imgTmp.channelData(0)),
-                                 imgTmp.rowByteNumber() * imgTmp.numChannels()));
-    }
+    int* pQPs = (pEncoder->WMP.wmiSCP.cfColorFormat == YUV_420 || pEncoder->WMP.wmiSCP.cfColorFormat == YUV_422)
+                  ? DPK_QPS_420[qi]
+                  : (img.info().bytesPerVoxel == 1 ? DPK_QPS_8[qi] : DPK_QPS_16[qi]);
 
-    if (pEncoder->WMP.nOffAlpha > 0) {
-      byteWritten = pEncoder->WMP.nOffAlpha + pEncoder->WMP.nCbAlpha;
-    } else {
-      byteWritten = pEncoder->WMP.nOffImage + pEncoder->WMP.nCbImage;
-    }
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)(0.5f + (float)pQPs[0] * (1.f - qf) + (float)(pQPs + 6)[0] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexU = (U8)(0.5f + (float)pQPs[1] * (1.f - qf) + (float)(pQPs + 6)[1] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexV = (U8)(0.5f + (float)pQPs[2] * (1.f - qf) + (float)(pQPs + 6)[2] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexYHP = (U8)(0.5f + (float)pQPs[3] * (1.f - qf) + (float)(pQPs + 6)[3] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexUHP = (U8)(0.5f + (float)pQPs[4] * (1.f - qf) + (float)(pQPs + 6)[4] * qf);
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndexVHP = (U8)(0.5f + (float)pQPs[5] * (1.f - qf) + (float)(pQPs + 6)[5] * qf);
+  } else {
+    pEncoder->WMP.wmiSCP.uiDefaultQPIndex = (U8)jpegXRQuality;
+  }
+  if (pEncoder->WMP.wmiSCP.uAlphaMode == 2) {
+    pEncoder->WMP.wmiSCP_Alpha.uiDefaultQPIndex = wmiSCP.uiDefaultQPIndexAlpha;
   }
 
-Cleanup:
-  if (pEncoder) {
-    pEncoder->Release(&pEncoder);
-  }
-  if (pCodecFactory) {
-    pCodecFactory->Release(&pCodecFactory);
-  }
-  if (pFactory) {
-    pFactory->Release(&pFactory);
+  PKPixelFormatGUID guidPixFormat = GUID_PKPixelFormat8bppGray;
+  if (img.info().numChannels == 1 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat16bppGray;
+  } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 1) {
+    guidPixFormat = GUID_PKPixelFormat24bppRGB;
+  } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 1) {
+    guidPixFormat = GUID_PKPixelFormat32bppRGBA;
+  } else if (img.info().numChannels == 3 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat48bppRGB;
+  } else if (img.info().numChannels == 4 && img.info().bytesPerVoxel == 2) {
+    guidPixFormat = GUID_PKPixelFormat64bppRGBA;
   }
 
-  reportError(err);
+  Call(pEncoder->SetPixelFormat(pEncoder, guidPixFormat));
+  Call(pEncoder->SetSize(pEncoder, img.width(), img.height()));
+  if (img.numChannels() == 1) {
+    Call(pEncoder->WritePixels(pEncoder, img.height(), const_cast<U8*>(img.channelData(0)), img.rowByteNumber()));
+    //      LOG(INFO) << pEncoder->WMP.nOffImage;
+    //      LOG(INFO) << pEncoder->WMP.nCbImage;
+    //      LOG(INFO) << pEncoder->WMP.nOffAlpha;
+    //      LOG(INFO) << pEncoder->WMP.nCbAlpha;
+  } else {
+    ZImg imgTmp(img.info());
+    XYZCtoCXYZ(img, imgTmp);
+    Call(pEncoder->WritePixels(pEncoder,
+                               img.height(),
+                               const_cast<U8*>(imgTmp.channelData(0)),
+                               imgTmp.rowByteNumber() * imgTmp.numChannels()));
+  }
+
+  if (pEncoder->WMP.nOffAlpha > 0) {
+    byteWritten = pEncoder->WMP.nOffAlpha + pEncoder->WMP.nCbAlpha;
+  } else {
+    byteWritten = pEncoder->WMP.nOffImage + pEncoder->WMP.nCbImage;
+  }
 
   return byteWritten;
 }
