@@ -192,7 +192,7 @@ void ZSwcColorParameters::initSubclassTypeColor()
 glm::vec4 ZSwcColorParameters::colorByType(const ZSwc::ConstSwcTreeNode& n)
 {
   if (colorMode.isSelected("Branch Type")) {
-    if (static_cast<size_t>(n->type) + 1 < colorsForDifferentType.size()) {
+    if (n->type >= 0 && static_cast<size_t>(n->type) + 1 < colorsForDifferentType.size()) {
       return colorsForDifferentType[n->type]->get();
     } else {
       return colorsForDifferentType.back()->get();

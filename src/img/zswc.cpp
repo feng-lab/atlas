@@ -127,7 +127,7 @@ void ZSwc::load(const QString& filename)
         SwcNode node;
         bool ok;
         node.id = fieldList[0].toInt(&ok);
-        if (!ok || node.id < 1) {
+        if (!ok || node.id < 0) {
           throw ZIOException(QString("Wrong SWC format: %1.").arg(line));
         }
         node.type = fieldList[1].toInt(&ok);
