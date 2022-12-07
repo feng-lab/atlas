@@ -308,7 +308,7 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   : ZObjFilter(view)
   , m_showSkeleton("Show Skeleton", true)
   , m_skeletonColor("Skeleton Color", glm::vec3(1, 0, 0), glm::vec3(0), glm::vec3(1))
-  , m_sizeScale("Size Scale", 1.f, .01f, std::numeric_limits<float>::max())
+  , m_sizeScale("Size Scale", 1.f, .001f, std::numeric_limits<float>::max())
   , m_opacity("Opacity", .5, 0., 1.)
 {
   m_skeletonColor.setStyle("COLOR");
@@ -319,8 +319,8 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSwcFilter::opacityChanged);
   addParameter(&m_showSkeleton);
   addParameter(&m_skeletonColor);
-  m_sizeScale.setSingleStep(0.1);
-  m_sizeScale.setDecimal(1);
+  m_sizeScale.setSingleStep(0.001);
+  m_sizeScale.setDecimal(3);
   m_sizeScale.setStyle("SPINBOX");
   addParameter(&m_sizeScale);
   m_viewPrecedencePara.blockSignals(true);

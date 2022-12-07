@@ -20,7 +20,7 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* pare
   //, m_coordYScale("Y Scale", 1.0f, 0.1f, 50.f)
   //, m_coordZScale("Z Scale", 1.0f, 0.1f, 50.f)
   , m_renderMethod("Rendering Method")
-  , m_sizeScale("Size Scale", 1.f, .01f, std::numeric_limits<float>::max())
+  , m_sizeScale("Size Scale", 1.f, .001f, std::numeric_limits<float>::max())
   , m_opacity("Opacity", 1.0f, .0f, 1.f)
   , m_filterNotFrontFacing("Filter Not Front Facing", true)
   , m_materialAmbient("Material Ambient", glm::vec4(0.1f, .1f, .1f, 1.f))
@@ -34,8 +34,8 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* pare
   m_renderMethod.addOptions("GLSL", "Old openGL");
   m_renderMethod.select("GLSL");
 
-  m_sizeScale.setSingleStep(0.1);
-  m_sizeScale.setDecimal(1);
+  m_sizeScale.setSingleStep(0.001);
+  m_sizeScale.setDecimal(3);
   m_sizeScale.setStyle("SPINBOX");
 
   addParameter(m_coordTransform);
