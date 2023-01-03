@@ -13,11 +13,11 @@ uniform mat4 viewport_matrix;
 uniform mat4 viewport_matrix_inverse;
 
 #if GLSL_VERSION >= 130 && defined(HAS_CLIP_PLANE)
-out float gl_ClipDistance[CLIP_PLANE_COUNT];
 in gl_PerVertex {
    vec4 gl_Position;
    float gl_ClipDistance[CLIP_PLANE_COUNT];
 } gl_in[];
+out float gl_ClipDistance[CLIP_PLANE_COUNT];
 #endif
 
 #if GLSL_VERSION >= 150
