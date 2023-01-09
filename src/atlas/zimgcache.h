@@ -281,7 +281,7 @@ public:
                                                              const ZImgSubBlock& imgBlock,
                                                              FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    auto cpuExecutor = getGlobalCPUExecutor();
+    auto cpuExecutor = folly::getGlobalCPUExecutor();
     auto ioExecutor = folly::getGlobalIOExecutor();
     return folly::via(cpuExecutor, [=, &imgBlock]() {
       ZThreadSafeScalableImageCache::ConstAccessor ca;
