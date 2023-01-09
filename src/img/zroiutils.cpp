@@ -1,7 +1,7 @@
 #include "zroiutils.h"
 
 #include "zglobal.h"
-#include <Mathematics/NaturalSplineCurve.h>
+#include <Mathematics/NaturalCubicSpline.h>
 #include <QImage>
 #include <QPainter>
 #include <cmath>
@@ -28,7 +28,7 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
     times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
   }
 
-  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
+  gte::NaturalCubicSpline<2, double> splineCurve(!isClosed,
                                                  spline.size(),
                                                  (gte::Vector<2, double> const*)spline.data(),
                                                  times.data());

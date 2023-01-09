@@ -228,7 +228,7 @@ print_target_properties(glog::glog)
 
 add_library(GeometricTools INTERFACE IMPORTED)
 set_target_properties(GeometricTools PROPERTIES
-                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/GeometricTools/GTE")
+                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/GeometricTools/GTE")
 print_target_properties(GeometricTools)
 
 add_library(glm::glm INTERFACE IMPORTED)

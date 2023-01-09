@@ -1,7 +1,7 @@
 #include "zroiutils2.h"
 
 #include "zglobal.h"
-#include <Mathematics/NaturalSplineCurve.h>
+#include <Mathematics/NaturalCubicSpline.h>
 #include <include/core/SkCanvas.h>
 #include <include/core/SkPath.h>
 #include <include/pathops/SkPathOps.h>
@@ -35,7 +35,7 @@ SkPath splineToPath(const std::vector<QPointF>& spline, bool showLastSeg = true)
     times[i] = times[i - 1] + std::sqrt(QPointF::dotProduct(spline[i] - spline[i - 1], spline[i] - spline[i - 1]));
   }
 
-  gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
+  gte::NaturalCubicSpline<2, double> splineCurve(!isClosed,
                                                  spline.size(),
                                                  (gte::Vector<2, double> const*)spline.data(),
                                                  times.data());

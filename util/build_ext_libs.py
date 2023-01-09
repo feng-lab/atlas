@@ -2513,12 +2513,8 @@ def build_libs(libs: OrderedDict, update_src: bool):
             build_jxrlib(src_dir, ext_build_dir())
 
         if lib_name == 'geometrictools':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'GeometricToolsEngine*'))
-            src_dir = get_package_top_level_folder(package_name, ext_build_dir())
-            if update_src or not os.path.exists(src_dir) or src_dir.endswith("GeometricTools"):
-                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'GeometricTools*'))
-                unpack_file_to_folder(package_name, ext_build_dir())
-            assert os.path.exists(src_dir)
+            if update_src:
+                update_git_submodule(os.path.join(ext_dir(), 'GeometricTools'))
 
         if lib_name == 'assimp':
             src_dir = os.path.join(ext_dir(), 'assimp')
