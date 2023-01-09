@@ -212,7 +212,7 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -272,6 +272,11 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir):
         else:
             src = details['realpath']
             debug("Unhandled type '%s' (%s)" % (details['type'], src))
+
+    for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6XcbQpa.so*')):
+        dst = dest_dir + os.sep + appdir_libs
+        debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
+        shutil.copyfile(dep, dst)  # overrides dest no questions asked
 
     shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
     for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
@@ -339,4 +344,4 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     dependencies = merge_dicts(dependencies, exedeps)
 
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir)
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir)
