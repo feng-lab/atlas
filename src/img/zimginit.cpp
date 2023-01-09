@@ -17,6 +17,10 @@
 #include <ippi.h>
 #endif
 
+#include <folly/Singleton.h>
+#include <folly/init/Phase.h>
+#include <folly/synchronization/HazptrThreadPoolExecutor.h>
+
 namespace nim {
 
 void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QString& msg)
@@ -230,10 +234,24 @@ void initImgLib(const char* argv0,
   }
 
   jpegxr_register_h5filter();
+
+  // folly
+  // Indicate ProcessPhase::Regular and register handler to
+  // indicate ProcessPhase::Exit.
+  folly::set_process_phases();
+  // Move from the registration phase to the "you can actually instantiate
+  // things now" phase.
+  folly::SingletonVault::singleton()->registrationComplete();
+  // Set the default hazard pointer domain to use a thread pool executor
+  // for asynchronous reclamation
+  folly::enable_hazptr_thread_pool_executor();
 }
 
 void shutdownImgLib(bool isApp)
 {
+  folly::SingletonVault::singleton()->startShutdownTimer();
+  folly::SingletonVault::singleton()->destroyInstances();
+
   if (isApp) {
     LOG(INFO) << "--- App Log End ---";
   }
