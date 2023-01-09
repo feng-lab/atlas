@@ -276,7 +276,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     for dep in glob.glob(os.path.join(qt_lib_dir, 'libQt6XcbQpa.so*')):
         dst = dest_dir + os.sep + appdir_libs
         debug("Copying library " + dep + ": " + dep + ' -> ' + dst)
-        shutil.copyfile(dep, dst)  # overrides dest no questions asked
+        shutil.copy2(dep, dst)  # overrides dest no questions asked
 
     shutil.copytree(qt_plugin_dir, os.path.join(dest_dir, appdir_plugins))
     for dst in glob.glob(os.path.join(dest_dir, appdir_plugins, '**', '*.so.debug')):
