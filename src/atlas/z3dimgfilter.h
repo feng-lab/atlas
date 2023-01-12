@@ -181,6 +181,15 @@ private:
   ZBoolParameter m_showZSlice;
   ZIntParameter m_zSlicePosition;
   std::vector<std::unique_ptr<ZColorMapParameter>> m_sliceColormaps;
+
+  ZBoolParameter m_showObliqueSlice;
+  ZVec3Parameter m_obliqueSliceNormal;
+  ZFloatParameter m_obliqueSliceDistance;
+
+  ZBoolParameter m_showObliqueSlice2;
+  ZVec3Parameter m_obliqueSlice2Normal;
+  ZFloatParameter m_obliqueSlice2Distance;
+
   ZBoolParameter m_showXSlice2;
   ZIntParameter m_xSlice2Position;
   ZBoolParameter m_showYSlice2;

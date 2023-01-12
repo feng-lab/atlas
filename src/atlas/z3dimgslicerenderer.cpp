@@ -57,14 +57,13 @@ void Z3DImgSliceRenderer::setData(Z3DImg& img, const std::vector<std::unique_ptr
   }
 }
 
-void Z3DImgSliceRenderer::addQuad(const ZMesh& quad)
+void Z3DImgSliceRenderer::addSlice(const ZMesh& slice)
 {
-  if (quad.empty() || (quad.numVertices() != 4 && quad.numVertices() != 6) ||
-      quad.numVertices() != quad.num3DTextureCoordinates()) {
-    LOG(FATAL) << "Input quad should be 2D slice with 3D texture coordinates";
+  if (slice.empty() || slice.numVertices() != slice.num3DTextureCoordinates()) {
+    LOG(FATAL) << "Input slice should be plane triangles with 3D texture coordinates";
     return;
   }
-  m_quads.push_back(quad);
+  m_slices.push_back(slice);
 }
 
 void Z3DImgSliceRenderer::bindVolumes(Z3DShaderProgram& shader) const
@@ -130,7 +129,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 {
   m_lastRenderingIsFastRendering = false;
 
-  bool needRender = m_img && !m_quads.empty();
+  bool needRender = m_img && !m_slices.empty();
   if (!needRender) {
     return;
   }
@@ -163,12 +162,12 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     m_img->bindFullResBlockIDsShader(m_image3DSliceWithColorMapBlockIDsShader);
 
-    for (auto& quad : m_quads) {
+    for (auto& slice : m_slices) {
       m_blockIDsRenderTarget->bind();
       glDrawBuffers(1, g_drawBuffers);
       glClear(GL_COLOR_BUFFER_BIT);
 
-      renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, quad);
+      renderTriangleList(m_VAO, m_image3DSliceWithColorMapBlockIDsShader, slice);
 
       m_blockIDsRenderTarget->release();
 
@@ -223,8 +222,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
       m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
       m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
-      for (auto& quad : m_quads) {
-        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, quad);
+      for (auto& slice : m_slices) {
+        renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);
       }
     } else {
       for (size_t i = 0; i < m_img->numChannels(); ++i) {
@@ -241,8 +240,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
         m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, i);
         m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
-        for (auto& quad : m_quads) {
-          renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, quad);
+        for (auto& slice : m_slices) {
+          renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);
         }
 
         m_layerTarget->release();
@@ -264,8 +263,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
     if (m_img->numChannels() == 1) {
       bindVolume(m_scVolumeSliceShader, 0);
-      for (auto& quad : m_quads) {
-        renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
+      for (auto& slice : m_slices) {
+        renderTriangleList(m_VAO, m_scVolumeSliceShader, slice);
       }
     } else {
       for (size_t j = 0; j < m_img->numChannels(); ++j) {
@@ -274,8 +273,8 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_layerTarget->clear();
 
         bindVolume(m_scVolumeSliceShader, j);
-        for (auto& quad : m_quads) {
-          renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
+        for (auto& slice : m_slices) {
+          renderTriangleList(m_VAO, m_scVolumeSliceShader, slice);
         }
 
         m_layerTarget->release();

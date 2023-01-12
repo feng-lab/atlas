@@ -95,6 +95,8 @@ int main(int argc, char* argv[])
       nim::shutdownImgLib();
     });
 
+    LOG(INFO) << "Version: " << GIT_VERSION;
+
     if (!FLAGS_flagfile.empty()) {
       LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;
     } else {

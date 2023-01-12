@@ -1375,20 +1375,20 @@ void Z3DVolumeFilter::prepareDataForRaycaster(Z3DVolume* volume, Z3DEye eye)
 
   //  // 3d volume MIP
   //  if (m_volumeRaycasterRenderer->isMIPRendering()) {
-  //    m_volumeRaycasterRenderer->clearQuads();
+  //    m_volumeRaycasterRenderer->clearSlices();
   //    float thre = 0.5;
   //    if (glm::dot(m_camera.getViewVector(), glm::vec3(0,0,1)) > thre)
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["ZB2F"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["ZB2F"]);
   //    else if (glm::dot(m_camera.getViewVector(), glm::vec3(0,0,-1)) > thre)
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["ZF2B"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["ZF2B"]);
   //    else if (glm::dot(m_camera.getViewVector(), glm::vec3(0,1,0)) > thre)
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["YB2F"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["YB2F"]);
   //    else if (glm::dot(m_camera.getViewVector(), glm::vec3(0,-1,0)) > thre)
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["YF2B"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["YF2B"]);
   //    else if (glm::dot(m_camera.getViewVector(), glm::vec3(1,0,0)) > thre)
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["XB2F"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["XB2F"]);
   //    else
-  //      m_volumeRaycasterRenderer->addQuad(m_cubeSerieSlices["XF2B"]);
+  //      m_volumeRaycasterRenderer->addSlice(m_cubeSerieSlices["XF2B"]);
   //    return;
   //  }
 

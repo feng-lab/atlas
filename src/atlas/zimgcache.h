@@ -266,6 +266,9 @@ public:
                                          const ZImgSubBlock& imgBlock,
                                          FindStategy findStategy = FindStategy::UpdateLRUList)
   {
+#if 1
+    return imgBlock.read();
+#else
     ZThreadSafeScalableImageCache::ConstAccessor ca;
     if (find(ca, key, findStategy)) {
       return *ca;
@@ -274,6 +277,7 @@ public:
       insert(key, res);
       return res;
     }
+#endif
   }
 
   // never return nullptr, throw ZException on error

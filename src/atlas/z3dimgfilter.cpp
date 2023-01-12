@@ -62,6 +62,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_ySlicePosition("Y Slice Position", 0, 0, 1)
   , m_showZSlice("Show Z Slice", false)
   , m_zSlicePosition("Z Slice Position", 0, 0, 1)
+  , m_showObliqueSlice("Show Oblique Slice", false)
+  , m_obliqueSliceNormal("Oblique Slice Normal", glm::vec3(1, 1, 0), glm::vec3(-1, -1, -1), glm::vec3(1, 1, 1))
+  , m_obliqueSliceDistance("Oblique Slice Distance", 0)
+  , m_showObliqueSlice2("Show Oblique Slice 2", false)
+  , m_obliqueSlice2Normal("Oblique Slice 2 Normal", glm::vec3(1, 1, 0), glm::vec3(-1, -1, -1), glm::vec3(1, 1, 1))
+  , m_obliqueSlice2Distance("Oblique Slice 2 Distance", 0)
   , m_showXSlice2("Show X Slice 2", false)
   , m_xSlice2Position("X Slice 2 Position", 0, 0, 1)
   , m_showYSlice2("Show Y Slice 2", false)
@@ -168,6 +174,15 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addPrivateRenderPort(m_opaqueLeftEyeOutport);
   addPrivateRenderPort(m_opaqueRightEyeOutport);
 
+  m_obliqueSliceNormal.setNameForEachValue({"x", "y", "z"});
+  m_obliqueSliceDistance.setStyle("SPINBOX");
+  m_obliqueSliceDistance.setDecimal(3);
+  m_obliqueSliceDistance.setSingleStep(1);
+  m_obliqueSlice2Normal.setNameForEachValue({"x", "y", "z"});
+  m_obliqueSlice2Distance.setStyle("SPINBOX");
+  m_obliqueSlice2Distance.setDecimal(3);
+  m_obliqueSlice2Distance.setSingleStep(1);
+
   // addParameter(m_useFRVolumeSlice);
   addParameter(m_showXSlice);
   addParameter(m_xSlicePosition);
@@ -175,6 +190,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_ySlicePosition);
   addParameter(m_showZSlice);
   addParameter(m_zSlicePosition);
+  addParameter(m_showObliqueSlice);
+  addParameter(m_obliqueSliceNormal);
+  addParameter(m_obliqueSliceDistance);
+  addParameter(m_showObliqueSlice2);
+  addParameter(m_obliqueSlice2Normal);
+  addParameter(m_obliqueSlice2Distance);
   addParameter(m_showXSlice2);
   addParameter(m_xSlice2Position);
   addParameter(m_showYSlice2);
@@ -185,6 +206,8 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   connect(&m_showXSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showYSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showZSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
+  connect(&m_showObliqueSlice, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
+  connect(&m_showObliqueSlice2, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showXSlice2, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showYSlice2, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
   connect(&m_showZSlice2, &ZBoolParameter::valueChanged, this, &Z3DImgFilter::adjustWidget);
@@ -344,12 +367,16 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_showXSlice.set(false);
     m_showYSlice.set(false);
     m_showZSlice.set(false);
+    m_showObliqueSlice.set(false);
+    m_showObliqueSlice2.set(false);
     m_showXSlice2.set(false);
     m_showYSlice2.set(false);
     m_showZSlice2.set(false);
     m_showXSlice.setVisible(!is2DImage);
     m_showYSlice.setVisible(!is2DImage);
     m_showZSlice.setVisible(!is2DImage);
+    m_showObliqueSlice.setVisible(!is2DImage);
+    m_showObliqueSlice2.setVisible(!is2DImage);
     m_showXSlice2.setVisible(!is2DImage);
     m_showYSlice2.setVisible(!is2DImage);
     m_showZSlice2.setVisible(!is2DImage);
@@ -448,7 +475,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
 
     const std::vector<ZParameter*>& paras = parameters();
     for (auto para : paras) {
-      if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position")) {
+      if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position") &&
+          !para->name().endsWith("2 Normal") && !para->name().endsWith("2 Distance")) {
         m_widgetsGroup->addChild(*para, 11);
       } else if (para->name().contains("Slice")) {
         m_widgetsGroup->addChild(*para, 19);
@@ -533,6 +561,10 @@ void Z3DImgFilter::adjustWidget()
   m_zSlice2Position.setVisible(m_showZSlice2.get());
   m_ySlice2Position.setVisible(m_showYSlice2.get());
   m_xSlice2Position.setVisible(m_showXSlice2.get());
+  m_obliqueSliceNormal.setVisible(m_showObliqueSlice.get());
+  m_obliqueSliceDistance.setVisible(m_showObliqueSlice.get());
+  m_obliqueSlice2Normal.setVisible(m_showObliqueSlice2.get());
+  m_obliqueSlice2Distance.setVisible(m_showObliqueSlice2.get());
 }
 
 void Z3DImgFilter::fullResolutionRenderingToggled()
@@ -671,7 +703,7 @@ void Z3DImgFilter::process(Z3DEye eye)
 bool Z3DImgFilter::hasSlices() const
 {
   return m_showZSlice.get() || m_showXSlice.get() || m_showYSlice.get() || m_showXSlice2.get() || m_showYSlice2.get() ||
-         m_showZSlice2.get();
+         m_showZSlice2.get() || m_showObliqueSlice.get() || m_showObliqueSlice2.get();
 }
 
 void Z3DImgFilter::renderSlices(Z3DEye eye)
@@ -697,7 +729,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    size_t sliceRendererIdx = 0;
   //    if (m_showZSlice.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeZSliceVolume(m_zSlicePosition.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -706,7 +738,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(zCoord, 2, coordLuf.xy(), coordRdb.xy());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -714,7 +746,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    sliceRendererIdx = 1;
   //    if (m_showYSlice.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeYSliceVolume(m_ySlicePosition.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -723,7 +755,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(yCoord, 1, coordLuf.xz(), coordRdb.xz());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -731,7 +763,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    sliceRendererIdx = 2;
   //    if (m_showXSlice.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeXSliceVolume(m_xSlicePosition.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -740,7 +772,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(xCoord, 0, coordLuf.yz(), coordRdb.yz());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -748,7 +780,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    sliceRendererIdx = 3;
   //    if (m_showZSlice2.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeZSliceVolume(m_zSlice2Position.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -757,7 +789,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(zCoord, 2, coordLuf.xy(), coordRdb.xy());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -765,7 +797,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    sliceRendererIdx = 4;
   //    if (m_showYSlice2.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeYSliceVolume(m_ySlice2Position.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -774,7 +806,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(yCoord, 1, coordLuf.xz(), coordRdb.xz());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -782,7 +814,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //    sliceRendererIdx = 5;
   //    if (m_showXSlice2.get()) {
   //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearQuads();
+  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
 
   //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeXSliceVolume(m_xSlice2Position.get());
   //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
@@ -791,7 +823,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
   //        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
   //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(xCoord, 0, coordLuf.yz(), coordRdb.yz());
   //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addQuad(slice);
+  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
   //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
   //      }
   //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
@@ -800,7 +832,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
   //  } else {
 
-  m_imgSliceRenderer.clearQuads();
+  m_imgSliceRenderer.clearSlices();
 
   if (m_showZSlice.get()) {
     float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z - 1);
@@ -808,7 +840,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showYSlice.get()) {
     float yTexCoord = m_ySlicePosition.get() / static_cast<float>(volDim.y - 1);
@@ -816,7 +848,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showXSlice.get()) {
     float xTexCoord = m_xSlicePosition.get() / static_cast<float>(volDim.x - 1);
@@ -824,7 +856,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
 
   if (m_showZSlice2.get()) {
@@ -833,7 +865,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showYSlice2.get()) {
     float yTexCoord = m_ySlice2Position.get() / static_cast<float>(volDim.y - 1);
@@ -841,7 +873,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showXSlice2.get()) {
     float xTexCoord = m_xSlice2Position.get() / static_cast<float>(volDim.x - 1);
@@ -849,7 +881,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
     ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
     slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addQuad(slice);
+    m_imgSliceRenderer.addSlice(slice);
   }
   m_rendererBase.render(eye, m_imgSliceRenderer);
   //}

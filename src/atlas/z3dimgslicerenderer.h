@@ -42,15 +42,15 @@ public:
     return m_lastRenderingIsFastRendering;
   }
 
-  // a slice (quad) in 3D volume contains corner vertex and 3d texture coordinates
+  // a slice in 3D volume contains plane triangles and 3d texture coordinates
   // clear
-  void clearQuads()
+  void clearSlices()
   {
-    m_quads.clear();
+    m_slices.clear();
   }
 
-  // add quad
-  void addQuad(const ZMesh& quad);
+  // add slice
+  void addSlice(const ZMesh& slice);
 
   void compile() override;
 
@@ -78,7 +78,7 @@ protected:
   std::vector<QString> m_colormapUniformNames;
 
 private:
-  std::vector<ZMesh> m_quads;
+  std::vector<ZMesh> m_slices;
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
