@@ -2631,10 +2631,6 @@ def build_libs(libs: OrderedDict, update_src: bool):
             src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
             build_opencv(src_dir, src_contrib_dir, ext_conda_build_dir(), conda_build=True)
 
-        if lib_name == 'conda-zimg':
-            src_dir = os.path.join(atlas_src_dir(), 'python')
-            build_conda_zimg(src_dir, ext_conda_build_dir())
-
         if lib_name == 'skia':
             src_dir = os.path.join(atlas_repository_dir(), '..', 'skia')
             update_or_clone_git_repository(src_dir, 'https://github.com/google/skia.git')
@@ -2660,6 +2656,10 @@ def build_libs(libs: OrderedDict, update_src: bool):
             if update_src:
                 update_git_submodule(src_dir)
             build_rocksdb(src_dir, ext_build_dir())
+
+        if lib_name == 'conda-zimg':
+            src_dir = os.path.join(atlas_src_dir(), 'python')
+            build_conda_zimg(src_dir, ext_conda_build_dir())
 
 
 def parse_inputs(argv: list):
