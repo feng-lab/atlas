@@ -249,9 +249,6 @@ void initImgLib(const char* argv0,
 
 void shutdownImgLib(bool isApp)
 {
-  folly::SingletonVault::singleton()->startShutdownTimer();
-  folly::SingletonVault::singleton()->destroyInstances();
-
   if (isApp) {
     LOG(INFO) << "--- App Log End ---";
   }
