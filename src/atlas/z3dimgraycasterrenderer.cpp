@@ -572,9 +572,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           ZBenchTimer btcb("collect blockids");
           // check missed blocks and upload
-          std::vector<uint32_t> missingBlockIDs;
-          std::vector<uint32_t> usedBlockIDs;
-
           const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
           if (missingBlockIDsTexture->numPixels() * 4 != m_blockIDs.size()) {
             m_blockIDs.resize(missingBlockIDsTexture->numPixels() * 4);
@@ -719,9 +716,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = true;
           }
 
+          std::vector<uint32_t> missingBlockIDs;
+          std::vector<uint32_t> usedBlockIDs;
+
           ccSet.unsafe_erase(0_u32);
           if (!ccSet.empty()) {
-            CHECK(ccSet.size() < m_img->numCachedImages() * 10) << ccSet.size() << " " << m_img->numCachedImages();
+            LOG(INFO) << ccSet.size() << " " << m_img->numCachedImages();
+            CHECK(ccSet.size() < m_img->numCachedImages() * 10);
             missingBlockIDs.reserve(ccSet.size());
             missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
             if ((repeat % 2 == 1) && hasEnoughMissingIDs) {
