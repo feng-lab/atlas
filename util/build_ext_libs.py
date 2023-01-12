@@ -2668,8 +2668,8 @@ def parse_inputs(argv: list):
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'conda-zimg', 'skia',
-                'neuTube', 'llfio', 'rocksdb',
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'skia',
+                'neuTube', 'llfio', 'rocksdb', 'conda-zimg'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
