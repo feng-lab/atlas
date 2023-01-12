@@ -2747,7 +2747,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
         for lib in libs:
             if started:
                 break
-            started = args.start_from.lower() == lib
+            started = args.start_from.lower() == lib.lower()
             if not started:
                 libs[lib] = False
 
