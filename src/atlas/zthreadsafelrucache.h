@@ -326,7 +326,7 @@ template<class TKey, class TValue, class THash>
 bool ZThreadSafeLRUCache<TKey, TValue, THash>::insert(const TKey& key, const TValue& value, size_t objSize)
 {
   // Insert into the CHM
-  ListNode* node = new ListNode(key, objSize);
+  auto node = new ListNode(key, objSize);
   HashMapAccessor hashAccessor;
   HashMapValuePair hashMapValue(key, HashMapValue(value, node));
   if (!m_map.insert(hashAccessor, hashMapValue)) {

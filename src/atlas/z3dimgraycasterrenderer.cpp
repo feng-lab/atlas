@@ -10,6 +10,10 @@
 #include <QApplication>
 #include <QFileInfo>
 
+DEFINE_bool(atlas_clear_image_cache_after_rendering,
+            false,
+            "Clear image cache after rendering, for test, default is false");
+
 namespace nim {
 
 Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
@@ -815,6 +819,11 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->release();
         }
       }
+
+      if (FLAGS_atlas_clear_image_cache_after_rendering) {
+        ZImgCache::instance().clear();
+      }
+      LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
     } else {
       m_lastRenderingIsFastRendering = true;
 

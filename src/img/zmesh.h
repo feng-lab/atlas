@@ -353,6 +353,11 @@ public:
                                int resolution = 32,
                                const glm::mat4& tfmat = glm::mat4(1.f));
 
+  static ZMesh clipClosedSurface(const ZMesh& mesh,
+                                 const std::vector<glm::vec3>& clipPlaneNormals,
+                                 const std::vector<glm::vec3>& clipPlaneOrigins,
+                                 double epsilon = 1e-6);
+
   void swapXY();
 
   [[nodiscard]] std::string toString() const

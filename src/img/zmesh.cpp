@@ -22,6 +22,8 @@
 #include <vtkXMLPolyDataReader.h>
 #include <vtkXMLPolyDataWriter.h>
 #include <vtkSelectEnclosedPoints.h>
+#include <vtkPlaneCollection.h>
+#include <vtkClipClosedSurface.h>
 #include <boost/math/constants/constants.hpp>
 #include <map>
 
@@ -75,7 +77,7 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
 
   vtkSmartPointer<vtkFloatArray> nrmls = vtkSmartPointer<vtkFloatArray>::New();
   const std::vector<glm::vec3>& normals = mesh.normals();
-  CHECK(normals.size() == vertices.size());
+  CHECK(normals.size() == vertices.size()) << normals.size() << " " << vertices.size();
   nrmls->SetNumberOfComponents(3);
   nrmls->Allocate(3 * normals.size());
   nrmls->SetName("Normals");
@@ -875,6 +877,7 @@ ZMesh ZMesh::createCube(const glm::vec3& coordLlf,
   cube.m_vertices.swap(vertices);
   cube.m_3DTextureCoordinates.swap(texCoords);
   cube.m_indices.swap(indexes);
+  cube.generateNormals();
   return cube;
 }
 
@@ -1424,6 +1427,45 @@ void ZMesh::createPunctaMesh(const ZPuncta& puncta, ZMesh& punctaMesh, int resol
   }
 
   punctaMesh.transformVerticesByMatrix(tfmat);
+}
+
+ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
+                               const std::vector<glm::vec3>& clipPlaneNormals,
+                               const std::vector<glm::vec3>& clipPlaneOrigins,
+                               double epsilon)
+{
+  // PolyData to process
+  vtkSmartPointer<vtkPolyData> polyData = meshToVtkPolyData(mesh);
+  // polyData->PrintSelf(std::cout, vtkIndent());
+
+  vtkNew<vtkPlaneCollection> planes;
+  std::vector<vtkSmartPointer<vtkPlane>> tmpPlanes;
+  for (size_t i = 0; i < clipPlaneNormals.size(); ++i) {
+    glm::vec3 normal = glm::normalize(clipPlaneNormals[i]);
+    tmpPlanes.push_back(vtkSmartPointer<vtkPlane>::New());
+    tmpPlanes[i]->SetOrigin(clipPlaneOrigins[i].x, clipPlaneOrigins[i].y, clipPlaneOrigins[i].z);
+    tmpPlanes[i]->SetNormal(normal.x, normal.y, normal.z);
+    planes->AddItem(tmpPlanes[i]);
+  }
+
+  vtkNew<vtkClipClosedSurface> clipper;
+  clipper->SetInputData(polyData);
+  clipper->SetClippingPlanes(planes);
+  clipper->SetActivePlaneId(0);
+  clipper->SetScalarModeToColors();
+  clipper->SetTolerance(epsilon);
+  clipper->SetTriangulationErrorDisplay(true);
+  clipper->Update();
+  clipper->PrintSelf(std::cout, vtkIndent());
+
+  LOG(INFO) << "1";
+  auto pdres = clipper->GetOutput();
+  pdres->PrintSelf(std::cout, vtkIndent());
+  auto res = vtkPolyDataToMesh(clipper->GetOutput());
+  LOG(INFO) << "1";
+  res.interpolate(mesh);
+  LOG(INFO) << "1";
+  return res;
 }
 
 void ZMesh::swapXY()

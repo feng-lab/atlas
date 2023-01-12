@@ -33,3 +33,6 @@
 
 # Whether to check opengl error after all gl calls, default is true, can set to false for better performance
 --atlas_check_opengl_error_for_all_gl_calls=true
+
+# Whether to clear image cache after rendering, for test, default is false
+--atlas_clear_image_cache_after_rendering=false

@@ -984,6 +984,38 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_rendererBase.setViewport(m_exitTarget.size());
     CHECK_GL_ERROR
 
+#if 0
+    std::vector<glm::vec3> planeNormals;
+    std::vector<glm::vec3> planeOrigins;
+    planeNormals.push_back(-globalCamera().viewVector());
+    planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * globalCamera().nearDist());
+    if (m_rendererBase.globalParas().xCut.lowerValue() != m_rendererBase.globalParas().xCut.minimum()) {
+      planeNormals.emplace_back(-1., 0., 0.);
+      planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.lowerValue(), 0, 0);
+    }
+    if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
+      planeNormals.emplace_back(1., 0., 0.);
+      planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.upperValue(), 0, 0);
+    }
+    if (m_rendererBase.globalParas().yCut.lowerValue() != m_rendererBase.globalParas().yCut.minimum()) {
+      planeNormals.emplace_back(0., -1., 0.);
+      planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.lowerValue(), 0);
+    }
+    if (m_rendererBase.globalParas().yCut.upperValue() != m_rendererBase.globalParas().yCut.maximum()) {
+      planeNormals.emplace_back(0., 1., 0.);
+      planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.upperValue(), 0);
+    }
+    if (m_rendererBase.globalParas().zCut.lowerValue() != m_rendererBase.globalParas().zCut.minimum()) {
+      planeNormals.emplace_back(0., 0., -1.);
+      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.lowerValue());
+    }
+    if (m_rendererBase.globalParas().zCut.upperValue() != m_rendererBase.globalParas().zCut.maximum()) {
+      planeNormals.emplace_back(0., 0., 1.);
+      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.upperValue());
+    }
+    LOG(INFO) << planeNormals.size();
+    ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
+#else
     float nearPlaneDistToOrigin =
       glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
     std::vector<glm::vec4> planes;
@@ -1008,6 +1040,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     }
     LOG(INFO) << planes.size();
     ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
+#endif
 
     // render back texture
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
