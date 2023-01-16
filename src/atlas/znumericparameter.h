@@ -291,6 +291,15 @@ public:
     m_groupBoxName = name;
   }
 
+  void setRange(T min, T max)
+  {
+    if (min != m_min || max != m_max) {
+      m_min = min;
+      m_max = max;
+      changeRange();
+    }
+  }
+
   [[nodiscard]] T rangeMin() const
   {
     return m_min;
@@ -310,6 +319,9 @@ public:
   {
     m_suffix = suf;
   }
+
+  // inherite this to notify associated widgets about the range change (Q_EMIT a signal)
+  virtual void changeRange() {}
 
   // ZParameter interface
 
@@ -437,10 +449,18 @@ Q_SIGNALS:
 
   void value3WillChange(double);
 
+  void range1Changed(double min, double max);
+
+  void range2Changed(double min, double max);
+
+  void range3Changed(double min, double max);
+
 protected:
   void beforeChange(glm::vec3& value) override;
 
   QWidget* actualCreateWidget(QWidget* parent) override;
+
+  void changeRange() override;
 };
 
 class ZVec4Parameter : public ZNumericVectorParameter<glm::vec4>

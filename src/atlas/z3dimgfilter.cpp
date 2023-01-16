@@ -5,7 +5,6 @@
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
 #include "zmesh.h"
-#include "zmeshutils.h"
 #include <QMessageBox>
 #include <QApplication>
 #include <QMenu>
@@ -64,10 +63,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_zSlicePosition("Z Slice Position", 0, 0, 1)
   , m_showObliqueSlice("Show Oblique Slice", false)
   , m_obliqueSliceNormal("Oblique Slice Normal", glm::vec3(1, 1, 0), glm::vec3(-1, -1, -1), glm::vec3(1, 1, 1))
-  , m_obliqueSliceDistance("Oblique Slice Distance", 0)
+  , m_obliqueSliceDistanceToOrigin("Oblique Slice Distance to Origin", 0, 0, 0)
   , m_showObliqueSlice2("Show Oblique Slice 2", false)
   , m_obliqueSlice2Normal("Oblique Slice 2 Normal", glm::vec3(1, 1, 0), glm::vec3(-1, -1, -1), glm::vec3(1, 1, 1))
-  , m_obliqueSlice2Distance("Oblique Slice 2 Distance", 0)
+  , m_obliqueSlice2DistanceToOrigin("Oblique Slice 2 Distance to Origin", 0, 0, 0)
   , m_showXSlice2("Show X Slice 2", false)
   , m_xSlice2Position("X Slice 2 Position", 0, 0, 1)
   , m_showYSlice2("Show Y Slice 2", false)
@@ -175,13 +174,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addPrivateRenderPort(m_opaqueRightEyeOutport);
 
   m_obliqueSliceNormal.setNameForEachValue({"x", "y", "z"});
-  m_obliqueSliceDistance.setStyle("SPINBOX");
-  m_obliqueSliceDistance.setDecimal(3);
-  m_obliqueSliceDistance.setSingleStep(1);
   m_obliqueSlice2Normal.setNameForEachValue({"x", "y", "z"});
-  m_obliqueSlice2Distance.setStyle("SPINBOX");
-  m_obliqueSlice2Distance.setDecimal(3);
-  m_obliqueSlice2Distance.setSingleStep(1);
 
   // addParameter(m_useFRVolumeSlice);
   addParameter(m_showXSlice);
@@ -192,10 +185,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_zSlicePosition);
   addParameter(m_showObliqueSlice);
   addParameter(m_obliqueSliceNormal);
-  addParameter(m_obliqueSliceDistance);
+  addParameter(m_obliqueSliceDistanceToOrigin);
   addParameter(m_showObliqueSlice2);
   addParameter(m_obliqueSlice2Normal);
-  addParameter(m_obliqueSlice2Distance);
+  addParameter(m_obliqueSlice2DistanceToOrigin);
   addParameter(m_showXSlice2);
   addParameter(m_xSlice2Position);
   addParameter(m_showYSlice2);
@@ -294,7 +287,8 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   try {
     std::vector<glm::dvec2> drs;
     if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
-      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(imgPack.minIntensity(), imgPack.maxIntensity()));
+      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels,
+                                    glm::dvec2(imgPack.minIntensity(), imgPack.maxIntensity()));
     } else {
       drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(imgPack.rangeMin(), imgPack.rangeMax()));
     }
@@ -328,11 +322,11 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
         1.0,
         QColor(0, 0, 0),
         QColor(m_3dImg->channelColor(c).r, m_3dImg->channelColor(c).g, m_3dImg->channelColor(c).b));
-      m_doubleChannelRangeParas.emplace_back(std::make_unique<ZDoubleSpanParameter>(
-        QString("Channel %1 Display Range").arg(c + 1),
-        drs[c],
-        imgPack.rangeMin(),
-        imgPack.rangeMax()));
+      m_doubleChannelRangeParas.emplace_back(
+        std::make_unique<ZDoubleSpanParameter>(QString("Channel %1 Display Range").arg(c + 1),
+                                               drs[c],
+                                               imgPack.rangeMin(),
+                                               imgPack.rangeMax()));
       m_doubleChannelRangeParas.back()->setStyle("SPINBOX");
       if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
         m_doubleChannelRangeParas.back()->setDecimal(0);
@@ -352,6 +346,11 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_yCut.set(m_yCut.range());
     m_zCut.setRange(-1, volDim.z);
     m_zCut.set(m_zCut.range());
+
+    m_obliqueSliceDistanceToOrigin.setRange(-glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)),
+                                            glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)));
+    m_obliqueSlice2DistanceToOrigin.setRange(-glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)),
+                                             glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)));
 
     m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
 
@@ -476,7 +475,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     const std::vector<ZParameter*>& paras = parameters();
     for (auto para : paras) {
       if (para->name().contains("Slice") && !para->name().endsWith("2") && !para->name().endsWith("2 Position") &&
-          !para->name().endsWith("2 Normal") && !para->name().endsWith("2 Distance")) {
+          !para->name().endsWith("2 Normal") && !para->name().endsWith("2 Distance to Origin")) {
         m_widgetsGroup->addChild(*para, 11);
       } else if (para->name().contains("Slice")) {
         m_widgetsGroup->addChild(*para, 19);
@@ -562,9 +561,9 @@ void Z3DImgFilter::adjustWidget()
   m_ySlice2Position.setVisible(m_showYSlice2.get());
   m_xSlice2Position.setVisible(m_showXSlice2.get());
   m_obliqueSliceNormal.setVisible(m_showObliqueSlice.get());
-  m_obliqueSliceDistance.setVisible(m_showObliqueSlice.get());
+  m_obliqueSliceDistanceToOrigin.setVisible(m_showObliqueSlice.get());
   m_obliqueSlice2Normal.setVisible(m_showObliqueSlice2.get());
-  m_obliqueSlice2Distance.setVisible(m_showObliqueSlice2.get());
+  m_obliqueSlice2DistanceToOrigin.setVisible(m_showObliqueSlice2.get());
 }
 
 void Z3DImgFilter::fullResolutionRenderingToggled()
@@ -834,6 +833,20 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
 
   m_imgSliceRenderer.clearSlices();
 
+  ZMesh cube = ZMesh::createCube(coordLuf, coordRdb, glm::vec3(0, 0, 0), glm::vec3(1, 1, 1));
+  if (m_showObliqueSlice.get()) {
+    glm::vec3 normal = m_obliqueSliceNormal.get();
+    if (glm::length(normal) == 0) {
+      normal = glm::vec3(1, 1, 0);
+    } else {
+      normal = glm::normalize(normal);
+    }
+    ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
+    if (!slice.empty()) {
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+  }
   if (m_showZSlice.get()) {
     float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z - 1);
     float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
@@ -859,6 +872,19 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     m_imgSliceRenderer.addSlice(slice);
   }
 
+  if (m_showObliqueSlice2.get()) {
+    glm::vec3 normal = m_obliqueSlice2Normal.get();
+    if (glm::length(normal) == 0) {
+      normal = glm::vec3(1, 1, 0);
+    } else {
+      normal = glm::normalize(normal);
+    }
+    ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
+    if (!slice.empty()) {
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+  }
   if (m_showZSlice2.get()) {
     float zTexCoord = m_zSlice2Position.get() / static_cast<float>(volDim.z - 1);
     float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
@@ -984,38 +1010,37 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     m_rendererBase.setViewport(m_exitTarget.size());
     CHECK_GL_ERROR
 
-#if 0
     std::vector<glm::vec3> planeNormals;
     std::vector<glm::vec3> planeOrigins;
-    planeNormals.push_back(-globalCamera().viewVector());
-    planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * globalCamera().nearDist());
+    planeNormals.push_back(globalCamera().viewVector());
+    planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * (globalCamera().nearDist() + 0.01f));
     if (m_rendererBase.globalParas().xCut.lowerValue() != m_rendererBase.globalParas().xCut.minimum()) {
-      planeNormals.emplace_back(-1., 0., 0.);
+      planeNormals.emplace_back(1., 0., 0.);
       planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.lowerValue(), 0, 0);
     }
     if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
-      planeNormals.emplace_back(1., 0., 0.);
+      planeNormals.emplace_back(-1., 0., 0.);
       planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.upperValue(), 0, 0);
     }
     if (m_rendererBase.globalParas().yCut.lowerValue() != m_rendererBase.globalParas().yCut.minimum()) {
-      planeNormals.emplace_back(0., -1., 0.);
+      planeNormals.emplace_back(0., 1., 0.);
       planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.lowerValue(), 0);
     }
     if (m_rendererBase.globalParas().yCut.upperValue() != m_rendererBase.globalParas().yCut.maximum()) {
-      planeNormals.emplace_back(0., 1., 0.);
+      planeNormals.emplace_back(0., -1., 0.);
       planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.upperValue(), 0);
     }
     if (m_rendererBase.globalParas().zCut.lowerValue() != m_rendererBase.globalParas().zCut.minimum()) {
-      planeNormals.emplace_back(0., 0., -1.);
+      planeNormals.emplace_back(0., 0., 1.);
       planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.lowerValue());
     }
     if (m_rendererBase.globalParas().zCut.upperValue() != m_rendererBase.globalParas().zCut.maximum()) {
-      planeNormals.emplace_back(0., 0., 1.);
+      planeNormals.emplace_back(0., 0., -1.);
       planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.upperValue());
     }
     LOG(INFO) << planeNormals.size();
     ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
-#else
+#if 0
     float nearPlaneDistToOrigin =
       glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
     std::vector<glm::vec4> planes;
@@ -1039,7 +1064,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
       planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().zCut.upperValue());
     }
     LOG(INFO) << planes.size();
-    ZMesh clipped = ZMeshUtils::clipClosedSurface(cube, planes);
+    auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);
 #endif
 
     // render back texture

@@ -184,11 +184,11 @@ private:
 
   ZBoolParameter m_showObliqueSlice;
   ZVec3Parameter m_obliqueSliceNormal;
-  ZFloatParameter m_obliqueSliceDistance;
+  ZFloatParameter m_obliqueSliceDistanceToOrigin;
 
   ZBoolParameter m_showObliqueSlice2;
   ZVec3Parameter m_obliqueSlice2Normal;
-  ZFloatParameter m_obliqueSlice2Distance;
+  ZFloatParameter m_obliqueSlice2DistanceToOrigin;
 
   ZBoolParameter m_showXSlice2;
   ZIntParameter m_xSlice2Position;

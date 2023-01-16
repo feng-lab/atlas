@@ -358,6 +358,12 @@ public:
                                  const std::vector<glm::vec3>& clipPlaneOrigins,
                                  double epsilon = 1e-6);
 
+  // can return empty mesh when no intersection
+  static ZMesh planeClosedSurfaceIntersection(const ZMesh& mesh,
+                                              const glm::vec3& clipPlaneNormal,
+                                              const glm::vec3& clipPlaneOrigin,
+                                              double epsilon = 1e-6);
+
   void swapXY();
 
   [[nodiscard]] std::string toString() const

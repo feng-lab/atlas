@@ -8,7 +8,9 @@
 #include "zlog.h"
 #include "zpuncta.h"
 #include <QFile>
+#include <vtkCellData.h>
 #include <vtkPolyData.h>
+#include <vtkDataArray.h>
 #include <vtkPointData.h>
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
@@ -29,7 +31,7 @@
 
 namespace {
 
-nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
+nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData, int label = -1)
 {
   CHECK(polyData);
   vtkPoints* points = polyData->GetPoints();
@@ -37,19 +39,35 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
   vtkDataArray* pointsNormals = polyData->GetPointData()->GetNormals();
 
   std::vector<glm::dvec3> vertices(points->GetNumberOfPoints());
-  std::vector<glm::dvec3> normals(pointsNormals->GetNumberOfTuples());
-  CHECK(vertices.size() == normals.size());
+  // LOG(INFO) << vertices.size();
+  std::vector<glm::dvec3> normals;
+  if (pointsNormals) {
+    normals.resize(pointsNormals->GetNumberOfTuples());
+    CHECK(vertices.size() == normals.size());
+  }
   std::vector<uint32_t> indices;
   for (vtkIdType id = 0; id < points->GetNumberOfPoints(); ++id) {
     points->GetPoint(id, &vertices[id][0]);
-    pointsNormals->GetTuple(id, &normals[id][0]);
+    if (pointsNormals) {
+      pointsNormals->GetTuple(id, &normals[id][0]);
+    }
   }
   vtkIdType npts;
   const vtkIdType* pts;
+  vtkDataArray* scalars;
+  if (label >= 0) {
+    scalars = polyData->GetCellData()->GetScalars("Labels");
+  }
+  polys->InitTraversal();
   for (vtkIdType i = 0; i < polyData->GetNumberOfPolys(); ++i) {
     auto h = polys->GetNextCell(npts, pts);
     if (h == 0) {
       break;
+    }
+    if (label >= 0) {
+      if (scalars->GetTuple1(i) != label) {
+        continue;
+      }
     }
     if (npts == 3) {
       indices.push_back(pts[0]);
@@ -61,7 +79,11 @@ nim::ZMesh vtkPolyDataToMesh(vtkPolyData* polyData)
   nim::ZMesh msh;
   msh.setVertices(vertices);
   msh.setIndices(indices);
-  msh.setNormals(normals);
+  if (pointsNormals) {
+    msh.setNormals(normals);
+  } else {
+    msh.generateNormals();
+  }
   return msh;
 }
 
@@ -77,12 +99,14 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
 
   vtkSmartPointer<vtkFloatArray> nrmls = vtkSmartPointer<vtkFloatArray>::New();
   const std::vector<glm::vec3>& normals = mesh.normals();
-  CHECK(normals.size() == vertices.size()) << normals.size() << " " << vertices.size();
-  nrmls->SetNumberOfComponents(3);
-  nrmls->Allocate(3 * normals.size());
-  nrmls->SetName("Normals");
-  for (size_t i = 0; i < normals.size(); ++i) {
-    nrmls->InsertTuple(i, &normals[i][0]);
+  if (!normals.empty()) {
+    CHECK(normals.size() == vertices.size()) << normals.size() << " " << vertices.size();
+    nrmls->SetNumberOfComponents(3);
+    nrmls->Allocate(3 * normals.size());
+    nrmls->SetName("Normals");
+    for (size_t i = 0; i < normals.size(); ++i) {
+      nrmls->InsertTuple(i, &normals[i][0]);
+    }
   }
 
   vtkSmartPointer<vtkCellArray> polys = vtkSmartPointer<vtkCellArray>::New();
@@ -99,7 +123,9 @@ vtkSmartPointer<vtkPolyData> meshToVtkPolyData(const nim::ZMesh& mesh)
 
   vtkSmartPointer<vtkPolyData> polyData = vtkSmartPointer<vtkPolyData>::New();
   polyData->SetPoints(points);
-  polyData->GetPointData()->SetNormals(nrmls);
+  if (!normals.empty()) {
+    polyData->GetPointData()->SetNormals(nrmls);
+  }
   polyData->SetPolys(polys);
 
   return polyData;
@@ -1434,38 +1460,103 @@ ZMesh ZMesh::clipClosedSurface(const ZMesh& mesh,
                                const std::vector<glm::vec3>& clipPlaneOrigins,
                                double epsilon)
 {
+  CHECK(clipPlaneNormals.size() == clipPlaneOrigins.size());
+  if (clipPlaneNormals.empty()) {
+    return mesh;
+  }
+
   // PolyData to process
   vtkSmartPointer<vtkPolyData> polyData = meshToVtkPolyData(mesh);
   // polyData->PrintSelf(std::cout, vtkIndent());
 
   vtkNew<vtkPlaneCollection> planes;
-  std::vector<vtkSmartPointer<vtkPlane>> tmpPlanes;
+  // std::vector<vtkSmartPointer<vtkPlane>> tmpPlanes;
   for (size_t i = 0; i < clipPlaneNormals.size(); ++i) {
     glm::vec3 normal = glm::normalize(clipPlaneNormals[i]);
-    tmpPlanes.push_back(vtkSmartPointer<vtkPlane>::New());
-    tmpPlanes[i]->SetOrigin(clipPlaneOrigins[i].x, clipPlaneOrigins[i].y, clipPlaneOrigins[i].z);
-    tmpPlanes[i]->SetNormal(normal.x, normal.y, normal.z);
-    planes->AddItem(tmpPlanes[i]);
+    // tmpPlanes.push_back(vtkSmartPointer<vtkPlane>::New());
+    vtkNew<vtkPlane> plane;
+    plane->SetOrigin(clipPlaneOrigins[i].x, clipPlaneOrigins[i].y, clipPlaneOrigins[i].z);
+    plane->SetNormal(normal.x, normal.y, normal.z);
+    planes->AddItem(plane);
   }
 
   vtkNew<vtkClipClosedSurface> clipper;
   clipper->SetInputData(polyData);
   clipper->SetClippingPlanes(planes);
+  // clipper->SetActivePlaneId(0);
+  // clipper->SetScalarModeToColors();
+  clipper->SetTolerance(epsilon);
+  clipper->SetTriangulationErrorDisplay(true);
+  // clipper->SetPassPointData(true);
+  clipper->Update();
+  // clipper->PrintSelf(std::cout, vtkIndent());
+
+  auto pdres = clipper->GetOutput();
+  if (pdres->GetNumberOfPolys() > 0) {
+    // pdres->PrintSelf(std::cout, vtkIndent());
+    auto res = vtkPolyDataToMesh(clipper->GetOutput());
+    res.interpolate(mesh);
+    //    LOG(INFO) << res.numTriangles();
+    //    for (size_t i = 0; i < res.numVertices(); ++i) {
+    //      LOG(INFO) << res.vertices()[i] << " " << res.textureCoordinates3D()[i];
+    //    }
+    //    for (size_t i = 0; i < res.numTriangles(); ++i) {
+    //      LOG(INFO) << res.triangleIndices()[i];
+    //    }
+    //    LOG(INFO) << "original: ";
+    //    LOG(INFO) << mesh.numTriangles();
+    //    for (size_t i = 0; i < mesh.numVertices(); ++i) {
+    //      LOG(INFO) << mesh.vertices()[i] << " " << mesh.textureCoordinates3D()[i];
+    //    }
+    return res;
+  } else {
+    return mesh;
+  }
+}
+
+ZMesh ZMesh::planeClosedSurfaceIntersection(const ZMesh& mesh,
+                                            const glm::vec3& clipPlaneNormal,
+                                            const glm::vec3& clipPlaneOrigin,
+                                            double epsilon)
+{
+  // PolyData to process
+  vtkSmartPointer<vtkPolyData> polyData = meshToVtkPolyData(mesh);
+
+  vtkNew<vtkPlaneCollection> planes;
+  glm::vec3 normal = glm::normalize(clipPlaneNormal);
+  vtkNew<vtkPlane> plane;
+  plane->SetOrigin(clipPlaneOrigin.x, clipPlaneOrigin.y, clipPlaneOrigin.z);
+  plane->SetNormal(normal.x, normal.y, normal.z);
+  planes->AddItem(plane);
+
+  vtkNew<vtkClipClosedSurface> clipper;
+  clipper->SetInputData(polyData);
+  clipper->SetClippingPlanes(planes);
   clipper->SetActivePlaneId(0);
-  clipper->SetScalarModeToColors();
+  clipper->SetScalarModeToLabels();
   clipper->SetTolerance(epsilon);
   clipper->SetTriangulationErrorDisplay(true);
   clipper->Update();
-  clipper->PrintSelf(std::cout, vtkIndent());
 
-  LOG(INFO) << "1";
   auto pdres = clipper->GetOutput();
-  pdres->PrintSelf(std::cout, vtkIndent());
-  auto res = vtkPolyDataToMesh(clipper->GetOutput());
-  LOG(INFO) << "1";
-  res.interpolate(mesh);
-  LOG(INFO) << "1";
-  return res;
+  if (pdres->GetNumberOfPolys() > 0) {
+    // pdres->PrintSelf(std::cout, vtkIndent());
+    auto res = vtkPolyDataToMesh(clipper->GetOutput(), 2);
+    for (size_t t = 0; t < res.numTriangles(); ++t) {
+      for (size_t v = 0; v < 3; ++v) {
+        auto vertex = glm::dvec3(res.triangleVertex(t, v));
+        auto dist = plane->DistanceToPlane(&vertex[0]);
+        if (dist > 1e-2) {
+          // LOG(INFO) << dist;
+          return ZMesh();
+        }
+      }
+    }
+    res.interpolate(mesh);
+    return res;
+  } else {
+    return ZMesh();
+  }
 }
 
 void ZMesh::swapXY()
