@@ -602,7 +602,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
-  if (FLAGS_atlas_readRegionToImg_version == 0) {
+  if (FLAGS_atlas_readRegionToImg_version == 1) {
     auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
                                                                            xyRatio,
                                                                            zRatio,
@@ -703,7 +703,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                            std::make_shared<ZImg>(res));
         return res;
       });
-  } else if (FLAGS_atlas_readRegionToImg_version == 1) {
+  } else if (FLAGS_atlas_readRegionToImg_version == 0) {
     return folly::via(cpuExecutor, [=, &resInfo]() {
       auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
                                                                              xyRatio,
