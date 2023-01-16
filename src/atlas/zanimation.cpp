@@ -456,8 +456,6 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
     m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
-
-  ZImgRegionCache::instance().clear();
 }
 
 void ZAnimation::export3DAnimation(const QString& fn,
@@ -604,8 +602,6 @@ void ZAnimation::export3DAnimation(const QString& fn,
     m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
-
-  ZImgRegionCache::instance().clear();
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
