@@ -3,6 +3,7 @@
 #include "zcpuinfo.h"
 #include "z3dgpuinfo.h"
 #include "zlog.h"
+#include "zimgregioncache.h"
 #include <QFileInfo>
 #include <QPoint>
 #include <QDir>
@@ -17,7 +18,7 @@ DEFINE_bool(atlas_readRegionToImg_use_multithreaded_resize,
 
 DEFINE_uint32(atlas_readRegionToImg_version,
               0,
-              "Which version of readRegionToImg to use, value can be 0-1, default is 0");
+              "Which version of readRegionToImg to use, value can be 0-3, default is 0");
 
 // DEFINE_bool(atlas_readRegionToImg_use_ipp_resize,
 //             false,
@@ -602,6 +603,205 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   if (FLAGS_atlas_readRegionToImg_version == 0) {
+    auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
+                                                                           xyRatio,
+                                                                           zRatio,
+                                                                           sx,
+                                                                           sy,
+                                                                           sz,
+                                                                           sc,
+                                                                           t,
+                                                                           resInfo.width,
+                                                                           resInfo.height,
+                                                                           resInfo.depth,
+                                                                           displayRangeMin,
+                                                                           displayRangeMax));
+    if (img) {
+      return folly::makeFuture(*img);
+    }
+
+    auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+    return folly::via(cpuExecutor,
+                      [=]() {
+                        std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
+                        if (auto tiit =
+                              m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+                            tiit != m_rtToTileBoxRTree.end()) {
+                          std::vector<size_t> queryResult;
+                          TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
+                                               TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                                              (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                                              (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+                          tiit->second->query(bgi::intersects(queryBox),
+                                              boost::make_function_output_iterator([&queryResult](const auto& value) {
+                                                queryResult.push_back(value.second);
+                                              }));
+
+                          for (auto tileIndex : queryResult) {
+                            const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
+                            tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+                              return std::make_tuple(
+                                ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                                 std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                                 std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                                 -ZVoxelCoordinate::value_type(sc),
+                                                 0),
+                                ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile));
+                            }));
+                          }
+                        }
+                        return folly::collect(tileFutures);
+                      })
+      .via(cpuExecutor)
+      .then([=](const auto& tiles) {
+        ZImg res;
+        if (tiles.hasValue() && !tiles.value().empty()) {
+          auto tmpResInfo = resInfo;
+          tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+          tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+          tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+          res = ZImg(tmpResInfo);
+          for (const auto& [start, imgPtr] : tiles.value()) {
+            if (imgPtr->isSameType(res)) {
+              if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+                ZImg tmp = imgPtr->normalized(displayRangeMin, displayRangeMax);
+                res.pasteImg(tmp, start);
+              } else {
+                res.pasteImg(*imgPtr, start);
+              }
+            } else {
+              ZImg tmp = imgPtr->convertTo(displayRangeMin, displayRangeMax, res);
+              res.pasteImg(tmp, start);
+            }
+          }
+          if (res.width() != resInfo.width || res.height() != resInfo.height || res.depth() != resInfo.depth) {
+            res.resize(resInfo.width,
+                       resInfo.height,
+                       resInfo.depth,
+                       Interpolant::Cubic,
+                       true,
+                       false,
+                       FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+          }
+        } else {
+          res = ZImg(resInfo);
+        }
+
+        ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
+                                                                       xyRatio,
+                                                                       zRatio,
+                                                                       sx,
+                                                                       sy,
+                                                                       sz,
+                                                                       sc,
+                                                                       t,
+                                                                       resInfo.width,
+                                                                       resInfo.height,
+                                                                       resInfo.depth,
+                                                                       displayRangeMin,
+                                                                       displayRangeMax),
+                                           std::make_shared<ZImg>(res));
+        return res;
+      });
+  } else if (FLAGS_atlas_readRegionToImg_version == 1) {
+    return folly::via(cpuExecutor, [=, &resInfo]() {
+      auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
+                                                                             xyRatio,
+                                                                             zRatio,
+                                                                             sx,
+                                                                             sy,
+                                                                             sz,
+                                                                             sc,
+                                                                             t,
+                                                                             resInfo.width,
+                                                                             resInfo.height,
+                                                                             resInfo.depth,
+                                                                             displayRangeMin,
+                                                                             displayRangeMax));
+      if (img) {
+        return folly::makeFuture(*img);
+      }
+
+      auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
+      std::vector<size_t> queryResult;
+      if (auto tiit = m_rtToTileBoxRTree.find(std::make_tuple(readRatio[0], readRatio[1], readRatio[2], t));
+          tiit != m_rtToTileBoxRTree.end()) {
+        TileBoxType queryBox(TileCornerType(sx * xyRatio, sy * xyRatio, sz * zRatio),
+                             TileCornerType((sx + static_cast<index_t>(resInfo.width)) * xyRatio - 1,
+                                            (sy + static_cast<index_t>(resInfo.height)) * xyRatio - 1,
+                                            (sz + static_cast<index_t>(resInfo.depth)) * zRatio - 1));
+        tiit->second->query(bgi::intersects(queryBox),
+                            boost::make_function_output_iterator([&queryResult](const auto& value) {
+                              queryResult.push_back(value.second);
+                            }));
+      }
+
+      if (queryResult.empty()) {
+        return folly::makeFuture(ZImg(resInfo));
+      }
+
+      auto tmpResInfo = resInfo;
+      tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
+      tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
+      tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
+      auto res = new ZImg(tmpResInfo); // will be used as return value
+      std::vector<folly::Future<folly::Unit>> tileFutures;
+
+      for (auto tileIndex : queryResult) {
+        const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
+        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
+          auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
+          ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
+                                 std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
+                                 std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
+                                 -ZVoxelCoordinate::value_type(sc),
+                                 0);
+          if (imgPtr->isSameType(*res)) {
+            if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
+              ZImg tmp = imgPtr->normalized(displayRangeMin, displayRangeMax);
+              res->pasteImg(tmp, start);
+            } else {
+              res->pasteImg(*imgPtr, start);
+            }
+          } else {
+            ZImg tmp = imgPtr->convertTo(displayRangeMin, displayRangeMax, *res);
+            res->pasteImg(tmp, start);
+          }
+        }));
+      }
+
+      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
+        if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
+          res->resize(resInfo.width,
+                      resInfo.height,
+                      resInfo.depth,
+                      Interpolant::Cubic,
+                      true,
+                      false,
+                      FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
+        }
+        ZImg rres;
+        rres.swap(*res);
+        delete res;
+
+        ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
+                                                                       xyRatio,
+                                                                       zRatio,
+                                                                       sx,
+                                                                       sy,
+                                                                       sz,
+                                                                       sc,
+                                                                       t,
+                                                                       resInfo.width,
+                                                                       resInfo.height,
+                                                                       resInfo.depth,
+                                                                       displayRangeMin,
+                                                                       displayRangeMax),
+                                           std::make_shared<ZImg>(rres));
+        return rres;
+      });
+    });
+  } else if (FLAGS_atlas_readRegionToImg_version == 2) {
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
     return folly::via(cpuExecutor,
                       [=]() {

@@ -341,7 +341,7 @@ struct hash<nim::ImageCacheHashKeyType>
 {
   inline std::size_t operator()(const nim::ImageCacheHashKeyType& s) const noexcept
   {
-    return boost::hash<std::tuple<const void*, size_t>>{}(s);
+    return boost::hash<nim::ImageCacheHashKeyType>{}(s);
   }
 };
 #endif

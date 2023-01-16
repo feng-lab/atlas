@@ -4,6 +4,7 @@
 #include "z3dimg.h"
 #include "zimgformat.h"
 #include "zbenchtimer.h"
+#include "zimgregioncache.h"
 #include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
@@ -824,6 +825,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         ZImgCache::instance().clear();
       }
       LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
+      LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
     } else {
       m_lastRenderingIsFastRendering = true;
 

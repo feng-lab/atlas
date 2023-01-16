@@ -10,6 +10,7 @@
 #include "z3dcanvas.h"
 #include "z3dcanvaspainter.h"
 #include "zgraphicsview.h"
+#include "zimgregioncache.h"
 #include <QLabel>
 #include <QFile>
 #include <QFileInfo>
@@ -455,6 +456,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
     m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
+
+  ZImgRegionCache::instance().clear();
 }
 
 void ZAnimation::export3DAnimation(const QString& fn,
@@ -601,6 +604,8 @@ void ZAnimation::export3DAnimation(const QString& fn,
     m_tempDir = tempdir;
     m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
   }
+
+  ZImgRegionCache::instance().clear();
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,

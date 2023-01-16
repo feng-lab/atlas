@@ -4,13 +4,16 @@
 # win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode
 --zimg_llfio_mapped_file_handle_flags=multiplexable
 
-# Proportion of RAM that will be used for image cache, default is 0.5
---atlas_image_cache_memory_proportion=0.5
+# Proportion of RAM that will be used for image cache, default is 0.3
+--atlas_image_cache_memory_proportion=0.3
+
+# Proportion of RAM that will be used for image region cache, default is 0.3
+--atlas_image_region_cache_memory_proportion=0.3
 
 # Interval in seconds for logging folly global executor status during waiting, default is 5
 --atlas_log_folly_global_executor_status_interval_in_seconds=5
 
-# Which version of readRegionToImg to use, value can be 0-1, default is 0
+# Which version of readRegionToImg to use, value can be 0-3, default is 0
 --atlas_readRegionToImg_version=0
 
 # Whether readRegionToImg uses multithreaded resize, default is false
