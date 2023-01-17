@@ -217,8 +217,8 @@ private:
 
   Z3DCanvas* m_canvas = nullptr;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
-  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;
+  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;  // has to be destroyed before (so declared after) m_canvasPainter
   std::unique_ptr<Z3DCompositor> m_compositor;
 
   ZBBox<glm::dvec3> m_boundBox;
