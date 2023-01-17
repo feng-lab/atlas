@@ -173,6 +173,8 @@ void ZImgPack::save(const QString& fileName, FileFormat format, const ZImgWriteP
   for (size_t i = 0; i < m_allTiles.size(); ++i) {
     ZImgCache::instance().remove(ImageCacheHashKeyType(this, i));
   }
+  ZImgRegionCache::instance().clear();
+
   std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> subBlocks;
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(m_imgSource.filenames[0], &subBlocks, m_imgSource.format);
   CHECK(!infos.empty() && !subBlocks.empty());

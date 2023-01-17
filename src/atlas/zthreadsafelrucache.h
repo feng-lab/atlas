@@ -367,9 +367,9 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::insert(const TKey& key, const TVa
     // We could continue to evict in a loop, but if there are a lot of threads
     // here at the same time, that could lead to spinning. So we will just evict
     // one extra element per insert() until the overfill is rectified.
-    // if (m_size.compare_exchange_strong(size, size - 1)) {
-    evict();
-    //}
+    if (m_size.compare_exchange_strong(size, size)) {
+      evict();
+    }
   }
   return true;
 }
