@@ -15,6 +15,10 @@ DEFINE_bool(atlas_clear_image_cache_after_rendering,
             false,
             "Clear image cache after rendering, for test, default is false");
 
+DEFINE_uint32(atlas_volume_rendering_maximum_round,
+              100,
+              "Maximum number of rounds for volume rendering, default is 100");
+
 namespace nim {
 
 Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
@@ -526,8 +530,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();
 
       for (size_t i = 0; i < visibleIdxs.size(); ++i) {
-        for (auto repeat = 0; repeat < 100; ++repeat) {
-          LOG(INFO) << "repeat " << repeat;
+        for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
+          LOG(INFO) << "round " << round;
           ZBenchTimer btrb("render blockids");
           m_image3DRaycasterBlockIDsShader.bind();
           //          m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP",
@@ -554,7 +558,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             GL_COLOR_ATTACHMENT7,
           };
 
-          if (repeat == 0) {
+          if (round == 0) {
             m_lastImageRenderTarget->bind();
             glDrawBuffers(2, g_drawBuffers);
             m_lastImageRenderTarget->clear();
@@ -730,7 +734,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             CHECK(ccSet.size() < m_img->numCachedImages() * 10);
             missingBlockIDs.reserve(ccSet.size());
             missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
-            if ((repeat % 2 == 1) && hasEnoughMissingIDs) {
+            if ((round % 2 == 1) && hasEnoughMissingIDs) {
               std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
             } else {
               std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
@@ -792,8 +796,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
 
-          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(QString("/Users/feng/Downloads/att1_repeat%1.nim").arg(repeat));
-          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(QString("/Users/feng/Downloads/att2_repeat%1.nim").arg(repeat));
+          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(QString("/Users/feng/Downloads/att1_repeat%1.nim").arg(round));
+          // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(QString("/Users/feng/Downloads/att2_repeat%1.nim").arg(round));
 
           if (lastRound) {
             break;

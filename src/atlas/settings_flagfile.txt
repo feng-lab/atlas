@@ -39,3 +39,6 @@
 
 # Whether to clear image cache after rendering, for test, default is false
 --atlas_clear_image_cache_after_rendering=false
+
+# Maximum number of rounds for volume rendering, default is 100
+--atlas_volume_rendering_maximum_round=100
