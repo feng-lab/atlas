@@ -256,7 +256,7 @@ public:
 
   explicit ZImgCache(bool canSkipDestructor = false);
 
-  inline void insert(const ImageCacheHashKeyType& key, std::shared_ptr<ZImg> object)
+  inline void insert(const ImageCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
   {
     ZThreadSafeScalableImageCache::insert(key, object, object->byteNumber());
   }
@@ -308,7 +308,7 @@ public:
     if (find(ca, key, findStategy)) {
       return *ca;
     } else {
-      return std::shared_ptr<ZImg>();
+      return {};
     }
   }
 

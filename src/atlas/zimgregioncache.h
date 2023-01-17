@@ -38,7 +38,7 @@ public:
 
   explicit ZImgRegionCache(bool canSkipDestructor = false);
 
-  inline void insert(const ImageRegionCacheHashKeyType& key, std::shared_ptr<ZImg> object)
+  inline void insert(const ImageRegionCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
   {
     ZThreadSafeScalableImageRegionCache::insert(key, object, object->byteNumber());
   }
@@ -50,7 +50,7 @@ public:
     if (find(ca, key, findStategy)) {
       return *ca;
     } else {
-      return std::shared_ptr<ZImg>();
+      return {};
     }
   }
 

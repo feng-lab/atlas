@@ -437,7 +437,8 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
     HashMapAccessor hashAccessor;
     if (!m_map.find(hashAccessor, moribund->m_key)) {
       // Presumably unreachable
-      return;
+      delete moribund;
+      continue;
     }
     m_map.erase(hashAccessor);
     delete moribund;
