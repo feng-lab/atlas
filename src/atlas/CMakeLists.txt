@@ -707,6 +707,8 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
+  target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
+
   # for some files
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
                               "-Wno-unused-parameter")
