@@ -461,8 +461,8 @@ void ZImgPng::writeImg(const QString& filename, const ZImg& img, const ZImgWrite
   png_text text[1];
   int num_text = 0;
   text[num_text].compression = PNG_TEXT_COMPRESSION_NONE;
-  text[num_text].key = strdup("Description");
-  text[num_text].text = strdup("Created by zimg");
+  text[num_text].key = const_cast<char*>("Description");
+  text[num_text].text = const_cast<char*>("Created by zimg");
   ++num_text;
   png_set_text(png.pngPtr, png.infoPtr, text, num_text);
 

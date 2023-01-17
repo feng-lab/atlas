@@ -707,6 +707,7 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
+  target_compile_options(${APP_NAME} PUBLIC -fsanitize=address)
   target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
 
   # for some files

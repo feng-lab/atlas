@@ -353,7 +353,7 @@ if (WIN32)
   #set_source_files_properties(zminimumspanningtree.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC $<$<COMPILE_LANGUAGE:CXX>:-frtti>)
-  target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing -fsanitize=address)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress -Wdeprecated)
   target_compile_options(${LIBRARY_NAME} PUBLIC -mavx -fopenmp-simd -DSIMDE_ENABLE_OPENMP)
@@ -372,6 +372,7 @@ else (WIN32)
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
   endif ()
 
+  target_compile_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
   target_link_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
 
   # for some files
