@@ -2607,7 +2607,8 @@ def build_libs(libs: OrderedDict, update_src: bool):
             jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
             print(jdk_dir)
             if not os.path.exists(jdk_dir):
-                os.unlink(os.path.join(ext_build_dir(), 'jdk'))
+                if os.path.exists(os.path.join(ext_build_dir(), 'jdk')):
+                    os.unlink(os.path.join(ext_build_dir(), 'jdk'))
                 remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jdk*'))
                 unpack_file_to_folder(package_name, ext_build_dir())
                 assert os.path.exists(jdk_dir)
