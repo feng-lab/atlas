@@ -2599,14 +2599,15 @@ def build_libs(libs: OrderedDict, update_src: bool):
             distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
 
             if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*macos*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*mac*'))
             elif is_linux():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*linux*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*linux*'))
             else:
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*jdk*windows*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*windows*'))
             jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
             print(jdk_dir)
             if not os.path.exists(jdk_dir):
+                os.unlink(os.path.join(ext_build_dir(), 'jdk'))
                 remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jdk*'))
                 unpack_file_to_folder(package_name, ext_build_dir())
                 assert os.path.exists(jdk_dir)
