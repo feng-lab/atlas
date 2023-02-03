@@ -1187,7 +1187,7 @@ inline void aligned_dealloc(void *ptr)
     { _aligned_free(ptr); }
 #elif __cplusplus >= 201703L"""
         bak_file_1 = patch_file(orig_file_1,
-                                from_texts=[r'#if __cplusplus >= 201703L',
+                                from_texts=[r'#if (__cplusplus >= 201703L) && (!defined(__MINGW32__))',
                                             ],
                                 to_texts=[msvc_workaround,
                                           ])
