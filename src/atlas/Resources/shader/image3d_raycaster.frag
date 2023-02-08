@@ -118,7 +118,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
       ch1V = voxel;
       rayDepth = currentRayLength;
     }
-    finished = ch1V >= 1.0;
+    finished = ch1V >= .95;
 #endif
 #else
 #if GLSL_VERSION >= 130

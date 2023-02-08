@@ -48,7 +48,7 @@ public:
 
   [[nodiscard]] glm::dvec2 displayRange(size_t ch) const
   {
-    return m_displayRanges.at(ch);
+    return m_channelDisplayRanges.at(ch);
   }
 
   [[nodiscard]] glm::uvec3 dimensions() const
@@ -142,12 +142,12 @@ public:
     return m_numLevels;
   }
 
-  [[nodiscard]] size_t numCachedImages() const
+  [[nodiscard]] size_t numCachedImages(size_t c) const
   {
-    return m_imageCacheManager->size();
+    return m_channelImageCacheManagers[c]->size();
   }
 
-  void bindFullResBlockIDsShader(Z3DShaderProgram& shader) const;
+  void bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const;
 
   void bindFullResRenderShader(Z3DShaderProgram& shader) const;
 
@@ -155,6 +155,7 @@ public:
 
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           const std::vector<uint32_t>& usedBlockIDs,
+                                          size_t c,
                                           bool silenceExistingWarning = true);
 
   void uploadImageCache(size_t channel);
@@ -174,15 +175,15 @@ protected:
   const int m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
   const int m_emptyFlag = 40000;
 
-  std::vector<glm::uvec4> m_pageDirectory;
+  std::vector<std::vector<glm::uvec4>> m_channelPageDirectories;
   glm::uvec3 m_pageDirectorySize;
-  std::unique_ptr<Z3DTexture> m_pageDirectoryTexture;
-  std::vector<glm::uvec4> m_pageTableCache;
+  std::vector<std::unique_ptr<Z3DTexture>> m_channelPageDirectoryTextures;
+  std::vector<std::vector<glm::uvec4>> m_channelPageTableCaches;
   glm::uvec3 m_pageTableCacheSize;
-  std::unique_ptr<Z3DTexture> m_pageTableCacheTexture;
-  std::unique_ptr<Z3DBlockCache<glm::uvec4>> m_pageTableCacheManager;
-  std::vector<std::unique_ptr<Z3DTexture>> m_imageCacheTextures;
-  std::unique_ptr<Z3DBlockCache<glm::uvec4>> m_imageCacheManager;
+  std::vector<std::unique_ptr<Z3DTexture>> m_channelPageTableCacheTextures;
+  std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelPageTableCacheManagers;
+  std::vector<std::unique_ptr<Z3DTexture>> m_channelImageCacheTextures;
+  std::vector<std::unique_ptr<Z3DBlockCache<glm::uvec4>>> m_channelImageCacheManagers;
 
   size_t m_numLevels = 1;
   std::vector<glm::uvec3> m_pageDirectoryBases;
@@ -208,7 +209,7 @@ private:
 
   ZVertexBufferObject m_PBO;
 
-  std::vector<glm::dvec2> m_displayRanges;
+  std::vector<glm::dvec2> m_channelDisplayRanges;
 };
 
 } // namespace nim
