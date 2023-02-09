@@ -325,7 +325,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_doubleChannelRangeParas.emplace_back(
         std::make_unique<ZDoubleSpanParameter>(QString("Channel %1 Display Range").arg(c + 1),
                                                drs[c],
-                                               imgPack.rangeMin(),
+                                               imgPack.rangeMin() + (imgPack.rangeMax() - imgPack.rangeMin()) * 0.02,
                                                imgPack.rangeMax()));
       m_doubleChannelRangeParas.back()->setStyle("SPINBOX");
       if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
@@ -337,6 +337,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
               this,
               &Z3DImgFilter::channelRangeChanged);
     }
+    channelRangeChanged();
 
     bool is2DImage = m_3dImg->is2DData();
     glm::uvec3 volDim = m_3dImg->dimensions();
