@@ -650,7 +650,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       }
 
       if (queryResult.empty()) {
-        return folly::makeFuture(ZImg(resInfo));
+        return folly::makeFuture(ZImg());
       }
 
       auto tmpResInfo = resInfo;
