@@ -149,16 +149,12 @@ public:
 
   void bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const;
 
-  void bindFullResRenderShader(Z3DShaderProgram& shader) const;
-
-  void bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
+  void bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
 
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           const std::vector<uint32_t>& usedBlockIDs,
                                           size_t c,
                                           bool silenceExistingWarning = true);
-
-  void uploadImageCache(size_t channel);
 
 protected:
   void readVolumes();
@@ -203,9 +199,6 @@ private:
   std::vector<std::unique_ptr<Z3DVolume>> m_volumes;
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
-
-  std::vector<std::vector<std::pair<glm::uvec3, glm::uvec4>>>
-    m_channelPendingUpdates; // block cache pos and block image pos
 
   ZVertexBufferObject m_PBO;
 

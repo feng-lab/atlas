@@ -748,6 +748,11 @@ public:
     return m_info.isSameType(other.m_info);
   }
 
+  [[nodiscard]] inline bool isSameType(const ZImgInfo& otherInfo) const
+  {
+    return m_info.isSameType(otherInfo);
+  }
+
   [[nodiscard]] inline bool isSameSize(const ZImg& other) const
   {
     return m_info.isSameSize(other.m_info);
@@ -1418,6 +1423,12 @@ public:
   [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImg& targetImgType) const
   {
     IMG_RETURN_TYPED_CALL(convertTo, targetImgType.info(), minData, maxData)
+  }
+
+  template<typename TRange>
+  [[nodiscard]] ZImg convertTo(TRange minData, TRange maxData, const ZImgInfo& targetImgTypeInfo) const
+  {
+    IMG_RETURN_TYPED_CALL(convertTo, targetImgTypeInfo, minData, maxData)
   }
 
   // resize in x-y-z dimensions

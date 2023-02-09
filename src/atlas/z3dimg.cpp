@@ -14,6 +14,7 @@
 #include <folly/synchronization/Latch.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
 #include <boost/functional/hash.hpp>
+#include <boost/dynamic_bitset.hpp>
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <chrono>
@@ -43,8 +44,6 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
   readVolumes();
 
   if (m_isVolumeDownsampled) {
-    m_channelPendingUpdates.resize(m_nChannels);
-
     auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
 
     glm::uvec3 imageCacheSize;
@@ -190,10 +189,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
     return;
   }
 
-  for (auto& pu : m_channelPendingUpdates) {
-    pu.clear();
-  }
-
   const ZImgInfo& info = m_imgPack.imgInfo();
   glm::dvec3 imgDim = glm::dvec3(info.width, info.height, info.depth);
   glm::dvec3 relativeResolution = glm::dvec3(glm::abs(scale));
@@ -331,10 +326,6 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
   CHECK(m_imgPack.imgInfo().numChannels == m_channelDisplayRanges.size())
     << m_imgPack.imgInfo().numChannels << " " << m_channelDisplayRanges.size();
 
-  for (auto& pu : m_channelPendingUpdates) {
-    pu.clear();
-  }
-
   glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
   for (size_t c = 0; c < m_nChannels; ++c) {
     m_channelPageTableCacheManagers[c] =
@@ -364,7 +355,7 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
 }
 
-void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader) const
+void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 {
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
@@ -373,10 +364,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader) const
   shader.setUniform("image_block_size", m_imageBlockSize);
   shader.setUniform("image_address_to_normalized_texture_coord",
                     1.f / glm::vec3(m_channelImageCacheTextures[0]->dimension() - 1_u32));
-}
 
-void Z3DImg::bindImageCacheToFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
-{
   shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
   shader.bindTexture("image_cache", m_channelImageCacheTextures[c].get());
@@ -424,6 +412,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     m_channelPageTableCacheManagers[c]->touch(key);
   }
 
+  std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*,
   auto count = 0;
   auto alreadyMapped = 0;
   // level = 0;
@@ -474,36 +463,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     }
 
-    glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
-    // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " << level;
-    if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
-      glm::uvec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::uvec4(1, m_pageTableBlockSize);
-      glm::uvec3 erasedKeyPageDirectoryEntryCoord =
-        m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
-      glm::uvec4& erasedKeyPageDirectoryEntry =
-        m_channelPageDirectories[c][erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
-                                    erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
-                                    erasedKeyPageDirectoryEntryCoord.x];
-
-      if (erasedKeyPageDirectoryEntry.w > 0) {
-        glm::uvec3 erasedKeyPageTableEntryCoord =
-          erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % m_pageTableBlockSize;
-        glm::uvec4& erasedKeyPageTableEntry =
-          m_channelPageTableCaches[c][erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                                      erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
-                                      erasedKeyPageTableEntryCoord.x];
-        if (erasedKeyPageTableEntry.w > 0) {
-          erasedKeyPageTableEntry.w = 0;
-          --erasedKeyPageDirectoryEntry.w;
-          if (erasedKeyPageDirectoryEntry.w == 0) {
-            // unmap entire page table block
-            m_channelPageTableCacheManagers[c]->remove(erasedKeyPageDirectoryEntryKey);
-            ++numAvailablePageCacheBlock;
-          }
-        }
-      }
-    }
-
+    glm::uvec4* pageTableEntry = nullptr;
     if (pageDirectoryEntry.w == 0) { // page directory unmapped
       if (numAvailablePageCacheBlock > 0) { // construct new page table block
         glm::uvec3 pageTableBlockCachePos =
@@ -532,10 +492,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
 
         pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
-        glm::uvec4& pageTableEntry =
-          m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-        pageTableEntry = glm::uvec4(imageBlockCachePos, 1);
+        pageTableEntry =
+          &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                                       pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+
         --numAvailablePageCacheBlock;
       } else {
         m_channelImageCacheManagers[c]->popFront();
@@ -544,28 +504,263 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     } else { // page directory mapped
       CHECK(pageDirectoryEntry.w > 0);
-      m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                                  pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x] =
-        glm::uvec4(imageBlockCachePos, 1);
+      pageTableEntry =
+        &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                                     pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
       ++pageDirectoryEntry.w;
     }
+    CHECK(pageTableEntry);
 
-    glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
-    auto blockCachePos = glm::uvec3(imageBlockCachePos);
-    for (auto& pu : m_channelPendingUpdates) {
-      if (auto it = std::find_if(pu.begin(),
-                                 pu.end(),
-                                 [&](const auto& pr) {
-                                   return pr.first == blockCachePos;
-                                 });
-          it != pu.end()) {
-        pu.erase(it);
-      }
-      pu.emplace_back(blockCachePos, blockImagePos);
-    }
+    pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntry));
     ++count;
   }
-  LOG(INFO) << "filled " << count << " blocks (" << alreadyMapped << " already mapped)";
+
+  // read image
+  int emptyBlockCount = 0;
+  if (!pendingTasks.empty()) {
+    ZBenchTimer bti(fmt::format("upload image ch{} cache", c));
+
+    LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
+
+    auto cpuExecutor = folly::getGlobalCPUExecutor();
+    auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
+    CHECK(p);
+
+    //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
+    //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
+    //  }
+
+    ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", c));
+
+    auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
+    ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
+    auto blockSizeInByte = resInfo.byteNumber();
+
+    uint8_t* pboPtr = nullptr;
+    std::vector<uint8_t> pboLocalBuffer;
+    if (pendingTasks.size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
+      m_PBO.bind(GL_PIXEL_UNPACK_BUFFER);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, blockSizeInByte * pendingTasks.size(), nullptr, GL_STREAM_DRAW);
+      pboPtr = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
+      if (!pboPtr) {
+        LOG(WARNING) << "glMapBuffer failed on PBO";
+        m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
+      } else {
+        pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size());
+      }
+    }
+
+    if (!pboPtr) {
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+      folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
+#else
+      folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
+#endif
+      std::vector<folly::Future<folly::Unit>> blockFutures;
+      blockFutures.reserve(pendingTasks.size());
+      for (size_t i = 0; i < pendingTasks.size(); ++i) {
+        const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
+        glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+        blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
+          return m_imgPack
+            .readRegionToImg(m_levelScales[blockImagePos.x].x,
+                             m_levelScales[blockImagePos.x].z,
+                             index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                             index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                             index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                             c,
+                             0,
+                             resInfo,
+                             m_channelDisplayRanges[c].x,
+                             m_channelDisplayRanges[c].y)
+            .thenValueInline([=, &imgQueue](ZImg&& img) {
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+              imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
+#else
+                imgQueue.enqueue(std::make_tuple(i, std::move(img)));
+#endif
+            });
+        }));
+      }
+      auto f = folly::collect(blockFutures).via(cpuExecutor).then([](auto&&) {
+        LOG(INFO) << "image blocks reading finished.";
+      });
+
+      std::tuple<size_t, ZImg> elem;
+      auto lastLogTime = std::chrono::steady_clock::now();
+      int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
+      while (remainingBlocksToUpload > 0) {
+#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
+        if (imgQueue.tryReadUntil(std::chrono::steady_clock::now() +
+                                    std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s),
+                                  elem)) {
+#else
+        if (imgQueue.try_dequeue_until(
+              elem,
+              std::chrono::steady_clock::now() +
+                std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
+#endif
+          if (std::get<1>(elem).isEmpty()) {
+            ++emptyBlockCount;
+            *std::get<1>(pendingTasks[std::get<0>(elem)]) = glm::uvec4(0, 0, 0, m_emptyFlag);
+          } else {
+            const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[std::get<0>(elem)];
+            glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
+            *pageTableEntry = glm::uvec4(imageBlockCachePos, 1);
+            // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
+            // level;
+            if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
+              glm::uvec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::uvec4(1, m_pageTableBlockSize);
+              glm::uvec3 erasedKeyPageDirectoryEntryCoord =
+                m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
+              glm::uvec4& erasedKeyPageDirectoryEntry =
+                m_channelPageDirectories[c][erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x *
+                                              m_pageDirectorySize.y +
+                                            erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
+                                            erasedKeyPageDirectoryEntryCoord.x];
+
+              if (erasedKeyPageDirectoryEntry.w > 0) {
+                glm::uvec3 erasedKeyPageTableEntryCoord =
+                  erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % m_pageTableBlockSize;
+                glm::uvec4& erasedKeyPageTableEntry =
+                  m_channelPageTableCaches[c][erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x *
+                                                m_pageTableCacheSize.y +
+                                              erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
+                                              erasedKeyPageTableEntryCoord.x];
+                if (erasedKeyPageTableEntry.w > 0) {
+                  erasedKeyPageTableEntry.w = 0;
+                  --erasedKeyPageDirectoryEntry.w;
+                  if (erasedKeyPageDirectoryEntry.w == 0) {
+                    // unmap entire page table block
+                    m_channelPageTableCacheManagers[c]->remove(erasedKeyPageDirectoryEntryKey);
+                    ++numAvailablePageCacheBlock;
+                  }
+                }
+              }
+            }
+            m_channelImageCacheTextures[c]->uploadSubImage(imageBlockCachePos,
+                                                           imageBlockSize,
+                                                           std::get<1>(elem).channelData(0));
+          }
+          --remainingBlocksToUpload;
+        }
+        if (std::chrono::steady_clock::now() - lastLogTime >=
+            std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
+          auto poolStats = p->getPoolStats();
+          LOG(INFO) << fmt::format(
+            "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",
+            poolStats.pendingTaskCount,
+            poolStats.totalTaskCount,
+            poolStats.activeThreadCount,
+            poolStats.idleThreadCount,
+            imgQueue.size(),
+            remainingBlocksToUpload);
+          lastLogTime = std::chrono::steady_clock::now();
+        }
+      }
+    } else {
+      boost::dynamic_bitset blockIsEmpty(pendingTasks.size(), 0);
+      std::vector<folly::Future<folly::Unit>> blockFutures;
+      blockFutures.reserve(pendingTasks.size());
+      for (int i = 0; i < static_cast<int>(pendingTasks.size()); ++i) {
+        const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
+        glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+        blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty]() {
+          return m_imgPack
+            .readRegionToImg(m_levelScales[blockImagePos.x].x,
+                             m_levelScales[blockImagePos.x].z,
+                             index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                             index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                             index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                             c,
+                             0,
+                             resInfo,
+                             m_channelDisplayRanges[c].x,
+                             m_channelDisplayRanges[c].y)
+            .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](ZImg&& img) {
+              if (img.isEmpty()) {
+                blockIsEmpty.set(i);
+              } else {
+                memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
+              }
+            });
+        }));
+      }
+      auto f = folly::collect(blockFutures).via(cpuExecutor).then([=, &pboLocalBuffer](auto&&) {
+        memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
+        LOG(INFO) << "image blocks reading finished.";
+      });
+
+      while (
+        !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+        auto poolStats = p->getPoolStats();
+        LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
+                                 poolStats.pendingTaskCount,
+                                 poolStats.totalTaskCount,
+                                 poolStats.activeThreadCount,
+                                 poolStats.idleThreadCount);
+      }
+      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+
+      ZBenchTimer bt_pboUpload("PBO uploading");
+      for (size_t i = 0; i < pendingTasks.size(); ++i) {
+        if (blockIsEmpty.at(i)) {
+          *std::get<1>(pendingTasks[i]) = glm::uvec4(0, 0, 0, m_emptyFlag);
+          continue;
+        }
+        const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[i];
+        glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
+        *pageTableEntry = glm::uvec4(imageBlockCachePos, 1);
+        // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
+        // level;
+        if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
+          glm::uvec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::uvec4(1, m_pageTableBlockSize);
+          glm::uvec3 erasedKeyPageDirectoryEntryCoord =
+            m_pageDirectoryBases[erasedKeyPageDirectoryEntryKey.x] + erasedKeyPageDirectoryEntryKey.yzw();
+          glm::uvec4& erasedKeyPageDirectoryEntry =
+            m_channelPageDirectories[c][erasedKeyPageDirectoryEntryCoord.z * m_pageDirectorySize.x *
+                                          m_pageDirectorySize.y +
+                                        erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
+                                        erasedKeyPageDirectoryEntryCoord.x];
+
+          if (erasedKeyPageDirectoryEntry.w > 0) {
+            glm::uvec3 erasedKeyPageTableEntryCoord =
+              erasedKeyPageDirectoryEntry.xyz() + erasedKey.yzw() % m_pageTableBlockSize;
+            glm::uvec4& erasedKeyPageTableEntry =
+              m_channelPageTableCaches[c][erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.x *
+                                            m_pageTableCacheSize.y +
+                                          erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
+                                          erasedKeyPageTableEntryCoord.x];
+            if (erasedKeyPageTableEntry.w > 0) {
+              erasedKeyPageTableEntry.w = 0;
+              --erasedKeyPageDirectoryEntry.w;
+              if (erasedKeyPageDirectoryEntry.w == 0) {
+                // unmap entire page table block
+                m_channelPageTableCacheManagers[c]->remove(erasedKeyPageDirectoryEntryKey);
+                ++numAvailablePageCacheBlock;
+              }
+            }
+          }
+        }
+        m_channelImageCacheTextures[c]->uploadSubImage(imageBlockCachePos,
+                                                       imageBlockSize,
+                                                       (const void*)(i * blockSizeInByte));
+      }
+      STOP_AND_LOG(bt_pboUpload)
+
+      m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
+
+      emptyBlockCount = blockIsEmpty.count();
+    }
+    STOP_AND_LOG(bt_async)
+
+    STOP_AND_LOG(bti)
+  }
+
+  LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks)",
+                           count,
+                           alreadyMapped,
+                           emptyBlockCount);
   m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
   m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
   // glFinish();
@@ -577,169 +772,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 }
 
 // #define ATLAS_uploadImageCache_USE_MPMCQueue
-
-void Z3DImg::uploadImageCache(size_t channel)
-{
-  if (m_channelPendingUpdates[channel].empty()) {
-    return;
-  }
-
-  ZBenchTimer bt(fmt::format("upload image ch{} cache", channel));
-
-  LOG(INFO) << "reading " << m_channelPendingUpdates[channel].size() << " image blocks...";
-
-  auto cpuExecutor = folly::getGlobalCPUExecutor();
-  auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
-  CHECK(p);
-
-  //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
-  //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
-  //  }
-
-  ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", channel));
-
-  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
-  ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
-  auto blockSizeInByte = resInfo.byteNumber();
-
-  uint8_t* pboPtr = nullptr;
-  std::vector<uint8_t> pboLocalBuffer;
-  if (m_channelPendingUpdates[channel].size() >= FLAGS_atlas_number_of_blocks_to_use_PBO_threashold) {
-    m_PBO.bind(GL_PIXEL_UNPACK_BUFFER);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER,
-                 blockSizeInByte * m_channelPendingUpdates[channel].size(),
-                 nullptr,
-                 GL_STREAM_DRAW);
-    pboPtr = (uint8_t*)glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
-    if (!pboPtr) {
-      LOG(WARNING) << "glMapBuffer failed on PBO";
-      m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
-    } else {
-      pboLocalBuffer.resize(blockSizeInByte * m_channelPendingUpdates[channel].size());
-    }
-  }
-
-  if (!pboPtr) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-    folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
-#else
-    folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
-#endif
-    std::vector<folly::Future<folly::Unit>> blockFutures;
-    blockFutures.reserve(m_channelPendingUpdates[channel].size());
-    for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
-      const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-      blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
-        return m_imgPack
-          .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                           m_levelScales[blockImagePos.x].z,
-                           index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                           index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                           index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                           channel,
-                           0,
-                           resInfo,
-                           m_channelDisplayRanges[channel].x,
-                           m_channelDisplayRanges[channel].y)
-          .thenValueInline([=, &imgQueue](ZImg&& img) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-            imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
-#else
-            imgQueue.enqueue(std::make_tuple(i, std::move(img)));
-#endif
-          });
-      }));
-    }
-    auto f = folly::collect(blockFutures).via(cpuExecutor).then([](auto&&) {
-      LOG(INFO) << "image blocks reading finished.";
-    });
-
-    std::tuple<size_t, ZImg> elem;
-    auto lastLogTime = std::chrono::steady_clock::now();
-    int remainingBlocksToUpload = static_cast<int>(m_channelPendingUpdates[channel].size());
-    while (remainingBlocksToUpload > 0) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-      if (imgQueue.tryReadUntil(std::chrono::steady_clock::now() +
-                                  std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s),
-                                elem)) {
-#else
-      if (imgQueue.try_dequeue_until(
-            elem,
-            std::chrono::steady_clock::now() +
-              std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
-#endif
-        m_channelImageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][std::get<0>(elem)].first,
-                                                             imageBlockSize,
-                                                             std::get<1>(elem).channelData(0));
-        --remainingBlocksToUpload;
-      }
-      if (std::chrono::steady_clock::now() - lastLogTime >=
-          std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)) {
-        auto poolStats = p->getPoolStats();
-        LOG(INFO) << fmt::format(
-          "pending/total task count: {}/{}, active/idle thread count: {}/{}, ready/remaining blocks: {}/{}",
-          poolStats.pendingTaskCount,
-          poolStats.totalTaskCount,
-          poolStats.activeThreadCount,
-          poolStats.idleThreadCount,
-          imgQueue.size(),
-          remainingBlocksToUpload);
-        lastLogTime = std::chrono::steady_clock::now();
-      }
-    }
-  } else {
-    std::vector<folly::Future<folly::Unit>> blockFutures;
-    blockFutures.reserve(m_channelPendingUpdates[channel].size());
-    for (int i = 0; i < static_cast<int>(m_channelPendingUpdates[channel].size()); ++i) {
-      const auto& blockImagePos = m_channelPendingUpdates[channel][i].second;
-      blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer]() {
-        return m_imgPack
-          .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                           m_levelScales[blockImagePos.x].z,
-                           index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                           index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                           index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                           channel,
-                           0,
-                           resInfo,
-                           m_channelDisplayRanges[channel].x,
-                           m_channelDisplayRanges[channel].y)
-          .thenValueInline([=, &pboLocalBuffer](ZImg&& img) {
-            memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
-          });
-      }));
-    }
-    auto f = folly::collect(blockFutures).via(cpuExecutor).then([=, &pboLocalBuffer](auto&&) {
-      memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
-      LOG(INFO) << "image blocks reading finished.";
-    });
-
-    while (!f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
-      auto poolStats = p->getPoolStats();
-      LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
-                               poolStats.pendingTaskCount,
-                               poolStats.totalTaskCount,
-                               poolStats.activeThreadCount,
-                               poolStats.idleThreadCount);
-    }
-    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-
-    ZBenchTimer bt_pboUpload("PBO uploading");
-    for (size_t i = 0; i < m_channelPendingUpdates[channel].size(); ++i) {
-      m_channelImageCacheTextures[channel]->uploadSubImage(m_channelPendingUpdates[channel][i].first,
-                                                           imageBlockSize,
-                                                           (const void*)(i * blockSizeInByte));
-    }
-    STOP_AND_LOG(bt_pboUpload)
-
-    m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
-  }
-  STOP_AND_LOG(bt_async)
-
-  m_channelPendingUpdates[channel].clear();
-
-  STOP_AND_LOG(bt)
-}
 
 void Z3DImg::readVolumes()
 {

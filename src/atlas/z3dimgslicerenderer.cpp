@@ -221,9 +221,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
       // m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
 
       if (m_img->numChannels() == 1) {
-        m_img->uploadImageCache(0);
-        m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
-        m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
+        m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader, 0);
         m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[0]->get().texture1D());
         for (auto& slice : m_slices) {
           renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);
@@ -238,9 +236,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
         m_layerTarget->bind();
         m_layerTarget->clear();
 
-        m_img->uploadImageCache(i);
-        m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader);
-        m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithColorMapShader, i);
+        m_img->bindFullResRenderShader(m_image3DSliceWithColorMapShader, i);
         m_image3DSliceWithColorMapShader.bindTexture("colormap", (*m_colormaps)[i]->get().texture1D());
         for (auto& slice : m_slices) {
           renderTriangleList(m_VAO, m_image3DSliceWithColorMapShader, slice);

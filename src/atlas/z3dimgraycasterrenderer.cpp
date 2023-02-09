@@ -452,11 +452,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             m_rendererBase.camera().projectionViewMatrix(eye));
           m_image3DSliceWithTransferfunShader.setViewMatrixUniform(m_rendererBase.camera().viewMatrix(eye));
 
-          m_img->bindFullResRenderShader(m_image3DSliceWithTransferfunShader);
-
           if (visibleIdxs.size() == 1) {
-            m_img->uploadImageCache(c);
-            m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithTransferfunShader, c);
+            m_img->bindFullResRenderShader(m_image3DSliceWithTransferfunShader, c);
             m_image3DSliceWithTransferfunShader.bindTexture("transfer_function",
                                                             m_transferFuncParas[c]->get().texture());
             for (auto& quad : m_quads) {
@@ -467,8 +464,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             m_layerTarget->bind();
             m_layerTarget->clear();
 
-            m_img->uploadImageCache(c);
-            m_img->bindImageCacheToFullResRenderShader(m_image3DSliceWithTransferfunShader, c);
+            m_img->bindFullResRenderShader(m_image3DSliceWithTransferfunShader, c);
             m_image3DSliceWithTransferfunShader.bindTexture("transfer_function",
                                                             m_transferFuncParas[c]->get().texture());
             for (auto& quad : m_quads) {
@@ -748,8 +744,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           if (!missingBlockIDs.empty()) {
             lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c) && lastRound;
-          } else {
-            break;
           }
 
           ZBenchTimer btri("render image");
@@ -779,14 +773,12 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           }
 
           m_image3DRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
-          m_img->bindFullResRenderShader(m_image3DRaycasterShader);
 
           m_currentImageRenderTarget->bind();
           glDrawBuffers(2, g_drawBuffers);
           m_currentImageRenderTarget->clear();
 
-          m_img->uploadImageCache(c);
-          m_img->bindImageCacheToFullResRenderShader(m_image3DRaycasterShader, c);
+          m_img->bindFullResRenderShader(m_image3DRaycasterShader, c);
           m_image3DRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[c]->get().texture());
           renderScreenQuad(m_VAO, m_image3DRaycasterShader);
 

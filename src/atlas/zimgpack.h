@@ -10,6 +10,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/index/rtree.hpp>
+#include <tbb/concurrent_map.h>
 #include <tuple>
 #include <array>
 
@@ -301,6 +302,11 @@ private:
   mutable size_t m_mipZEnd;
 
   mutable std::vector<std::shared_ptr<ZImg>> m_mipImgs;
+
+  mutable tbb::concurrent_map<
+    std::tuple<index_t, index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t>,
+    std::pair<double, double>>
+    m_blockInfo;
 };
 
 } // namespace nim
