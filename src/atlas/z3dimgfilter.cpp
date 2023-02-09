@@ -287,10 +287,14 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   try {
     std::vector<glm::dvec2> drs;
     if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
-      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels,
-                                    glm::dvec2(imgPack.minIntensity(), imgPack.maxIntensity()));
+      drs = std::vector<glm::dvec2>(
+        imgPack.imgInfo().numChannels,
+        glm::dvec2(imgPack.minIntensity() + (imgPack.maxIntensity() - imgPack.minIntensity()) * 0.02,
+                   imgPack.maxIntensity()));
     } else {
-      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(imgPack.rangeMin(), imgPack.rangeMax()));
+      drs = std::vector<glm::dvec2>(
+        imgPack.imgInfo().numChannels,
+        glm::dvec2(imgPack.rangeMin() + (imgPack.rangeMax() - imgPack.rangeMin()) * 0.02, imgPack.rangeMax()));
     }
 
     m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale(), drs);
@@ -325,7 +329,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       m_doubleChannelRangeParas.emplace_back(
         std::make_unique<ZDoubleSpanParameter>(QString("Channel %1 Display Range").arg(c + 1),
                                                drs[c],
-                                               imgPack.rangeMin() + (imgPack.rangeMax() - imgPack.rangeMin()) * 0.02,
+                                               imgPack.rangeMin(),
                                                imgPack.rangeMax()));
       m_doubleChannelRangeParas.back()->setStyle("SPINBOX");
       if (imgPack.imgInfo().voxelFormat != VoxelFormat::Float) {
@@ -337,7 +341,6 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
               this,
               &Z3DImgFilter::channelRangeChanged);
     }
-    channelRangeChanged();
 
     bool is2DImage = m_3dImg->is2DData();
     glm::uvec3 volDim = m_3dImg->dimensions();
