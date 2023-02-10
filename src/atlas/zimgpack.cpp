@@ -660,12 +660,12 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
       tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
       tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
-      auto res = std::make_shared<ZImg>(tmpResInfo);
+      auto res = new ZImg(tmpResInfo);
 
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto tileIndex : queryResult) {
         const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
-        tileFutures.push_back(folly::via(cpuExecutor).then([=, &res](auto&&) {
+        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
           auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
@@ -676,7 +676,8 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo, &res](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
+        std::shared_ptr<ZImg> rres(res);
         if (needToUpdateBlockInfo) {
           double minv;
           double maxv;
@@ -717,8 +718,8 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                        resInfo.depth,
                                                                        displayRangeMin,
                                                                        displayRangeMax),
-                                           res);
-        return *res;
+                                           rres);
+        return *rres;
       });
     });
   } else {
