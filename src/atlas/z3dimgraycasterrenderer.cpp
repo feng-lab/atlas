@@ -438,9 +438,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
-          if (!missingBlockIDs.empty()) {
-            m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c);
-          }
+          m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c);
 
           bt.resetAndStart("render image3d slice");
           // render channels one by one
@@ -742,9 +740,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
           STOP_AND_LOG(btcb)
 
-          if (!missingBlockIDs.empty()) {
-            lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c) && lastRound;
-          }
+          lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c) && lastRound;
 
           ZBenchTimer btri("render image");
           // render channels one by one

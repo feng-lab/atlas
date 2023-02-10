@@ -46,8 +46,7 @@ public:
   inline std::shared_ptr<ZImg> get(const ImageRegionCacheHashKeyType& key,
                                    FindStategy findStategy = FindStategy::UpdateLRUList)
   {
-    ZThreadSafeScalableImageRegionCache::ConstAccessor ca;
-    if (find(ca, key, findStategy)) {
+    if (ZThreadSafeScalableImageRegionCache::ConstAccessor ca; find(ca, key, findStategy)) {
       return *ca;
     } else {
       return {};

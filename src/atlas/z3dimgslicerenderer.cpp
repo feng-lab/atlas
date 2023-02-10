@@ -204,9 +204,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
       LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
-      if (!missingBlockIDs.empty()) {
-        m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, i);
-      }
+      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, i);
 
       bt.resetAndStart("render image3d slice");
       // render channels one by one

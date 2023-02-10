@@ -88,10 +88,10 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
       m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
 
       m_channelImageCacheTextures.emplace_back(
-        new Z3DTexture(GLint(GL_R8),
-                       (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
-                       GL_RED,
-                       GL_UNSIGNED_BYTE));
+        std::make_unique<Z3DTexture>(GLint(GL_R8),
+                                     (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
+                                     GL_RED,
+                                     GL_UNSIGNED_BYTE));
       m_channelImageCacheTextures[c]->uploadImage();
     }
 
@@ -345,14 +345,15 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
 
 void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
 {
-  shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
-  shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
   shader.setUniformArray("image_dimensions", m_imageBounds.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", m_imageBlockSize);
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
+
+  shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
+  shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
 }
 
 void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
@@ -375,6 +376,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                                                 size_t c,
                                                 bool silenceExistingWarning)
 {
+  if (missingBlockIDs.empty()) {
+    LOG(INFO) << "no missing blocks";
+    return true;
+  }
   auto numBlocksToRead = int(m_channelImageCacheManagers[c]->size()) - int(usedBlockIDs.size());
   if (silenceExistingWarning) {
     CHECK(usedBlockIDs.empty());
@@ -383,7 +388,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " reuse " << usedBlockIDs.size() << " missing "
               << missingBlockIDs.size() << " will upload " << std::min<int>(missingBlockIDs.size(), numBlocksToRead);
   }
-  if (missingBlockIDs.empty() || numBlocksToRead <= 0) {
+  if (numBlocksToRead <= 0) {
+    LOG(INFO) << "not reading because of full image cache";
     return false;
   }
 

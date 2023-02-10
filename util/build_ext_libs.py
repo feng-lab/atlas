@@ -2698,7 +2698,6 @@ def parse_inputs(argv: list):
                             'fmt': ['folly'],
                             'openjpeg': ['opencv'],
                             'libwebp': ['opencv'],
-                            'opencv': ['conda-opencv'],
                             'snappy': ['folly', 'rocksdb'],
                             'bzip2': ['folly'],
                             'libsodium': ['folly'],
