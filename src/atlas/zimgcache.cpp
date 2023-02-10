@@ -3,8 +3,8 @@
 #include "zcpuinfo.h"
 
 DEFINE_double(atlas_image_cache_memory_proportion,
-              0.3,
-              "Proportion of RAM that will be used for image cache, default is 0.3");
+              0.25,
+              "Proportion of RAM that will be used for image cache, default is 0.25");
 
 namespace nim {
 

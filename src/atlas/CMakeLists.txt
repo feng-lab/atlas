@@ -707,9 +707,12 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${APP_NAME} PUBLIC -fsanitize=address)
-    target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
+  message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
+  if (ATLAS_SANITIZE_ADDRESS)
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      target_compile_options(${APP_NAME} PUBLIC -fsanitize=address)
+      target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
+    endif ()
   endif ()
 
   # for some files

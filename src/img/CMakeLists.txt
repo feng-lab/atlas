@@ -372,9 +372,12 @@ else (WIN32)
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
   endif ()
 
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
-    target_link_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
+  message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
+  if (ATLAS_SANITIZE_ADDRESS)
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+      target_compile_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
+      target_link_options(${LIBRARY_NAME} PUBLIC -fsanitize=address)
+    endif ()
   endif ()
 
   # for some files

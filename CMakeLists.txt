@@ -67,6 +67,8 @@ message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 include(PrintCMakeTargetInfo)
 include(LibsForImg)
 
+option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
+
 # subprojects
 add_subdirectory(src/img)
 # add_subdirectory(src/matlab)
