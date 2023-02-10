@@ -707,8 +707,10 @@ else (WIN32)
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
-#  target_compile_options(${APP_NAME} PUBLIC -fsanitize=address)
-#  target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${APP_NAME} PUBLIC -fsanitize=address)
+    target_link_options(${APP_NAME} PUBLIC -fsanitize=address)
+  endif ()
 
   # for some files
   set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS
