@@ -10,7 +10,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include <tbb/concurrent_map.h>
+#include <tbb/concurrent_unordered_map.h>
 #include <tuple>
 #include <array>
 
@@ -180,16 +180,16 @@ public:
                        double displayRangeMax,
                        ZImg& res) const;
 
-  folly::Future<ZImg> readRegionToImg(index_t xyRatio,
-                                      index_t zRatio,
-                                      index_t sx,
-                                      index_t sy,
-                                      index_t sz,
-                                      size_t sc,
-                                      size_t t,
-                                      const ZImgInfo& resInfo,
-                                      double displayRangeMin,
-                                      double displayRangeMax) const;
+  folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,
+                                                       index_t zRatio,
+                                                       index_t sx,
+                                                       index_t sy,
+                                                       index_t sz,
+                                                       size_t sc,
+                                                       size_t t,
+                                                       const ZImgInfo& resInfo,
+                                                       double displayRangeMin,
+                                                       double displayRangeMax) const;
 
   std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
                                                                      index_t zRatio,
@@ -303,10 +303,9 @@ private:
 
   mutable std::vector<std::shared_ptr<ZImg>> m_mipImgs;
 
-  mutable tbb::concurrent_map<
-    std::tuple<index_t, index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t>,
-    std::pair<double, double>>
-    m_blockInfo;
+  using BlockInfoKeyType =
+    std::tuple<index_t, index_t, index_t, index_t, index_t, size_t, size_t, size_t, size_t, size_t>;
+  mutable tbb::concurrent_unordered_map<BlockInfoKeyType, std::pair<double, double>> m_blockInfo;
 };
 
 } // namespace nim

@@ -327,13 +327,10 @@ bool ZThreadSafeLRUCache<TKey, TValue, THash>::insert(const TKey& key, const TVa
 {
   // Insert into the CHM
   auto node = new ListNode(key, objSize);
-  HashMapAccessor hashAccessor;
-  HashMapValuePair hashMapValue(key, HashMapValue(value, node));
-  if (!m_map.insert(hashAccessor, hashMapValue)) {
+  if (!m_map.insert(HashMapValuePair(key, HashMapValue(value, node)))) {
     delete node;
     return false;
   }
-  hashAccessor.release();
 
   // Evict if necessary, now that we know the hashmap insertion was successful.
   // size_t size = m_size.load();
@@ -434,13 +431,7 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
     delink(moribund);
     lock.unlock();
 
-    HashMapAccessor hashAccessor;
-    if (!m_map.find(hashAccessor, moribund->m_key)) {
-      // Presumably unreachable
-      delete moribund;
-      continue;
-    }
-    m_map.erase(hashAccessor);
+    m_map.erase(moribund->m_key);
     delete moribund;
   }
 }

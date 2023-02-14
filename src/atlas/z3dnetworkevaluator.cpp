@@ -5,7 +5,6 @@
 #include "z3dfilter.h"
 #include "z3dmeshfilter.h"
 #include "zlog.h"
-#include "zrandom.h"
 #include <boost/graph/topological_sort.hpp>
 #include <algorithm>
 #include <queue>
@@ -88,16 +87,16 @@ void Z3DNetworkEvaluator::process(bool stereo)
       }
 
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
-        m_filterWrappers[j]->afterFilterProcess(currentFilter);
+      for (const auto& filterWrapper : m_filterWrappers) {
+        filterWrapper->afterFilterProcess(currentFilter);
       }
       CHECK_GL_ERROR
     }
 
     if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
-        m_filterWrappers[j]->beforeFilterProcess(currentFilter);
+      for (const auto& filterWrapper : m_filterWrappers) {
+        filterWrapper->beforeFilterProcess(currentFilter);
       }
       CHECK_GL_ERROR
 
@@ -108,16 +107,16 @@ void Z3DNetworkEvaluator::process(bool stereo)
       }
 
       // notify filter wrappers
-      for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
-        m_filterWrappers[j]->afterFilterProcess(currentFilter);
+      for (const auto& filterWrapper : m_filterWrappers) {
+        filterWrapper->afterFilterProcess(currentFilter);
       }
       CHECK_GL_ERROR
     }
   }
 
   // notify filter wrappers
-  for (size_t j = 0; j < m_filterWrappers.size(); ++j) {
-    m_filterWrappers[j]->afterNetworkProcess();
+  for (const auto& filterWrapper : m_filterWrappers) {
+    filterWrapper->afterNetworkProcess();
   }
   CHECK_GL_ERROR
 
@@ -126,7 +125,7 @@ void Z3DNetworkEvaluator::process(bool stereo)
   // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
   if (m_processPending) {
     m_processPending = false;
-    m_canvasPainter.invalidate();
+    m_canvasPainter.invalidate(Z3DFilter::State::AllResultInvalid);
   }
 }
 
@@ -186,7 +185,7 @@ void Z3DNetworkEvaluator::updateNetwork()
   // update size
   sizeChangedFromFilter();
   for (auto filter : m_reverseSortedFilters) {
-    QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, nullptr, 0);
+    QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, nullptr, nullptr);
     connect(filter, &Z3DFilter::requestUpstreamSizeChange, this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
   }
 }

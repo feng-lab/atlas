@@ -26,7 +26,6 @@ Z3DInputPortBase::~Z3DInputPortBase()
 
 void Z3DInputPortBase::invalidate()
 {
-  m_hasChanged = true;
   filter()->invalidate(m_invalidationState);
 }
 

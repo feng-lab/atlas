@@ -557,11 +557,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
 
     if (!pboPtr) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-      folly::MPMCQueue<std::tuple<size_t, ZImg>> imgQueue(m_channelPendingUpdates[channel].size());
-#else
-      folly::UMPSCQueue<std::tuple<size_t, ZImg>, true> imgQueue;
-#endif
+      folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
       std::vector<folly::Future<folly::Unit>> blockFutures;
       blockFutures.reserve(pendingTasks.size());
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
@@ -579,12 +575,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              resInfo,
                              m_channelDisplayRanges[c].x,
                              m_channelDisplayRanges[c].y)
-            .thenValueInline([=, &imgQueue](ZImg&& img) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-              imgQueue.blockingWrite(std::make_tuple(i, std::move(img)));
-#else
-                imgQueue.enqueue(std::make_tuple(i, std::move(img)));
-#endif
+            .thenValueInline([=, &imgQueue](std::shared_ptr<ZImg>&& img) {
+              imgQueue.enqueue(std::make_tuple(i, std::move(img)));
             });
         }));
       }
@@ -592,21 +584,15 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         LOG(INFO) << "image blocks reading finished.";
       });
 
-      std::tuple<size_t, ZImg> elem;
+      std::tuple<size_t, std::shared_ptr<ZImg>> elem;
       auto lastLogTime = std::chrono::steady_clock::now();
       int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
       while (remainingBlocksToUpload > 0) {
-#ifdef ATLAS_uploadImageCache_USE_MPMCQueue
-        if (imgQueue.tryReadUntil(std::chrono::steady_clock::now() +
-                                    std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_s),
-                                  elem)) {
-#else
         if (imgQueue.try_dequeue_until(
               elem,
               std::chrono::steady_clock::now() +
                 std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
-#endif
-          if (std::get<1>(elem).isEmpty()) {
+          if (!std::get<1>(elem)) {
             ++emptyBlockCount;
             *std::get<1>(pendingTasks[std::get<0>(elem)]) = glm::uvec4(0, 0, 0, m_emptyFlag);
           } else {
@@ -646,7 +632,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
             }
             m_channelImageCacheTextures[c]->uploadSubImage(imageBlockCachePos,
                                                            imageBlockSize,
-                                                           std::get<1>(elem).channelData(0));
+                                                           std::get<1>(elem)->channelData(0));
           }
           --remainingBlocksToUpload;
         }
@@ -683,11 +669,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              resInfo,
                              m_channelDisplayRanges[c].x,
                              m_channelDisplayRanges[c].y)
-            .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](ZImg&& img) {
-              if (img.isEmpty()) {
+            .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](std::shared_ptr<ZImg>&& img) {
+              if (!img) {
                 blockIsEmpty.set(i);
               } else {
-                memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img.channelData(0), blockSizeInByte);
+                memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img->channelData(0), blockSizeInByte);
               }
             });
         }));

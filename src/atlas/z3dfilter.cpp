@@ -119,10 +119,6 @@ void Z3DFilter::setValid(Z3DEye eye)
   } else {
     reset_flag(m_state, State::RightEyeResultInvalid);
   }
-
-  for (auto port : m_inputPorts) {
-    port->setValid();
-  }
 }
 
 bool Z3DFilter::isValid(Z3DEye eye) const
@@ -327,7 +323,7 @@ void Z3DFilter::updateSize()
     port->setExpectedSize(maxOutportSize);
   }
 
-  invalidate();
+  invalidate(State::AllResultInvalid);
 }
 
 } // namespace nim

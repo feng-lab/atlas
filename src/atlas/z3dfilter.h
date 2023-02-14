@@ -83,7 +83,7 @@ public:
   // returns first parameter with the given name. return nullptr if not found
   [[nodiscard]] ZParameter* parameter(const QString& name) const;
 
-  virtual void invalidate(State inv = State::AllResultInvalid);
+  virtual void invalidate(State inv);
 
   // returns the port with the given name, or nullptr if such a port does not exist.
   [[nodiscard]] Z3DInputPortBase* inputPort(const QString& name) const;

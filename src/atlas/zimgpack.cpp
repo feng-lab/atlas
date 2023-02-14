@@ -592,16 +592,16 @@ void ZImgPack::readRegionToImg(index_t xyRatio,
   // STOP_AND_LOG(bt_read)
 }
 
-folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
-                                              index_t zRatio,
-                                              index_t sx,
-                                              index_t sy,
-                                              index_t sz,
-                                              size_t sc,
-                                              size_t t,
-                                              const ZImgInfo& resInfo,
-                                              double displayRangeMin,
-                                              double displayRangeMax) const
+folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
+                                                               index_t zRatio,
+                                                               index_t sx,
+                                                               index_t sy,
+                                                               index_t sz,
+                                                               size_t sc,
+                                                               size_t t,
+                                                               const ZImgInfo& resInfo,
+                                                               double displayRangeMin,
+                                                               double displayRangeMax) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
@@ -613,7 +613,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
           it != m_blockInfo.end()) {
         const auto [minv, maxv] = it->second;
         if (maxv <= displayRangeMin) {
-          return folly::makeFuture(ZImg());
+          return folly::makeFuture(std::shared_ptr<ZImg>());
         }
       } else {
         needToUpdateBlockInfo = true;
@@ -633,7 +633,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                              displayRangeMin,
                                                                              displayRangeMax));
       if (img) {
-        return folly::makeFuture(*img);
+        return folly::makeFuture(img);
       }
 
       auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
@@ -651,7 +651,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       }
 
       if (queryResult.empty()) {
-        return folly::makeFuture(ZImg());
+        return folly::makeFuture(std::shared_ptr<ZImg>());
       }
 
       auto tmpResInfo = resInfo;
@@ -660,7 +660,8 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
       tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
       tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
-      auto res = new ZImg(tmpResInfo);
+      auto rres = std::make_shared<ZImg>(tmpResInfo);
+      auto res = rres.get();
 
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto tileIndex : queryResult) {
@@ -677,16 +678,15 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       }
 
       return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
-        std::shared_ptr<ZImg> rres(res);
         if (needToUpdateBlockInfo) {
           double minv;
           double maxv;
           res->computeMinMax(minv, maxv);
-          m_blockInfo
-            [std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth)] =
-              std::make_pair(minv, maxv);
+          m_blockInfo.emplace(
+            std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
+            std::make_pair(minv, maxv));
           if (maxv <= displayRangeMin) {
-            return ZImg();
+            return std::shared_ptr<ZImg>();
           }
         }
         if (res->isSameType(resInfo)) {
@@ -719,7 +719,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                        displayRangeMin,
                                                                        displayRangeMax),
                                            rres);
-        return *rres;
+        return rres;
       });
     });
   } else {
@@ -729,7 +729,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
         it != m_blockInfo.end()) {
       const auto [minv, maxv] = it->second;
       if (maxv <= displayRangeMin) {
-        return folly::makeFuture(ZImg());
+        return folly::makeFuture(std::shared_ptr<ZImg>());
       }
     } else {
       needToUpdateBlockInfo = true;
@@ -749,7 +749,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                            displayRangeMin,
                                                                            displayRangeMax));
     if (img) {
-      return folly::makeFuture(*img);
+      return folly::makeFuture(img);
     }
 
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
@@ -787,7 +787,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
       .via(cpuExecutor)
       .then([=](const auto& tiles) {
         if (!tiles.hasValue() || tiles.value().empty()) {
-          return ZImg();
+          return std::shared_ptr<ZImg>();
         }
         auto tmpResInfo = resInfo;
         tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
@@ -803,11 +803,11 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
           double minv;
           double maxv;
           res->computeMinMax(minv, maxv);
-          m_blockInfo
-            [std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth)] =
-              std::make_pair(minv, maxv);
+          m_blockInfo.emplace(
+            std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth),
+            std::make_pair(minv, maxv));
           if (maxv <= displayRangeMin) {
-            return ZImg();
+            return std::shared_ptr<ZImg>();
           }
         }
         if (res->isSameType(resInfo)) {
@@ -840,7 +840,7 @@ folly::Future<ZImg> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                        displayRangeMin,
                                                                        displayRangeMax),
                                            res);
-        return *res;
+        return res;
       });
   }
 }

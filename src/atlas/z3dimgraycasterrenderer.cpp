@@ -2,18 +2,12 @@
 
 #include "z3dtexture.h"
 #include "z3dimg.h"
-#include "zimgformat.h"
 #include "zbenchtimer.h"
-#include "zimgregioncache.h"
 #include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <QApplication>
 #include <QFileInfo>
-
-DEFINE_bool(atlas_clear_image_cache_after_rendering,
-            false,
-            "Clear image cache after rendering, for test, default is false");
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
@@ -814,12 +808,6 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->release();
         }
       }
-
-      if (FLAGS_atlas_clear_image_cache_after_rendering) {
-        ZImgCache::instance().clear();
-      }
-      LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
-      LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
     } else {
       m_lastRenderingIsFastRendering = true;
 

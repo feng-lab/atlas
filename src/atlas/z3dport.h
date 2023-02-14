@@ -29,22 +29,10 @@ public:
     return m_name;
   }
 
-  // invalidate filter with the given State and set hasChanged=true.
+  // invalidate filter with the given State
   void invalidate();
 
-  // has the data in this port changed since the last process() call?
-  [[nodiscard]] bool hasChanged() const
-  {
-    return m_hasChanged;
-  }
-
-  // mark the port as valid.
-  void setValid()
-  {
-    m_hasChanged = false;
-  }
-
-  [[nodiscard]] const std::vector<Z3DOutputPortBase*> connected() const
+  [[nodiscard]] std::vector<Z3DOutputPortBase*> connected() const
   {
     return m_connectedOutputPorts;
   }
@@ -91,7 +79,6 @@ protected:
   Z3DFilter::State m_invalidationState;
 
   std::vector<Z3DOutputPortBase*> m_connectedOutputPorts;
-  bool m_hasChanged = true;
 
   glm::uvec2 m_expectedSize;
 };
@@ -114,7 +101,7 @@ public:
     return m_name;
   }
 
-  [[nodiscard]] const std::vector<Z3DInputPortBase*> connected() const
+  [[nodiscard]] std::vector<Z3DInputPortBase*> connected() const
   {
     return m_connectedInputPorts;
   }

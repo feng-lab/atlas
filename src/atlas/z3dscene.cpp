@@ -2,6 +2,11 @@
 
 #include "z3dgl.h"
 #include "z3dnetworkevaluator.h"
+#include "zimgregioncache.h"
+
+DEFINE_bool(atlas_clear_image_cache_after_rendering,
+            false,
+            "Clear image cache after rendering, for test, default is false");
 
 namespace nim {
 
@@ -24,6 +29,13 @@ void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF& /*rect*/)
   m_networkEvaluator->process(m_isStereoScene || m_fakeStereoOnce);
   m_fakeStereoOnce = false;
   glFinish();
+
+  if (FLAGS_atlas_clear_image_cache_after_rendering) {
+    ZImgCache::instance().clear();
+    ZImgRegionCache::instance().clear();
+  }
+  LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
+  LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
 }
 
 } // namespace nim
