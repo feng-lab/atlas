@@ -660,7 +660,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       tmpResInfo.depth = std::ceil(resInfo.depth * zRatio * 1.0 / readRatio[2]);
       tmpResInfo.voxelFormat = m_imgInfo.voxelFormat;
       tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
-      auto rres = std::make_shared<ZImg>(tmpResInfo);
+      auto rres = std::make_shared<ZImg>(tmpResInfo); // will be captured by value to keep the image alive
       auto res = rres.get();
 
       std::vector<folly::Future<folly::Unit>> tileFutures;

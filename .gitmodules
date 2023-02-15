@@ -21,7 +21,7 @@
 [submodule "src/3rdparty/cpuinfo"]
 	path = src/3rdparty/cpuinfo
 	url = https://github.com/pytorch/cpuinfo.git
-	branch = master
+	branch = main
 [submodule "src/3rdparty/gflags"]
 	path = src/3rdparty/gflags
 	url = https://github.com/gflags/gflags.git
