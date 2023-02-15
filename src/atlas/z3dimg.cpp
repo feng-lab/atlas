@@ -816,7 +816,7 @@ void Z3DImg::readVolumes()
 
     auto vh = std::make_unique<Z3DVolume>(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
-    m_volumes.emplace_back(vh);
+    m_volumes.emplace_back(std::move(vh));
   } else {
     for (size_t i = 0; i < m_nChannels; ++i) {
       ZImg cImg = img.crop(ZImgRegion(0, -1, 0, -1, 0, -1, i, i + 1));
@@ -827,7 +827,7 @@ void Z3DImg::readVolumes()
       }
       auto vh = std::make_unique<Z3DVolume>(cImg, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
-      m_volumes.emplace_back(vh);
+      m_volumes.emplace_back(std::move(vh));
     } // for each cannel
   }
 
