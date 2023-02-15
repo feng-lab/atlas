@@ -126,7 +126,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
     } else {
       croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
     }
-    auto vh = new Z3DVolume(croped);
+    auto vh = std::make_unique<Z3DVolume>(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -151,7 +151,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeYSliceVolume(size_t y)
     } else {
       croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
     }
-    auto vh = new Z3DVolume(croped);
+    auto vh = std::make_unique<Z3DVolume>(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -174,7 +174,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeZSliceVolume(size_t z)
     } else {
       croped.normalize(m_channelDisplayRanges[c].x, m_channelDisplayRanges[c].y);
     }
-    auto vh = new Z3DVolume(croped);
+    auto vh = std::make_unique<Z3DVolume>(croped);
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
@@ -814,7 +814,7 @@ void Z3DImg::readVolumes()
       img.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
     }
 
-    auto vh = new Z3DVolume(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
+    auto vh = std::make_unique<Z3DVolume>(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
     m_volumes.emplace_back(vh);
   } else {
@@ -825,7 +825,7 @@ void Z3DImg::readVolumes()
       } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
         cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
       }
-      auto vh = new Z3DVolume(cImg, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
+      auto vh = std::make_unique<Z3DVolume>(cImg, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
       m_volumes.emplace_back(vh);
     } // for each cannel

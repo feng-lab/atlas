@@ -117,11 +117,9 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
 
   std::unique_ptr<ZImageTransform> transform;
   if (srcImg.depth() > 1) {
-    auto tfm = new ZImageTranslation3DTransform();
-    transform.reset(tfm);
+    transform.reset(new ZImageTranslation3DTransform());
   } else {
-    auto tfm = new ZImageTranslation2DTransform();
-    transform.reset(tfm);
+    transform.reset(new ZImageTranslation2DTransform());
   }
 
   auto it = presetNameToParameters.find(presetName);
@@ -303,11 +301,9 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, size_t fixedCha
   std::unique_ptr<ZImageTransform> transform;
   if (m_transform == "Translation") {
     if (srcImg.depth() > 1) {
-      auto tfm = new ZImageTranslation3DTransform();
-      transform.reset(tfm);
+      transform.reset(new ZImageTranslation3DTransform());
     } else {
-      auto tfm = new ZImageTranslation2DTransform();
-      transform.reset(tfm);
+      transform.reset(new ZImageTranslation2DTransform());
     }
   } else if (m_transform == "Rigid") {
     if (srcImg.depth() > 1) {

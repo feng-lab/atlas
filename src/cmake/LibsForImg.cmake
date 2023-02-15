@@ -107,19 +107,8 @@ else ()
   #message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
 endif ()
 
-set(CPUINFO_INCLUDE_DIRS ${CPUINFO_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
-if (WIN32)
-  set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/cpuinfo.lib
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/clog.lib)
-else (WIN32)
-  set(CPUINFO_LIBRARIES ${CPUINFO_LIBRARIES}
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libcpuinfo.a
-      ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/lib/libclog.a)
-endif (WIN32)
-message(STATUS "CPUINFO_INCLUDE_DIRS: ${CPUINFO_INCLUDE_DIRS}")
-message(STATUS "CPUINFO_LIBRARIES: ${CPUINFO_LIBRARIES}")
+find_package(cpuinfo REQUIRED)
+print_target_properties(cpuinfo::cpuinfo)
 
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}
     ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/include)
