@@ -130,7 +130,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeXSliceVolume(size_t x)
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(vh);
+    res.emplace_back(std::move(vh));
   }
   return res;
 }
@@ -155,7 +155,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeYSliceVolume(size_t y)
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(vh);
+    res.emplace_back(std::move(vh));
   }
   return res;
 }
@@ -178,7 +178,7 @@ std::vector<std::unique_ptr<Z3DVolume>> Z3DImg::makeZSliceVolume(size_t z)
     vh->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[c].r / 255.,
                               m_imgPack.imgInfo().channelColors[c].g / 255.,
                               m_imgPack.imgInfo().channelColors[c].b / 255.));
-    res.emplace_back(vh);
+    res.emplace_back(std::move(vh));
   }
   return res;
 }
