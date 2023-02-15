@@ -31,6 +31,8 @@ void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF& /*rect*/)
   m_fakeStereoOnce = false;
   glFinish();
 
+  ZImgCache::instance().squeeze();
+  ZImgRegionCache::instance().squeeze();
   if (FLAGS_atlas_clear_image_cache_after_rendering) {
     ZImgCache::instance().clear();
     ZImgRegionCache::instance().clear();

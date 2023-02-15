@@ -69,6 +69,8 @@ struct ZThreadSafeScalableCache
    */
   void clear();
 
+  void squeeze();
+
   /**
    * Get a snapshot of the keys in the container by copying them into the
    * supplied vector. This will block inserts and prevent LRU updates while it
@@ -156,6 +158,14 @@ void ZThreadSafeScalableCache<TKey, TValue, THash>::clear()
 {
   for (size_t i = 0; i < m_numShards; i++) {
     m_shards[i]->clear();
+  }
+}
+
+template<class TKey, class TValue, class THash>
+void ZThreadSafeScalableCache<TKey, TValue, THash>::squeeze()
+{
+  for (size_t i = 0; i < m_numShards; i++) {
+    m_shards[i]->squeeze();
   }
 }
 

@@ -177,6 +177,8 @@ public:
    */
   void clear();
 
+  void squeeze();
+
   /**
    * Get a snapshot of the keys in the container by copying them into the
    * supplied vector. This will block inserts and prevent LRU updates while it
@@ -379,6 +381,13 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::clear()
   m_head.m_next = &m_tail;
   m_tail.m_prev = &m_head;
   m_size = 0;
+}
+
+template<class TKey, class TValue, class THash>
+void ZThreadSafeLRUCache<TKey, TValue, THash>::squeeze()
+{
+  auto newMap = m_map;
+  m_map.swap(newMap);
 }
 
 template<class TKey, class TValue, class THash>
