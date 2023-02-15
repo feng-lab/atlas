@@ -54,7 +54,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       //        LOG(INFO) << QFile(tempFile.fileName()).size();
       //      }
 
-      std::unique_ptr<std::byte[]> memBuf(new std::byte[info.byteNumber()]);
+      auto memBuf = make_unique_for_overwrite<std::byte[]>(info.byteNumber());
       auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
       // LOG(INFO) << byteWritten;
       if (byteWritten > info.byteNumber()) {

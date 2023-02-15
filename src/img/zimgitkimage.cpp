@@ -188,7 +188,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, img.numTimes());
       imageIO->SetIORegion(ioRegion);
       if (imgInfo.numTimes > 1) {
-        std::unique_ptr<uint8_t[]> buf(new uint8_t[img.byteNumber()]);
+        auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
         imageIO->Read(buf.get());
         if (isNd2) {
           fixDimensionOrder(buf.get(), "XYZTC", img);
@@ -232,7 +232,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
       imageIO->SetIORegion(ioRegion);
       if (clipInfo.numTimes > 1) {
-        std::unique_ptr<uint8_t[]> buf(new uint8_t[tmpImg.byteNumber()]);
+        auto buf = make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
         imageIO->Read(buf.get());
         if (isNd2) {
           fixDimensionOrder(buf.get(), "XYZTC", tmpImg);

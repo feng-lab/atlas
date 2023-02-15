@@ -88,7 +88,8 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-  std::unique_ptr<glm::col4[]> buf(new glm::col4[Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4]);
+  auto buf =
+    make_unique_for_overwrite<glm::col4[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
   tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
   glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
   if (radius < 0) {

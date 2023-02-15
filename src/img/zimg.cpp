@@ -1807,7 +1807,7 @@ ZImg& ZImg::flip(Dimension dim)
     std::reverse(m_data.begin(), m_data.end());
   } else if (dim == Dimension::C) { // flip channels
     if (numChannels() > 1) {
-      std::unique_ptr<std::byte[]> buf(new std::byte[channelByteNumber()]);
+      auto buf = make_unique_for_overwrite<std::byte[]>(channelByteNumber());
       for (size_t t = 0; t < numTimes(); ++t) {
         size_t j = numChannels() - 1;
         for (size_t i = 0; i < numChannels() / 2; ++i, --j) {

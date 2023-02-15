@@ -637,7 +637,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
             // bt.pause();
             if (hdf5Tile.compression == Compression::JPEGXR) {
-              std::unique_ptr<std::byte[]> memBuf(new std::byte[res->channelByteNumber()]);
+              auto memBuf = make_unique_for_overwrite<std::byte[]>(res->channelByteNumber());
               ZImgJpegXR::readMemImg(res->channelData(c), hdf5Tile.length, memBuf.get(), res->channelByteNumber());
               std::memcpy(res->channelData(c), memBuf.get(), res->channelByteNumber());
             } else {
@@ -670,7 +670,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
           if (hdf5Tile.compressed) {
             readStream(inputFileStream, res->channelData(c), hdf5Tile.length);
             if (hdf5Tile.compression == Compression::JPEGXR) {
-              std::unique_ptr<std::byte[]> memBuf(new std::byte[res->channelByteNumber()]);
+              auto memBuf = make_unique_for_overwrite<std::byte[]>(res->channelByteNumber());
               ZImgJpegXR::readMemImg(res->channelData(c), hdf5Tile.length, memBuf.get(), res->channelByteNumber());
               std::memcpy(res->channelData(c), memBuf.get(), res->channelByteNumber());
             } else {

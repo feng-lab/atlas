@@ -229,6 +229,13 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
   return std::forward<T>(t)[Index];
 }
 
+template<class Tp>
+__forceinline auto make_unique_for_overwrite(size_t n)
+{
+  typedef typename std::remove_extent<Tp>::type Up;
+  return std::unique_ptr<Tp>(new Up[n]);
+}
+
 folly::Executor::KeepAlive<> getGlobalCPUExecutor();
 
 // c++23 utility
