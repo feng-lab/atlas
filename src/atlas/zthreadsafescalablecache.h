@@ -80,7 +80,7 @@ struct ZThreadSafeScalableCache
    * Get the approximate size of the container. May be slightly too low when
    * insertion is in progress.
    */
-  size_t size() const;
+  [[nodiscard]] size_t size() const;
 
 private:
   /**

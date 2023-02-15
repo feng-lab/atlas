@@ -1,13 +1,8 @@
 #pragma once
 
 #include "zimg.h"
-#include "zimgcache.h"
-#include <QReadWriteLock>
-#include <folly/futures/Future.h>
-#include <boost/functional/hash.hpp>
-#include <list>
-#include <unordered_map>
-#include <atomic>
+#include "zthreadsafescalablecache.h"
+#include "zhashutils.h"
 
 namespace nim {
 
@@ -61,17 +56,3 @@ public:
 };
 
 } // namespace nim
-
-namespace std {
-
-// custom specialization of std::hash can be injected in namespace std
-template<>
-struct hash<nim::ImageRegionCacheHashKeyType>
-{
-  inline std::size_t operator()(const nim::ImageRegionCacheHashKeyType& s) const noexcept
-  {
-    return boost::hash<nim::ImageRegionCacheHashKeyType>{}(s);
-  }
-};
-
-} // namespace std

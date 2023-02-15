@@ -1,5 +1,7 @@
 #include "z3dshadergroup.h"
 
+#include <memory>
+
 #include "z3dgl.h"
 #include "z3dgpuinfo.h"
 #include "z3dshaderprogram.h"
@@ -22,7 +24,7 @@ void Z3DShaderGroup::init(const QStringList& shaderFiles,
   m_header = header;
   m_geomHeader = geomHeader;
   m_normalShaderFiles = normalShaderFiles;
-  m_shaders[Z3DRendererBase::ShaderHookType::Normal].reset(new Z3DShaderProgram());
+  m_shaders[Z3DRendererBase::ShaderHookType::Normal] = std::make_unique<Z3DShaderProgram>();
   if (!GLVersionGE(3, 2)) {
     m_shaders[Z3DRendererBase::ShaderHookType::Normal]->setGeometryInputType(m_geometryInputType);
     m_shaders[Z3DRendererBase::ShaderHookType::Normal]->setGeometryOutputType(m_geometryOutputType);
@@ -41,14 +43,14 @@ void Z3DShaderGroup::addAllSupportedPostShaders()
 void Z3DShaderGroup::addDualDepthPeelingShaders()
 {
   if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].reset(new Z3DShaderProgram());
+    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit] = std::make_unique<Z3DShaderProgram>();
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputType(m_geometryOutputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit]->setGeometryOutputVertexCount(
         m_geometryOutputVertexCount);
     }
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].reset(new Z3DShaderProgram());
+    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel] = std::make_unique<Z3DShaderProgram>();
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel]->setGeometryOutputType(m_geometryOutputType);
@@ -63,7 +65,7 @@ void Z3DShaderGroup::addDualDepthPeelingShaders()
 void Z3DShaderGroup::addWeightedAverageShaders()
 {
   if (Z3DGpuInfo::instance().isWeightedAverageSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].reset(new Z3DShaderProgram());
+    m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit] = std::make_unique<Z3DShaderProgram>();
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit]->setGeometryOutputType(m_geometryOutputType);
@@ -77,7 +79,7 @@ void Z3DShaderGroup::addWeightedAverageShaders()
 void Z3DShaderGroup::addWeightedBlendedShaders()
 {
   if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit].reset(new Z3DShaderProgram());
+    m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit] = std::make_unique<Z3DShaderProgram>();
     if (!GLVersionGE(3, 2)) {
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit]->setGeometryInputType(m_geometryInputType);
       m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit]->setGeometryOutputType(m_geometryOutputType);

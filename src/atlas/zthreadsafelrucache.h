@@ -47,24 +47,19 @@ class ZThreadSafeLRUCache
    */
   struct ListNode
   {
-    ListNode()
-      : m_prev(OutOfListMarker)
-      , m_next(nullptr)
-    {}
+    ListNode() = default;
 
     ListNode(const TKey& key, size_t size)
       : m_key(key)
       , m_size(size)
-      , m_prev(OutOfListMarker)
-      , m_next(nullptr)
     {}
 
     TKey m_key;
-    size_t m_size;
-    ListNode* m_prev;
-    ListNode* m_next;
+    size_t m_size = 0;
+    ListNode* m_prev = OutOfListMarker;
+    ListNode* m_next = nullptr;
 
-    bool isInList() const
+    [[nodiscard]] bool isInList() const
     {
       return m_prev != OutOfListMarker;
     }
@@ -95,7 +90,6 @@ class ZThreadSafeLRUCache
   typedef typename HashMap::const_accessor HashMapConstAccessor;
   typedef typename HashMap::accessor HashMapAccessor;
   typedef typename HashMap::value_type HashMapValuePair;
-  typedef std::pair<const TKey, TValue> SnapshotValue;
 
 public:
   /**
@@ -105,7 +99,7 @@ public:
    */
   struct ConstAccessor
   {
-    ConstAccessor() {}
+    ConstAccessor() = default;
 
     const TValue& operator*() const
     {
@@ -122,7 +116,7 @@ public:
       return &m_hashAccessor->second.m_value;
     }
 
-    bool empty() const
+    [[nodiscard]] bool empty() const
     {
       return m_hashAccessor.empty();
     }
@@ -427,11 +421,11 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
       // List is empty, can't evict
       return;
     }
-    m_size.fetch_sub(moribund->m_size, std::memory_order_relaxed);
     delink(moribund);
     lock.unlock();
 
     m_map.erase(moribund->m_key);
+    m_size.fetch_sub(moribund->m_size, std::memory_order_relaxed);
     delete moribund;
   }
 }

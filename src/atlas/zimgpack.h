@@ -3,7 +3,6 @@
 #include "zimg.h"
 #include "zimgsliceprovider.h"
 #include "zlog.h"
-#include "zimgcache.h"
 #include <QRectF>
 #include <folly/futures/Future.h>
 #include <boost/geometry.hpp>
@@ -168,18 +167,6 @@ public:
 
   ZImg resizedImg(size_t width, size_t height, size_t depth, size_t t) const;
 
-  void readRegionToImg(index_t xyRatio,
-                       index_t zRatio,
-                       index_t sx,
-                       index_t sy,
-                       index_t sz,
-                       size_t sc,
-                       size_t t,
-                       const ZImgInfo& resInfo,
-                       double displayRangeMin,
-                       double displayRangeMax,
-                       ZImg& res) const;
-
   folly::Future<std::shared_ptr<ZImg>> readRegionToImg(index_t xyRatio,
                                                        index_t zRatio,
                                                        index_t sx,
@@ -190,21 +177,6 @@ public:
                                                        const ZImgInfo& resInfo,
                                                        double displayRangeMin,
                                                        double displayRangeMax) const;
-
-  std::set<ImageCacheHashKeyType> collectCacheKeysForReadRegionToImg(index_t xyRatio,
-                                                                     index_t zRatio,
-                                                                     index_t sx,
-                                                                     index_t sy,
-                                                                     index_t sz,
-                                                                     index_t width,
-                                                                     index_t height,
-                                                                     index_t depth,
-                                                                     size_t t,
-                                                                     bool onlyCollectNotInCacheKeys = false) const;
-
-  void preloadImageCache(const ImageCacheHashKeyType& key) const;
-
-  void prefetchImageCache(const ImageCacheHashKeyType& key) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const

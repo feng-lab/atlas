@@ -2,14 +2,16 @@
 
 #include "zimg.h"
 #include "zthreadsafescalablecache.h"
+#include "zhashutils.h"
+
+// #define USE_ZSharedCache
+
+#ifdef USE_ZSharedCache
 #include <QReadWriteLock>
-#include <folly/futures/Future.h>
-#include <boost/functional/hash.hpp>
 #include <list>
 #include <unordered_map>
 #include <atomic>
-
-// #define USE_ZSharedCache
+#endif
 
 // #define USE_KeyWithMemoizedHash
 
@@ -227,21 +229,6 @@ using ZThreadSafeScalableImageCache =
 
 using ImageCacheHashKeyType = std::tuple<const void*, size_t>;
 
-template<typename K>
-struct ZHashCompare
-{
-  static size_t hash(const K& key)
-  {
-    boost::hash<K> hasher;
-    return hasher(key);
-  }
-
-  static bool equal(const K& key1, const K& key2)
-  {
-    return key1 == key2;
-  }
-};
-
 using ZThreadSafeScalableImageCache =
   ZThreadSafeScalableCache<ImageCacheHashKeyType, std::shared_ptr<ZImg>, ZHashCompare<ImageCacheHashKeyType>>;
 
@@ -295,28 +282,3 @@ public:
 #endif
 
 } // namespace nim
-
-namespace std {
-
-// custom specialization of std::hash can be injected in namespace std
-#ifdef USE_KeyWithMemoizedHash
-template<>
-struct hash<nim::ImageCacheHashKeyType>
-{
-  inline std::size_t operator()(const nim::ImageCacheHashKeyType& s) const noexcept
-  {
-    return s.hash();
-  }
-};
-#else
-template<>
-struct hash<nim::ImageCacheHashKeyType>
-{
-  inline std::size_t operator()(const nim::ImageCacheHashKeyType& s) const noexcept
-  {
-    return boost::hash<nim::ImageCacheHashKeyType>{}(s);
-  }
-};
-#endif
-
-} // namespace std

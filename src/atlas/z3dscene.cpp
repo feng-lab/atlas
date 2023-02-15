@@ -2,6 +2,7 @@
 
 #include "z3dgl.h"
 #include "z3dnetworkevaluator.h"
+#include "zimgcache.h"
 #include "zimgregioncache.h"
 
 DEFINE_bool(atlas_clear_image_cache_after_rendering,

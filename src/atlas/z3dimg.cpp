@@ -82,10 +82,10 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
     for (size_t c = 0; c < m_nChannels; ++c) {
       m_channelPageTableCacheTextures.emplace_back(
         std::make_unique<Z3DTexture>(GLint(GL_RGBA32UI), m_pageTableCacheSize, GL_RGBA_INTEGER, GL_UNSIGNED_INT));
-      m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels(),
-                                         glm::uvec4(0, 0, 0, m_unmappedFlag));
       m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-      m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+
+      m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels());
+      // m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());  // will do this in setScale
 
       m_channelImageCacheTextures.emplace_back(
         std::make_unique<Z3DTexture>(GLint(GL_R8),
@@ -285,10 +285,12 @@ void Z3DImg::setScale(const glm::vec3& scale)
   }
 
   glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
-  m_channelPageTableCacheManagers.resize(m_nChannels);
-  m_channelImageCacheManagers.resize(m_nChannels);
-  m_channelPageDirectoryTextures.resize(m_nChannels);
-  m_channelPageDirectories.resize(m_nChannels);
+  if (m_channelPageTableCacheManagers.size() != m_nChannels) {
+    m_channelPageTableCacheManagers.resize(m_nChannels);
+    m_channelImageCacheManagers.resize(m_nChannels);
+    m_channelPageDirectoryTextures.resize(m_nChannels);
+    m_channelPageDirectories.resize(m_nChannels);
+  }
   for (size_t c = 0; c < m_nChannels; ++c) {
     m_channelPageTableCacheManagers[c] =
       std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
@@ -297,12 +299,16 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                                                  invalidKey);
 
     // content of RGBA32I texture
-    m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
-                                                                     GLint(GL_RGBA32UI),
-                                                                     glm::uvec3(m_pageDirectorySize),
-                                                                     GL_RGBA_INTEGER,
-                                                                     GL_UNSIGNED_INT);
-    m_channelPageDirectoryTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+    if (!m_channelPageDirectoryTextures[c] ||
+        m_channelPageDirectoryTextures[c]->dimension() != glm::uvec3(m_pageDirectorySize)) {
+      m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                       GLint(GL_RGBA32UI),
+                                                                       glm::uvec3(m_pageDirectorySize),
+                                                                       GL_RGBA_INTEGER,
+                                                                       GL_UNSIGNED_INT);
+      m_channelPageDirectoryTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+    }
+
     m_channelPageDirectories[c].resize(m_channelPageDirectoryTextures[c]->numPixels());
     std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
     m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
@@ -814,7 +820,8 @@ void Z3DImg::readVolumes()
       img.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
     }
 
-    auto vh = std::make_unique<Z3DVolume>(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
+    auto vh =
+      std::make_unique<Z3DVolume>(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
 
     m_volumes.emplace_back(std::move(vh));
   } else {
@@ -825,7 +832,9 @@ void Z3DImg::readVolumes()
       } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
         cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
       }
-      auto vh = std::make_unique<Z3DVolume>(cImg, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
+      auto vh = std::make_unique<Z3DVolume>(cImg,
+                                            glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
+                                            glm::vec3(.0));
 
       m_volumes.emplace_back(std::move(vh));
     } // for each cannel
