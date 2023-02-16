@@ -60,6 +60,12 @@ __forceinline void clearAndDeallocate(Container& c)
   Container().swap(c);
 }
 
+template<typename Container>
+__forceinline void shrinkToFit(Container& c)
+{
+  Container(c).swap(c);
+}
+
 using index_t = std::ptrdiff_t;
 
 // literal

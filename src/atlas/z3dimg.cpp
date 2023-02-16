@@ -48,22 +48,28 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 
     glm::uvec3 imageCacheSize;
     // m_imageBlockReadSize = glm::ivec3(510, 510, 30);
-    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20480) {
+    if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 32768) {
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
 #else
-      imageCacheSize = glm::uvec3(4096, 2048, 2048); // 16G
+      imageCacheSize = glm::uvec3(3072, 3072, 2048); // 18G
 #endif
       m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
-    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20480) {
 #ifdef Q_OS_MACOS
-      imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
+      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
 #else
-      imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
+      imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
 #endif
+      m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 16384) {
+      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
+      m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
+    } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8192) {
+      imageCacheSize = glm::uvec3(2048, 1536, 1024); // 3G
       m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4096) {
-      imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
+      imageCacheSize = glm::uvec3(1024, 1024, 1024); // 1G
       m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2048) {
       imageCacheSize = glm::uvec3(1024, 1024, 512); // 0.5G
@@ -85,7 +91,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
       m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
 
       m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels());
-      // m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());  // will do this in setScale
+      // m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());  // will do this in
+      // setScale
 
       m_channelImageCacheTextures.emplace_back(
         std::make_unique<Z3DTexture>(GLint(GL_R8),

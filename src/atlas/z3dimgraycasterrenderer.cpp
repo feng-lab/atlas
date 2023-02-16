@@ -15,6 +15,10 @@ DEFINE_bool(atlas_clear_image_cache_after_rendering,
             false,
             "Clear image cache after rendering, for test, default is false");
 
+DEFINE_bool(atlas_squeeze_image_cache_after_rendering,
+            false,
+            "Squeeze image cache after rendering, default is true");
+
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
               "Maximum number of rounds for volume rendering, default is 100");
@@ -814,11 +818,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           m_layerTarget->release();
         }
       }
-      ZImgCache::instance().squeeze();
-      ZImgRegionCache::instance().squeeze();
+
       if (FLAGS_atlas_clear_image_cache_after_rendering) {
         ZImgCache::instance().clear();
         ZImgRegionCache::instance().clear();
+      } else if (FLAGS_atlas_squeeze_image_cache_after_rendering) {
+        ZImgCache::instance().squeeze();
+        ZImgRegionCache::instance().squeeze();
       }
       LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
       LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
