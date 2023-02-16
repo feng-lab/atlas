@@ -433,7 +433,14 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::evict()
     delink(moribund);
     lock.unlock();
 
-    m_map.erase(moribund->m_key);
+    // m_map.erase(moribund->m_key);
+    HashMapAccessor hashAccessor;
+    if (!m_map.find(hashAccessor, moribund->m_key)) {
+      // Presumably unreachable
+      continue;
+    }
+    LOG(INFO) << hashAccessor->second.m_value.use_count();
+    m_map.erase(hashAccessor);
     m_size.fetch_sub(moribund->m_size, std::memory_order_relaxed);
     delete moribund;
   }
