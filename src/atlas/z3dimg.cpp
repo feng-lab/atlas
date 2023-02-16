@@ -52,24 +52,20 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
 #else
-      imageCacheSize = glm::uvec3(3072, 3072, 2048); // 18G
+      imageCacheSize = glm::uvec3(4096, 2048, 2048); // 16G
 #endif
       m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20000) {
-#ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
-#else
-      imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
-#endif
       m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 16000) {
-      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
+      imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
       m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 12000) {
       imageCacheSize = glm::uvec3(2048, 2048, 1024); // 4G
       m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8000) {
-      imageCacheSize = glm::uvec3(2048, 1536, 1024); // 3G
+      imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
       m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4000) {
       imageCacheSize = glm::uvec3(1024, 1024, 1024); // 1G
