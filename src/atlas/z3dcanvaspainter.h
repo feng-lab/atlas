@@ -20,7 +20,7 @@ class Z3DCanvasPainter : public Z3DBoundedFilter
 public:
   explicit Z3DCanvasPainter(Z3DGlobalParameters& globalParas, Z3DCanvas& canvas, QObject* parent = nullptr);
 
-  void invalidate(State inv = State::AllResultInvalid) override;
+  void invalidate(State inv) override;
 
   Z3DCanvas& canvas()
   {

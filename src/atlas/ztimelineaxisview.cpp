@@ -1,12 +1,7 @@
 #include "ztimelineaxisview.h"
 
-#include "zlog.h"
 #include "zsaturateoperation.h"
 #include <QGraphicsItem>
-#include <QGraphicsEllipseItem>
-#include <QGraphicsTextItem>
-#include <QGraphicsRectItem>
-#include <QGraphicsLineItem>
 #include <QScrollBar>
 
 namespace nim {
@@ -99,12 +94,12 @@ void ZTimelineAxisView::updateAxisScene()
 
   for (double time = 0; time <= m_timeline.eventViewWidth() / m_timeline.pixelsPerSecond(); time += tickTimeSpan) {
     double x = m_timeline.timeToX(time);
-    uint64_t count = roundTo<uint64_t>(time / tickTimeSpan);
+    auto count = roundTo<uint64_t>(time / tickTimeSpan);
     if (count % 10 == 0) { // big tick
       auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.2, x, m_timeline.rowHeight());
       line->setPen(QPen(palette().color(QPalette::Text)));
-      QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
+      auto text = new QGraphicsTextItem(timeToString(time));
       text->setPos(x, 0);
       QFont font;
       font.setPointSize(11);
@@ -116,7 +111,7 @@ void ZTimelineAxisView::updateAxisScene()
       auto line = new QGraphicsLineItem();
       line->setLine(x, m_timeline.rowHeight() * 0.5, x, m_timeline.rowHeight());
       line->setPen(QPen(palette().color(QPalette::Text)));
-      QGraphicsTextItem* text = new QGraphicsTextItem(timeToString(time));
+      auto text = new QGraphicsTextItem(timeToString(time));
       text->setPos(x, 0);
       QFont font;
       font.setPointSize(11);
@@ -145,9 +140,9 @@ void ZTimelineAxisView::updateAxisScene()
   m_scene->addItem(m_currentTimeItem);
 }
 
-QString ZTimelineAxisView::timeToString(double time) const
+QString ZTimelineAxisView::timeToString(double time)
 {
-  uint64_t tm = roundTo<uint64_t>(time / 0.001);
+  auto tm = roundTo<uint64_t>(time / 0.001);
   uint64_t hour = tm / 3600000;
   tm -= hour * 3600000;
   uint64_t miniter = tm / 60000;

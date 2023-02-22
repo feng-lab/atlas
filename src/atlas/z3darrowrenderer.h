@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DArrowRenderer : public Z3DConeRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DArrowRenderer(Z3DRendererBase& rendererBase);
 

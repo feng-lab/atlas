@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DSphereRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // default use display list and lighting for opengl mode
   explicit Z3DSphereRenderer(Z3DRendererBase& rendererBase);

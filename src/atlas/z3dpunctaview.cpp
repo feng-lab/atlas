@@ -1,5 +1,7 @@
 #include "z3dpunctaview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view)

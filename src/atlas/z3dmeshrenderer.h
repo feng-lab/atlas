@@ -15,8 +15,6 @@ namespace nim {
 // "CustomColor" : setDataColors must be called to set color of each mesh
 class Z3DMeshRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DMeshRenderer(Z3DRendererBase& rendererBase);
 

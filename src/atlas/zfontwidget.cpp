@@ -19,7 +19,7 @@ ZFontWidget::ZFontWidget(const QFont& font, QWidget* parent)
   m_button = new QToolButton();
   m_button->setText("...");
   connect(m_button, &QToolButton::clicked, this, &ZFontWidget::chooseFont);
-  QHBoxLayout* lo = new QHBoxLayout(this);
+  auto lo = new QHBoxLayout(this);
   lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_label);
   lo->addWidget(m_button);
@@ -38,7 +38,7 @@ void ZFontWidget::setLabelFollowFontSize(bool v)
   m_label->home(false);
 }
 
-void ZFontWidget::setFont(const QFont& font)
+void ZFontWidget::set_Font(const QFont& font)
 {
   if (font != m_font) {
     m_font = font;
@@ -53,7 +53,7 @@ void ZFontWidget::chooseFont()
   bool ok;
   QFont font = QFontDialog::getFont(&ok, m_font, this, "Select Font");
   if (ok) {
-    setFont(font);
+    set_Font(font);
   }
 }
 

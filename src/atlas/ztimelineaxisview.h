@@ -32,7 +32,7 @@ Q_SIGNALS:
 protected:
   void updateAxisScene();
 
-  QString timeToString(double time) const;
+  static QString timeToString(double time) ;
 
   void moveCurrentTime();
 

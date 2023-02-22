@@ -8,8 +8,6 @@ namespace nim {
 
 class Z3DFontRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DFontRenderer(Z3DRendererBase& rendererBase);
 

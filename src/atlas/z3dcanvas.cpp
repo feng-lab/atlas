@@ -252,7 +252,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   m_3dScene = new Z3DScene(width, height, m_glWindow->format().stereo(), this);
   setViewport(QWidget::createWindowContainer(m_glWindow, nullptr, f));
 #else
-  m_glWidget = new ZOpenGLWidget(nullptr, f);
+  m_glWidget = new ZOpenGLWidget(this, f);
   m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), this);
   setViewport(m_glWidget);
 #endif

@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DConeRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // default use display list and lighting in opengl mode
   // Round cap style might have bug. It only works when we are dealing with cylinder with slightly different radius.

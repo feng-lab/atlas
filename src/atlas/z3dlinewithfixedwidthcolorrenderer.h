@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DLineWithFixedWidthColorRenderer : public Z3DLineRenderer
 {
-  Q_OBJECT
-
 public:
   // default use display list but not lighting in opengl mode
   explicit Z3DLineWithFixedWidthColorRenderer(Z3DRendererBase& base);

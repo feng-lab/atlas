@@ -33,6 +33,12 @@ class Z3DAnimationDoc;
 
 class ZROIDoc;
 
+class ZPunctaDoc;
+
+class ZSvgDoc;
+
+class ZSwcDoc;
+
 class ZRegionAnnotationDoc;
 
 class ZMeshDoc;
@@ -196,6 +202,21 @@ public:
     return *m_roiDoc;
   }
 
+  ZPunctaDoc& punctaDoc()
+  {
+    return *m_punctaDoc;
+  }
+
+  ZSwcDoc& swcDoc()
+  {
+    return *m_swcDoc;
+  }
+
+  ZSvgDoc& svgDoc()
+  {
+    return *m_svgDoc;
+  }
+
   ZMeshDoc& meshDoc()
   {
     return *m_meshDoc;
@@ -313,6 +334,9 @@ private:
   Z2DAnimationDoc* m_animation2DDoc = nullptr;
   Z3DAnimationDoc* m_animation3DDoc = nullptr;
   ZROIDoc* m_roiDoc = nullptr;
+  ZPunctaDoc* m_punctaDoc = nullptr;
+  ZSwcDoc* m_swcDoc = nullptr;
+  ZSvgDoc* m_svgDoc = nullptr;
   ZMeshDoc* m_meshDoc = nullptr;
   ZRegionAnnotationDoc* m_regionAnnotationDoc = nullptr;
 };

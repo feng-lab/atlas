@@ -26,11 +26,6 @@ public:
 
   void resize(GLsizei n);
 
-  inline void clear()
-  {
-    resize(0);
-  }
-
 private:
   std::vector<GLuint> m_arrays;
 };

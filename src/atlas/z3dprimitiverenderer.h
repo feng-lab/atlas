@@ -12,17 +12,10 @@ class ZMesh;
 
 class Z3DPrimitiveRenderer : public QObject
 {
-  Q_OBJECT
-
 public:
   explicit Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase);
 
   virtual ~Z3DPrimitiveRenderer();
-
-  inline QString className() const
-  {
-    return metaObject()->className();
-  }
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // for opengl mode only, if set, display list will be build in opengl mode.
@@ -87,9 +80,8 @@ public:
   // render a trianglelist with whatever it contains
   static void renderTriangleList(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader, const ZMesh& mesh);
 
-Q_SIGNALS:
-
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
+Q_SIGNALS:
   void openglRendererInvalid();
   void openglPickingRendererInvalid();
 #endif

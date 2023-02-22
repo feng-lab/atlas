@@ -13,8 +13,6 @@ class Z3DVolume;
 // use colormap of each volume to composite final image
 class Z3DImage2DRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DImage2DRenderer(Z3DRendererBase& rendererBase);
 

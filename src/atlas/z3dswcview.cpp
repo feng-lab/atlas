@@ -1,5 +1,7 @@
 #include "z3dswcview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DView& view)

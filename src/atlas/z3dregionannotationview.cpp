@@ -1,5 +1,7 @@
 #include "z3dregionannotationview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DView& view)

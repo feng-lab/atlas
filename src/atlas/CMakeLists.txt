@@ -543,10 +543,6 @@ set(SOURCES
     z2dtransformparameter.h
     zspinboxdelegate.cpp
     zspinboxdelegate.h
-    z3dvolumefilter.cpp
-    z3dvolumefilter.h
-    z3dvolumeraycasterrenderer.cpp
-    z3dvolumeraycasterrenderer.h
     z3dopenglwidget.cpp
     z3dopenglwidget.h
     zchromaticshiftcorrectiondialog.cpp

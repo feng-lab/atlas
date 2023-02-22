@@ -15,8 +15,6 @@ class Z3DImg;
 // use colormap of each volume to composite final image
 class Z3DImgSliceRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DImgSliceRenderer(Z3DRendererBase& rendererBase);
 

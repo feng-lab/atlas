@@ -23,6 +23,7 @@
 #include "ztheme.h"
 #include <QMessageBox>
 #include <QPlainTextEdit>
+#include <QApplication>
 #include <memory>
 
 namespace nim {

@@ -8,8 +8,6 @@ namespace nim {
 
 class Z3DTextureGlowRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase);
 

@@ -10,6 +10,9 @@
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
 #include "zroidoc.h"
+#include "zpunctadoc.h"
+#include "zswcdoc.h"
+#include "zsvgdoc.h"
 #include "zregionannotationdoc.h"
 #include "zmeshdoc.h"
 #include "ztheme.h"
@@ -49,6 +52,15 @@ ZDoc::ZDoc(QObject* parent)
 
   m_roiDoc = new ZROIDoc(*this);
   registerObjDoc(m_roiDoc);
+
+  m_punctaDoc = new ZPunctaDoc(*this);
+  registerObjDoc(m_punctaDoc);
+
+  m_swcDoc = new ZSwcDoc(*this);
+  registerObjDoc(m_swcDoc);
+
+  m_svgDoc = new ZSvgDoc(*this);
+  registerObjDoc(m_svgDoc);
 
   m_meshDoc = new ZMeshDoc(*this);
   registerObjDoc(m_meshDoc);

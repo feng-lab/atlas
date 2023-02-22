@@ -14,16 +14,13 @@
 #include "zobjeditwidget.h"
 #include "zobjdetailedinfowidget.h"
 #include "zimgview.h"
-#include "zpunctadoc.h"
 #include "zpunctaview.h"
-#include "zswcdoc.h"
 #include "zswcview.h"
 #include "zmeshdoc.h"
 #include "z2danimationdoc.h"
 #include "z3danimationdoc.h"
 #include "zroiview.h"
 #include "zregionannotationview.h"
-#include "zsvgdoc.h"
 #include "zsvgview.h"
 #include "zjson.h"
 #include "zfileutils.h"
@@ -506,22 +503,11 @@ void ZMainWindow::init()
 
   // packages
   m_view->registerObjView(std::make_unique<ZImgView>(m_doc->imgDoc(), *m_view));
-
   m_view->registerObjView(std::make_unique<ZROIView>(m_doc->roiDoc(), *m_view));
-
-  auto punctaDoc = new ZPunctaDoc(*m_doc);
-  m_doc->registerObjDoc(punctaDoc);
-  m_view->registerObjView(std::make_unique<ZPunctaView>(*punctaDoc, *m_view));
-
-  auto swcDoc = new ZSwcDoc(*m_doc);
-  m_doc->registerObjDoc(swcDoc);
-  m_view->registerObjView(std::make_unique<ZSwcView>(*swcDoc, *m_view));
-
+  m_view->registerObjView(std::make_unique<ZPunctaView>(m_doc->punctaDoc(), *m_view));
+  m_view->registerObjView(std::make_unique<ZSwcView>(m_doc->swcDoc(), *m_view));
   m_view->registerObjView(std::make_unique<ZRegionAnnotationView>(m_doc->regionAnnotationDoc(), *m_view));
-
-  auto svgDoc = new ZSvgDoc(*m_doc);
-  m_doc->registerObjDoc(svgDoc);
-  m_view->registerObjView(std::make_unique<ZSvgView>(*svgDoc, *m_view));
+  m_view->registerObjView(std::make_unique<ZSvgView>(m_doc->svgDoc(), *m_view));
 
   // UI
   setCentralWidget(m_view.get());

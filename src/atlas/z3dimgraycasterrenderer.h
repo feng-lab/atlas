@@ -15,8 +15,6 @@ class Z3DImg;
 // transfer functions
 class Z3DImgRaycasterRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase);
 

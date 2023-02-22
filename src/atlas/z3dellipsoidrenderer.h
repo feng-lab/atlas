@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DEllipsoidRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // default use display list and lighting for opengl mode
   explicit Z3DEllipsoidRenderer(Z3DRendererBase& rendererBase);

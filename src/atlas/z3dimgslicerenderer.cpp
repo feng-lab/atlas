@@ -6,7 +6,6 @@
 #include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
-#include <QApplication>
 
 namespace nim {
 

@@ -1,5 +1,7 @@
 #include "z3dmeshview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DView& view)

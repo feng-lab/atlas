@@ -2,14 +2,11 @@
 
 #include "z3dprimitiverenderer.h"
 #include "z3dgpuinfo.h"
-#include <QApplication>
 
 namespace nim {
 
 class Z3DLineRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // default use display list but not lighing in opengl mode
   explicit Z3DLineRenderer(Z3DRendererBase& rendererBase);

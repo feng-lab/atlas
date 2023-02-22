@@ -1,5 +1,7 @@
 #include "z3danimationview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)

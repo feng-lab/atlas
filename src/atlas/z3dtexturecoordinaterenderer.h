@@ -10,8 +10,6 @@ namespace nim {
 // render 3d texture coordinates as color
 class Z3DTextureCoordinateRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DTextureCoordinateRenderer(Z3DRendererBase& rendererBase);
 

@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DBackgroundRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   explicit Z3DBackgroundRenderer(Z3DRendererBase& rendererBase);
 

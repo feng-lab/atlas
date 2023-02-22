@@ -3,8 +3,9 @@
 namespace nim {
 
 ZVertexBufferObject::ZVertexBufferObject(GLsizei n)
-  : m_arrays(std::max(GLsizei(0), n), 0)
+  : m_arrays(n, 0)
 {
+  CHECK(n > 0);
   glGenBuffers(m_arrays.size(), m_arrays.data());
 }
 
@@ -25,11 +26,12 @@ void ZVertexBufferObject::release(GLenum target)
 
 void ZVertexBufferObject::resize(GLsizei n)
 {
+  CHECK(n > 0);
   if (n == GLsizei(m_arrays.size())) {
     return;
   }
   glDeleteBuffers(m_arrays.size(), m_arrays.data());
-  m_arrays.resize(std::max(GLsizei(0), n), 0);
+  m_arrays.resize(n, 0);
   glGenBuffers(m_arrays.size(), m_arrays.data());
 }
 

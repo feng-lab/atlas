@@ -1,5 +1,7 @@
 #include "z3dimgview.h"
 
+#include <QApplication>
+
 namespace nim {
 
 Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DView& view)

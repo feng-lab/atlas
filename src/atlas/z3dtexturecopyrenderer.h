@@ -6,8 +6,6 @@ namespace nim {
 
 class Z3DTextureCopyRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // Multiply_Alpha : output color will be multiplied by alpha value (convert to premultiplied format)
   // None (default): just copy

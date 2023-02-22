@@ -7,8 +7,6 @@ namespace nim {
 
 class Z3DTextureBlendRenderer : public Z3DPrimitiveRenderer
 {
-  Q_OBJECT
-
 public:
   // supported modes:
   // "DepthTest", "FirstOnTop", "SecondOnTop"

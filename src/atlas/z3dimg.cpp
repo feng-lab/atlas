@@ -8,14 +8,10 @@
 #include "zexception.h"
 #include <QApplication>
 #include <QMessageBox>
-#include <fmt/chrono.h>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
-#include <folly/synchronization/Latch.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
-#include <boost/functional/hash.hpp>
 #include <boost/dynamic_bitset.hpp>
-#include <tbb/parallel_for.h>
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -52,7 +48,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
 #else
-      imageCacheSize = glm::uvec3(4096, 2048, 2048); // 16G
+      imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
 #endif
       m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20000) {

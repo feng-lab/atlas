@@ -8,6 +8,7 @@
 #include "zexception.h"
 #include "zimgformat.h"
 #include "zlog.h"
+#include <QApplication>
 #include <memory>
 
 namespace nim {

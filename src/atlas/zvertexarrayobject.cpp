@@ -15,8 +15,9 @@ namespace nim {
 
 ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
   : m_hardwareSupportVAO(Z3DGpuInfo::instance().isVAOSupported())
-  , m_arrays(std::max(GLsizei(0), n), 0)
+  , m_arrays(n, 0)
 {
+  CHECK(n > 0);
   if (m_hardwareSupportVAO) {
     glGenVertexArrays(m_arrays.size(), m_arrays.data());
   }
@@ -57,6 +58,7 @@ void ZVertexArrayObject::release() const
 
 void ZVertexArrayObject::resize(GLsizei n)
 {
+  CHECK(n > 0);
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
   CHECK(m_context == Z3DContext());
 #endif
@@ -64,7 +66,7 @@ void ZVertexArrayObject::resize(GLsizei n)
     return;
   }
   glDeleteVertexArrays(m_arrays.size(), m_arrays.data());
-  m_arrays.resize(std::max(GLsizei(0), n), 0);
+  m_arrays.resize(n, 0);
   glGenVertexArrays(m_arrays.size(), m_arrays.data());
 }
 

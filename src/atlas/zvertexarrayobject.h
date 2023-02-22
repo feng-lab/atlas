@@ -27,11 +27,6 @@ public:
 
   void resize(GLsizei n);
 
-  inline void clear()
-  {
-    resize(0);
-  }
-
 private:
   bool m_hardwareSupportVAO;
   std::vector<GLuint> m_arrays;

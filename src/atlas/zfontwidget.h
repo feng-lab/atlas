@@ -19,7 +19,7 @@ public:
   // default is false
   void setLabelFollowFontSize(bool v);
 
-  void setFont(const QFont& font);
+  void set_Font(const QFont& font);
 
 Q_SIGNALS:
 

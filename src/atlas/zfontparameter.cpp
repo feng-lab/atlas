@@ -25,9 +25,9 @@ void ZFontParameter::beforeChange(QFont& value)
 
 QWidget* ZFontParameter::actualCreateWidget(QWidget* parent)
 {
-  ZFontWidget* res = new ZFontWidget(m_value, parent);
+  auto res = new ZFontWidget(m_value, parent);
   connect(res, &ZFontWidget::fontChanged, this, &ZFontParameter::setValue);
-  connect(this, &ZFontParameter::valueWillChange, res, &ZFontWidget::setFont);
+  connect(this, &ZFontParameter::valueWillChange, res, &ZFontWidget::set_Font);
   return res;
 }
 

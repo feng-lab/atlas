@@ -19,7 +19,7 @@ class Z3DShaderProgram;
 
 // contains basic properties such as lighting, method, size for rendering.
 // A renderBase usually contains multiple primitive renderers. Some of those are
-// combined to draw a complicated object. Some of those are just sharing the enviroment
+// combined to draw a complicated object. Some of those are just sharing the environment
 // (rendering parameters).
 class Z3DRendererBase : public QObject
 {

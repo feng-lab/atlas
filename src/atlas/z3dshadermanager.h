@@ -4,6 +4,7 @@
 #include "z3dcontext.h"
 #include <map>
 #include <memory>
+#include <utility>
 
 namespace nim {
 
@@ -21,9 +22,9 @@ public:
 private:
   struct ShaderKey
   {
-    ShaderKey(const QString& fn, const QString& hd, const Z3DContextGroup& ct)
-      : filename(fn)
-      , header(hd)
+    ShaderKey(QString fn, QString hd, const Z3DContextGroup& ct)
+      : filename(std::move(fn))
+      , header(std::move(hd))
       , context(ct)
     {}
 
