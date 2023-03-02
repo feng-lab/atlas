@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
+Z3DGlobalParameters::Z3DGlobalParameters(Z3DRenderingEngine& engine)
   : geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
@@ -24,9 +24,8 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   , xCut("X Cut", glm::vec2(0, 0), 0, 0)
   , yCut("Y Cut", glm::vec2(0, 0), 0, 0)
   , zCut("Z Cut", glm::vec2(0, 0), 0, 0)
-  , devicePixelRatio("Device Pixel Ratio", canvas.devicePixelRatio(), 1.f, 16.f)
-  , m_canvas(canvas)
-  , m_view(view)
+  , devicePixelRatio("Device Pixel Ratio", 1.f, 1.f, 16.f)
+  , m_engine(engine)
 {
   geometriesMultisampleMode.addOptions("None", "2x2");
   geometriesMultisampleMode.select("2x2");
@@ -242,7 +241,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
   for (size_t i = 0; i < m_parameters.size(); ++i) {
     if (i == cameraParameterIndex) {
-      m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_view)), 1);
+      m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_engine)), 1);
       m_widgetsGrp->addChild(*m_parameters[i], 1);
     } else {
       m_widgetsGrp->addChild(*m_parameters[i], 1);
@@ -254,7 +253,15 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view)
   m_widgetsGrp->addChild(devicePixelRatio, 1);
   m_widgetsGrpNoCamera->addChild(devicePixelRatio, 1);
 
-  pickingManager.setDevicePixelRatio(m_canvas.devicePixelRatio());
+  pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+}
+
+void Z3DGlobalParameters::attachToCanvas(Z3DCanvas& canvas)
+{
+  if (canvas.devicePixelRatio() != devicePixelRatio.get()) {
+    devicePixelRatio.set(canvas.devicePixelRatio());
+    pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+  }
 }
 
 void Z3DGlobalParameters::read(const json::object& json)

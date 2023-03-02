@@ -6,7 +6,7 @@ namespace nim {
 
 class ZDoc;
 
-class Z3DView;
+class Z3DRenderingEngine;
 
 class ZViewSettingWidget;
 
@@ -16,6 +16,10 @@ class ZObjEditWidget;
 
 class ZMainWindow;
 
+class Z3DCanvas;
+
+enum class Z3DScreenShotType;
+
 class Z3DMainWindow : public QMainWindow
 {
   Q_OBJECT
@@ -23,9 +27,9 @@ class Z3DMainWindow : public QMainWindow
 public:
   explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false, QWidget* parent = nullptr);
 
-  Z3DView* view()
+  Z3DRenderingEngine* view()
   {
-    return m_view;
+    return m_engine;
   }
 
   void openEditWidget(size_t id);
@@ -38,7 +42,7 @@ Q_SIGNALS:
 
   void loadJsonScene(const QString& fn);
 
-  void viewReady(Z3DView* view);
+  void viewReady(Z3DRenderingEngine* view);
 
 protected:
   void closeEvent(QCloseEvent* event) override;
@@ -98,6 +102,12 @@ private:
 
   void onViewReady();
 
+  QWidget* createCaptureWidget() const;
+
+  void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
+
+  void takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;
@@ -139,7 +149,9 @@ private:
 
   //
   ZDoc& m_doc;
-  Z3DView* m_view = nullptr;
+  Z3DRenderingEngine* m_engine = nullptr;
+
+  Z3DCanvas* m_canvas = nullptr;
 
   bool m_isStereoView = false;
 

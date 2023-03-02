@@ -1,7 +1,7 @@
 #include "z3dnetworkevaluator.h"
 
 #include "z3dgl.h"
-#include "z3dcanvaspainter.h"
+#include "z3dcompositor.h"
 #include "z3dfilter.h"
 #include "z3dmeshfilter.h"
 #include "zlog.h"
@@ -13,10 +13,10 @@
 
 namespace nim {
 
-Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCanvasPainter& canvasPainter, QObject* parent)
+Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* parent)
   : QObject(parent)
   , m_processPending(false)
-  , m_canvasPainter(canvasPainter)
+  , m_compositor(compositor)
 {
 #if defined(_DEBUG_)
   m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
@@ -26,13 +26,6 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCanvasPainter& canvasPainter, QObjec
 #endif
 
   updateNetwork();
-
-  m_canvasPainter.canvas().setNetworkEvaluator(this);
-}
-
-Z3DNetworkEvaluator::~Z3DNetworkEvaluator()
-{
-  m_canvasPainter.canvas().setNetworkEvaluator(nullptr);
 }
 
 void Z3DNetworkEvaluator::process(bool stereo)
@@ -59,8 +52,6 @@ void Z3DNetworkEvaluator::process(bool stereo)
   //      }
   //    }
   //  }
-
-  m_canvasPainter.canvas().getGLFocus();
 
   // notify filter wrappers
   for (auto& filterWrapper : m_filterWrappers) {
@@ -122,11 +113,11 @@ void Z3DNetworkEvaluator::process(bool stereo)
 
   m_locked = false;
 
-  // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
-  if (m_processPending) {
-    m_processPending = false;
-    m_canvasPainter.invalidate(Z3DFilter::State::AllResultInvalid);
-  }
+  //  // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
+  //  if (m_processPending) {
+  //    m_processPending = false;
+  //    m_compositor.invalidate(Z3DFilter::State::AllResultInvalid);
+  //  }
 }
 
 void Z3DNetworkEvaluator::updateNetwork()
@@ -138,9 +129,9 @@ void Z3DNetworkEvaluator::updateNetwork()
 
   std::queue<Z3DFilter*> filterQueue;
 
-  filterQueue.push(&m_canvasPainter);
-  Vertex v = boost::add_vertex(VertexInfo(&m_canvasPainter), m_filterGraph);
-  m_filterToVertexMapper[&m_canvasPainter] = v;
+  filterQueue.push(&m_compositor);
+  Vertex v = boost::add_vertex(VertexInfo(&m_compositor), m_filterGraph);
+  m_filterToVertexMapper[&m_compositor] = v;
 
   // build graph of all connected filters
   while (!filterQueue.empty()) {

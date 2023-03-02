@@ -282,8 +282,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
         m_pageDirectorySize.z > Z3DGpuInfo::instance().max3DTextureSize()) {
       throw ZGLException(QString("Image (%1) is not supported").arg(info.toQString()));
     }
-    LOG(INFO) << l << " " << m_pageDirectoryDimensions[l] << " " << m_pageTableDimensions[l] << " "
-              << m_imageDimensions[l] << " " << m_levelScales[l] << " " << m_posToBlockIDs[l];
   }
 
   glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
@@ -325,6 +323,13 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] =
       std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+  }
+
+  for (size_t l = 0; l < m_numLevels; ++l) {
+    LOG(INFO) << l << " pageDirectoryDimension:" << m_pageDirectoryDimensions[l]
+              << " pageTableDimension:" << m_pageTableDimensions[l] << " imageDimension:" << m_imageDimensions[l]
+              << " levelScale:" << m_levelScales[l] << " posToBlockID:" << m_posToBlockIDs[l]
+              << " voxelWorldDimension:" << m_voxelWorldDimensions[l] << " voxelWorldSize:" << m_voxelWorldSizes[l];
   }
 }
 
@@ -529,6 +534,18 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     ++count;
   }
 
+//  for (size_t i = 0; i < pendingTasks.size(); ++i) {
+//    const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
+//    glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+//    auto imageBlockSize = m_imageBlockSize;
+//    LOG(INFO) << m_levelScales[blockImagePos.x].x * blockImagePos.y << " "
+//              << m_levelScales[blockImagePos.x].x * blockImagePos.z << " "
+//              << m_levelScales[blockImagePos.x].z * blockImagePos.w << " "
+//              << m_levelScales[blockImagePos.x].x * imageBlockSize.x << " "
+//              << m_levelScales[blockImagePos.x].x * imageBlockSize.y << " "
+//              << m_levelScales[blockImagePos.x].z * imageBlockSize.z;
+//  }
+
   // read image
   int emptyBlockCount = 0;
   if (!pendingTasks.empty()) {
@@ -607,8 +624,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
             const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[std::get<0>(elem)];
             glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
             *pageTableEntry = glm::uvec4(imageBlockCachePos, 1);
-            // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
-            // level;
+            // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " "
+            // << level;
             if (erasedKey.x != std::numeric_limits<uint32_t>::max()) { // valid
               glm::uvec4 erasedKeyPageDirectoryEntryKey = erasedKey / glm::uvec4(1, m_pageTableBlockSize);
               glm::uvec3 erasedKeyPageDirectoryEntryCoord =

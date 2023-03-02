@@ -8,10 +8,8 @@ namespace nim {
 
 class Z3DAnimationView : public Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>
 {
-  Q_OBJECT
-
 public:
-  Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view);
+  Z3DAnimationView(Z3DAnimationDoc& doc, Z3DRenderingEngine& view);
 
 private:
   void docAnimationsAdded(const std::vector<size_t>& objs);

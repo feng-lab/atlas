@@ -8,10 +8,8 @@ namespace nim {
 
 class Z3DImgView : public Z3DFilterView<ZImgDoc, Z3DImgFilter>
 {
-  Q_OBJECT
-
 public:
-  Z3DImgView(ZImgDoc& doc, Z3DView& view);
+  Z3DImgView(ZImgDoc& doc, Z3DRenderingEngine& view);
 
 private:
   void docImgsAdded(const std::vector<size_t>& objs);

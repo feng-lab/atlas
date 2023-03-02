@@ -169,9 +169,6 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addPort(m_leftEyeOutport);
   addPort(m_rightEyeOutport);
   addPort(m_vPPort);
-  addPrivateRenderPort(m_opaqueOutport);
-  addPrivateRenderPort(m_opaqueLeftEyeOutport);
-  addPrivateRenderPort(m_opaqueRightEyeOutport);
 
   m_obliqueSliceNormal.setNameForEachValue({"x", "y", "z"});
   m_obliqueSlice2Normal.setNameForEachValue({"x", "y", "z"});

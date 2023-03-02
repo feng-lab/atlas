@@ -4,7 +4,7 @@
 
 namespace nim {
 
-class Z3DView;
+class Z3DRenderingEngine;
 
 class ZParameterAnimation;
 
@@ -17,7 +17,7 @@ class Z3DAnimation : public ZAnimation
 public:
   explicit Z3DAnimation(ZDoc& doc, QObject* parent = nullptr);
 
-  void bindView(Z3DView* v);
+  void bindView(Z3DRenderingEngine* v);
 
   void load(const QString& fn);
 

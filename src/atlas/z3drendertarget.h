@@ -51,6 +51,16 @@ public:
     return m_attachments.at(attachment);
   }
 
+  Z3DTexture* colorTexture()
+  {
+    return attachment(GL_COLOR_ATTACHMENT0);
+  }
+
+  Z3DTexture* depthTexture()
+  {
+    return attachment(GL_DEPTH_ATTACHMENT);
+  }
+
   // Get the color at position pos. This method will bind the RenderTarget!
   glm::vec4 floatColorAtPos(const glm::ivec2& pos);
 

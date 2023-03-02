@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DView& view)
+Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DRenderingEngine& view)
   : Z3DFilterView<ZImgDoc, Z3DImgFilter>(doc, view)
 {
   docImgsAdded(m_doc.objs());
@@ -33,7 +33,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
-      m_view.updateBoundBox();
+      m_engine.updateBoundBox();
 
       for (auto id : objs) {
         Q_EMIT objViewReady(id);
@@ -42,7 +42,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render image:\n%1").arg(e.what()));
   }
@@ -68,13 +68,13 @@ void Z3DImgView::docImgAdded(size_t id)
     canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render image: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render image:\n%1").arg(e.what()));
   }

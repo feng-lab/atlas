@@ -219,7 +219,7 @@ protected:
   friend class ZAnimationChangeDurationCommand;
 
   ZDoc& m_doc;
-  ZViewSettingInterface* m_view;
+  ZViewSettingInterface* m_engine;
 
   double m_duration;
 

@@ -8,10 +8,8 @@ namespace nim {
 
 class Z3DMeshView : public Z3DFilterView<ZMeshDoc, Z3DMeshFilter>
 {
-  Q_OBJECT
-
 public:
-  Z3DMeshView(ZMeshDoc& doc, Z3DView& view);
+  Z3DMeshView(ZMeshDoc& doc, Z3DRenderingEngine& engine);
 
 private:
   void docMeshesAdded(const std::vector<size_t>& objs);

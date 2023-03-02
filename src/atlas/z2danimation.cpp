@@ -22,17 +22,17 @@ Z2DAnimation::Z2DAnimation(ZDoc& doc, QObject* parent)
 
 void Z2DAnimation::bindView(ZView* v)
 {
-  if (m_view == v) {
+  if (m_engine == v) {
     return;
   }
 
   if (v) {
     connect(v, &ZView::objViewReady, this, &Z2DAnimation::tryLinkAnimationWith);
-    m_view = v;
+    m_engine = v;
     rebindView();
   } else {
     releaseParameters();
-    m_view = nullptr;
+    m_engine = nullptr;
   }
 }
 
@@ -52,19 +52,19 @@ void Z2DAnimation::save(const QString& fn)
 
 void Z2DAnimation::bindGlobalParameters()
 {
-  m_sliceAnimation->bindParameter(static_cast<ZView*>(m_view)->slicePara());
-  m_timeAnimation->bindParameter(static_cast<ZView*>(m_view)->timePara());
-  m_viewStyleAnimation->bindParameter(static_cast<ZView*>(m_view)->viewStylePara());
-  m_viewportAnimation->bindParameter(static_cast<ZView*>(m_view)->viewportPara());
+  m_sliceAnimation->bindParameter(static_cast<ZView*>(m_engine)->slicePara());
+  m_timeAnimation->bindParameter(static_cast<ZView*>(m_engine)->timePara());
+  m_viewStyleAnimation->bindParameter(static_cast<ZView*>(m_engine)->viewStylePara());
+  m_viewportAnimation->bindParameter(static_cast<ZView*>(m_engine)->viewportPara());
 }
 
 void Z2DAnimation::addGlobalKey(double time)
 {
   // global settings
-  m_sliceAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->slicePara()));
-  m_timeAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->timePara()));
-  m_viewStyleAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->viewStylePara()));
-  m_viewportAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_view)->viewportPara()));
+  m_sliceAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_engine)->slicePara()));
+  m_timeAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_engine)->timePara()));
+  m_viewStyleAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_engine)->viewStylePara()));
+  m_viewportAnimation->addKey(std::make_unique<ZParameterKey>(time, static_cast<ZView*>(m_engine)->viewportPara()));
 }
 
 } // namespace nim

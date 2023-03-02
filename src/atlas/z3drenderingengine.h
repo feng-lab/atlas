@@ -20,22 +20,18 @@ class Z3DObjView;
 
 class Z3DCompositor;
 
-class Z3DCanvasPainter;
-
 class Z3DNetworkEvaluator;
 
-class Z3DMainWindow;
-
-class Z3DView
+class Z3DRenderingEngine
   : public QObject
   , public ZViewSettingInterface
 {
   Q_OBJECT
 
 public:
-  Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent = nullptr);
+  Z3DRenderingEngine(ZDoc& doc, bool stereo, QObject* parent = nullptr);
 
-  ~Z3DView() override;
+  ~Z3DRenderingEngine() override;
 
   [[nodiscard]] const ZDoc& doc() const;
 
@@ -71,19 +67,14 @@ public:
     return m_globalParas->interactionHandler;
   }
 
-  inline Z3DCanvas& canvas()
+  inline Z3DCanvas* canvas()
   {
-    return *m_canvas;
+    return m_canvas;
   }
 
   [[nodiscard]] inline const Z3DCanvas& canvas() const
   {
     return *m_canvas;
-  }
-
-  inline Z3DCanvasPainter& canvasPainter()
-  {
-    return *m_canvasPainter;
   }
 
   inline Z3DCompositor& compositor()
@@ -103,8 +94,6 @@ public:
 
   QWidget* globalParasWidget();
 
-  [[nodiscard]] QWidget* captureWidget() const;
-
   QWidget* backgroundWidget();
 
   QWidget* axisWidget();
@@ -121,16 +110,14 @@ public:
 
   void write(json::object& json) const;
 
-  bool takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
+  void takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
-  bool takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
-                                                            int width,
-                                                            int height,
-                                                            Z3DScreenShotType sst);
+  void
+  takeFixedSizeScreenShotWithoutResetCanvasSize(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
-  void resetCanvasPainterSize();
+  void resetCanvasSize();
 
-  bool takeScreenShot(const QString& filename, Z3DScreenShotType sst);
+  void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
 
   std::vector<Z3DObjView*> objViews()
   {
@@ -167,6 +154,14 @@ public:
 
   void setYZView();
 
+  void init();
+
+  void attachToCanvas(Z3DCanvas& canvas);
+
+  void setOutputSize(const glm::uvec2& size);
+
+  void makeOutputSizeEvenNumbers();
+
 Q_SIGNALS:
 
   void objViewReady(size_t id);
@@ -199,9 +194,9 @@ private:
                             int numFrame,
                             Z3DScreenShotType sst);
 
-  void init();
-
   void createActions();
+
+  static ZImg textureToRGBAImg(const Z3DTexture& tex);
 
 private:
   ZDoc& m_doc;
@@ -217,8 +212,8 @@ private:
 
   Z3DCanvas* m_canvas = nullptr;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
-  std::unique_ptr<Z3DCanvasPainter> m_canvasPainter;
-  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;  // has to be destroyed before (so declared after) m_canvasPainter
+  std::unique_ptr<Z3DNetworkEvaluator>
+    m_networkEvaluator; // has to be destroyed before (so declared after) m_compositor
   std::unique_ptr<Z3DCompositor> m_compositor;
 
   ZBBox<glm::dvec3> m_boundBox;

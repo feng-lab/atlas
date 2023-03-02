@@ -8,7 +8,7 @@ template<class DocType, class FilterType>
 class Z3DFilterView : public Z3DObjView
 {
 public:
-  Z3DFilterView(DocType& doc, Z3DView& view)
+  Z3DFilterView(DocType& doc, Z3DRenderingEngine& view)
     : Z3DObjView(view)
     , m_doc(doc)
   {
@@ -68,7 +68,7 @@ public:
     if (it != m_idToFilter.end()) {
       return it->second->widgetsGroup();
     }
-    return std::shared_ptr<ZWidgetsGroup>();
+    return {};
   }
 
   const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter()
@@ -85,7 +85,7 @@ protected:
         expandBoundBox(idFilter.second->axisAlignedBoundBox());
       }
     }
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
   }
 
   void onObjAboutToBeRemoved(size_t id) override
@@ -95,8 +95,10 @@ protected:
       return;
     }
     FilterType* viewControl = it->second.get();
-    canvas().removeEventListener(*viewControl);
-    m_view.canvas().getGLFocus();
+    if (m_engine.canvas()) {
+      m_engine.canvas()->removeEventListener(*viewControl);
+    }
+    // m_engine.canvas().getGLFocus();
     m_idToFilter.erase(it);
     networkEvaluator().updateNetwork();
     updateBoundBox();

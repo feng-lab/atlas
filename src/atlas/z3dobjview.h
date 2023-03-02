@@ -1,6 +1,6 @@
 #pragma once
 
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 #include "zwidgetsgroup.h"
 #include "z3dnetworkevaluator.h"
 #include "z3dcompositor.h"
@@ -16,7 +16,7 @@ class Z3DObjView : public QObject
   Q_OBJECT
 
 public:
-  explicit Z3DObjView(Z3DView& view);
+  explicit Z3DObjView(Z3DRenderingEngine& engine);
 
   [[nodiscard]] const ZBBox<glm::dvec3>& boundBox() const
   {
@@ -41,32 +41,27 @@ public:
 
   inline Z3DCameraParameter& camera()
   {
-    return m_view.camera();
+    return m_engine.camera();
   }
 
   inline Z3DTrackballInteractionHandler& interactionHandler()
   {
-    return m_view.interactionHandler();
-  }
-
-  inline Z3DCanvas& canvas()
-  {
-    return m_view.canvas();
+    return m_engine.interactionHandler();
   }
 
   inline Z3DCompositor& compositor()
   {
-    return m_view.compositor();
+    return m_engine.compositor();
   }
 
   inline Z3DNetworkEvaluator& networkEvaluator()
   {
-    return m_view.networkEvaluator();
+    return m_engine.networkEvaluator();
   }
 
   inline Z3DGlobalParameters& globalParas()
   {
-    return m_view.globalParas();
+    return m_engine.globalParas();
   }
 
 Q_SIGNALS:
@@ -99,7 +94,7 @@ protected:
   }
 
 protected:
-  Z3DView& m_view;
+  Z3DRenderingEngine& m_engine;
   ZBBox<glm::dvec3> m_boundBox;
 };
 

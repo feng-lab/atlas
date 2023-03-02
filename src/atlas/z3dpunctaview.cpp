@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DView& view)
+Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DRenderingEngine& view)
   : Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>(doc, view)
 {
   docPunctasAdded(m_doc.objs());
@@ -30,7 +30,7 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
-      m_view.updateBoundBox();
+      m_engine.updateBoundBox();
 
       for (auto id : objs) {
         Q_EMIT objViewReady(id);
@@ -39,7 +39,7 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render puncta:\n%1").arg(e.what()));
   }
@@ -62,13 +62,13 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render puncta:\n%1").arg(e.what()));
   }

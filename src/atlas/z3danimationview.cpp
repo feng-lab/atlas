@@ -1,10 +1,11 @@
 #include "z3danimationview.h"
 
+#include "z3dcanvas.h"
 #include <QApplication>
 
 namespace nim {
 
-Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DView& view)
+Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DRenderingEngine& view)
   : Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>(doc, view)
 {
   docAnimationsAdded(m_doc.objs());
@@ -31,14 +32,16 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
-      m_view.updateBoundBox();
+      m_engine.updateBoundBox();
     }
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render 3d animation:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render 3d animation:\n%1").arg(e.what()));
+    }
   }
 }
 
@@ -55,15 +58,17 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
     connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
     networkEvaluator().updateNetwork();
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render 3d animation:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render 3d animation:\n%1").arg(e.what()));
+    }
   }
 }
 

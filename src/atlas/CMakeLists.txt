@@ -207,7 +207,7 @@ set(SOURCES
     zitemselectionmodel.h
     zviewsettingwidget.h
     z3dmainwindow.h
-    z3dview.h
+    z3drenderingengine.h
     z3dobjview.h
     z3dimgview.h
     zviewsettinginterface.h
@@ -384,7 +384,7 @@ set(SOURCES
     zitemselectionmodel.cpp
     zviewsettingwidget.cpp
     z3dmainwindow.cpp
-    z3dview.cpp
+    z3drenderingengine.cpp
     z3dobjview.cpp
     z3dimgview.cpp
     zpunctadoc.cpp

@@ -1,7 +1,8 @@
 #include "z3dmainwindow.h"
 
 #include "zdoc.h"
-#include "z3dview.h"
+#include "z3drenderingengine.h"
+#include "ztakescreenshotwidget.h"
 #include "zviewsettingwidget.h"
 #include "zobjdetailedinfowidget.h"
 #include "z3dcanvas.h"
@@ -32,8 +33,11 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   , m_isStereoView(stereoView)
   , m_2dWindow(win2d)
 {
-  m_view = new Z3DView(m_doc, false, this);
-  setCentralWidget(&m_view->canvas());
+  m_engine = new Z3DRenderingEngine(m_doc, false, this);
+  m_canvas = new Z3DCanvas("", 512, 512, this);
+  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, m_engine, &Z3DRenderingEngine::init);
+
+  setCentralWidget(m_canvas);
   init();
   setCurrentFile("");
 }
@@ -193,7 +197,7 @@ void Z3DMainWindow::init()
   createToolBars();
   createStatusBar();
   createDockWindows();
-  connect(m_view, &Z3DView::networkConstructed, this, &Z3DMainWindow::onViewReady);
+  connect(m_engine, &Z3DRenderingEngine::networkConstructed, this, &Z3DMainWindow::onViewReady);
 
   readSettings();
 }
@@ -276,9 +280,9 @@ void Z3DMainWindow::createMenus()
   m_editMenu->addAction(m_doc.redoAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
-  m_viewMenu->addAction(m_view->zoomInAction());
-  m_viewMenu->addAction(m_view->zoomOutAction());
-  m_viewMenu->addAction(m_view->resetCameraAction());
+  m_viewMenu->addAction(m_engine->zoomInAction());
+  m_viewMenu->addAction(m_engine->zoomOutAction());
+  m_viewMenu->addAction(m_engine->resetCameraAction());
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_changeBackgroundAction);
   m_viewMenu->addAction(m_changeAxisAction);
@@ -321,9 +325,9 @@ void Z3DMainWindow::createToolBars()
   m_editToolBar->setIconSize(iconSize);
 
   m_viewToolBar = addToolBar(tr("View"));
-  m_viewToolBar->addAction(m_view->zoomInAction());
-  m_viewToolBar->addAction(m_view->zoomOutAction());
-  m_viewToolBar->addAction(m_view->resetCameraAction());
+  m_viewToolBar->addAction(m_engine->zoomInAction());
+  m_viewToolBar->addAction(m_engine->zoomOutAction());
+  m_viewToolBar->addAction(m_engine->resetCameraAction());
   m_viewToolBar->addAction(m_changeBackgroundAction);
   m_viewToolBar->addAction(m_changeAxisAction);
   m_viewToolBar->addAction(m_screenShotAction);
@@ -423,21 +427,21 @@ void Z3DMainWindow::fillDockWindows()
   ZObjWidget* objWidget = m_doc.createObjWidget(this);
   m_objectsDockWidget->setWidget(objWidget);
 
-  m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_view, this);
+  m_viewSettingWidget = new ZViewSettingWidget(m_doc, m_engine, this);
   if (m_doc.viewSettingId() > 0) {
     m_viewSettingWidget->showViewSettingWidgetOfObj(m_doc.viewSettingId());
   }
   m_viewSettingDockWidget->setWidget(m_viewSettingWidget);
 
-  m_globalSettingDockWidget->setWidget(m_view->globalParasWidget());
+  m_globalSettingDockWidget->setWidget(m_engine->globalParasWidget());
 
-  m_captureDockWidget->setWidget(m_view->captureWidget());
+  m_captureDockWidget->setWidget(createCaptureWidget());
 
-  m_backgroundDockWidget->setWidget(m_view->backgroundWidget());
+  m_backgroundDockWidget->setWidget(m_engine->backgroundWidget());
 
-  m_axisDockWidget->setWidget(m_view->axisWidget());
+  m_axisDockWidget->setWidget(m_engine->axisWidget());
 
-  m_helpDockWidget->setWidget(Z3DView::helpWidget());
+  m_helpDockWidget->setWidget(Z3DRenderingEngine::helpWidget());
 }
 
 void Z3DMainWindow::readSettings()
@@ -505,7 +509,42 @@ void Z3DMainWindow::setCurrentFile(const QString& fileName)
 void Z3DMainWindow::onViewReady()
 {
   fillDockWindows();
-  Q_EMIT viewReady(m_view);
+  Q_EMIT viewReady(m_engine);
+}
+
+QWidget* Z3DMainWindow::createCaptureWidget() const
+{
+  auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
+  m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, this, &Z3DMainWindow::takeScreenShot);
+  connect(m_screenShotWidget,
+          &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
+          this,
+          &Z3DMainWindow::takeFixedSizeScreenShot);
+
+  return m_screenShotWidget;
+}
+
+void Z3DMainWindow::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
+{
+  try {
+    m_engine->takeScreenShot(filename, sst);
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << "Exception: " << e.what();
+    QMessageBox::critical(this, QApplication::applicationName(), e.what());
+  }
+}
+
+void Z3DMainWindow::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
+{
+  try {
+    m_engine->takeFixedSizeScreenShot(filename, width, height, sst);
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << "Exception: " << e.what();
+    QMessageBox::critical(this, QApplication::applicationName(), e.what());
+  }
 }
 
 } // namespace nim

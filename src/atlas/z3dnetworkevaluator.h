@@ -1,6 +1,5 @@
 #pragma once
 
-#include "z3dcanvas.h"
 #include "zbenchtimer.h"
 #include <QObject>
 #ifndef Q_MOC_RUN
@@ -12,7 +11,7 @@ namespace nim {
 
 class Z3DFilter;
 
-class Z3DCanvasPainter;
+class Z3DCompositor;
 
 class Z3DOutputPortBase;
 
@@ -37,9 +36,7 @@ class Z3DNetworkEvaluator : public QObject
   Q_OBJECT
 
 public:
-  explicit Z3DNetworkEvaluator(Z3DCanvasPainter& canvasPainter, QObject* parent = nullptr);
-
-  ~Z3DNetworkEvaluator();
+  explicit Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* parent = nullptr);
 
   // process the currently assigned network. The rendering order is determined internally
   // according the network topology and the invalidation levels of the filters.
@@ -62,7 +59,7 @@ private:
 
   bool m_processPending;
 
-  Z3DCanvasPainter& m_canvasPainter;
+  Z3DCompositor& m_compositor;
 
   struct VertexInfo
   {

@@ -12,7 +12,7 @@ class Z3DAnimationDoc : public ZObjDoc
 public:
   explicit Z3DAnimationDoc(ZDoc& doc);
 
-  void bindView(Z3DView* v);
+  void bindView(Z3DRenderingEngine* v);
 
   void createNewAnimation(const QString& name = "");
 
@@ -124,7 +124,7 @@ private:
 
   QAction* m_loadAnimationsAction = nullptr;
 
-  Z3DView* m_view = nullptr;
+  Z3DRenderingEngine* m_view = nullptr;
 };
 
 } // namespace nim

@@ -4,9 +4,9 @@
 
 namespace nim {
 
-Z3DObjView::Z3DObjView(Z3DView& view)
-  : QObject(&view)
-  , m_view(view)
+Z3DObjView::Z3DObjView(Z3DRenderingEngine& engine)
+  : QObject(&engine)
+  , m_engine(engine)
 {}
 
 std::shared_ptr<ZWidgetsGroup> Z3DObjView::viewSettingWidgetsGroupOf(size_t /*id*/)

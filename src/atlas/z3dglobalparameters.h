@@ -14,14 +14,16 @@ class Z3DCanvas;
 
 class ZWidgetsGroup;
 
-class Z3DView;
+class Z3DRenderingEngine;
 
 class Z3DGlobalParameters : public QObject
 {
   Q_OBJECT
 
 public:
-  Z3DGlobalParameters(Z3DCanvas& canvas, Z3DView& view);
+  Z3DGlobalParameters(Z3DRenderingEngine& engine);
+
+  void attachToCanvas(Z3DCanvas& canvas);
 
   [[nodiscard]] const std::vector<ZParameter*>& parameters() const
   {
@@ -146,9 +148,7 @@ private:
   std::vector<float> m_lightSpotExponentArray;
   std::vector<glm::vec3> m_lightSpotDirectionArray;
 
-  Z3DCanvas& m_canvas;
-
-  Z3DView& m_view;
+  Z3DRenderingEngine& m_engine;
 };
 
 } // namespace nim

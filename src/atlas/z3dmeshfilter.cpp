@@ -32,13 +32,6 @@ Z3DMeshFilter::Z3DMeshFilter(Z3DGlobalParameters& globalParas, const RegionNode*
   , m_dataIsInvalid(false)
   , m_regionNode(regionNode)
 {
-  addPrivateRenderPort(m_monoEyeOutport);
-  addPrivateRenderPort(m_leftEyeOutport);
-  addPrivateRenderPort(m_rightEyeOutport);
-  addPrivateRenderPort(m_monoEyeOutport2);
-  addPrivateRenderPort(m_leftEyeOutport2);
-  addPrivateRenderPort(m_rightEyeOutport2);
-
   m_textureCopyRenderer.setDiscardTransparent(true);
 
   m_singleColorForAllMesh.setStyle("COLOR");

@@ -179,11 +179,6 @@ protected:
 
   void toggleInteractionMode(bool interactionMode, void* source);
 
-  void addPrivateRenderPort(Z3DRenderOutputPort& port);
-
-  // for backward compat, should not be used anymore
-  void addPrivateRenderTarget(Z3DRenderTarget& target);
-
   static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
@@ -212,9 +207,6 @@ protected:
   std::vector<Z3DInputPortBase*> m_inputPorts;
   // output the filter generates.
   std::vector<Z3DOutputPortBase*> m_outputPorts;
-  // private port for intermediate rendering, for backward compat, should not be used by subclass
-  std::vector<Z3DRenderOutputPort*> m_privateRenderPorts;
-  std::vector<Z3DRenderTarget*> m_privateRenderTargets;
 
   std::vector<ZEventListenerParameter*> m_eventListeners;
   std::vector<Z3DInteractionHandler*> m_interactionHandlers;

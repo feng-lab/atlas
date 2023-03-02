@@ -84,7 +84,7 @@ private:
   std::map<const void*, glm::col4> m_objectToColor;
   Z3DRenderTarget* m_renderTarget = nullptr;
   glm::col4 m_currentColor{0, 0, 0, 128};
-  double m_devicePixelRatio = 0;
+  double m_devicePixelRatio = 1.;
 };
 
 } // namespace nim

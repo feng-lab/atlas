@@ -523,8 +523,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       float ze_to_zw_b = 0.5f * (f + n) / (f - n) + 0.5f;
       float ze_to_screen_pixel_voxel_size =
         -std::min(pixelEyeSpaceSize.x, pixelEyeSpaceSize.y) / n * m_rendererBase.globalParas().devicePixelRatio.get();
+      LOG(INFO) << n << " " << f << " " << ze_to_screen_pixel_voxel_size << " " << pixelEyeSpaceSize;
 
-      LOG(INFO) << "";
       CHECK(m_lastImageRenderTarget->size() == m_layerTarget->size()) << m_lastImageRenderTarget->size();
       CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size())
         << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();

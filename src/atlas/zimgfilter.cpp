@@ -572,7 +572,7 @@ void ZImgFilter::updateImgItems()
 {
   CHECK(m_isVisible);
 
-  // LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_view.currentSlice();
+  // LOG(INFO) << curDisplay->slice() << " " << m_lastSlice << " " << m_engine.currentSlice();
   if (!m_imgItems.empty() && m_displayValid && m_lastMIP == m_view.isMaxZProjView() &&
       m_lastSlice == m_view.currentSlice() && m_lastTime == m_view.currentTime()) {
     // LOG(INFO) << "0";

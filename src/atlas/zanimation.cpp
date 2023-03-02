@@ -6,11 +6,8 @@
 #include "zparameteranimation.h"
 #include "zexception.h"
 #include "zview.h"
-#include "z3dview.h"
-#include "z3dcanvas.h"
-#include "z3dcanvaspainter.h"
+#include "z3drenderingengine.h"
 #include "zgraphicsview.h"
-#include "zimgregioncache.h"
 #include <QLabel>
 #include <QFile>
 #include <QFileInfo>
@@ -95,7 +92,7 @@ void ZAnimationChangeDurationCommand::redo()
 ZAnimation::ZAnimation(ZDoc& doc, QObject* parent)
   : QObject(parent)
   , m_doc(doc)
-  , m_view(nullptr)
+  , m_engine(nullptr)
   , m_duration(10.0)
   , m_nextUniqueId(100)
 {
@@ -114,7 +111,7 @@ ZAnimation::~ZAnimation()
 void ZAnimation::addKeyFrame(double time)
 {
   CHECK(time >= 0.0);
-  CHECK(m_view);
+  CHECK(m_engine);
 
   bool objChange = false;
   bool sorted = false;
@@ -146,7 +143,7 @@ void ZAnimation::addKeyFrame(double time)
     if (objTypeName.contains("Animation", Qt::CaseInsensitive)) {
       continue;
     }
-    std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
+    std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
     const std::vector<ZParameter*>& paraList = wg->getParameterList();
 
     AnimationObj* aniObj = findBoundId(id);
@@ -280,7 +277,7 @@ void ZAnimation::removeRedundantKeys()
 void ZAnimation::rebindView()
 {
   releaseParameters();
-  if (!m_view) {
+  if (!m_engine) {
     return;
   }
 
@@ -293,7 +290,7 @@ void ZAnimation::rebindView()
     if (id == 0) {
       continue;
     }
-    std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
+    std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
     CHECK(wg);
     connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
     sorted = bind(obj->objParaAnimations, wg->getParameterList()) || sorted;
@@ -307,9 +304,9 @@ void ZAnimation::rebindView()
 
 void ZAnimation::releaseView()
 {
-  if (m_view) {
+  if (m_engine) {
     releaseParameters();
-    m_view = nullptr;
+    m_engine = nullptr;
   }
 }
 
@@ -334,7 +331,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
   if (endTime < 0 || endTime > m_duration) {
     endTime = m_duration;
   }
-  CHECK(m_view);
+  CHECK(m_engine);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
@@ -363,10 +360,10 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
     }
   }
   if (width % 2 == 1) {
-    --width;
+    ++width;
   }
   if (height % 2 == 1) {
-    --height;
+    ++height;
   }
   m_doc.hideAnimation3DView();
   m_doc.deselectAllObjs();
@@ -419,14 +416,18 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
       }
     }
     QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeFixedSizeScreenShotWithoutResetCanvasPainterSize(filepath,
-                                                                                              width,
-                                                                                              height,
-                                                                                              sst)) {
+    try {
+      dynamic_cast<Z3DRenderingEngine*>(m_engine)->takeFixedSizeScreenShotWithoutResetCanvasSize(filepath,
+                                                                                                 width,
+                                                                                                 height,
+                                                                                                 sst);
+    }
+    catch (ZException const& e) {
+      LOG(ERROR) << "Exception: " << e.what();
       break;
     }
   }
-  dynamic_cast<Z3DView*>(m_view)->resetCanvasPainterSize();
+  dynamic_cast<Z3DRenderingEngine*>(m_engine)->resetCanvasSize();
   //  if (!progress->wasCanceled()) {
   //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
   //    QString filepath = tmpdir.filePath(filename);
@@ -477,7 +478,7 @@ void ZAnimation::export3DAnimation(const QString& fn,
   if (endTime < 0 || endTime > m_duration) {
     endTime = m_duration;
   }
-  CHECK(m_view);
+  CHECK(m_engine);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
@@ -507,20 +508,7 @@ void ZAnimation::export3DAnimation(const QString& fn,
   }
   m_doc.hideAnimation3DView();
   m_doc.deselectAllObjs();
-  Z3DCanvas& canvas = static_cast<Z3DView*>(m_view)->canvas();
-  int h = canvas.height();
-  if (h % 2 == 1) {
-    --h;
-  }
-  int w = canvas.width();
-  if (w % 2 == 1) {
-    --w;
-  }
-  if (canvas.width() % 2 == 1 || canvas.height() % 2 == 1) {
-    LOG(INFO) << "Resize canvas size from (" << canvas.width() << ", " << canvas.height() << ") to (" << w << ", " << h
-              << ").";
-    canvas.resize(w, h);
-  }
+  static_cast<Z3DRenderingEngine*>(m_engine)->makeOutputSizeEvenNumbers();
 
   auto duration = endTime - startTime;
   int numFrame = std::ceil(duration * framePerSecond);
@@ -569,7 +557,11 @@ void ZAnimation::export3DAnimation(const QString& fn,
       }
     }
     QApplication::processEvents();
-    if (!dynamic_cast<Z3DView*>(m_view)->takeScreenShot(filepath, sst)) {
+    try {
+      dynamic_cast<Z3DRenderingEngine*>(m_engine)->takeScreenShot(filepath, sst);
+    }
+    catch (ZException const& e) {
+      LOG(ERROR) << "Exception: " << e.what();
       break;
     }
   }
@@ -624,7 +616,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   if (endTime < 0 || endTime > m_duration) {
     endTime = m_duration;
   }
-  CHECK(m_view);
+  CHECK(m_engine);
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
@@ -658,7 +650,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   if (height % 2 == 1) {
     --height;
   }
-  ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
+  ZGraphicsView& canvasPainter = static_cast<ZView*>(m_engine)->graphicsView();
 
   auto duration = endTime - startTime;
   int numFrame = std::ceil(duration * framePerSecond);
@@ -741,8 +733,8 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
 
 void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime)
 {
-  CHECK(m_view);
-  ZGraphicsView& canvasPainter = static_cast<ZView*>(m_view)->graphicsView();
+  CHECK(m_engine);
+  ZGraphicsView& canvasPainter = static_cast<ZView*>(m_engine)->graphicsView();
   exportFixedSize2DAnimation(fn,
                              framePerSecond,
                              startTime,
@@ -771,7 +763,7 @@ void ZAnimation::tryLinkAnimationWith(size_t id)
   for (const auto& obj : m_objList) {
     if (obj->boundId == 0 && obj->objType == doc->typeName() && doc->isSameObj(obj->objJsonValue, jv)) {
       obj->boundId = id;
-      std::shared_ptr<ZWidgetsGroup> wg = m_view->viewSettingWidgetsGroupOf(id);
+      std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
       CHECK(wg);
       bind(obj->objParaAnimations, wg->getParameterList());
       buildDisplayPacks();
@@ -915,7 +907,7 @@ void ZAnimation::buildDisplayPacks()
 
 void ZAnimation::releaseParameters()
 {
-  if (m_view) {
+  if (m_engine) {
     for (const auto& pa : m_globalParaAnimations) {
       pa->releaseParameter();
     }

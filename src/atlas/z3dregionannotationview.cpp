@@ -4,7 +4,7 @@
 
 namespace nim {
 
-Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DView& view)
+Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& view)
   : Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>(doc, view)
 {
   docRegionAnnotationsAdded(m_doc.objs());
@@ -39,7 +39,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
-      m_view.updateBoundBox();
+      m_engine.updateBoundBox();
 
       for (auto id : objs) {
         Q_EMIT objViewReady(id);
@@ -48,7 +48,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
   }
@@ -80,13 +80,13 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     canvas().addEventListenerToBack(*viewControl);
 
     networkEvaluator().updateNetwork();
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
+    QMessageBox::critical(&m_engine.canvas(),
                           QApplication::applicationName(),
                           QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
   }

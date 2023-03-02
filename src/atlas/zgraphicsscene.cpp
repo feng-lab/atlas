@@ -140,9 +140,9 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             break;
         }
         //        if (m_roiAction == ROIAction::New) {
-        //          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        //          std::pair<int, int> sliceRange = m_engine->currentSliceRange();
         //          for (auto i = sliceRange.first; i < sliceRange.second; ++i)
-        //            m_view->roi().deleteSliceROI(i);
+        //            m_engine->roi().deleteSliceROI(i);
         //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
@@ -216,9 +216,9 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
             break;
         }
         //        if (m_roiAction == ROIAction::New) {
-        //          std::pair<int, int> sliceRange = m_view->currentSliceRange();
+        //          std::pair<int, int> sliceRange = m_engine->currentSliceRange();
         //          for (auto i = sliceRange.first; i < sliceRange.second; ++i)
-        //            m_view->roi().deleteSliceROI(i);
+        //            m_engine->roi().deleteSliceROI(i);
         //        }
         QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
         m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
@@ -325,9 +325,9 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         break;
     }
     //    if (m_roiAction == ROIAction::New) {
-    //      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+    //      std::pair<int, int> sliceRange = m_engine->currentSliceRange();
     //      for (auto i = sliceRange.first; i < sliceRange.second; ++i)
-    //        m_view->roi().deleteSliceROI(i);
+    //        m_engine->roi().deleteSliceROI(i);
     //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);
@@ -355,9 +355,9 @@ void ZGraphicsScene::mousePressEvent(QGraphicsSceneMouseEvent* event)
         break;
     }
     //    if (m_roiAction == ROIAction::New) {
-    //      std::pair<int, int> sliceRange = m_view->currentSliceRange();
+    //      std::pair<int, int> sliceRange = m_engine->currentSliceRange();
     //      for (auto i = sliceRange.first; i < sliceRange.second; ++i)
-    //        m_view->roi().deleteSliceROI(i);
+    //        m_engine->roi().deleteSliceROI(i);
     //    }
     QPolygonF startPoly = QRectF(scenePt - startPolyHalfWidth, scenePt + startPolyHalfWidth);
     m_startPtItem = std::make_unique<QGraphicsPolygonItem>(startPoly);

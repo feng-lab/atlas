@@ -205,11 +205,11 @@ void ROIGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* event)
                                                                                     m_id,
                                                                                     dlg.selectedID());
             //            if (m_regionNode) {
-            //              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice,
+            //              m_engine.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi, m_slice,
             //              m_id,
             //                                                                                      dlg.selectedID());
             //            } else {
-            //              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice,
+            //              m_engine.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi, m_slice,
             //              m_id,
             //                                                                                       dlg.selectedID());
             //            }
@@ -413,12 +413,12 @@ void ROICtrlPtGraphicsItem::contextMenuEvent(QGraphicsSceneContextMenuEvent* eve
                                                                                     m_controlPoint.shapeID,
                                                                                     dlg.selectedID());
             //            if (m_regionNode) {
-            //              m_view.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi,
+            //              m_engine.currentRegionAnnotationPack().regionAnnotation().changeROIRegion(m_roi,
             //              m_controlPoint.slice,
             //                                                                                      m_controlPoint.shapeID,
             //                                                                                      dlg.selectedID());
             //            } else {
-            //              m_view.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi,
+            //              m_engine.currentRegionAnnotationPack().regionAnnotation().mergeROIToRegion(m_roi,
             //              m_controlPoint.slice,
             //                                                                                       m_controlPoint.shapeID,
             //                                                                                       dlg.selectedID());
@@ -1087,9 +1087,9 @@ void ZROIFilter::transformChanged()
   //    }
   //  }
   //
-  //  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items);
+  //  QGraphicsItemGroup* gr = m_engine.scene().createItemGroup(items);
   //  gr->setTransform(trans);
-  //  m_view.scene().destroyItemGroup(gr);
+  //  m_engine.scene().destroyItemGroup(gr);
 
   ZObjFilter::transformChanged();
 }
@@ -1139,9 +1139,9 @@ void ZROIFilter::createShapeItem(int slice, size_t shapeID)
   roiItem->setLocked(isLocked());
 
   //  QList<QGraphicsItem*> items{roiItem};
-  //  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items);
+  //  QGraphicsItemGroup* gr = m_engine.scene().createItemGroup(items);
   //  gr->setTransform(trans);
-  //  m_view.scene().destroyItemGroup(gr);
+  //  m_engine.scene().destroyItemGroup(gr);
 
   m_sliceToROIItem[slice][shapeID] = std::unique_ptr<ROIGraphicsItem>(roiItem);
 }
@@ -1175,9 +1175,9 @@ void ZROIFilter::createCtrlPtItems(int slice, size_t shapeID)
     // items_all.push_front(rectItem);
   }
 
-  //  QGraphicsItemGroup* gr = m_view.scene().createItemGroup(items_all);
+  //  QGraphicsItemGroup* gr = m_engine.scene().createItemGroup(items_all);
   //  gr->setTransform(trans);
-  //  m_view.scene().destroyItemGroup(gr);
+  //  m_engine.scene().destroyItemGroup(gr);
 
   m_sliceToCtrlPtItems[slice][shapeID].swap(items);
 }
@@ -1191,7 +1191,7 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
   if (!m_ROI) {
     return;
   }
-  // LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
+  // LOG(INFO) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
   if (!append) {
     for (auto& item : m_view.scene().selectedItems()) {
       item->setSelected(false);
@@ -1203,7 +1203,7 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
       item->setSelected(true);
     }
   }
-  // LOG(INFO) << slice << " " << shapeID << " " << m_view.scene().selectedItems().size();
+  // LOG(INFO) << slice << " " << shapeID << " " << m_engine.scene().selectedItems().size();
 }
 
 void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)

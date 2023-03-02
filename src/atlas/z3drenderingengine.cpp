@@ -1,13 +1,11 @@
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 
 #include "z3dcanvas.h"
 #include "z3dcompositor.h"
-#include "z3dcanvaspainter.h"
 #include "z3dcameraparameter.h"
 #include "z3dinteractionhandler.h"
 #include "z3dnetworkevaluator.h"
 #include "zwidgetsgroup.h"
-#include "ztakescreenshotwidget.h"
 #include "zimgdoc.h"
 #include "z3dimgview.h"
 #include "zpunctadoc.h"
@@ -19,7 +17,7 @@
 #include "z3danimationdoc.h"
 #include "z3danimationview.h"
 #include "z3dregionannotationview.h"
-#include "z3dmainwindow.h"
+#include "zimgformat.h"
 #include "ztheme.h"
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -28,36 +26,31 @@
 
 namespace nim {
 
-Z3DView::Z3DView(ZDoc& doc, bool stereo, Z3DMainWindow* parent)
+Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, bool stereo, QObject* parent)
   : QObject(parent)
   , m_doc(doc)
   , m_isStereoView(stereo)
-  , m_mainWin(parent)
   , m_numObjsBefore(m_doc.numObjs())
 {
-  m_canvas = new Z3DCanvas("", 512, 512, m_mainWin);
-
   createActions();
-
-  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DView::init);
 
   connect(&m_doc,
           &ZDoc::requestToAdjustViewToPosition,
           this,
-          qOverload<double, double, double, double>(&Z3DView::cameraFocusesOn));
+          qOverload<double, double, double, double>(&Z3DRenderingEngine::cameraFocusesOn));
 }
 
-Z3DView::~Z3DView()
+Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   m_canvas->getGLFocus();
 }
 
-const ZDoc& Z3DView::doc() const
+const ZDoc& Z3DRenderingEngine::doc() const
 {
   return m_doc;
 }
 
-std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
+std::shared_ptr<ZWidgetsGroup> Z3DRenderingEngine::viewSettingWidgetsGroupOf(size_t id)
 {
   if (id == 1) {
     return m_compositor->backgroundWidgetsGroup();
@@ -76,41 +69,22 @@ std::shared_ptr<ZWidgetsGroup> Z3DView::viewSettingWidgetsGroupOf(size_t id)
   return {};
 }
 
-QWidget* Z3DView::globalParasWidget()
+QWidget* Z3DRenderingEngine::globalParasWidget()
 {
   return m_globalParas->widgetsGroup(true)->createWidget(false);
 }
 
-QWidget* Z3DView::captureWidget() const
-{
-  // auto res = new QScrollArea();
-  auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
-  m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, this, &Z3DView::takeScreenShot);
-  connect(m_screenShotWidget,
-          &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
-          this,
-          &Z3DView::takeFixedSizeScreenShot);
-  //  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeries3DScreenShot,
-  //          this, &Z3DView::takeSeriesScreenShot);
-  //  connect(m_screenShotWidget, &ZTakeScreenShotWidget::takeSeriesFixedSize3DScreenShot,
-  //          this, &Z3DView::takeFixedSizeSeriesScreenShot);
-  // res->setWidget(m_screenShotWidget);
-
-  return m_screenShotWidget;
-}
-
-QWidget* Z3DView::backgroundWidget()
+QWidget* Z3DRenderingEngine::backgroundWidget()
 {
   return m_compositor->backgroundWidgetsGroup()->createWidget(false);
 }
 
-QWidget* Z3DView::axisWidget()
+QWidget* Z3DRenderingEngine::axisWidget()
 {
   return m_compositor->axisWidgetsGroup()->createWidget(false);
 }
 
-QWidget* Z3DView::helpWidget()
+QWidget* Z3DRenderingEngine::helpWidget()
 {
   auto edt = new QPlainTextEdit();
   edt->setReadOnly(true);
@@ -133,7 +107,7 @@ QWidget* Z3DView::helpWidget()
   return edt;
 }
 
-void Z3DView::updateBoundBox()
+void Z3DRenderingEngine::updateBoundBox()
 {
   m_boundBox.reset();
   for (auto& m_3dObjView : m_3dObjViews) {
@@ -164,7 +138,7 @@ void Z3DView::updateBoundBox()
                                            std::ceil(m_boundBox.maxCorner.z) + 1);
 }
 
-void Z3DView::read(size_t id, const json::object& json)
+void Z3DRenderingEngine::read(size_t id, const json::object& json)
 {
   for (auto& m_3dObjView : m_3dObjViews) {
     if (m_3dObjView->hasObj(id)) {
@@ -179,7 +153,7 @@ void Z3DView::read(size_t id, const json::object& json)
   }
 }
 
-void Z3DView::write(size_t id, json::object& json) const
+void Z3DRenderingEngine::write(size_t id, json::object& json) const
 {
   for (auto m_3dObjView : m_3dObjViews) {
     if (m_3dObjView->hasObj(id)) {
@@ -191,7 +165,7 @@ void Z3DView::write(size_t id, json::object& json) const
   }
 }
 
-void Z3DView::read(const json::object& json)
+void Z3DRenderingEngine::read(const json::object& json)
 {
   if (json.contains("Compositor") && json.at("Compositor").is_object()) {
     m_compositor->read(json.at("Compositor").as_object());
@@ -201,7 +175,7 @@ void Z3DView::read(const json::object& json)
   }
 }
 
-void Z3DView::write(json::object& json) const
+void Z3DRenderingEngine::write(json::object& json) const
 {
   json::object compObj;
   m_compositor->write(compObj);
@@ -212,29 +186,29 @@ void Z3DView::write(json::object& json) const
   json["Global"] = globObj;
 }
 
-void Z3DView::zoomIn()
+void Z3DRenderingEngine::zoomIn()
 {
   camera().dolly(1.1);
   // resetCameraClippingRange();
 }
 
-void Z3DView::zoomOut()
+void Z3DRenderingEngine::zoomOut()
 {
   camera().dolly(0.9);
   // resetCameraClippingRange();
 }
 
-void Z3DView::resetCamera()
+void Z3DRenderingEngine::resetCamera()
 {
   camera().resetCamera(m_boundBox, Z3DCamera::ResetOption::ResetAll);
 }
 
-void Z3DView::resetCameraCenter()
+void Z3DRenderingEngine::resetCameraCenter()
 {
   camera().resetCamera(m_boundBox, Z3DCamera::ResetOption::PreserveViewVector);
 }
 
-void Z3DView::resetCameraClippingRange()
+void Z3DRenderingEngine::resetCameraClippingRange()
 {
   if (!m_mutex.try_lock()) {
     return;
@@ -243,60 +217,124 @@ void Z3DView::resetCameraClippingRange()
   m_mutex.unlock();
 }
 
-bool Z3DView::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
 {
-  QMutexLocker locker(&m_mutex);
-  bool res = true;
-  if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
-    res = false;
-    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
-  }
-  m_canvasPainter->resetToMatchCanvasSize();
-  return res;
+  takeFixedSizeScreenShotWithoutResetCanvasSize(filename, width, height, sst);
+  resetCanvasSize();
 }
 
-bool Z3DView::takeFixedSizeScreenShotWithoutResetCanvasPainterSize(const QString& filename,
-                                                                   int width,
-                                                                   int height,
-                                                                   Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSize(const QString& filename,
+                                                                       int width,
+                                                                       int height,
+                                                                       Z3DScreenShotType sst)
 {
-  bool res = true;
-  if (!m_canvasPainter->renderToImage(filename, width, height, sst, compositor())) {
-    res = false;
-    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
+  const int tileSize = 7680; // 2048;
+  const int tileBorder = 128;
+  const auto tileInnerSize = tileSize - 2 * tileBorder;
+
+  if (width <= tileSize && height <= tileSize) {
+    // resize texture container to desired image dimensions and propagate change
+    setOutputSize(glm::uvec2(width, height));
+
+    takeScreenShot(filename, sst);
+  } else {
+    m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+    setOutputSize(glm::uvec2(tileSize, tileSize));
+
+    ZImg img(ZImgInfo(width, height, 1, 4));
+    ZImg rightImg;
+    if (sst != Z3DScreenShotType::MonoView) {
+      rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+    }
+
+    auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
+    auto numRows = (height + tileInnerSize - 1) / tileInnerSize;
+    for (auto c = 0; c < numCols; ++c) {
+      for (auto r = 0; r < numRows; ++r) {
+        auto m_tileStartX = c * tileInnerSize - tileBorder;
+        auto m_tileStartY = r * tileInnerSize - tileBorder;
+        double left = m_tileStartX / 1.0 / width;
+        double right = (m_tileStartX + tileSize) / 1.0 / width;
+        double bottom = m_tileStartY / 1.0 / height;
+        double top = (m_tileStartY + tileSize) / 1.0 / height;
+
+        // set camera frustum
+        m_globalParas->camera.setTileFrustum(left, right, bottom, top);
+        m_compositor->setRenderingRegion(left, right, bottom, top);
+        // LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
+        // globalCameraPara().get().top() << globalCameraPara().get().bottom();
+
+        m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+
+        if (sst == Z3DScreenShotType::MonoView) {
+          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
+          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+        } else {
+          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
+          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
+          rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+        }
+      }
+    }
+
+    if (sst == Z3DScreenShotType::MonoView) {
+      img.flip(Dimension::Y).save(filename);
+      LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
+    } else {
+      if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+        LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height() << ") to file: " << filename;
+      } else {
+        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+          .zoom(0.5, 1)
+          .flip(Dimension::Y)
+          .save(filename);
+        LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
+                  << ") to file:" << filename;
+      }
+    }
+
+    m_globalParas->camera.setTileFrustum();
+    m_compositor->setRenderingRegion();
   }
-  return res;
 }
 
-void Z3DView::resetCanvasPainterSize()
+void Z3DRenderingEngine::resetCanvasSize()
 {
-  m_canvasPainter->resetToMatchCanvasSize();
+  if (m_canvas) {
+    m_compositor->setOutputSize(m_canvas->physicalSize());
+  }
 }
 
-bool Z3DView::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
-  auto h = m_canvas->height();
-  if (h % 2 == 1) {
-    ++h;
+  m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+
+  if (sst == Z3DScreenShotType::MonoView) {
+    auto img = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
+    img.flip(Dimension::Y).save(filename);
+    LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
+  } else {
+    auto leftImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
+    auto rightImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
+
+    if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+      LOG(INFO) << "Saved stereo rendering (" << leftImg.width() << " x 2, " << leftImg.height()
+                << ") to file: " << filename;
+    } else {
+      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
+        .zoom(0.5, 1)
+        .flip(Dimension::Y)
+        .save(filename);
+      LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
+                << ") to file:" << filename;
+    }
   }
-  auto w = m_canvas->width();
-  if (w % 2 == 1) {
-    ++w;
-  }
-  if (m_canvas->width() % 2 == 1 || m_canvas->height() % 2 == 1) {
-    LOG(INFO)
-      << fmt::format("Resize canvas size from ({}, {}) to ({}, {}).", m_canvas->width(), m_canvas->height(), w, h);
-    m_canvas->resize(w, h);
-  }
-  bool res = true;
-  if (!m_canvasPainter->renderToImage(filename, sst)) {
-    res = false;
-    QMessageBox::critical(m_mainWin, QApplication::applicationName(), m_canvasPainter->renderToImageError());
-  }
-  return res;
 }
 
-ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t>& ids) const
+ZBBox<glm::dvec3> Z3DRenderingEngine::boundBoxOfObjs(const std::vector<size_t>& ids) const
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
@@ -309,7 +347,7 @@ ZBBox<glm::dvec3> Z3DView::boundBoxOfObjs(const std::vector<size_t>& ids) const
   return res;
 }
 
-ZBBox<glm::dvec3> Z3DView::boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const
+ZBBox<glm::dvec3> Z3DRenderingEngine::boundBoxOfObjsAfterClipping(const std::vector<size_t>& ids) const
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
@@ -322,26 +360,27 @@ ZBBox<glm::dvec3> Z3DView::boundBoxOfObjsAfterClipping(const std::vector<size_t>
   return res;
 }
 
-void Z3DView::flipView()
+void Z3DRenderingEngine::flipView()
 {
   camera().flipViewDirection();
 }
 
-void Z3DView::setXZView()
+void Z3DRenderingEngine::setXZView()
 {
   resetCamera();
   camera().rotate90X();
   resetCameraClippingRange();
 }
 
-void Z3DView::setYZView()
+void Z3DRenderingEngine::setYZView()
 {
   resetCamera();
   camera().rotate90XZ();
   resetCameraClippingRange();
 }
 
-// bool Z3DView::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+// bool Z3DRenderingEngine::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3&
+// axis,
 //                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType
 //                                             sst)
 //{
@@ -379,7 +418,7 @@ void Z3DView::setYZView()
 //   return res;
 // }
 //
-// bool Z3DView::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
+// bool Z3DRenderingEngine::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
 //                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
 //{
 //   using namespace boost::math::double_constants;
@@ -416,48 +455,42 @@ void Z3DView::setYZView()
 //   return res;
 // }
 
-void Z3DView::init()
+void Z3DRenderingEngine::init()
 {
   m_canvas->getGLFocus();
-  m_globalParas = std::make_unique<Z3DGlobalParameters>(*m_canvas, *this);
+  m_globalParas = std::make_unique<Z3DGlobalParameters>(*this);
 
   // filters
-  m_canvasPainter = std::make_unique<Z3DCanvasPainter>(*m_globalParas, *m_canvas);
-
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
-  m_compositor->outputPort("Image")->connect(m_canvasPainter->inputPort("Image"));
-  m_compositor->outputPort("LeftEyeImage")->connect(m_canvasPainter->inputPort("LeftEyeImage"));
-  m_compositor->outputPort("RightEyeImage")->connect(m_canvasPainter->inputPort("RightEyeImage"));
-  m_canvas->addEventListenerToBack(*m_compositor);
 
   // build network and connect to canvas
-  m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_canvasPainter);
+  m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
 
   // packages
   for (auto objDoc : m_doc.objDocs()) {
     if (auto imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       auto imgView = new Z3DImgView(*imgDoc, *this);
-      connect(imgView, &Z3DImgView::objViewReady, this, &Z3DView::objViewReady);
+      connect(imgView, &Z3DImgView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(imgView);
     } else if (auto punctaDoc = qobject_cast<ZPunctaDoc*>(objDoc)) {
       auto punctaView = new Z3DPunctaView(*punctaDoc, *this);
-      connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DView::objViewReady);
+      connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(punctaView);
     } else if (auto swcDoc = qobject_cast<ZSwcDoc*>(objDoc)) {
       auto swcView = new Z3DSwcView(*swcDoc, *this);
-      connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DView::objViewReady);
+      connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(swcView);
     } else if (auto meshDoc = qobject_cast<ZMeshDoc*>(objDoc)) {
       auto meshView = new Z3DMeshView(*meshDoc, *this);
-      connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DView::objViewReady);
+      connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(meshView);
     } else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
       auto aniView = new Z3DAnimationView(*aniDoc, *this);
-      connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DView::objViewReady);
+      connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(aniView);
     } else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
       auto aniView = new Z3DRegionAnnotationView(*raDoc, *this);
-      connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DView::objViewReady);
+      connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
       m_3dObjViews.push_back(aniView);
     }
   }
@@ -467,30 +500,63 @@ void Z3DView::init()
   // adjust camera
   resetCamera();
 
-  connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DView::resetCameraClippingRange);
+  connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DRenderingEngine::resetCameraClippingRange);
 
   Q_EMIT networkConstructed();
 }
 
-void Z3DView::createActions()
+void Z3DRenderingEngine::attachToCanvas(Z3DCanvas& canvas)
+{
+  m_canvas = &canvas;
+  m_globalParas->attachToCanvas(canvas);
+  m_canvas->addEventListenerToBack(*m_compositor);
+}
+
+void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
+{
+  m_compositor->setOutputSize(size);
+}
+
+void Z3DRenderingEngine::makeOutputSizeEvenNumbers()
+{
+  m_compositor->makeOutputSizeEvenNumbers();
+}
+
+void Z3DRenderingEngine::createActions()
 {
   m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
   QList<QKeySequence> zoomInKey;
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
   m_zoomInAction->setStatusTip(tr("Zoom in"));
-  connect(m_zoomInAction, &QAction::triggered, this, &Z3DView::zoomIn);
+  connect(m_zoomInAction, &QAction::triggered, this, &Z3DRenderingEngine::zoomIn);
 
   m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
   m_zoomOutAction->setStatusTip(tr("Zoom out"));
-  connect(m_zoomOutAction, &QAction::triggered, this, &Z3DView::zoomOut);
+  connect(m_zoomOutAction, &QAction::triggered, this, &Z3DRenderingEngine::zoomOut);
 
   m_resetCameraAction = new QAction(tr("&Reset Camera"), this);
   m_resetCameraAction->setStatusTip(tr("Reset camera to show all objects in scene"));
-  connect(m_resetCameraAction, &QAction::triggered, this, &Z3DView::resetCamera);
+  connect(m_resetCameraAction, &QAction::triggered, this, &Z3DRenderingEngine::resetCamera);
+}
+
+ZImg Z3DRenderingEngine::textureToRGBAImg(const Z3DTexture& tex)
+{
+  GLenum dataFormat = GL_BGRA;
+  GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
+  std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
+    Z3DTexture::bypePerPixel(dataFormat, dataType) * tex.numPixels());
+  tex.downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
+  ZImg bufImg;
+  bufImg.wrapData(colorBuffer.data(), ZImgInfo(tex.width(), tex.height(), 1, 4));
+  ZImg res(bufImg.info());
+  ZImgFormat::CXYZtoXYZC(bufImg, res, true);
+  res.infoRef().lastChannelIsAlphaChannel = true;
+  res.correctPreMultipliedColor();
+  return res;
 }
 
 } // namespace nim

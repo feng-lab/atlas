@@ -1,11 +1,12 @@
 #include "z3dmeshview.h"
 
+#include "z3dcanvas.h"
 #include <QApplication>
 
 namespace nim {
 
-Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DView& view)
-  : Z3DFilterView<ZMeshDoc, Z3DMeshFilter>(doc, view)
+Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<ZMeshDoc, Z3DMeshFilter>(doc, engine)
 {
   docMeshesAdded(m_doc.objs());
   connect(&m_doc, &ZMeshDoc::objAdded, this, &Z3DMeshView::docMeshAdded);
@@ -26,11 +27,13 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
       connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
       connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(*viewControl);
+      if (m_engine.canvas()) {
+        m_engine.canvas()->addEventListenerToBack(*viewControl);
+      }
     }
     if (!objs.empty()) {
       networkEvaluator().updateNetwork();
-      m_view.updateBoundBox();
+      m_engine.updateBoundBox();
 
       for (auto id : objs) {
         Q_EMIT objViewReady(id);
@@ -39,9 +42,11 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render mesh: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render mesh:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render mesh:\n%1").arg(e.what()));
+    }
   }
 }
 
@@ -59,18 +64,22 @@ void Z3DMeshView::docMeshAdded(size_t id)
     connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
     connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
     connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(*viewControl);
+    if (m_engine.canvas()) {
+      m_engine.canvas()->addEventListenerToBack(*viewControl);
+    }
 
     networkEvaluator().updateNetwork();
-    m_view.updateBoundBox();
+    m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render mesh: " << e.what();
-    QMessageBox::critical(&m_view.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render mesh:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render mesh:\n%1").arg(e.what()));
+    }
   }
 }
 

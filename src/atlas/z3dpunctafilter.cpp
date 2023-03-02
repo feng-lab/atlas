@@ -35,8 +35,8 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   , m_contextMenuEvent("Context Menu", false)
 {
   //  addPrivateRenderPort(m_monoEyeOutport);
-  //  addPrivateRenderPort(m_leftEyeOutport);
-  //  addPrivateRenderPort(m_rightEyeOutport);
+  //  addPrivateRenderPort(m_leftEyeOutRenderTarget1);
+  //  addPrivateRenderPort(m_rightEyeOutRenderTarget1);
   //  addPrivateRenderPort(m_monoEyeOutport2);
   //  addPrivateRenderPort(m_leftEyeOutport2);
   //  addPrivateRenderPort(m_rightEyeOutport2);
@@ -142,7 +142,7 @@ void Z3DPunctaFilter::process(Z3DEye /*eye*/)
   //    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
 
   //    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
 
   //    currentOutport.bindTarget();
   //    currentOutport.clearTarget();
@@ -267,7 +267,7 @@ void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 {
   //  if (m_randomGlow.get()) {
   //    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutport : m_rightEyeOutport;
+  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
   //    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
   //          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
   //    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());

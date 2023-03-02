@@ -1,6 +1,6 @@
 #include "z3dcameracontrolwidget.h"
 
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 #include "zdoc.h"
 #include <QVBoxLayout>
 #include <QPushButton>
@@ -8,10 +8,10 @@
 
 namespace nim {
 
-Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DView& view, QWidget* parent)
+Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRenderingEngine& engine, QWidget* parent)
   : QWidget(parent)
   , m_camera(camera)
-  , m_view(view)
+  , m_view(engine)
 {
   createWidget();
 }

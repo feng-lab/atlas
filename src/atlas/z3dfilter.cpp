@@ -238,21 +238,6 @@ void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
   }
 }
 
-void Z3DFilter::addPrivateRenderPort(Z3DRenderOutputPort& port)
-{
-  if (m_outputPortMap.count(port.name())) {
-    LOG(FATAL) << className() << " port " << port.name() << " has already been inserted!";
-  } else {
-    m_outputPortMap.emplace(port.name(), &port);
-    m_privateRenderPorts.push_back(&port);
-  }
-}
-
-void Z3DFilter::addPrivateRenderTarget(Z3DRenderTarget& target)
-{
-  m_privateRenderTargets.push_back(&target);
-}
-
 void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
   if (!shader.isLinked()) {

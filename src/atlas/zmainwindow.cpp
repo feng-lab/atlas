@@ -9,7 +9,7 @@
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
 #include "z3dmainwindow.h"
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 #include "zobjwidget.h"
 #include "zobjeditwidget.h"
 #include "zobjdetailedinfowidget.h"
@@ -663,7 +663,7 @@ void ZMainWindow::createMenus()
   m_editMenu->addSeparator();
   m_editMenu->addAction(m_view->copyAction());
   m_editMenu->addAction(m_view->pasteAction());
-  // m_editMenu->addAction(m_view->deleteAction());
+  // m_editMenu->addAction(m_engine->deleteAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
   m_viewMenu->addAction(m_view->zoomInAction());

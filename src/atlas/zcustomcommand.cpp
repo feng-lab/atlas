@@ -18,7 +18,7 @@
 #include "zmainwindow.h"
 #include "zdoc.h"
 #include "z3dmainwindow.h"
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 #include "zview.h"
 #include "zvbgmm.h"
 #include "zpunctadetection.h"
@@ -960,7 +960,7 @@ void createCellTable()
     mainWin->loadJsonScene(scnName);
     QApplication::processEvents();
 
-    Z3DView* view3d = mainWin->get3DWindow()->view();
+    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
     view3d->resetCameraAction()->trigger();
     view3d->zoomInAction()->trigger();
     view3d->zoomInAction()->trigger();
@@ -1399,7 +1399,7 @@ void createGlanceThumbnails()
       mainWin->loadJsonScene(scnName);
       QApplication::processEvents();
 
-      Z3DView* view3d = mainWin->get3DWindow()->view();
+      Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
       view3d->resetCameraAction()->trigger();
       view3d->zoomInAction()->trigger();
       // view3d->zoomInAction()->trigger();
@@ -1423,9 +1423,9 @@ void exportSceneForGlance()
 
   QStringList cellnames;
 
-  Z3DView* view3d = mainWin->get3DWindow()->view();
+  Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
   for (auto ojbview : view3d->objViews()) {
-    if (auto meshView = qobject_cast<Z3DMeshView*>(ojbview)) {
+    if (auto meshView = dynamic_cast<Z3DMeshView*>(ojbview)) {
       auto doc = const_cast<ZMeshDoc*>(qobject_cast<const ZMeshDoc*>(&meshView->doc()));
       CHECK(doc);
       for (auto& kv : meshView->idToFilter()) {
@@ -1440,7 +1440,7 @@ void exportSceneForGlance()
         mesh.generateNormals();
         mesh.save(name);
       }
-    } else if (auto swcView = qobject_cast<Z3DSwcView*>(ojbview)) {
+    } else if (auto swcView = dynamic_cast<Z3DSwcView*>(ojbview)) {
       auto doc = const_cast<ZSwcDoc*>(qobject_cast<const ZSwcDoc*>(&swcView->doc()));
       CHECK(doc);
       for (auto& kv : swcView->idToFilter()) {
@@ -1464,7 +1464,7 @@ void exportSceneForGlance()
         QString cellname = doc->objName(id);
         cellnames.push_back(cellname);
       }
-    } else if (auto punctaView = qobject_cast<Z3DPunctaView*>(ojbview)) {
+    } else if (auto punctaView = dynamic_cast<Z3DPunctaView*>(ojbview)) {
       auto doc = const_cast<ZPunctaDoc*>(qobject_cast<const ZPunctaDoc*>(&punctaView->doc()));
       CHECK(doc);
       for (auto& kv : punctaView->idToFilter()) {
@@ -1847,7 +1847,7 @@ void createPCCellTable()
     mainWin->loadJsonScene(scnName);
     QApplication::processEvents();
 
-    Z3DView* view3d = mainWin->get3DWindow()->view();
+    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
     view3d->resetCameraAction()->trigger();
     view3d->zoomInAction()->trigger();
     view3d->zoomInAction()->trigger();

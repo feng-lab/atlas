@@ -1,7 +1,7 @@
 #include "z3danimationdoc.h"
 
 #include "zanimationwidget.h"
-#include "z3dview.h"
+#include "z3drenderingengine.h"
 #include "zexception.h"
 #include "zlog.h"
 #include "ztheme.h"
@@ -20,10 +20,10 @@ Z3DAnimationDoc::Z3DAnimationDoc(ZDoc& doc)
   createActions();
 }
 
-void Z3DAnimationDoc::bindView(Z3DView* v)
+void Z3DAnimationDoc::bindView(Z3DRenderingEngine* v)
 {
   m_view = v;
-  connect(m_view, &Z3DView::destroyed, this, &Z3DAnimationDoc::releaseView);
+  connect(m_view, &Z3DRenderingEngine::destroyed, this, &Z3DAnimationDoc::releaseView);
   for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
   }

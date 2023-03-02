@@ -9,14 +9,14 @@ class QPushButton;
 
 namespace nim {
 
-class Z3DView;
+class Z3DRenderingEngine;
 
 class Z3DCameraControlWidget : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DView& view, QWidget* parent = nullptr);
+  explicit Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRenderingEngine& engine, QWidget* parent = nullptr);
 
 private:
   void roll();
@@ -49,7 +49,7 @@ private:
 
 private:
   Z3DCameraParameter& m_camera;
-  Z3DView& m_view;
+  Z3DRenderingEngine& m_view;
   QSpinBox* m_rollDegreeSpinBox = nullptr;
   QSpinBox* m_azimuthDegreeSpinBox = nullptr;
   QSpinBox* m_yawDegreeSpinBox = nullptr;
