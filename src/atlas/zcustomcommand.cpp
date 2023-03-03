@@ -960,10 +960,10 @@ void createCellTable()
     mainWin->loadJsonScene(scnName);
     QApplication::processEvents();
 
-    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
-    view3d->resetCameraAction()->trigger();
-    view3d->zoomInAction()->trigger();
-    view3d->zoomInAction()->trigger();
+    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->engine();
+    view3d->resetCamera();
+    view3d->zoomIn();
+    view3d->zoomIn();
     QApplication::processEvents();
     QString imgName = QString("/Users/feng/Downloads/cell_table/%1.tif").arg(cellName);
     view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);
@@ -1399,9 +1399,9 @@ void createGlanceThumbnails()
       mainWin->loadJsonScene(scnName);
       QApplication::processEvents();
 
-      Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
-      view3d->resetCameraAction()->trigger();
-      view3d->zoomInAction()->trigger();
+      Z3DRenderingEngine* view3d = mainWin->get3DWindow()->engine();
+      view3d->resetCamera();
+      view3d->zoomIn();
       // view3d->zoomInAction()->trigger();
       QApplication::processEvents();
       QString imgName = QString("/Users/feng/Google Drive/eeum/raw/thumbnails/%1.tif").arg(cellName);
@@ -1423,7 +1423,7 @@ void exportSceneForGlance()
 
   QStringList cellnames;
 
-  Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
+  Z3DRenderingEngine* view3d = mainWin->get3DWindow()->engine();
   for (auto ojbview : view3d->objViews()) {
     if (auto meshView = dynamic_cast<Z3DMeshView*>(ojbview)) {
       auto doc = const_cast<ZMeshDoc*>(qobject_cast<const ZMeshDoc*>(&meshView->doc()));
@@ -1514,8 +1514,8 @@ void exportSceneForGlance()
     mainWin->loadFileList(fileList);
     QApplication::processEvents();
 
-    view3d->resetCameraAction()->trigger();
-    view3d->zoomInAction()->trigger();
+    view3d->resetCamera();
+    view3d->zoomIn();
     // view3d->zoomInAction()->trigger();
     QApplication::processEvents();
 
@@ -1847,10 +1847,10 @@ void createPCCellTable()
     mainWin->loadJsonScene(scnName);
     QApplication::processEvents();
 
-    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->view();
-    view3d->resetCameraAction()->trigger();
-    view3d->zoomInAction()->trigger();
-    view3d->zoomInAction()->trigger();
+    Z3DRenderingEngine* view3d = mainWin->get3DWindow()->engine();
+    view3d->resetCamera();
+    view3d->zoomIn();
+    view3d->zoomIn();
     QApplication::processEvents();
     QString imgName = QString("/Users/feng/Desktop/cell_table_pc/%1.tif").arg(cellName);
     view3d->takeFixedSizeScreenShot(imgName, 512, 512, Z3DScreenShotType::MonoView);

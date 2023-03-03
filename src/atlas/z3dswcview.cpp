@@ -16,23 +16,20 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DSwcFilter(globalParas(), this);
+      auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this);
       viewControl->setData(m_doc.swcPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DSwcFilter::boundBoxChanged, this, &Z3DSwcView::updateBoundBox);
       connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
       connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
-      if (m_engine.canvas()) {
-        m_engine.canvas()->addEventListenerToBack(*viewControl);
-      }
     }
     if (!objs.empty()) {
-      networkEvaluator().updateNetwork();
+      m_engine.networkEvaluator().updateNetwork();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -53,22 +50,19 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
 void Z3DSwcView::docSwcAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DSwcFilter(globalParas(), this);
+    auto viewControl = new Z3DSwcFilter(m_engine.globalParas(), this);
     viewControl->setData(m_doc.swcPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DSwcFilter::boundBoxChanged, this, &Z3DSwcView::updateBoundBox);
     connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
     connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
-    if (m_engine.canvas()) {
-      m_engine.canvas()->addEventListenerToBack(*viewControl);
-    }
 
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

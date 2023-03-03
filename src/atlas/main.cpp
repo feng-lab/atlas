@@ -10,8 +10,6 @@
 #include "ztheme.h"
 
 #include <QSurfaceFormat>
-// #include <QOpenGLContext>
-// #include <QOffscreenSurface>
 #include <QDir>
 #include <QFileInfo>
 #include <QMessageBox>
@@ -110,34 +108,10 @@ int main(int argc, char* argv[])
 
     // ZServiceManager sm;
 
-    //    // initialize OpenGL
-    //    QOpenGLContext context;
-    //    context.setFormat(format);
-    //    context.create();
-    //    if (!context.isValid()) {
-    //      LOG(ERROR) << "Can not create OpenGL context";
-    //    }
-    //
-    //    QOffscreenSurface surface;
-    //    surface.setFormat(format);
-    //    surface.create();
-    //    if(!surface.isValid()) {
-    //      LOG(ERROR) << "Can not create OpenGL Offscreen surface";
-    //    }
-    //    context.makeCurrent(&surface);
-    //
-    //    if (!ZSystemInfo::instance().initializeGL()) {
-    //      QString msg = ZSystemInfo::instance().errorMessage();
-    //      msg += ". 3D functions will be disabled.";
-    //      QMessageBox::warning(nullptr, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
-    //    }
-    //    ZSystemInfo::instance().setStereoSupported(context.format().stereo());
-
     // ZMainWindow has Qt::WA_DeleteOnClose attribute
     auto mainWin = new nim::ZMainWindow(GIT_VERSION);
     QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
     mainWin->show();
-    mainWin->initOpenglContext();
 
     return ZApplication::exec();
   }

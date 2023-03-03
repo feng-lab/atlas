@@ -1,6 +1,5 @@
 #include "z3dmeshview.h"
 
-#include "z3dcanvas.h"
 #include <QApplication>
 
 namespace nim {
@@ -16,23 +15,20 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
+      auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
       viewControl->setData(m_doc.meshList(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
       connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
       connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
       connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
-      if (m_engine.canvas()) {
-        m_engine.canvas()->addEventListenerToBack(*viewControl);
-      }
     }
     if (!objs.empty()) {
-      networkEvaluator().updateNetwork();
+      m_engine.networkEvaluator().updateNetwork();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -53,13 +49,13 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
 void Z3DMeshView::docMeshAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DMeshFilter(globalParas(), nullptr, this);
+    auto viewControl = new Z3DMeshFilter(m_engine.globalParas(), nullptr, this);
     viewControl->setData(m_doc.meshList(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DMeshFilter::boundBoxChanged, this, &Z3DMeshView::updateBoundBox);
     connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
     connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
@@ -68,7 +64,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
       m_engine.canvas()->addEventListenerToBack(*viewControl);
     }
 
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

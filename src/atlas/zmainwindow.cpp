@@ -1,6 +1,5 @@
 #include "zmainwindow.h"
 
-#include "z3dcanvas.h"
 #include "zsysteminfo.h"
 #include "zdoc.h"
 #include "zview.h"
@@ -8,8 +7,8 @@
 #include "zrunbenchmark.h"
 #include "zcustomcommand.h"
 #include "zviewsettingwidget.h"
-#include "z3dmainwindow.h"
 #include "z3drenderingengine.h"
+#include "z3dmainwindow.h"
 #include "zobjwidget.h"
 #include "zobjeditwidget.h"
 #include "zobjdetailedinfowidget.h"
@@ -52,22 +51,6 @@ ZMainWindow::ZMainWindow(QString versionStr)
   init();
   setWindowTitle(QString("Atlas version %1").arg(m_versionString));
   // setCurrentFile("");
-}
-
-void ZMainWindow::initOpenglContext()
-{
-  m_sharedContext = new Z3DCanvas("Init Canvas", 32, 32, this);
-  m_sharedContext->show();
-
-  // initialize OpenGL
-  if (!ZSystemInfo::instance().initializeGL()) {
-    QString msg = ZSystemInfo::instance().errorMessage();
-    msg += ". 3D functions will be disabled.";
-    QMessageBox::warning(this, QApplication::applicationName(), "OpenGL Initialization.\n" + msg);
-  }
-
-  ZSystemInfo::instance().setStereoSupported(m_sharedContext->format().stereo());
-  m_sharedContext->hide();
 }
 
 void ZMainWindow::updateRecentFileActions()
@@ -383,35 +366,29 @@ void ZMainWindow::runCustomCommand()
 
 void ZMainWindow::open3DWindow()
 {
-  if (ZSystemInfo::instance().is3DSupported()) {
-    try {
-      if (!m_3dWindow) {
-        m_3dWindow = new Z3DMainWindow(*m_doc, *this, false);
-        m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
-        connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
-        connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
-        connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
-        QApplication::processEvents();
-        connect(m_3dWindow, &Z3DMainWindow::viewReady, &m_doc->animation3DDoc(), &Z3DAnimationDoc::bindView);
-      }
+  try {
+    if (!m_3dWindow) {
+      m_3dWindow = new Z3DMainWindow(*m_doc, *this, false);
+      m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
+      connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
+      connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
+      connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
+      QApplication::processEvents();
+      connect(m_3dWindow, &Z3DMainWindow::viewReady, &m_doc->animation3DDoc(), &Z3DAnimationDoc::bindView);
+    }
 
-      m_3dWindow->showNormal();
-      m_3dWindow->raise();
-      m_3dWindow->activateWindow();
-      // m_3dWindow->setWindowState(Qt::WindowActive);
-    }
-    catch (const ZException& e) {
-      LOG(ERROR) << "Failed to open 3D window: " << e.what();
-      QMessageBox::critical(this,
-                            QApplication::applicationName(),
-                            QString("Failed to open 3D window:\n%1").arg(e.what()));
-      delete m_3dWindow.data();
-      m_3dWindow.clear();
-    }
-  } else {
+    m_3dWindow->showNormal();
+    m_3dWindow->raise();
+    m_3dWindow->activateWindow();
+    // m_3dWindow->setWindowState(Qt::WindowActive);
+  }
+  catch (const ZException& e) {
+    LOG(ERROR) << "Failed to open 3D window: " << e.what();
     QMessageBox::critical(this,
                           QApplication::applicationName(),
-                          QString("3D functions are disabled:\n%1").arg(ZSystemInfo::instance().errorMessage()));
+                          QString("Failed to open 3D window:\n%1").arg(e.what()));
+    delete m_3dWindow.data();
+    m_3dWindow.clear();
   }
 }
 
@@ -921,7 +898,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         m_view->read(value.as_object());
       } else if (key == "View3DGeneral") {
         if (m_3dWindow) {
-          m_3dWindow->view()->read(value.as_object());
+          m_3dWindow->engine()->read(value.as_object());
         }
       } else if (key != "Doc" && key != "Version") {
         QString qkey = QString::fromUtf8(key.data(), key.size());
@@ -941,7 +918,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
                 QApplication::processEvents();
               }
               if (m_3dWindow) {
-                m_3dWindow->view()->read(id, viewObj.at("View3D").as_object());
+                m_3dWindow->engine()->read(id, viewObj.at("View3D").as_object());
               }
             }
           }
@@ -981,7 +958,7 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
       if (m_3dWindow) {
         json::object view3DObj;
-        m_3dWindow->view()->write(id, view3DObj);
+        m_3dWindow->engine()->write(id, view3DObj);
         jObj["View3D"] = view3DObj;
       }
 
@@ -994,7 +971,7 @@ bool ZMainWindow::saveJsonSceneImpl(const QString& fn, QString& err)
 
     if (m_3dWindow) {
       json::object view3DGeneralObj;
-      m_3dWindow->view()->write(view3DGeneralObj);
+      m_3dWindow->engine()->write(view3DGeneralObj);
       sceneObj["View3DGeneral"] = view3DGeneralObj;
     }
 

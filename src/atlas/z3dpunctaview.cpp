@@ -15,21 +15,20 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DPunctaFilter(globalParas(), this);
+      auto viewControl = new Z3DPunctaFilter(m_engine.globalParas(), this);
       viewControl->setData(m_doc.punctaPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DPunctaFilter::boundBoxChanged, this, &Z3DPunctaView::updateBoundBox);
       connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      networkEvaluator().updateNetwork();
+      m_engine.networkEvaluator().updateNetwork();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -39,38 +38,41 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_engine.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render puncta:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render puncta:\n%1").arg(e.what()));
+    }
   }
 }
 
 void Z3DPunctaView::docPunctaAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DPunctaFilter(globalParas(), this);
+    auto viewControl = new Z3DPunctaFilter(m_engine.globalParas(), this);
     viewControl->setData(m_doc.punctaPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DPunctaFilter::boundBoxChanged, this, &Z3DPunctaView::updateBoundBox);
     connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(*viewControl);
 
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render puncta: " << e.what();
-    QMessageBox::critical(&m_engine.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render puncta:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render puncta:\n%1").arg(e.what()));
+    }
   }
 }
 

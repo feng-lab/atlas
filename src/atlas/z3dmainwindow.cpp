@@ -33,13 +33,24 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   , m_isStereoView(stereoView)
   , m_2dWindow(win2d)
 {
-  m_engine = new Z3DRenderingEngine(m_doc, false, this);
+  m_engine = new Z3DRenderingEngine(m_doc);
+  m_engine->moveToThread(&m_renderingThread);
+  connect(&m_renderingThread, &QThread::finished, m_engine, &QObject::deleteLater);
+  connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
+  m_renderingThread.start();
+
   m_canvas = new Z3DCanvas("", 512, 512, this);
-  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, m_engine, &Z3DRenderingEngine::init);
+  connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::onCanvasReady);
 
   setCentralWidget(m_canvas);
   init();
   setCurrentFile("");
+}
+
+Z3DMainWindow::~Z3DMainWindow()
+{
+  m_renderingThread.quit();
+  m_renderingThread.wait();
 }
 
 void Z3DMainWindow::openEditWidget(size_t id)
@@ -236,6 +247,24 @@ void Z3DMainWindow::createActions()
   // edit
 
   // view
+  m_zoomInAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomInIcon), tr("Zoom &In"), this);
+  QList<QKeySequence> zoomInKey;
+  zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
+  m_zoomInAction->setShortcuts(zoomInKey);
+  m_zoomInAction->setStatusTip(tr("Zoom in"));
+  connect(m_zoomInAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::zoomIn);
+
+  m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
+  QList<QKeySequence> zoomOutKey;
+  zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
+  m_zoomOutAction->setShortcuts(zoomOutKey);
+  m_zoomOutAction->setStatusTip(tr("Zoom out"));
+  connect(m_zoomOutAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::zoomOut);
+
+  m_resetCameraAction = new QAction(tr("&Reset Camera"), this);
+  m_resetCameraAction->setStatusTip(tr("Reset camera to show all objects in scene"));
+  connect(m_resetCameraAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::resetCamera);
+
   m_changeBackgroundAction =
     new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
   m_changeBackgroundAction->setStatusTip(tr("Change background of 3d view"));
@@ -280,9 +309,9 @@ void Z3DMainWindow::createMenus()
   m_editMenu->addAction(m_doc.redoAction());
 
   m_viewMenu = menuBar()->addMenu(tr("&View"));
-  m_viewMenu->addAction(m_engine->zoomInAction());
-  m_viewMenu->addAction(m_engine->zoomOutAction());
-  m_viewMenu->addAction(m_engine->resetCameraAction());
+  m_viewMenu->addAction(m_zoomInAction);
+  m_viewMenu->addAction(m_zoomOutAction);
+  m_viewMenu->addAction(m_resetCameraAction);
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_changeBackgroundAction);
   m_viewMenu->addAction(m_changeAxisAction);
@@ -325,9 +354,9 @@ void Z3DMainWindow::createToolBars()
   m_editToolBar->setIconSize(iconSize);
 
   m_viewToolBar = addToolBar(tr("View"));
-  m_viewToolBar->addAction(m_engine->zoomInAction());
-  m_viewToolBar->addAction(m_engine->zoomOutAction());
-  m_viewToolBar->addAction(m_engine->resetCameraAction());
+  m_viewToolBar->addAction(m_zoomInAction);
+  m_viewToolBar->addAction(m_zoomOutAction);
+  m_viewToolBar->addAction(m_resetCameraAction);
   m_viewToolBar->addAction(m_changeBackgroundAction);
   m_viewToolBar->addAction(m_changeAxisAction);
   m_viewToolBar->addAction(m_screenShotAction);
@@ -441,7 +470,7 @@ void Z3DMainWindow::fillDockWindows()
 
   m_axisDockWidget->setWidget(m_engine->axisWidget());
 
-  m_helpDockWidget->setWidget(Z3DRenderingEngine::helpWidget());
+  m_helpDockWidget->setWidget(createHelpWidget());
 }
 
 void Z3DMainWindow::readSettings()
@@ -531,7 +560,6 @@ void Z3DMainWindow::takeScreenShot(const QString& filename, Z3DScreenShotType ss
     m_engine->takeScreenShot(filename, sst);
   }
   catch (ZException const& e) {
-    LOG(ERROR) << "Exception: " << e.what();
     QMessageBox::critical(this, QApplication::applicationName(), e.what());
   }
 }
@@ -542,9 +570,36 @@ void Z3DMainWindow::takeFixedSizeScreenShot(const QString& filename, int width, 
     m_engine->takeFixedSizeScreenShot(filename, width, height, sst);
   }
   catch (ZException const& e) {
-    LOG(ERROR) << "Exception: " << e.what();
     QMessageBox::critical(this, QApplication::applicationName(), e.what());
   }
+}
+
+void Z3DMainWindow::onCanvasReady()
+{
+  Q_EMIT canvasReady(m_canvas);
+}
+
+QWidget* Z3DMainWindow::createHelpWidget()
+{
+  auto edt = new QPlainTextEdit();
+  edt->setReadOnly(true);
+  edt->appendPlainText("zoom/dolly:");
+  edt->appendPlainText("    1) command/control key + mouse wheel scroll");
+  edt->appendPlainText("    2) command/control key + =(+)/- key");
+  // edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
+  // edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
+  edt->appendPlainText("rotate:");
+  edt->appendPlainText("    1) [(optional) command/control key] + mouse drag");
+  edt->appendPlainText("    2) command/control key + Left/Right/Up/Down key");
+  edt->appendPlainText("shift:");
+  edt->appendPlainText("    1) shift key + mouse drag");
+  edt->appendPlainText("    2) shift key + Left/Right/Up/Down key");
+  edt->appendPlainText("roll:");
+  edt->appendPlainText("    1) alt key + mouse drag");
+  edt->appendPlainText("    2) alt key + Left/Right key");
+  edt->moveCursor(QTextCursor::Start);
+  edt->ensureCursorVisible();
+  return edt;
 }
 
 } // namespace nim

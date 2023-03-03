@@ -49,7 +49,7 @@ private:
 
 private:
   Z3DCameraParameter& m_camera;
-  Z3DRenderingEngine& m_view;
+  Z3DRenderingEngine& m_engine;
   QSpinBox* m_rollDegreeSpinBox = nullptr;
   QSpinBox* m_azimuthDegreeSpinBox = nullptr;
   QSpinBox* m_yawDegreeSpinBox = nullptr;

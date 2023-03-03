@@ -2,28 +2,32 @@
 
 #include "zlog.h"
 #include <QOpenGLContext>
+#include <QSurfaceFormat>
+#include <QOffscreenSurface>
 
 namespace nim {
 
 Z3DContext::Z3DContext()
-  : m_context(QOpenGLContext::currentContext())
 {
-  CHECK(m_context);
+  m_context = new QOpenGLContext();
+  m_context->setFormat(QSurfaceFormat::defaultFormat());
+  m_context->create();
+  if (!m_context->isValid()) {
+    LOG(ERROR) << "Can not create OpenGL context";
+  }
+
+  m_offscreenSurface = new QOffscreenSurface;
+  m_offscreenSurface->setFormat(QSurfaceFormat::defaultFormat());
+  m_offscreenSurface->create();
+  if (!m_offscreenSurface->isValid()) {
+    LOG(ERROR) << "Can not create OpenGL Offscreen surface";
+  }
 }
 
-bool Z3DContext::operator<(const Z3DContext& rhs) const
+Z3DContext::~Z3DContext()
 {
-  return m_context < rhs.m_context;
-}
-
-bool Z3DContext::operator==(const Z3DContext& rhs) const
-{
-  return m_context == rhs.m_context;
-}
-
-bool Z3DContext::operator!=(const Z3DContext& rhs) const
-{
-  return m_context != rhs.m_context;
+  delete m_offscreenSurface;
+  delete m_context;
 }
 
 void Z3DContext::logCurrentContext()
@@ -38,6 +42,11 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
   }
 
   return m_context->getProcAddress(name);
+}
+
+void Z3DContext::makeCurrent() const
+{
+  m_context->makeCurrent(m_offscreenSurface);
 }
 
 Z3DContextGroup::Z3DContextGroup()

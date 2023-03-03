@@ -1,14 +1,8 @@
 #include "zsysteminfo.h"
 
-#include "z3dgl.h"
 #include "zlog.h"
-#include "z3dgpuinfo.h"
-#include "z3dcontext.h"
 #include "zmainwindow.h"
-#include "z3dmainwindow.h"
 #include "zapplication.h"
-#include <glbinding/glbinding.h>
-#include <glbinding-aux/Meta.h>
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSettings>
@@ -20,11 +14,6 @@
 #if !defined(Q_OS_WIN) && !defined(Q_OS_DARWIN)
 #include <sys/utsname.h> // for uname
 #endif
-
-DEFINE_bool(
-  atlas_check_opengl_error_for_all_gl_calls,
-  true,
-  "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
 
 namespace nim {
 
@@ -70,62 +59,6 @@ void ZSystemInfo::logOSInfo() const
             << 1e9 * std::chrono::high_resolution_clock::period::num / std::chrono::high_resolution_clock::period::den
             << " ns";
   LOG(INFO) << "high_resolution_clock is_steady = " << std::boolalpha << std::chrono::high_resolution_clock::is_steady;
-}
-
-bool ZSystemInfo::initializeGL()
-{
-  if (m_glInitialized) {
-    LOG(ERROR) << "OpenGL already initialized. Skip.";
-    return false;
-  }
-
-  glbinding::initialize([](const char* name) {
-    return Z3DContext().getProcAddress(name);
-  });
-  Z3DGpuInfo::instance().logGpuInfo();
-  if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
-    glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
-                                       glbinding::CallbackMask::ParametersAndReturnValue |
-                                       glbinding::CallbackMask::Unresolved,
-                                     {"glGetError"});
-    glbinding::setAfterCallback([](const glbinding::FunctionCall& call) {
-      GLenum error = glGetError();
-      if (error != GL_NO_ERROR) {
-        std::ostringstream os;
-
-        os << call.function->name() << "(";
-        for (size_t i = 0; i < call.parameters.size(); ++i) {
-          os << call.parameters[i].get();
-          if (i + 1 < call.parameters.size()) {
-            os << ", ";
-          }
-        }
-        os << ")";
-
-        if (call.returnValue) {
-          os << " -> " << call.returnValue.get();
-        }
-
-        LOG(ERROR) << "OpenGL error: " << glbinding::aux::Meta::getString(error) << " with " << os.str();
-      }
-    });
-  } else {
-    glbinding::setCallbackMask(glbinding::CallbackMask::Unresolved);
-  }
-  glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
-    LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
-  });
-  glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-    LOG(INFO) << "Switching to OpenGL context " << handle;
-  });
-  if (Z3DGpuInfo::instance().isSupported()) {
-    m_glInitialized = true;
-    return m_glInitialized;
-  }
-  m_errorMsg = Z3DGpuInfo::instance().notSupportedReason();
-  LOG(ERROR) << m_errorMsg;
-  m_glInitialized = false;
-  return m_glInitialized;
 }
 
 QString ZSystemInfo::shaderPath(const QString& filename) const

@@ -423,7 +423,6 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                                                                                  sst);
     }
     catch (ZException const& e) {
-      LOG(ERROR) << "Exception: " << e.what();
       break;
     }
   }
@@ -561,7 +560,6 @@ void ZAnimation::export3DAnimation(const QString& fn,
       dynamic_cast<Z3DRenderingEngine*>(m_engine)->takeScreenShot(filepath, sst);
     }
     catch (ZException const& e) {
-      LOG(ERROR) << "Exception: " << e.what();
       break;
     }
   }

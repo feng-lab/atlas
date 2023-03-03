@@ -15,13 +15,13 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
+      auto viewControl = new Z3DRegionAnnotationFilter(m_engine.globalParas(), this);
       viewControl->setData(m_doc.regionAnnotationPack(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
       connect(viewControl,
               &Z3DRegionAnnotationFilter::objDeselected,
@@ -35,10 +35,9 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
               &Z3DRegionAnnotationFilter::objVisibleChanged,
               this,
               &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
-      canvas().addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
-      networkEvaluator().updateNetwork();
+      m_engine.networkEvaluator().updateNetwork();
       m_engine.updateBoundBox();
 
       for (auto id : objs) {
@@ -48,22 +47,24 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_engine.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
+    }
   }
 }
 
 void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DRegionAnnotationFilter(globalParas(), this);
+    auto viewControl = new Z3DRegionAnnotationFilter(m_engine.globalParas(), this);
     viewControl->setData(m_doc.regionAnnotationPack(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DRegionAnnotationFilter::boundBoxChanged, this, &Z3DRegionAnnotationView::updateBoundBox);
     connect(viewControl,
             &Z3DRegionAnnotationFilter::objDeselected,
@@ -77,18 +78,19 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
             &Z3DRegionAnnotationFilter::objVisibleChanged,
             this,
             &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
-    canvas().addEventListenerToBack(*viewControl);
 
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
     LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    QMessageBox::critical(&m_engine.canvas(),
-                          QApplication::applicationName(),
-                          QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
+    if (m_engine.canvas()) {
+      QMessageBox::critical(m_engine.canvas(),
+                            QApplication::applicationName(),
+                            QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
+    }
   }
 }
 

@@ -1,7 +1,6 @@
 #include "z3dglobalparameters.h"
 
 #include "zwidgetsgroup.h"
-#include "z3dcanvas.h"
 #include "z3dgpuinfo.h"
 #include "z3dcameracontrolwidget.h"
 
@@ -55,7 +54,7 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DRenderingEngine& engine)
   addParameter(transparencyMethod);
   addParameter(weightedBlendedDepthScale);
 
-  auto cameraParameterIndex = m_parameters.size();
+  m_cameraParameterIndex = m_parameters.size();
   addParameter(camera);
 
   xCut.setSingleStep(1);
@@ -237,30 +236,16 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DRenderingEngine& engine)
   addParameter(fogRange);
   addParameter(fogDensity);
 
-  m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
-  m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
-  for (size_t i = 0; i < m_parameters.size(); ++i) {
-    if (i == cameraParameterIndex) {
-      m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_engine)), 1);
-      m_widgetsGrp->addChild(*m_parameters[i], 1);
-    } else {
-      m_widgetsGrp->addChild(*m_parameters[i], 1);
-      m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);
-    }
-  }
-
   devicePixelRatio.setEnabled(false);
-  m_widgetsGrp->addChild(devicePixelRatio, 1);
-  m_widgetsGrpNoCamera->addChild(devicePixelRatio, 1);
 
   pickingManager.setDevicePixelRatio(devicePixelRatio.get());
 }
 
-void Z3DGlobalParameters::attachToCanvas(Z3DCanvas& canvas)
+void Z3DGlobalParameters::setDevicePixelRatio(float f)
 {
-  if (canvas.devicePixelRatio() != devicePixelRatio.get()) {
-    devicePixelRatio.set(canvas.devicePixelRatio());
-    pickingManager.setDevicePixelRatio(devicePixelRatio.get());
+  if (f != devicePixelRatio.get()) {
+    devicePixelRatio.set(f);
+    pickingManager.setDevicePixelRatio(f);
   }
 }
 
@@ -280,6 +265,22 @@ void Z3DGlobalParameters::write(json::object& json) const
 
 std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCamera)
 {
+  if (!m_widgetsGrp) {
+    m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
+    m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
+    for (size_t i = 0; i < m_parameters.size(); ++i) {
+      if (i == m_cameraParameterIndex) {
+        m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_engine)), 1);
+        m_widgetsGrp->addChild(*m_parameters[i], 1);
+      } else {
+        m_widgetsGrp->addChild(*m_parameters[i], 1);
+        m_widgetsGrpNoCamera->addChild(*m_parameters[i], 1);
+      }
+    }
+
+    m_widgetsGrp->addChild(devicePixelRatio, 1);
+    m_widgetsGrpNoCamera->addChild(devicePixelRatio, 1);
+  }
   return includeCamera ? m_widgetsGrp : m_widgetsGrpNoCamera;
 }
 

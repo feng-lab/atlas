@@ -300,6 +300,11 @@ QSurfaceFormat Z3DCanvas::format() const
 #endif
 }
 
+void Z3DCanvas::setShareContext(QOpenGLContext* shareContext)
+{
+  m_glWidget->context()->setShareContext(shareContext);
+}
+
 void Z3DCanvas::toggleFullScreen()
 {
   if (m_fullscreen) {

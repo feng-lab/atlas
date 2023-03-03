@@ -30,6 +30,8 @@ public:
   void resetToMatchCanvasSize();
 
 protected:
+
+  void updateSize() override;
   void onCanvasResized(size_t w, size_t h);
 
   void process(Z3DEye eye) override;
@@ -38,7 +40,7 @@ protected:
 
   [[nodiscard]] bool isValid(Z3DEye eye) const override;
 
-  void updateSize() override;
+
 
   void renderInportToImage(Z3DEye eye);
 

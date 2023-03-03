@@ -16,13 +16,13 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
 {
   try {
     for (auto id : objs) {
-      auto viewControl = new Z3DAnimationFilter(globalParas(), this);
+      auto viewControl = new Z3DAnimationFilter(m_engine.globalParas(), this);
       viewControl->setData(&m_doc.animation(id));
       viewControl->setSelected(m_doc.isObjSelected(id));
       expandBoundBox(viewControl->axisAlignedBoundBox());
       m_idToFilter[id].reset(viewControl);
 
-      viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+      viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
       connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
       connect(viewControl,
               &Z3DAnimationFilter::objVisibleChanged,
@@ -31,7 +31,7 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
       Q_EMIT objViewReady(id);
     }
     if (!objs.empty()) {
-      networkEvaluator().updateNetwork();
+      m_engine.networkEvaluator().updateNetwork();
       m_engine.updateBoundBox();
     }
   }
@@ -48,16 +48,16 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
 void Z3DAnimationView::docAnimationAdded(size_t id)
 {
   try {
-    auto viewControl = new Z3DAnimationFilter(globalParas(), this);
+    auto viewControl = new Z3DAnimationFilter(m_engine.globalParas(), this);
     viewControl->setData(&m_doc.animation(id));
     viewControl->setSelected(m_doc.isObjSelected(id));
     expandBoundBox(viewControl->axisAlignedBoundBox());
     m_idToFilter[id].reset(viewControl);
 
-    viewControl->outputPort("GeometryFilter")->connect(compositor().inputPort("GeometryFilters"));
+    viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
     connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 
     Q_EMIT objViewReady(id);

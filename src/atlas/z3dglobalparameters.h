@@ -10,8 +10,6 @@
 
 namespace nim {
 
-class Z3DCanvas;
-
 class ZWidgetsGroup;
 
 class Z3DRenderingEngine;
@@ -23,7 +21,7 @@ class Z3DGlobalParameters : public QObject
 public:
   Z3DGlobalParameters(Z3DRenderingEngine& engine);
 
-  void attachToCanvas(Z3DCanvas& canvas);
+  void setDevicePixelRatio(float f);
 
   [[nodiscard]] const std::vector<ZParameter*>& parameters() const
   {
@@ -149,6 +147,7 @@ private:
   std::vector<glm::vec3> m_lightSpotDirectionArray;
 
   Z3DRenderingEngine& m_engine;
+  size_t m_cameraParameterIndex = 0;
 };
 
 } // namespace nim

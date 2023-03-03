@@ -173,6 +173,8 @@ public:
 
   [[nodiscard]] QSurfaceFormat format() const;
 
+  void setShareContext(QOpenGLContext *shareContext);
+
   void setNetworkEvaluator(Z3DNetworkEvaluator* n);
 
   void setFakeStereoOnce();

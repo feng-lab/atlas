@@ -2,6 +2,7 @@
 
 #include "z3drenderingengine.h"
 #include "zwidgetsgroup.h"
+#include "z3dcanvas.h"
 #include "z3dnetworkevaluator.h"
 #include "z3dcompositor.h"
 #include "zobjdoc.h"
@@ -39,30 +40,7 @@ public:
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
-  inline Z3DCameraParameter& camera()
-  {
-    return m_engine.camera();
-  }
-
-  inline Z3DTrackballInteractionHandler& interactionHandler()
-  {
-    return m_engine.interactionHandler();
-  }
-
-  inline Z3DCompositor& compositor()
-  {
-    return m_engine.compositor();
-  }
-
-  inline Z3DNetworkEvaluator& networkEvaluator()
-  {
-    return m_engine.networkEvaluator();
-  }
-
-  inline Z3DGlobalParameters& globalParas()
-  {
-    return m_engine.globalParas();
-  }
+  virtual void attachToCanvas(Z3DCanvas& canvas) const = 0;
 
 Q_SIGNALS:
 

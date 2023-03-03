@@ -11,7 +11,7 @@ namespace nim {
 Z3DCameraControlWidget::Z3DCameraControlWidget(Z3DCameraParameter& camera, Z3DRenderingEngine& engine, QWidget* parent)
   : QWidget(parent)
   , m_camera(camera)
-  , m_view(engine)
+  , m_engine(engine)
 {
   createWidget();
 }
@@ -58,54 +58,54 @@ void Z3DCameraControlWidget::pitch()
 
 void Z3DCameraControlWidget::focusOn()
 {
-  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Focuses on objects..."), this);
+  auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Focuses on objects..."), this);
   if (!objIDs.empty()) {
-    m_view.cameraFocusesOn(m_view.boundBoxOfObjsAfterClipping(objIDs));
+    m_engine.cameraFocusesOn(m_engine.boundBoxOfObjsAfterClipping(objIDs));
   }
 }
 
 void Z3DCameraControlWidget::focusOnIgnoreClipping()
 {
-  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Focuses on objects (ignore clipping)..."), this);
+  auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Focuses on objects (ignore clipping)..."), this);
   if (!objIDs.empty()) {
-    m_view.cameraFocusesOn(m_view.boundBoxOfObjs(objIDs));
+    m_engine.cameraFocusesOn(m_engine.boundBoxOfObjs(objIDs));
   }
 }
 
 void Z3DCameraControlWidget::pointsTo()
 {
-  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Camera points to objects..."), this);
+  auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Camera points to objects..."), this);
   if (!objIDs.empty()) {
-    m_view.cameraPointsTo(m_view.boundBoxOfObjsAfterClipping(objIDs));
+    m_engine.cameraPointsTo(m_engine.boundBoxOfObjsAfterClipping(objIDs));
   }
 }
 
 void Z3DCameraControlWidget::pointsToIgnoreClipping()
 {
-  auto objIDs = m_view.doc().chooseObjsWithWidget(QString("Camera points to objects (ignore clipping)..."), this);
+  auto objIDs = m_engine.doc().chooseObjsWithWidget(QString("Camera points to objects (ignore clipping)..."), this);
   if (!objIDs.empty()) {
-    m_view.cameraPointsTo(m_view.boundBoxOfObjs(objIDs));
+    m_engine.cameraPointsTo(m_engine.boundBoxOfObjs(objIDs));
   }
 }
 
 void Z3DCameraControlWidget::flipView()
 {
-  m_view.flipView();
+  m_engine.flipView();
 }
 
 void Z3DCameraControlWidget::setXYView()
 {
-  m_view.resetCameraAction()->trigger();
+  m_engine.resetCamera();
 }
 
 void Z3DCameraControlWidget::setXZView()
 {
-  m_view.setXZView();
+  m_engine.setXZView();
 }
 
 void Z3DCameraControlWidget::setYZView()
 {
-  m_view.setYZView();
+  m_engine.setYZView();
 }
 
 void Z3DCameraControlWidget::createWidget()

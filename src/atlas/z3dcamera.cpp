@@ -318,6 +318,7 @@ void Z3DCamera::updateCamera()
   // make sure upVector is not parallel to viewVector
   if (std::abs(glm::dot(m_upVector, m_viewVector)) >= 0.9) {
     LOG(WARNING) << "Resetting view up since view plane normal is parallel";
+    LOG(INFO) << m_upVector << " " << m_viewVector;
     m_upVector = glm::cross(m_viewVector, glm::vec3(1.f, 0.f, 0.f));
     if (glm::dot(m_upVector, m_upVector) < 0.001) {
       m_upVector = glm::cross(m_viewVector, glm::vec3(0.f, 1.f, 0.f));

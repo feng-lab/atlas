@@ -71,6 +71,13 @@ public:
     return {};
   }
 
+  void attachToCanvas(Z3DCanvas& canvas) const override
+  {
+    for (const auto& idFilter : m_idToFilter) {
+      canvas.addEventListenerToBack(*idFilter.second);
+    }
+  }
+
   const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter()
   {
     return m_idToFilter;
@@ -100,7 +107,7 @@ protected:
     }
     // m_engine.canvas().getGLFocus();
     m_idToFilter.erase(it);
-    networkEvaluator().updateNetwork();
+    m_engine.networkEvaluator().updateNetwork();
     updateBoundBox();
   }
 

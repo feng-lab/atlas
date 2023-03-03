@@ -1,11 +1,11 @@
 #pragma once
 
 #include "z3dglobalparameters.h"
+#include "z3dcontext.h"
 #include "zviewsettinginterface.h"
 #include "zbbox.h"
 #include <QDir>
 #include <QObject>
-#include <QAction>
 #include <QMutexLocker>
 
 class QMainWindow;
@@ -29,26 +29,11 @@ class Z3DRenderingEngine
   Q_OBJECT
 
 public:
-  Z3DRenderingEngine(ZDoc& doc, bool stereo, QObject* parent = nullptr);
+  Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
 
   ~Z3DRenderingEngine() override;
 
   [[nodiscard]] const ZDoc& doc() const;
-
-  inline QAction* zoomInAction()
-  {
-    return m_zoomInAction;
-  }
-
-  inline QAction* zoomOutAction()
-  {
-    return m_zoomOutAction;
-  }
-
-  inline QAction* resetCameraAction()
-  {
-    return m_resetCameraAction;
-  }
 
   std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id) override;
 
@@ -72,11 +57,6 @@ public:
     return m_canvas;
   }
 
-  [[nodiscard]] inline const Z3DCanvas& canvas() const
-  {
-    return *m_canvas;
-  }
-
   inline Z3DCompositor& compositor()
   {
     return *m_compositor;
@@ -97,8 +77,6 @@ public:
   QWidget* backgroundWidget();
 
   QWidget* axisWidget();
-
-  static QWidget* helpWidget();
 
   void updateBoundBox();
 
@@ -156,11 +134,17 @@ public:
 
   void init();
 
-  void attachToCanvas(Z3DCanvas& canvas);
+  void initAndAttachToCanvas(Z3DCanvas* canvas);
 
   void setOutputSize(const glm::uvec2& size);
 
   void makeOutputSizeEvenNumbers();
+
+  void zoomIn();
+
+  void zoomOut();
+
+  void resetCamera(); // set up camera based on visible objects in scene, original position
 
 Q_SIGNALS:
 
@@ -169,44 +153,35 @@ Q_SIGNALS:
   void networkConstructed();
 
 private:
-  void zoomIn();
-
-  void zoomOut();
-
-  void resetCamera(); // set up camera based on visible objects in scene, original position
   void resetCameraCenter();
 
   void resetCameraClippingRange(); // Reset the camera clipping range to include this entire bounding box
 
-  bool takeFixedSizeSeriesScreenShot(const QDir& dir,
-                                     const QString& namePrefix,
-                                     const glm::vec3& axis,
-                                     bool clockWise,
-                                     int numFrame,
-                                     int width,
-                                     int height,
-                                     Z3DScreenShotType sst);
-
-  bool takeSeriesScreenShot(const QDir& dir,
-                            const QString& namePrefix,
-                            const glm::vec3& axis,
-                            bool clockWise,
-                            int numFrame,
-                            Z3DScreenShotType sst);
-
-  void createActions();
+  //  bool takeFixedSizeSeriesScreenShot(const QDir& dir,
+  //                                     const QString& namePrefix,
+  //                                     const glm::vec3& axis,
+  //                                     bool clockWise,
+  //                                     int numFrame,
+  //                                     int width,
+  //                                     int height,
+  //                                     Z3DScreenShotType sst);
+  //
+  //  bool takeSeriesScreenShot(const QDir& dir,
+  //                            const QString& namePrefix,
+  //                            const glm::vec3& axis,
+  //                            bool clockWise,
+  //                            int numFrame,
+  //                            Z3DScreenShotType sst);
 
   static ZImg textureToRGBAImg(const Z3DTexture& tex);
 
-private:
-  ZDoc& m_doc;
-  bool m_isStereoView;
-  QMainWindow* m_mainWin = nullptr;
+  void onCanvasResized(size_t w, size_t h);
 
-  //
-  QAction* m_zoomInAction = nullptr;
-  QAction* m_zoomOutAction = nullptr;
-  QAction* m_resetCameraAction = nullptr;
+  void initGL();
+
+private:
+  std::unique_ptr<Z3DContext> m_context;
+  ZDoc& m_doc;
 
   std::vector<Z3DObjView*> m_3dObjViews;
 

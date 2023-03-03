@@ -20,16 +20,12 @@ class Z3DMainWindow;
 
 class ZObjEditWidget;
 
-class Z3DCanvas;
-
 class ZMainWindow : public QMainWindow
 {
   Q_OBJECT
 
 public:
   explicit ZMainWindow(QString versionStr);
-
-  void initOpenglContext();
 
   [[nodiscard]] const std::vector<QAction*>& recentFileActions() const
   {
@@ -225,9 +221,6 @@ private:
   //
   std::unique_ptr<ZDoc> m_doc;
   std::unique_ptr<ZView> m_view;
-
-  //
-  Z3DCanvas* m_sharedContext = nullptr;
 
   QPointer<Z3DMainWindow> m_3dWindow;
 

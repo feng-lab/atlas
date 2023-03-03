@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QThread>
 
 namespace nim {
 
@@ -27,7 +28,9 @@ class Z3DMainWindow : public QMainWindow
 public:
   explicit Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView = false, QWidget* parent = nullptr);
 
-  Z3DRenderingEngine* view()
+  ~Z3DMainWindow() override;
+
+  Z3DRenderingEngine* engine()
   {
     return m_engine;
   }
@@ -43,6 +46,8 @@ Q_SIGNALS:
   void loadJsonScene(const QString& fn);
 
   void viewReady(Z3DRenderingEngine* view);
+
+  void canvasReady(Z3DCanvas* canvas);
 
 protected:
   void closeEvent(QCloseEvent* event) override;
@@ -108,6 +113,10 @@ private:
 
   void takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
 
+  void onCanvasReady();
+
+  static QWidget* createHelpWidget();
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;
@@ -126,6 +135,10 @@ private:
   QAction* m_loadSceneAction = nullptr;
   QAction* m_saveSceneAction = nullptr;
   QAction* m_closeAction = nullptr;
+
+  QAction* m_zoomInAction = nullptr;
+  QAction* m_zoomOutAction = nullptr;
+  QAction* m_resetCameraAction = nullptr;
 
   QAction* m_separatorAction = nullptr;
 
@@ -156,6 +169,8 @@ private:
   bool m_isStereoView = false;
 
   ZMainWindow& m_2dWindow;
+
+  QThread m_renderingThread;
 };
 
 } // namespace nim
