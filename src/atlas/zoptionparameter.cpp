@@ -75,7 +75,7 @@ QWidget* ZOptionParameter<T, T2>::actualCreateWidget(QWidget* parent)
       this->set(m_options[0]);
     }
   }
-  this->connect(this, &ZOptionParameter::reservedIntSignal1, cb, &ZComboBox::setCurrentIndex);
+  this->connect(this, &ZOptionParameter::reservedIntSignal1, cb, &ZComboBox::setCurrentIndexBlockSignals);
   this->connect(this, &ZOptionParameter::reservedStringSignal1, cb, &ZComboBox::addItemSlot);
   this->connect(this, &ZOptionParameter::reservedStringSignal2, cb, &ZComboBox::removeItemSlot);
   this->connect(this, &ZOptionParameter::reservedSignal1, cb, &ZComboBox::clear);

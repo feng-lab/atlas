@@ -26,6 +26,8 @@ public:
 
   QSize minimumSizeHint() const override;
 
+  void setValueBlockSignals(int v);
+
 protected:
   void focusInEvent(QFocusEvent* e) override;
 
@@ -42,6 +44,8 @@ public:
   QSize sizeHint() const override;
 
   QSize minimumSizeHint() const override;
+
+  void setValueBlockSignals(double v);
 
 protected:
   void focusInEvent(QFocusEvent* e) override;

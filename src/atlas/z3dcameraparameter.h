@@ -245,7 +245,6 @@ private:
   ZFloatParameter m_fieldOfView;
   ZFloatParameter m_nearDist;
   ZFloatParameter m_farDist;
-  bool m_receiveWidgetSignal;
 };
 
 } // namespace nim

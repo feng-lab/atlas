@@ -200,9 +200,10 @@ ZPunctaFilter::ZPunctaFilter(ZView& view)
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZPunctaFilter::opacityChanged);
   addParameter(&m_outlineColor);
   addParameter(&m_regionColor);
-  m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(getViewPrecedence());
-  m_viewPrecedencePara.blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_viewPrecedencePara);
+    m_viewPrecedencePara.set(getViewPrecedence());
+  }
   addParameter(&m_useSameSizeForAllPuncta);
   m_sizeScale.setSingleStep(0.1);
   m_sizeScale.setDecimal(1);

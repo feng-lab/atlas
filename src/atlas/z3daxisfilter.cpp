@@ -88,21 +88,22 @@ std::shared_ptr<ZWidgetsGroup> Z3DAxisFilter::widgetsGroup()
 void Z3DAxisFilter::renderOpaque(Z3DEye eye)
 {
   prepareData(eye);
-  m_rendererBase.coordTransformPara().blockSignals(true);
-  m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
+  {
+    const QSignalBlocker blocker(m_rendererBase.coordTransformPara());
+    m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
 
-  glm::uvec4 viewport = m_rendererBase.viewport();
-  GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
-  glViewport(viewport.x, viewport.y, size, size);
+    glm::uvec4 viewport = m_rendererBase.viewport();
+    GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
+    glViewport(viewport.x, viewport.y, size, size);
 
-  if (m_mode.get() == "Arrow") {
-    m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
-  } else {
-    m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+    if (m_mode.get() == "Arrow") {
+      m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
+    } else {
+      m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+    }
+
+    glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
   }
-
-  glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
-  m_rendererBase.coordTransformPara().blockSignals(false);
 }
 
 void Z3DAxisFilter::prepareData(Z3DEye eye)

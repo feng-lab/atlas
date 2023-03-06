@@ -212,7 +212,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
                                                                      m_suffix,
                                                                      parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue1);
-      connect(this, &ZQuatParameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZQuatParameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -241,7 +241,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
                                                                      m_suffix,
                                                                      parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue2);
-      connect(this, &ZQuatParameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZQuatParameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -270,7 +270,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
                                                                      m_suffix,
                                                                      parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue3);
-      connect(this, &ZQuatParameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZQuatParameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
@@ -299,7 +299,7 @@ QWidget* ZQuatParameter::actualCreateWidget(QWidget* parent)
                                                                      m_suffix,
                                                                      parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZQuatParameter::setValue4);
-      connect(this, &ZQuatParameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZQuatParameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sbws4);
       } else {

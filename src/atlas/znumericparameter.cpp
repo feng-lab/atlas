@@ -50,20 +50,20 @@ QWidget* ZIntParameter::actualCreateWidget(QWidget* parent)
     sb->setPrefix(m_prefix);
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIntParameter::setValue);
-    connect(this, &ZIntParameter::valueWillChange, sb, &ZSpinBox::setValue);
+    connect(this, &ZIntParameter::valueWillChange, sb, &ZSpinBox::setValueBlockSignals);
     connect(this, &ZIntParameter::rangeChanged, sb, &ZSpinBox::setRange);
     return sb;
   } else if (m_style == "SPINBOXWITHSCROLLBAR") {
     ZSpinBoxWithScrollBar* sbws =
       new ZSpinBoxWithScrollBar(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZSpinBoxWithScrollBar::valueChanged, this, &ZIntParameter::setValue);
-    connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithScrollBar::setValue);
+    connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithScrollBar::setValueBlockSignals);
     connect(this, &ZIntParameter::rangeChanged, sbws, &ZSpinBoxWithScrollBar::setDataRange);
     return sbws;
   } else {
     auto sbws = new ZSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZSpinBoxWithSlider::valueChanged, this, &ZIntParameter::setValue);
-    connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithSlider::setValue);
+    connect(this, &ZIntParameter::valueWillChange, sbws, &ZSpinBoxWithSlider::setValueBlockSignals);
     connect(this, &ZIntParameter::rangeChanged, sbws, &ZSpinBoxWithSlider::setDataRange);
     return sbws;
   }
@@ -116,14 +116,14 @@ QWidget* ZDoubleParameter::actualCreateWidget(QWidget* parent)
     sb->setPrefix(m_prefix);
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleParameter::setValue);
-    connect(this, &ZDoubleParameter::valueWillChange, sb, &ZDoubleSpinBox::setValue);
+    connect(this, &ZDoubleParameter::valueWillChange, sb, &ZDoubleSpinBox::setValueBlockSignals);
     connect(this, &ZDoubleParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
     auto sbws =
       new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_decimal, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDoubleParameter::setValue);
-    connect(this, &ZDoubleParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValue);
+    connect(this, &ZDoubleParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
     connect(this, &ZDoubleParameter::rangeChanged, sbws, &ZDoubleSpinBoxWithSlider::setDataRange);
     return sbws;
   }
@@ -172,14 +172,14 @@ QWidget* ZFloatParameter::actualCreateWidget(QWidget* parent)
     sb->setPrefix(m_prefix);
     sb->setSuffix(m_suffix);
     connect(sb, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatParameter::setValue);
-    connect(this, &ZFloatParameter::valueWillChange, sb, &ZDoubleSpinBox::setValue);
+    connect(this, &ZFloatParameter::valueWillChange, sb, &ZDoubleSpinBox::setValueBlockSignals);
     connect(this, &ZFloatParameter::rangeChanged, sb, &ZDoubleSpinBox::setRange);
     return sb;
   } else {
     auto sbws =
       new ZDoubleSpinBoxWithSlider(m_value, m_min, m_max, m_step, m_decimal, m_tracking, m_prefix, m_suffix, parent);
     connect(sbws, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZFloatParameter::setValue);
-    connect(this, &ZFloatParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValue);
+    connect(this, &ZFloatParameter::valueWillChange, sbws, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
     connect(this, &ZFloatParameter::rangeChanged, sbws, &ZDoubleSpinBoxWithSlider::setDataRange);
     return sbws;
   }
@@ -253,7 +253,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec2Parameter::setValue1);
-      connect(this, &ZVec2Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec2Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -280,7 +280,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec2Parameter::setValue2);
-      connect(this, &ZVec2Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec2Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -310,7 +310,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec2Parameter::setValue1);
-      connect(this, &ZVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -339,7 +339,7 @@ QWidget* ZVec2Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec2Parameter::setValue2);
-      connect(this, &ZVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -440,7 +440,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec3Parameter::setValue1);
-      connect(this, &ZVec3Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec3Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range1Changed, sb1, &ZDoubleSpinBox::setRange);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
@@ -468,7 +468,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec3Parameter::setValue2);
-      connect(this, &ZVec3Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec3Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range2Changed, sb2, &ZDoubleSpinBox::setRange);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
@@ -496,7 +496,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
       sb3->setPrefix(m_prefix);
       sb3->setSuffix(m_suffix);
       connect(sb3, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec3Parameter::setValue3);
-      connect(this, &ZVec3Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec3Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range3Changed, sb3, &ZDoubleSpinBox::setRange);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
@@ -527,7 +527,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue1);
-      connect(this, &ZVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range1Changed, sbws1, &ZDoubleSpinBoxWithSlider::setDataRange);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
@@ -557,7 +557,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue2);
-      connect(this, &ZVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range2Changed, sbws2, &ZDoubleSpinBoxWithSlider::setDataRange);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
@@ -587,7 +587,7 @@ QWidget* ZVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec3Parameter::setValue3);
-      connect(this, &ZVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       connect(this, &ZVec3Parameter::range3Changed, sbws3, &ZDoubleSpinBoxWithSlider::setDataRange);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
@@ -704,7 +704,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec4Parameter::setValue1);
-      connect(this, &ZVec4Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec4Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -731,7 +731,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec4Parameter::setValue2);
-      connect(this, &ZVec4Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec4Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -758,7 +758,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       sb3->setPrefix(m_prefix);
       sb3->setSuffix(m_suffix);
       connect(sb3, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec4Parameter::setValue3);
-      connect(this, &ZVec4Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec4Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
       } else {
@@ -785,7 +785,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
       sb4->setPrefix(m_prefix);
       sb4->setSuffix(m_suffix);
       connect(sb4, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZVec4Parameter::setValue4);
-      connect(this, &ZVec4Parameter::value4WillChange, sb4, &ZDoubleSpinBox::setValue);
+      connect(this, &ZVec4Parameter::value4WillChange, sb4, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sb4);
       } else {
@@ -815,7 +815,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue1);
-      connect(this, &ZVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -844,7 +844,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue2);
-      connect(this, &ZVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -873,7 +873,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue3);
-      connect(this, &ZVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
@@ -902,7 +902,7 @@ QWidget* ZVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZVec4Parameter::setValue4);
-      connect(this, &ZVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sbws4);
       } else {
@@ -989,7 +989,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec2Parameter::setValue1);
-      connect(this, &ZDVec2Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec2Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -1016,7 +1016,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec2Parameter::setValue2);
-      connect(this, &ZDVec2Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec2Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -1046,7 +1046,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec2Parameter::setValue1);
-      connect(this, &ZDVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec2Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -1075,7 +1075,7 @@ QWidget* ZDVec2Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec2Parameter::setValue2);
-      connect(this, &ZDVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec2Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -1176,7 +1176,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec3Parameter::setValue1);
-      connect(this, &ZDVec3Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec3Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -1203,7 +1203,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec3Parameter::setValue2);
-      connect(this, &ZDVec3Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec3Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -1230,7 +1230,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
       sb3->setPrefix(m_prefix);
       sb3->setSuffix(m_suffix);
       connect(sb3, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec3Parameter::setValue3);
-      connect(this, &ZDVec3Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec3Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
       } else {
@@ -1260,7 +1260,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue1);
-      connect(this, &ZDVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec3Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -1289,7 +1289,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue2);
-      connect(this, &ZDVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec3Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -1318,7 +1318,7 @@ QWidget* ZDVec3Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec3Parameter::setValue3);
-      connect(this, &ZDVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec3Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
@@ -1427,7 +1427,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec4Parameter::setValue1);
-      connect(this, &ZDVec4Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec4Parameter::value1WillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -1454,7 +1454,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec4Parameter::setValue2);
-      connect(this, &ZDVec4Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec4Parameter::value2WillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -1481,7 +1481,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       sb3->setPrefix(m_prefix);
       sb3->setSuffix(m_suffix);
       connect(sb3, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec4Parameter::setValue3);
-      connect(this, &ZDVec4Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec4Parameter::value3WillChange, sb3, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
       } else {
@@ -1508,7 +1508,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
       sb4->setPrefix(m_prefix);
       sb4->setSuffix(m_suffix);
       connect(sb4, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDVec4Parameter::setValue4);
-      connect(this, &ZDVec4Parameter::value4WillChange, sb4, &ZDoubleSpinBox::setValue);
+      connect(this, &ZDVec4Parameter::value4WillChange, sb4, &ZDoubleSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sb4);
       } else {
@@ -1538,7 +1538,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws1, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue1);
-      connect(this, &ZDVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec4Parameter::value1WillChange, sbws1, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -1567,7 +1567,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws2, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue2);
-      connect(this, &ZDVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec4Parameter::value2WillChange, sbws2, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -1596,7 +1596,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws3, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue3);
-      connect(this, &ZDVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec4Parameter::value3WillChange, sbws3, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
@@ -1625,7 +1625,7 @@ QWidget* ZDVec4Parameter::actualCreateWidget(QWidget* parent)
                                                 m_suffix,
                                                 parent);
       connect(sbws4, &ZDoubleSpinBoxWithSlider::valueChanged, this, &ZDVec4Parameter::setValue4);
-      connect(this, &ZDVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValue);
+      connect(this, &ZDVec4Parameter::value4WillChange, sbws4, &ZDoubleSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(3).isEmpty()) {
         lo->addWidget(sbws4);
       } else {
@@ -1711,7 +1711,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIVec2Parameter::setValue1);
-      connect(this, &ZIVec2Parameter::value1WillChange, sb1, &ZSpinBox::setValue);
+      connect(this, &ZIVec2Parameter::value1WillChange, sb1, &ZSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -1737,7 +1737,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIVec2Parameter::setValue2);
-      connect(this, &ZIVec2Parameter::value2WillChange, sb2, &ZSpinBox::setValue);
+      connect(this, &ZIVec2Parameter::value2WillChange, sb2, &ZSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -1760,7 +1760,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       auto sbws1 =
         new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws1, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec2Parameter::setValue1);
-      connect(this, &ZIVec2Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValue);
+      connect(this, &ZIVec2Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -1782,7 +1782,7 @@ QWidget* ZIVec2Parameter::actualCreateWidget(QWidget* parent)
       auto sbws2 =
         new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws2, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec2Parameter::setValue2);
-      connect(this, &ZIVec2Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValue);
+      connect(this, &ZIVec2Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -1876,7 +1876,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       sb1->setPrefix(m_prefix);
       sb1->setSuffix(m_suffix);
       connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIVec3Parameter::setValue1);
-      connect(this, &ZIVec3Parameter::value1WillChange, sb1, &ZSpinBox::setValue);
+      connect(this, &ZIVec3Parameter::value1WillChange, sb1, &ZSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sb1);
       } else {
@@ -1902,7 +1902,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       sb2->setPrefix(m_prefix);
       sb2->setSuffix(m_suffix);
       connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIVec3Parameter::setValue2);
-      connect(this, &ZIVec3Parameter::value2WillChange, sb2, &ZSpinBox::setValue);
+      connect(this, &ZIVec3Parameter::value2WillChange, sb2, &ZSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sb2);
       } else {
@@ -1928,7 +1928,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       sb3->setPrefix(m_prefix);
       sb3->setSuffix(m_suffix);
       connect(sb3, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIVec3Parameter::setValue3);
-      connect(this, &ZIVec3Parameter::value3WillChange, sb3, &ZSpinBox::setValue);
+      connect(this, &ZIVec3Parameter::value3WillChange, sb3, &ZSpinBox::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sb3);
       } else {
@@ -1951,7 +1951,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       auto sbws1 =
         new ZSpinBoxWithSlider(m_value[0], m_min[0], m_max[0], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws1, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue1);
-      connect(this, &ZIVec3Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValue);
+      connect(this, &ZIVec3Parameter::value1WillChange, sbws1, &ZSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(0).isEmpty()) {
         lo->addWidget(sbws1);
       } else {
@@ -1973,7 +1973,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       auto sbws2 =
         new ZSpinBoxWithSlider(m_value[1], m_min[1], m_max[1], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws2, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue2);
-      connect(this, &ZIVec3Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValue);
+      connect(this, &ZIVec3Parameter::value2WillChange, sbws2, &ZSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(1).isEmpty()) {
         lo->addWidget(sbws2);
       } else {
@@ -1995,7 +1995,7 @@ QWidget* ZIVec3Parameter::actualCreateWidget(QWidget* parent)
       auto sbws3 =
         new ZSpinBoxWithSlider(m_value[2], m_min[2], m_max[2], m_step, m_tracking, m_prefix, m_suffix, parent);
       connect(sbws3, &ZSpinBoxWithSlider::valueChanged, this, &ZIVec3Parameter::setValue3);
-      connect(this, &ZIVec3Parameter::value3WillChange, sbws3, &ZSpinBoxWithSlider::setValue);
+      connect(this, &ZIVec3Parameter::value3WillChange, sbws3, &ZSpinBoxWithSlider::setValueBlockSignals);
       if (m_nameOfEachValue.at(2).isEmpty()) {
         lo->addWidget(sbws3);
       } else {
@@ -2084,7 +2084,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     sb1->setPrefix(m_prefix);
     sb1->setSuffix(m_suffix);
     connect(sb1, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIntSpanParameter::setLowerValue);
-    connect(this, &ZIntSpanParameter::lowerValueWillChange, sb1, &ZSpinBox::setValue);
+    connect(this, &ZIntSpanParameter::lowerValueWillChange, sb1, &ZSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(0).isEmpty()) {
       lo->addWidget(sb1);
     } else {
@@ -2108,7 +2108,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     sb2->setPrefix(m_prefix);
     sb2->setSuffix(m_suffix);
     connect(sb2, qOverload<int>(&ZSpinBox::valueChanged), this, &ZIntSpanParameter::setUpperValue);
-    connect(this, &ZIntSpanParameter::upperValueWillChange, sb2, &ZSpinBox::setValue);
+    connect(this, &ZIntSpanParameter::upperValueWillChange, sb2, &ZSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(1).isEmpty()) {
       lo->addWidget(sb2);
     } else {
@@ -2134,8 +2134,14 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
     auto spanSlider = new ZSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_tracking, parent);
     connect(spanSlider, &ZSpanSliderWithSpinBox::lowerValueChanged, this, &ZIntSpanParameter::setLowerValue);
     connect(spanSlider, &ZSpanSliderWithSpinBox::upperValueChanged, this, &ZIntSpanParameter::setUpperValue);
-    connect(this, &ZIntSpanParameter::lowerValueWillChange, spanSlider, &ZSpanSliderWithSpinBox::setLowerValue);
-    connect(this, &ZIntSpanParameter::upperValueWillChange, spanSlider, &ZSpanSliderWithSpinBox::setUpperValue);
+    connect(this,
+            &ZIntSpanParameter::lowerValueWillChange,
+            spanSlider,
+            &ZSpanSliderWithSpinBox::setLowerValueBlockSignals);
+    connect(this,
+            &ZIntSpanParameter::upperValueWillChange,
+            spanSlider,
+            &ZSpanSliderWithSpinBox::setUpperValueBlockSignals);
     connect(this, &ZIntSpanParameter::rangeChanged, spanSlider, &ZSpanSliderWithSpinBox::setDataRange);
     return spanSlider;
   }
@@ -2210,7 +2216,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
     sb1->setPrefix(m_prefix);
     sb1->setSuffix(m_suffix);
     connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatSpanParameter::setLowerValue);
-    connect(this, &ZFloatSpanParameter::lowerValueWillChange, sb1, &ZDoubleSpinBox::setValue);
+    connect(this, &ZFloatSpanParameter::lowerValueWillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(0).isEmpty()) {
       lo->addWidget(sb1);
     } else {
@@ -2235,7 +2241,7 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
     sb2->setPrefix(m_prefix);
     sb2->setSuffix(m_suffix);
     connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZFloatSpanParameter::setUpperValue);
-    connect(this, &ZFloatSpanParameter::upperValueWillChange, sb2, &ZDoubleSpinBox::setValue);
+    connect(this, &ZFloatSpanParameter::upperValueWillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(1).isEmpty()) {
       lo->addWidget(sb2);
     } else {
@@ -2262,8 +2268,14 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
       new ZDoubleSpanSliderWithSpinBox(m_value[0], m_value[1], m_min, m_max, m_step, m_decimal, m_tracking, parent);
     connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::lowerValueChanged, this, &ZFloatSpanParameter::setLowerValue);
     connect(spanSlider, &ZDoubleSpanSliderWithSpinBox::upperValueChanged, this, &ZFloatSpanParameter::setUpperValue);
-    connect(this, &ZFloatSpanParameter::lowerValueWillChange, spanSlider, &ZDoubleSpanSliderWithSpinBox::setLowerValue);
-    connect(this, &ZFloatSpanParameter::upperValueWillChange, spanSlider, &ZDoubleSpanSliderWithSpinBox::setUpperValue);
+    connect(this,
+            &ZFloatSpanParameter::lowerValueWillChange,
+            spanSlider,
+            &ZDoubleSpanSliderWithSpinBox::setLowerValueBlockSignals);
+    connect(this,
+            &ZFloatSpanParameter::upperValueWillChange,
+            spanSlider,
+            &ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals);
     connect(this, &ZFloatSpanParameter::rangeChanged, spanSlider, &ZDoubleSpanSliderWithSpinBox::setDataRange);
     return spanSlider;
   }
@@ -2342,7 +2354,7 @@ QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
     sb1->setPrefix(m_prefix);
     sb1->setSuffix(m_suffix);
     connect(sb1, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanParameter::setLowerValue);
-    connect(this, &ZDoubleSpanParameter::lowerValueWillChange, sb1, &ZDoubleSpinBox::setValue);
+    connect(this, &ZDoubleSpanParameter::lowerValueWillChange, sb1, &ZDoubleSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(0).isEmpty()) {
       lo->addWidget(sb1);
     } else {
@@ -2367,7 +2379,7 @@ QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
     sb2->setPrefix(m_prefix);
     sb2->setSuffix(m_suffix);
     connect(sb2, qOverload<double>(&ZDoubleSpinBox::valueChanged), this, &ZDoubleSpanParameter::setUpperValue);
-    connect(this, &ZDoubleSpanParameter::upperValueWillChange, sb2, &ZDoubleSpinBox::setValue);
+    connect(this, &ZDoubleSpanParameter::upperValueWillChange, sb2, &ZDoubleSpinBox::setValueBlockSignals);
     if (m_nameOfEachValue.at(1).isEmpty()) {
       lo->addWidget(sb2);
     } else {
@@ -2397,11 +2409,11 @@ QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
     connect(this,
             &ZDoubleSpanParameter::lowerValueWillChange,
             spanSlider,
-            &ZDoubleSpanSliderWithSpinBox::setLowerValue);
+            &ZDoubleSpanSliderWithSpinBox::setLowerValueBlockSignals);
     connect(this,
             &ZDoubleSpanParameter::upperValueWillChange,
             spanSlider,
-            &ZDoubleSpanSliderWithSpinBox::setUpperValue);
+            &ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals);
     connect(this, &ZDoubleSpanParameter::rangeChanged, spanSlider, &ZDoubleSpanSliderWithSpinBox::setDataRange);
     return spanSlider;
   }

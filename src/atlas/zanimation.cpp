@@ -116,72 +116,73 @@ void ZAnimation::addKeyFrame(double time)
   bool objChange = false;
   bool sorted = false;
 
-  blockSignals(true);
+  {
+    const QSignalBlocker blocker(this);
 
-  addGlobalKey(time);
+    addGlobalKey(time);
 
-  auto objs = m_doc.objs();
-  if (!is2DAnimation()) {
-    objs.push_back(1); // background
-    objs.push_back(2); // axis
-    objs.push_back(3); // lighting
-  }
-  for (auto id : objs) {
-    QString objTypeName;
-    json::value objJsonValue;
-    if (id == 1) {
-      objTypeName = "Background";
-    } else if (id == 2) {
-      objTypeName = "Axis";
-    } else if (id == 3) {
-      objTypeName = "Lighting";
-    } else {
-      ZObjDoc* objDoc = m_doc.idToDoc(id);
-      objTypeName = objDoc->typeName();
-      objJsonValue = objDoc->jsonValue(id);
+    auto objs = m_doc.objs();
+    if (!is2DAnimation()) {
+      objs.push_back(1); // background
+      objs.push_back(2); // axis
+      objs.push_back(3); // lighting
     }
-    if (objTypeName.contains("Animation", Qt::CaseInsensitive)) {
-      continue;
-    }
-    std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
-    const std::vector<ZParameter*>& paraList = wg->getParameterList();
+    for (auto id : objs) {
+      QString objTypeName;
+      json::value objJsonValue;
+      if (id == 1) {
+        objTypeName = "Background";
+      } else if (id == 2) {
+        objTypeName = "Axis";
+      } else if (id == 3) {
+        objTypeName = "Lighting";
+      } else {
+        ZObjDoc* objDoc = m_doc.idToDoc(id);
+        objTypeName = objDoc->typeName();
+        objJsonValue = objDoc->jsonValue(id);
+      }
+      if (objTypeName.contains("Animation", Qt::CaseInsensitive)) {
+        continue;
+      }
+      std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
+      const std::vector<ZParameter*>& paraList = wg->getParameterList();
 
-    AnimationObj* aniObj = findBoundId(id);
-    if (!aniObj) {
-      auto aO = std::make_unique<AnimationObj>(objTypeName, objJsonValue);
-      aO->uniqueId = m_nextUniqueId++;
-      aO->boundId = id;
-      objChange = true;
-      m_objList.push_back(std::move(aO));
-      aniObj = m_objList.back().get();
-    }
-    auto& paraAnimationList = aniObj->objParaAnimations;
+      AnimationObj* aniObj = findBoundId(id);
+      if (!aniObj) {
+        auto aO = std::make_unique<AnimationObj>(objTypeName, objJsonValue);
+        aO->uniqueId = m_nextUniqueId++;
+        aO->boundId = id;
+        objChange = true;
+        m_objList.push_back(std::move(aO));
+        aniObj = m_objList.back().get();
+      }
+      auto& paraAnimationList = aniObj->objParaAnimations;
 
-    for (size_t i = 0; i < paraList.size(); ++i) {
-      bool found = false;
-      // LOG(INFO) << paraList[i]->name();
-      for (size_t j = 0; j < paraAnimationList.size(); ++j) {
-        if (paraList[i] == paraAnimationList[j]->boundParameter()) {
-          found = true;
-          paraAnimationList[j]->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
-          if (j != i) {
-            std::swap(paraAnimationList[i], paraAnimationList[j]);
-            sorted = true;
+      for (size_t i = 0; i < paraList.size(); ++i) {
+        bool found = false;
+        // LOG(INFO) << paraList[i]->name();
+        for (size_t j = 0; j < paraAnimationList.size(); ++j) {
+          if (paraList[i] == paraAnimationList[j]->boundParameter()) {
+            found = true;
+            paraAnimationList[j]->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
+            if (j != i) {
+              std::swap(paraAnimationList[i], paraAnimationList[j]);
+              sorted = true;
+            }
+            break;
           }
-          break;
+        }
+        if (!found) {
+          objChange = true;
+          auto paraAnimation = std::make_unique<ZParameterAnimation>(paraList[i]->name(), paraList[i]->type());
+          paraAnimation->setParent(this);
+          paraAnimation->bindParameter(*paraList[i]);
+          paraAnimation->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
+          paraAnimationList.insert(paraAnimationList.begin() + i, std::move(paraAnimation));
         }
       }
-      if (!found) {
-        objChange = true;
-        auto paraAnimation = std::make_unique<ZParameterAnimation>(paraList[i]->name(), paraList[i]->type());
-        paraAnimation->setParent(this);
-        paraAnimation->bindParameter(*paraList[i]);
-        paraAnimation->addKey(std::make_unique<ZParameterKey>(time, *paraList[i]), false);
-        paraAnimationList.insert(paraAnimationList.begin() + i, std::move(paraAnimation));
-      }
     }
   }
-  blockSignals(false);
 
   if (objChange) {
     updateObjAnimation();
@@ -261,16 +262,17 @@ void ZAnimation::removeObj(size_t id)
 
 void ZAnimation::removeRedundantKeys()
 {
-  blockSignals(true);
-  for (const auto& pa : m_globalParaAnimations) {
-    pa->removeRedundantKeys();
-  }
-  for (const auto& obj : m_objList) {
-    for (const auto& pa : obj->objParaAnimations) {
+  {
+    const QSignalBlocker blocker(this);
+    for (const auto& pa : m_globalParaAnimations) {
       pa->removeRedundantKeys();
     }
+    for (const auto& obj : m_objList) {
+      for (const auto& pa : obj->objParaAnimations) {
+        pa->removeRedundantKeys();
+      }
+    }
   }
-  blockSignals(false);
   Q_EMIT keysChanged();
 }
 

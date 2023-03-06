@@ -30,6 +30,8 @@ public:
 
   void removeItemSlot(const QString& text);
 
+  void setCurrentIndexBlockSignals(int index);
+
 protected:
   void focusInEvent(QFocusEvent* event) override;
 

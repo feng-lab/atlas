@@ -323,9 +323,10 @@ ZSwcFilter::ZSwcFilter(ZView& view)
   m_sizeScale.setDecimal(3);
   m_sizeScale.setStyle("SPINBOX");
   addParameter(&m_sizeScale);
-  m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(getViewPrecedence());
-  m_viewPrecedencePara.blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_viewPrecedencePara);
+    m_viewPrecedencePara.set(getViewPrecedence());
+  }
   addParameter(&m_opacity);
 
   connect(&m_swcColorParameters.colorMode,

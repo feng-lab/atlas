@@ -116,7 +116,6 @@ private:
   ZVec3Parameter m_translation;
   ZVec4Parameter m_rotation; // angle in degree and axis
   ZVec3Parameter m_center;
-  bool m_receiveWidgetSignal;
 };
 
 } // namespace nim

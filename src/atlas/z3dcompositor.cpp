@@ -1551,32 +1551,33 @@ void Z3DCompositor::renderImages(Z3DRenderInputPort& currentInport,
 void Z3DCompositor::renderAxis(Z3DEye eye)
 {
   prepareAxisData(eye);
-  m_rendererBase.coordTransformPara().blockSignals(true);
-  m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
+  {
+    const QSignalBlocker blocker(m_rendererBase.coordTransformPara());
+    m_rendererBase.coordTransformPara().set(glm::mat4(globalCamera().rotateMatrix(eye)));
 
-  glm::uvec4 viewport = m_rendererBase.viewport();
+    glm::uvec4 viewport = m_rendererBase.viewport();
 
-  if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
-    double startX = viewport.x + viewport.z / m_region[1] * m_region[0];
-    double startY = viewport.y + viewport.w / m_region[3] * m_region[2];
+    if (m_region[0] <= 0.f && m_region[2] <= 0.f) {
+      double startX = viewport.x + viewport.z / m_region[1] * m_region[0];
+      double startY = viewport.y + viewport.w / m_region[3] * m_region[2];
 
-    GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
-    glViewport(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
-    glScissor(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
-    glEnable(GL_SCISSOR_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
+      GLsizei size = std::min(viewport.z, viewport.w) * m_axisRegionRatio.get();
+      glViewport(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
+      glScissor(viewport.x - std::floor(startX), viewport.y - std::floor(startY), size, size);
+      glEnable(GL_SCISSOR_TEST);
+      glClear(GL_DEPTH_BUFFER_BIT);
 
-    if (m_axisMode.get() == "Arrow") {
-      m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
-    } else {
-      m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+      if (m_axisMode.get() == "Arrow") {
+        m_rendererBase.render(eye, m_arrowRenderer, m_fontRenderer);
+      } else {
+        m_rendererBase.render(eye, m_lineRenderer, m_fontRenderer);
+      }
+
+      glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
+      glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
+      glDisable(GL_SCISSOR_TEST);
     }
-
-    glViewport(viewport.x, viewport.y, viewport.z, viewport.w);
-    glScissor(viewport.x, viewport.y, viewport.z, viewport.w);
-    glDisable(GL_SCISSOR_TEST);
   }
-  m_rendererBase.coordTransformPara().blockSignals(false);
 }
 
 void Z3DCompositor::prepareAxisData(Z3DEye eye)

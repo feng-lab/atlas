@@ -118,7 +118,6 @@ private:
   ZDVec2Parameter m_translation;
   ZDoubleParameter m_rotation; // angle in degree
   ZDVec2Parameter m_center;
-  bool m_receiveWidgetSignal;
 };
 
 } // namespace nim

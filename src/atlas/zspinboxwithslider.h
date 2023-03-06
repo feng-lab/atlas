@@ -27,6 +27,8 @@ public:
 
   explicit ZSlider2(Qt::Orientation ori, QWidget* parent = nullptr);
 
+  void setValueBlockSignals(int v);
+
 protected:
   void focusInEvent(QFocusEvent* e) override;
 
@@ -47,7 +49,7 @@ public:
                               const QString& suffix = "",
                               QWidget* parent = nullptr);
 
-  void setValue(int v);
+  void setValueBlockSignals(int v);
 
   void setDataRange(int min, int max);
 
@@ -82,7 +84,7 @@ public:
                                     const QString& suffix = "",
                                     QWidget* parent = nullptr);
 
-  void setValue(double v);
+  void setValueBlockSignals(double v);
 
   void setDataRange(double min, double max);
 

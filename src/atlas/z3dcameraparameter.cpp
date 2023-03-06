@@ -23,7 +23,6 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, QObject* parent)
   , m_fieldOfView("Field of View", glm::degrees(m_value.fieldOfView()), 10.f, 170.f)
   , m_nearDist("Near Distance", m_value.nearDist(), 1e-10, std::numeric_limits<float>::max())
   , m_farDist("Far Distance", m_value.farDist(), 1e-10, std::numeric_limits<float>::max())
-  , m_receiveWidgetSignal(true)
 {
   m_projectionType.addOptions("Perspective", "Orthographic");
   if (m_value.isPerspectiveProjection()) {
@@ -87,7 +86,6 @@ Z3DCameraParameter::Z3DCameraParameter(const QString& name, const Z3DCamera& val
   , m_fieldOfView("Field of View", glm::degrees(m_value.fieldOfView()), 10.f, 170.f)
   , m_nearDist("Near Distance", m_value.nearDist(), 1e-10, std::numeric_limits<float>::max())
   , m_farDist("Far Distance", m_value.farDist(), 1e-10, std::numeric_limits<float>::max())
-  , m_receiveWidgetSignal(true)
 {
   m_projectionType.addOptions("Perspective", "Orthographic");
   if (m_value.isPerspectiveProjection()) {
@@ -171,75 +169,56 @@ void Z3DCameraParameter::setWindowsAspectRatio(float r)
 
 void Z3DCameraParameter::updateProjectionType()
 {
-  if (m_receiveWidgetSignal) {
-    if (m_projectionType.isSelected("Perspective")) {
-      m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
-    } else {
-      m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
-    }
-    Q_EMIT valueChanged();
+  if (m_projectionType.isSelected("Perspective")) {
+    m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);
+  } else {
+    m_value.setProjectionType(Z3DCamera::ProjectionType::Orthographic);
   }
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateEye()
 {
-  LOG(INFO) << "e";
-  if (m_receiveWidgetSignal) {
-    m_value.setEye(m_eye.get());
-    Q_EMIT valueChanged();
-  }
+  m_value.setEye(m_eye.get());
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateCenter()
 {
-  LOG(INFO) << "c";
-  if (m_receiveWidgetSignal) {
-    m_value.setCenter(m_center.get());
-    Q_EMIT valueChanged();
-  }
+  m_value.setCenter(m_center.get());
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateUpVector()
 {
-  LOG(INFO) << "u";
-  if (m_receiveWidgetSignal) {
-    m_value.setUpVector(m_upVector.get());
-    Q_EMIT valueChanged();
-  }
+  m_value.setUpVector(m_upVector.get());
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateEyeSeparationAngle()
 {
-  if (m_receiveWidgetSignal) {
-    m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
-    Q_EMIT valueChanged();
-  }
+  m_value.setEyeSeparationAngle(glm::radians(m_eyeSeparationAngle.get()));
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateFieldOfView()
 {
-  if (m_receiveWidgetSignal) {
-    m_value.setFieldOfView(glm::radians(m_fieldOfView.get()));
-    Q_EMIT valueChanged();
-  }
+  m_value.setFieldOfView(glm::radians(m_fieldOfView.get()));
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateNearDist()
 {
-  if (m_receiveWidgetSignal) {
-    m_value.setNearDist(m_nearDist.get());
-    m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
-    Q_EMIT valueChanged();
-  }
+  m_value.setNearDist(m_nearDist.get());
+  m_farDist.setRange(m_value.nearDist(), std::numeric_limits<float>::max());
+  Q_EMIT valueChanged();
 }
 
 void Z3DCameraParameter::updateFarDist()
 {
-  if (m_receiveWidgetSignal) {
-    m_value.setFarDist(m_farDist.get());
-    m_nearDist.setRange(1e-10, m_value.farDist());
-    Q_EMIT valueChanged();
-  }
+  m_value.setFarDist(m_farDist.get());
+  m_nearDist.setRange(1e-10, m_value.farDist());
+  Q_EMIT valueChanged();
 }
 
 QWidget* Z3DCameraParameter::actualCreateWidget(QWidget* parent)
@@ -272,11 +251,12 @@ void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 
 void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
-  LOG(INFO) << "w";
-  m_receiveWidgetSignal = false;
   m_eye.set(value.eye());
+  // LOG(INFO) << value.eye() << " " << m_eye.get();
   m_center.set(value.center());
+  // LOG(INFO) << value.center() << " " << m_center.get();
   m_upVector.set(value.upVector());
+  // LOG(INFO) << value.upVector() << " " << m_upVector.get();
   if (value.isPerspectiveProjection()) {
     m_projectionType.select("Perspective");
   } else {
@@ -288,7 +268,6 @@ void Z3DCameraParameter::updateWidget(Z3DCamera& value)
   m_farDist.set(value.farDist());
   m_nearDist.setRange(1e-10, value.farDist());
   m_farDist.setRange(value.nearDist(), std::numeric_limits<float>::max());
-  m_receiveWidgetSignal = true;
 }
 
 void Z3DCameraParameter::setSameAs(const ZParameter& rhs)
@@ -328,7 +307,6 @@ json::value Z3DCameraParameter::jsonValue() const
 
 void Z3DCameraParameter::readValue(const json::value& jsonValue)
 {
-  m_receiveWidgetSignal = false;
   if (jsonValue.is_object()) {
     const auto& obj = jsonValue.as_object();
     m_projectionType.read(obj);
@@ -340,7 +318,6 @@ void Z3DCameraParameter::readValue(const json::value& jsonValue)
     // m_nearDist.read(obj);
     // m_farDist.read(obj);
   }
-  m_receiveWidgetSignal = true;
 
   if (m_projectionType.isSelected("Perspective")) {
     m_value.setProjectionType(Z3DCamera::ProjectionType::Perspective);

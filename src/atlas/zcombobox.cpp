@@ -37,6 +37,12 @@ void ZComboBox::removeItemSlot(const QString& text)
   removeItem(findText(text));
 }
 
+void ZComboBox::setCurrentIndexBlockSignals(int index)
+{
+  const QSignalBlocker blocker(this);
+  setCurrentIndex(index);
+}
+
 void ZComboBox::focusInEvent(QFocusEvent* /*e*/)
 {
   setFocusPolicy(Qt::WheelFocus);

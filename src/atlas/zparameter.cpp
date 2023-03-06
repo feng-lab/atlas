@@ -1,9 +1,9 @@
 #include "zparameter.h"
 
+#include "zcheckbox.h"
 #include "zlog.h"
 #include <QWidget>
 #include <QLabel>
-#include <QCheckBox>
 #include <utility>
 
 namespace nim {
@@ -167,10 +167,10 @@ void ZBoolParameter::afterChange(bool& /*unused*/)
 
 QWidget* ZBoolParameter::actualCreateWidget(QWidget* parent)
 {
-  auto cb = new QCheckBox(parent);
+  auto cb = new ZCheckBox(parent);
   cb->setChecked(m_value);
-  connect(cb, &QCheckBox::toggled, this, &ZBoolParameter::setValue);
-  connect(this, &ZBoolParameter::valueWillChange, cb, &QCheckBox::setChecked);
+  connect(cb, &ZCheckBox::toggled, this, &ZBoolParameter::setValue);
+  connect(this, &ZBoolParameter::valueWillChange, cb, &ZCheckBox::setCheckedBlockSignals);
   return cb;
 }
 

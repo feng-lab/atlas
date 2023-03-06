@@ -1,10 +1,21 @@
 #pragma once
 
 #include "zspinbox.h"
-
-class QxtSpanSlider;
+#include <qxtspanslider.h>
 
 namespace nim {
+
+class ZSpanSlider : public QxtSpanSlider
+{
+  Q_OBJECT
+
+public:
+  explicit ZSpanSlider(QWidget* parent = 0);
+  explicit ZSpanSlider(Qt::Orientation orientation, QWidget* parent = 0);
+
+  void setLowerValueBlockSignals(int lower);
+  void setUpperValueBlockSignals(int upper);
+};
 
 class ZSpanSliderWithSpinBox : public QWidget
 {
@@ -19,9 +30,9 @@ public:
                                   bool tracking = true,
                                   QWidget* parent = nullptr);
 
-  void setLowerValue(int lower);
+  void setLowerValueBlockSignals(int lower);
 
-  void setUpperValue(int upper);
+  void setUpperValueBlockSignals(int upper);
 
   void setDataRange(int min, int max);
 
@@ -43,7 +54,7 @@ private:
   void valueChangedFromUpperSpinBox(int u);
 
 private:
-  QxtSpanSlider* m_slider;
+  ZSpanSlider* m_slider;
   ZSpinBox* m_lowerSpinBox;
   ZSpinBox* m_upperSpinBox;
 };
@@ -62,9 +73,9 @@ public:
                                         bool tracking = true,
                                         QWidget* parent = nullptr);
 
-  void setLowerValue(double lower);
+  void setLowerValueBlockSignals(double lower);
 
-  void setUpperValue(double upper);
+  void setUpperValueBlockSignals(double upper);
 
   void setDataRange(double min, double max);
 
@@ -86,7 +97,7 @@ private:
   void createWidget();
 
 private:
-  QxtSpanSlider* m_slider;
+  ZSpanSlider* m_slider;
   ZDoubleSpinBox* m_lowerSpinBox;
   ZDoubleSpinBox* m_upperSpinBox;
   double m_lowerValue;

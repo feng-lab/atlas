@@ -38,6 +38,12 @@ ZSlider2::ZSlider2(Qt::Orientation ori, QWidget* parent)
   : QSlider(ori, parent)
 {}
 
+void ZSlider2::setValueBlockSignals(int v)
+{
+  const QSignalBlocker blocker(this);
+  setValue(v);
+}
+
 void ZSlider2::focusInEvent(QFocusEvent* e)
 {
   QSlider::focusInEvent(e);
@@ -63,25 +69,21 @@ ZSpinBoxWithSlider::ZSpinBoxWithSlider(int value,
   createWidget(value, min, max, step, tracking, prefix, suffix);
 }
 
-void ZSpinBoxWithSlider::setValue(int v)
+void ZSpinBoxWithSlider::setValueBlockSignals(int v)
 {
-  m_slider->setValue(v);
-  m_spinBox->setValue(v);
+  m_slider->setValueBlockSignals(v);
+  m_spinBox->setValueBlockSignals(v);
 }
 
 void ZSpinBoxWithSlider::valueChangedFromSlider(int v)
 {
-  m_spinBox->blockSignals(true);
-  m_spinBox->setValue(v);
-  m_spinBox->blockSignals(false);
+  m_spinBox->setValueBlockSignals(v);
   Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithSlider::valueChangedFromSpinBox(int v)
 {
-  m_slider->blockSignals(true);
-  m_slider->setValue(v);
-  m_slider->blockSignals(false);
+  m_slider->setValueBlockSignals(v);
   Q_EMIT valueChanged(v);
 }
 
@@ -110,7 +112,7 @@ void ZSpinBoxWithSlider::createWidget(int value,
   m_spinBox->setSingleStep(step);
   m_spinBox->setPrefix(prefix);
   m_spinBox->setSuffix(suffix);
-  QHBoxLayout* lo = new QHBoxLayout(this);
+  auto lo = new QHBoxLayout(this);
   lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);
@@ -144,17 +146,17 @@ ZDoubleSpinBoxWithSlider::ZDoubleSpinBoxWithSlider(double value,
   createWidget(prefix, suffix);
 }
 
-void ZDoubleSpinBoxWithSlider::setValue(double v)
+void ZDoubleSpinBoxWithSlider::setValueBlockSignals(double v)
 {
-  m_spinBox->setValue(v);
+  m_spinBox->setValueBlockSignals(v);
+  int sliderPos = static_cast<int>((v - m_min) / (m_max - m_min) * m_sliderMaxValue);
+  m_slider->setValueBlockSignals(sliderPos);
 }
 
 void ZDoubleSpinBoxWithSlider::valueChangedFromSlider(int v)
 {
   m_value = static_cast<double>(v) / m_sliderMaxValue * (m_max - m_min) + m_min;
-  m_spinBox->blockSignals(true);
-  m_spinBox->setValue(m_value);
-  m_spinBox->blockSignals(false);
+  m_spinBox->setValueBlockSignals(m_value);
   Q_EMIT valueChanged(m_value);
 }
 
@@ -162,9 +164,7 @@ void ZDoubleSpinBoxWithSlider::valueChangedFromSpinBox(double v)
 {
   m_value = v;
   int sliderPos = static_cast<int>((m_value - m_min) / (m_max - m_min) * m_sliderMaxValue);
-  m_slider->blockSignals(true);
-  m_slider->setValue(sliderPos);
-  m_slider->blockSignals(false);
+  m_slider->setValueBlockSignals(sliderPos);
   Q_EMIT valueChanged(m_value);
 }
 
@@ -196,7 +196,7 @@ void ZDoubleSpinBoxWithSlider::createWidget(const QString& prefix, const QString
   m_spinBox->setDecimals(m_decimal);
   m_spinBox->setPrefix(prefix);
   m_spinBox->setSuffix(suffix);
-  QHBoxLayout* lo = new QHBoxLayout(this);
+  auto lo = new QHBoxLayout(this);
   lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_spinBox);
   lo->addWidget(m_slider);

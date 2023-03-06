@@ -2,6 +2,7 @@
 
 #include "zlog.h"
 #include <QEvent>
+#include <QSignalBlocker>
 
 namespace nim {
 
@@ -25,6 +26,12 @@ QSize ZSpinBox::minimumSizeHint() const
   QSize size = QSpinBox::minimumSizeHint();
   size.setWidth(std::min(size.width(), 57));
   return size;
+}
+
+void ZSpinBox::setValueBlockSignals(int v)
+{
+  const QSignalBlocker blocker(this);
+  setValue(v);
 }
 
 void ZSpinBox::focusInEvent(QFocusEvent* e)
@@ -59,6 +66,12 @@ QSize ZDoubleSpinBox::minimumSizeHint() const
   QSize size = QDoubleSpinBox::minimumSizeHint();
   size.setWidth(std::min(size.width(), 57));
   return size;
+}
+
+void ZDoubleSpinBox::setValueBlockSignals(double v)
+{
+  const QSignalBlocker blocker(this);
+  setValue(v);
 }
 
 void ZDoubleSpinBox::focusInEvent(QFocusEvent* e)

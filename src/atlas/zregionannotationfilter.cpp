@@ -18,9 +18,10 @@ ZRegionAnnotationFilter::ZRegionAnnotationFilter(ZView& view)
   , m_fixedControlPointsSize("Fixed Control Points Size", true)
   , m_highlightRegionOnMouseHover("Highlight Region On Mouse Hover", true)
 {
-  m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(getViewPrecedence());
-  m_viewPrecedencePara.blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_viewPrecedencePara);
+    m_viewPrecedencePara.set(getViewPrecedence());
+  }
   addParameter(&m_showControlPoints);
   addParameter(&m_fixedControlPointsSize);
   addParameter(&m_highlightRegionOnMouseHover);

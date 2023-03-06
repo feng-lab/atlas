@@ -16,9 +16,10 @@ ZSvgFilter::ZSvgFilter(ZView& view)
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZSvgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZSvgFilter::opacityChanged);
-  m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(getViewPrecedence());
-  m_viewPrecedencePara.blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_viewPrecedencePara);
+    m_viewPrecedencePara.set(getViewPrecedence());
+  }
   addParameter(&m_opacity);
 }
 

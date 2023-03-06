@@ -20,25 +20,25 @@ ZSpinBoxWithScrollBar::ZSpinBoxWithScrollBar(int value,
   createWidget(value, min, max, step, tracking, prefix, suffix);
 }
 
-void ZSpinBoxWithScrollBar::setValue(int v)
+void ZSpinBoxWithScrollBar::setValueBlockSignals(int v)
 {
+  const QSignalBlocker blocker(m_scrollBar);
   m_scrollBar->setValue(v);
-  m_spinBox->setValue(v);
+  m_spinBox->setValueBlockSignals(v);
 }
 
 void ZSpinBoxWithScrollBar::valueChangedFromScrollBar(int v)
 {
-  m_spinBox->blockSignals(true);
-  m_spinBox->setValue(v);
-  m_spinBox->blockSignals(false);
+  m_spinBox->setValueBlockSignals(v);
   Q_EMIT valueChanged(v);
 }
 
 void ZSpinBoxWithScrollBar::valueChangedFromSpinBox(int v)
 {
-  m_scrollBar->blockSignals(true);
-  m_scrollBar->setValue(v);
-  m_scrollBar->blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_scrollBar);
+    m_scrollBar->setValue(v);
+  }
   Q_EMIT valueChanged(v);
 }
 

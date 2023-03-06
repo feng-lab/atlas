@@ -109,9 +109,10 @@ ZImgFilter::ZImgFilter(ZView& view)
   m_scaleBarColor.setStyle("COLOR");
   connect(&m_scaleBarColor, &ZVec3Parameter::valueChanged, this, &ZImgFilter::scaleBarColorChanged);
   addParameter(&m_scaleBarColor);
-  m_viewPrecedencePara.blockSignals(true);
-  m_viewPrecedencePara.set(getViewPrecedence());
-  m_viewPrecedencePara.blockSignals(false);
+  {
+    const QSignalBlocker blocker(m_viewPrecedencePara);
+    m_viewPrecedencePara.set(getViewPrecedence());
+  }
   connect(&m_view, &ZView::viewportChanged, this, &ZImgFilter::viewportChanged);
   connect(&view.graphicsView(), &ZGraphicsView::scaleChanged, this, &ZImgFilter::viewScaleChanged);
 }

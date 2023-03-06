@@ -24,7 +24,7 @@ public:
                                  const QString& suffix = "",
                                  QWidget* parent = nullptr);
 
-  void setValue(int v);
+  void setValueBlockSignals(int v);
 
   void setDataRange(int min, int max);
 

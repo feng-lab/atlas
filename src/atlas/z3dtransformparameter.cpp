@@ -138,7 +138,6 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, QObject* paren
              glm::vec3(0.f),
              glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
-  , m_receiveWidgetSignal(true)
 {
   updateWidget(m_value);
 
@@ -188,7 +187,6 @@ Z3DTransformParameter::Z3DTransformParameter(const QString& name, const glm::mat
              glm::vec3(0.f),
              glm::vec3(std::numeric_limits<float>::lowest()),
              glm::vec3(std::numeric_limits<float>::max()))
-  , m_receiveWidgetSignal(true)
 {
   updateWidget(m_value);
 
@@ -237,7 +235,6 @@ void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang)
 
 void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang, const glm::vec3& center)
 {
-  m_receiveWidgetSignal = false;
   glm::vec3 scale = m_scale.get();
   glm::mat4 currValue = m_value;
   if (scale.x == 0 || scale.y == 0 || scale.z == 0) {
@@ -262,7 +259,6 @@ void Z3DTransformParameter::rotate(const glm::vec3& axis, float ang, const glm::
   setRotation(quat);
   m_translation.set(currValue[3].xyz());
   m_center.set(glm::vec3(0, 0, 0));
-  m_receiveWidgetSignal = true;
   updateMatrix();
 }
 
@@ -272,12 +268,10 @@ void Z3DTransformParameter::setValueSameAs(const ZParameter& rhs)
   const Z3DTransformParameter& src = static_cast<const Z3DTransformParameter&>(rhs);
   if (m_scale.get() != src.m_scale.get() || m_translation.get() != src.m_translation.get() ||
       m_rotation.get() != src.m_rotation.get() || m_center.get() != src.m_center.get()) {
-    m_receiveWidgetSignal = false;
     m_scale.set(src.m_scale.get());
     m_translation.set(src.m_translation.get());
     m_rotation.set(src.m_rotation.get());
     m_center.set(src.m_center.get());
-    m_receiveWidgetSignal = true;
     updateMatrix();
   }
 }
@@ -287,7 +281,6 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
   CHECK(this->isSameType(prev) && this->isSameType(dest));
   const Z3DTransformParameter& prevPara = static_cast<const Z3DTransformParameter&>(prev);
   Z3DTransformParameter& desPara = static_cast<Z3DTransformParameter&>(dest);
-  desPara.m_receiveWidgetSignal = false;
   desPara.setScale(glm::mix(prevPara.scale(), scale(), progress));
   if (prevPara.m_rotation.get().yzw() == m_rotation.get().yzw()) {
     desPara.setRotation(glm::mix(prevPara.m_rotation.get(), m_rotation.get(), progress));
@@ -299,22 +292,19 @@ void Z3DTransformParameter::interpolate(const ZParameter& prev, double progress,
   desPara.setTranslation(glm::mix(prevPara.translation(), translation(), progress));
   // desPara.setRotationCenter(glm::mix(prevPara.m_center.get(), m_center.get(), progress));
   desPara.setRotationCenter(progress >= 1.0 ? m_center.get() : prevPara.m_center.get());
-  desPara.m_receiveWidgetSignal = true;
   desPara.updateMatrix();
 }
 
 void Z3DTransformParameter::updateMatrix()
 {
-  if (m_receiveWidgetSignal) {
-    glm::mat4 trans1 = glm::translate(glm::mat4(1.f), -m_center.get() * m_scale.get());
-    glm::mat4 trans = glm::translate(glm::mat4(1.f), m_translation.get() + m_center.get() * m_scale.get());
-    glm::mat4 scale = glm::scale(glm::mat4(1.f), m_scale.get());
-    glm::mat4 rot = glm::mat4_cast(rotation());
+  glm::mat4 trans1 = glm::translate(glm::mat4(1.f), -m_center.get() * m_scale.get());
+  glm::mat4 trans = glm::translate(glm::mat4(1.f), m_translation.get() + m_center.get() * m_scale.get());
+  glm::mat4 scale = glm::scale(glm::mat4(1.f), m_scale.get());
+  glm::mat4 rot = glm::mat4_cast(rotation());
 
-    m_value = trans * rot * trans1 * scale;
+  m_value = trans * rot * trans1 * scale;
 
-    Q_EMIT valueChanged();
-  }
+  Q_EMIT valueChanged();
 }
 
 void Z3DTransformParameter::showTransformMatrix()
@@ -354,7 +344,6 @@ void Z3DTransformParameter::beforeChange(glm::mat4& value)
 
 void Z3DTransformParameter::updateWidget(const glm::mat4& /*value*/)
 {
-  m_receiveWidgetSignal = false;
   //  m_eye.set(value.getEye());
   //  m_center.set(value.getCenter());
   //  m_upVector.set(value.getUpVector());
@@ -368,7 +357,6 @@ void Z3DTransformParameter::updateWidget(const glm::mat4& /*value*/)
   //  m_farDist.set(value.getFarDist());
   //  m_nearDist.setRange(1e-10, value.getFarDist());
   //  m_farDist.setRange(value.getNearDist(), std::numeric_limits<float>::max());
-  m_receiveWidgetSignal = true;
 }
 
 void Z3DTransformParameter::setSameAs(const ZParameter& rhs)
@@ -391,12 +379,10 @@ void Z3DTransformParameter::readValue(const json::value& jsonValue)
 {
   if (jsonValue.is_object()) {
     const auto& obj = jsonValue.as_object();
-    m_receiveWidgetSignal = false;
     m_scale.read(obj);
     m_translation.read(obj);
     m_rotation.read(obj);
     m_center.read(obj);
-    m_receiveWidgetSignal = true;
     updateMatrix();
   }
 }

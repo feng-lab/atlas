@@ -598,7 +598,7 @@ set(SOURCES
     zswccolorparameters.h
     zthreadsafelrucache.h
     zthreadsafescalablecache.h
-    zrunbenchmark.cpp zrunbenchmark.h zimgregioncache.cpp zimgregioncache.h)
+    zrunbenchmark.cpp zrunbenchmark.h zimgregioncache.cpp zimgregioncache.h zcheckbox.cpp zcheckbox.h)
 
 # our target
 set(APP_NAME Atlas)
