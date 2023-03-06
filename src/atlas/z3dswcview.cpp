@@ -5,8 +5,8 @@
 
 namespace nim {
 
-Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DRenderingEngine& view)
-  : Z3DFilterView<ZSwcDoc, Z3DSwcFilter>(doc, view)
+Z3DSwcView::Z3DSwcView(ZSwcDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<ZSwcDoc, Z3DSwcFilter>(doc, engine)
 {
   docSwcsAdded(m_doc.objs());
   connect(&m_doc, &ZSwcDoc::objAdded, this, &Z3DSwcView::docSwcAdded);
@@ -27,6 +27,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
       connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
+      m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       m_engine.networkEvaluator().updateNetwork();
@@ -61,6 +62,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
     connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
+    m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();

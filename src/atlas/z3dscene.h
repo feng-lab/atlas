@@ -4,8 +4,6 @@
 
 namespace nim {
 
-class Z3DNetworkEvaluator;
-
 class Z3DScene : public QGraphicsScene
 {
   Q_OBJECT
@@ -15,20 +13,8 @@ public:
 
   void drawBackground(QPainter* painter, const QRectF& rect) override;
 
-  void setNetworkEvaluator(Z3DNetworkEvaluator* n)
-  {
-    m_networkEvaluator = n;
-  }
-
-  void setFakeStereoOnce()
-  {
-    m_fakeStereoOnce = true;
-  }
-
 private:
-  Z3DNetworkEvaluator* m_networkEvaluator;
   bool m_isStereoScene;
-  bool m_fakeStereoOnce;
 };
 
 } // namespace nim

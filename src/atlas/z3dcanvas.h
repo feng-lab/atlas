@@ -12,7 +12,6 @@
 #include <QOpenGLWidget>
 #endif
 
-#include <deque>
 #include <memory>
 
 namespace nim {
@@ -20,8 +19,6 @@ namespace nim {
 class Z3DScene;
 
 class Z3DNetworkEvaluator;
-
-class Z3DCanvasEventListener;
 
 class ZOpenGLWidget;
 
@@ -173,27 +170,12 @@ public:
 
   [[nodiscard]] QSurfaceFormat format() const;
 
-  void setShareContext(QOpenGLContext *shareContext);
+  void setShareContext(QOpenGLContext* shareContext);
 
-  void setNetworkEvaluator(Z3DNetworkEvaluator* n);
-
-  void setFakeStereoOnce();
-
-  void addEventListenerToBack(Z3DCanvasEventListener& e)
+  void setEventReceiver(QObject* obj)
   {
-    m_listeners.push_back(&e);
+    m_eventReceiver = obj;
   }
-
-  void addEventListenerToFront(Z3DCanvasEventListener& e)
-  {
-    m_listeners.push_front(&e);
-  }
-
-  void removeEventListener(Z3DCanvasEventListener& e);
-
-  void clearEventListeners();
-
-  void broadcastEvent(QEvent* e, int w, int h);
 
   // Set the opengl context of this canvas as the current one.
   void getGLFocus();
@@ -211,7 +193,7 @@ public:
   // for high dpi support like retina
   glm::uvec2 physicalSize()
   {
-    return glm::uvec2(width() * devicePixelRatioF(), height() * devicePixelRatioF());
+    return glm::uvec2(width() * devicePixelRatio(), height() * devicePixelRatio());
   }
 
   glm::uvec2 logicalSize()
@@ -225,6 +207,18 @@ Q_SIGNALS:
   void canvasSizeChanged(size_t w, size_t h);
 
   void openGLContextInitialized();
+
+  void rotateX();
+
+  void rotateY();
+
+  void rotateZ();
+
+  void rotateXM();
+
+  void rotateYM();
+
+  void rotateZM();
 
 protected:
   void contextMenuEvent(QContextMenuEvent* event) override;
@@ -260,18 +254,6 @@ protected:
   //  void setCursor(const QCursor& c)
   //  { viewport()->setCursor(c); }
 
-  void rotateX();
-
-  void rotateY();
-
-  void rotateZ();
-
-  void rotateXM();
-
-  void rotateYM();
-
-  void rotateZM();
-
 private:
   // double devicePixelRatio();
 
@@ -281,7 +263,6 @@ private:
   ZOpenGLWidget* m_glWidget = nullptr;
   ZOpenGLWindow* m_glWindow = nullptr;
   Z3DScene* m_3dScene = nullptr;
-  std::deque<Z3DCanvasEventListener*> m_listeners;
 
   QShortcut* m_rotateXShortCut = nullptr;
   QShortcut* m_rotateYShortCut = nullptr;
@@ -289,6 +270,8 @@ private:
   QShortcut* m_rotateXMShortCut = nullptr;
   QShortcut* m_rotateYMShortCut = nullptr;
   QShortcut* m_rotateZMShortCut = nullptr;
+
+  QObject* m_eventReceiver = nullptr;
 };
 
 #endif

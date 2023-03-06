@@ -4,8 +4,8 @@
 
 namespace nim {
 
-Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DRenderingEngine& view)
-  : Z3DFilterView<ZImgDoc, Z3DImgFilter>(doc, view)
+Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<ZImgDoc, Z3DImgFilter>(doc, engine)
 {
   docImgsAdded(m_doc.objs());
   connect(&m_doc, &ZImgDoc::objAdded, this, &Z3DImgView::docImgAdded);
@@ -29,6 +29,7 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
       connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
       connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
+      m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       m_engine.networkEvaluator().updateNetwork();
@@ -66,6 +67,7 @@ void Z3DImgView::docImgAdded(size_t id)
     connect(viewControl, &Z3DImgFilter::objDeselected, this, &Z3DImgView::onObjDeselectedFromView);
     connect(viewControl, &Z3DImgFilter::objSelected, this, &Z3DImgView::onObjSelectedFromView);
     connect(viewControl, &Z3DImgFilter::objVisibleChanged, this, &Z3DImgView::onObjVisibleChangedFromView);
+    m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();

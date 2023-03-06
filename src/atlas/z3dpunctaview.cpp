@@ -4,8 +4,8 @@
 
 namespace nim {
 
-Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DRenderingEngine& view)
-  : Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>(doc, view)
+Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<ZPunctaDoc, Z3DPunctaFilter>(doc, engine)
 {
   docPunctasAdded(m_doc.objs());
   connect(&m_doc, &ZPunctaDoc::objAdded, this, &Z3DPunctaView::docPunctaAdded);
@@ -26,6 +26,7 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
+      m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       m_engine.networkEvaluator().updateNetwork();
@@ -60,6 +61,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
+    m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();

@@ -6,7 +6,9 @@
 #include "zbbox.h"
 #include <QDir>
 #include <QObject>
+#include <QEvent>
 #include <QMutexLocker>
+#include <set>
 
 class QMainWindow;
 
@@ -22,6 +24,8 @@ class Z3DCompositor;
 
 class Z3DNetworkEvaluator;
 
+class Z3DCanvasEventListener;
+
 class Z3DRenderingEngine
   : public QObject
   , public ZViewSettingInterface
@@ -29,7 +33,7 @@ class Z3DRenderingEngine
   Q_OBJECT
 
 public:
-  Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
+  explicit Z3DRenderingEngine(ZDoc& doc, QObject* parent = nullptr);
 
   ~Z3DRenderingEngine() override;
 
@@ -134,7 +138,7 @@ public:
 
   void init();
 
-  void initAndAttachToCanvas(Z3DCanvas* canvas);
+  void attachToCanvas(Z3DCanvas* canvas);
 
   void setOutputSize(const glm::uvec2& size);
 
@@ -146,11 +150,34 @@ public:
 
   void resetCamera(); // set up camera based on visible objects in scene, original position
 
+  void addEventListenerToBack(Z3DCanvasEventListener& e)
+  {
+    m_listeners.push_back(&e);
+  }
+
+  void addEventListenerToFront(Z3DCanvasEventListener& e)
+  {
+    m_listeners.push_front(&e);
+  }
+
+  void removeEventListener(Z3DCanvasEventListener& e)
+  {
+    erase(m_listeners, &e);
+  }
+
+  void clearEventListeners()
+  {
+    m_listeners.clear();
+  }
+
 Q_SIGNALS:
 
   void objViewReady(size_t id);
 
   void networkConstructed();
+
+protected:
+  bool event(QEvent* e) override;
 
 private:
   void resetCameraCenter();
@@ -179,6 +206,18 @@ private:
 
   void initGL();
 
+  void rotateX();
+
+  void rotateY();
+
+  void rotateZ();
+
+  void rotateXM();
+
+  void rotateYM();
+
+  void rotateZM();
+
 private:
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
@@ -187,14 +226,18 @@ private:
 
   Z3DCanvas* m_canvas = nullptr;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
-  std::unique_ptr<Z3DNetworkEvaluator>
-    m_networkEvaluator; // has to be destroyed before (so declared after) m_compositor
+  std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCompositor> m_compositor;
 
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
 
   QMutex m_mutex;
+
+  std::deque<Z3DCanvasEventListener*> m_listeners;
+  bool m_inited = false;
+
+  std::set<QEvent::Type> m_eventTypes;
 };
 
 } // namespace nim

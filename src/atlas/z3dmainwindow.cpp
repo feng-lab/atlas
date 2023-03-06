@@ -35,12 +35,13 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 {
   m_engine = new Z3DRenderingEngine(m_doc);
   m_engine->moveToThread(&m_renderingThread);
+  connect(&m_renderingThread, &QThread::started, m_engine, &Z3DRenderingEngine::init);
   connect(&m_renderingThread, &QThread::finished, m_engine, &QObject::deleteLater);
-  connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
   m_renderingThread.start();
 
   m_canvas = new Z3DCanvas("", 512, 512, this);
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::onCanvasReady);
+  connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::attachToCanvas);
 
   setCentralWidget(m_canvas);
   init();

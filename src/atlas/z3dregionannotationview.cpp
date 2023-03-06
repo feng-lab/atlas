@@ -4,8 +4,8 @@
 
 namespace nim {
 
-Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& view)
-  : Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>(doc, view)
+Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>(doc, engine)
 {
   docRegionAnnotationsAdded(m_doc.objs());
   connect(&m_doc, &ZRegionAnnotationDoc::objAdded, this, &Z3DRegionAnnotationView::docRegionAnnotationAdded);
@@ -35,6 +35,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
               &Z3DRegionAnnotationFilter::objVisibleChanged,
               this,
               &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
+      m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
       m_engine.networkEvaluator().updateNetwork();
@@ -78,6 +79,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
             &Z3DRegionAnnotationFilter::objVisibleChanged,
             this,
             &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
+    m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();

@@ -5,8 +5,8 @@
 
 namespace nim {
 
-Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DRenderingEngine& view)
-  : Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>(doc, view)
+Z3DAnimationView::Z3DAnimationView(Z3DAnimationDoc& doc, Z3DRenderingEngine& engine)
+  : Z3DFilterView<Z3DAnimationDoc, Z3DAnimationFilter>(doc, engine)
 {
   docAnimationsAdded(m_doc.objs());
   connect(&m_doc, &Z3DAnimationDoc::objAdded, this, &Z3DAnimationView::docAnimationAdded);

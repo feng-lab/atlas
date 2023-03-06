@@ -219,6 +219,11 @@ void Z3DCompositor::setOutputSize(const glm::uvec2& size)
   }
 }
 
+glm::uvec2 Z3DCompositor::outputSize() const
+{
+  return m_outRenderTarget1.size();
+}
+
 void Z3DCompositor::makeOutputSizeEvenNumbers()
 {
   auto size = m_outRenderTarget1.size();

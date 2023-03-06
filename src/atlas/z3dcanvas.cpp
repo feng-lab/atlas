@@ -5,6 +5,7 @@
 #include "z3dscene.h"
 #include "zlog.h"
 #include "z3dopenglwidget.h"
+#include <QCoreApplication>
 #include <algorithm>
 
 namespace nim {
@@ -325,71 +326,89 @@ void Z3DCanvas::updateAll()
 #endif
 }
 
-void Z3DCanvas::contextMenuEvent(QContextMenuEvent* event)
+void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
 {
-  broadcastEvent(event, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::enterEvent(QEnterEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::leaveEvent(QEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::mousePressEvent(QMouseEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
-  broadcastEvent(e, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
-void Z3DCanvas::keyPressEvent(QKeyEvent* event)
+void Z3DCanvas::keyPressEvent(QKeyEvent* e)
 {
-  QGraphicsView::keyPressEvent(event);
-  broadcastEvent(event, width(), height());
+  QGraphicsView::keyPressEvent(e);
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
-void Z3DCanvas::keyReleaseEvent(QKeyEvent* event)
+void Z3DCanvas::keyReleaseEvent(QKeyEvent* e)
 {
-  broadcastEvent(event, width(), height());
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  }
 }
 
 void Z3DCanvas::resizeEvent(QResizeEvent* event)
 {
-  getGLFocus();
   QGraphicsView::resizeEvent(event);
   if (m_3dScene) {
     m_3dScene->setSceneRect(QRect(QPoint(0, 0), event->size()));
   }
 
-  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatioF(), event->size().height() * devicePixelRatioF());
+  Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 
 void Z3DCanvas::paintEvent(QPaintEvent* event)
 {
-  getGLFocus();
   QGraphicsView::paintEvent(event);
 }
 
@@ -403,87 +422,10 @@ void Z3DCanvas::dropEvent(QDropEvent* event)
   event->ignore();
 }
 
-void Z3DCanvas::rotateX()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateX();
-  }
-}
-
-void Z3DCanvas::rotateY()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateY();
-  }
-}
-
-void Z3DCanvas::rotateZ()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateZ();
-  }
-}
-
-void Z3DCanvas::rotateXM()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateXM();
-  }
-}
-
-void Z3DCanvas::rotateYM()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateYM();
-  }
-}
-
-void Z3DCanvas::rotateZM()
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->rotateZM();
-  }
-}
-
 void Z3DCanvas::timerEvent(QTimerEvent* e)
 {
-  broadcastEvent(e, width(), height());
-}
-
-void Z3DCanvas::setNetworkEvaluator(Z3DNetworkEvaluator* n)
-{
-  m_3dScene->setNetworkEvaluator(n);
-}
-
-void Z3DCanvas::setFakeStereoOnce()
-{
-  m_3dScene->setFakeStereoOnce();
-}
-
-void Z3DCanvas::removeEventListener(Z3DCanvasEventListener& e)
-{
-  erase(m_listeners, &e);
-}
-
-void Z3DCanvas::clearEventListeners()
-{
-  m_listeners.clear();
-}
-
-void Z3DCanvas::broadcastEvent(QEvent* e, int w, int h)
-{
-  getGLFocus();
-  for (auto listener : m_listeners) {
-    listener->onEvent(e, w, h);
-    if (e->isAccepted()) {
-      break;
-    }
+  if (m_eventReceiver) {
+    QCoreApplication::postEvent(m_eventReceiver, e->clone());
   }
 }
 

@@ -8,8 +8,8 @@ template<class DocType, class FilterType>
 class Z3DFilterView : public Z3DObjView
 {
 public:
-  Z3DFilterView(DocType& doc, Z3DRenderingEngine& view)
-    : Z3DObjView(view)
+  Z3DFilterView(DocType& doc, Z3DRenderingEngine& engine)
+    : Z3DObjView(engine)
     , m_doc(doc)
   {
     connect(&m_doc, &DocType::objAboutToBeRemoved, this, &Z3DFilterView::onObjAboutToBeRemoved);
@@ -71,13 +71,6 @@ public:
     return {};
   }
 
-  void attachToCanvas(Z3DCanvas& canvas) const override
-  {
-    for (const auto& idFilter : m_idToFilter) {
-      canvas.addEventListenerToBack(*idFilter.second);
-    }
-  }
-
   const std::map<size_t, std::unique_ptr<FilterType>>& idToFilter()
   {
     return m_idToFilter;
@@ -102,9 +95,7 @@ protected:
       return;
     }
     FilterType* viewControl = it->second.get();
-    if (m_engine.canvas()) {
-      m_engine.canvas()->removeEventListener(*viewControl);
-    }
+    m_engine.removeEventListener(*viewControl);
     // m_engine.canvas().getGLFocus();
     m_idToFilter.erase(it);
     m_engine.networkEvaluator().updateNetwork();

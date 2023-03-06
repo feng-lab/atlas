@@ -183,6 +183,7 @@ void Z3DCameraParameter::updateProjectionType()
 
 void Z3DCameraParameter::updateEye()
 {
+  LOG(INFO) << "e";
   if (m_receiveWidgetSignal) {
     m_value.setEye(m_eye.get());
     Q_EMIT valueChanged();
@@ -191,6 +192,7 @@ void Z3DCameraParameter::updateEye()
 
 void Z3DCameraParameter::updateCenter()
 {
+  LOG(INFO) << "c";
   if (m_receiveWidgetSignal) {
     m_value.setCenter(m_center.get());
     Q_EMIT valueChanged();
@@ -199,6 +201,7 @@ void Z3DCameraParameter::updateCenter()
 
 void Z3DCameraParameter::updateUpVector()
 {
+  LOG(INFO) << "u";
   if (m_receiveWidgetSignal) {
     m_value.setUpVector(m_upVector.get());
     Q_EMIT valueChanged();
@@ -269,6 +272,7 @@ void Z3DCameraParameter::beforeChange(Z3DCamera& value)
 
 void Z3DCameraParameter::updateWidget(Z3DCamera& value)
 {
+  LOG(INFO) << "w";
   m_receiveWidgetSignal = false;
   m_eye.set(value.eye());
   m_center.set(value.center());

@@ -34,6 +34,17 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   , m_doc(doc)
   , m_numObjsBefore(m_doc.numObjs())
 {
+  m_eventTypes = std::set<QEvent::Type>{QEvent::ContextMenu,
+                                        QEvent::Enter,
+                                        QEvent::Leave,
+                                        QEvent::MouseButtonPress,
+                                        QEvent::MouseButtonRelease,
+                                        QEvent::MouseMove,
+                                        QEvent::MouseButtonDblClick,
+                                        QEvent::Wheel,
+                                        QEvent::KeyPress,
+                                        QEvent::KeyRelease,
+                                        QEvent::Timer};
 }
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
@@ -460,6 +471,7 @@ void Z3DRenderingEngine::init()
 
   // filters
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
+  addEventListenerToBack(*m_compositor);
 
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
@@ -504,25 +516,29 @@ void Z3DRenderingEngine::init()
 
   connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DRenderingEngine::resetCameraClippingRange);
 
+  m_inited = true;
+  LOG(INFO) << "3D Renderer Inited.";
+
   Q_EMIT networkConstructed();
 }
 
-void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
+void Z3DRenderingEngine::attachToCanvas(Z3DCanvas* canvas)
 {
   CHECK(canvas);
-  init();
   m_canvas = canvas;
   m_canvas->setShareContext(m_context->context());
+  m_canvas->setEventReceiver(this);
 
   m_globalParas->setDevicePixelRatio(m_canvas->devicePixelRatio());
 
-  m_canvas->addEventListenerToBack(*m_compositor);
-  for (auto objView : m_3dObjViews) {
-    objView->attachToCanvas(*m_canvas);
-  }
-
   setOutputSize(m_canvas->physicalSize());
   connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DRenderingEngine::onCanvasResized);
+  connect(m_canvas, &Z3DCanvas::rotateX, this, &Z3DRenderingEngine::rotateX);
+  connect(m_canvas, &Z3DCanvas::rotateY, this, &Z3DRenderingEngine::rotateY);
+  connect(m_canvas, &Z3DCanvas::rotateZ, this, &Z3DRenderingEngine::rotateZ);
+  connect(m_canvas, &Z3DCanvas::rotateXM, this, &Z3DRenderingEngine::rotateXM);
+  connect(m_canvas, &Z3DCanvas::rotateYM, this, &Z3DRenderingEngine::rotateYM);
+  connect(m_canvas, &Z3DCanvas::rotateZM, this, &Z3DRenderingEngine::rotateZM);
 }
 
 void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
@@ -608,6 +624,68 @@ void Z3DRenderingEngine::initGL()
     LOG(ERROR) << errMsg;
     throw ZGLException(errMsg);
   }
+}
+
+void Z3DRenderingEngine::rotateX()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateX();
+  }
+}
+
+void Z3DRenderingEngine::rotateY()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateY();
+  }
+}
+
+void Z3DRenderingEngine::rotateZ()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateZ();
+  }
+}
+
+void Z3DRenderingEngine::rotateXM()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateXM();
+  }
+}
+
+void Z3DRenderingEngine::rotateYM()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateYM();
+  }
+}
+
+void Z3DRenderingEngine::rotateZM()
+{
+  for (auto listener : m_listeners) {
+    listener->rotateZM();
+  }
+}
+
+bool Z3DRenderingEngine::event(QEvent* e)
+{
+  if (m_inited && contains(m_eventTypes, e->type())) {
+    auto outputSize = m_compositor->outputSize();
+    int w = outputSize.x;
+    int h = outputSize.y;
+    if (m_canvas) {
+      w = m_canvas->width();
+      h = m_canvas->height();
+    }
+    for (auto listener : m_listeners) {
+      listener->onEvent(e, w, h);
+      if (e->isAccepted()) {
+        return true;
+      }
+    }
+  }
+  return QObject::event(e);
 }
 
 } // namespace nim

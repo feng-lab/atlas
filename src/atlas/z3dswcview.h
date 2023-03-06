@@ -9,7 +9,7 @@ namespace nim {
 class Z3DSwcView : public Z3DFilterView<ZSwcDoc, Z3DSwcFilter>
 {
 public:
-  Z3DSwcView(ZSwcDoc& doc, Z3DRenderingEngine& view);
+  Z3DSwcView(ZSwcDoc& doc, Z3DRenderingEngine& engine);
 
 private:
   void docSwcsAdded(const std::vector<size_t>& objs);

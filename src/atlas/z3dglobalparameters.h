@@ -7,6 +7,7 @@
 #include "zoptionparameter.h"
 #include "z3dinteractionhandler.h"
 #include <vector>
+#include <deque>
 
 namespace nim {
 
@@ -19,7 +20,7 @@ class Z3DGlobalParameters : public QObject
   Q_OBJECT
 
 public:
-  Z3DGlobalParameters(Z3DRenderingEngine& engine);
+  explicit Z3DGlobalParameters(Z3DRenderingEngine& engine);
 
   void setDevicePixelRatio(float f);
 

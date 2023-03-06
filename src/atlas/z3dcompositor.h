@@ -35,6 +35,8 @@ public:
 
   void setOutputSize(const glm::uvec2& size);
 
+  glm::uvec2 outputSize() const;
+
   void makeOutputSizeEvenNumbers();
 
   Z3DRenderTarget* monoReadyTarget() const

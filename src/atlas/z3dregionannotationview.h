@@ -9,7 +9,7 @@ namespace nim {
 class Z3DRegionAnnotationView : public Z3DFilterView<ZRegionAnnotationDoc, Z3DRegionAnnotationFilter>
 {
 public:
-  Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& view);
+  Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& engine);
 
 private:
   void docRegionAnnotationsAdded(const std::vector<size_t>& objs);

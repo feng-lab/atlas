@@ -40,8 +40,6 @@ public:
   // get view setting widget group of obj id, default return nullptr
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
-  virtual void attachToCanvas(Z3DCanvas& canvas) const = 0;
-
 Q_SIGNALS:
 
   void objViewReady(size_t id);
