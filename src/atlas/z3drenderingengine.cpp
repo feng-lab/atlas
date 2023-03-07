@@ -44,13 +44,15 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::Wheel,
                                         QEvent::KeyPress,
                                         QEvent::KeyRelease,
-                                        QEvent::Timer};
+                                        QEvent::Timer,
+                                        QEvent::Paint};
 }
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
 {
   LOG(INFO) << "in engine destructor";
-  m_context->makeCurrent();
+  detachCanvas();
+  getGLFocus();
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -65,7 +67,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DRenderingEngine::viewSettingWidgetsGroupOf(siz
   } else if (id == 2) {
     return m_compositor->axisWidgetsGroup();
   } else if (id == 3) {
-    return m_globalParas->widgetsGroup(false);
+    return m_globalParas->widgetsGroup(false, *this);
   } else {
     for (auto& objView : m_3dObjViews) {
       std::shared_ptr<ZWidgetsGroup> wg = objView->viewSettingWidgetsGroupOf(id);
@@ -79,7 +81,7 @@ std::shared_ptr<ZWidgetsGroup> Z3DRenderingEngine::viewSettingWidgetsGroupOf(siz
 
 QWidget* Z3DRenderingEngine::globalParasWidget()
 {
-  return m_globalParas->widgetsGroup(true)->createWidget(false);
+  return m_globalParas->widgetsGroup(true, *this)->createWidget(false);
 }
 
 QWidget* Z3DRenderingEngine::backgroundWidget()
@@ -220,7 +222,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSize(const QSt
                                                                        Z3DScreenShotType sst)
 {
   try {
-    m_context->makeCurrent();
+    getGLFocus();
 
     const int tileSize = 7680; // 2048;
     const int tileBorder = 128;
@@ -310,7 +312,7 @@ void Z3DRenderingEngine::resetCanvasSize()
 void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
   try {
-    m_context->makeCurrent();
+    getGLFocus();
     m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
     if (sst == Z3DScreenShotType::MonoView) {
@@ -465,13 +467,14 @@ void Z3DRenderingEngine::setYZView()
 void Z3DRenderingEngine::init()
 {
   initGL();
-  m_context->makeCurrent();
+  getGLFocus();
 
-  m_globalParas = std::make_unique<Z3DGlobalParameters>(*this);
+  m_globalParas = std::make_unique<Z3DGlobalParameters>();
 
   // filters
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
   addEventListenerToBack(*m_compositor);
+  connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
 
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
@@ -522,12 +525,12 @@ void Z3DRenderingEngine::init()
   Q_EMIT networkConstructed();
 }
 
-void Z3DRenderingEngine::attachToCanvas(Z3DCanvas* canvas)
+void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
 {
   CHECK(canvas);
   m_canvas = canvas;
-  m_canvas->setShareContext(m_context->context());
-  m_canvas->setEventReceiver(this);
+  init();
+  m_canvas->setRenderingEngine(this);
 
   m_globalParas->setDevicePixelRatio(m_canvas->devicePixelRatio());
 
@@ -539,17 +542,34 @@ void Z3DRenderingEngine::attachToCanvas(Z3DCanvas* canvas)
   connect(m_canvas, &Z3DCanvas::rotateXM, this, &Z3DRenderingEngine::rotateXM);
   connect(m_canvas, &Z3DCanvas::rotateYM, this, &Z3DRenderingEngine::rotateYM);
   connect(m_canvas, &Z3DCanvas::rotateZM, this, &Z3DRenderingEngine::rotateZM);
+  connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
+  connect(this, &Z3DRenderingEngine::finishRendering, m_canvas, &Z3DCanvas::renderingFinished);
+}
+
+void Z3DRenderingEngine::detachCanvas()
+{
+  if (!m_canvas) {
+    return;
+  }
+  m_canvas->setRenderingEngine(nullptr);
+
+  m_globalParas->setDevicePixelRatio(1);
+
+  m_canvas->disconnect(this);
+  disconnect(m_canvas);
+
+  m_canvas = nullptr;
 }
 
 void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
 {
-  m_context->makeCurrent();
+  getGLFocus();
   m_compositor->setOutputSize(size);
 }
 
 void Z3DRenderingEngine::makeOutputSizeEvenNumbers()
 {
-  m_context->makeCurrent();
+  getGLFocus();
   m_compositor->makeOutputSizeEvenNumbers();
 }
 
@@ -576,12 +596,17 @@ void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 
 void Z3DRenderingEngine::initGL()
 {
-  m_context = std::make_unique<Z3DContext>();
+  if (m_canvas) {
+    m_context = std::make_unique<Z3DContext>(m_canvas->context());
+  } else {
+    m_context = std::make_unique<Z3DContext>();
+  }
   m_context->makeCurrent();
 
-  glbinding::initialize([](const char* name) {
-    return Z3DContext().getProcAddress(name);
+  glbinding::initialize(0, [this](const char* name) {
+    return m_context->getProcAddress(name);
   });
+  glbinding::useContext(0);
   Z3DGpuInfo::instance().logGpuInfo();
   if (FLAGS_atlas_check_opengl_error_for_all_gl_calls) {
     glbinding::setCallbackMaskExcept(glbinding::CallbackMask::After |
@@ -671,6 +696,11 @@ void Z3DRenderingEngine::rotateZM()
 bool Z3DRenderingEngine::event(QEvent* e)
 {
   if (m_inited && contains(m_eventTypes, e->type())) {
+    if (e->type() == QEvent::Paint) {
+      render();
+      e->accept();
+      return true;
+    }
     auto outputSize = m_compositor->outputSize();
     int w = outputSize.x;
     int h = outputSize.y;
@@ -686,6 +716,38 @@ bool Z3DRenderingEngine::event(QEvent* e)
     }
   }
   return QObject::event(e);
+}
+
+void Z3DRenderingEngine::getGLFocus()
+{
+  m_context->makeCurrent();
+  glbinding::useContext(0);
+}
+
+void Z3DRenderingEngine::render(bool stereo)
+{
+  getGLFocus();
+  Q_EMIT startRendering();
+  LOG(INFO) << "start rendering";
+  m_networkEvaluator->process(stereo);
+  glFinish();
+  LOG(INFO) << "finish rendering";
+  Q_EMIT finishRendering();
+}
+
+Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const
+{
+  return m_compositor->monoReadyTarget();
+}
+
+Z3DRenderTarget* Z3DRenderingEngine::leftReadyTarget() const
+{
+  return m_compositor->leftReadyTarget();
+}
+
+Z3DRenderTarget* Z3DRenderingEngine::rightReadyTarget() const
+{
+  return m_compositor->rightReadyTarget();
 }
 
 } // namespace nim

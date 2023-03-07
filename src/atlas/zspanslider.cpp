@@ -6,14 +6,6 @@
 
 namespace nim {
 
-ZSpanSlider::ZSpanSlider(QWidget* parent)
-  : QxtSpanSlider(parent)
-{}
-
-ZSpanSlider::ZSpanSlider(Qt::Orientation orientation, QWidget* parent)
-  : QxtSpanSlider(orientation, parent)
-{}
-
 void ZSpanSlider::setLowerValueBlockSignals(int lower)
 {
   const QSignalBlocker blocker(this);

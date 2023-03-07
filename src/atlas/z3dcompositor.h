@@ -54,6 +54,11 @@ public:
     return m_rightReadyTarget;
   }
 
+  void invalidate(State inv) override;
+
+Q_SIGNALS:
+  void sceneParaUpdated();
+
 protected:
   void process(Z3DEye eye) override;
 

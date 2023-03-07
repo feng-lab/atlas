@@ -20,7 +20,7 @@ class Z3DGlobalParameters : public QObject
   Q_OBJECT
 
 public:
-  explicit Z3DGlobalParameters(Z3DRenderingEngine& engine);
+  Z3DGlobalParameters();
 
   void setDevicePixelRatio(float f);
 
@@ -33,7 +33,7 @@ public:
 
   void write(json::object& json) const;
 
-  std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera);
+  std::shared_ptr<ZWidgetsGroup> widgetsGroup(bool includeCamera, Z3DRenderingEngine& engine);
 
   // count is lightCount
   [[nodiscard]] const glm::vec4* lightPositionArray() const
@@ -147,7 +147,6 @@ private:
   std::vector<float> m_lightSpotExponentArray;
   std::vector<glm::vec3> m_lightSpotDirectionArray;
 
-  Z3DRenderingEngine& m_engine;
   size_t m_cameraParameterIndex = 0;
 };
 

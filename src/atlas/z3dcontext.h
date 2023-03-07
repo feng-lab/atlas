@@ -11,7 +11,7 @@ using ProcAddress = void (*)();
 class Z3DContext
 {
 public:
-  Z3DContext();
+  Z3DContext(QOpenGLContext* sharedContext = nullptr);
 
   ~Z3DContext();
 

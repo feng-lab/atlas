@@ -1,6 +1,5 @@
 #include "zanimationexportwidget.h"
 
-#include "z3dgpuinfo.h"
 #include "zselectfilewidget.h"
 #include "ztheme.h"
 #include <QHBoxLayout>
@@ -22,7 +21,7 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_customSize("Custom Image Size",
                  glm::ivec2(3840, 2160),
                  glm::ivec2(128, 128),
-                 glm::ivec2(Z3DGpuInfo::instance().maxTextureSize()))
+                 glm::ivec2(7680, 4320))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
   , m_startTime("Start", 0.0, 0.0, 99999.0)
   , m_endTime("End", -1., -1., 99999.0)

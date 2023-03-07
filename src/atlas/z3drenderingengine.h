@@ -136,9 +136,12 @@ public:
 
   void setYZView();
 
+  // for offscreen rendering
   void init();
 
-  void attachToCanvas(Z3DCanvas* canvas);
+  void initAndAttachToCanvas(Z3DCanvas* canvas);
+
+  void detachCanvas();
 
   void setOutputSize(const glm::uvec2& size);
 
@@ -170,14 +173,30 @@ public:
     m_listeners.clear();
   }
 
+  void render(bool stereo = false);
+
+  Z3DRenderTarget* monoReadyTarget() const;
+
+  Z3DRenderTarget* leftReadyTarget() const;
+
+  Z3DRenderTarget* rightReadyTarget() const;
+
 Q_SIGNALS:
 
   void objViewReady(size_t id);
 
   void networkConstructed();
 
+  void sceneParaUpdated();
+
+  void startRendering();
+
+  void finishRendering();
+
 protected:
   bool event(QEvent* e) override;
+
+  void getGLFocus();
 
 private:
   void resetCameraCenter();

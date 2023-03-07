@@ -6,7 +6,7 @@
 
 namespace nim {
 
-Z3DGlobalParameters::Z3DGlobalParameters(Z3DRenderingEngine& engine)
+Z3DGlobalParameters::Z3DGlobalParameters()
   : geometriesMultisampleMode("Multisample Anti-Aliasing")
   , transparencyMethod("Transparency")
   , weightedBlendedDepthScale("Weighted Blended Depth Scale", 1.f, 1e-3f, 1e3f)
@@ -24,7 +24,6 @@ Z3DGlobalParameters::Z3DGlobalParameters(Z3DRenderingEngine& engine)
   , yCut("Y Cut", glm::vec2(0, 0), 0, 0)
   , zCut("Z Cut", glm::vec2(0, 0), 0, 0)
   , devicePixelRatio("Device Pixel Ratio", 1.f, 1.f, 16.f)
-  , m_engine(engine)
 {
   geometriesMultisampleMode.addOptions("None", "2x2");
   geometriesMultisampleMode.select("2x2");
@@ -263,14 +262,14 @@ void Z3DGlobalParameters::write(json::object& json) const
   }
 }
 
-std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCamera)
+std::shared_ptr<ZWidgetsGroup> Z3DGlobalParameters::widgetsGroup(bool includeCamera, Z3DRenderingEngine& engine)
 {
   if (!m_widgetsGrp) {
     m_widgetsGrp = std::make_shared<ZWidgetsGroup>("Global", 1);
     m_widgetsGrpNoCamera = std::make_shared<ZWidgetsGroup>("Lighting", 1);
     for (size_t i = 0; i < m_parameters.size(); ++i) {
       if (i == m_cameraParameterIndex) {
-        m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, m_engine)), 1);
+        m_widgetsGrp->addChild(*(new Z3DCameraControlWidget(camera, engine)), 1);
         m_widgetsGrp->addChild(*m_parameters[i], 1);
       } else {
         m_widgetsGrp->addChild(*m_parameters[i], 1);

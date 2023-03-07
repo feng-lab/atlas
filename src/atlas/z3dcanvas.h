@@ -18,7 +18,7 @@ namespace nim {
 
 class Z3DScene;
 
-class Z3DNetworkEvaluator;
+class Z3DRenderingEngine;
 
 class ZOpenGLWidget;
 
@@ -170,12 +170,9 @@ public:
 
   [[nodiscard]] QSurfaceFormat format() const;
 
-  void setShareContext(QOpenGLContext* shareContext);
+  QOpenGLContext* context() const;
 
-  void setEventReceiver(QObject* obj)
-  {
-    m_eventReceiver = obj;
-  }
+  void setRenderingEngine(Z3DRenderingEngine* engine);
 
   // Set the opengl context of this canvas as the current one.
   void getGLFocus();
@@ -187,6 +184,10 @@ public:
     auto pe = std::make_unique<QPaintEvent>(rect());
     paintEvent(pe.get());
   }
+
+  void sceneParaUpdated();
+
+  void renderingFinished();
 
   void updateAll();
 
@@ -271,7 +272,9 @@ private:
   QShortcut* m_rotateYMShortCut = nullptr;
   QShortcut* m_rotateZMShortCut = nullptr;
 
-  QObject* m_eventReceiver = nullptr;
+  Z3DRenderingEngine* m_engine = nullptr;
+
+  bool m_renderingFinished = false;
 };
 
 #endif

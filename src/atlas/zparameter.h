@@ -226,7 +226,6 @@ void ZSingleValueParameter<T>::set(const T& valueIn)
   if (m_mutex.try_lock()) {
     m_mutex.unlock();
   } else {
-    CHECK(false);
     return; // prevent widget change echo back
   }
   if (m_value != valueIn) {

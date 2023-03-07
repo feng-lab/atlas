@@ -10,8 +10,7 @@ class ZSpanSlider : public QxtSpanSlider
   Q_OBJECT
 
 public:
-  explicit ZSpanSlider(QWidget* parent = 0);
-  explicit ZSpanSlider(Qt::Orientation orientation, QWidget* parent = 0);
+  using QxtSpanSlider::QxtSpanSlider;
 
   void setLowerValueBlockSignals(int lower);
   void setUpperValueBlockSignals(int upper);

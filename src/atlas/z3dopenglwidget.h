@@ -17,6 +17,8 @@ public:
 protected:
   void initializeGL() override;
 
+  void paintGL() override;
+
 Q_SIGNALS:
   void openGLContextInitialized();
 };

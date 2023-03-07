@@ -1,7 +1,6 @@
 #include "z3dcanvas.h"
 
-#include "z3dnetworkevaluator.h"
-#include "z3dcanvaseventlistener.h"
+#include "z3drenderingengine.h"
 #include "z3dscene.h"
 #include "zlog.h"
 #include "z3dopenglwidget.h"
@@ -254,7 +253,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setViewport(QWidget::createWindowContainer(m_glWindow, nullptr, f));
 #else
   m_glWidget = new ZOpenGLWidget(this, f);
-  m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), this);
+  m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), *this);
   setViewport(m_glWidget);
 #endif
 
@@ -289,6 +288,7 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
 #else
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
+  connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene, &Z3DScene::initPainter);
 #endif
 }
 
@@ -301,9 +301,15 @@ QSurfaceFormat Z3DCanvas::format() const
 #endif
 }
 
-void Z3DCanvas::setShareContext(QOpenGLContext* shareContext)
+QOpenGLContext* Z3DCanvas::context() const
 {
-  m_glWidget->context()->setShareContext(shareContext);
+  return m_glWidget->context();
+}
+
+void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine)
+{
+  m_engine = engine;
+  m_3dScene->setRenderingEngine(engine);
 }
 
 void Z3DCanvas::toggleFullScreen()
@@ -317,6 +323,18 @@ void Z3DCanvas::toggleFullScreen()
   }
 }
 
+void Z3DCanvas::sceneParaUpdated()
+{
+  m_renderingFinished = false;
+  updateAll();
+}
+
+void Z3DCanvas::renderingFinished()
+{
+  m_renderingFinished = true;
+  updateAll();
+}
+
 void Z3DCanvas::updateAll()
 {
 #ifdef ATLAS_USE_OPENGLWINDOW
@@ -328,72 +346,72 @@ void Z3DCanvas::updateAll()
 
 void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::enterEvent(QEnterEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::leaveEvent(QEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::mousePressEvent(QMouseEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::keyPressEvent(QKeyEvent* e)
 {
   QGraphicsView::keyPressEvent(e);
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
 void Z3DCanvas::keyReleaseEvent(QKeyEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 
@@ -407,9 +425,14 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
   Q_EMIT canvasSizeChanged(event->size().width() * devicePixelRatio(), event->size().height() * devicePixelRatio());
 }
 
-void Z3DCanvas::paintEvent(QPaintEvent* event)
+void Z3DCanvas::paintEvent(QPaintEvent* e)
 {
-  QGraphicsView::paintEvent(event);
+  LOG(INFO) << "paintevent"
+            << " " << m_renderingFinished;
+  if (m_engine && !m_renderingFinished) {
+    QCoreApplication::postEvent(m_engine, e->clone());
+  }
+  QGraphicsView::paintEvent(e);
 }
 
 void Z3DCanvas::dragEnterEvent(QDragEnterEvent* event)
@@ -424,8 +447,8 @@ void Z3DCanvas::dropEvent(QDropEvent* event)
 
 void Z3DCanvas::timerEvent(QTimerEvent* e)
 {
-  if (m_eventReceiver) {
-    QCoreApplication::postEvent(m_eventReceiver, e->clone());
+  if (m_engine) {
+    QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
 

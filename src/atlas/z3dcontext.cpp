@@ -7,10 +7,13 @@
 
 namespace nim {
 
-Z3DContext::Z3DContext()
+Z3DContext::Z3DContext(QOpenGLContext* sharedContext)
 {
   m_context = new QOpenGLContext();
   m_context->setFormat(QSurfaceFormat::defaultFormat());
+  if (sharedContext) {
+    m_context->setShareContext(sharedContext);
+  }
   m_context->create();
   if (!m_context->isValid()) {
     LOG(ERROR) << "Can not create OpenGL context";

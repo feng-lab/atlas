@@ -241,6 +241,15 @@ void Z3DCompositor::makeOutputSizeEvenNumbers()
   }
 }
 
+void Z3DCompositor::invalidate(State inv)
+{
+  if (inv == State::Valid) {
+    return;
+  }
+  m_state |= inv;
+  Q_EMIT sceneParaUpdated();
+}
+
 void Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();

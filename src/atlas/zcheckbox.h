@@ -9,7 +9,7 @@ class ZCheckBox : public QCheckBox
   Q_OBJECT
 
 public:
-  explicit ZCheckBox(QWidget* parent = nullptr);
+  using QCheckBox::QCheckBox;
 
   void setCheckedBlockSignals(bool v);
 };

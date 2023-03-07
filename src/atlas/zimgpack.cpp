@@ -1,7 +1,6 @@
 #include "zimgpack.h"
 
 #include "zcpuinfo.h"
-#include "z3dgpuinfo.h"
 #include "zlog.h"
 #include "zimgcache.h"
 #include "zimgregioncache.h"
@@ -84,15 +83,15 @@ ZImgPack::ZImgPack(ZImgSource imgSource)
     }
   }
 
-  bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
-  if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold && !needScale) {
+  // bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold) {
     LOG(INFO) << "read all";
     m_diskCached = false;
     m_img = ZImg(m_imgSource);
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
-  } else if (hasPyramidal || !needScale) {
-    LOG(INFO) << fmt::format("has pyramidal: {}, need scale: {}", hasPyramidal, needScale);
+  } else if (hasPyramidal) {
+    // LOG(INFO) << fmt::format("has pyramidal: {}, need scale: {}", hasPyramidal, needScale);
     buildFastReadIndex(sceneSubBlock);
   } else {
     LOG(INFO) << "building pyramidal";
