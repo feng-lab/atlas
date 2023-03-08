@@ -3,7 +3,6 @@
 #include "znumericparameter.h"
 #include "zoptionparameter.h"
 #include "zview.h"
-#include <QApplication>
 
 namespace nim {
 

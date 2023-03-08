@@ -211,8 +211,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
     resetCanvasSize();
   }
   catch (ZException const& e) {
-    LOG(ERROR) << "Exception: " << e.what();
-    throw;
+    auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
   }
 }
 
@@ -297,8 +298,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSize(const QSt
     }
   }
   catch (ZException const& e) {
-    LOG(ERROR) << "Exception: " << e.what();
-    throw;
+    auto errorMsg = fmt::format("takeFixedSizeScreenShotWithoutResetCanvasSize error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
   }
 }
 
@@ -338,8 +340,9 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
     }
   }
   catch (ZException const& e) {
-    LOG(ERROR) << "Exception: " << e.what();
-    throw;
+    auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
   }
 }
 
@@ -543,7 +546,7 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   connect(m_canvas, &Z3DCanvas::rotateYM, this, &Z3DRenderingEngine::rotateYM);
   connect(m_canvas, &Z3DCanvas::rotateZM, this, &Z3DRenderingEngine::rotateZM);
   connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
-  connect(this, &Z3DRenderingEngine::finishRendering, m_canvas, &Z3DCanvas::renderingFinished);
+  connect(this, &Z3DRenderingEngine::renderingFinished, m_canvas, &Z3DCanvas::renderingFinished);
 }
 
 void Z3DRenderingEngine::detachCanvas()
@@ -645,9 +648,9 @@ void Z3DRenderingEngine::initGL()
   });
 
   if (!Z3DGpuInfo::instance().isSupported()) {
-    auto errMsg = Z3DGpuInfo::instance().notSupportedReason();
+    auto errMsg = QString("3D Rendering not supported: ") + Z3DGpuInfo::instance().notSupportedReason();
     LOG(ERROR) << errMsg;
-    throw ZGLException(errMsg);
+    reportRenderingError(errMsg);
   }
 }
 
@@ -727,12 +730,11 @@ void Z3DRenderingEngine::getGLFocus()
 void Z3DRenderingEngine::render(bool stereo)
 {
   getGLFocus();
-  Q_EMIT startRendering();
-  LOG(INFO) << "start rendering";
+  Q_EMIT progressChanged(0);
   m_networkEvaluator->process(stereo);
   glFinish();
-  LOG(INFO) << "finish rendering";
-  Q_EMIT finishRendering();
+  Q_EMIT progressChanged(100);
+  Q_EMIT renderingFinished();
 }
 
 Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const
@@ -748,6 +750,16 @@ Z3DRenderTarget* Z3DRenderingEngine::leftReadyTarget() const
 Z3DRenderTarget* Z3DRenderingEngine::rightReadyTarget() const
 {
   return m_compositor->rightReadyTarget();
+}
+
+void Z3DRenderingEngine::reportRenderingError(const QString& error) const
+{
+  Q_EMIT renderingError(error);
+}
+
+void Z3DRenderingEngine::reportRenderingError(const std::string& error) const
+{
+  Q_EMIT renderingError(QString::fromStdString(error));
 }
 
 } // namespace nim

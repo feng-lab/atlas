@@ -1,7 +1,5 @@
 #include "z3dmeshview.h"
 
-#include <QApplication>
-
 namespace nim {
 
 Z3DMeshView::Z3DMeshView(ZMeshDoc& doc, Z3DRenderingEngine& engine)
@@ -38,12 +36,9 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
     }
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render mesh: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render mesh:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render mesh: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
@@ -69,12 +64,9 @@ void Z3DMeshView::docMeshAdded(size_t id)
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render mesh: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render mesh:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render mesh: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 

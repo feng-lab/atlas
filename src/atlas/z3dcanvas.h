@@ -179,12 +179,6 @@ public:
 
   void toggleFullScreen();
 
-  void forceUpdate()
-  {
-    auto pe = std::make_unique<QPaintEvent>(rect());
-    paintEvent(pe.get());
-  }
-
   void sceneParaUpdated();
 
   void renderingFinished();
@@ -222,7 +216,7 @@ Q_SIGNALS:
   void rotateZM();
 
 protected:
-  void contextMenuEvent(QContextMenuEvent* event) override;
+  void contextMenuEvent(QContextMenuEvent* e) override;
 
   void enterEvent(QEnterEvent* e) override;
 
@@ -240,17 +234,17 @@ protected:
 
   void timerEvent(QTimerEvent* e) override;
 
-  void keyPressEvent(QKeyEvent* event) override;
+  void keyPressEvent(QKeyEvent* e) override;
 
-  void keyReleaseEvent(QKeyEvent* event) override;
+  void keyReleaseEvent(QKeyEvent* e) override;
 
-  void resizeEvent(QResizeEvent* event) override;
+  void resizeEvent(QResizeEvent* e) override;
 
-  void paintEvent(QPaintEvent* event) override;
+  void paintEvent(QPaintEvent* e) override;
 
-  void dragEnterEvent(QDragEnterEvent* event) override;
+  void dragEnterEvent(QDragEnterEvent* e) override;
 
-  void dropEvent(QDropEvent* event) override;
+  void dropEvent(QDropEvent* e) override;
 
   //  void setCursor(const QCursor& c)
   //  { viewport()->setCursor(c); }
@@ -273,8 +267,6 @@ private:
   QShortcut* m_rotateZMShortCut = nullptr;
 
   Z3DRenderingEngine* m_engine = nullptr;
-
-  bool m_renderingFinished = false;
 };
 
 #endif

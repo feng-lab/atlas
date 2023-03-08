@@ -325,13 +325,14 @@ void Z3DCanvas::toggleFullScreen()
 
 void Z3DCanvas::sceneParaUpdated()
 {
-  m_renderingFinished = false;
-  updateAll();
+  if (m_engine) {
+    auto pe = std::make_unique<QPaintEvent>(rect());
+    QCoreApplication::postEvent(m_engine, pe->clone());
+  }
 }
 
 void Z3DCanvas::renderingFinished()
 {
-  m_renderingFinished = true;
   updateAll();
 }
 
@@ -427,11 +428,7 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
 
 void Z3DCanvas::paintEvent(QPaintEvent* e)
 {
-  LOG(INFO) << "paintevent"
-            << " " << m_renderingFinished;
-  if (m_engine && !m_renderingFinished) {
-    QCoreApplication::postEvent(m_engine, e->clone());
-  }
+  LOG(INFO) << "paintevent";
   QGraphicsView::paintEvent(e);
 }
 

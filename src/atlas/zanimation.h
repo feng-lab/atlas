@@ -9,6 +9,7 @@
 #include <QUndoStack>
 #include <QTemporaryDir>
 #include <map>
+#include <utility>
 
 namespace nim {
 
@@ -51,9 +52,9 @@ public:
     setText("Change Duration");
   }
 
-  void undo();
+  void undo() override;
 
-  void redo();
+  void redo() override;
 
 private:
   ZAnimation* m_ani;
@@ -68,21 +69,21 @@ class ZAnimation : public QObject
 public:
   explicit ZAnimation(ZDoc& doc, QObject* parent = nullptr);
 
-  ~ZAnimation();
+  ~ZAnimation() override;
 
   void addKeyFrame(double time);
 
-  inline double duration() const
+  [[nodiscard]] inline double duration() const
   {
     return m_duration;
   }
 
-  const std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList(size_t id) const
+  [[nodiscard]] const std::vector<std::unique_ptr<ZParameterAnimation>>& paraAnimationList(size_t id) const
   {
     return findUniqueId(id)->objParaAnimations;
   }
 
-  const std::vector<ZAnimationDisplayPack>& displayPacks() const
+  [[nodiscard]] const std::vector<ZAnimationDisplayPack>& displayPacks() const
   {
     return m_displayPacks;
   }
@@ -98,7 +99,7 @@ public:
     return &m_undoStack;
   }
 
-  virtual bool is2DAnimation() const
+  [[nodiscard]] virtual bool is2DAnimation() const
   {
     return false;
   }
@@ -188,9 +189,9 @@ protected:
 
   struct AnimationObj
   {
-    AnimationObj(const QString& type, const json::value& value)
-      : objType(type)
-      , objJsonValue(value)
+    AnimationObj(QString type, json::value value)
+      : objType(std::move(type))
+      , objJsonValue(std::move(value))
       , isExpanded(false)
       , isShowAll(false)
       , boundId(0)

@@ -1,7 +1,5 @@
 #include "z3dimgview.h"
 
-#include <QApplication>
-
 namespace nim {
 
 Z3DImgView::Z3DImgView(ZImgDoc& doc, Z3DRenderingEngine& engine)
@@ -41,12 +39,9 @@ void Z3DImgView::docImgsAdded(const std::vector<size_t>& objs)
     }
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render image: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render image:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render image: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
@@ -75,12 +70,9 @@ void Z3DImgView::docImgAdded(size_t id)
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render image: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render image:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render image: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 

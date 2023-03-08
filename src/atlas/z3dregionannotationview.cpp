@@ -1,7 +1,5 @@
 #include "z3dregionannotationview.h"
 
-#include <QApplication>
-
 namespace nim {
 
 Z3DRegionAnnotationView::Z3DRegionAnnotationView(ZRegionAnnotationDoc& doc, Z3DRenderingEngine& engine)
@@ -47,12 +45,9 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
     }
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render regionAnnotation: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
@@ -87,12 +82,9 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render regionAnnotation: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render regionAnnotation:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render regionAnnotation: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 

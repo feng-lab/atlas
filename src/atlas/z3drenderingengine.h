@@ -56,11 +56,6 @@ public:
     return m_globalParas->interactionHandler;
   }
 
-  inline Z3DCanvas* canvas()
-  {
-    return m_canvas;
-  }
-
   inline Z3DCompositor& compositor()
   {
     return *m_compositor;
@@ -181,6 +176,10 @@ public:
 
   Z3DRenderTarget* rightReadyTarget() const;
 
+  void reportRenderingError(const QString& error) const;
+
+  void reportRenderingError(const std::string& error) const;
+
 Q_SIGNALS:
 
   void objViewReady(size_t id);
@@ -189,9 +188,11 @@ Q_SIGNALS:
 
   void sceneParaUpdated();
 
-  void startRendering();
+  void renderingFinished();
 
-  void finishRendering();
+  void renderingError(const QString& error) const;
+
+  void progressChanged(int v);
 
 protected:
   bool event(QEvent* e) override;

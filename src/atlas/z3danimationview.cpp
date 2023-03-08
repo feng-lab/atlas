@@ -1,7 +1,6 @@
 #include "z3danimationview.h"
 
 #include "z3dcanvas.h"
-#include <QApplication>
 
 namespace nim {
 
@@ -36,12 +35,9 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
     }
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render 3d animation:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render 3d animation: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
@@ -63,12 +59,9 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render 3d animation: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render 3d animation:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render 3d animation: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 

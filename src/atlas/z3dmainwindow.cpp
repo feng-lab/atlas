@@ -22,6 +22,7 @@
 #include <QMenuBar>
 #include <QSettings>
 #include <QStatusBar>
+#include <QProgressBar>
 #include <QApplication>
 #include <QDesktopServices>
 
@@ -46,6 +47,9 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   setCentralWidget(m_canvas);
   init();
   setCurrentFile("");
+
+  connect(m_engine, &Z3DRenderingEngine::renderingError, this, &Z3DMainWindow::onRenderingError);
+  connect(m_engine, &Z3DRenderingEngine::progressChanged, this, &Z3DMainWindow::onProgressChanged);
 }
 
 Z3DMainWindow::~Z3DMainWindow()
@@ -366,6 +370,9 @@ void Z3DMainWindow::createToolBars()
   m_helpToolBar = addToolBar(tr("Help"));
   m_helpToolBar->addAction(m_helpAction);
   m_helpToolBar->setIconSize(iconSize);
+  m_progressBarWidget = new QProgressBar();
+  m_progressBarWidget->setMaximumWidth(150);
+  m_progressBarAction = m_helpToolBar->addWidget(m_progressBarWidget);
 }
 
 void Z3DMainWindow::createStatusBar()
@@ -546,38 +553,23 @@ QWidget* Z3DMainWindow::createCaptureWidget() const
 {
   auto m_screenShotWidget = new ZTakeScreenShotWidget(false, false, nullptr);
   m_screenShotWidget->setCaptureStereoImage(m_isStereoView);
-  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, this, &Z3DMainWindow::takeScreenShot);
+  connect(m_screenShotWidget, &ZTakeScreenShotWidget::take3DScreenShot, m_engine, &Z3DRenderingEngine::takeScreenShot);
   connect(m_screenShotWidget,
           &ZTakeScreenShotWidget::takeFixedSize3DScreenShot,
-          this,
-          &Z3DMainWindow::takeFixedSizeScreenShot);
+          m_engine,
+          &Z3DRenderingEngine::takeFixedSizeScreenShot);
 
   return m_screenShotWidget;
-}
-
-void Z3DMainWindow::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
-{
-  try {
-    m_engine->takeScreenShot(filename, sst);
-  }
-  catch (ZException const& e) {
-    QMessageBox::critical(this, QApplication::applicationName(), e.what());
-  }
-}
-
-void Z3DMainWindow::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
-{
-  try {
-    m_engine->takeFixedSizeScreenShot(filename, width, height, sst);
-  }
-  catch (ZException const& e) {
-    QMessageBox::critical(this, QApplication::applicationName(), e.what());
-  }
 }
 
 void Z3DMainWindow::onCanvasReady()
 {
   Q_EMIT canvasReady(m_canvas);
+}
+
+void Z3DMainWindow::onRenderingError(const QString& error)
+{
+  QMessageBox::critical(this, QApplication::applicationName(), error);
 }
 
 QWidget* Z3DMainWindow::createHelpWidget()
@@ -601,6 +593,18 @@ QWidget* Z3DMainWindow::createHelpWidget()
   edt->moveCursor(QTextCursor::Start);
   edt->ensureCursorVisible();
   return edt;
+}
+
+void Z3DMainWindow::onProgressChanged(int v)
+{
+  if (v == 100) {
+    m_progressBarAction->setVisible(false);
+  } else {
+    if (!m_progressBarAction->isVisible()) {
+      m_progressBarAction->setVisible(true);
+    }
+    m_progressBarWidget->setValue(v);
+  }
 }
 
 } // namespace nim

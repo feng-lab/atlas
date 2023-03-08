@@ -3,6 +3,8 @@
 #include <QMainWindow>
 #include <QThread>
 
+class QProgressBar;
+
 namespace nim {
 
 class ZDoc;
@@ -107,15 +109,15 @@ private:
 
   void onViewReady();
 
-  QWidget* createCaptureWidget() const;
-
-  void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
-
-  void takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
+  [[nodiscard]] QWidget* createCaptureWidget() const;
 
   void onCanvasReady();
 
+  void onRenderingError(const QString& error);
+
   static QWidget* createHelpWidget();
+
+  void onProgressChanged(int v);
 
 private:
   QMenu* m_fileMenu = nullptr;
@@ -159,6 +161,8 @@ private:
   QAction* m_changeAxisAction = nullptr;
   QAction* m_screenShotAction = nullptr;
   QAction* m_helpAction = nullptr;
+  QProgressBar* m_progressBarWidget = nullptr;
+  QAction* m_progressBarAction = nullptr;
 
   //
   ZDoc& m_doc;

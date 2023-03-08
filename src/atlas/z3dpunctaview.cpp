@@ -38,12 +38,9 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
     }
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render puncta: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render puncta:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render puncta: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
@@ -69,12 +66,9 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     Q_EMIT objViewReady(id);
   }
   catch (const ZException& e) {
-    LOG(ERROR) << "Failed to render puncta: " << e.what();
-    if (m_engine.canvas()) {
-      QMessageBox::critical(m_engine.canvas(),
-                            QApplication::applicationName(),
-                            QString("Failed to render puncta:\n%1").arg(e.what()));
-    }
+    auto errorMsg = fmt::format("Failed to render puncta: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    m_engine.reportRenderingError(errorMsg);
   }
 }
 
