@@ -45,3 +45,6 @@
 
 # Whether to squeeze image cache after rendering, default is true
 --atlas_squeeze_image_cache_after_rendering=true
+
+# Whether to log glbinding context switch event, default is false"
+--atlas_log_glbinding_context_switch=false

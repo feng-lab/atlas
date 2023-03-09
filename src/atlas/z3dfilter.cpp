@@ -212,32 +212,6 @@ void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
   m_interactionHandlers.push_back(&handler);
 }
 
-bool Z3DFilter::isInInteractionMode() const
-{
-  return (!m_interactionModeSources.empty());
-}
-
-void Z3DFilter::toggleInteractionMode(bool interactionMode, void* source)
-{
-  if (interactionMode) {
-    if (m_interactionModeSources.find(source) == m_interactionModeSources.end()) {
-      m_interactionModeSources.insert(source);
-
-      if (m_interactionModeSources.size() == 1) {
-        enterInteractionMode();
-      }
-    }
-  } else {
-    if (m_interactionModeSources.find(source) != m_interactionModeSources.end()) {
-      m_interactionModeSources.erase(source);
-
-      if (m_interactionModeSources.empty()) {
-        exitInteractionMode();
-      }
-    }
-  }
-}
-
 void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
   if (!shader.isLinked()) {

@@ -764,14 +764,23 @@ void Z3DCompositor::process(Z3DEye eye)
 
   glDisable(GL_DEPTH_TEST);
 
-  if (!m_monoReadyTarget) {
-    m_monoReadyTarget = &m_outRenderTarget2;
-    m_leftReadyTarget = &m_leftEyeOutRenderTarget2;
-    m_rightReadyTarget = &m_rightEyeOutRenderTarget2;
+  glFinish();
+
+  {
+    const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
+    if (!m_monoReadyTarget) {
+      m_monoReadyTarget = &m_outRenderTarget2;
+      m_leftReadyTarget = &m_leftEyeOutRenderTarget2;
+      m_rightReadyTarget = &m_rightEyeOutRenderTarget2;
+    }
+    std::swap(m_monoReadyTarget, m_monoCurrentTarget);
+    std::swap(m_leftReadyTarget, m_leftCurrentTarget);
+    std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+
+    m_rendererBase.globalParas().hasNewRendering = true;
   }
-  std::swap(m_monoReadyTarget, m_monoCurrentTarget);
-  std::swap(m_leftReadyTarget, m_leftCurrentTarget);
-  std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+  LOG(INFO) << isValid(eye) << " finished";
+  Q_EMIT renderingFinished();
 }
 
 void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,

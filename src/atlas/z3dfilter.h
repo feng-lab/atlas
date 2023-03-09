@@ -149,7 +149,7 @@ protected:
   [[nodiscard]] virtual bool isReady(Z3DEye eye) const;
 
   // this is the place to do rendering related work
-  // the networkevaluator will sets its invalidation level to VALID after calling this
+  // the networkevaluator will set its invalidation level to VALID after calling this
   // input is current camera (eye), can be left or right in stereo case
   virtual void process(Z3DEye eye) = 0;
 
@@ -175,10 +175,6 @@ protected:
 
   virtual void exitInteractionMode() {}
 
-  [[nodiscard]] bool isInInteractionMode() const;
-
-  void toggleInteractionMode(bool interactionMode, void* source);
-
   static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
@@ -195,7 +191,6 @@ protected:
   std::map<QString, Z3DOutputPortBase*> m_outputPortMap;
 
   State m_state;
-  std::set<void*> m_interactionModeSources;
 
   QString m_name;
 

@@ -51,11 +51,6 @@ public:
     return m_globalParas->camera;
   }
 
-  Z3DTrackballInteractionHandler& interactionHandler()
-  {
-    return m_globalParas->interactionHandler;
-  }
-
   inline Z3DCompositor& compositor()
   {
     return *m_compositor;
@@ -176,6 +171,21 @@ public:
 
   Z3DRenderTarget* rightReadyTarget() const;
 
+  std::mutex& targetSwitchMutex()
+  {
+    return m_globalParas->targetSwitchMutex;
+  }
+
+  bool hasNewRenderingFlag() const
+  {
+    return m_globalParas->hasNewRendering.load();
+  }
+
+  void clearNewRenderingFlag()
+  {
+    m_globalParas->hasNewRendering = false;
+  }
+
   void reportRenderingError(const QString& error) const;
 
   void reportRenderingError(const std::string& error) const;
@@ -255,7 +265,6 @@ private:
   QMutex m_mutex;
 
   std::deque<Z3DCanvasEventListener*> m_listeners;
-  bool m_inited = false;
 
   std::set<QEvent::Type> m_eventTypes;
 };

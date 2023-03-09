@@ -19,7 +19,7 @@ void Z3DScene::drawBackground(QPainter* /*painter*/, const QRectF& /*rect*/)
 {
   LOG(INFO) << "draw background";
   m_canvas.getGLFocus();
-  glbinding::useContext(1);
+  // glbinding::useContext(1);
   m_painter->paint(m_isStereoScene);
 }
 

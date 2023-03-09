@@ -333,7 +333,9 @@ void Z3DCanvas::sceneParaUpdated()
 
 void Z3DCanvas::renderingFinished()
 {
-  updateAll();
+  if (m_engine->hasNewRenderingFlag()) {
+    updateAll();
+  }
 }
 
 void Z3DCanvas::updateAll()

@@ -27,6 +27,11 @@ DEFINE_bool(
   true,
   "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
 
+DEFINE_bool(
+  atlas_log_glbinding_context_switch,
+  false,
+  "Whether to log glbinding context switch event, default is false");
+
 namespace nim {
 
 Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
@@ -478,6 +483,7 @@ void Z3DRenderingEngine::init()
   m_compositor = std::make_unique<Z3DCompositor>(*m_globalParas);
   addEventListenerToBack(*m_compositor);
   connect(m_compositor.get(), &Z3DCompositor::sceneParaUpdated, this, &Z3DRenderingEngine::sceneParaUpdated);
+  connect(m_compositor.get(), &Z3DCompositor::renderingFinished, this, &Z3DRenderingEngine::renderingFinished);
 
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
@@ -522,7 +528,6 @@ void Z3DRenderingEngine::init()
 
   connect(&camera(), &Z3DCameraParameter::valueChanged, this, &Z3DRenderingEngine::resetCameraClippingRange);
 
-  m_inited = true;
   LOG(INFO) << "3D Renderer Inited.";
 
   Q_EMIT networkConstructed();
@@ -533,11 +538,11 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   CHECK(canvas);
   m_canvas = canvas;
   init();
-  m_canvas->setRenderingEngine(this);
 
   m_globalParas->setDevicePixelRatio(m_canvas->devicePixelRatio());
-
   setOutputSize(m_canvas->physicalSize());
+
+  m_canvas->setRenderingEngine(this);
   connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DRenderingEngine::onCanvasResized);
   connect(m_canvas, &Z3DCanvas::rotateX, this, &Z3DRenderingEngine::rotateX);
   connect(m_canvas, &Z3DCanvas::rotateY, this, &Z3DRenderingEngine::rotateY);
@@ -554,12 +559,12 @@ void Z3DRenderingEngine::detachCanvas()
   if (!m_canvas) {
     return;
   }
-  m_canvas->setRenderingEngine(nullptr);
-
-  m_globalParas->setDevicePixelRatio(1);
 
   m_canvas->disconnect(this);
   disconnect(m_canvas);
+  m_canvas->setRenderingEngine(nullptr);
+
+  m_globalParas->setDevicePixelRatio(1);
 
   m_canvas = nullptr;
 }
@@ -643,9 +648,11 @@ void Z3DRenderingEngine::initGL()
   glbinding::setUnresolvedCallback([](const glbinding::AbstractFunction& call) {
     LOG(ERROR) << "OpenGL function " << call.name() << " can not be resolved.";
   });
-  glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
-    LOG(INFO) << "Switching to OpenGL context " << handle;
-  });
+  if (FLAGS_atlas_log_glbinding_context_switch) {
+    glbinding::addContextSwitchCallback([](glbinding::ContextHandle handle) {
+      LOG(INFO) << "Switching to OpenGL context " << handle;
+    });
+  }
 
   if (!Z3DGpuInfo::instance().isSupported()) {
     auto errMsg = QString("3D Rendering not supported: ") + Z3DGpuInfo::instance().notSupportedReason();
@@ -698,7 +705,7 @@ void Z3DRenderingEngine::rotateZM()
 
 bool Z3DRenderingEngine::event(QEvent* e)
 {
-  if (m_inited && contains(m_eventTypes, e->type())) {
+  if (contains(m_eventTypes, e->type())) {
     if (e->type() == QEvent::Paint) {
       render();
       e->accept();
@@ -724,7 +731,7 @@ bool Z3DRenderingEngine::event(QEvent* e)
 void Z3DRenderingEngine::getGLFocus()
 {
   m_context->makeCurrent();
-  glbinding::useContext(0);
+  // glbinding::useContext(0);
 }
 
 void Z3DRenderingEngine::render(bool stereo)
@@ -732,9 +739,7 @@ void Z3DRenderingEngine::render(bool stereo)
   getGLFocus();
   Q_EMIT progressChanged(0);
   m_networkEvaluator->process(stereo);
-  glFinish();
   Q_EMIT progressChanged(100);
-  Q_EMIT renderingFinished();
 }
 
 Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const

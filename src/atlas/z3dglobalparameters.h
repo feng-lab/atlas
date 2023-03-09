@@ -8,6 +8,7 @@
 #include "z3dinteractionhandler.h"
 #include <vector>
 #include <deque>
+#include <mutex>
 
 namespace nim {
 
@@ -131,6 +132,9 @@ public:
   ZFloatSpanParameter zCut;
 
   ZFloatParameter devicePixelRatio;
+
+  std::mutex targetSwitchMutex;
+  std::atomic_bool hasNewRendering = false;
 
 private:
   std::vector<ZParameter*> m_parameters;

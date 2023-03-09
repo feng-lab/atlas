@@ -59,6 +59,8 @@ public:
 Q_SIGNALS:
   void sceneParaUpdated();
 
+  void renderingFinished();
+
 protected:
   void process(Z3DEye eye) override;
 
