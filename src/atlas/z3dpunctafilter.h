@@ -54,7 +54,7 @@ protected:
 
   void updateData();
 
-  void process(Z3DEye eye) override;
+  double process(Z3DEye eye) override;
 
   void renderPicking(Z3DEye eye) override;
 

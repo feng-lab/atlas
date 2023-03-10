@@ -326,6 +326,7 @@ void Z3DCanvas::toggleFullScreen()
 void Z3DCanvas::sceneParaUpdated()
 {
   if (m_engine) {
+    m_engine->cancelLongRendering();
     auto pe = std::make_unique<QPaintEvent>(rect());
     QCoreApplication::postEvent(m_engine, pe->clone());
   }
@@ -371,6 +372,7 @@ void Z3DCanvas::leaveEvent(QEvent* e)
 void Z3DCanvas::mousePressEvent(QMouseEvent* e)
 {
   if (m_engine) {
+    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -385,6 +387,7 @@ void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
   if (m_engine) {
+    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -399,6 +402,7 @@ void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
   if (m_engine) {
+    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }

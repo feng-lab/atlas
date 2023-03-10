@@ -49,7 +49,7 @@ public:
     m_glow.set(v);
   }
 
-  void process(Z3DEye eye) override;
+  double process(Z3DEye eye) override;
 
   void setData(std::vector<ZMesh*>* meshList);
 

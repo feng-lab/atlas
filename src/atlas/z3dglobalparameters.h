@@ -135,6 +135,8 @@ public:
 
   std::mutex targetSwitchMutex;
   std::atomic_bool hasNewRendering = false;
+  std::atomic_bool cancelLongRendering = false;
+  bool fastRenderingMode = false;
 
 private:
   std::vector<ZParameter*> m_parameters;

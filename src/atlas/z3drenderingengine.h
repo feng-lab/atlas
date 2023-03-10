@@ -186,6 +186,11 @@ public:
     m_globalParas->hasNewRendering = false;
   }
 
+  void cancelLongRendering()
+  {
+    m_globalParas->cancelLongRendering = true;
+  }
+
   void reportRenderingError(const QString& error) const;
 
   void reportRenderingError(const std::string& error) const;

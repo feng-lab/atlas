@@ -28,15 +28,15 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   updateNetwork();
 }
 
-void Z3DNetworkEvaluator::process(bool stereo)
+double Z3DNetworkEvaluator::process(bool stereo)
 {
-  if (m_locked) {
-    LOG(INFO) << "locked. Scheduling.";
-    // m_processPending = true;
-    return;
-  }
-
-  m_locked = true;
+  //  if (m_locked) {
+  //    LOG(INFO) << "locked. Scheduling.";
+  //    // m_processPending = true;
+  //    return;
+  //  }
+  //
+  //  m_locked = true;
 
   // already locked
 
@@ -59,6 +59,9 @@ void Z3DNetworkEvaluator::process(bool stereo)
   }
   CHECK_GL_ERROR
 
+  double currentProgress = 0.0;
+  double totalProgress = 0.0;
+
   // Iterate over filters in rendering order
   for (auto currentFilter : m_renderingOrder) {
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
@@ -72,8 +75,18 @@ void Z3DNetworkEvaluator::process(bool stereo)
       CHECK_GL_ERROR
 
       {
-        currentFilter->process(eye);
-        currentFilter->setValid(eye);
+        double progress = currentFilter->process(eye);
+        if (progress == 1.0) {
+          if (currentFilter == &m_compositor) {
+            if (totalProgress == currentProgress) {
+              currentFilter->setValid(eye);
+            }
+          } else {
+            currentFilter->setValid(eye);
+          }
+        }
+        currentProgress += progress;
+        totalProgress += 1.0;
         CHECK_GL_ERROR
       }
 
@@ -92,8 +105,18 @@ void Z3DNetworkEvaluator::process(bool stereo)
       CHECK_GL_ERROR
 
       {
-        currentFilter->process(Z3DEye::Right);
-        currentFilter->setValid(Z3DEye::Right);
+        double progress = currentFilter->process(Z3DEye::Right);
+        if (progress == 1.0) {
+          if (currentFilter == &m_compositor) {
+            if (totalProgress == currentProgress) {
+              currentFilter->setValid(Z3DEye::Right);
+            }
+          } else {
+            currentFilter->setValid(Z3DEye::Right);
+          }
+        }
+        currentProgress += progress;
+        totalProgress += 1.0;
         CHECK_GL_ERROR
       }
 
@@ -118,6 +141,8 @@ void Z3DNetworkEvaluator::process(bool stereo)
   //    m_processPending = false;
   //    m_compositor.invalidate(Z3DFilter::State::AllResultInvalid);
   //  }
+
+  return totalProgress > 0 ? currentProgress / totalProgress : 1.0;
 }
 
 void Z3DNetworkEvaluator::updateNetwork()

@@ -64,10 +64,10 @@ public:
     m_fastRendering = v;
   }
 
-  [[nodiscard]] bool lastRenderingIsFastRendering() const
-  {
-    return m_lastRenderingIsFastRendering;
-  }
+//  [[nodiscard]] bool lastRenderingIsFastRendering() const
+//  {
+//    return m_lastRenderingIsFastRendering;
+//  }
 
   // return true if something is rendered by this renderer
   [[nodiscard]] bool hasVisibleRendering() const;
@@ -179,7 +179,7 @@ private:
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = false;
-  bool m_lastRenderingIsFastRendering = false;
+  // bool m_lastRenderingIsFastRendering = false;
 };
 
 } // namespace nim

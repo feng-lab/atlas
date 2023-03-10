@@ -18,13 +18,14 @@ Z3DRegionAnnotationFilter::Z3DRegionAnnotationFilter(Z3DGlobalParameters& global
   m_numParas = m_parameters.size();
 }
 
-void Z3DRegionAnnotationFilter::process(Z3DEye eye)
+double Z3DRegionAnnotationFilter::process(Z3DEye eye)
 {
   initializeCutRange();
   initializeRotationCenter();
   for (const auto& idFilter : m_idToMeshFilters) {
     idFilter.second->process(eye);
   }
+  return 1.;
 }
 
 void Z3DRegionAnnotationFilter::setData(ZRegionAnnotationPack& rap)

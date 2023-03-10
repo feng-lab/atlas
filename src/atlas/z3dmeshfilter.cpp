@@ -75,7 +75,7 @@ QString Z3DMeshFilter::regionName() const
   return m_regionNode ? m_regionNode->name : QString();
 }
 
-void Z3DMeshFilter::process(Z3DEye eye)
+double Z3DMeshFilter::process(Z3DEye eye)
 {
   if (m_dataIsInvalid) {
     prepareData();
@@ -115,6 +115,8 @@ void Z3DMeshFilter::process(Z3DEye eye)
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
   }
+
+  return 1.;
 }
 
 void Z3DMeshFilter::setData(std::vector<ZMesh*>* meshList)

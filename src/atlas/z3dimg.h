@@ -154,6 +154,7 @@ public:
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           const std::vector<uint32_t>& usedBlockIDs,
                                           size_t c,
+                                          const std::atomic_bool& cancelFlag,
                                           bool silenceExistingWarning = true);
 
 protected:

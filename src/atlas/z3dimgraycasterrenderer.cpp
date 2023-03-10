@@ -312,7 +312,7 @@ QString Z3DImgRaycasterRenderer::generateHeader()
 
 void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 {
-  m_lastRenderingIsFastRendering = false;
+  // m_lastRenderingIsFastRendering = false;
 
   if (!hasVisibleRendering()) {
     return;
@@ -340,6 +340,8 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       visibleIdxs.push_back(i);
     }
   }
+
+  auto& cancelFlag = m_rendererBase.globalParas().cancelLongRendering;
 
   if (!m_quads.empty()) { // 2d image or slice from 3d volume
     if (m_img->is2DData()) { // image is 2D
@@ -442,7 +444,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
-          m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c);
+          m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancelFlag);
 
           bt.resetAndStart("render image3d slice");
           // render channels one by one
@@ -481,7 +483,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           STOP_AND_LOG(bt)
         }
       } else {
-        m_lastRenderingIsFastRendering = true;
+        // m_lastRenderingIsFastRendering = true;
 
         m_scVolumeSliceWithTransferfunShader.bind();
         m_rendererBase.setGlobalShaderParameters(m_scVolumeSliceWithTransferfunShader, eye);
@@ -534,6 +536,11 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
           LOG(INFO) << "round " << round;
           ZBenchTimer btrb("render blockids");
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           m_image3DRaycasterBlockIDsShader.bind();
           //          m_image3DRaycasterBlockIDsShader.setUniform("screen_dim_RCP",
           //                                                      1.f / glm::vec2(m_blockIDsRenderTarget->size()));
@@ -580,6 +587,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           // glFinish();
           STOP_AND_LOG(btrb)
 
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           ZBenchTimer btcb("collect blockids");
           // check missed blocks and upload
           const Z3DTexture* missingBlockIDsTexture = m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT0);
@@ -610,6 +621,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           bool hasEnoughMissingIDs = false;
 
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           if (ccSet.size() > 1 || ccSet.find(0_u32) == ccSet.end()) { // has some real blocks in attachment0
             numberBlock = ccSet.size();
             hasEnoughMissingIDs = numberBlock > m_img->numCachedImages(c);
@@ -630,6 +645,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             break; // no blocks to render
           }
 
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           bool lastRound = false;
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
             numberBlock = ccSet.size();
@@ -644,6 +663,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
           } else {
             lastRound = !hasEnoughMissingIDs;
+          }
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
           }
 
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
@@ -661,6 +684,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
             numberBlock = ccSet.size();
             m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT4)
@@ -674,6 +701,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
           } else {
             lastRound = !hasEnoughMissingIDs;
+          }
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
           }
 
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
@@ -691,6 +722,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
             numberBlock = ccSet.size();
             m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT6)
@@ -704,6 +739,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
           } else {
             lastRound = !hasEnoughMissingIDs;
+          }
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
           }
 
           if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
@@ -720,6 +759,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             // LOG(INFO) << m_img->numCachedImages() << " " << numberBlock << " " << ccSet.size();
           } else {
             lastRound = !hasEnoughMissingIDs;
+          }
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
           }
 
           if (!hasEnoughMissingIDs && numberBlock == ccSet.size()) {
@@ -744,7 +787,15 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
           STOP_AND_LOG(btcb)
 
-          lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c) && lastRound;
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
+
+          lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancelFlag) && lastRound;
+
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
 
           ZBenchTimer btri("render image");
           // render channels one by one
@@ -798,6 +849,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           }
         }
 
+        if (cancelFlag.load()) {
+          throw ZGLException("cancel");
+        }
+
         if (visibleIdxs.size() == 1) {
           m_copyTextureShader.bind();
           m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
@@ -819,6 +874,10 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
       }
 
+      if (cancelFlag.load()) {
+        throw ZGLException("cancel");
+      }
+
       if (FLAGS_atlas_clear_image_cache_after_rendering) {
         ZImgCache::instance().clear();
         ZImgRegionCache::instance().clear();
@@ -829,7 +888,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
       LOG(INFO) << "image cache size: " << ZImgCache::instance().size();
       LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
     } else {
-      m_lastRenderingIsFastRendering = true;
+      // m_lastRenderingIsFastRendering = true;
 
       m_scRaycasterShader.bind();
 

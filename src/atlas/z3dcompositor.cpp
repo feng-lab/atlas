@@ -250,7 +250,7 @@ void Z3DCompositor::invalidate(State inv)
   Q_EMIT sceneParaUpdated();
 }
 
-void Z3DCompositor::process(Z3DEye eye)
+double Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
   std::vector<Z3DImgFilter*> vFilters = m_vPPort.connectedFilters();
@@ -779,8 +779,10 @@ void Z3DCompositor::process(Z3DEye eye)
 
     m_rendererBase.globalParas().hasNewRendering = true;
   }
-  LOG(INFO) << isValid(eye) << " finished";
+  LOG(INFO) << m_rendererBase.globalParas().fastRenderingMode << " finished";
   Q_EMIT renderingFinished();
+
+  return 1.0;
 }
 
 void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,

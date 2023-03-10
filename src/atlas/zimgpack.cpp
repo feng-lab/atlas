@@ -532,12 +532,17 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                size_t t,
                                                                const ZImgInfo& resInfo,
                                                                double displayRangeMin,
-                                                               double displayRangeMax) const
+                                                               double displayRangeMax,
+                                                               const std::atomic_bool& cancelFlag) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   if (FLAGS_atlas_readRegionToImg_version == 0) {
-    return folly::via(cpuExecutor, [=, &resInfo]() {
+    return folly::via(cpuExecutor, [=, &resInfo, &cancelFlag]() {
+      if (cancelFlag.load()) {
+        throw ZGLException("cancel");
+      }
+
       bool needToUpdateBlockInfo = false;
       if (auto it = m_blockInfo.find(
             std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, resInfo.width, resInfo.height, resInfo.depth));
@@ -548,6 +553,10 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         }
       } else {
         needToUpdateBlockInfo = true;
+      }
+
+      if (cancelFlag.load()) {
+        throw ZGLException("cancel");
       }
 
       auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
@@ -565,6 +574,10 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                              displayRangeMax));
       if (img) {
         return folly::makeFuture(img);
+      }
+
+      if (cancelFlag.load()) {
+        throw ZGLException("cancel");
       }
 
       auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
@@ -585,6 +598,10 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return folly::makeFuture(std::shared_ptr<ZImg>());
       }
 
+      if (cancelFlag.load()) {
+        throw ZGLException("cancel");
+      }
+
       auto tmpResInfo = resInfo;
       tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
       tmpResInfo.height = std::ceil(resInfo.height * xyRatio * 1.0 / readRatio[1]);
@@ -597,7 +614,10 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto tileIndex : queryResult) {
         const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
-        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
+        tileFutures.push_back(folly::via(cpuExecutor).then([=, &cancelFlag](auto&&) {
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
           auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
@@ -608,7 +628,11 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).then([=, &resInfo](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).thenValue([=, &resInfo, &cancelFlag](auto&&) {
+        if (cancelFlag.load()) {
+          throw ZGLException("cancel");
+        }
+
         if (needToUpdateBlockInfo) {
           double minv;
           double maxv;
@@ -627,6 +651,11 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         } else {
           *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
         }
+
+        if (cancelFlag.load()) {
+          throw ZGLException("cancel");
+        }
+
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
           res->resize(resInfo.width,
                       resInfo.height,

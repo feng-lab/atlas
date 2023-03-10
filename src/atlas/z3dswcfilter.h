@@ -86,7 +86,7 @@ protected:
 
   void contextMenuEvent(QContextMenuEvent* e, int w, int h);
 
-  void process(Z3DEye /*unused*/) override;
+  double process(Z3DEye /*unused*/) override;
 
   void registerPickingObjects() override;
 

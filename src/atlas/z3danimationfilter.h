@@ -25,7 +25,7 @@ class Z3DAnimationFilter : public Z3DGeometryFilter
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void process(Z3DEye /*unused*/) override;
+  double process(Z3DEye /*unused*/) override;
 
   void setData(Z3DAnimation* animation);
 

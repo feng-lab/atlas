@@ -54,6 +54,7 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 
 Z3DMainWindow::~Z3DMainWindow()
 {
+  m_engine->cancelLongRendering();
   m_renderingThread.quit();
   m_renderingThread.wait();
 }
@@ -597,7 +598,7 @@ QWidget* Z3DMainWindow::createHelpWidget()
 
 void Z3DMainWindow::onProgressChanged(int v)
 {
-  if (v == 100) {
+  if (v == 100 && m_progressBarAction->isVisible()) {
     m_progressBarAction->setVisible(false);
   } else {
     if (!m_progressBarAction->isVisible()) {

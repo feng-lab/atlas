@@ -82,14 +82,14 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_stayOnTop);
   addParameter(m_fullResolutionRendering);
   connect(&m_rendererBase, &Z3DRendererBase::coordTransformChanged, this, &Z3DImgFilter::changeCoordTransform);
-  connect(&m_rendererBase.globalParas().interactionHandler,
-          &Z3DTrackballInteractionHandler::enterInteractionMode,
-          this,
-          &Z3DImgFilter::enterFastMode);
-  connect(&m_rendererBase.globalParas().interactionHandler,
-          &Z3DTrackballInteractionHandler::exitInteractionMode,
-          this,
-          &Z3DImgFilter::exitFastMode);
+//  connect(&m_rendererBase.globalParas().interactionHandler,
+//          &Z3DTrackballInteractionHandler::enterInteractionMode,
+//          this,
+//          &Z3DImgFilter::enterFastMode);
+//  connect(&m_rendererBase.globalParas().interactionHandler,
+//          &Z3DTrackballInteractionHandler::exitInteractionMode,
+//          this,
+//          &Z3DImgFilter::exitFastMode);
 
   // addParameter(m_interactionDownsample);
   addParameter(m_smoothInteraction);
@@ -660,29 +660,32 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 //   m_FRVolumeSlicesValidState[5] = false;
 // }
 
-void Z3DImgFilter::enterFastMode()
-{
-  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
-    m_imgRaycasterRenderer.setFastRendering(true);
-    m_imgSliceRenderer.setFastRendering(true);
-  }
-}
+//void Z3DImgFilter::enterFastMode()
+//{
+//  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
+//    m_imgRaycasterRenderer.setFastRendering(true);
+//    m_imgSliceRenderer.setFastRendering(true);
+//  }
+//}
+//
+//void Z3DImgFilter::exitFastMode()
+//{
+//  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
+//    m_imgRaycasterRenderer.setFastRendering(false);
+//    m_imgSliceRenderer.setFastRendering(false);
+//    // upstream will invalidate the network, but in case there are no upstream
+//    // do one more invalidation
+//    if (m_imgRaycasterRenderer.lastRenderingIsFastRendering() || m_imgSliceRenderer.lastRenderingIsFastRendering()) {
+//      invalidateResult();
+//    }
+//  }
+//}
 
-void Z3DImgFilter::exitFastMode()
+double Z3DImgFilter::process(Z3DEye eye)
 {
-  if (m_smoothInteraction.get() && m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get()) {
-    m_imgRaycasterRenderer.setFastRendering(false);
-    m_imgSliceRenderer.setFastRendering(false);
-    // upstream will invalidate the network, but in case there are no upstream
-    // do one more invalidation
-    if (m_imgRaycasterRenderer.lastRenderingIsFastRendering() || m_imgSliceRenderer.lastRenderingIsFastRendering()) {
-      invalidateResult();
-    }
-  }
-}
+  m_imgRaycasterRenderer.setFastRendering(m_rendererBase.globalParas().fastRenderingMode);
+  m_imgSliceRenderer.setFastRendering(m_rendererBase.globalParas().fastRenderingMode);
 
-void Z3DImgFilter::process(Z3DEye eye)
-{
   glEnable(GL_DEPTH_TEST);
 
   if (hasImage()) {
@@ -698,6 +701,13 @@ void Z3DImgFilter::process(Z3DEye eye)
   glDisable(GL_DEPTH_TEST);
 
   CHECK_GL_ERROR
+
+  if (m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get() &&
+      m_rendererBase.globalParas().fastRenderingMode && (hasImage() || hasSlices())) {
+    return 0.2;
+  } else {
+    return 1.0;
+  }
 }
 
 bool Z3DImgFilter::hasSlices() const

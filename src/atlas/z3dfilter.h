@@ -151,7 +151,7 @@ protected:
   // this is the place to do rendering related work
   // the networkevaluator will set its invalidation level to VALID after calling this
   // input is current camera (eye), can be left or right in stereo case
-  virtual void process(Z3DEye eye) = 0;
+  virtual double process(Z3DEye eye) = 0;
 
   void addPort(Z3DInputPortBase& port);
 

@@ -81,11 +81,11 @@ protected:
 
   void setClipPlanes() override {}
 
-  void enterFastMode();
+//  void enterFastMode();
+//
+//  void exitFastMode();
 
-  void exitFastMode();
-
-  void process(Z3DEye eye) override;
+  double process(Z3DEye eye) override;
 
   [[nodiscard]] bool hasSlices() const;
 

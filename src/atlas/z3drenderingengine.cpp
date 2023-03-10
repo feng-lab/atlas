@@ -27,10 +27,9 @@ DEFINE_bool(
   true,
   "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
 
-DEFINE_bool(
-  atlas_log_glbinding_context_switch,
-  false,
-  "Whether to log glbinding context switch event, default is false");
+DEFINE_bool(atlas_log_glbinding_context_switch,
+            false,
+            "Whether to log glbinding context switch event, default is false");
 
 namespace nim {
 
@@ -738,8 +737,22 @@ void Z3DRenderingEngine::render(bool stereo)
 {
   getGLFocus();
   Q_EMIT progressChanged(0);
-  m_networkEvaluator->process(stereo);
-  Q_EMIT progressChanged(100);
+  m_globalParas->fastRenderingMode = true;
+  double progress = m_networkEvaluator->process(stereo);
+  Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+  if (!m_globalParas->cancelLongRendering.load()) {
+    try {
+      m_globalParas->fastRenderingMode = false;
+      while (progress < 1.0) {
+        progress = m_networkEvaluator->process(stereo);
+        Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+      }
+    }
+    catch (ZException& e) {
+      LOG(INFO) << e.what();
+    }
+  }
+  m_globalParas->cancelLongRendering = false;
 }
 
 Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const

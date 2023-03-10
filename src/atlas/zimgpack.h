@@ -176,7 +176,8 @@ public:
                                                        size_t t,
                                                        const ZImgInfo& resInfo,
                                                        double displayRangeMin,
-                                                       double displayRangeMax) const;
+                                                       double displayRangeMax,
+                                                       const std::atomic_bool& cancelFlag) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const

@@ -62,7 +62,7 @@ Q_SIGNALS:
   void renderingFinished();
 
 protected:
-  void process(Z3DEye eye) override;
+  double process(Z3DEye eye) override;
 
 private:
   // little helper function

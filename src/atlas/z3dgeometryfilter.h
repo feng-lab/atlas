@@ -47,7 +47,10 @@ public:
   }
 
 protected:
-  void process(Z3DEye /*eye*/) override {}
+  double process(Z3DEye /*eye*/) override
+  {
+    return 1.0;
+  }
 
   // once processed, should be valid for both stereo view and mono view
   void setValid(Z3DEye eye) override

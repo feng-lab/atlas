@@ -108,7 +108,7 @@ Z3DPunctaFilter::Z3DPunctaFilter(Z3DGlobalParameters& globalParas, QObject* pare
   adjustWidgets();
 }
 
-void Z3DPunctaFilter::process(Z3DEye /*eye*/)
+double Z3DPunctaFilter::process(Z3DEye /*eye*/)
 {
   if (m_dataIsInvalid) {
     prepareData();
@@ -166,6 +166,8 @@ void Z3DPunctaFilter::process(Z3DEye /*eye*/)
   //    glDisable(GL_BLEND);
   //    glDisable(GL_DEPTH_TEST);
   //  }
+
+  return 1.;
 }
 
 void Z3DPunctaFilter::setData(ZPunctaPack& puncta)

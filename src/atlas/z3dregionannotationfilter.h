@@ -13,7 +13,7 @@ class Z3DRegionAnnotationFilter : public Z3DGeometryFilter
 public:
   explicit Z3DRegionAnnotationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  void process(Z3DEye eye) override;
+  double process(Z3DEye eye) override;
 
   void setData(ZRegionAnnotationPack& rap);
 
