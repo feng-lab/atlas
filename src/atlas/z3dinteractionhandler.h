@@ -47,9 +47,9 @@ Q_SIGNALS:
 
   void cameraMoved();
 
-  void enterInteractionMode();
-
-  void exitInteractionMode();
+//  void enterInteractionMode();
+//
+//  void exitInteractionMode();
 
 protected:
   enum class State

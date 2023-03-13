@@ -185,6 +185,8 @@ public:
 
   void updateAll();
 
+  void repaintAll();
+
   // for high dpi support like retina
   glm::uvec2 physicalSize()
   {

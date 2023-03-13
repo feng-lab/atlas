@@ -41,10 +41,10 @@ void Z3DCanvasPainter::paint(bool stereo)
     m_textureCopyRenderer.setColorTexture(m_engine->monoReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->monoReadyTarget()->depthTexture());
     auto endTarget = m_engine->monoReadyTarget();
-    LOG(INFO) << startTarget << " " << endTarget << " " << m_canvas.physicalSize();
     m_rendererBase.render(Z3DEye::Mono, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();
+    LOG(INFO) << startTarget << " " << endTarget << " " << m_canvas.physicalSize();
   }
 }
 

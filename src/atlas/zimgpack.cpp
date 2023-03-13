@@ -83,7 +83,8 @@ ZImgPack::ZImgPack(ZImgSource imgSource)
     }
   }
 
-  // bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height, m_imgInfo.depth);
+  // bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height,
+  // m_imgInfo.depth);
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold) {
     LOG(INFO) << "read all";
     m_diskCached = false;
@@ -624,12 +625,17 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
+          if (cancelFlag.load()) {
+            throw ZGLException("cancel");
+          }
           res->pasteImg(*imgPtr, start);
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).thenValue([=, &resInfo, &cancelFlag](auto&&) {
-        if (cancelFlag.load()) {
+      return folly::collectAll(tileFutures).via(cpuExecutor).thenValue([=, &resInfo, &cancelFlag](auto&& fres) {
+        if (cancelFlag.load() || std::any_of(fres.cbegin(), fres.cend(), [](const auto& i) {
+              return i.hasException();
+            })) {
           throw ZGLException("cancel");
         }
 

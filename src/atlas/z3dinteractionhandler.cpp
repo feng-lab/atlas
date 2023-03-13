@@ -38,31 +38,31 @@ void Z3DInteractionHandler::setSharing(bool sharing)
 
 void Z3DInteractionHandler::onEvent(QEvent* e, int w, int h)
 {
-  if (e->type() == QEvent::MouseButtonPress) {
-    auto event = dynamic_cast<QMouseEvent*>(e);
-    if (event->button() == Qt::LeftButton) {
-      LOG(INFO) << "mouse enter interaction";
-      Q_EMIT enterInteractionMode();
-    }
-  } else if (e->type() == QEvent::MouseButtonRelease) {
-    auto event = dynamic_cast<QMouseEvent*>(e);
-    if (event->button() == Qt::LeftButton && QApplication::keyboardModifiers() == Qt::NoModifier) {
-      LOG(INFO) << "mouse exit interaction";
-      Q_EMIT exitInteractionMode();
-    }
-  } else if (e->type() == QEvent::KeyPress) {
-    auto event = dynamic_cast<QKeyEvent*>(e);
-    if (event->modifiers() != Qt::NoModifier) {
-      LOG(INFO) << "key enter interaction";
-      Q_EMIT enterInteractionMode();
-    }
-  } else if (e->type() == QEvent::KeyRelease) {
-    auto event = dynamic_cast<QKeyEvent*>(e);
-    if (event->modifiers() == Qt::NoModifier && QApplication::mouseButtons() == Qt::NoButton) {
-      LOG(INFO) << "key exit interaction";
-      Q_EMIT exitInteractionMode();
-    }
-  }
+//  if (e->type() == QEvent::MouseButtonPress) {
+//    auto event = dynamic_cast<QMouseEvent*>(e);
+//    if (event->button() == Qt::LeftButton) {
+//      LOG(INFO) << "mouse enter interaction";
+//      Q_EMIT enterInteractionMode();
+//    }
+//  } else if (e->type() == QEvent::MouseButtonRelease) {
+//    auto event = dynamic_cast<QMouseEvent*>(e);
+//    if (event->button() == Qt::LeftButton && QApplication::keyboardModifiers() == Qt::NoModifier) {
+//      LOG(INFO) << "mouse exit interaction";
+//      Q_EMIT exitInteractionMode();
+//    }
+//  } else if (e->type() == QEvent::KeyPress) {
+//    auto event = dynamic_cast<QKeyEvent*>(e);
+//    if (event->modifiers() != Qt::NoModifier) {
+//      LOG(INFO) << "key enter interaction";
+//      Q_EMIT enterInteractionMode();
+//    }
+//  } else if (e->type() == QEvent::KeyRelease) {
+//    auto event = dynamic_cast<QKeyEvent*>(e);
+//    if (event->modifiers() == Qt::NoModifier && QApplication::mouseButtons() == Qt::NoButton) {
+//      LOG(INFO) << "key exit interaction";
+//      Q_EMIT exitInteractionMode();
+//    }
+//  }
   for (size_t j = 0; j < m_eventListeners.size() && !e->isAccepted(); ++j) {
     m_eventListeners[j]->sendEvent(e, w, h);
   }

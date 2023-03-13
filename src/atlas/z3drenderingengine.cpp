@@ -48,7 +48,6 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::Wheel,
                                         QEvent::KeyPress,
                                         QEvent::KeyRelease,
-                                        QEvent::Timer,
                                         QEvent::Paint};
 }
 

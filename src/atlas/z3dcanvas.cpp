@@ -341,10 +341,20 @@ void Z3DCanvas::renderingFinished()
 
 void Z3DCanvas::updateAll()
 {
+  LOG(INFO) << "update";
 #ifdef ATLAS_USE_OPENGLWINDOW
   m_glWindow->update();
 #else
   m_glWidget->update();
+#endif
+}
+
+void Z3DCanvas::repaintAll()
+{
+#ifdef ATLAS_USE_OPENGLWINDOW
+  m_glWindow->repaint();
+#else
+  m_glWidget->repaint();
 #endif
 }
 
@@ -386,6 +396,7 @@ void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
+  LOG(INFO) << "mousemoveevent";
   if (m_engine) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
@@ -401,6 +412,7 @@ void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
+  LOG(INFO) << "wheelevent";
   if (m_engine) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
@@ -450,9 +462,10 @@ void Z3DCanvas::dropEvent(QDropEvent* event)
 
 void Z3DCanvas::timerEvent(QTimerEvent* e)
 {
-  if (m_engine) {
-    QCoreApplication::postEvent(m_engine, e->clone());
-  }
+//  if (m_engine) {
+//    QCoreApplication::postEvent(m_engine, e->clone());
+//  }
+  QGraphicsView::timerEvent(e);
 }
 
 void Z3DCanvas::getGLFocus()
