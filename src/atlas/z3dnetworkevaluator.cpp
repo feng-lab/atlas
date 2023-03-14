@@ -28,7 +28,7 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   updateNetwork();
 }
 
-double Z3DNetworkEvaluator::process(bool stereo)
+double Z3DNetworkEvaluator::process(bool stereo, bool checkValid)
 {
   //  if (m_locked) {
   //    LOG(INFO) << "locked. Scheduling.";
@@ -67,7 +67,7 @@ double Z3DNetworkEvaluator::process(bool stereo)
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
 
     // execute the filter, if it needs processing and is ready
-    if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
+    if ((!checkValid || !currentFilter->isValid(eye)) && currentFilter->isReady(eye)) {
       // notify filter wrappers
       for (auto& filterWrapper : m_filterWrappers) {
         filterWrapper->beforeFilterProcess(currentFilter);
@@ -76,15 +76,16 @@ double Z3DNetworkEvaluator::process(bool stereo)
 
       {
         double progress = currentFilter->process(eye);
-        if (progress == 1.0) {
-          if (currentFilter == &m_compositor) {
-            if (totalProgress == currentProgress) {
-              currentFilter->setValid(eye);
-            }
-          } else {
-            currentFilter->setValid(eye);
-          }
-        }
+        currentFilter->setValid(eye);
+//        if (progress == 1.0) {
+//          if (currentFilter == &m_compositor) {
+//            if (totalProgress == currentProgress) {
+//              currentFilter->setValid(eye);
+//            }
+//          } else {
+//            currentFilter->setValid(eye);
+//          }
+//        }
         currentProgress += progress;
         totalProgress += 1.0;
         CHECK_GL_ERROR
@@ -97,7 +98,7 @@ double Z3DNetworkEvaluator::process(bool stereo)
       CHECK_GL_ERROR
     }
 
-    if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
+    if (stereo && (!checkValid || !currentFilter->isValid(Z3DEye::Right)) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
         filterWrapper->beforeFilterProcess(currentFilter);
@@ -106,15 +107,16 @@ double Z3DNetworkEvaluator::process(bool stereo)
 
       {
         double progress = currentFilter->process(Z3DEye::Right);
-        if (progress == 1.0) {
-          if (currentFilter == &m_compositor) {
-            if (totalProgress == currentProgress) {
-              currentFilter->setValid(Z3DEye::Right);
-            }
-          } else {
-            currentFilter->setValid(Z3DEye::Right);
-          }
-        }
+        currentFilter->setValid(Z3DEye::Right);
+//        if (progress == 1.0) {
+//          if (currentFilter == &m_compositor) {
+//            if (totalProgress == currentProgress) {
+//              currentFilter->setValid(Z3DEye::Right);
+//            }
+//          } else {
+//            currentFilter->setValid(Z3DEye::Right);
+//          }
+//        }
         currentProgress += progress;
         totalProgress += 1.0;
         CHECK_GL_ERROR

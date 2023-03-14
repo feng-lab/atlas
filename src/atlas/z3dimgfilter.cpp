@@ -1049,7 +1049,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
       planeNormals.emplace_back(0., 0., -1.);
       planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.upperValue());
     }
-    LOG(INFO) << planeNormals.size();
+    // LOG(INFO) << planeNormals.size();
     ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
 #if 0
     float nearPlaneDistToOrigin =

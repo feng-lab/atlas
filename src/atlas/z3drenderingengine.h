@@ -259,7 +259,7 @@ private:
 
   std::vector<Z3DObjView*> m_3dObjViews;
 
-  Z3DCanvas* m_canvas = nullptr;
+  QPointer<Z3DCanvas> m_canvas;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
   std::unique_ptr<Z3DNetworkEvaluator> m_networkEvaluator;
   std::unique_ptr<Z3DCompositor> m_compositor;

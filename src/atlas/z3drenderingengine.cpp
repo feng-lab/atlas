@@ -48,7 +48,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::Wheel,
                                         QEvent::KeyPress,
                                         QEvent::KeyRelease,
-                                        QEvent::Paint};
+                                        QEvent::UpdateRequest};
 }
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
@@ -554,6 +554,8 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
 
 void Z3DRenderingEngine::detachCanvas()
 {
+  m_globalParas->setDevicePixelRatio(1);
+
   if (!m_canvas) {
     return;
   }
@@ -562,9 +564,7 @@ void Z3DRenderingEngine::detachCanvas()
   disconnect(m_canvas);
   m_canvas->setRenderingEngine(nullptr);
 
-  m_globalParas->setDevicePixelRatio(1);
-
-  m_canvas = nullptr;
+  m_canvas.clear();
 }
 
 void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
@@ -704,7 +704,7 @@ void Z3DRenderingEngine::rotateZM()
 bool Z3DRenderingEngine::event(QEvent* e)
 {
   if (contains(m_eventTypes, e->type())) {
-    if (e->type() == QEvent::Paint) {
+    if (e->type() == QEvent::UpdateRequest) {
       render();
       e->accept();
       return true;
@@ -734,16 +734,17 @@ void Z3DRenderingEngine::getGLFocus()
 
 void Z3DRenderingEngine::render(bool stereo)
 {
+  LOG(INFO) << "render";
   getGLFocus();
-  Q_EMIT progressChanged(0);
   m_globalParas->fastRenderingMode = true;
-  double progress = m_networkEvaluator->process(stereo);
-  Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+  m_networkEvaluator->process(stereo);
   if (!m_globalParas->cancelLongRendering.load()) {
     try {
       m_globalParas->fastRenderingMode = false;
+      double progress = 0.1;
+      Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       while (progress < 1.0) {
-        progress = m_networkEvaluator->process(stereo);
+        progress = m_networkEvaluator->process(stereo, false);
         Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       }
     }

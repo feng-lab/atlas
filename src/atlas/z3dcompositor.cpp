@@ -243,10 +243,13 @@ void Z3DCompositor::makeOutputSizeEvenNumbers()
 
 void Z3DCompositor::invalidate(State inv)
 {
+  // LOG(INFO) << to_underlying(m_state) << " " << to_underlying(inv);
+  set_flag(m_state, inv);
+
   if (inv == State::Valid) {
     return;
   }
-  m_state |= inv;
+
   Q_EMIT sceneParaUpdated();
 }
 
