@@ -59,6 +59,8 @@ public:
   // otherwise don't use the returned value
   glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
+  void setFastRenderingMode(bool v, bool stereo) override;
+
 protected:
   void updateSize() override;
 
@@ -66,7 +68,7 @@ protected:
 
   void adjustWidget();
 
-  void fullResolutionRenderingToggled();
+  // void fullResolutionRenderingToggled();
 
   void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
 
@@ -140,7 +142,7 @@ private:
   size_t m_numParas;
 
   // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
-  ZBoolParameter m_smoothInteraction;
+  // ZBoolParameter m_smoothInteraction;
 
   Z3DRenderTarget m_entryTarget;
   Z3DRenderTarget m_exitTarget;

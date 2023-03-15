@@ -10,7 +10,7 @@
 #include <QMutexLocker>
 #include <set>
 
-class QMainWindow;
+class QOffscreenSurface;
 
 namespace nim {
 
@@ -254,6 +254,7 @@ private:
   void rotateZM();
 
 private:
+  QOffscreenSurface* m_offscreenSurface = nullptr;
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
 

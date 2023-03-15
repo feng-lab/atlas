@@ -7,7 +7,8 @@
 
 namespace nim {
 
-Z3DContext::Z3DContext(QOpenGLContext* sharedContext)
+Z3DContext::Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* sharedContext)
+: m_offscreenSurface(offscreenSurface)
 {
   m_context = new QOpenGLContext();
   m_context->setFormat(QSurfaceFormat::defaultFormat());
@@ -18,18 +19,10 @@ Z3DContext::Z3DContext(QOpenGLContext* sharedContext)
   if (!m_context->isValid()) {
     LOG(ERROR) << "Can not create OpenGL context";
   }
-
-  m_offscreenSurface = new QOffscreenSurface;
-  m_offscreenSurface->setFormat(QSurfaceFormat::defaultFormat());
-  m_offscreenSurface->create();
-  if (!m_offscreenSurface->isValid()) {
-    LOG(ERROR) << "Can not create OpenGL Offscreen surface";
-  }
 }
 
 Z3DContext::~Z3DContext()
 {
-  delete m_offscreenSurface;
   delete m_context;
 }
 
@@ -49,7 +42,7 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
 
 void Z3DContext::makeCurrent() const
 {
-  m_context->makeCurrent(m_offscreenSurface);
+  m_context->makeCurrent(&m_offscreenSurface);
 }
 
 Z3DContextGroup::Z3DContextGroup()

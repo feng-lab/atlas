@@ -120,8 +120,8 @@ Z3DTrackballInteractionHandler::Z3DTrackballInteractionHandler(const QString& na
   //  addEventListener(m_mouseDollyEvent);
 
   m_wheelDollyEvent = new ZEventListenerParameter(name + " Wheel Dolly");
-  // m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::NoModifier, QEvent::Wheel);
-  m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::ControlModifier, QEvent::Wheel);
+  m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::NoModifier, QEvent::Wheel);
+  // m_wheelDollyEvent->listenTo("dolly", Qt::NoButton, Qt::ControlModifier, QEvent::Wheel);
   connect(m_wheelDollyEvent,
           &ZEventListenerParameter::wheelEventTriggered,
           this,

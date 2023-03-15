@@ -253,6 +253,15 @@ void Z3DCompositor::invalidate(State inv)
   Q_EMIT sceneParaUpdated();
 }
 
+void Z3DCompositor::setFastRenderingMode(bool v, bool /*stereo*/)
+{
+  if (m_fastRendering == v) {
+    return;
+  }
+  m_fastRendering = v;
+  m_state = State::AllResultInvalid;
+}
+
 double Z3DCompositor::process(Z3DEye eye)
 {
   std::vector<Z3DGeometryFilter*> filters = m_gPPort.connectedFilters();
@@ -782,7 +791,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
     m_rendererBase.globalParas().hasNewRendering = true;
   }
-  LOG(INFO) << m_rendererBase.globalParas().fastRenderingMode << " finished";
+  LOG(INFO) << m_fastRendering << " finished";
   Q_EMIT renderingFinished();
 
   return 1.0;

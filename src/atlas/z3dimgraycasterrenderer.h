@@ -64,6 +64,11 @@ public:
     m_fastRendering = v;
   }
 
+  bool isFastRendering() const
+  {
+    return m_fastRendering;
+  }
+
 //  [[nodiscard]] bool lastRenderingIsFastRendering() const
 //  {
 //    return m_lastRenderingIsFastRendering;
@@ -178,7 +183,7 @@ private:
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
-  bool m_fastRendering = false;
+  bool m_fastRendering = true;
   // bool m_lastRenderingIsFastRendering = false;
 };
 

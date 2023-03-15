@@ -578,10 +578,8 @@ QWidget* Z3DMainWindow::createHelpWidget()
   auto edt = new QPlainTextEdit();
   edt->setReadOnly(true);
   edt->appendPlainText("zoom/dolly:");
-  edt->appendPlainText("    1) command/control key + mouse wheel scroll");
-  edt->appendPlainText("    2) command/control key + =(+)/- key");
-  // edt->appendPlainText("    3) mouse wheel scroll (might be slow if image is rendered in full-resolution)");
-  // edt->appendPlainText("    4) =(+)/- key (might be slow if image is rendered in full-resolution)");
+  edt->appendPlainText("    1) mouse wheel scroll");
+  edt->appendPlainText("    2) [(optional) command/control key] + =(+)/- key");
   edt->appendPlainText("rotate:");
   edt->appendPlainText("    1) [(optional) command/control key] + mouse drag");
   edt->appendPlainText("    2) command/control key + Left/Right/Up/Down key");

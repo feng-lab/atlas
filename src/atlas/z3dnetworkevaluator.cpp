@@ -28,7 +28,7 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   updateNetwork();
 }
 
-double Z3DNetworkEvaluator::process(bool stereo, bool checkValid)
+double Z3DNetworkEvaluator::process(bool stereo)
 {
   //  if (m_locked) {
   //    LOG(INFO) << "locked. Scheduling.";
@@ -67,7 +67,7 @@ double Z3DNetworkEvaluator::process(bool stereo, bool checkValid)
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
 
     // execute the filter, if it needs processing and is ready
-    if ((!checkValid || !currentFilter->isValid(eye)) && currentFilter->isReady(eye)) {
+    if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
       // notify filter wrappers
       for (auto& filterWrapper : m_filterWrappers) {
         filterWrapper->beforeFilterProcess(currentFilter);
@@ -98,7 +98,7 @@ double Z3DNetworkEvaluator::process(bool stereo, bool checkValid)
       CHECK_GL_ERROR
     }
 
-    if (stereo && (!checkValid || !currentFilter->isValid(Z3DEye::Right)) && currentFilter->isReady(Z3DEye::Right)) {
+    if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
         filterWrapper->beforeFilterProcess(currentFilter);
@@ -205,6 +205,13 @@ void Z3DNetworkEvaluator::updateNetwork()
   for (auto filter : m_reverseSortedFilters) {
     QObject::disconnect(filter, &Z3DFilter::requestUpstreamSizeChange, nullptr, nullptr);
     connect(filter, &Z3DFilter::requestUpstreamSizeChange, this, &Z3DNetworkEvaluator::sizeChangedFromFilter);
+  }
+}
+
+void Z3DNetworkEvaluator::setFastRenderingMode(bool v, bool stereo)
+{
+  for (auto currentFilter : m_renderingOrder) {
+    currentFilter->setFastRenderingMode(v, stereo);
   }
 }
 

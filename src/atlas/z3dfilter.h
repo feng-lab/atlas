@@ -85,6 +85,8 @@ public:
 
   virtual void invalidate(State inv);
 
+  virtual void setFastRenderingMode(bool /*v*/, bool /*stereo*/) {}
+
   // returns the port with the given name, or nullptr if such a port does not exist.
   [[nodiscard]] Z3DInputPortBase* inputPort(const QString& name) const;
 

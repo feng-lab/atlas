@@ -327,7 +327,7 @@ void Z3DCanvas::sceneParaUpdated()
 {
   if (m_engine) {
     // m_engine->cancelLongRendering();
-    QCoreApplication::postEvent(m_engine, new QEvent(QEvent::UpdateRequest));
+    QCoreApplication::postEvent(m_engine, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
 }
 
@@ -395,7 +395,7 @@ void Z3DCanvas::mouseReleaseEvent(QMouseEvent* e)
 
 void Z3DCanvas::mouseMoveEvent(QMouseEvent* e)
 {
-  LOG(INFO) << "mousemoveevent";
+  // LOG(INFO) << "mousemoveevent";
   if (m_engine) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
@@ -411,7 +411,7 @@ void Z3DCanvas::mouseDoubleClickEvent(QMouseEvent* e)
 
 void Z3DCanvas::wheelEvent(QWheelEvent* e)
 {
-  LOG(INFO) << "wheelevent";
+  // LOG(INFO) << "wheelevent";
   if (m_engine) {
     m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
@@ -422,6 +422,7 @@ void Z3DCanvas::keyPressEvent(QKeyEvent* e)
 {
   QGraphicsView::keyPressEvent(e);
   if (m_engine) {
+    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -445,7 +446,7 @@ void Z3DCanvas::resizeEvent(QResizeEvent* event)
 
 void Z3DCanvas::paintEvent(QPaintEvent* e)
 {
-  LOG(INFO) << "paintevent";
+  // LOG(INFO) << "paintevent";
   QGraphicsView::paintEvent(e);
 }
 

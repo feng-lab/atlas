@@ -20,6 +20,7 @@
 #include "zimgformat.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
+#include <QOffscreenSurface>
 #include <memory>
 
 DEFINE_bool(
@@ -49,6 +50,15 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::KeyPress,
                                         QEvent::KeyRelease,
                                         QEvent::UpdateRequest};
+
+  // need to be created in main gui thread
+  // see https://bugreports.qt.io/browse/QTBUG-87115
+  m_offscreenSurface = new QOffscreenSurface;
+  m_offscreenSurface->setFormat(QSurfaceFormat::defaultFormat());
+  m_offscreenSurface->create();
+  if (!m_offscreenSurface->isValid()) {
+    LOG(ERROR) << "Can not create OpenGL Offscreen surface";
+  }
 }
 
 Z3DRenderingEngine::~Z3DRenderingEngine()
@@ -56,6 +66,7 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   LOG(INFO) << "in engine destructor";
   detachCanvas();
   getGLFocus();
+  m_offscreenSurface->deleteLater();
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -603,9 +614,9 @@ void Z3DRenderingEngine::onCanvasResized(size_t w, size_t h)
 void Z3DRenderingEngine::initGL()
 {
   if (m_canvas) {
-    m_context = std::make_unique<Z3DContext>(m_canvas->context());
+    m_context = std::make_unique<Z3DContext>(*m_offscreenSurface, m_canvas->context());
   } else {
-    m_context = std::make_unique<Z3DContext>();
+    m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
   }
   m_context->makeCurrent();
 
@@ -736,15 +747,15 @@ void Z3DRenderingEngine::render(bool stereo)
 {
   LOG(INFO) << "render";
   getGLFocus();
-  m_globalParas->fastRenderingMode = true;
+  m_networkEvaluator->setFastRenderingMode(true, stereo);
   m_networkEvaluator->process(stereo);
   if (!m_globalParas->cancelLongRendering.load()) {
     try {
-      m_globalParas->fastRenderingMode = false;
+      m_networkEvaluator->setFastRenderingMode(false, stereo);
       double progress = 0.1;
       Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       while (progress < 1.0) {
-        progress = m_networkEvaluator->process(stereo, false);
+        progress = m_networkEvaluator->process(stereo);
         Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       }
     }

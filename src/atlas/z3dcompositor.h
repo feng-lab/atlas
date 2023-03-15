@@ -56,6 +56,8 @@ public:
 
   void invalidate(State inv) override;
 
+  void setFastRenderingMode(bool v, bool stereo) override;
+
 Q_SIGNALS:
   void sceneParaUpdated();
 
@@ -216,6 +218,8 @@ private:
   ZVertexArrayObject m_screenQuadVAO;
 
   glm::vec4 m_region;
+
+  bool m_fastRendering = true;
 };
 
 } // namespace nim

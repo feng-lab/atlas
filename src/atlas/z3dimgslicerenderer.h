@@ -25,6 +25,11 @@ public:
     m_fastRendering = v;
   }
 
+  bool isFastRendering() const
+  {
+    return m_fastRendering;
+  }
+
   void setLayerTarget(Z3DRenderTarget& target)
   {
     m_layerTarget = &target;
@@ -35,10 +40,10 @@ public:
     m_blockIDsRenderTarget = &target;
   }
 
-  [[nodiscard]] bool lastRenderingIsFastRendering() const
-  {
-    return m_lastRenderingIsFastRendering;
-  }
+//  [[nodiscard]] bool lastRenderingIsFastRendering() const
+//  {
+//    return m_lastRenderingIsFastRendering;
+//  }
 
   // a slice in 3D volume contains plane triangles and 3d texture coordinates
   // clear
@@ -80,8 +85,8 @@ private:
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
-  bool m_fastRendering = false;
-  bool m_lastRenderingIsFastRendering = false;
+  bool m_fastRendering = true;
+  // bool m_lastRenderingIsFastRendering = false;
 };
 
 } // namespace nim

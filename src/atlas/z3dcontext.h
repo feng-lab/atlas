@@ -11,7 +11,7 @@ using ProcAddress = void (*)();
 class Z3DContext
 {
 public:
-  Z3DContext(QOpenGLContext* sharedContext = nullptr);
+  Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* sharedContext = nullptr);
 
   ~Z3DContext();
 
@@ -28,7 +28,7 @@ public:
 
 private:
   QOpenGLContext* m_context = nullptr;
-  QOffscreenSurface* m_offscreenSurface = nullptr;
+  QOffscreenSurface& m_offscreenSurface;
 };
 
 class Z3DContextGroup
