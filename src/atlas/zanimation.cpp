@@ -234,6 +234,10 @@ void ZAnimation::setDuration(double duration)
 
 void ZAnimation::setCurrentTime(double time)
 {
+  if (auto eng = dynamic_cast<Z3DRenderingEngine*>(m_engine); eng) {
+    eng->cancelLongRendering();
+  }
+
   time = std::max(0.0, time);
 
   for (const auto& obj : m_objList) {

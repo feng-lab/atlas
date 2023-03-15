@@ -27,6 +27,7 @@ void Z3DAnimationDoc::bindView(Z3DRenderingEngine* v)
   for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
   }
+  LOG(INFO) << "bind 3d view done";
 }
 
 void Z3DAnimationDoc::createNewAnimation(const QString& name)

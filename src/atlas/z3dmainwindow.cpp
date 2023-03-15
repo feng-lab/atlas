@@ -258,18 +258,18 @@ void Z3DMainWindow::createActions()
   zoomInKey << QKeySequence::ZoomIn << QKeySequence(Qt::Key_Plus) << QKeySequence(Qt::Key_Equal);
   m_zoomInAction->setShortcuts(zoomInKey);
   m_zoomInAction->setStatusTip(tr("Zoom in"));
-  connect(m_zoomInAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::zoomIn);
+  connect(m_zoomInAction, &QAction::triggered, this, &Z3DMainWindow::zoomIn);
 
   m_zoomOutAction = new QAction(ZTheme::instance().icon(ZTheme::ZoomOutIcon), tr("Zoom &Out"), this);
   QList<QKeySequence> zoomOutKey;
   zoomOutKey << QKeySequence::ZoomOut << QKeySequence(Qt::Key_Minus);
   m_zoomOutAction->setShortcuts(zoomOutKey);
   m_zoomOutAction->setStatusTip(tr("Zoom out"));
-  connect(m_zoomOutAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::zoomOut);
+  connect(m_zoomOutAction, &QAction::triggered, this, &Z3DMainWindow::zoomOut);
 
   m_resetCameraAction = new QAction(tr("&Reset Camera"), this);
   m_resetCameraAction->setStatusTip(tr("Reset camera to show all objects in scene"));
-  connect(m_resetCameraAction, &QAction::triggered, m_engine, &Z3DRenderingEngine::resetCamera);
+  connect(m_resetCameraAction, &QAction::triggered, this, &Z3DMainWindow::resetCamera);
 
   m_changeBackgroundAction =
     new QAction(ZTheme::instance().icon(ZTheme::BackgroundIcon), tr("&Change Background"), this);
@@ -604,6 +604,24 @@ void Z3DMainWindow::onProgressChanged(int v)
     }
     m_progressBarWidget->setValue(v);
   }
+}
+
+void Z3DMainWindow::zoomIn()
+{
+  m_engine->cancelLongRendering();
+  m_engine->zoomIn();
+}
+
+void Z3DMainWindow::zoomOut()
+{
+  m_engine->cancelLongRendering();
+  m_engine->zoomOut();
+}
+
+void Z3DMainWindow::resetCamera()
+{
+  m_engine->cancelLongRendering();
+  m_engine->resetCamera();
 }
 
 } // namespace nim

@@ -119,6 +119,12 @@ private:
 
   void onProgressChanged(int v);
 
+  void zoomIn();
+
+  void zoomOut();
+
+  void resetCamera();
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;

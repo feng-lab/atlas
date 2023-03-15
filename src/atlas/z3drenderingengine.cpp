@@ -53,7 +53,7 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
 
   // need to be created in main gui thread
   // see https://bugreports.qt.io/browse/QTBUG-87115
-  m_offscreenSurface = new QOffscreenSurface;
+  m_offscreenSurface = std::make_unique<QOffscreenSurface>();
   m_offscreenSurface->setFormat(QSurfaceFormat::defaultFormat());
   m_offscreenSurface->create();
   if (!m_offscreenSurface->isValid()) {
@@ -66,7 +66,6 @@ Z3DRenderingEngine::~Z3DRenderingEngine()
   LOG(INFO) << "in engine destructor";
   detachCanvas();
   getGLFocus();
-  m_offscreenSurface->deleteLater();
 }
 
 const ZDoc& Z3DRenderingEngine::doc() const
@@ -714,6 +713,7 @@ void Z3DRenderingEngine::rotateZM()
 
 bool Z3DRenderingEngine::event(QEvent* e)
 {
+  LOG(INFO) << e->type();
   if (contains(m_eventTypes, e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       render();

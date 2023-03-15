@@ -254,7 +254,7 @@ private:
   void rotateZM();
 
 private:
-  QOffscreenSurface* m_offscreenSurface = nullptr;
+  std::unique_ptr<QOffscreenSurface> m_offscreenSurface;
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
 
