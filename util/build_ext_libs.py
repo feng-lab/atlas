@@ -1530,6 +1530,12 @@ def build_assimp(src_dir: str, install_dir: str):
         #     subprocess.run(['install_name_tool', '-change', 'libIrrXML.dylib', '@loader_path/libIrrXML.dylib',
         #                     'lib/libassimp.dylib'],
         #                    cwd=install_dir, shell=False, check=True)
+
+        orig_file_5 = os.path.join(install_dir, 'include', 'assimp', 'types.h')
+        patch_file(orig_file_5,
+                   from_texts=[r'#   include "../contrib/utf8cpp/source/utf8.h"'],
+                   to_texts=[r''])
+
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
