@@ -1,8 +1,6 @@
 #include "z3dinteractionhandler.h"
 
 #include "z3dcameraparameter.h"
-#include "zlog.h"
-#include <QApplication>
 #include <boost/math/constants/constants.hpp>
 #include <utility>
 
@@ -400,6 +398,7 @@ void Z3DTrackballInteractionHandler::wheelEvent(QWheelEvent* e, int /*unused*/, 
   m_delta = 0;
 #else
   if (e->angleDelta().y() == 0) {
+    // LOG(INFO) << "empty wheel";
     return;
   }
   if (m_state == State::Dolly) {

@@ -157,6 +157,10 @@ public:
                                           const std::atomic_bool& cancelFlag,
                                           bool silenceExistingWarning = true);
 
+Q_SIGNALS:
+
+  void renderingError(const QString& error) const;
+
 protected:
   void readVolumes();
 

@@ -5,8 +5,6 @@
 #include "zeventlistenerparameter.h"
 #include "zlog.h"
 #include "zmesh.h"
-#include <QMessageBox>
-#include <QApplication>
 #include <QMenu>
 #include <memory>
 
@@ -295,6 +293,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     }
 
     m_3dImg = std::make_unique<Z3DImg>(imgPack, m_rendererBase.coordTransformPara().scale(), drs);
+    connect(m_3dImg.get(), &Z3DImg::renderingError, this, &Z3DImgFilter::renderingError);
 
     updateBlockIDTarget();
 
@@ -426,9 +425,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
   catch (const ZException& e) {
     m_3dImg.reset();
     LOG(ERROR) << e.what();
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("import 3d img error: %1").arg(e.what()));
+    Q_EMIT renderingError(QString("import 3d img error: %1").arg(e.what()));
   }
 
   invalidateResult();
@@ -544,10 +541,14 @@ void Z3DImgFilter::setFastRenderingMode(bool v, bool stereo)
   }
   // always fast rendering
   if (m_3dImg && !m_3dImg->isVolumeDownsampled()) {
+    m_imgRaycasterRenderer.setFastRendering(true);
+    m_imgSliceRenderer.setFastRendering(true);
     return;
   }
   // always fast rendering
   if (!m_fullResolutionRendering.get()) {
+    m_imgRaycasterRenderer.setFastRendering(true);
+    m_imgSliceRenderer.setFastRendering(true);
     return;
   }
   // has valid full-res rendering, do nothing
@@ -718,6 +719,19 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
 
 double Z3DImgFilter::process(Z3DEye eye)
 {
+  if (m_channelRangeChanged) {
+    if (m_3dImg) {
+      std::vector<glm::dvec2> channelDisplayRanges;
+      for (const auto& para : m_doubleChannelRangeParas) {
+        channelDisplayRanges.push_back(para->get());
+      }
+      m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
+      m_imgRaycasterRenderer.updateDisplayRanges();
+    }
+
+    m_channelRangeChanged = false;
+  }
+
   glEnable(GL_DEPTH_TEST);
 
   if (hasImage()) {
@@ -1216,14 +1230,7 @@ void Z3DImgFilter::volumeChanged() {}
 
 void Z3DImgFilter::channelRangeChanged()
 {
-  if (m_3dImg) {
-    std::vector<glm::dvec2> channelDisplayRanges;
-    for (const auto& para : m_doubleChannelRangeParas) {
-      channelDisplayRanges.push_back(para->get());
-    }
-    m_3dImg->setChannelDisplayRanges(channelDisplayRanges);
-    m_imgRaycasterRenderer.updateDisplayRanges();
-  }
+  m_channelRangeChanged = true;
 }
 
 glm::vec3 Z3DImgFilter::getFirstHit3DPosition(int x, int y, int width, int height, bool& success)

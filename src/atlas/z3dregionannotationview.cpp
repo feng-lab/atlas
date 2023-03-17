@@ -33,6 +33,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationsAdded(const std::vector<size_t
               &Z3DRegionAnnotationFilter::objVisibleChanged,
               this,
               &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DRegionAnnotationFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -74,6 +75,7 @@ void Z3DRegionAnnotationView::docRegionAnnotationAdded(size_t id)
             &Z3DRegionAnnotationFilter::objVisibleChanged,
             this,
             &Z3DRegionAnnotationView::onObjVisibleChangedFromView);
+    connect(viewControl, &Z3DRegionAnnotationFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();

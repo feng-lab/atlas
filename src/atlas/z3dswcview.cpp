@@ -26,6 +26,7 @@ void Z3DSwcView::docSwcsAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
       connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
       connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DSwcFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -58,6 +59,7 @@ void Z3DSwcView::docSwcAdded(size_t id)
     connect(viewControl, &Z3DSwcFilter::objDeselected, this, &Z3DSwcView::onObjDeselectedFromView);
     connect(viewControl, &Z3DSwcFilter::objSelected, this, &Z3DSwcView::onObjSelectedFromView);
     connect(viewControl, &Z3DSwcFilter::objVisibleChanged, this, &Z3DSwcView::onObjVisibleChangedFromView);
+    connect(viewControl, &Z3DSwcFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();

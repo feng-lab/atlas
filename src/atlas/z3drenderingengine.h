@@ -163,6 +163,8 @@ public:
     m_listeners.clear();
   }
 
+  void renderFast(bool stereo = false);
+
   void render(bool stereo = false);
 
   Z3DRenderTarget* monoReadyTarget() const;
@@ -268,11 +270,13 @@ private:
   ZBBox<glm::dvec3> m_boundBox;
   size_t m_numObjsBefore;
 
-  QMutex m_mutex;
-
   std::deque<Z3DCanvasEventListener*> m_listeners;
 
   std::set<QEvent::Type> m_eventTypes;
+
+  bool m_isRendering = false;
+
+  QMutex m_mutex;
 };
 
 } // namespace nim

@@ -6,8 +6,6 @@
 #include "zkmeans.h"
 #include "zbenchtimer.h"
 #include "zexception.h"
-#include <QApplication>
-#include <QMessageBox>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -868,9 +866,7 @@ void Z3DImg::readVolumes()
   size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
 #endif
   if (m_nChannels > maxPossibleChannels) {
-    QMessageBox::warning(
-      QApplication::activeWindow(),
-      QApplication::applicationName(),
+    Q_EMIT renderingError(
       QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels));
     m_nChannels = maxPossibleChannels;
   }

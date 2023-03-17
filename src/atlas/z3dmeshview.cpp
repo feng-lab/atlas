@@ -24,6 +24,7 @@ void Z3DMeshView::docMeshesAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
       connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
       connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DMeshFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -56,6 +57,7 @@ void Z3DMeshView::docMeshAdded(size_t id)
     connect(viewControl, &Z3DMeshFilter::objDeselected, this, &Z3DMeshView::onObjDeselectedFromView);
     connect(viewControl, &Z3DMeshFilter::objSelected, this, &Z3DMeshView::onObjSelectedFromView);
     connect(viewControl, &Z3DMeshFilter::objVisibleChanged, this, &Z3DMeshView::onObjVisibleChangedFromView);
+    connect(viewControl, &Z3DMeshFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();

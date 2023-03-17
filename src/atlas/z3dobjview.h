@@ -8,7 +8,6 @@
 #include "zobjdoc.h"
 #include "zexception.h"
 #include <QObject>
-#include <QMessageBox>
 
 namespace nim {
 

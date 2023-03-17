@@ -202,6 +202,8 @@ private:
   ZEventListenerParameter m_leftMouseButtonPressEvent;
   ZEventListenerParameter m_contextMenuEvent;
   glm::ivec2 m_startCoord{};
+
+  bool m_channelRangeChanged = false;
 };
 
 } // namespace nim

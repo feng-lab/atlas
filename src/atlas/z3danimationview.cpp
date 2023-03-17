@@ -27,6 +27,7 @@ void Z3DAnimationView::docAnimationsAdded(const std::vector<size_t>& objs)
               &Z3DAnimationFilter::objVisibleChanged,
               this,
               &Z3DAnimationView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DAnimationFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       Q_EMIT objViewReady(id);
     }
     if (!objs.empty()) {
@@ -53,6 +54,7 @@ void Z3DAnimationView::docAnimationAdded(size_t id)
     viewControl->outputPort("GeometryFilter")->connect(m_engine.compositor().inputPort("GeometryFilters"));
     connect(viewControl, &Z3DAnimationFilter::boundBoxChanged, this, &Z3DAnimationView::updateBoundBox);
     connect(viewControl, &Z3DAnimationFilter::objVisibleChanged, this, &Z3DAnimationView::onObjVisibleChangedFromView);
+    connect(viewControl, &Z3DAnimationFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.networkEvaluator().updateNetwork();
     m_engine.updateBoundBox();
 

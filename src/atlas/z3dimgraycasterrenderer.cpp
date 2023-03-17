@@ -8,7 +8,6 @@
 #include "zlog.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
-#include <QApplication>
 #include <QFileInfo>
 
 DEFINE_bool(atlas_clear_image_cache_after_rendering,

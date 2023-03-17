@@ -2,8 +2,6 @@
 
 #include "zrandom.h"
 #include "zlog.h"
-#include <QMessageBox>
-#include <QApplication>
 #include <iostream>
 
 namespace nim {
@@ -391,13 +389,11 @@ void Z3DSwcFilter::prepareData()
     if (checkRadius && n1->radius < std::numeric_limits<double>::epsilon() &&
         n2->radius < std::numeric_limits<double>::epsilon()) {
       checkRadius = false;
-      QMessageBox::information(QApplication::activeWindow(),
-                               QApplication::applicationName(),
-                               "Reset SWC Rendering Mode.\n"
-                               "SWC contains segments with zero radius. "
-                               "The geometrical primitive of SWC rendering "
-                               "will be set to 'Line' to "
-                               "make those segments visible.");
+      Q_EMIT renderingError("Reset SWC Rendering Mode.\n"
+                            "SWC contains segments with zero radius. "
+                            "The geometrical primitive of SWC rendering "
+                            "will be set to 'Line' to "
+                            "make those segments visible.");
       m_renderingPrimitive.select("Line");
     }
 

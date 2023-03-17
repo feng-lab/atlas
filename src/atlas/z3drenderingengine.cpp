@@ -21,6 +21,7 @@
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
+#include <QCoreApplication>
 #include <memory>
 
 DEFINE_bool(
@@ -40,8 +41,6 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   , m_numObjsBefore(m_doc.numObjs())
 {
   m_eventTypes = std::set<QEvent::Type>{QEvent::ContextMenu,
-                                        QEvent::Enter,
-                                        QEvent::Leave,
                                         QEvent::MouseButtonPress,
                                         QEvent::MouseButtonRelease,
                                         QEvent::MouseMove,
@@ -49,7 +48,8 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::Wheel,
                                         QEvent::KeyPress,
                                         QEvent::KeyRelease,
-                                        QEvent::UpdateRequest};
+                                        QEvent::UpdateRequest,
+                                        QEvent::LayoutRequest};
 
   // need to be created in main gui thread
   // see https://bugreports.qt.io/browse/QTBUG-87115
@@ -210,6 +210,7 @@ void Z3DRenderingEngine::resetCameraCenter()
 
 void Z3DRenderingEngine::resetCameraClippingRange()
 {
+  // LOG(INFO) << "resetCameraClippingRange";
   if (!m_mutex.try_lock()) {
     return;
   }
@@ -482,6 +483,7 @@ void Z3DRenderingEngine::setYZView()
 
 void Z3DRenderingEngine::init()
 {
+  Q_EMIT progressChanged(10);
   initGL();
   getGLFocus();
 
@@ -495,6 +497,8 @@ void Z3DRenderingEngine::init()
 
   // build network and connect to canvas
   m_networkEvaluator = std::make_unique<Z3DNetworkEvaluator>(*m_compositor);
+
+  Q_EMIT progressChanged(20);
 
   // packages
   connect(&m_doc,
@@ -531,6 +535,8 @@ void Z3DRenderingEngine::init()
 
   updateBoundBox();
 
+  Q_EMIT progressChanged(60);
+
   // adjust camera
   resetCamera();
 
@@ -539,6 +545,8 @@ void Z3DRenderingEngine::init()
   LOG(INFO) << "3D Renderer Inited.";
 
   Q_EMIT networkConstructed();
+
+  Q_EMIT progressChanged(100);
 }
 
 void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
@@ -716,6 +724,10 @@ bool Z3DRenderingEngine::event(QEvent* e)
   LOG(INFO) << e->type();
   if (contains(m_eventTypes, e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
+      renderFast();
+      e->accept();
+      return true;
+    } else if (e->type() == QEvent::LayoutRequest) {
       render();
       e->accept();
       return true;
@@ -743,12 +755,52 @@ void Z3DRenderingEngine::getGLFocus()
   // glbinding::useContext(0);
 }
 
-void Z3DRenderingEngine::render(bool stereo)
+void Z3DRenderingEngine::renderFast(bool stereo)
 {
-  LOG(INFO) << "render";
+  if (m_isRendering) {
+    LOG(INFO) << "in fast rendering, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
+
+  LOG(INFO) << "renderFast";
+  m_isRendering = true;
   getGLFocus();
+  Q_EMIT progressChanged(0);
   m_networkEvaluator->setFastRenderingMode(true, stereo);
   m_networkEvaluator->process(stereo);
+  Q_EMIT progressChanged(100);
+  //  if (!m_globalParas->cancelLongRendering.load()) {
+  //    try {
+  //      m_networkEvaluator->setFastRenderingMode(false, stereo);
+  //      double progress = 0.1;
+  //      Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+  //      while (progress < 1.0) {
+  //        progress = m_networkEvaluator->process(stereo);
+  //        Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+  //      }
+  //    }
+  //    catch (ZException& e) {
+  //      LOG(INFO) << e.what();
+  //    }
+  //  }
+  //  m_globalParas->cancelLongRendering = false;
+  QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+  m_globalParas->cancelLongRendering = false;
+  m_isRendering = false;
+}
+
+void Z3DRenderingEngine::render(bool stereo)
+{
+  if (m_isRendering) {
+    LOG(INFO) << "in rendering, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+    return;
+  }
+
+  LOG(INFO) << "render";
+  m_isRendering = true;
+  getGLFocus();
   if (!m_globalParas->cancelLongRendering.load()) {
     try {
       m_networkEvaluator->setFastRenderingMode(false, stereo);
@@ -764,6 +816,7 @@ void Z3DRenderingEngine::render(bool stereo)
     }
   }
   m_globalParas->cancelLongRendering = false;
+  m_isRendering = false;
 }
 
 Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const

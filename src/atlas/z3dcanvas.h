@@ -220,9 +220,9 @@ Q_SIGNALS:
 protected:
   void contextMenuEvent(QContextMenuEvent* e) override;
 
-  void enterEvent(QEnterEvent* e) override;
-
-  void leaveEvent(QEvent* e) override;
+  //  void enterEvent(QEnterEvent* e) override;
+  //
+  //  void leaveEvent(QEvent* e) override;
 
   void mousePressEvent(QMouseEvent* e) override;
 

@@ -1,7 +1,5 @@
 #include "z3dpunctaview.h"
 
-#include <QApplication>
-
 namespace nim {
 
 Z3DPunctaView::Z3DPunctaView(ZPunctaDoc& doc, Z3DRenderingEngine& engine)
@@ -26,6 +24,7 @@ void Z3DPunctaView::docPunctasAdded(const std::vector<size_t>& objs)
       connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
       connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
+      connect(viewControl, &Z3DPunctaFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
       m_engine.addEventListenerToBack(*viewControl);
     }
     if (!objs.empty()) {
@@ -58,6 +57,7 @@ void Z3DPunctaView::docPunctaAdded(size_t id)
     connect(viewControl, &Z3DPunctaFilter::objDeselected, this, &Z3DPunctaView::onObjDeselectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objSelected, this, &Z3DPunctaView::onObjSelectedFromView);
     connect(viewControl, &Z3DPunctaFilter::objVisibleChanged, this, &Z3DPunctaView::onObjVisibleChangedFromView);
+    connect(viewControl, &Z3DPunctaFilter::renderingError, &m_engine, &Z3DRenderingEngine::renderingError);
     m_engine.addEventListenerToBack(*viewControl);
 
     m_engine.networkEvaluator().updateNetwork();

@@ -132,6 +132,8 @@ Q_SIGNALS:
   // Q_EMIT this only if resize starts from current filter.
   void requestUpstreamSizeChange(Z3DFilter*);
 
+  void renderingError(const QString& error) const;
+
 protected:
   // mark that the output of current filter for certain eye is valid.
   // if process function (e.g. prepare data) is not related to stereo view or mono view, you should rewrite this
