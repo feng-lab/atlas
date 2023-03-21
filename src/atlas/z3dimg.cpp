@@ -19,8 +19,8 @@ DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
               "Interval in seconds for logging folly global executor status during waiting, default is 5");
 
 DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
-              10,
-              "Use PBO when number of blocks to upload is larger than this threashold, default is 10");
+              0,
+              "Use PBO when number of blocks to upload is larger than this threashold, default is 0");
 
 namespace nim {
 
