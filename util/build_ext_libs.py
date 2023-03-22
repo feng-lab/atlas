@@ -685,7 +685,16 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
     build_dir = create_build_dir(src_dir)
+    orig_file = bak_file = None
     try:
+        if is_linux():
+            orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.h')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'static const char',
+                                              ],
+                                  to_texts=[r'static constexpr const char',
+                                            ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
                          '-DgRPC_BUILD_TESTS:BOOL=OFF',
@@ -705,6 +714,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        if is_linux():
+            os.replace(bak_file, orig_file)
 
 
 def build_bzip2(src_dir: str, install_dir: str):
