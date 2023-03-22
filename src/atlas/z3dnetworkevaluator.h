@@ -41,12 +41,10 @@ public:
   // process the currently assigned network. The rendering order is determined internally
   // according the network topology and the invalidation levels of the filters.
   // stereo means run two passes for left and right eye
-  double process(bool stereo = false);
+  double process(bool stereo = false, bool fastRendering = false);
 
   // call when network topology changed
   void updateNetwork();
-
-  void setFastRenderingMode(bool v, bool stereo);
 
 protected:
   // update size of all upstream filters. If input filter is nullptr, update all filters

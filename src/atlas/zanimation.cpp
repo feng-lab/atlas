@@ -232,12 +232,8 @@ void ZAnimation::setDuration(double duration)
   }
 }
 
-void ZAnimation::setCurrentTime(double time)
+void ZAnimation::setCurrentTime(double time) const
 {
-  if (auto eng = dynamic_cast<Z3DRenderingEngine*>(m_engine); eng) {
-    eng->cancelLongRendering();
-  }
-
   time = std::max(0.0, time);
 
   for (const auto& obj : m_objList) {
@@ -251,6 +247,15 @@ void ZAnimation::setCurrentTime(double time)
   for (const auto& pa : m_globalParaAnimations) {
     pa->setCurrentTime(time);
   }
+}
+
+void ZAnimation::cancelRenderingAndSetCurrentTime(double time) const
+{
+  if (auto eng = dynamic_cast<Z3DRenderingEngine*>(m_engine); eng) {
+    eng->cancelLongRendering();
+  }
+
+  setCurrentTime(time);
 }
 
 void ZAnimation::removeObj(size_t id)
@@ -324,20 +329,15 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             int height,
                                             Z3DScreenShotType sst)
 {
-  if (startTime < 0 || startTime >= m_duration) {
+  if (!m_engine) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
-                          QString("Video start time %1 is not correct").arg(startTime));
+                          QString("View not ready"));
+    return;
   }
-  if (endTime >= 0 && endTime <= startTime) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("Video end time %1 is not correct").arg(endTime));
-  }
-  if (endTime < 0 || endTime > m_duration) {
-    endTime = m_duration;
-  }
-  CHECK(m_engine);
+  auto engine = dynamic_cast<Z3DRenderingEngine*>(m_engine);
+  CHECK(engine);
+
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
@@ -365,103 +365,51 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
       return;
     }
   }
-  if (width % 2 == 1) {
-    ++width;
-  }
-  if (height % 2 == 1) {
-    ++height;
-  }
+
+  // todo: remove these and correctly handle these in Z3DRenderingEngine
   m_doc.hideAnimation3DView();
   m_doc.deselectAllObjs();
 
-  auto duration = endTime - startTime;
-  int numFrame = std::ceil(duration * framePerSecond);
-  QString title = "Exporting 3D Animation As Images...";
+  QString title = "Exporting 3D Animation as Video...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-    title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
+    title = "Exporting 3D Animation as Half Side-By-Side Stereo Video...";
   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-    title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
+    title = "Exporting 3D Animation as Full Side-By-Side Stereo Video...";
   }
-  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+
+  auto progress = new QProgressDialog(title, "Cancel", 0, 100, QApplication::activeWindow());
+  progress->setAutoReset(false);
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
-  progress->show();
-  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
-  double time = startTime;
-  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
-  double timeIncrement = duration / numFrame;
-  bool checkOverwrite = true;
-  QString namePrefix = "video";
-  auto tempdir = std::make_shared<QTemporaryDir>();
-  QDir tmpdir(tempdir->path());
-  for (int i = 0; i < numFrame; ++i) {
-    progress->setValue(i);
-    if (progress->wasCanceled()) {
-      break;
-    }
+  QObject::disconnect(progress, &QProgressDialog::canceled, progress, &QProgressDialog::cancel);
+  connect(engine, &Z3DRenderingEngine::progressChanged, progress, &QProgressDialog::setValue);
+  connect(engine, &Z3DRenderingEngine::renderingError, progress, &QProgressDialog::reset);
+  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, progress, &QProgressDialog::reset);
+  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, this, &ZAnimation::videoEncoderFinished);
+  connect(progress, &QProgressDialog::canceled, this, &ZAnimation::cancelButtonPressed);
 
-    setCurrentTime(time);
-    time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
+  QObject::disconnect(this,
+                      &ZAnimation::exportFixedSize3DAnimationInEngine,
+                      engine,
+                      &Z3DRenderingEngine::exportFixedSize3DAnimation);
+  connect(this,
+          &ZAnimation::exportFixedSize3DAnimationInEngine,
+          engine,
+          &Z3DRenderingEngine::exportFixedSize3DAnimation);
 
-        if (ret == QMessageBox::Yes) {
-        } else if (ret == QMessageBox::YesToAll) {
-          checkOverwrite = false;
-        } else {
-          break;
-        }
-      }
-    }
-    QApplication::processEvents();
-    try {
-      dynamic_cast<Z3DRenderingEngine*>(m_engine)->takeFixedSizeScreenShotWithoutResetCanvasSize(filepath,
-                                                                                                 width,
-                                                                                                 height,
-                                                                                                 sst);
-    }
-    catch (ZException const& e) {
-      break;
-    }
-  }
-  dynamic_cast<Z3DRenderingEngine*>(m_engine)->resetCanvasSize();
-  //  if (!progress->wasCanceled()) {
-  //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-  //    QString filepath = tmpdir.filePath(filename);
-  //    if (checkOverwrite) {
-  //      if (tmpdir.exists(filename)) {
-  //        QMessageBox msgBox(QApplication::activeWindow());
-  //        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-  //        msgBox.setInformativeText("");
-  //        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-  //        msgBox.setDefaultButton(QMessageBox::Cancel);
-  //        int ret = msgBox.exec();
-  //
-  //        if (ret != QMessageBox::Cancel) {
-  //          return;
-  //        }
-  //        QFile::remove(tmpdir.filePath(filename));
-  //      }
-  //    }
-  //  }
+  m_cancelFlag = false;
+  Q_EMIT exportFixedSize3DAnimationInEngine(this,
+                                            fn,
+                                            framePerSecond,
+                                            startTime,
+                                            endTime,
+                                            width,
+                                            height,
+                                            true,
+                                            sst,
+                                            &m_cancelFlag);
 
-  if (!progress->wasCanceled()) {
-    progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
-    connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
-    m_tempDir = tempdir;
-    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-  }
+  progress->exec();
 }
 
 void ZAnimation::export3DAnimation(const QString& fn,
@@ -470,20 +418,15 @@ void ZAnimation::export3DAnimation(const QString& fn,
                                    double endTime,
                                    Z3DScreenShotType sst)
 {
-  if (startTime < 0 || startTime >= m_duration) {
+  if (!m_engine) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
-                          QString("Video start time %1 is not correct").arg(startTime));
+                          QString("View not ready"));
+    return;
   }
-  if (endTime >= 0 && endTime <= startTime) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("Video end time %1 is not correct").arg(endTime));
-  }
-  if (endTime < 0 || endTime > m_duration) {
-    endTime = m_duration;
-  }
-  CHECK(m_engine);
+  auto engine = dynamic_cast<Z3DRenderingEngine*>(m_engine);
+  CHECK(engine);
+
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
     if (!dir.mkpath(".")) {
@@ -511,93 +454,36 @@ void ZAnimation::export3DAnimation(const QString& fn,
       return;
     }
   }
+
+  // todo: remove these and correctly handle these in Z3DRenderingEngine
   m_doc.hideAnimation3DView();
   m_doc.deselectAllObjs();
-  static_cast<Z3DRenderingEngine*>(m_engine)->makeOutputSizeEvenNumbers();
 
-  auto duration = endTime - startTime;
-  int numFrame = std::ceil(duration * framePerSecond);
-  QString title = "Exporting 3D Animation As Images...";
+  QString title = "Exporting 3D Animation as Video...";
   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-    title = "Exporting 3D Animation As Half Side-By-Side Stereo Images...";
+    title = "Exporting 3D Animation as Half Side-By-Side Stereo Video...";
   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-    title = "Exporting 3D Animation As Full Side-By-Side Stereo Images...";
+    title = "Exporting 3D Animation as Full Side-By-Side Stereo Video...";
   }
-  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+
+  auto progress = new QProgressDialog(title, "Cancel", 0, 100, QApplication::activeWindow());
+  progress->setAutoReset(false);
   progress->setWindowModality(Qt::WindowModal);
-  progress->show();
-  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
-  double time = startTime;
-  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
-  double timeIncrement = duration / numFrame;
-  bool checkOverwrite = true;
-  QString namePrefix = "video";
-  auto tempdir = std::make_shared<QTemporaryDir>();
-  QDir tmpdir(tempdir->path());
-  for (int i = 0; i < numFrame; ++i) {
-    progress->setValue(i);
-    if (progress->wasCanceled()) {
-      break;
-    }
+  progress->setAttribute(Qt::WA_DeleteOnClose);
+  QObject::disconnect(progress, &QProgressDialog::canceled, progress, &QProgressDialog::cancel);
+  connect(engine, &Z3DRenderingEngine::progressChanged, progress, &QProgressDialog::setValue);
+  connect(engine, &Z3DRenderingEngine::renderingError, progress, &QProgressDialog::reset);
+  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, progress, &QProgressDialog::reset);
+  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, this, &ZAnimation::videoEncoderFinished);
+  connect(progress, &QProgressDialog::canceled, this, &ZAnimation::cancelButtonPressed);
 
-    setCurrentTime(time);
-    time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
+  QObject::disconnect(this, &ZAnimation::export3DAnimationInEngine, engine, &Z3DRenderingEngine::export3DAnimation);
+  connect(this, &ZAnimation::export3DAnimationInEngine, engine, &Z3DRenderingEngine::export3DAnimation);
 
-        if (ret == QMessageBox::Yes) {
-        } else if (ret == QMessageBox::YesToAll) {
-          checkOverwrite = false;
-        } else {
-          break;
-        }
-      }
-    }
-    QApplication::processEvents();
-    try {
-      dynamic_cast<Z3DRenderingEngine*>(m_engine)->takeScreenShot(filepath, sst);
-    }
-    catch (ZException const& e) {
-      break;
-    }
-  }
-  //  if (!progress->wasCanceled()) {
-  //    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-  //    QString filepath = tmpdir.filePath(filename);
-  //    if (checkOverwrite) {
-  //      if (tmpdir.exists(filename)) {
-  //        QMessageBox msgBox(QApplication::activeWindow());
-  //        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-  //        msgBox.setInformativeText("");
-  //        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-  //        msgBox.setDefaultButton(QMessageBox::Cancel);
-  //        int ret = msgBox.exec();
-  //
-  //        if (ret != QMessageBox::Cancel) {
-  //          return;
-  //        }
-  //        QFile::remove(tmpdir.filePath(filename));
-  //      }
-  //    }
-  //  }
+  m_cancelFlag = false;
+  Q_EMIT export3DAnimationInEngine(this, fn, framePerSecond, startTime, endTime, true, sst, &m_cancelFlag);
 
-  if (!progress->wasCanceled()) {
-    progress->setLabelText("Compressing Video...");
-    connect(m_videoEncoder, &ZVideoEncoder::error, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::finished, progress, &QProgressDialog::reset);
-    connect(m_videoEncoder, &ZVideoEncoder::canceled, progress, &QProgressDialog::reset);
-    connect(progress, &QProgressDialog::canceled, m_videoEncoder, &ZVideoEncoder::cancel);
-    m_tempDir = tempdir;
-    m_videoEncoder->encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-  }
+  progress->exec();
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
@@ -795,6 +681,14 @@ void ZAnimation::videoEncoderCanceled()
 {
   QMessageBox::warning(QApplication::activeWindow(), QApplication::applicationName(), "Video Encoding was canceled.");
   m_tempDir.reset();
+}
+
+void ZAnimation::cancelButtonPressed()
+{
+  if (auto eng = dynamic_cast<Z3DRenderingEngine*>(m_engine); eng) {
+    eng->cancelLongRendering();
+    m_cancelFlag = true;
+  }
 }
 
 void ZAnimation::updateObjAnimation()

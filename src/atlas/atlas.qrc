@@ -166,5 +166,7 @@
         <file>Resources/shader/image3d_slice_with_colormap.frag</file>
         <file>icons/help.svg</file>
         <file>icons/help-dark.svg</file>
+        <file>icons/cancel.svg</file>
+        <file>icons/cancel-dark.svg</file>
     </qresource>
 </RCC>

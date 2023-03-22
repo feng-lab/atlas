@@ -26,6 +26,8 @@ class Z3DNetworkEvaluator;
 
 class Z3DCanvasEventListener;
 
+class ZAnimation;
+
 class Z3DRenderingEngine
   : public QObject
   , public ZViewSettingInterface
@@ -82,14 +84,34 @@ public:
 
   void write(json::object& json) const;
 
-  void takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst);
-
-  void
-  takeFixedSizeScreenShotWithoutResetCanvasSize(const QString& filename, int width, int height, Z3DScreenShotType sst);
-
-  void resetCanvasSize();
+  void takeFixedSizeScreenShot(const QString& filename,
+                               int width,
+                               int height,
+                               Z3DScreenShotType sst = Z3DScreenShotType::MonoView);
 
   void takeScreenShot(const QString& filename, Z3DScreenShotType sst);
+
+  void exportFixedSize3DAnimation(const ZAnimation* animation,
+                                  const QString& fn,
+                                  double framePerSecond,
+                                  double startTime,
+                                  double endTime,
+                                  int width,
+                                  int height,
+                                  bool overwriteFileIfExist = true,
+                                  Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
+                                  std::atomic_bool* cancelFlag = nullptr);
+
+  void export3DAnimation(const ZAnimation* animation,
+                         const QString& fn,
+                         double framePerSecond,
+                         double startTime,
+                         double endTime,
+                         bool overwriteFileIfExist = true,
+                         Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
+                         std::atomic_bool* cancelFlag = nullptr);
+
+  void resetCanvasSize();
 
   std::vector<Z3DObjView*> objViews()
   {
@@ -193,9 +215,25 @@ public:
     m_globalParas->cancelLongRendering = true;
   }
 
-  void reportRenderingError(const QString& error) const;
+  void reportRenderingError(const QString& error) const
+  {
+    Q_EMIT renderingError(error);
+  }
 
-  void reportRenderingError(const std::string& error) const;
+  void reportRenderingError(const std::string& error) const
+  {
+    Q_EMIT renderingError(QString::fromStdString(error));
+  }
+
+  void reportRenderingError(const char* error) const
+  {
+    Q_EMIT renderingError(QString(error));
+  }
+
+  void reportCancelError() const
+  {
+    Q_EMIT renderingError("cancelled");
+  }
 
 Q_SIGNALS:
 
@@ -210,6 +248,8 @@ Q_SIGNALS:
   void renderingError(const QString& error) const;
 
   void progressChanged(int v);
+
+  void videoEncoderFinished();
 
 protected:
   bool event(QEvent* e) override;
@@ -254,6 +294,15 @@ private:
   void rotateYM();
 
   void rotateZM();
+
+  // private version will throw exception on error
+  void takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
+                                                            int width,
+                                                            int height,
+                                                            Z3DScreenShotType sst);
+
+  // private version will throw exception on error
+  void takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst);
 
 private:
   std::unique_ptr<QOffscreenSurface> m_offscreenSurface;

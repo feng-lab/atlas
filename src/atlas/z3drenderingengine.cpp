@@ -18,6 +18,7 @@
 #include "z3danimationview.h"
 #include "z3dregionannotationview.h"
 #include "zimgformat.h"
+#include "zvideoencoder.h"
 #include <glbinding/glbinding.h>
 #include <glbinding-aux/Meta.h>
 #include <QOffscreenSurface>
@@ -32,6 +33,134 @@ DEFINE_bool(
 DEFINE_bool(atlas_log_glbinding_context_switch,
             false,
             "Whether to log glbinding context switch event, default is false");
+
+namespace {
+
+// generic solution
+template<class T>
+int numDigits(T number)
+{
+  int digits = 0;
+  if (number < 0) {
+    digits = 1; // remove this line if '-' counts as a digit
+  }
+  while (number) {
+    number /= 10;
+    digits++;
+  }
+  return digits;
+}
+
+//// partial specialization optimization for 64-bit numbers
+// template<>
+// int numDigits(int64_t x)
+//{
+//   if (x == INT64_MIN) {
+//     return 19 + 1;
+//   }
+//   if (x < 0) {
+//     return numDigits(-x) + 1;
+//   }
+//
+//   if (x >= 10000000000) {
+//     if (x >= 100000000000000) {
+//       if (x >= 10000000000000000) {
+//         if (x >= 100000000000000000) {
+//           if (x >= 1000000000000000000) {
+//             return 19;
+//           }
+//           return 18;
+//         }
+//         return 17;
+//       }
+//       if (x >= 1000000000000000) {
+//         return 16;
+//       }
+//       return 15;
+//     }
+//     if (x >= 1000000000000) {
+//       if (x >= 10000000000000) {
+//         return 14;
+//       }
+//       return 13;
+//     }
+//     if (x >= 100000000000) {
+//       return 12;
+//     }
+//     return 11;
+//   }
+//   if (x >= 100000) {
+//     if (x >= 10000000) {
+//       if (x >= 100000000) {
+//         if (x >= 1000000000) {
+//           return 10;
+//         }
+//         return 9;
+//       }
+//       return 8;
+//     }
+//     if (x >= 1000000) {
+//       return 7;
+//     }
+//     return 6;
+//   }
+//   if (x >= 100) {
+//     if (x >= 1000) {
+//       if (x >= 10000) {
+//         return 5;
+//       }
+//       return 4;
+//     }
+//     return 3;
+//   }
+//   if (x >= 10) {
+//     return 2;
+//   }
+//   return 1;
+// }
+
+// partial specialization optimization for 32-bit numbers
+template<>
+int numDigits(int32_t x)
+{
+  if (x == INT32_MIN) {
+    return 10 + 1;
+  }
+  if (x < 0) {
+    return numDigits(-x) + 1;
+  }
+
+  if (x >= 10000) {
+    if (x >= 10000000) {
+      if (x >= 100000000) {
+        if (x >= 1000000000) {
+          return 10;
+        }
+        return 9;
+      }
+      return 8;
+    }
+    if (x >= 100000) {
+      if (x >= 1000000) {
+        return 7;
+      }
+      return 6;
+    }
+    return 5;
+  }
+  if (x >= 100) {
+    if (x >= 1000) {
+      return 4;
+    }
+    return 3;
+  }
+  if (x >= 10) {
+    return 2;
+  }
+  return 1;
+}
+
+} // namespace
 
 namespace nim {
 
@@ -221,7 +350,7 @@ void Z3DRenderingEngine::resetCameraClippingRange()
 void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int width, int height, Z3DScreenShotType sst)
 {
   try {
-    takeFixedSizeScreenShotWithoutResetCanvasSize(filename, width, height, sst);
+    takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst);
     resetCanvasSize();
   }
   catch (ZException const& e) {
@@ -231,90 +360,215 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
   }
 }
 
-void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSize(const QString& filename,
-                                                                       int width,
-                                                                       int height,
-                                                                       Z3DScreenShotType sst)
+void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
 {
   try {
-    getGLFocus();
+    takeScreenShotPrivate(filename, sst);
+  }
+  catch (ZException const& e) {
+    auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
+    LOG(ERROR) << errorMsg;
+    reportRenderingError(errorMsg);
+  }
+}
 
-    const int tileSize = 7680; // 2048;
-    const int tileBorder = 128;
-    const auto tileInnerSize = tileSize - 2 * tileBorder;
+void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
+                                                    const QString& fn,
+                                                    double framePerSecond,
+                                                    double startTime,
+                                                    double endTime,
+                                                    int width,
+                                                    int height,
+                                                    bool overwriteFileIfExist,
+                                                    Z3DScreenShotType sst,
+                                                    std::atomic_bool* cancelFlag)
+{
+  LOG(INFO) << "start exporting video";
+  auto logGuard = folly::makeGuard([]() {
+    LOG(INFO) << "end exporting video";
+  });
+  m_globalParas->cancelLongRendering = false;
+  CHECK(animation);
+  if (startTime < 0 || startTime >= animation->duration()) {
+    Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startTime));
+    return;
+  }
+  if (endTime >= 0 && endTime <= startTime) {
+    Q_EMIT renderingError(QString("Video end time %1 is not correct").arg(endTime));
+    return;
+  }
+  if (endTime < 0 || endTime > animation->duration()) {
+    endTime = animation->duration();
+  }
 
-    if (width <= tileSize && height <= tileSize) {
-      // resize texture container to desired image dimensions and propagate change
-      setOutputSize(glm::uvec2(width, height));
+  QDir dir(QFileInfo(fn).absolutePath());
+  if (!dir.exists()) {
+    if (!dir.mkpath(".")) {
+      Q_EMIT renderingError(QString("Can not create folder %1").arg(dir.path()));
+      return;
+    }
+  }
+  if (dir.exists(fn)) {
+    if (!overwriteFileIfExist) {
+      Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
+      return;
+    } else if (!QFile::remove(dir.filePath(fn))) {
+      Q_EMIT renderingError(QString("Can not replace %1").arg(dir.filePath(fn)));
+      return;
+    }
+  }
 
-      takeScreenShot(filename, sst);
-    } else {
-      m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
-      setOutputSize(glm::uvec2(tileSize, tileSize));
+  try {
+    if (width % 2 == 1) {
+      ++width;
+    }
+    if (height % 2 == 1) {
+      ++height;
+    }
+    m_doc.hideAnimation3DView();
+    m_doc.deselectAllObjs();
 
-      ZImg img(ZImgInfo(width, height, 1, 4));
-      ZImg rightImg;
-      if (sst != Z3DScreenShotType::MonoView) {
-        rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+    auto duration = endTime - startTime;
+    int numFrame = std::ceil(duration * framePerSecond);
+    int fieldWidth = numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond)));
+    double time = startTime;
+    int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
+    double timeIncrement = duration / numFrame;
+    QString namePrefix = "video";
+    auto tempdir = std::make_shared<QTemporaryDir>();
+    QDir tmpdir(tempdir->path());
+    for (int i = 0; i < numFrame; ++i) {
+      Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
+      if (cancelFlag && cancelFlag->load()) {
+        reportCancelError();
+        return;
       }
 
-      auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
-      auto numRows = (height + tileInnerSize - 1) / tileInnerSize;
-      for (auto c = 0; c < numCols; ++c) {
-        for (auto r = 0; r < numRows; ++r) {
-          auto m_tileStartX = c * tileInnerSize - tileBorder;
-          auto m_tileStartY = r * tileInnerSize - tileBorder;
-          double left = m_tileStartX / 1.0 / width;
-          double right = (m_tileStartX + tileSize) / 1.0 / width;
-          double bottom = m_tileStartY / 1.0 / height;
-          double top = (m_tileStartY + tileSize) / 1.0 / height;
+      animation->setCurrentTime(time);
+      time += timeIncrement;
+      QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
+      QString filepath = tmpdir.filePath(filename);
 
-          // set camera frustum
-          m_globalParas->camera.setTileFrustum(left, right, bottom, top);
-          m_compositor->setRenderingRegion(left, right, bottom, top);
-          // LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
-          // globalCameraPara().get().top() << globalCameraPara().get().bottom();
+      takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
+    }
+    resetCanvasSize();
 
-          m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+    if (cancelFlag && cancelFlag->load()) {
+      reportCancelError();
+      return;
+    }
 
-          if (sst == Z3DScreenShotType::MonoView) {
-            auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
-            img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
-          } else {
-            auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
-            img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
-            tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
-            rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
-          }
-        }
+    ZVideoEncoder videoEncoder;
+    connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
+    connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
+    connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
+    videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    while (!videoEncoder.waitForFinished(3000)) {
+      if (cancelFlag && cancelFlag->load()) {
+        videoEncoder.cancel();
+        return;
       }
-
-      if (sst == Z3DScreenShotType::MonoView) {
-        img.flip(Dimension::Y).save(filename);
-        LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
-      } else {
-        if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
-          LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height()
-                    << ") to file: " << filename;
-        } else {
-          ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
-            .zoom(0.5, 1)
-            .flip(Dimension::Y)
-            .save(filename);
-          LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
-                    << ") to file:" << filename;
-        }
-      }
-
-      m_globalParas->camera.setTileFrustum();
-      m_compositor->setRenderingRegion();
     }
   }
   catch (ZException const& e) {
-    auto errorMsg = fmt::format("takeFixedSizeScreenShotWithoutResetCanvasSize error: {}", e.what());
-    LOG(ERROR) << errorMsg;
-    reportRenderingError(errorMsg);
+    LOG(ERROR) << e.what();
+    reportRenderingError(e.what());
+  }
+}
+
+void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
+                                           const QString& fn,
+                                           double framePerSecond,
+                                           double startTime,
+                                           double endTime,
+                                           bool overwriteFileIfExist,
+                                           Z3DScreenShotType sst,
+                                           std::atomic_bool* cancelFlag)
+{
+  LOG(INFO) << "start exporting video";
+  auto logGuard = folly::makeGuard([]() {
+    LOG(INFO) << "end exporting video";
+  });
+  m_globalParas->cancelLongRendering = false;
+  CHECK(animation);
+  if (startTime < 0 || startTime >= animation->duration()) {
+    Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startTime));
+    return;
+  }
+  if (endTime >= 0 && endTime <= startTime) {
+    Q_EMIT renderingError(QString("Video end time %1 is not correct").arg(endTime));
+    return;
+  }
+  if (endTime < 0 || endTime > animation->duration()) {
+    endTime = animation->duration();
+  }
+
+  QDir dir(QFileInfo(fn).absolutePath());
+  if (!dir.exists()) {
+    if (!dir.mkpath(".")) {
+      Q_EMIT renderingError(QString("Can not create folder %1").arg(dir.path()));
+      return;
+    }
+  }
+  if (dir.exists(fn)) {
+    if (!overwriteFileIfExist) {
+      Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
+      return;
+    } else if (!QFile::remove(dir.filePath(fn))) {
+      Q_EMIT renderingError(QString("Can not replace %1").arg(dir.filePath(fn)));
+      return;
+    }
+  }
+
+  try {
+    m_doc.hideAnimation3DView();
+    m_doc.deselectAllObjs();
+    makeOutputSizeEvenNumbers();
+
+    auto duration = endTime - startTime;
+    int numFrame = std::ceil(duration * framePerSecond);
+    int fieldWidth = numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond)));
+    double time = startTime;
+    int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
+    double timeIncrement = duration / numFrame;
+    QString namePrefix = "video";
+    auto tempdir = std::make_shared<QTemporaryDir>();
+    QDir tmpdir(tempdir->path());
+    for (int i = 0; i < numFrame; ++i) {
+      Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
+      if (cancelFlag && cancelFlag->load()) {
+        reportCancelError();
+        return;
+      }
+
+      animation->setCurrentTime(time);
+      time += timeIncrement;
+      QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
+      QString filepath = tmpdir.filePath(filename);
+      takeScreenShotPrivate(filepath, sst);
+    }
+    resetCanvasSize();
+
+    if (cancelFlag && cancelFlag->load()) {
+      reportCancelError();
+      return;
+    }
+
+    ZVideoEncoder videoEncoder;
+    connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
+    connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
+    connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
+    videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    while (!videoEncoder.waitForFinished(3000)) {
+      if (cancelFlag && cancelFlag->load()) {
+        videoEncoder.cancel();
+        return;
+      }
+    }
+  }
+  catch (ZException const& e) {
+    LOG(ERROR) << e.what();
+    reportRenderingError(e.what());
   }
 }
 
@@ -322,41 +576,6 @@ void Z3DRenderingEngine::resetCanvasSize()
 {
   if (m_canvas) {
     setOutputSize(m_canvas->physicalSize());
-  }
-}
-
-void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotType sst)
-{
-  try {
-    getGLFocus();
-    m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
-
-    if (sst == Z3DScreenShotType::MonoView) {
-      auto img = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
-      img.flip(Dimension::Y).save(filename);
-      LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
-    } else {
-      auto leftImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
-      auto rightImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
-
-      if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
-        LOG(INFO) << "Saved stereo rendering (" << leftImg.width() << " x 2, " << leftImg.height()
-                  << ") to file: " << filename;
-      } else {
-        ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
-          .zoom(0.5, 1)
-          .flip(Dimension::Y)
-          .save(filename);
-        LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
-                  << ") to file:" << filename;
-      }
-    }
-  }
-  catch (ZException const& e) {
-    auto errorMsg = fmt::format("takeScreenShot error: {}", e.what());
-    LOG(ERROR) << errorMsg;
-    reportRenderingError(errorMsg);
   }
 }
 
@@ -721,7 +940,7 @@ void Z3DRenderingEngine::rotateZM()
 
 bool Z3DRenderingEngine::event(QEvent* e)
 {
-  LOG(INFO) << e->type();
+  // LOG(INFO) << e->type();
   if (contains(m_eventTypes, e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       renderFast();
@@ -767,24 +986,8 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   m_isRendering = true;
   getGLFocus();
   Q_EMIT progressChanged(0);
-  m_networkEvaluator->setFastRenderingMode(true, stereo);
-  m_networkEvaluator->process(stereo);
+  m_networkEvaluator->process(stereo, true);
   Q_EMIT progressChanged(100);
-  //  if (!m_globalParas->cancelLongRendering.load()) {
-  //    try {
-  //      m_networkEvaluator->setFastRenderingMode(false, stereo);
-  //      double progress = 0.1;
-  //      Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
-  //      while (progress < 1.0) {
-  //        progress = m_networkEvaluator->process(stereo);
-  //        Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
-  //      }
-  //    }
-  //    catch (ZException& e) {
-  //      LOG(INFO) << e.what();
-  //    }
-  //  }
-  //  m_globalParas->cancelLongRendering = false;
   QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
   m_globalParas->cancelLongRendering = false;
   m_isRendering = false;
@@ -803,7 +1006,6 @@ void Z3DRenderingEngine::render(bool stereo)
   getGLFocus();
   if (!m_globalParas->cancelLongRendering.load()) {
     try {
-      m_networkEvaluator->setFastRenderingMode(false, stereo);
       double progress = 0.1;
       Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       while (progress < 1.0) {
@@ -834,14 +1036,111 @@ Z3DRenderTarget* Z3DRenderingEngine::rightReadyTarget() const
   return m_compositor->rightReadyTarget();
 }
 
-void Z3DRenderingEngine::reportRenderingError(const QString& error) const
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(const QString& filename,
+                                                                              int width,
+                                                                              int height,
+                                                                              Z3DScreenShotType sst)
 {
-  Q_EMIT renderingError(error);
+  getGLFocus();
+
+  const int tileSize = 7680; // 2048;
+  const int tileBorder = 128;
+  const auto tileInnerSize = tileSize - 2 * tileBorder;
+
+  if (width <= tileSize && height <= tileSize) {
+    // resize texture container to desired image dimensions and propagate change
+    setOutputSize(glm::uvec2(width, height));
+
+    takeScreenShotPrivate(filename, sst);
+  } else {
+    m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+    setOutputSize(glm::uvec2(tileSize, tileSize));
+
+    ZImg img(ZImgInfo(width, height, 1, 4));
+    ZImg rightImg;
+    if (sst != Z3DScreenShotType::MonoView) {
+      rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+    }
+
+    auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
+    auto numRows = (height + tileInnerSize - 1) / tileInnerSize;
+    for (auto c = 0; c < numCols; ++c) {
+      for (auto r = 0; r < numRows; ++r) {
+        auto m_tileStartX = c * tileInnerSize - tileBorder;
+        auto m_tileStartY = r * tileInnerSize - tileBorder;
+        double left = m_tileStartX / 1.0 / width;
+        double right = (m_tileStartX + tileSize) / 1.0 / width;
+        double bottom = m_tileStartY / 1.0 / height;
+        double top = (m_tileStartY + tileSize) / 1.0 / height;
+
+        // set camera frustum
+        m_globalParas->camera.setTileFrustum(left, right, bottom, top);
+        m_compositor->setRenderingRegion(left, right, bottom, top);
+        // LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
+        // globalCameraPara().get().top() << globalCameraPara().get().bottom();
+
+        m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+
+        if (sst == Z3DScreenShotType::MonoView) {
+          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
+          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+        } else {
+          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
+          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
+          rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+        }
+      }
+    }
+
+    if (sst == Z3DScreenShotType::MonoView) {
+      img.flip(Dimension::Y).save(filename);
+      LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
+    } else {
+      if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+        LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height() << ") to file: " << filename;
+      } else {
+        ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+          .zoom(0.5, 1)
+          .flip(Dimension::Y)
+          .save(filename);
+        LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
+                  << ") to file:" << filename;
+      }
+    }
+
+    m_globalParas->camera.setTileFrustum();
+    m_compositor->setRenderingRegion();
+  }
 }
 
-void Z3DRenderingEngine::reportRenderingError(const std::string& error) const
+void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst)
 {
-  Q_EMIT renderingError(QString::fromStdString(error));
+  getGLFocus();
+  m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+
+  if (sst == Z3DScreenShotType::MonoView) {
+    auto img = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
+    img.flip(Dimension::Y).save(filename);
+    LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << filename;
+  } else {
+    auto leftImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
+    auto rightImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
+
+    if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X).flip(Dimension::Y).save(filename);
+      LOG(INFO) << "Saved stereo rendering (" << leftImg.width() << " x 2, " << leftImg.height()
+                << ") to file: " << filename;
+    } else {
+      ZImg::cat(std::vector<const ZImg*>{&leftImg, &rightImg}, Dimension::X)
+        .zoom(0.5, 1)
+        .flip(Dimension::Y)
+        .save(filename);
+      LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
+                << ") to file:" << filename;
+    }
+  }
 }
 
 } // namespace nim

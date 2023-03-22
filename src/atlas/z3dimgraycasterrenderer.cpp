@@ -536,7 +536,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           LOG(INFO) << "round " << round;
           ZBenchTimer btrb("render blockids");
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -586,7 +586,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           // glFinish();
           STOP_AND_LOG(btrb)
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -620,7 +620,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
 
           bool hasEnoughMissingIDs = false;
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -644,7 +644,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             break; // no blocks to render
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -664,7 +664,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -683,7 +683,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -702,7 +702,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -721,7 +721,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -740,7 +740,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -760,7 +760,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
             lastRound = !hasEnoughMissingIDs;
           }
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -786,13 +786,13 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
           STOP_AND_LOG(btcb)
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
           lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancelFlag) && lastRound;
 
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
 
@@ -848,7 +848,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
           }
         }
 
-        if (cancelFlag.load()) {
+        if (cancelFlag.load(std::memory_order_consume)) {
           throw ZGLException("cancel");
         }
 
@@ -873,7 +873,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
         }
       }
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         throw ZGLException("cancel");
       }
 

@@ -106,7 +106,9 @@ public:
 
   void setDuration(double duration);
 
-  void setCurrentTime(double time);
+  void setCurrentTime(double time) const;
+
+  void cancelRenderingAndSetCurrentTime(double time) const;
 
   void removeObj(size_t id);
 
@@ -154,6 +156,26 @@ Q_SIGNALS:
 
   void colorChanged(ZParameterAnimation* pa);
 
+  void exportFixedSize3DAnimationInEngine(const ZAnimation* animation,
+                                          const QString& fn,
+                                          double framePerSecond,
+                                          double startTime,
+                                          double endTime,
+                                          int width,
+                                          int height,
+                                          bool overwriteFileIfExist,
+                                          Z3DScreenShotType sst,
+                                          std::atomic_bool* cancelFlag);
+
+  void export3DAnimationInEngine(const ZAnimation* animation,
+                                 const QString& fn,
+                                 double framePerSecond,
+                                 double startTime,
+                                 double endTime,
+                                 bool overwriteFileIfExist,
+                                 Z3DScreenShotType sst,
+                                 std::atomic_bool* cancelFlag);
+
 protected:
   void disableAnimationOf(size_t id);
 
@@ -164,6 +186,8 @@ protected:
   void videoEncoderFinished();
 
   void videoEncoderCanceled();
+
+  void cancelButtonPressed();
 
   void updateObjAnimation();
 
@@ -235,6 +259,8 @@ protected:
   ZVideoEncoder* m_videoEncoder;
 
   std::shared_ptr<QTemporaryDir> m_tempDir;
+
+  std::atomic_bool m_cancelFlag = false;
 };
 
 } // namespace nim

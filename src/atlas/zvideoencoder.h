@@ -21,6 +21,11 @@ public:
 
   void cancel();
 
+  bool waitForFinished(int msecs = 3000)
+  {
+    return m_ffmpegProcess->waitForFinished(msecs);
+  }
+
 Q_SIGNALS:
 
   void error(QString);

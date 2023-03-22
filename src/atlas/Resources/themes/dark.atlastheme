@@ -90,7 +90,8 @@
             "FlipVerticalIcon": ":/icons/flip-vertical-dark.svg",
             "ClearIcon": ":/icons/clear-dark.svg",
             "CopyIcon": ":/icons/copy-dark.svg",
-            "HelpIcon": ":/icons/help-dark.svg"
+            "HelpIcon": ":/icons/help-dark.svg",
+            "CancelIcon": ":/icons/cancel-dark.svg"
         }
     }
 }

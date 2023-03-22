@@ -540,7 +540,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   if (FLAGS_atlas_readRegionToImg_version == 0) {
     return folly::via(cpuExecutor, [=, &resInfo, &cancelFlag]() {
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         throw ZGLException("cancel");
       }
 
@@ -556,7 +556,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         needToUpdateBlockInfo = true;
       }
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         throw ZGLException("cancel");
       }
 
@@ -577,7 +577,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return folly::makeFuture(img);
       }
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         throw ZGLException("cancel");
       }
 
@@ -599,7 +599,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return folly::makeFuture(std::shared_ptr<ZImg>());
       }
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         throw ZGLException("cancel");
       }
 
@@ -616,7 +616,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       for (auto tileIndex : queryResult) {
         const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
         tileFutures.push_back(folly::via(cpuExecutor).then([=, &cancelFlag](auto&&) {
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
           auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
@@ -625,7 +625,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
-          if (cancelFlag.load()) {
+          if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
           res->pasteImg(*imgPtr, start);
@@ -633,7 +633,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       }
 
       return folly::collectAll(tileFutures).via(cpuExecutor).thenValue([=, &resInfo, &cancelFlag](auto&& fres) {
-        if (cancelFlag.load() || std::any_of(fres.cbegin(), fres.cend(), [](const auto& i) {
+        if (cancelFlag.load(std::memory_order_consume) || std::any_of(fres.cbegin(), fres.cend(), [](const auto& i) {
               return i.hasException();
             })) {
           throw ZGLException("cancel");
@@ -658,7 +658,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
           *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
         }
 
-        if (cancelFlag.load()) {
+        if (cancelFlag.load(std::memory_order_consume)) {
           throw ZGLException("cancel");
         }
 

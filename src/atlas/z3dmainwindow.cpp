@@ -287,6 +287,10 @@ void Z3DMainWindow::createActions()
   m_helpAction = new QAction(ZTheme::instance().icon(ZTheme::HelpIcon), tr("&Help"), this);
   m_helpAction->setStatusTip(tr("Help"));
   connect(m_helpAction, &QAction::triggered, this, &Z3DMainWindow::openHelpPanel);
+
+  m_cancelAction = new QAction(ZTheme::instance().icon(ZTheme::CancelIcon), tr("&Cancel Rendering"), this);
+  m_cancelAction->setStatusTip(tr("Cancel Rendering"));
+  connect(m_cancelAction, &QAction::triggered, this, &Z3DMainWindow::cancelRendering);
 }
 
 void Z3DMainWindow::createMenus()
@@ -371,9 +375,13 @@ void Z3DMainWindow::createToolBars()
   m_helpToolBar = addToolBar(tr("Help"));
   m_helpToolBar->addAction(m_helpAction);
   m_helpToolBar->setIconSize(iconSize);
+
+  m_progressToolBar = addToolBar(tr("Progress"));
   m_progressBarWidget = new QProgressBar();
   m_progressBarWidget->setMaximumWidth(150);
-  m_progressBarAction = m_helpToolBar->addWidget(m_progressBarWidget);
+  m_progressBarAction = m_progressToolBar->addWidget(m_progressBarWidget);
+  m_progressToolBar->addAction(m_cancelAction);
+  m_progressToolBar->setIconSize(iconSize);
 }
 
 void Z3DMainWindow::createStatusBar()
@@ -598,9 +606,11 @@ void Z3DMainWindow::onProgressChanged(int v)
 {
   if (v == 100 && m_progressBarAction->isVisible()) {
     m_progressBarAction->setVisible(false);
+    m_cancelAction->setVisible(false);
   } else {
     if (!m_progressBarAction->isVisible()) {
       m_progressBarAction->setVisible(true);
+      m_cancelAction->setVisible(true);
     }
     m_progressBarWidget->setValue(v);
   }
@@ -622,6 +632,11 @@ void Z3DMainWindow::resetCamera()
 {
   m_engine->cancelLongRendering();
   m_engine->resetCamera();
+}
+
+void Z3DMainWindow::cancelRendering()
+{
+  m_engine->cancelLongRendering();
 }
 
 } // namespace nim

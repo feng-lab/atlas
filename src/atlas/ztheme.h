@@ -132,6 +132,7 @@ public:
     ClearIcon,
     CopyIcon,
     HelpIcon,
+    CancelIcon,
   };
 
   const QIcon& icon(Icon file) const

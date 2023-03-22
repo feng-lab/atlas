@@ -169,7 +169,7 @@ std::unique_ptr<ZParameterKey> ZParameterAnimation::createKey(double secs) const
   return std::make_unique<ZParameterKey>(secs, *m_boundPara);
 }
 
-void ZParameterAnimation::setCurrentTime(double secs)
+void ZParameterAnimation::setCurrentTime(double secs) const
 {
   if (!m_boundPara) {
     return;

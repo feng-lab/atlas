@@ -43,7 +43,7 @@ ZAnimationWidget::ZAnimationWidget(ZAnimation& ani, QWidget* parent)
   connect(m_timeLine, &QTimeLine::frameChanged, this, &ZAnimationWidget::setFrame);
   connect(m_timeLine, &QTimeLine::finished, this, &ZAnimationWidget::timeLineFinished);
   connect(&m_animation, &ZAnimation::durationChanged, this, &ZAnimationWidget::onDurationChanged);
-  connect(m_currentTime, &ZDoubleParameter::doubleChanged, &m_animation, &ZAnimation::setCurrentTime);
+  connect(m_currentTime, &ZDoubleParameter::doubleChanged, &m_animation, &ZAnimation::cancelRenderingAndSetCurrentTime);
   connect(m_playSpeed, &ZDoubleParameter::doubleChanged, this, &ZAnimationWidget::onSpeedChanged);
   connect(m_saveKeyFrameButton, &QPushButton::clicked, this, &ZAnimationWidget::saveKeyFrame);
   connect(m_reversePlayButton, &QToolButton::clicked, this, &ZAnimationWidget::reversePlayPause);
@@ -52,7 +52,7 @@ ZAnimationWidget::ZAnimationWidget(ZAnimation& ani, QWidget* parent)
   connect(m_gotoEndButton, &QToolButton::clicked, this, &ZAnimationWidget::gotoEnd);
   connect(m_repeatButton, &QToolButton::toggled, this, &ZAnimationWidget::repeatChanged);
 
-  m_animation.setCurrentTime(0);
+  m_animation.cancelRenderingAndSetCurrentTime(0);
 }
 
 void ZAnimationWidget::onDurationChanged(double d)

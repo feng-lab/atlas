@@ -432,7 +432,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     m_channelPageTableCacheManagers[c]->touch(key);
   }
 
-  if (cancelFlag.load()) {
+  if (cancelFlag.load(std::memory_order_consume)) {
     LOG(INFO) << "cancel here";
     throw ZGLException("cancel");
   }
@@ -562,7 +562,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
     });
 
-    if (cancelFlag.load()) {
+    if (cancelFlag.load(std::memory_order_consume)) {
       LOG(INFO) << "cancel here";
       throw ZGLException("cancel");
     }
@@ -600,7 +600,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     });
 
     if (!pboPtr) {
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
@@ -625,7 +625,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              m_channelDisplayRanges[c].y,
                              cancelFlag)
             .thenValueInline([=, &imgQueue, &cancelFlag](std::shared_ptr<ZImg>&& img) {
-              if (cancelFlag.load()) {
+              if (cancelFlag.load(std::memory_order_consume)) {
                 throw ZGLException("cancel");
               }
               imgQueue.enqueue(std::make_tuple(i, std::move(img)));
@@ -633,14 +633,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }));
       }
       auto f = folly::collectAll(blockFutures).via(cpuExecutor).thenValue([&cancelFlag](auto&& res) {
-        if (!cancelFlag.load() && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
+        if (!cancelFlag.load(std::memory_order_consume) && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
               return i.hasValue();
             })) {
           LOG(INFO) << "image blocks reading finished.";
         }
       });
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
@@ -649,7 +649,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       auto lastLogTime = std::chrono::steady_clock::now();
       int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
       while (remainingBlocksToUpload > 0) {
-        if (cancelFlag.load()) {
+        if (cancelFlag.load(std::memory_order_consume)) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
         }
@@ -716,7 +716,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
       }
     } else {
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
@@ -742,7 +742,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              m_channelDisplayRanges[c].y,
                              cancelFlag)
             .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty, &cancelFlag](std::shared_ptr<ZImg>&& img) {
-              if (cancelFlag.load()) {
+              if (cancelFlag.load(std::memory_order_consume)) {
                 throw ZGLException("cancel");
               }
               if (!img) {
@@ -755,7 +755,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
       auto f =
         folly::collectAll(blockFutures).via(cpuExecutor).thenValue([=, &pboLocalBuffer, &cancelFlag](auto&& res) {
-          if (!cancelFlag.load() && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
+          if (!cancelFlag.load(std::memory_order_consume) && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
                 return i.hasValue();
               })) {
             memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
@@ -774,14 +774,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
       glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
-      if (cancelFlag.load()) {
+      if (cancelFlag.load(std::memory_order_consume)) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
 
       ZBenchTimer bt_pboUpload("PBO uploading");
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
-        if (cancelFlag.load()) {
+        if (cancelFlag.load(std::memory_order_consume)) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
         }

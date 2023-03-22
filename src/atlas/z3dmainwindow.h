@@ -125,6 +125,8 @@ private:
 
   void resetCamera();
 
+  void cancelRendering();
+
 private:
   QMenu* m_fileMenu = nullptr;
   QMenu* m_editMenu = nullptr;
@@ -136,6 +138,7 @@ private:
   QToolBar* m_editToolBar = nullptr;
   QToolBar* m_viewToolBar = nullptr;
   QToolBar* m_helpToolBar = nullptr;
+  QToolBar* m_progressToolBar = nullptr;
 
   QAction* m_openAction = nullptr;
   QAction* m_saveAction = nullptr;
@@ -169,6 +172,7 @@ private:
   QAction* m_helpAction = nullptr;
   QProgressBar* m_progressBarWidget = nullptr;
   QAction* m_progressBarAction = nullptr;
+  QAction* m_cancelAction = nullptr;
 
   //
   ZDoc& m_doc;

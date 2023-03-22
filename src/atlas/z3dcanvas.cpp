@@ -325,9 +325,9 @@ void Z3DCanvas::toggleFullScreen()
 
 void Z3DCanvas::sceneParaUpdated()
 {
-  LOG(INFO) << "sceneParaUpdated";
+  // LOG(INFO) << "sceneParaUpdated";
   if (m_engine) {
-    m_engine->cancelLongRendering();
+    // m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
 }

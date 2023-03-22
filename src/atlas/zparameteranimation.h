@@ -101,7 +101,7 @@ public:
   // create a new key based on current view
   [[nodiscard]] virtual std::unique_ptr<ZParameterKey> createKey(double secs) const;
 
-  void setCurrentTime(double secs);
+  void setCurrentTime(double secs) const;
 
   void removeRedundantKeys();
 
