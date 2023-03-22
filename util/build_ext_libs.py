@@ -688,11 +688,11 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     orig_file = bak_file = None
     try:
         if is_linux():
-            orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.h')
+            orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
             bak_file = patch_file(orig_file,
-                                  from_texts=[r'static const char',
+                                  from_texts=[r'constexpr const char MetadataQuery',
                                               ],
-                                  to_texts=[r'static constexpr const char',
+                                  to_texts=[r'const char MetadataQuery',
                                             ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
