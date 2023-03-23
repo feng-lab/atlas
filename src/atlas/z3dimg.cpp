@@ -46,7 +46,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 #ifdef Q_OS_MACOS
       imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
 #else
-      imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
+      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
+      // imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
 #endif
       m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20000) {
