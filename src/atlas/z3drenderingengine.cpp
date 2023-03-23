@@ -763,9 +763,9 @@ void Z3DRenderingEngine::init()
 
   LOG(INFO) << "3D Renderer Inited.";
 
-  Q_EMIT networkConstructed();
-
   Q_EMIT progressChanged(100);
+
+  Q_EMIT initialized();
 }
 
 void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
@@ -777,7 +777,6 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   m_globalParas->setDevicePixelRatio(m_canvas->devicePixelRatio());
   setOutputSize(m_canvas->physicalSize());
 
-  m_canvas->setRenderingEngine(this);
   connect(m_canvas, &Z3DCanvas::canvasSizeChanged, this, &Z3DRenderingEngine::onCanvasResized);
   connect(m_canvas, &Z3DCanvas::rotateX, this, &Z3DRenderingEngine::rotateX);
   connect(m_canvas, &Z3DCanvas::rotateY, this, &Z3DRenderingEngine::rotateY);
@@ -787,6 +786,7 @@ void Z3DRenderingEngine::initAndAttachToCanvas(Z3DCanvas* canvas)
   connect(m_canvas, &Z3DCanvas::rotateZM, this, &Z3DRenderingEngine::rotateZM);
   connect(this, &Z3DRenderingEngine::sceneParaUpdated, m_canvas, &Z3DCanvas::sceneParaUpdated);
   connect(this, &Z3DRenderingEngine::renderingFinished, m_canvas, &Z3DCanvas::renderingFinished);
+  m_canvas->setRenderingEngine(this);
 }
 
 void Z3DRenderingEngine::detachCanvas()

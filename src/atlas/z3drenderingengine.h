@@ -239,8 +239,6 @@ Q_SIGNALS:
 
   void objViewReady(size_t id);
 
-  void networkConstructed();
-
   void sceneParaUpdated();
 
   void renderingFinished();
@@ -250,6 +248,8 @@ Q_SIGNALS:
   void progressChanged(int v);
 
   void videoEncoderFinished();
+
+  void initialized();
 
 protected:
   bool event(QEvent* e) override;

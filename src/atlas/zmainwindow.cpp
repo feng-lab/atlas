@@ -41,6 +41,7 @@
 #include <QStatusBar>
 #include <QDesktopServices>
 #include <QProcess>
+#include <QSignalSpy>
 #include <utility>
 
 namespace nim {
@@ -141,7 +142,6 @@ void ZMainWindow::loadFileList(const QStringList& fileList)
 void ZMainWindow::removeAllObjs()
 {
   m_doc->removeAllObjs();
-  QApplication::processEvents();
 }
 
 Z3DMainWindow* ZMainWindow::get3DWindow()
@@ -369,11 +369,11 @@ void ZMainWindow::open3DWindow()
   try {
     if (!m_3dWindow) {
       m_3dWindow = new Z3DMainWindow(*m_doc, *this, false);
+      connect(m_3dWindow, &Z3DMainWindow::renderingEngineInitialized, this, &ZMainWindow::window3DReady);
       m_3dWindow->setWindowTitle(QString("3D View  %1").arg(windowTitle()));
       connect(m_3dWindow, &Z3DMainWindow::loadScene, this, &ZMainWindow::loadScene);
       connect(m_3dWindow, &Z3DMainWindow::saveScene, this, &ZMainWindow::saveScene);
       connect(m_3dWindow, &Z3DMainWindow::loadJsonScene, this, &ZMainWindow::loadJsonScene);
-      QApplication::processEvents();
       connect(m_3dWindow, &Z3DMainWindow::viewReady, &m_doc->animation3DDoc(), &Z3DAnimationDoc::bindView);
     }
 
@@ -881,11 +881,13 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
     QDir::setCurrent(QFileInfo(fn).absolutePath());
 
     std::map<size_t, size_t> idmap = m_doc->read(sceneObj.at("Doc").as_object(), err);
-    QApplication::processEvents();
     if (sceneObj.contains("View3DGeneral")) {
       if (!m_3dWindow) {
+        QSignalSpy spy(this, &ZMainWindow::window3DReady);
         open3DWindow();
-        QApplication::processEvents();
+        while (!spy.wait(5000)) {
+          LOG(INFO) << "waiting for 3d window initialization";
+        }
       }
     }
 
@@ -914,8 +916,11 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
             }
             if (viewObj.contains("View3D")) {
               if (!m_3dWindow) {
+                QSignalSpy spy(this, &ZMainWindow::window3DReady);
                 open3DWindow();
-                QApplication::processEvents();
+                while (!spy.wait(5000)) {
+                  LOG(INFO) << "waiting for 3d window initialization";
+                }
               }
               if (m_3dWindow) {
                 m_3dWindow->engine()->read(id, viewObj.at("View3D").as_object());
@@ -927,7 +932,6 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         }
       }
     }
-    QApplication::processEvents();
     LOG(INFO) << "Finish loading scene";
 
     return true;

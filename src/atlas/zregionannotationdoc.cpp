@@ -265,7 +265,7 @@ void ZRegionAnnotationDoc::importLabelImage()
     }
     dialog.close();
   }
-  QApplication::processEvents();
+
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
       auto regionAnnotation = new ZRegionAnnotation();
@@ -331,7 +331,7 @@ void ZRegionAnnotationDoc::exportLabelImage()
     }
     dialog.close();
   }
-  QApplication::processEvents();
+
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
       ZImgWriteParameters paras;

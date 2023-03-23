@@ -76,6 +76,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
     }
     m_imageCacheNumBlocks = imageCacheSize / imageBlockTotalSize;
     m_pageTableCacheNumBlocks = m_pageTableCacheSize / m_pageTableBlockSize;
+    LOG(INFO) << "imageCacheNumBlocks: " << m_imageCacheNumBlocks
+              << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
 
     m_channelPageTableCaches.resize(m_nChannels);
     for (size_t c = 0; c < m_nChannels; ++c) {
@@ -336,22 +338,24 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
   m_channelDisplayRanges = displayRanges;
   CHECK(m_imgPack.imgInfo().numChannels == m_channelDisplayRanges.size())
     << m_imgPack.imgInfo().numChannels << " " << m_channelDisplayRanges.size();
-
-  glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
-  for (size_t c = 0; c < m_nChannels; ++c) {
-    m_channelPageTableCacheManagers[c] =
-      std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
-    m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
-                                                                                 m_imageCacheNumBlocks,
-                                                                                 invalidKey);
-    std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
-    m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
-
-    std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
-    m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
-  }
-
   readVolumes();
+
+  if (m_isVolumeDownsampled) {
+    glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
+    for (size_t c = 0; c < m_nChannels; ++c) {
+      m_channelPageTableCacheManagers[c] =
+        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
+      m_channelImageCacheManagers[c] =
+        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
+                                                    m_imageCacheNumBlocks,
+                                                    invalidKey);
+      std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
+      m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
+
+      std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
+      m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+    }
+  }
 }
 
 void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const

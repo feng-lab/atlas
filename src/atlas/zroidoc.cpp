@@ -321,7 +321,7 @@ void ZROIDoc::importMaskImage()
     }
     dialog.close();
   }
-  QApplication::processEvents();
+
   if (fmtIdx >= 0 && !fn.isEmpty()) {
     try {
       auto roi = new ZROI();

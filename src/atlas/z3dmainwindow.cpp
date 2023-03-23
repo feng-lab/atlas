@@ -43,6 +43,7 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
   m_canvas = new Z3DCanvas("", 512, 512, this);
   connect(m_canvas, &Z3DCanvas::openGLContextInitialized, this, &Z3DMainWindow::onCanvasReady);
   connect(this, &Z3DMainWindow::canvasReady, m_engine, &Z3DRenderingEngine::initAndAttachToCanvas);
+  connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::renderingEngineInitialized);
 
   setCentralWidget(m_canvas);
   init();
@@ -214,7 +215,7 @@ void Z3DMainWindow::init()
   createToolBars();
   createStatusBar();
   createDockWindows();
-  connect(m_engine, &Z3DRenderingEngine::networkConstructed, this, &Z3DMainWindow::onViewReady);
+  connect(m_engine, &Z3DRenderingEngine::initialized, this, &Z3DMainWindow::onViewReady);
 
   readSettings();
 }

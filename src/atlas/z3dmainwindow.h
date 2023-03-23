@@ -51,6 +51,8 @@ Q_SIGNALS:
 
   void canvasReady(Z3DCanvas* canvas);
 
+  void renderingEngineInitialized();
+
 protected:
   void closeEvent(QCloseEvent* event) override;
 

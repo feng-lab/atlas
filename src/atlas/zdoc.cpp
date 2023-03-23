@@ -80,7 +80,7 @@ std::vector<size_t> ZDoc::chooseObjsWithWidget(const QString& title, QWidget* pa
       return dlg.selectedIDs();
     }
   }
-  return std::vector<size_t>();
+  return {};
 }
 
 bool ZDoc::hasObj() const
@@ -173,13 +173,13 @@ QString ZDoc::objName(size_t id) const
     return idToDoc(id)->objName(id);
   }
   if (id == 1) {
-    return QString("Background");
+    return {"Background"};
   }
   if (id == 2) {
-    return QString("Axis");
+    return {"Axis"};
   }
   if (id == 3) {
-    return QString("Lighting");
+    return {"Lighting"};
   }
   CHECK(false);
   return "";
@@ -191,13 +191,13 @@ QString ZDoc::objNameWithModifiedMarker(size_t id) const
     return idToDoc(id)->objNameWithModifiedMarker(id);
   }
   if (id == 1) {
-    return QString("Background");
+    return {"Background"};
   }
   if (id == 2) {
-    return QString("Axis");
+    return {"Axis"};
   }
   if (id == 3) {
-    return QString("Lighting");
+    return {"Lighting"};
   }
   CHECK(false);
   return "";
@@ -209,13 +209,13 @@ QString ZDoc::objNameWithModifiedMarkerAndID(size_t id) const
     return idToDoc(id)->objNameWithModifiedMarkerAndID(id);
   }
   if (id == 1) {
-    return QString("Background");
+    return {"Background"};
   }
   if (id == 2) {
-    return QString("Axis");
+    return {"Axis"};
   }
   if (id == 3) {
-    return QString("Lighting");
+    return {"Lighting"};
   }
   CHECK(false);
   return "";

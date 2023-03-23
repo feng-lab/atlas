@@ -79,6 +79,10 @@ public:
     return m_openConfigFolderAction;
   }
 
+Q_SIGNALS:
+
+  void window3DReady();
+
 protected:
   // void appAboutToQuit();
 

@@ -134,7 +134,6 @@ std::map<size_t, size_t> ZObjDoc::read(const std::vector<std::pair<QString, json
     }
   }
 
-  QApplication::processEvents();
   return idmap;
 }
 
