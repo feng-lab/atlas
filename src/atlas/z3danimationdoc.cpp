@@ -104,6 +104,10 @@ size_t Z3DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
     errorMsg = e.what();
     return 0;
   }
+  catch (const std::exception& e) {
+    errorMsg = e.what();
+    return 0;
+  }
 }
 
 size_t Z3DAnimationDoc::loadFile(const json::value& jValue, QString& errorMsg)

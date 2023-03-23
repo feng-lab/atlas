@@ -400,6 +400,10 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   if (endTime < 0 || endTime > animation->duration()) {
     endTime = animation->duration();
   }
+  if (width > 7680 || height > 4320) {
+    Q_EMIT renderingError("does not support output size larger than 7680x4320");
+    return;
+  }
 
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -413,7 +417,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
       return;
     } else if (!QFile::remove(dir.filePath(fn))) {
-      Q_EMIT renderingError(QString("Can not replace %1").arg(dir.filePath(fn)));
+      Q_EMIT renderingError(QString("Can not replace existed file %1").arg(dir.filePath(fn)));
       return;
     }
   }
@@ -469,6 +473,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         return;
       }
     }
+    LOG(INFO) << dir.filePath(fn) << " saved";
   }
   catch (ZException const& e) {
     LOG(ERROR) << e.what();
@@ -515,7 +520,7 @@ void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
       Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
       return;
     } else if (!QFile::remove(dir.filePath(fn))) {
-      Q_EMIT renderingError(QString("Can not replace %1").arg(dir.filePath(fn)));
+      Q_EMIT renderingError(QString("Can not replace existed file %1").arg(dir.filePath(fn)));
       return;
     }
   }
@@ -565,6 +570,7 @@ void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
         return;
       }
     }
+    LOG(INFO) << dir.filePath(fn) << " saved";
   }
   catch (ZException const& e) {
     LOG(ERROR) << e.what();

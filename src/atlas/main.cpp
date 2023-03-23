@@ -113,11 +113,21 @@ int main(int argc, char* argv[])
 
     if (FLAGS_run_benchmarks || FLAGS_run_export_3d_animation) {
       // start non-GUI version...
-      if (FLAGS_run_benchmarks) {
-        return nim::ZRunBenchmark::run();
+      try {
+        if (FLAGS_run_benchmarks) {
+          return nim::ZRunBenchmark::run();
+        }
+        if (FLAGS_run_export_3d_animation) {
+          return nim::ZRunExport3DAnimation::run();
+        }
       }
-      if (FLAGS_run_export_3d_animation) {
-        return nim::ZRunExport3DAnimation::run();
+      catch (const nim::ZException& e) {
+        LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
+        return 1;
+      }
+      catch (const std::exception& e) {
+        LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
+        return 1;
       }
     } else {
       // start GUI version...
