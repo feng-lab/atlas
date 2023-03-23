@@ -4,7 +4,7 @@
 #include "zjson.h"
 #include "zlog.h"
 #include "zroiutils.h"
-#include "zapplication.h"
+#include "zsysteminfo.h"
 // #include <CGAL/Surface_mesh_default_triangulation_3.h>
 // #include <CGAL/Surface_mesh_default_criteria_3.h>
 // #include <CGAL/Complex_2_in_triangulation_3.h>
@@ -123,7 +123,7 @@ void readOntology(const json::object& obj,
 void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
+  QString ontologyFilename = ZSystemInfo::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {
@@ -137,8 +137,8 @@ void readMouseBrainAtlasOntology(ZTree<RegionNode>& ontology)
 void readMouseBrainAtlasOntology(const QStringList& regionAbbrevs, ZTree<RegionNode>& ontology)
 {
   ontology.clear();
-  // QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
-  QString ontologyFilename = ZApplication::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
+  // QString ontologyFilename = ZSystemInfo::resourcesDirPath() + "/ontology/mouse_brain_atlas.json";
+  QString ontologyFilename = ZSystemInfo::resourcesDirPath() + "/ontology/lemur_atlas_ontology_v5.json";
   auto loadObj = loadJsonObject(ontologyFilename);
   if (!loadObj.contains("msg") || !loadObj.at("msg").is_array() || loadObj.at("msg").as_array().empty() ||
       !loadObj.at("msg").as_array()[0].is_object()) {

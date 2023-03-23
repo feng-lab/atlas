@@ -31,7 +31,7 @@ void ZVideoEncoder::encode(const QDir& dir,
 #ifdef _WIN32
   QString program = ZSystemInfo::resourceDir().absoluteFilePath("ffmpeg.exe");
 #else
-  QString program = ZSystemInfo::resourceDir().absoluteFilePath("ffmpeg");
+  QString program = ZSystemInfo::resourcesDir().absoluteFilePath("ffmpeg");
 #endif
   QStringList arguments;
   arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"

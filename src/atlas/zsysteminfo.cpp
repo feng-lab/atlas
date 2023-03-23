@@ -2,7 +2,6 @@
 
 #include "zlog.h"
 #include "zmainwindow.h"
-#include "zapplication.h"
 #include <QStandardPaths>
 #include <QStorageInfo>
 #include <QSettings>
@@ -71,6 +70,41 @@ QString ZSystemInfo::fontPath(const QString& filename) const
   return m_fontPath + (filename.isEmpty() ? QString("") : QString("/") + filename);
 }
 
+QDir ZSystemInfo::resourcesDir()
+{
+#ifdef Q_OS_MACOS
+  return QDir(QCoreApplication::applicationDirPath() + u"/../Resources");
+#else
+  return QDir(QCoreApplication::applicationDirPath() + u"/Resources");
+#endif
+}
+
+QString ZSystemInfo::resourcesDirPath()
+{
+  return resourcesDir().absolutePath();
+}
+
+QString ZSystemInfo::jdkDirPath()
+{
+  return resourcesDir().absoluteFilePath("jdk");
+}
+
+QString ZSystemInfo::jarsDirPath()
+{
+  return resourcesDir().absoluteFilePath("jars");
+}
+
+QString ZSystemInfo::applicationInstallDirPath()
+{
+#ifdef Q_OS_MACOS
+  return QCoreApplication::applicationDirPath() + u"/../../..";
+#elif defined(Q_OS_WIN64)
+  return QCoreApplication::applicationDirPath() + u"/..";
+#else
+  return QCoreApplication::applicationDirPath() + u"/..";
+#endif
+}
+
 QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 {
   QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
@@ -131,12 +165,6 @@ QDir ZSystemInfo::configDir()
   if (!dir.exists()) {
     dir.mkpath(".");
   }
-  return dir;
-}
-
-QDir ZSystemInfo::resourceDir()
-{
-  static QDir dir(ZApplication::resourcesDirPath());
   return dir;
 }
 

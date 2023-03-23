@@ -47,39 +47,4 @@ bool ZApplication::event(QEvent* event)
   return QApplication::event(event);
 }
 
-QDir ZApplication::resourcesDir()
-{
-#ifdef Q_OS_MACOS
-  return QDir(applicationDirPath() + u"/../Resources");
-#else
-  return QDir(applicationDirPath() + u"/Resources");
-#endif
-}
-
-QString ZApplication::resourcesDirPath()
-{
-  return resourcesDir().absolutePath();
-}
-
-QString ZApplication::jdkDirPath()
-{
-  return resourcesDir().absoluteFilePath("jdk");
-}
-
-QString ZApplication::jarsDirPath()
-{
-  return resourcesDir().absoluteFilePath("jars");
-}
-
-QString ZApplication::applicationInstallDirPath()
-{
-#ifdef Q_OS_MACOS
-  return applicationDirPath() + u"/../../..";
-#elif defined(Q_OS_WIN64)
-  return applicationDirPath() + u"/..";
-#else
-  return applicationDirPath() + u"/..";
-#endif
-}
-
 } // namespace nim

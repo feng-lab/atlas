@@ -17,14 +17,22 @@ public:
 
   [[nodiscard]] QString fontPath(const QString& filename = "") const;
 
+  static QDir resourcesDir();
+
+  static QString resourcesDirPath();
+
+  static QString jdkDirPath();
+
+  static QString jarsDirPath();
+
+  static QString applicationInstallDirPath();
+
   // return empty if can not find enough space
   static QString imgCachePath(size_t requiredSpaceInBytes);
 
   [[nodiscard]] static QDir logDir();
 
   [[nodiscard]] static QDir configDir();
-
-  [[nodiscard]] static QDir resourceDir();
 
   [[nodiscard]] QString lastOpenedObjPathQSettingLocation(const QString& typeName) const
   {

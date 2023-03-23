@@ -9,6 +9,9 @@
 #include "zsysteminfo.h"
 #include "ztheme.h"
 
+#include "zrunbenchmark.h"
+#include "zrunexport3danimation.h"
+
 #include <QSurfaceFormat>
 #include <QDir>
 #include <QFileInfo>
@@ -18,8 +21,8 @@
 #include <iostream>
 
 DECLARE_string(flagfile);
-
-using namespace nim;
+DEFINE_bool(run_benchmarks, false, "run benchmarks");
+DECLARE_bool(run_export_3d_animation);
 
 // force NVidia Optimus to used dedicated graphics
 #ifdef _WIN32
@@ -38,8 +41,9 @@ int main(int argc, char* argv[])
 #endif
   QCoreApplication::setApplicationName("Atlas");
   try {
-    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
-      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
+    if (QString setting_filename = "user_settings_flagfile.txt";
+        nim::ZSystemInfo::configDir().exists(setting_filename)) {
+      FLAGS_flagfile = QFile::encodeName(nim::ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
     }
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
@@ -70,6 +74,7 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
     QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
+
     nim::ZApplication app(argc, argv);
 
     if (!nim::ZCpuInfo::instance().bAVX) {
@@ -84,11 +89,11 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::logDir();
     nim::ZSystemInfo::removeOldLogs();
 
-    initImgLib(argv[0],
-               ZApplication::resourcesDirPath(),
-               ZApplication::jdkDirPath(),
-               ZApplication::jarsDirPath(),
-               logDir.filePath("atlas"));
+    nim::initImgLib(argv[0],
+                    nim::ZSystemInfo::resourcesDirPath(),
+                    nim::ZSystemInfo::jdkDirPath(),
+                    nim::ZSystemInfo::jarsDirPath(),
+                    logDir.filePath("atlas"));
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();
     });
@@ -102,18 +107,29 @@ int main(int argc, char* argv[])
     }
     LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
 
-    ZTheme::instance();
-
     nim::ZSystemInfo::instance().logOSInfo();
 
     // ZServiceManager sm;
 
-    // ZMainWindow has Qt::WA_DeleteOnClose attribute
-    auto mainWin = new nim::ZMainWindow(GIT_VERSION);
-    QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
-    mainWin->show();
+    if (FLAGS_run_benchmarks || FLAGS_run_export_3d_animation) {
+      // start non-GUI version...
+      if (FLAGS_run_benchmarks) {
+        return nim::ZRunBenchmark::run();
+      }
+      if (FLAGS_run_export_3d_animation) {
+        return nim::ZRunExport3DAnimation::run();
+      }
+    } else {
+      // start GUI version...
+      nim::ZTheme::instance();
 
-    return ZApplication::exec();
+      // ZMainWindow has Qt::WA_DeleteOnClose attribute
+      auto mainWin = new nim::ZMainWindow(GIT_VERSION);
+      QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
+      mainWin->show();
+    }
+
+    return app.exec();
   }
   catch (const nim::ZException& e) {
     LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();

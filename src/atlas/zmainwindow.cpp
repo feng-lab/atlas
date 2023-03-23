@@ -25,7 +25,6 @@
 #include "zfileutils.h"
 #include "ztheme.h"
 #include "zlogdialog.h"
-#include "zapplication.h"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QAction>
@@ -158,11 +157,11 @@ void ZMainWindow::checkForUpdates()
 {
   QString updaterName("MaintenanceTool");
 #ifdef Q_OS_MACOS
-  QString program = ZApplication::applicationInstallDirPath() + QString("/%1.app/Contents/MacOS/%1").arg(updaterName);
+  QString program = ZSystemInfo::applicationInstallDirPath() + QString("/%1.app/Contents/MacOS/%1").arg(updaterName);
 #elif defined(Q_OS_WIN64)
-  QString program = ZApplication::applicationInstallDirPath() + QString("/%1.exe").arg(updaterName);
+  QString program = ZSystemInfo::applicationInstallDirPath() + QString("/%1.exe").arg(updaterName);
 #else
-  QString program = ZApplication::applicationInstallDirPath() + QString("/%1").arg(updaterName);
+  QString program = ZSystemInfo::applicationInstallDirPath() + QString("/%1").arg(updaterName);
 #endif
   if (QFileInfo(program).exists()) {
     QStringList arguments;
@@ -346,7 +345,7 @@ void ZMainWindow::generateConfigFile()
       return;
     }
   }
-  if (!QFile::copy(ZSystemInfo::resourceDir().absoluteFilePath("settings_flagfile.txt"), dir.absoluteFilePath(fn))) {
+  if (!QFile::copy(ZSystemInfo::resourcesDir().absoluteFilePath("settings_flagfile.txt"), dir.absoluteFilePath(fn))) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
                           QString("Could not copy file to %1").arg(dir.filePath(fn)));
