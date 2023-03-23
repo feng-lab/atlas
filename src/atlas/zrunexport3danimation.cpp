@@ -15,6 +15,7 @@ DEFINE_double(output_end_time, -1., "end time of the output video");
 DEFINE_int32(output_width, 3840, "width of the output video");
 DEFINE_int32(output_height, 2160, "height of the output video");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists");
+DEFINE_string(output_image_folder_name, "", "output folder for images, use temporary folder if not provided");
 
 namespace nim {
 
@@ -47,6 +48,11 @@ int ZRunExport3DAnimation::run()
     LOG(ERROR) << fmt::format("output file name ({}) is empty", FLAGS_output_filename);
     return 1;
   }
+  if (!outputFilename.endsWith(".mp4", Qt::CaseInsensitive)) {
+    outputFilename += ".mp4";
+  }
+
+  auto outputImageFolderName = QString::fromStdString(FLAGS_output_image_folder_name).trimmed();
 
   doc.animation3DDoc().bindView(&engine);
 
@@ -59,7 +65,10 @@ int ZRunExport3DAnimation::run()
                                     FLAGS_output_end_time,
                                     FLAGS_output_width,
                                     FLAGS_output_height,
-                                    FLAGS_overwrite);
+                                    FLAGS_overwrite,
+                                    Z3DScreenShotType::MonoView,
+                                    nullptr,
+                                    outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName);
 
   return 0;
 }

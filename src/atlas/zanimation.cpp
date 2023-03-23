@@ -330,9 +330,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             Z3DScreenShotType sst)
 {
   if (!m_engine) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("View not ready"));
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), QString("View not ready"));
     return;
   }
   auto engine = dynamic_cast<Z3DRenderingEngine*>(m_engine);
@@ -407,7 +405,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             height,
                                             true,
                                             sst,
-                                            &m_cancelFlag);
+                                            &m_cancelFlag,
+                                            nullptr);
 
   progress->exec();
 }
@@ -419,9 +418,7 @@ void ZAnimation::export3DAnimation(const QString& fn,
                                    Z3DScreenShotType sst)
 {
   if (!m_engine) {
-    QMessageBox::critical(QApplication::activeWindow(),
-                          QApplication::applicationName(),
-                          QString("View not ready"));
+    QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), QString("View not ready"));
     return;
   }
   auto engine = dynamic_cast<Z3DRenderingEngine*>(m_engine);
@@ -481,7 +478,7 @@ void ZAnimation::export3DAnimation(const QString& fn,
   connect(this, &ZAnimation::export3DAnimationInEngine, engine, &Z3DRenderingEngine::export3DAnimation);
 
   m_cancelFlag = false;
-  Q_EMIT export3DAnimationInEngine(this, fn, framePerSecond, startTime, endTime, true, sst, &m_cancelFlag);
+  Q_EMIT export3DAnimationInEngine(this, fn, framePerSecond, startTime, endTime, true, sst, &m_cancelFlag, nullptr);
 
   progress->exec();
 }

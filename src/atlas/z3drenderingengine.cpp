@@ -381,7 +381,8 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     int height,
                                                     bool overwriteFileIfExist,
                                                     Z3DScreenShotType sst,
-                                                    std::atomic_bool* cancelFlag)
+                                                    std::atomic_bool* cancelFlag,
+                                                    const QString* imageOuputFolder)
 {
   LOG(INFO) << "start exporting video";
   auto logGuard = folly::makeGuard([]() {
@@ -421,6 +422,25 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       return;
     }
   }
+  if (imageOuputFolder) {
+    if (imageOuputFolder->trimmed().isEmpty()) {
+      Q_EMIT renderingError(QString("Image output folder name %1 is empty, can not be used").arg(*imageOuputFolder));
+      return;
+    }
+    QFileInfo iof(*imageOuputFolder);
+    QDir iofDir(iof.absolutePath());
+    if (!iofDir.exists()) {
+      if (!iofDir.mkpath(".")) {
+        Q_EMIT renderingError(QString("Can not create image output folder %1").arg(*imageOuputFolder));
+        return;
+      }
+    }
+    iof = QFileInfo(iofDir.absolutePath());
+    if (!iof.isDir() || !iof.isWritable()) {
+      Q_EMIT renderingError(QString("Image output folder %1 can not be used").arg(*imageOuputFolder));
+      return;
+    }
+  }
 
   try {
     if (width % 2 == 1) {
@@ -440,7 +460,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     double timeIncrement = duration / numFrame;
     QString namePrefix = "video";
     auto tempdir = std::make_shared<QTemporaryDir>();
-    QDir tmpdir(tempdir->path());
+    QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     for (int i = 0; i < numFrame; ++i) {
       Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
       if (cancelFlag && cancelFlag->load()) {
@@ -488,7 +508,8 @@ void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
                                            double endTime,
                                            bool overwriteFileIfExist,
                                            Z3DScreenShotType sst,
-                                           std::atomic_bool* cancelFlag)
+                                           std::atomic_bool* cancelFlag,
+                                           const QString* imageOuputFolder)
 {
   LOG(INFO) << "start exporting video";
   auto logGuard = folly::makeGuard([]() {
@@ -524,6 +545,25 @@ void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
       return;
     }
   }
+  if (imageOuputFolder) {
+    if (imageOuputFolder->trimmed().isEmpty()) {
+      Q_EMIT renderingError(QString("Image output folder name %1 is empty, can not be used").arg(*imageOuputFolder));
+      return;
+    }
+    QFileInfo iof(*imageOuputFolder);
+    QDir iofDir(iof.absolutePath());
+    if (!iofDir.exists()) {
+      if (!iofDir.mkpath(".")) {
+        Q_EMIT renderingError(QString("Can not create image output folder %1").arg(*imageOuputFolder));
+        return;
+      }
+    }
+    iof = QFileInfo(iofDir.absolutePath());
+    if (!iof.isDir() || !iof.isWritable()) {
+      Q_EMIT renderingError(QString("Image output folder %1 can not be used").arg(*imageOuputFolder));
+      return;
+    }
+  }
 
   try {
     m_doc.hideAnimation3DView();
@@ -538,7 +578,7 @@ void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
     double timeIncrement = duration / numFrame;
     QString namePrefix = "video";
     auto tempdir = std::make_shared<QTemporaryDir>();
-    QDir tmpdir(tempdir->path());
+    QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     for (int i = 0; i < numFrame; ++i) {
       Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
       if (cancelFlag && cancelFlag->load()) {

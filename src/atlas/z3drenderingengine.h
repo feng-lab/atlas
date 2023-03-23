@@ -100,7 +100,8 @@ public:
                                   int height,
                                   bool overwriteFileIfExist = true,
                                   Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
-                                  std::atomic_bool* cancelFlag = nullptr);
+                                  std::atomic_bool* cancelFlag = nullptr,
+                                  const QString* imageOuputFolder = nullptr);
 
   void export3DAnimation(const ZAnimation* animation,
                          const QString& fn,
@@ -109,7 +110,8 @@ public:
                          double endTime,
                          bool overwriteFileIfExist = true,
                          Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
-                         std::atomic_bool* cancelFlag = nullptr);
+                         std::atomic_bool* cancelFlag = nullptr,
+                         const QString* imageOuputFolder = nullptr);
 
   void resetCanvasSize();
 
