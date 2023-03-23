@@ -16,7 +16,7 @@ int ZRunExport3DAnimation::run()
     LOG(INFO) << "Export 3D Animation End";
   });
 
-  ZDoc doc(nullptr, false);
+  ZDoc doc;
   LOG(INFO) << "1";
   Z3DRenderingEngine engine(doc);
   LOG(INFO) << "1";
