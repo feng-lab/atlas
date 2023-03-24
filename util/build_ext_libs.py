@@ -173,11 +173,11 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
     elif is_linux():
         if use_clang_in_linux():
             res['CC'] = 'clang'
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx -O3'
             res['CXX'] = 'clang++'
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
         else:
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx -O3'
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
