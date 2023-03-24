@@ -451,7 +451,6 @@ def build_boost(src_dir: str, install_dir: str):
                                 'address-model=64',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
-                                f'linkflags={cbf["LDFLAGS"]}',
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True, env=env)
