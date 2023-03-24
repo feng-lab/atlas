@@ -203,7 +203,6 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
         if use_clang_in_linux():
             env['CC'] = cbf['CC']
             env['CFLAGS'] = cbf['CFLAGS']
-            env['LDFLAGS'] = cbf['LDFLAGS']
             env['CXX'] = cbf['CXX']
             env['CXXFLAGS'] = cbf['CXXFLAGS']
         else:
