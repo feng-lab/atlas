@@ -694,13 +694,14 @@ else (WIN32)
     target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
     target_compile_options(${APP_NAME} PUBLIC -Waddress-of-temporary)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
-    target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600 -stdlib=libc++)
+    target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600)
     target_compile_options(${APP_NAME} PUBLIC -Wshadow)
     target_compile_options(${APP_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
-
-    target_link_options(${APP_NAME} PUBLIC -stdlib=libc++ -framework OpenGL)
+    if(APPLE)
+      target_compile_options(${APP_NAME} PUBLIC -stdlib=libc++)
+      target_link_options(${APP_NAME} PUBLIC -stdlib=libc++ -framework OpenGL)
+    endif()
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()
 
