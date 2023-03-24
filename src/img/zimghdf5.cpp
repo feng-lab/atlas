@@ -658,7 +658,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
             m_mmf->readToBuffer(hdf5Tile.offset, hdf5Tile.length, res->channelData(c));
           }
         }
-      } else {
+      } else if (false) {
         std::ifstream inputFileStream;
         openFileStream(inputFileStream, m_filename, std::ios_base::in | std::ios_base::binary);
         for (size_t c = 0; c < m_hdf5Tiles.size(); ++c) {
