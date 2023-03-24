@@ -172,10 +172,10 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
-            res['CC'] = 'clang-15'
+            res['CC'] = 'clang'
             res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
             res['LDFLAGS'] = '-stdlib=libc++'
-            res['CXX'] = 'clang++-15'
+            res['CXX'] = 'clang++'
             res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                               f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
         else:
@@ -434,7 +434,7 @@ def build_boost(src_dir: str, install_dir: str):
         else:
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
-                            '--with-toolset=clang-15' if use_clang_in_linux() else '',
+                            '--with-toolset=clang' if use_clang_in_linux() else '',
                             '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                             '--without-icu',
                             '--prefix=' + install_dir],
@@ -450,7 +450,7 @@ def build_boost(src_dir: str, install_dir: str):
                                cwd=src_dir, shell=False, check=True, env=env)
             else:
                 subprocess.run(['./b2',
-                                'toolset=clang-15' if use_clang_in_linux() else '',
+                                'toolset=clang' if use_clang_in_linux() else '',
                                 'address-model=64',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
