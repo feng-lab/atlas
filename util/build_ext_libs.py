@@ -1615,6 +1615,8 @@ def build_freeimage(src_dir: str, install_dir: str):
         elif is_linux():
             if use_clang_in_linux():
                 env = get_env_for_config_make()
+                env.pop('CFLAGS')
+                env.pop('CXXFLAGS')
                 shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip_clang_linux'), src_dir)
                 subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', '-j' + str(os.cpu_count())],
                                cwd=src_dir, shell=False, check=True, env=env)
