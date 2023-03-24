@@ -2146,6 +2146,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                          '-DUSE_FOLLY:BOOL=ON',
                          '-DROCKSDB_INSTALL_ON_WINDOWS:BOOL=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
+                         '-DFAIL_ON_WARNINGS:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])
