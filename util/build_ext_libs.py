@@ -163,22 +163,22 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
         res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC -fvisibility=hidden -mavx'
+                        f'-fPIC -fvisibility=hidden -mavx -O3'
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
             res['CC'] = 'clang'
             res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
             res['CXX'] = 'clang++'
-            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
         else:
             res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
-            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
         res[
