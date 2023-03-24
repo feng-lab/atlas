@@ -434,7 +434,7 @@ def build_boost(src_dir: str, install_dir: str):
         else:
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
-                            '--with-toolset=clang' if use_clang_in_linux() else '',
+                            '--with-toolset=clang-15' if use_clang_in_linux() else '',
                             '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                             '--without-icu',
                             '--prefix=' + install_dir],
@@ -450,6 +450,7 @@ def build_boost(src_dir: str, install_dir: str):
                                cwd=src_dir, shell=False, check=True, env=env)
             else:
                 subprocess.run(['./b2',
+                                'toolset=clang-15' if use_clang_in_linux() else '',
                                 'address-model=64',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
@@ -689,7 +690,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     build_dir = create_build_dir(src_dir)
     orig_file = bak_file = None
     try:
-        if is_linux():
+        if is_linux() and not use_clang_in_linux():
             orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
             bak_file = patch_file(orig_file,
                                   from_texts=[r'constexpr const char MetadataQuery',
