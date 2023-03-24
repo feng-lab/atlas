@@ -717,7 +717,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_linux():
+        if is_linux() and not use_clang_in_linux():
             os.replace(bak_file, orig_file)
 
 
@@ -968,6 +968,11 @@ def build_folly(src_dir: str, install_dir: str):
             bak_file = patch_file(orig_file,
                                   from_texts=[r'-std=${CXX_STD}'],
                                   to_texts=[r''])
+        if is_linux() and use_clang_in_linux():
+            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
+            bak_file = patch_file(orig_file,
+                                  from_texts=[r'-std=${CXX_STD}'],
+                                  to_texts=[r''])
         if is_mac() and macos_min_version().startswith('10.'):
             # preadv and pwritev are only available after macOS 11.0
             orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
@@ -1061,6 +1066,8 @@ def build_folly(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
+            os.replace(bak_file, orig_file)
+        if is_linux() and use_clang_in_linux():
             os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
         if is_mac() and macos_min_version().startswith('10.'):
@@ -1606,34 +1613,42 @@ def build_freeimage(src_dir: str, install_dir: str):
             distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
                                          os.path.join(install_dir, 'freeimage'))
         elif is_linux():
-            orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
-            from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
-                          r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
-                          r' -o root -g root ']
-            to_texts = [r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
-                        r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
-                        r' ']
-            bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
+            if use_clang_in_linux():
+                shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip_clang_linux'), src_dir)
+                subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', '-j' + str(os.cpu_count())],
+                               cwd=src_dir, shell=False, check=True)
+                subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', '-j' + str(os.cpu_count()), 'install',
+                                'PREFIX=' + install_dir],
+                               cwd=src_dir, shell=False, check=True)
+                subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', 'clean'],
+                               cwd=src_dir, shell=False, check=True)
+            else:
+                orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
+                from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
+                              r'INSTALLDIR ?= $(DESTDIR)/usr/lib',
+                              r' -o root -g root ']
+                to_texts = [r'INCDIR ?= $(DESTDIR)$(PREFIX)/include',
+                            r'INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib',
+                            r' ']
+                bak_file_3 = patch_file(orig_file_3, from_texts=from_texts, to_texts=to_texts)
 
-            orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
-            bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
+                orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
+                bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
-            env = get_env_for_config_make()
-
-            # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
-            #                cwd=src_dir, shell=False, check=True)
-            # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
-            #                 'PREFIX=' + install_dir],
-            #                cwd=src_dir, shell=False, check=True)
-            # subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
-            #                cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=False, check=True, env=env)
-            subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count()), 'install',
-                            'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=False, check=True, env=env)
-            subprocess.run(['make', '-f', 'Makefile.fip', 'clean'],
-                           cwd=src_dir, shell=False, check=True, env=env)
+                # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
+                #                cwd=src_dir, shell=False, check=True)
+                # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
+                #                 'PREFIX=' + install_dir],
+                #                cwd=src_dir, shell=False, check=True)
+                # subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
+                #                cwd=src_dir, shell=False, check=True)
+                subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count())],
+                               cwd=src_dir, shell=False, check=True)
+                subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count()), 'install',
+                                'PREFIX=' + install_dir],
+                               cwd=src_dir, shell=False, check=True)
+                subprocess.run(['make', '-f', 'Makefile.fip', 'clean'],
+                               cwd=src_dir, shell=False, check=True)
         else:
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip'), src_dir)
@@ -1656,8 +1671,11 @@ def build_freeimage(src_dir: str, install_dir: str):
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
         elif is_linux():
-            os.replace(bak_file_3, orig_file_3)
-            os.replace(bak_file_4, orig_file_4)
+            if use_clang_in_linux():
+                os.remove(os.path.join(src_dir, 'Makefile_fip_clang_linux'))
+            else:
+                os.replace(bak_file_3, orig_file_3)
+                os.replace(bak_file_4, orig_file_4)
 
 
 def build_botan(src_dir: str, install_dir: str):

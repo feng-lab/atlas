@@ -17,7 +17,7 @@ MODULES = $(SRCS:.c=.o)
 MODULES := $(MODULES:.cpp=.o)
 
 # C flags
-CFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -w -mmacosx-version-min=10.15 -mavx
+CFLAGS ?= -std=c99 -O3 -fPIC -fexceptions -w -fvisibility=hidden -mavx
 # OpenJPEG
 CFLAGS += -DOPJ_STATIC
 # LibRaw
@@ -27,7 +27,7 @@ CFLAGS += -DDISABLE_PERF_MEASUREMENT -D__ANSI__
 CFLAGS += $(INCLUDE)
 
 # C++ flags
-CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -mmacosx-version-min=10.15 -stdlib=libc++ -std=c++14 -mavx -fvisibility-inlines-hidden
+CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -stdlib=libc++ -std=c++14 -mavx -fvisibility-inlines-hidden
 # LibJXR
 CXXFLAGS += -D__ANSI__
 CXXFLAGS += $(INCLUDE)
@@ -39,9 +39,9 @@ endif
 
 TARGET  = freeimageplus
 STATICLIB = lib$(TARGET).a
-SHAREDLIB = lib$(TARGET).$(VER_MAJOR).$(VER_MINOR).dylib
-LIBNAME	= lib$(TARGET).dylib
-VERLIBNAME = lib$(TARGET).$(VER_MAJOR).dylib
+SHAREDLIB = lib$(TARGET)-$(VER_MAJOR).$(VER_MINOR).so
+LIBNAME	= lib$(TARGET).so
+VERLIBNAME = $(LIBNAME).$(VER_MAJOR)
 HEADER = Source/FreeImage.h
 HEADERFIP = Wrapper/FreeImagePlus/FreeImagePlus.h
 
@@ -53,7 +53,7 @@ all: dist
 dist: FreeImage
 	mkdir -p Dist
 	cp *.a Dist/
-	cp *.dylib Dist/
+	cp *.so Dist/
 	cp Source/FreeImage.h Dist/
 	cp Wrapper/FreeImagePlus/FreeImagePlus.h Dist/
 
@@ -72,7 +72,7 @@ $(STATICLIB): $(MODULES)
 	$(AR) r $@ $(MODULES)
 
 $(SHAREDLIB): $(MODULES)
-	$(CXX) -dynamiclib -mmacosx-version-min=10.15 -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
+	$(CC) -s -shared -Wl,-soname,$(VERLIBNAME) $(LDFLAGS) -o $@ $(MODULES) $(LIBRARIES)
 
 install:
 	install -d $(INCDIR) $(INSTALLDIR)

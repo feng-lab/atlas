@@ -27,8 +27,7 @@
 /src/3rdparty/libjpeg*
 /src/3rdparty/libpng*
 /src/3rdparty/hdf5*
-/src/3rdparty/FreeImage*
-/src/3rdparty/freeimage*
+/src/3rdparty/freeimage-svn*
 /src/3rdparty/__*
 /src/3rdparty/boost*
 /src/3rdparty/openssl*
