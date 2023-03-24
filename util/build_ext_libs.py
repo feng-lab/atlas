@@ -18,6 +18,10 @@ def cpp_standard() -> int:
     return 17
 
 
+def use_clang_in_linux() -> bool:
+    return True
+
+
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
@@ -146,16 +150,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 
 
 def get_tbb_env():
-    # if is_windows():
-    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.bat'),
-    #                                            para='intel64 vs2017',
-    #                                            start_env=get_vcvars_environment())
-    # elif is_linux():
-    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.sh'),
-    #                                            para='intel64')
-    # else:
-    #     env = get_enviroment_from_shell_script(os.path.join(intel_sw_dir(), 'tbb', 'bin', 'tbbvars.sh'))
-    env = get_vcvars_environment() if is_windows() else os.environ.copy()
+    env = {}
     env['TBBROOT'] = os.path.join(intel_sw_dir(), 'tbb', 'latest')
     env['TBB_ROOT'] = env['TBBROOT']
     return env
@@ -176,8 +171,16 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
                           f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
-        res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
-        res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+        if use_clang_in_linux():
+            res['CC'] = 'clang-15'
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
+            res['LDFLAGS'] = '-stdlib=libc++'
+            res['CXX'] = 'clang++-15'
+            res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
+                              f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+        else:
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
         res[
@@ -199,8 +202,15 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
         env['CXX'] = cbf['CXX']
         env['CXXFLAGS'] = cbf['CXXFLAGS']
     elif is_linux():
-        env['CFLAGS'] = cbf['CFLAGS']
-        env['CXXFLAGS'] = cbf['CXXFLAGS']
+        if use_clang_in_linux():
+            env['CC'] = cbf['CC']
+            env['CFLAGS'] = cbf['CFLAGS']
+            env['LDFLAGS'] = cbf['LDFLAGS']
+            env['CXX'] = cbf['CXX']
+            env['CXXFLAGS'] = cbf['CXXFLAGS']
+        else:
+            env['CFLAGS'] = cbf['CFLAGS']
+            env['CXXFLAGS'] = cbf['CXXFLAGS']
     elif is_windows():
         env['CFLAGS'] = cbf['CFLAGS']
         env['CXXFLAGS'] = cbf['CXXFLAGS']
@@ -282,43 +292,44 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
         return res
 
 
-def build_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja()):
-    if is_windows():
-        if env is None:
-            env = get_vcvars_environment()
-        subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-        if use_ninja:
-            subprocess.run([get_ninja_binary()],
-                           cwd=build_dir, shell=False, check=True, env=env)
-        else:
-            subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
-                           cwd=build_dir, shell=True, check=True, env=env)
-    else:
-        if use_ninja:
-            if env is None:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run([get_ninja_binary()],
-                               cwd=build_dir, shell=False, check=True)
-            else:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run([get_ninja_binary()],
-                               cwd=build_dir, shell=False, check=True, env=env)
-        else:
-            if env is None:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run(['make', '-j' + str(os.cpu_count())],
-                               cwd=build_dir, shell=False, check=True)
-            else:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run(['make', '-j' + str(os.cpu_count())],
-                               cwd=build_dir, shell=False, check=True, env=env)
+# def build_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja()):
+#     if is_windows():
+#         if env is None:
+#             env = get_vcvars_environment()
+#         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+#         if use_ninja:
+#             subprocess.run([get_ninja_binary()],
+#                            cwd=build_dir, shell=False, check=True, env=env)
+#         else:
+#             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
+#                            cwd=build_dir, shell=True, check=True, env=env)
+#     else:
+#         if use_ninja:
+#             if env is None:
+#                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+#                 subprocess.run([get_ninja_binary()],
+#                                cwd=build_dir, shell=False, check=True)
+#             else:
+#                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+#                 subprocess.run([get_ninja_binary()],
+#                                cwd=build_dir, shell=False, check=True, env=env)
+#         else:
+#             if env is None:
+#                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
+#                 subprocess.run(['make', '-j' + str(os.cpu_count())],
+#                                cwd=build_dir, shell=False, check=True)
+#             else:
+#                 subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+#                 subprocess.run(['make', '-j' + str(os.cpu_count())],
+#                                cwd=build_dir, shell=False, check=True, env=env)
 
 
-def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=use_ninja(), use_cmake=False,
+def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, additional_env=None, use_ninja=use_ninja(), use_cmake=False,
                                ninja_para: str = 'install'):
     if is_windows():
-        if env is None:
-            env = get_vcvars_environment()
+        env = get_vcvars_environment()
+        if additional_env is not None:
+            env.update(additional_env)
         subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
         if use_cmake:
             subprocess.run([get_cmake_binary(), '--build', '.'],
@@ -330,33 +341,21 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, env=None, use_ninja=
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
     else:
+        env = get_env_for_config_make()
+        if additional_env is not None:
+            env.update(additional_env)
         if use_cmake:
-            if env is None:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run([get_cmake_binary(), '--build', '.'],
-                               cwd=build_dir, shell=False, check=True)
-            else:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run([get_cmake_binary(), '--build', '.'],
-                               cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run([get_cmake_binary(), '--build', '.'],
+                           cwd=build_dir, shell=False, check=True, env=env)
         elif use_ninja:
-            if env is None:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run([get_ninja_binary(), ninja_para],
-                               cwd=build_dir, shell=False, check=True)
-            else:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run([get_ninja_binary(), ninja_para],
-                               cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run([get_ninja_binary(), ninja_para],
+                           cwd=build_dir, shell=False, check=True, env=env)
         else:
-            if env is None:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True)
-                subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                               cwd=build_dir, shell=False, check=True)
-            else:
-                subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
-                subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                               cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(cmakecmd, cwd=build_dir, shell=False, check=True, env=env)
+            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
+                           cwd=build_dir, shell=False, check=True, env=env)
 
 
 def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: bool = True) -> str:
@@ -1143,7 +1142,8 @@ def build_eigen(src_dir: str, install_dir: str):
                                  r'(EIGEN_PI/4.)',
                                  ])
 
-            orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'functors', 'BinaryFunctors.h')
+            orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'functors',
+                                       'BinaryFunctors.h')
             patch_file(orig_file_2,
                        from_texts=[r'(M_PI_2)',
                                    r'(M_PI_4)',
@@ -1292,9 +1292,9 @@ def build_ceres_solver(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
 
-        env = get_vcvars_environment() if is_windows() else os.environ.copy()
+        env = {}
         env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl', 'latest')
-        build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
 
         # on linux, cmake complains about could not find the fake target SuiteSparse::Partition
         orig_file3 = os.path.join(install_dir, 'lib', 'cmake', 'Ceres', 'CeresTargets.cmake')
@@ -1855,7 +1855,7 @@ def build_vtk(src_dir: str, install_dir: str):
                          ])
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir, env=get_tbb_env())
+        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -2036,7 +2036,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                                                    para='activate',
                                                    start_env=get_vcvars_environment(),
                                                    remove_conda_from_path=False)
-            build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+            build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
         else:
             build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -2154,7 +2154,7 @@ def build_conda_zimg(src_dir: str, install_dir: str):
         env['PREFIX'] = env['CONDA_PREFIX']
 
         cmakecmd.extend([src_dir])
-        build_and_install_cmakecmd(cmakecmd, build_dir, env=env)
+        build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
     finally:
         print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
