@@ -174,10 +174,8 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
         if use_clang_in_linux():
             res['CC'] = 'clang'
             res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
-            res['LDFLAGS'] = '-stdlib=libc++'
             res['CXX'] = 'clang++'
-            res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
-                              f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
         else:
             res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx'
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx'
@@ -2212,7 +2210,7 @@ def build_ants(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir, use_ninja=False)
 
         cmakecmd.extend([src_dir])
-        build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
+        # build_cmakecmd(cmakecmd, build_dir, use_ninja=False)
         subprocess.run(['make', 'install'],
                        cwd=os.path.join(build_dir, 'ANTS-build'), shell=False, check=True)
     finally:

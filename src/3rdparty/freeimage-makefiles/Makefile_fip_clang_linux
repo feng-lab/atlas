@@ -11,7 +11,7 @@ INSTALLDIR ?= $(DESTDIR)$(PREFIX)/lib
 # Converts cr/lf to just lf
 DOS2UNIX = dos2unix
 
-LIBRARIES = -lc++
+LIBRARIES = -lstdc++
 
 MODULES = $(SRCS:.c=.o)
 MODULES := $(MODULES:.cpp=.o)
@@ -27,7 +27,7 @@ CFLAGS += -DDISABLE_PERF_MEASUREMENT -D__ANSI__
 CFLAGS += $(INCLUDE)
 
 # C++ flags
-CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -stdlib=libc++ -std=c++14 -mavx -fvisibility-inlines-hidden
+CXXFLAGS ?= -O3 -fPIC -fexceptions -fvisibility=hidden -Wno-ctor-dtor-privacy -w -std=c++14 -mavx -fvisibility-inlines-hidden
 # LibJXR
 CXXFLAGS += -D__ANSI__
 CXXFLAGS += $(INCLUDE)
