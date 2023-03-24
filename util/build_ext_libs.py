@@ -19,7 +19,7 @@ def cpp_standard() -> int:
 
 
 def use_clang_in_linux() -> bool:
-    return True
+    return is_linux()
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
@@ -434,6 +434,7 @@ def build_boost(src_dir: str, install_dir: str):
         else:
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
+                            '--with-toolset=clang' if use_clang_in_linux() else '',
                             '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                             '--without-icu',
                             '--prefix=' + install_dir],
@@ -452,6 +453,7 @@ def build_boost(src_dir: str, install_dir: str):
                                 'address-model=64',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
+                                f'linkflags={cbf["LDFLAGS"]}',
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True, env=env)
