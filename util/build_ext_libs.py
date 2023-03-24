@@ -1618,6 +1618,8 @@ def build_freeimage(src_dir: str, install_dir: str):
             orig_file_4 = os.path.join(src_dir, 'Makefile.fip')
             bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
+            env = get_env_for_config_make()
+
             # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count())],
             #                cwd=src_dir, shell=False, check=True)
             # subprocess.run(['make', '-f', 'Makefile.gnu', '-j' + str(os.cpu_count()), 'install',
@@ -1626,12 +1628,12 @@ def build_freeimage(src_dir: str, install_dir: str):
             # subprocess.run(['make', '-f', 'Makefile.gnu', 'clean'],
             #                cwd=src_dir, shell=False, check=True)
             subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count())],
-                           cwd=src_dir, shell=False, check=True)
+                           cwd=src_dir, shell=False, check=True, env=env)
             subprocess.run(['make', '-f', 'Makefile.fip', '-j' + str(os.cpu_count()), 'install',
                             'PREFIX=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
+                           cwd=src_dir, shell=False, check=True, env=env)
             subprocess.run(['make', '-f', 'Makefile.fip', 'clean'],
-                           cwd=src_dir, shell=False, check=True)
+                           cwd=src_dir, shell=False, check=True, env=env)
         else:
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_gnu'), src_dir)
             shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip'), src_dir)
