@@ -58,7 +58,7 @@ public:
   }
 
   void setInterpolant(Interpolant ip)
-  {
+  {cd ..
     m_interpolant = ip;
   }
 
@@ -78,9 +78,9 @@ public:
   }
 
   // http://www.paulinternet.nl/?page=bicubic
-  double cubicInterpolate(double p[4], double x) const;
+  static double cubicInterpolate(double p[4], double x);
 
-  double bicubicInterpolate(double p[4][4], double x, double y) const;
+  static double bicubicInterpolate(double p[4][4], double x, double y) ;
 
   double tricubicInterpolate(double p[4][4][4], double x, double y, double z) const;
 
@@ -93,7 +93,7 @@ public:
   double sample(const TPixel* img, size_t width, size_t height, size_t depth, double x, double y, double z) const;
 
 protected:
-  inline bool inBound(size_t width, size_t height, double x, double y) const
+  [[nodiscard]] inline bool inBound(size_t width, size_t height, double x, double y) const
   {
     return x >= 0. && x < static_cast<double>(width) && y >= 0. && y < static_cast<double>(height);
   }

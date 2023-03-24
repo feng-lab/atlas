@@ -99,9 +99,7 @@ int64_t* vtkCCSEdgeLocator::InsertUniqueEdge(int64_t i0, int64_t i1, int64_t& ed
     return nullptr;
   }
 
-  int i = 1;
   while (node->next != nullptr) {
-    ++i;
     node = node->next;
 
     if (node->ptId0 == i0 && node->ptId1 == i1) {

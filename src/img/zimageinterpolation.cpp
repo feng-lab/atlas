@@ -13,14 +13,14 @@ ZImageInterpolation::ZImageInterpolation(Interpolant interp, PadOption padOption
   , m_fillValue(fillValue)
 {}
 
-double ZImageInterpolation::cubicInterpolate(double p[], double x) const
+double ZImageInterpolation::cubicInterpolate(double p[4], double x)
 {
   return p[1] +
          0.5 * x *
            (p[2] - p[0] + x * (2.0 * p[0] - 5.0 * p[1] + 4.0 * p[2] - p[3] + x * (3.0 * (p[1] - p[2]) + p[3] - p[0])));
 }
 
-double ZImageInterpolation::bicubicInterpolate(double p[][4], double x, double y) const
+double ZImageInterpolation::bicubicInterpolate(double p[4][4], double x, double y)
 {
   double arr[4];
   arr[0] = cubicInterpolate(p[0], y);
@@ -30,7 +30,7 @@ double ZImageInterpolation::bicubicInterpolate(double p[][4], double x, double y
   return cubicInterpolate(arr, x);
 }
 
-double ZImageInterpolation::tricubicInterpolate(double p[][4][4], double x, double y, double z) const
+double ZImageInterpolation::tricubicInterpolate(double p[4][4][4], double x, double y, double z) const
 {
   double arr[4];
   arr[0] = bicubicInterpolate(p[0], y, z);
