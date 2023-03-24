@@ -1614,14 +1614,15 @@ def build_freeimage(src_dir: str, install_dir: str):
                                          os.path.join(install_dir, 'freeimage'))
         elif is_linux():
             if use_clang_in_linux():
+                env = get_env_for_config_make()
                 shutil.copy2(os.path.join(ext_dir(), 'freeimage-makefiles', 'Makefile_fip_clang_linux'), src_dir)
                 subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', '-j' + str(os.cpu_count())],
-                               cwd=src_dir, shell=False, check=True)
+                               cwd=src_dir, shell=False, check=True, env=env)
                 subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', '-j' + str(os.cpu_count()), 'install',
                                 'PREFIX=' + install_dir],
-                               cwd=src_dir, shell=False, check=True)
+                               cwd=src_dir, shell=False, check=True, env=env)
                 subprocess.run(['make', '-f', 'Makefile_fip_clang_linux', 'clean'],
-                               cwd=src_dir, shell=False, check=True)
+                               cwd=src_dir, shell=False, check=True, env=env)
             else:
                 orig_file_3 = os.path.join(src_dir, 'Makefile.gnu')
                 from_texts = [r'INCDIR ?= $(DESTDIR)/usr/include',
