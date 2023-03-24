@@ -432,11 +432,12 @@ def build_boost(src_dir: str, install_dir: str):
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
         else:
+            env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
                             '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                             '--without-icu',
                             '--prefix=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
+                           cwd=src_dir, shell=False, check=True, env=env)
             if is_mac():
                 subprocess.run(['./b2',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
@@ -445,7 +446,7 @@ def build_boost(src_dir: str, install_dir: str):
                                 f'asmflags={cbf["ASMFLAGS"]}',
                                 'install',
                                 ],
-                               cwd=src_dir, shell=False, check=True)
+                               cwd=src_dir, shell=False, check=True, env=env)
             else:
                 subprocess.run(['./b2',
                                 'address-model=64',
@@ -453,7 +454,7 @@ def build_boost(src_dir: str, install_dir: str):
                                 f'cxxflags={cbf["CXXFLAGS"]}',
                                 'install',
                                 ],
-                               cwd=src_dir, shell=False, check=True)
+                               cwd=src_dir, shell=False, check=True, env=env)
     finally:
         print('done')
 
