@@ -58,7 +58,7 @@ public:
   }
 
   void setInterpolant(Interpolant ip)
-  {cd ..
+  {
     m_interpolant = ip;
   }
 
