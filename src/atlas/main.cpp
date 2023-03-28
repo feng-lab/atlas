@@ -11,6 +11,7 @@
 
 #include "zrunbenchmark.h"
 #include "zrunexport3danimation.h"
+#include "zwindowsheader.h"
 
 #include <QSurfaceFormat>
 #include <QDir>
@@ -33,6 +34,13 @@ __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 
 int main(int argc, char* argv[])
 {
+#ifdef _WIN32
+  if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+    freopen("CONOUT$", "w", stdout);
+    freopen("CONOUT$", "w", stderr);
+  }
+#endif
+
   QCoreApplication::setOrganizationName("fenglab");
   // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
   //  is preferred over the name. On other platforms, the name is preferred over the domain.
@@ -114,6 +122,7 @@ int main(int argc, char* argv[])
     if (FLAGS_run_benchmarks || FLAGS_run_export_3d_animation) {
       // start non-GUI version...
       try {
+        LOG(INFO) << "console mode";
         if (FLAGS_run_benchmarks) {
           return nim::ZRunBenchmark::run();
         }
@@ -131,6 +140,7 @@ int main(int argc, char* argv[])
       }
     } else {
       // start GUI version...
+      LOG(INFO) << "GUI mode";
       nim::ZTheme::instance();
 
       // ZMainWindow has Qt::WA_DeleteOnClose attribute
