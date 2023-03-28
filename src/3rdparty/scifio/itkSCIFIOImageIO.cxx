@@ -1,12 +1,12 @@
 /*=========================================================================
  *
- *  Copyright Insight Software Consortium
+ *  Copyright NumFOCUS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0.txt
+ *         https://www.apache.org/licenses/LICENSE-2.0.txt
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,14 +18,17 @@
 
 #include "itkSCIFIOImageIO.h"
 #include "itkIOCommon.h"
-#include "itkMacro.h"
 #include "itkMetaDataObject.h"
+#include "itksys/SystemTools.hxx"
 
 #include "zlog.h"
 #include "zimginterface.h"
 
 #include <cstdio>
+#include <cstdlib>
 
+#include <cmath>
+#include <fstream>
 #include <string>
 #include <sstream>
 #include <utility>
@@ -38,38 +41,46 @@
 #include <cmath>
 #else
 #define SCIFIO_SEP ":"
-
 #include <unistd.h>
-
 #endif
 
 namespace {
-void checkLength(long length, double spacing,
-                 std::vector<long>& lengthVec, std::vector<double>& spacingVec)
+void checkLength(long length, double spacing, std::vector<long>& lengthVec, std::vector<double>& spacingVec)
 {
-  if (length > 1 || !lengthVec.empty()) {
-    if (spacing <= 0.0) spacing = 1.0;
+  if (length > 1 || lengthVec.size() > 0) {
+    if (spacing <= 0.0) {
+      spacing = 1.0;
+    }
 
     lengthVec.push_back(length);
     spacingVec.push_back(spacing);
   }
 }
 
+//std::string getEnv(const char* name)
+//{
+//  const char* result = itksys::SystemTools::GetEnv(name);
+//  if (result == NULL) {
+//    return "";
+//  }
+//  return result;
+//}
+
 /*
  * Splits a string into tokens using the given delimiter.
  *
  * Thanks to SO #236129 for this solution:
- * http://stackoverflow.com/a/236803
+ * https://stackoverflow.com/a/236803
  */
-[[maybe_unused]] std::vector<std::string>& split(const std::string& s, char delim, std::vector<std::string>& elems)
-{
-  std::stringstream ss(s);
-  std::string item;
-  while (std::getline(ss, item, delim)) {
-    elems.push_back(item);
-  }
-  return elems;
-}
+//std::vector<std::string>& split(const std::string& s, char delim, std::vector<std::string>& elems)
+//{
+//  std::stringstream ss(s);
+//  std::string item;
+//  while (std::getline(ss, item, delim)) {
+//    elems.push_back(item);
+//  }
+//  return elems;
+//}
 
 /*
  * this signature not needed
@@ -79,7 +90,7 @@ void checkLength(long length, double spacing,
     return split(s, delim, elems);
   }
 */
-}
+} // namespace
 
 namespace itk {
 template<typename ReturnType>
@@ -87,20 +98,18 @@ ReturnType valueOfString(const std::string& s)
 {
   ReturnType res;
   if (!(std::istringstream(s) >> res)) {
-    itkGenericExceptionMacro(<<"SCIFIOImageIO: error while converting: " << s);
+    itkGenericExceptionMacro(<< "SCIFIOImageIO: error while converting: " << s);
   }
   return res;
 }
 
-
 template<typename T>
-T GetTypedMetaData(const MetaDataDictionary& dict, std::string key)
+T GetTypedMetaData(MetaDataDictionary dict, std::string key)
 {
   std::string tmp;
-  ExposeMetaData<std::string>(dict, std::move(key), tmp);
+  ExposeMetaData<std::string>(dict, key, tmp);
   return valueOfString<T>(tmp);
 }
-
 
 template<>
 bool valueOfString<bool>(const std::string& s)
@@ -115,7 +124,6 @@ bool valueOfString<bool>(const std::string& s)
   }
   return res;
 }
-
 
 template<typename T>
 std::string toString(const T& Value)
@@ -132,15 +140,14 @@ std::string SCIFIOImageIO::WaitForNewLines(int pipedatalength)
   std::string readBack;
   size_t findStart = 0;
   bool keepReading = true;
-  std::string errorMessage;
+  std::string errorMessage("");
   while (keepReading) {
-    int retcode = itksysProcess_WaitForData(m_Process, &pipedata, &pipedatalength, nullptr);
+    int retcode = itksysProcess_WaitForData(m_Process, &pipedata, &pipedatalength, NULL);
     if (retcode == itksysProcess_Pipe_STDOUT) {
       readBack += std::string(pipedata, pipedatalength);
 
       // Remove any \r so that we only dealing with unix-style line endings
-      for (size_t backslashRIndex = readBack.find('\r', findStart);
-           backslashRIndex != std::string::npos;
+      for (size_t backslashRIndex = readBack.find("\r", findStart); backslashRIndex != std::string::npos;
            findStart = backslashRIndex) {
         readBack.erase(backslashRIndex, 1);
       }
@@ -151,36 +158,36 @@ std::string SCIFIOImageIO::WaitForNewLines(int pipedatalength)
       }
     } else if (retcode == itksysProcess_Pipe_STDERR) {
       std::string message(pipedata, pipedatalength);
-      VLOG(1) << "Got error message: " << message;
+      itkDebugMacro("Got error message:" << std::endl << message);
       CheckError(message);
       errorMessage += message;
     } else {
       DestroyJavaProcess();
-      itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. " << errorMessage);
+      itkExceptionMacro(<< "SCIFIOImageIO exited abnormally. " << errorMessage);
     }
   }
 
   return readBack;
 }
 
-void SCIFIOImageIO::CheckError(const std::string& message)
+void SCIFIOImageIO::CheckError(std::string message)
 {
-  if (message.size() >= 16 && message.substr(0, 16) == "Caught exception") {
+  if (message.size() >= 16 && message.substr(0, 16).compare("Caught exception") == 0) {
     LOG(ERROR) << "SCIFIOITKBridge caught exception: " << message;
     DestroyJavaProcess();
-    //exit(1);
-    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ");
-  } else if (message.size() >= 15 && message.substr(0, 15) == "Command failure") {
+    // exit(1);
+    itkExceptionMacro(<< "SCIFIOImageIO exited abnormally. ");
+  } else if (message.size() >= 15 && message.substr(0, 15).compare("Command failure") == 0) {
     LOG(ERROR) << "SCIFIOITKBridge command failed with message: " << message;
     DestroyJavaProcess();
-    //exit(1);
-    itkExceptionMacro(<<"SCIFIOImageIO exited abnormally. ");
+    // exit(1);
+    itkExceptionMacro(<< "SCIFIOImageIO exited abnormally. ");
   }
 }
 
 std::string SCIFIOImageIO::FindDimensionOrder(const ImageIORegion& region)
 {
-  std::string command;
+  std::string command("");
 
   // calculate max sizes. Used to determine dimension order as well.
   std::vector<long> maxSizes;
@@ -188,11 +195,21 @@ std::string SCIFIOImageIO::FindDimensionOrder(const ImageIORegion& region)
 
   long sizeX = 1, sizeY = 1, sizeZ = 1, sizeT = 1, sizeC = 1;
 
-  if (dict.HasKey("SizeX")) sizeX = GetTypedMetaData<long>(dict, "SizeX");
-  if (dict.HasKey("SizeY")) sizeY = GetTypedMetaData<long>(dict, "SizeY");
-  if (dict.HasKey("SizeZ")) sizeZ = GetTypedMetaData<long>(dict, "SizeZ");
-  if (dict.HasKey("SizeT")) sizeT = GetTypedMetaData<long>(dict, "SizeT");
-  if (dict.HasKey("SizeC")) sizeC = GetTypedMetaData<long>(dict, "SizeC");
+  if (dict.HasKey("SizeX")) {
+    sizeX = GetTypedMetaData<long>(dict, "SizeX");
+  }
+  if (dict.HasKey("SizeY")) {
+    sizeY = GetTypedMetaData<long>(dict, "SizeY");
+  }
+  if (dict.HasKey("SizeZ")) {
+    sizeZ = GetTypedMetaData<long>(dict, "SizeZ");
+  }
+  if (dict.HasKey("SizeT")) {
+    sizeT = GetTypedMetaData<long>(dict, "SizeT");
+  }
+  if (dict.HasKey("SizeC")) {
+    sizeC = GetTypedMetaData<long>(dict, "SizeC");
+  }
 
   maxSizes.push_back(sizeX);
   maxSizes.push_back(sizeY);
@@ -205,6 +222,14 @@ std::string SCIFIOImageIO::FindDimensionOrder(const ImageIORegion& region)
     int offset = region.GetIndex(regionIndex);
     int length = region.GetSize(regionIndex);
 
+    while (maxSizeIndex < 5 && offset + length > maxSizes.at(maxSizeIndex)) {
+      command += "\t";
+      command += toString(0);
+      command += "\t";
+      command += toString(1);
+      maxSizeIndex++;
+    }
+
     command += "\t";
     command += toString(offset);
     command += "\t";
@@ -216,13 +241,13 @@ std::string SCIFIOImageIO::FindDimensionOrder(const ImageIORegion& region)
     command += "\t";
     command += toString(0);
     command += "\t";
-    command += toString(maxSizes.at(maxSizeIndex));
+    command += toString(1);
   }
 
   return command;
 }
 
-bool SCIFIOImageIO::CheckJavaPath(const std::string& javaHome, std::string& javaCmd)
+bool SCIFIOImageIO::CheckJavaPath(std::string javaHome, std::string& javaCmd)
 {
   std::vector<std::string> javaCmdPath;
 #if defined(_WIN32)
@@ -230,9 +255,9 @@ bool SCIFIOImageIO::CheckJavaPath(const std::string& javaHome, std::string& java
 #else
   javaCmd = "java";
 #endif
-  javaCmdPath.emplace_back(""); // NB: JoinPath skips the first one (why?).
+  javaCmdPath.push_back(""); // NB: JoinPath skips the first one (why?).
   javaCmdPath.push_back(javaHome);
-  javaCmdPath.emplace_back("bin");
+  javaCmdPath.push_back("bin");
   javaCmdPath.push_back(javaCmd);
   std::string path = itksys::SystemTools::JoinPath(javaCmdPath);
   if (itksys::SystemTools::FileExists(path, false)) {
@@ -243,7 +268,7 @@ bool SCIFIOImageIO::CheckJavaPath(const std::string& javaHome, std::string& java
   return false;
 }
 
-std::string SCIFIOImageIO::RemoveFinalSlash(std::string path)
+std::string SCIFIOImageIO::RemoveFinalSlash(std::string path) const
 {
   if (!path.empty() && (path[path.size() - 1] == '/' || path[path.size() - 1] == '\\')) {
     path.resize(path.size() - 1);
@@ -251,15 +276,17 @@ std::string SCIFIOImageIO::RemoveFinalSlash(std::string path)
   return path;
 }
 
-SCIFIOImageIO::SCIFIOImageIO() : m_Argv(nullptr)
+SCIFIOImageIO::SCIFIOImageIO()
+  : m_Argv(0)
 {
   this->m_FileType = IOFileEnum::Binary;
 
   // determine Java classpath from SCIFIO_PATH environment variable
   std::string scifioPath = nim::ZImgGlobal::instance().jarsDIR.toStdString();
   if (!itksys::SystemTools::FileExists(scifioPath.c_str(), false)) {
-    itkExceptionMacro("SCIFIO_PATH is not set. " << "This environment variable must point to the "
-                                                 << "directory containing the SCIFIO JAR files");
+    itkExceptionMacro("SCIFIO_PATH is not set. "
+                      << "This environment variable must point to the "
+                      << "directory containing the SCIFIO JAR files");
   }
 
   std::vector<std::string> packageCmdPath;
@@ -281,41 +308,40 @@ SCIFIOImageIO::SCIFIOImageIO() : m_Argv(nullptr)
   if (javaHome.empty()) {
     VLOG(1) << "SCIFIO: JAVA_HOME not set; assuming Java is on the path";
   }
-// use the appropriate java command
+  // use the appropriate java command
   m_Args.push_back(javaCmd);
 
-// allocate 256MB by default (can be overridden using JAVA_FLAGS variable)
+  // allocate 256MB by default (can be overridden using JAVA_FLAGS variable)
   m_Args.emplace_back("-Xmx256m");
 
-// run headless, to avoid any problems with AWT
+  // run headless, to avoid any problems with AWT
   m_Args.emplace_back("-Djava.awt.headless=true");
 
-// append Java classpath
+  // append Java classpath
   m_Args.emplace_back("-cp");
   m_Args.push_back(classpath);
 
-// append any user-given parameters
+  // append any user-given parameters
   // std::string javaFlags = getEnv("JAVA_FLAGS");
   // split(javaFlags, ' ', m_Args);
 
-// append the name of the main class to execute
+  // append the name of the main class to execute
   m_Args.emplace_back("io.scif.itk.SCIFIOITKBridge");
 
-// append the command to pass to the ITK bridge
+  // append the command to pass to the ITK bridge
   m_Args.emplace_back("waitForInput");
 
-// output the full Java command line, for debugging
+  // output the full Java command line, for debugging
   VLOG(1) << "-- JAVA COMMAND --";
   for (auto& m_Arg : m_Args) {
     VLOG(1) << "\t" << m_Arg;
   }
 
-// convert to something usable by itksys
+  // convert to something usable by itksys
   delete[] m_Argv;
   m_Argv = toCArray(m_Args);
   m_Process = nullptr;
 }
-
 
 void SCIFIOImageIO::CreateJavaProcess()
 {
@@ -337,14 +363,16 @@ void SCIFIOImageIO::CreateJavaProcess()
   saAttr.bInheritHandle = TRUE;
   saAttr.lpSecurityDescriptor = NULL;
 
- if( !CreatePipe( &(m_Pipe[0]), &(m_Pipe[1]), &saAttr, 0) )
-   itkExceptionMacro(<<"createpipe() failed");
- if ( ! SetHandleInformation(m_Pipe[1], HANDLE_FLAG_INHERIT, 0) )
-   itkExceptionMacro(<<"set inherited failed");
+  if (!CreatePipe(&(m_Pipe[0]), &(m_Pipe[1]), &saAttr, 0)) {
+    itkExceptionMacro(<< "createpipe() failed");
+  }
+  if (!SetHandleInformation(m_Pipe[1], HANDLE_FLAG_INHERIT, 0)) {
+    itkExceptionMacro(<< "set inherited failed");
+  }
 #else
   const int pipeResult = pipe(m_Pipe);
   if (pipeResult != 0) {
-    itkExceptionMacro(<<"Error with SCIFIOImageIO pipe.");
+    itkExceptionMacro(<< "Error with SCIFIOImageIO pipe.");
   }
 #endif
 
@@ -358,46 +386,51 @@ void SCIFIOImageIO::CreateJavaProcess()
   switch (state) {
     case itksysProcess_State_Exited: {
       int retCode = itksysProcess_GetExitValue(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exited with return value: " << retCode);
+      itkExceptionMacro(<< "SCIFIOImageIO: ITKReadImageInformation exited with return value: " << retCode);
+      break;
     }
     case itksysProcess_State_Error: {
       std::string msg = itksysProcess_GetErrorString(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation error:" << std::endl << msg);
+      itkExceptionMacro(<< "SCIFIOImageIO: ITKReadImageInformation error:" << std::endl << msg);
+      break;
     }
     case itksysProcess_State_Exception: {
       std::string msg = itksysProcess_GetExceptionString(m_Process);
-      itkExceptionMacro(<<"SCIFIOImageIO: ITKReadImageInformation exception:" << std::endl << msg);
+      itkExceptionMacro(<< "SCIFIOImageIO: ITKReadImageInformation exception:" << std::endl << msg);
+      break;
     }
     case itksysProcess_State_Executing: {
       // this is the expected state
       break;
     }
     case itksysProcess_State_Expired: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation expired.");
+      itkExceptionMacro(<< "SCIFIOImageIO: internal error: ITKReadImageInformation expired.");
+      break;
     }
     case itksysProcess_State_Killed: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation killed.");
+      itkExceptionMacro(<< "SCIFIOImageIO: internal error: ITKReadImageInformation killed.");
+      break;
     }
     case itksysProcess_State_Disowned: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation disowned.");
+      itkExceptionMacro(<< "SCIFIOImageIO: internal error: ITKReadImageInformation disowned.");
+      break;
     }
-//     case kwsysProcess_State_Starting:
-//       {
-//       break;
-//       }
+      //     case kwsysProcess_State_Starting:
+      //       {
+      //       break;
+      //       }
     default: {
-      itkExceptionMacro(<<"SCIFIOImageIO: internal error: ITKReadImageInformation is in unknown state.");
+      itkExceptionMacro(<< "SCIFIOImageIO: internal error: ITKReadImageInformation is in unknown state.");
+      break;
     }
   }
 }
-
 
 SCIFIOImageIO::~SCIFIOImageIO()
 {
   DestroyJavaProcess();
   delete[] m_Argv;
 }
-
 
 void SCIFIOImageIO::DestroyJavaProcess()
 {
@@ -417,7 +450,7 @@ void SCIFIOImageIO::DestroyJavaProcess()
   m_Process = nullptr;
 
 #ifdef _WIN32
-  CloseHandle( m_Pipe[1] );
+  CloseHandle(m_Pipe[1]);
 #else
   close(m_Pipe[1]);
 #endif
@@ -442,10 +475,10 @@ bool SCIFIOImageIO::CanReadFile(const char* FileNameToRead)
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  bool r = WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  bool r = WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -465,7 +498,7 @@ bool SCIFIOImageIO::CanReadFile(const char* FileNameToRead)
   int p1 = 0;
   std::string canRead;
   // can read?
-  p1 = imgInfo.find('\n', p0);
+  p1 = imgInfo.find("\n", p0);
   canRead = imgInfo.substr(p0, p1);
 
   return valueOfString<bool>(canRead);
@@ -486,10 +519,10 @@ bool SCIFIOImageIO::SetSeries(int series)
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -507,9 +540,9 @@ bool SCIFIOImageIO::SetSeries(int series)
   int p0 = 0;
   int p1 = 0;
   std::string seriesResult;
-  p1 = commandOutput.find('\n', p0);
+  p1 = commandOutput.find("\n", p0);
   seriesResult = commandOutput.substr(p0, p1);
-  VLOG(1) << "SetSeries result: " << seriesResult;
+  itkDebugMacro("SetSeries result: " << seriesResult);
 
   // Clear the previous dictionary entries, since we do not
   // allow overwriting of pre-existing entries - this will
@@ -534,10 +567,10 @@ int SCIFIOImageIO::GetSeriesCount()
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -556,9 +589,9 @@ int SCIFIOImageIO::GetSeriesCount()
   int p0 = 0;
   int p1 = 0;
   std::string seriesResult;
-  p1 = commandOutput.find('\n', p0);
+  p1 = commandOutput.find("\n", p0);
   seriesResult = commandOutput.substr(p0, p1);
-  VLOG(1) << "GetSeriesCount result: " << seriesResult;
+  itkDebugMacro("GetSeriesCount result: " << seriesResult);
 
   seriesCount = valueOfString<int>(commandOutput);
 
@@ -579,10 +612,10 @@ void SCIFIOImageIO::ReadImageInformation()
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -595,7 +628,6 @@ void SCIFIOImageIO::ReadImageInformation()
   imgInfo = WaitForNewLines(pipedatalength);
   VLOG(1) << "Done reading image information";
 
-
   // fill the metadata dictionary
   MetaDataDictionary& dict = this->GetMetaDataDictionary();
 
@@ -605,7 +637,6 @@ void SCIFIOImageIO::ReadImageInformation()
   std::string line;
 
   while (p0 < imgInfo.size()) {
-
     // get the key line
     p1 = imgInfo.find('\n', p0);
 
@@ -623,7 +654,7 @@ void SCIFIOImageIO::ReadImageInformation()
     p0 = p1 + 1;
 
     // get the value line
-    p1 = imgInfo.find('\n', p0);
+    p1 = imgInfo.find("\n", p0);
 
     line = imgInfo.substr(p0, p1 - p0);
 
@@ -647,7 +678,7 @@ void SCIFIOImageIO::ReadImageInformation()
       size_t lp1 = 0;
 
       while (lp0 < value.size()) {
-        lp1 = value.find('\\', lp0);
+        lp1 = value.find("\\", lp0);
         if (lp1 == std::string::npos) {
           tmp += value.substr(lp0, value.size() - lp0);
           lp0 = value.size();
@@ -663,7 +694,6 @@ void SCIFIOImageIO::ReadImageInformation()
           }
           lp0 = lp1 + 2;
         }
-
       }
       VLOG(1) << "Storing metadata: " << key << " ---> " << tmp;
       EncapsulateMetaData<std::string>(dict, key, tmp);
@@ -671,7 +701,6 @@ void SCIFIOImageIO::ReadImageInformation()
 
     // go to the next line
     p0 = p1 + 1;
-
   }
 
   // save the dicitonary
@@ -699,8 +728,8 @@ void SCIFIOImageIO::ReadImageInformation()
 
   // component type
   itkAssertOrThrowMacro(dict.HasKey("PixelType"), "PixelType is not in the metadata dictionary!");
-  auto pixelType = GetTypedMetaData<int>(dict, "PixelType");
-  VLOG(1) << "Setting ComponentType: " << pixelType;
+  const long pixelType = GetTypedMetaData<long>(dict, "PixelType");
+  itkDebugMacro("Setting ComponentType: " << pixelType);
   this->SetComponentType(scifioToITKComponentType(pixelType));
 
   // Dimensions are stored in x, y, z, t, c order
@@ -735,9 +764,9 @@ void SCIFIOImageIO::ReadImageInformation()
 
   this->SetNumberOfDimensions(lengthVec.size());
   for (size_t i = 0; i < lengthVec.size(); i++) {
-    VLOG(1) << "Setting Length " << i << ": " << lengthVec.at(i);
-    VLOG(1) << "Setting Spacing " << i << ": " << spacingVec.at(i);
-    auto index = lengthVec.size() - 1 - i;
+    itkDebugMacro("Setting Length " << i << ": " << lengthVec.at(i));
+    itkDebugMacro("Setting Spacing " << i << ": " << spacingVec.at(i));
+    int index = lengthVec.size() - 1 - i;
     this->SetDimensions(i, lengthVec.at(index));
     this->SetSpacing(i, spacingVec.at(index));
   }
@@ -773,10 +802,10 @@ void SCIFIOImageIO::Read(void* pData)
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -784,28 +813,29 @@ void SCIFIOImageIO::Read(void* pData)
   // fflush( m_Pipe[1] );
 
   // and read the image
-  char* data = (char*) pData;
+  char* data = (char*)pData;
   size_t pos = 0;
   std::string errorMessage;
   char* pipedata;
   int pipedatalength;
 
   MetaDataDictionary& dict = this->GetMetaDataDictionary();
-  size_t byteCount = this->GetComponentSize() * region.GetNumberOfPixels() * GetTypedMetaData<long>(dict, "SizeC");
+  const long rgbChannelCount = GetTypedMetaData<long>(dict, "RGBChannelCount");
+  size_t byteCount = this->GetComponentSize() * region.GetNumberOfPixels() * rgbChannelCount;
 
   while (pos < byteCount) {
-    int retcode = itksysProcess_WaitForData(m_Process, &pipedata, &pipedatalength, nullptr);
+    int retcode = itksysProcess_WaitForData(m_Process, &pipedata, &pipedatalength, NULL);
     if (retcode == itksysProcess_Pipe_STDOUT) {
       memcpy(data + pos, pipedata, pipedatalength);
       pos += pipedatalength;
     } else if (retcode == itksysProcess_Pipe_STDERR) {
       std::string message(pipedata, pipedatalength);
-      VLOG(1) << "Got error message: " << message;
+      itkDebugMacro("Got error message:" << std::endl << message);
       CheckError(message);
       errorMessage += message;
     } else {
       DestroyJavaProcess();
-      itkExceptionMacro(<<"SCIFIOImageIO: 'SCIFIOITKBridge read' exited abnormally. " << errorMessage);
+      itkExceptionMacro(<< "SCIFIOImageIO: 'SCIFIOITKBridge read' exited abnormally. " << errorMessage);
     }
   }
 }
@@ -821,10 +851,10 @@ bool SCIFIOImageIO::CanWriteFile(const char* name)
 
 #ifdef _WIN32
   DWORD bytesWritten;
-   WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -843,19 +873,17 @@ bool SCIFIOImageIO::CanWriteFile(const char* name)
   int p1 = 0;
   std::string canWrite;
   // can write?
-  p1 = imgInfo.find('\n', p0);
+  p1 = imgInfo.find("\n", p0);
   canWrite = imgInfo.substr(p0, p1);
-  VLOG(1) << "CanWrite result: " << canWrite;
+  itkDebugMacro("CanWrite result: " << canWrite);
   return valueOfString<bool>(canWrite);
 }
 
-
 void SCIFIOImageIO::WriteImageInformation()
 {
-  VLOG(1) << "SCIFIOImageIO::WriteImageInformation";
+  itkDebugMacro("SCIFIOImageIO::WriteImageInformation");
   // NB: Nothing to do.
 }
-
 
 void SCIFIOImageIO::Write(const void* buffer)
 {
@@ -864,7 +892,7 @@ void SCIFIOImageIO::Write(const void* buffer)
   CreateJavaProcess();
 
   ImageIORegion region = GetIORegion();
-  auto regionDim = region.GetImageDimension();
+  int regionDim = region.GetImageDimension();
 
   std::string command = "write\t";
   VLOG(1) << "File name: " << m_FileName;
@@ -884,26 +912,26 @@ void SCIFIOImageIO::Write(const void* buffer)
   command += toString(regionDim);
   command += "\t";
 
-  for (uint32_t i = 0; i < regionDim; ++i) {
-    VLOG(1) << "Dimension " << i << ": " << region.GetSize(i);
+  for (int i = 0; i < regionDim; ++i) {
+    itkDebugMacro("Dimension " << i << ": " << region.GetSize(i));
     command += toString(region.GetSize(i));
     command += "\t";
   }
 
-  for (uint32_t i = regionDim; i < 5; ++i) {
-    VLOG(1) << "Dimension " << i << ": " << 1;
+  for (int i = regionDim; i < 5; ++i) {
+    itkDebugMacro("Dimension " << i << ": " << 1);
     command += toString(1);
     command += "\t";
   }
 
-  for (uint32_t i = 0; i < regionDim; ++i) {
-    VLOG(1) << "Phys Pixel size " << i << ": " << this->GetSpacing(i);
+  for (int i = 0; i < regionDim; ++i) {
+    itkDebugMacro("Phys Pixel size " << i << ": " << this->GetSpacing(i));
     command += toString(this->GetSpacing(i));
     command += "\t";
   }
 
-  for (uint32_t i = regionDim; i < 5; i++) {
-    VLOG(1) << "Phys Pixel size" << i << ": " << 1;
+  for (int i = regionDim; i < 5; i++) {
+    itkDebugMacro("Phys Pixel size" << i << ": " << 1);
     command += toString(1);
     command += "\t";
   }
@@ -912,20 +940,20 @@ void SCIFIOImageIO::Write(const void* buffer)
   command += toString(itkToSCIFIOPixelType(GetComponentType()));
   command += "\t";
 
-  auto rgbChannelCount = GetNumberOfComponents();
+  int rgbChannelCount = GetNumberOfComponents();
 
   VLOG(1) << "RGB Channels: " << rgbChannelCount;
   command += toString(rgbChannelCount);
   command += "\t";
 
   // int xIndex = 0, yIndex = 1
-  uint32_t zIndex = 2;
-  uint32_t cIndex = 3;
-  uint32_t tIndex = 4;
+  int zIndex = 2;
+  int cIndex = 3;
+  int tIndex = 4;
   int bytesPerPlane = rgbChannelCount;
   int numPlanes = 1;
 
-  for (uint32_t dim = 0; dim < 5; dim++) {
+  for (int dim = 0; dim < 5; dim++) {
     if (dim < regionDim) {
       int index = region.GetIndex(dim);
       int size = region.GetSize(dim);
@@ -979,18 +1007,18 @@ void SCIFIOImageIO::Write(const void* buffer)
         int bValue = GetTypedMetaData<int>(dict, "LUTB" + toString(i));
         command += toString(bValue);
         command += "\t";
-        VLOG(1) << "Retrieval " << i << " r,g,b values = " << rValue << "," << gValue << "," << bValue;
+        itkDebugMacro("Retrieval " << i << " r,g,b values = " << rValue << "," << gValue << "," << bValue);
       } else {
-        auto rValue = GetTypedMetaData<short>(dict, "LUTR" + toString(i));
+        short rValue = GetTypedMetaData<short>(dict, "LUTR" + toString(i));
         command += toString(rValue);
         command += "\t";
-        auto gValue = GetTypedMetaData<short>(dict, "LUTG" + toString(i));
+        short gValue = GetTypedMetaData<short>(dict, "LUTG" + toString(i));
         command += toString(gValue);
         command += "\t";
-        auto bValue = GetTypedMetaData<short>(dict, "LUTB" + toString(i));
+        short bValue = GetTypedMetaData<short>(dict, "LUTB" + toString(i));
         command += toString(bValue);
         command += "\t";
-        VLOG(1) << "Retrieval " << i << " r,g,b values = " << rValue << "," << gValue << "," << bValue;
+        itkDebugMacro("Retrieval " << i << " r,g,b values = " << rValue << "," << gValue << "," << bValue);
         command += "\t";
       }
     }
@@ -1002,15 +1030,14 @@ void SCIFIOImageIO::Write(const void* buffer)
 
   command += "\n";
 
-
   VLOG(1) << "SCIFIOImageIO::Write command: " << command;
 
 #ifdef _WIN32
   DWORD bytesWritten;
-  WriteFile( m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
 #else
   ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
-  if (writtenBytes < static_cast< ssize_t >( command.size())) {
+  if (writtenBytes < static_cast<ssize_t>(command.size())) {
     itkExceptionMacro(<< "Only wrote " << writtenBytes << " of " << command.size() << " bytes!");
   }
 #endif
@@ -1027,18 +1054,18 @@ void SCIFIOImageIO::Write(const void* buffer)
   int p0 = 0;
   int p1 = 0;
   std::string vals;
-  p1 = imgInfo.find('\n', p0);
+  p1 = imgInfo.find("\n", p0);
   vals = imgInfo.substr(p0, p1);
 
   bytesPerPlane = valueOfString<int>(vals);
   VLOG(1) << "BPP: " << bytesPerPlane << " numPlanes: " << numPlanes;
 
   p0 = p1;
-  p1 = imgInfo.find('\n', p0);
+  p1 = imgInfo.find("\n", p0);
   vals = imgInfo.substr(p0, p1);
 
   using BYTE = unsigned char;
-  BYTE* data = (BYTE*) buffer;
+  BYTE* data = (BYTE*)buffer;
   char donemsg[] = {'O', 'K'};
 
   constexpr int pipelength = 10000;
@@ -1057,7 +1084,7 @@ void SCIFIOImageIO::Write(const void* buffer)
       VLOG(1) << "Writing " << bytesToRead << " bytes to plane " << i << ".  Bytes read: " << bytesRead;
 
 #ifdef _WIN32
-      WriteFile( m_Pipe[1], data, bytesToRead, &bytesWritten, NULL );
+      WriteFile(m_Pipe[1], data, bytesToRead, &bytesWritten, NULL);
 #else
       writtenBytes = write(m_Pipe[1], data, bytesToRead);
       if (writtenBytes < bytesToRead) {
@@ -1079,7 +1106,7 @@ void SCIFIOImageIO::Write(const void* buffer)
 
     // Hand-shake with Java signaling it's OK to send end of plane msg.
 #ifdef _WIN32
-    WriteFile( m_Pipe[1], donemsg, 2, &bytesWritten, NULL );
+    WriteFile(m_Pipe[1], donemsg, 2, &bytesWritten, NULL);
 #else
     writtenBytes = write(m_Pipe[1], donemsg, 2);
 #endif
@@ -1092,7 +1119,7 @@ void SCIFIOImageIO::Write(const void* buffer)
 
   // Hand-shake with Java signaling it's OK to send end of image msg.
 #ifdef _WIN32
-  WriteFile( m_Pipe[1], donemsg, 2, &bytesWritten, NULL );
+  WriteFile(m_Pipe[1], donemsg, 2, &bytesWritten, NULL);
 #else
   writtenBytes = write(m_Pipe[1], donemsg, 2);
 #endif

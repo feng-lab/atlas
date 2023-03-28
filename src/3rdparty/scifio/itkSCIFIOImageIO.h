@@ -1,12 +1,12 @@
 /*=========================================================================
  *
- *  Copyright Insight Software Consortium
+ *  Copyright NumFOCUS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0.txt
+ *         https://www.apache.org/licenses/LICENSE-2.0.txt
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -70,9 +70,9 @@ namespace itk {
  *   size, but also nice for tweaking the VM in many other ways (e.g.,
  *   garbage collection settings).
  *
- * [scifio]:       http://openmicroscopy.org/site/support/bio-formats/developers/scifio.html
- * [bio-formats]:  http://openmicroscopy.org/site/products/bio-formats
- * [file formats]: http://openmicroscopy.org/site/support/bio-formats/formats
+ * [scifio]:       https://openmicroscopy.org/site/support/bio-formats/developers/scifio.html
+ * [bio-formats]:  https://openmicroscopy.org/site/products/bio-formats
+ * [file formats]: https://openmicroscopy.org/site/support/bio-formats/formats
  *
  * \ingroup SCIFIO
  */
@@ -124,35 +124,31 @@ protected:
   ~SCIFIOImageIO() override;
 
   SizeType GetHeaderSize() const override
-  { return 0; }
+  {
+    return 0;
+  }
 
 private:
   void CreateJavaProcess();
-
   void DestroyJavaProcess();
-
   std::string FindDimensionOrder(const ImageIORegion& region);
-
   std::string WaitForNewLines(int pipedatalength);
+  void CheckError(std::string message);
+  bool CheckJavaPath(std::string javaHome, std::string& javaCmd);
+  std::string RemoveFinalSlash(std::string path) const;
 
-  void CheckError(const std::string& message);
-
-  static bool CheckJavaPath(const std::string& javaHome, std::string& javaCmd);
-
-  static std::string RemoveFinalSlash(std::string path) ;
-
-  static char** toCArray(std::vector<std::string>& args)
+  char** toCArray(std::vector<std::string>& args)
   {
-    auto** argv = new char* [args.size() + 1];
-    for (int i = 0; i < static_cast< int >( args.size()); i++) {
+    auto** argv = new char*[args.size() + 1];
+    for (int i = 0; i < static_cast<int>(args.size()); i++) {
       itkDebugMacro("SCIFIOImageIO::toCArray::args[" << i << "] = " << args[i]);
-      argv[i] = (char*) args[i].c_str();
+      argv[i] = (char*)args[i].c_str();
     }
     argv[args.size()] = nullptr;
     return argv;
   }
 
-  static ImageIOBase::IOComponentEnum scifioToITKComponentType(int pixelType)
+  IOComponentEnum scifioToITKComponentType(int pixelType)
   {
     switch (pixelType) {
       case 0:
@@ -174,7 +170,7 @@ private:
     }
   }
 
-  static int itkToSCIFIOPixelType(ImageIOBase::IOComponentEnum cmp)
+  int itkToSCIFIOPixelType(ImageIOBase::IOComponentEnum cmp)
   {
     switch (cmp) {
       case IOComponentEnum::CHAR:
@@ -202,7 +198,7 @@ private:
   MetaDataDictionary m_MetaDataDictionary;
   std::vector<std::string> m_Args;
   char** m_Argv;
-  itksysProcess_Pipe_Handle m_Pipe[2]{};
+  itksysProcess_Pipe_Handle m_Pipe[2];
   itksysProcess* m_Process;
 };
 } // end namespace itk
