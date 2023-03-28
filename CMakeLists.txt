@@ -69,6 +69,10 @@ include(LibsForImg)
 
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
 
+if (ATLAS_SANITIZE_ADDRESS)
+  set(CMAKE_CXX_FLAGS_RELEASE "-g -O1")
+endif ()
+
 # subprojects
 add_subdirectory(src/img)
 # add_subdirectory(src/matlab)
