@@ -60,7 +60,9 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h.in ${CMAKE_CURR
 include(BuildType)
 
 if (UNIX AND NOT APPLE)
-  set(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} " -O2")
+  # Modify compile flags to change optimization level from O3 to O2
+  string(REGEX REPLACE "([\\/\\-]O)3" "\\12"
+         CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 endif (UNIX AND NOT APPLE)
 
 if (NOT CMAKE_DEBUG_POSTFIX)
