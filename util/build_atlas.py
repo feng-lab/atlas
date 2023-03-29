@@ -73,20 +73,17 @@ def build_atlas():
         subprocess.run([get_ctest_binary(), '--extra-verbose'],
                        cwd=atlas_build_dir(), shell=False, check=True, env=env)
     else:
-        subprocess.run(cmakecmd, cwd=atlas_build_dir(), shell=False, check=True)
+        env = os.environ.copy()
+        if is_linux() and build_ext_libs.use_clang_in_linux():
+            env['CC'] = 'clang'
+            env['CXX'] = 'clang++'
+        subprocess.run(cmakecmd, cwd=atlas_build_dir(), shell=False, check=True, env=env)
         if use_ninja():
-            if is_linux() and build_ext_libs.use_clang_in_linux():
-                env = os.environ.copy()
-                env['CC'] = 'clang'
-                env['CXX'] = 'clang++'
-                subprocess.run([build_ext_libs.get_ninja_binary()],
-                               cwd=atlas_build_dir(), shell=False, check=True, env=env)
-            else:
-                subprocess.run([build_ext_libs.get_ninja_binary()],
-                               cwd=atlas_build_dir(), shell=False, check=True)
+            subprocess.run([build_ext_libs.get_ninja_binary()],
+                           cwd=atlas_build_dir(), shell=False, check=True, env=env)
         else:
             subprocess.run(['make', '-j' + str(os.cpu_count())],
-                           cwd=atlas_build_dir(), shell=False, check=True)
+                           cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
         subprocess.run([get_ctest_binary(), '--extra-verbose'],
                        cwd=atlas_build_dir(), shell=False, check=True)
