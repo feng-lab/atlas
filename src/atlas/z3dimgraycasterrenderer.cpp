@@ -16,7 +16,7 @@ DEFINE_bool(atlas_clear_image_cache_after_rendering,
 
 DEFINE_bool(atlas_squeeze_image_cache_after_rendering,
             false,
-            "Squeeze image cache after rendering, default is true");
+            "Squeeze image cache after rendering, default is false");
 
 DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,

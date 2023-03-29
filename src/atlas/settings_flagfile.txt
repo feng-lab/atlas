@@ -43,8 +43,8 @@
 # Maximum number of rounds for volume rendering, default is 100
 --atlas_volume_rendering_maximum_round=100
 
-# Whether to squeeze image cache after rendering, default is true
---atlas_squeeze_image_cache_after_rendering=true
+# Whether to squeeze image cache after rendering, default is false
+--atlas_squeeze_image_cache_after_rendering=false
 
 # Whether to log glbinding context switch event, default is false"
 --atlas_log_glbinding_context_switch=false

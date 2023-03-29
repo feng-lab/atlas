@@ -1064,7 +1064,7 @@ def build_folly(src_dir: str, install_dir: str):
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan() else 'OFF',
+                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if (use_asan() or is_linux()) else 'OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
