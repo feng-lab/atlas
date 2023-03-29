@@ -75,8 +75,15 @@ def build_atlas():
     else:
         subprocess.run(cmakecmd, cwd=atlas_build_dir(), shell=False, check=True)
         if use_ninja():
-            subprocess.run([build_ext_libs.get_ninja_binary()],
-                           cwd=atlas_build_dir(), shell=False, check=True)
+            if is_linux() and build_ext_libs.use_clang_in_linux():
+                env = os.environ.copy()
+                env['CC'] = 'clang'
+                env['CXX'] = 'clang++'
+                subprocess.run([build_ext_libs.get_ninja_binary()],
+                               cwd=atlas_build_dir(), shell=False, check=True, env=env)
+            else:
+                subprocess.run([build_ext_libs.get_ninja_binary()],
+                               cwd=atlas_build_dir(), shell=False, check=True)
         else:
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True)
