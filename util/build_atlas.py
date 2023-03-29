@@ -50,6 +50,9 @@ def build_atlas():
     print('useNinja:', use_ninja())
 
     cmakecmd = get_cmake_cmd_common_part()
+    if build_ext_libs.use_asan():
+        cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=ON',
+                         ])
     cmakecmd.extend([atlas_repository_dir()])
 
     if is_windows():

@@ -419,7 +419,7 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC TBB::tbb ${ITK_LIBRARIES} ${JPEGTUR
                       ${VTK_LIBRARIES} assimp::assimp
                       glog::glog llfio::sl ${_QT_LIBS_})
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (UNIX AND NOT APPLE)
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
 else ()
   target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES} ${IPP_LIBRARIES})
