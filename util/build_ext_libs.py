@@ -1059,14 +1059,12 @@ def build_folly(src_dir: str, install_dir: str):
                                    ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
-        asan_cxx_flags = f'-std=c++{cpp_standard()} -fPIC -g -O1'
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DPYTHON_EXTENSIONS:BOOL=OFF',
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
                          '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan() else 'OFF',
-                         f'-DCMAKE_CXX_FLAGS_RELEASE={asan_cxx_flags}' if use_asan() else '',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
