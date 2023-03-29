@@ -59,6 +59,10 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version/version.h.in ${CMAKE_CURR
 
 include(BuildType)
 
+if (UNIX AND NOT APPLE)
+  set(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} " -O2")
+endif (UNIX AND NOT APPLE)
+
 if (NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
 endif ()
@@ -70,7 +74,7 @@ include(LibsForImg)
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
 
 if (ATLAS_SANITIZE_ADDRESS)
-  set(CMAKE_CXX_FLAGS_RELEASE "-g -O1")
+  set(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} " -g")
 endif ()
 
 # subprojects
