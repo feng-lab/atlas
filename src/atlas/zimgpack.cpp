@@ -777,7 +777,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                         return folly::collectAll(tileFutures);
                       })
       .via(cpuExecutor)
-      .thenValue([=, &cancelFlag](const auto& tiles) {
+      .thenValue([=, &resInfo, &cancelFlag](auto&& tiles) {
         if (cancelFlag.load(std::memory_order_consume) || std::any_of(tiles.cbegin(), tiles.cend(), [](const auto& i) {
               return i.hasException();
             })) {
@@ -799,12 +799,13 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
           throw ZGLException("cancel");
         }
 
-        for (const auto& tile : tiles) {
+        for (auto& tile : tiles) {
           if (cancelFlag.load(std::memory_order_consume)) {
             throw ZGLException("cancel");
           }
-          const auto& [start, imgPtr] = tile.value();
+          auto& [start, imgPtr] = tile.value();
           res->pasteImg(*imgPtr, start);
+          imgPtr.reset();
         }
 
         if (cancelFlag.load(std::memory_order_consume)) {
