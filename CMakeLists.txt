@@ -79,6 +79,6 @@ add_subdirectory(src/img)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)
-if (BUILD_TESTING)
+if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS))
   include(test/test.cmake)
-endif (BUILD_TESTING)
+endif (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS))

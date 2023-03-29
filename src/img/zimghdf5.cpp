@@ -1039,13 +1039,13 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
 
     ZImgInfoIO::save(allGrp, img.info());
 
-    uint64_t numLevels = 1;
+    // uint64_t numLevels = 1;
     std::set<size_t> levels{1};
     size_t level = 1;
     size_t width = img.width();
     size_t height = img.height();
     while (width > chunkSize() || height > chunkSize()) {
-      ++numLevels;
+      // ++numLevels;
       level *= 2;
       levels.insert(level);
       width = std::ceil(width / 2.0);
@@ -1180,13 +1180,13 @@ void ZImgHDF5::writeImg(const QString& filename,
     const ZImgInfo& info = imgBlockrovider.imgInfo();
     ZImgInfoIO::save(allGrp, info);
 
-    uint64_t numLevels = 1;
+    // uint64_t numLevels = 1;
     std::set<size_t> levels{1};
     size_t level = 1;
     size_t width = info.width;
     size_t height = info.height;
     while (width > chunkSize() || height > chunkSize()) {
-      ++numLevels;
+      // ++numLevels;
       level *= 2;
       levels.insert(level);
       width = std::ceil(width / 2.0);

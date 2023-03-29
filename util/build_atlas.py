@@ -85,8 +85,9 @@ def build_atlas():
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
-        subprocess.run([get_ctest_binary(), '--extra-verbose'],
-                       cwd=atlas_build_dir(), shell=False, check=True)
+        if not build_ext_libs.use_asan():
+            subprocess.run([get_ctest_binary(), '--extra-verbose'],
+                           cwd=atlas_build_dir(), shell=False, check=True)
 
 
 if __name__ == "__main__":
