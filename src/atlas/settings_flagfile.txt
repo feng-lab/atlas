@@ -13,8 +13,8 @@
 # Interval in seconds for logging folly global executor status during waiting, default is 5
 --atlas_log_folly_global_executor_status_interval_in_seconds=5
 
-# Which version of readRegionToImg to use, value can be 0-1, default is 0
---atlas_readRegionToImg_version=0
+# Which version of readRegionToImg to use, value can be 0-1, default is 1
+--atlas_readRegionToImg_version=1
 
 # Whether readRegionToImg uses multithreaded resize, default is false
 --atlas_readRegionToImg_use_multithreaded_resize=false
