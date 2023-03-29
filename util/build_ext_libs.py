@@ -1059,7 +1059,7 @@ def build_folly(src_dir: str, install_dir: str):
                                    ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
-        asan_cxx_flags = f'-std=c++{cpp_standard} -fPIC -g -O1'
+        asan_cxx_flags = f'-std=c++{cpp_standard()} -fPIC -g -O1'
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DPYTHON_EXTENSIONS:BOOL=OFF',
                          '-DBUILD_TESTS:BOOL=OFF',
