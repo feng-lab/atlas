@@ -22,6 +22,10 @@ def use_clang_in_linux() -> bool:
     return is_linux()
 
 
+def use_asan() -> bool:
+    return False
+
+
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
@@ -156,29 +160,32 @@ def get_tbb_env():
     return env
 
 
-def get_common_build_flags(cpp_standard: int = cpp_standard()):
+def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization: bool = False):
     res = {}
+    optimization = ' -O3' if with_optimization else ''
     if is_mac():
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
         res['CC'] = 'clang'
         res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC -fvisibility=hidden -mavx -O3'
+                        f'-fPIC -fvisibility=hidden -mavx' + optimization
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
+                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
             res['CC'] = 'clang'
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx -O3'
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx' + optimization
             res['CXX'] = 'clang++'
-            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
+            res[
+                'CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
         else:
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx -O3'
-            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx -O3'
+            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx' + optimization
+            res[
+                'CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
     elif is_windows():
         res['CFLAGS'] = f'/utf-8'
         res[
@@ -188,11 +195,12 @@ def get_common_build_flags(cpp_standard: int = cpp_standard()):
 
 def get_env_for_config_make(cpp_standard: int = cpp_standard(),
                             remove_conda_from_path: bool = True,
-                            remove_scoop_from_path: bool = True
+                            remove_scoop_from_path: bool = True,
+                            with_optimization: bool = True
                             ):
     env = get_vcvars_environment(remove_conda_from_path=remove_conda_from_path,
                                  remove_scoop_from_path=remove_scoop_from_path) if is_windows() else os.environ.copy()
-    cbf = get_common_build_flags(cpp_standard=cpp_standard)
+    cbf = get_common_build_flags(cpp_standard=cpp_standard, with_optimization=with_optimization)
     if is_mac():
         env['CC'] = cbf['CC']
         env['CFLAGS'] = cbf['CFLAGS']
@@ -216,7 +224,7 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
 
 def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: int = cpp_standard(),
                               cpp_extention: bool = False):
-    cbf = get_common_build_flags(cpp_standard=cpp_standard)
+    cbf = get_common_build_flags(cpp_standard=cpp_standard, with_optimization=False)
     if is_windows():
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
@@ -338,7 +346,7 @@ def build_and_install_cmakecmd(cmakecmd, build_dir: str, *, additional_env=None,
             subprocess.run(['MSBuild', 'INSTALL.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=build_dir, shell=True, check=True, env=env)
     else:
-        env = get_env_for_config_make()
+        env = get_env_for_config_make(with_optimization=False)
         if additional_env is not None:
             env.update(additional_env)
         if use_cmake:
@@ -408,7 +416,7 @@ def build_zlib(src_dir: str, install_dir: str):
 
 def build_boost(src_dir: str, install_dir: str):
     try:
-        cbf = get_common_build_flags()
+        cbf = get_common_build_flags(with_optimization=True)
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['bootstrap'],
@@ -1051,12 +1059,14 @@ def build_folly(src_dir: str, install_dir: str):
                                    ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True)
+        asan_cxx_flags = f'-std=c++{cpp_standard} -fPIC -g -O1'
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DPYTHON_EXTENSIONS:BOOL=OFF',
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'OFF' if is_linux() else 'OFF',
+                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan() else 'OFF',
+                         f'-DCMAKE_CXX_FLAGS_RELEASE={asan_cxx_flags}' if use_asan() else '',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
