@@ -2,8 +2,9 @@ import os
 import shutil
 import subprocess
 import tempfile
-
 import glob
+
+import build_ext_libs
 
 
 def error(s):
@@ -240,7 +241,8 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
 
     # Strip executable
-    strip(dest_file)
+    if not build_ext_libs.use_asan():
+        strip(dest_file)
     # https://github.com/NixOS/patchelf/issues/94
     # todo: check if it is needed as we set it in cmake already
     patch_elf(['--remove-rpath'], dest_file)
