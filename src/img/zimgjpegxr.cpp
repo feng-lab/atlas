@@ -1,9 +1,9 @@
 #include "zimgjpegxr.h"
 
-#include <QFile>
-#include <JXRGlue.h>
 #include <folly/ScopeGuard.h>
+#include <QFile>
 #include <cmath>
+#include <JXRGlue.h>
 
 #ifdef Call
 #undef Call

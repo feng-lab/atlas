@@ -1,7 +1,6 @@
 #pragma once
 
 #include "zexception.h"
-#include <folly/Executor.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -241,8 +240,6 @@ __forceinline auto make_unique_for_overwrite(size_t n)
   typedef typename std::remove_extent<Tp>::type Up;
   return std::unique_ptr<Tp>(new Up[n]);
 }
-
-folly::Executor::KeepAlive<> getGlobalCPUExecutor();
 
 // c++23 utility
 [[noreturn]] __forceinline void unreachable()
