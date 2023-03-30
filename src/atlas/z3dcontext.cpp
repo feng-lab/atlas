@@ -119,7 +119,6 @@ void Z3DContext::makeCurrent() const
 
 #if defined(__linux__)
 Z3DContextGroup::Z3DContextGroup()
-  : m_contextGroup(QOpenGLContext::currentContext()->shareGroup())
 {
   if (FLAGS___use_EGL) {
     m_contextGroup = eglGetCurrentContext();
