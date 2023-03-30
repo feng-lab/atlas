@@ -73,6 +73,7 @@ def build_atlas():
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=atlas_build_dir(), shell=True, check=True, env=env)
 
+        env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
         subprocess.run([get_ctest_binary(), '--extra-verbose'],
                        cwd=atlas_build_dir(), shell=False, check=True, env=env)
     else:
@@ -88,9 +89,10 @@ def build_atlas():
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
+        env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
         if not build_ext_libs.use_asan():
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
-                           cwd=atlas_build_dir(), shell=False, check=True)
+                           cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
 
 if __name__ == "__main__":
