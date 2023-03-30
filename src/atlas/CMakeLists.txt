@@ -95,6 +95,12 @@ print_target_properties(RocksDB::rocksdb)
 
 print_target_properties(img NO_LOCATION)
 
+if (UNIX AND NOT APPLE)
+find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
+print_target_properties(OpenGL::OpenGL)
+print_target_properties(OpenGL::EGL)
+endif ()
+
 # get_cmake_property(_variableNames VARIABLES)
 # foreach (_variableName ${_variableNames})
 #   message(STATUS "${_variableName}=${${_variableName}}")
@@ -797,3 +803,7 @@ target_link_libraries(${APP_NAME} PUBLIC glbinding::glbinding-aux glbinding::glb
                       img ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
                       Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf RocksDB::rocksdb)
+
+if (UNIX AND NOT APPLE)
+  target_link_libraries(${APP_NAME} PRIVATE OpenGL::OpenGL OpenGL::EGL)
+endif ()
