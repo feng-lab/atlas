@@ -47,7 +47,7 @@ public:
   bool operator!=(const Z3DContextGroup& rhs) const;
 
 private:
-  void* m_contextGroup;
+  void* m_contextGroup = nullptr;
 };
 
 } // namespace nim
