@@ -20,7 +20,12 @@ DEFINE_uint32(atlas_log_folly_global_executor_status_interval_in_seconds,
 
 DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
               0,
-              "Use PBO when number of blocks to upload is larger than this threashold, default is 0");
+              "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
+
+DEFINE_int32(
+  atlas_batch_size_of_block_uploading,
+  1000,
+  "Upload image blocks in batch to limit memory usage, default is 1000, set to 0 or negative number to upload all at one batch");
 
 namespace nim {
 
@@ -721,6 +726,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
       }
     } else {
+      // use PBO
       if (cancelFlag.load(std::memory_order_consume)) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
@@ -728,61 +734,79 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
 
       boost::dynamic_bitset blockIsEmpty(pendingTasks.size(), 0);
-      std::vector<folly::Future<folly::Unit>> blockFutures;
-      blockFutures.reserve(pendingTasks.size());
-      for (int i = 0; i < static_cast<int>(pendingTasks.size()); ++i) {
-        const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
-        glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
-        blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty, &cancelFlag]() {
-          return m_imgPack
-            .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                             m_levelScales[blockImagePos.x].z,
-                             index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                             index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                             index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                             c,
-                             0,
-                             resInfo,
-                             m_channelDisplayRanges[c].x,
-                             m_channelDisplayRanges[c].y,
-                             cancelFlag)
-            .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty, &cancelFlag](std::shared_ptr<ZImg>&& img) {
-              if (cancelFlag.load(std::memory_order_consume)) {
-                throw ZGLException("cancel");
-              }
-              if (!img) {
-                blockIsEmpty.set(i);
-              } else {
-                memcpy(pboLocalBuffer.data() + i * blockSizeInByte, img->channelData(0), blockSizeInByte);
-              }
-            });
-        }));
+
+      int batchSize = FLAGS_atlas_batch_size_of_block_uploading;
+      if (batchSize <= 0) {
+        batchSize = pendingTasks.size();
       }
-      auto f =
-        folly::collectAll(blockFutures).via(cpuExecutor).thenValue([=, &pboLocalBuffer, &cancelFlag](auto&& res) {
+
+      int taskIdx = 0;
+      while (taskIdx < static_cast<int>(pendingTasks.size())) {
+        if (cancelFlag.load(std::memory_order_consume)) {
+          glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+          LOG(INFO) << "cancel here";
+          throw ZGLException("cancel");
+        }
+        int numberOfTasks = std::min(batchSize, static_cast<int>(pendingTasks.size()) - taskIdx);
+        std::vector<folly::Future<folly::Unit>> blockFutures;
+        blockFutures.reserve(numberOfTasks);
+        int finalTaskIdx = taskIdx + numberOfTasks;
+        for (; taskIdx < finalTaskIdx; ++taskIdx) {
+          const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
+          glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+          blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty, &cancelFlag]() {
+            return m_imgPack
+              .readRegionToImg(m_levelScales[blockImagePos.x].x,
+                               m_levelScales[blockImagePos.x].z,
+                               index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                               index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                               index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                               c,
+                               0,
+                               resInfo,
+                               m_channelDisplayRanges[c].x,
+                               m_channelDisplayRanges[c].y,
+                               cancelFlag)
+              .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty, &cancelFlag](std::shared_ptr<ZImg>&& img) {
+                if (cancelFlag.load(std::memory_order_consume)) {
+                  throw ZGLException("cancel");
+                }
+                if (!img) {
+                  blockIsEmpty.set(taskIdx);
+                } else {
+                  memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
+                }
+              });
+          }));
+        }
+        auto f = folly::collectAll(blockFutures).via(cpuExecutor).thenValueInline([=, &cancelFlag](auto&& res) {
           if (!cancelFlag.load(std::memory_order_consume) && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
                 return i.hasValue();
               })) {
-            memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
-            LOG(INFO) << "image blocks reading finished.";
+            LOG(INFO) << fmt::format("finish block {}", taskIdx);
           }
         });
 
-      while (
-        !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
-        auto poolStats = p->getPoolStats();
-        LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
-                                 poolStats.pendingTaskCount,
-                                 poolStats.totalTaskCount,
-                                 poolStats.activeThreadCount,
-                                 poolStats.idleThreadCount);
+        while (
+          !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+          auto poolStats = p->getPoolStats();
+          LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
+                                   poolStats.pendingTaskCount,
+                                   poolStats.totalTaskCount,
+                                   poolStats.activeThreadCount,
+                                   poolStats.idleThreadCount);
+        }
       }
-      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
       if (cancelFlag.load(std::memory_order_consume)) {
+        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
+
+      memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
+      LOG(INFO) << "image blocks reading finished.";
+      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 
       ZBenchTimer bt_pboUpload("PBO uploading");
       for (size_t i = 0; i < pendingTasks.size(); ++i) {

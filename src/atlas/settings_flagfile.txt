@@ -19,7 +19,7 @@
 # Whether readRegionToImg uses multithreaded resize, default is false
 --atlas_readRegionToImg_use_multithreaded_resize=false
 
-# Use PBO when number of blocks to upload is larger than this threashold, default is 0
+# Use PBO when number of blocks to upload is larger than this threshold, default is 0
 --atlas_number_of_blocks_to_use_PBO_threashold=0
 
 # Number of threads fft will use, default is 0 which is hardware concurrency.
@@ -48,3 +48,6 @@
 
 # Whether to log glbinding context switch event, default is false"
 --atlas_log_glbinding_context_switch=false
+
+# Upload image blocks in batch to limit memory usage, default is 1000, set to 0 or negative number to upload all at one batch
+--atlas_batch_size_of_block_uploading=1000
