@@ -32,6 +32,8 @@ __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 }
 #endif
 
+using namespace nim;
+
 int main(int argc, char* argv[])
 {
 #ifdef _WIN32
@@ -107,6 +109,8 @@ int main(int argc, char* argv[])
     });
 
     LOG(INFO) << "Version: " << GIT_VERSION;
+
+    LOG(INFO) << "log location: " << logDir.absolutePath();
 
     if (!FLAGS_flagfile.empty()) {
       LOG(INFO) << "user setting file loaded: " << FLAGS_flagfile;

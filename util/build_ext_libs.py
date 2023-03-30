@@ -966,6 +966,7 @@ def build_folly(src_dir: str, install_dir: str):
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file6 = bak_file6 = None
+    orig_file7 = bak_file7 = None
     try:
         if is_mac():
             orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
@@ -992,6 +993,13 @@ def build_folly(src_dir: str, install_dir: str):
                                to_texts=['find_dependency(fmt)\n'
                                          'find_dependency(gflags CONFIG)\n'
                                          'find_dependency(glog CONFIG)'])
+
+        orig_file7 = os.path.join(src_dir, 'CMake', 'folly-config.h.cmake')
+        bak_file7 = patch_file(orig_file7,
+                               from_texts=[r'#cmakedefine FOLLY_USE_JEMALLOC 1'],
+                               to_texts=['#cmakedefine FOLLY_USE_JEMALLOC 1\n'
+                                         '#define FOLLY_ASSUME_NO_JEMALLOC\n'
+                                         '#define FOLLY_ASSUME_NO_TCMALLOC'])
 
         orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
         bak_file2 = patch_file(orig_file2,
@@ -1064,7 +1072,7 @@ def build_folly(src_dir: str, install_dir: str):
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if (use_asan() or is_linux()) else 'OFF',
+                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan() else 'OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -1080,6 +1088,7 @@ def build_folly(src_dir: str, install_dir: str):
         os.replace(bak_file3, orig_file3)
         if is_windows():
             os.replace(bak_file6, orig_file6)
+        os.replace(bak_file7, orig_file7)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
