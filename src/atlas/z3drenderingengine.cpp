@@ -34,6 +34,10 @@ DEFINE_bool(atlas_log_glbinding_context_switch,
             false,
             "Whether to log glbinding context switch event, default is false");
 
+#if defined(__linux__)
+DECLARE_bool(__use_EGL)
+#endif
+
 namespace {
 
 // generic solution
@@ -180,6 +184,11 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
                                         QEvent::UpdateRequest,
                                         QEvent::LayoutRequest};
 
+#if defined(__linux__)
+  if (FLAGS___use_EGL) {
+    return;
+  }
+#endif
   // need to be created in main gui thread
   // see https://bugreports.qt.io/browse/QTBUG-87115
   m_offscreenSurface = std::make_unique<QOffscreenSurface>();
@@ -888,7 +897,15 @@ void Z3DRenderingEngine::initGL()
   if (m_canvas) {
     m_context = std::make_unique<Z3DContext>(*m_offscreenSurface, m_canvas->context());
   } else {
+#if defined(__linux__)
+    if (FLAGS___use_EGL) {
+      m_context = std::make_unique<Z3DContext>();
+    } else {
+      m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
+    }
+#else
     m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
+#endif
   }
   m_context->makeCurrent();
 

@@ -2,7 +2,6 @@
 
 class QOpenGLContext;
 class QOffscreenSurface;
-class QOpenGLContextGroup;
 
 namespace nim {
 
@@ -11,16 +10,13 @@ using ProcAddress = void (*)();
 class Z3DContext
 {
 public:
-  Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* sharedContext = nullptr);
+  explicit Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* sharedContext = nullptr);
+
+#if defined(__linux__)
+  Z3DContext();
+#endif
 
   ~Z3DContext();
-
-  QOpenGLContext* context() const
-  {
-    return m_context;
-  }
-
-  static void logCurrentContext();
 
   ProcAddress getProcAddress(const char* name) const;
 
@@ -28,7 +24,11 @@ public:
 
 private:
   QOpenGLContext* m_context = nullptr;
-  QOffscreenSurface& m_offscreenSurface;
+  QOffscreenSurface* m_offscreenSurface = nullptr;
+#if defined(__linux__)
+  void* m_eglContext = nullptr;
+  void* m_eglDisplay = nullptr;
+#endif
 };
 
 class Z3DContextGroup
@@ -47,7 +47,7 @@ public:
   bool operator!=(const Z3DContextGroup& rhs) const;
 
 private:
-  QOpenGLContextGroup* m_contextGroup;
+  void* m_contextGroup;
 };
 
 } // namespace nim

@@ -17,6 +17,10 @@ DEFINE_int32(output_height, 2160, "height of the output video");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists");
 DEFINE_string(output_image_folder_name, "", "output folder for images, use temporary folder if not provided");
 
+#if defined(__linux__)
+DECLARE_bool(__use_EGL)
+#endif
+
 namespace nim {
 
 int ZRunExport3DAnimation::run()
@@ -25,6 +29,10 @@ int ZRunExport3DAnimation::run()
   auto guard = folly::makeGuard([]() {
     LOG(INFO) << "Export 3D Animation End";
   });
+
+#if defined(__linux__)
+  FLAGS___use_EGL = true;
+#endif
 
   ZDoc doc;
   Z3DRenderingEngine engine(doc);
