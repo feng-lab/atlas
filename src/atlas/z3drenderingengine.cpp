@@ -35,7 +35,7 @@ DEFINE_bool(atlas_log_glbinding_context_switch,
             "Whether to log glbinding context switch event, default is false");
 
 #if defined(__linux__)
-DECLARE_bool(__use_EGL)
+DECLARE_bool(__use_EGL);
 #endif
 
 namespace {

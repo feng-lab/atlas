@@ -18,7 +18,7 @@ DEFINE_bool(overwrite, false, "whether to overwrite output file if it already ex
 DEFINE_string(output_image_folder_name, "", "output folder for images, use temporary folder if not provided");
 
 #if defined(__linux__)
-DECLARE_bool(__use_EGL)
+DECLARE_bool(__use_EGL);
 #endif
 
 namespace nim {
