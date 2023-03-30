@@ -97,7 +97,7 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
   if (m_context) {
     return m_context->getProcAddress(name);
   } else {
-    eglGetProcAddress(name);
+    return eglGetProcAddress(name);
   }
 #else
   return m_context->getProcAddress(name);
