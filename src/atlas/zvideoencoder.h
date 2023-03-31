@@ -13,6 +13,12 @@ class ZVideoEncoder : public QObject
 public:
   explicit ZVideoEncoder(QObject* parent = nullptr);
 
+  static std::tuple<QString, QStringList> encodeDryRun(const QDir& dir,
+                                                       const QString& namePrefix,
+                                                       int fieldWidth,
+                                                       int framesPerSecond,
+                                                       const QString& outputFilename);
+
   void encode(const QDir& dir,
               const QString& namePrefix,
               int fieldWidth,

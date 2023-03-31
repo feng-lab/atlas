@@ -16,6 +16,7 @@ DEFINE_int32(output_width, 3840, "width of the output video");
 DEFINE_int32(output_height, 2160, "height of the output video");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists");
 DEFINE_string(output_image_folder_name, "", "output folder for images, use temporary folder if not provided");
+DEFINE_bool(skip_video_compression, false, "whether to skip video compression, if true, --output_image_folder_name must be provided");
 DECLARE_uint32(use_gpu_device);
 
 #if defined(__linux__)
@@ -77,7 +78,8 @@ int ZRunExport3DAnimation::run()
                                     FLAGS_overwrite,
                                     Z3DScreenShotType::MonoView,
                                     nullptr,
-                                    outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName);
+                                    outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName,
+                                    FLAGS_skip_video_compression);
 
   return 0;
 }

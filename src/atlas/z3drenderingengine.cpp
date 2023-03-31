@@ -360,7 +360,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShot(const QString& filename, int wi
 {
   try {
     takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filename, width, height, sst);
-    resetCanvasSize();
+    resetOutputSizeToMatchCanvasSize();
   }
   catch (ZException const& e) {
     auto errorMsg = fmt::format("takeFixedSizeScreenShot error: {}", e.what());
@@ -391,7 +391,8 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     bool overwriteFileIfExist,
                                                     Z3DScreenShotType sst,
                                                     std::atomic_bool* cancelFlag,
-                                                    const QString* imageOuputFolder)
+                                                    const QString* imageOuputFolder,
+                                                    bool skipVideoCompression)
 {
   LOG(INFO) << "start exporting video";
   auto logGuard = folly::makeGuard([]() {
@@ -446,7 +447,13 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     }
     iof = QFileInfo(iofDir.absolutePath());
     if (!iof.isDir() || !iof.isWritable()) {
-      Q_EMIT renderingError(QString("Image output folder %1 can not be used").arg(*imageOuputFolder));
+      Q_EMIT renderingError(QString("Image output folder %1 can not be used, not writable").arg(*imageOuputFolder));
+      return;
+    }
+  }
+  if (skipVideoCompression) {
+    if (!imageOuputFolder) {
+      Q_EMIT renderingError(QString("Image output folder must be specified if we are going to skip video compression"));
       return;
     }
   }
@@ -484,7 +491,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
 
       takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
     }
-    resetCanvasSize();
+    resetOutputSizeToMatchCanvasSize();
 
     if (cancelFlag && cancelFlag->load()) {
       reportCancelError();
@@ -492,145 +499,26 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     }
 
     ZVideoEncoder videoEncoder;
-    connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
-    connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
-    connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
-    videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-    while (!videoEncoder.waitForFinished(3000)) {
-      if (cancelFlag && cancelFlag->load()) {
-        videoEncoder.cancel();
-        return;
+    if (skipVideoCompression) {
+      LOG(INFO) << "video compression skipped, you can run the following command to get video:";
+      videoEncoder.encodeDryRun(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+    } else {
+      connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
+      connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
+      connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
+      videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+      while (!videoEncoder.waitForFinished(3000)) {
+        if (cancelFlag && cancelFlag->load()) {
+          videoEncoder.cancel();
+          return;
+        }
       }
+      LOG(INFO) << dir.filePath(fn) << " saved";
     }
-    LOG(INFO) << dir.filePath(fn) << " saved";
   }
   catch (ZException const& e) {
     LOG(ERROR) << e.what();
     reportRenderingError(e.what());
-  }
-}
-
-void Z3DRenderingEngine::export3DAnimation(const ZAnimation* animation,
-                                           const QString& fn,
-                                           double framePerSecond,
-                                           double startTime,
-                                           double endTime,
-                                           bool overwriteFileIfExist,
-                                           Z3DScreenShotType sst,
-                                           std::atomic_bool* cancelFlag,
-                                           const QString* imageOuputFolder)
-{
-  LOG(INFO) << "start exporting video";
-  auto logGuard = folly::makeGuard([]() {
-    LOG(INFO) << "end exporting video";
-  });
-  m_globalParas->cancelLongRendering = false;
-  CHECK(animation);
-  if (startTime < 0 || startTime >= animation->duration()) {
-    Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startTime));
-    return;
-  }
-  if (endTime >= 0 && endTime <= startTime) {
-    Q_EMIT renderingError(QString("Video end time %1 is not correct").arg(endTime));
-    return;
-  }
-  if (endTime < 0 || endTime > animation->duration()) {
-    endTime = animation->duration();
-  }
-
-  QDir dir(QFileInfo(fn).absolutePath());
-  if (!dir.exists()) {
-    if (!dir.mkpath(".")) {
-      Q_EMIT renderingError(QString("Can not create folder %1").arg(dir.path()));
-      return;
-    }
-  }
-  if (dir.exists(fn)) {
-    if (!overwriteFileIfExist) {
-      Q_EMIT renderingError(QString("File %1 already exists").arg(dir.filePath(fn)));
-      return;
-    } else if (!QFile::remove(dir.filePath(fn))) {
-      Q_EMIT renderingError(QString("Can not replace existed file %1").arg(dir.filePath(fn)));
-      return;
-    }
-  }
-  if (imageOuputFolder) {
-    if (imageOuputFolder->trimmed().isEmpty()) {
-      Q_EMIT renderingError(QString("Image output folder name %1 is empty, can not be used").arg(*imageOuputFolder));
-      return;
-    }
-    QFileInfo iof(*imageOuputFolder);
-    QDir iofDir(iof.absolutePath());
-    if (!iofDir.exists()) {
-      if (!iofDir.mkpath(".")) {
-        Q_EMIT renderingError(QString("Can not create image output folder %1").arg(*imageOuputFolder));
-        return;
-      }
-    }
-    iof = QFileInfo(iofDir.absolutePath());
-    if (!iof.isDir() || !iof.isWritable()) {
-      Q_EMIT renderingError(QString("Image output folder %1 can not be used").arg(*imageOuputFolder));
-      return;
-    }
-  }
-
-  try {
-    m_doc.hideAnimation3DView();
-    m_doc.deselectAllObjs();
-    makeOutputSizeEvenNumbers();
-
-    auto duration = endTime - startTime;
-    int numFrame = std::ceil(duration * framePerSecond);
-    int fieldWidth = numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond)));
-    double time = startTime;
-    int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
-    double timeIncrement = duration / numFrame;
-    QString namePrefix = "video";
-    auto tempdir = std::make_shared<QTemporaryDir>();
-    QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
-    for (int i = 0; i < numFrame; ++i) {
-      Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
-      if (cancelFlag && cancelFlag->load()) {
-        reportCancelError();
-        return;
-      }
-
-      animation->setCurrentTime(time);
-      time += timeIncrement;
-      QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
-      QString filepath = tmpdir.filePath(filename);
-      takeScreenShotPrivate(filepath, sst);
-    }
-    resetCanvasSize();
-
-    if (cancelFlag && cancelFlag->load()) {
-      reportCancelError();
-      return;
-    }
-
-    ZVideoEncoder videoEncoder;
-    connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
-    connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
-    connect(&videoEncoder, &ZVideoEncoder::canceled, this, &Z3DRenderingEngine::reportCancelError);
-    videoEncoder.encode(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
-    while (!videoEncoder.waitForFinished(3000)) {
-      if (cancelFlag && cancelFlag->load()) {
-        videoEncoder.cancel();
-        return;
-      }
-    }
-    LOG(INFO) << dir.filePath(fn) << " saved";
-  }
-  catch (ZException const& e) {
-    LOG(ERROR) << e.what();
-    reportRenderingError(e.what());
-  }
-}
-
-void Z3DRenderingEngine::resetCanvasSize()
-{
-  if (m_canvas) {
-    setOutputSize(m_canvas->physicalSize());
   }
 }
 
@@ -678,82 +566,6 @@ void Z3DRenderingEngine::setYZView()
   camera().rotate90XZ();
   resetCameraClippingRange();
 }
-
-// bool Z3DRenderingEngine::takeFixedSizeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3&
-// axis,
-//                                             bool clockWise, int numFrame, int width, int height, Z3DScreenShotType
-//                                             sst)
-//{
-//   using namespace boost::math::double_constants;
-//   QString title = "Capturing Images...";
-//   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-//     title = "Capturing Half Side-By-Side Stereo Images...";
-//   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-//     title = "Capturing Full Side-By-Side Stereo Images...";
-//   }
-//   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-//   progress.setWindowModality(Qt::WindowModal);
-//   progress.show();
-//   double rAngle = two_pi / numFrame;
-//   bool res = true;
-//   for (auto i = 0; i < numFrame; ++i) {
-//     progress.setValue(i);
-//     if (progress.wasCanceled())
-//       break;
-//
-//     if (clockWise)
-//       camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//     else
-//       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//     //resetCameraClippingRange();
-//     auto fieldWidth = numDigits(numFrame);
-//     auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-//     auto filepath = dir.filePath(filename);
-//     if (!takeFixedSizeScreenShot(filepath, width, height, sst)) {
-//       res = false;
-//       break;
-//     }
-//   }
-//   progress.setValue(numFrame);
-//   return res;
-// }
-//
-// bool Z3DRenderingEngine::takeSeriesScreenShot(const QDir& dir, const QString& namePrefix, const glm::vec3& axis,
-//                                    bool clockWise, int numFrame, Z3DScreenShotType sst)
-//{
-//   using namespace boost::math::double_constants;
-//   QString title = "Capturing Images...";
-//   if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-//     title = "Capturing Half Side-By-Side Stereo Images...";
-//   } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-//     title = "Capturing Full Side-By-Side Stereo Images...";
-//   }
-//   QProgressDialog progress(title, "Cancel", 0, numFrame, m_mainWin);
-//   progress.setWindowModality(Qt::WindowModal);
-//   progress.show();
-//   double rAngle = two_pi / numFrame;
-//   bool res = true;
-//   for (auto i = 0; i < numFrame; ++i) {
-//     progress.setValue(i);
-//     if (progress.wasCanceled())
-//       break;
-//
-//     if (clockWise)
-//       camera().rotate(rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//     else
-//       camera().rotate(-rAngle, camera().get().vectorEyeToWorld(axis), camera().get().center());
-//     //resetCameraClippingRange();
-//     auto fieldWidth = numDigits(numFrame);
-//     auto filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-//     auto filepath = dir.filePath(filename);
-//     if (!takeScreenShot(filepath, sst)) {
-//       res = false;
-//       break;
-//     }
-//   }
-//   progress.setValue(numFrame);
-//   return res;
-// }
 
 void Z3DRenderingEngine::init()
 {
@@ -859,16 +671,15 @@ void Z3DRenderingEngine::detachCanvas()
   m_canvas.clear();
 }
 
+glm::uvec2 Z3DRenderingEngine::outputSize() const
+{
+  return m_compositor->outputSize();
+}
+
 void Z3DRenderingEngine::setOutputSize(const glm::uvec2& size)
 {
   getGLFocus();
   m_compositor->setOutputSize(size);
-}
-
-void Z3DRenderingEngine::makeOutputSizeEvenNumbers()
-{
-  getGLFocus();
-  m_compositor->makeOutputSizeEvenNumbers();
 }
 
 ZImg Z3DRenderingEngine::textureToRGBAImg(const Z3DTexture& tex)
@@ -1210,6 +1021,13 @@ void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScree
       LOG(INFO) << "Saved half sbs stereo rendering (" << leftImg.width() << ", " << leftImg.height()
                 << ") to file:" << filename;
     }
+  }
+}
+
+void Z3DRenderingEngine::resetOutputSizeToMatchCanvasSize()
+{
+  if (m_canvas) {
+    setOutputSize(m_canvas->physicalSize());
   }
 }
 

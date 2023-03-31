@@ -37,8 +37,6 @@ public:
 
   glm::uvec2 outputSize() const;
 
-  void makeOutputSizeEvenNumbers();
-
   Z3DRenderTarget* monoReadyTarget() const
   {
     return m_monoReadyTarget;

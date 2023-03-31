@@ -101,19 +101,8 @@ public:
                                   bool overwriteFileIfExist = true,
                                   Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
                                   std::atomic_bool* cancelFlag = nullptr,
-                                  const QString* imageOuputFolder = nullptr);
-
-  void export3DAnimation(const ZAnimation* animation,
-                         const QString& fn,
-                         double framePerSecond,
-                         double startTime,
-                         double endTime,
-                         bool overwriteFileIfExist = true,
-                         Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
-                         std::atomic_bool* cancelFlag = nullptr,
-                         const QString* imageOuputFolder = nullptr);
-
-  void resetCanvasSize();
+                                  const QString* imageOuputFolder = nullptr,
+                                  bool skipVideoCompression = false);
 
   std::vector<Z3DObjView*> objViews()
   {
@@ -157,9 +146,9 @@ public:
 
   void detachCanvas();
 
-  void setOutputSize(const glm::uvec2& size);
+  glm::uvec2 outputSize() const;
 
-  void makeOutputSizeEvenNumbers();
+  void setOutputSize(const glm::uvec2& size);
 
   void zoomIn();
 
@@ -305,6 +294,8 @@ private:
 
   // private version will throw exception on error
   void takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst);
+
+  void resetOutputSizeToMatchCanvasSize();
 
 private:
   std::unique_ptr<QOffscreenSurface> m_offscreenSurface;

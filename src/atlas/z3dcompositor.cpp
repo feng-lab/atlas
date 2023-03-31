@@ -224,23 +224,6 @@ glm::uvec2 Z3DCompositor::outputSize() const
   return m_outRenderTarget1.size();
 }
 
-void Z3DCompositor::makeOutputSizeEvenNumbers()
-{
-  auto size = m_outRenderTarget1.size();
-  if (size.x % 2 == 1 || size.y % 2 == 1) {
-    if (size.x % 2 == 1) {
-      ++size.x;
-    }
-    if (size.y % 2 == 1) {
-      ++size.y;
-    }
-
-    LOG(INFO) << "Resize output size from (" << m_outRenderTarget1.size().x << ", " << m_outRenderTarget1.size().y
-              << ") to (" << size.x << ", " << size.y << ").";
-    setOutputSize(size);
-  }
-}
-
 void Z3DCompositor::invalidate(State inv)
 {
   // LOG(INFO) << to_underlying(m_state) << " " << to_underlying(inv);

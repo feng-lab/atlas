@@ -17,17 +17,12 @@ ZVideoEncoder::ZVideoEncoder(QObject* parent)
   connect(m_ffmpegProcess, &QProcess::readyReadStandardError, this, &ZVideoEncoder::logStandardError);
 }
 
-void ZVideoEncoder::encode(const QDir& dir,
-                           const QString& namePrefix,
-                           int fieldWidth,
-                           int framesPerSecond,
-                           const QString& outputFilename)
+std::tuple<QString, QStringList> ZVideoEncoder::encodeDryRun(const QDir& dir,
+                                                             const QString& namePrefix,
+                                                             int fieldWidth,
+                                                             int framesPerSecond,
+                                                             const QString& outputFilename)
 {
-  if (m_ffmpegProcess->state() != QProcess::NotRunning) {
-    Q_EMIT error("Encoder is already running.");
-    return;
-  }
-
 #ifdef _WIN32
   QString program = ZSystemInfo::resourcesDir().absoluteFilePath("ffmpeg.exe");
 #else
@@ -44,6 +39,21 @@ void ZVideoEncoder::encode(const QDir& dir,
             << "yuv420p"
             << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
   LOG(INFO) << program << " " << arguments.join(" ");
+  return std::make_tuple(program, arguments);
+}
+
+void ZVideoEncoder::encode(const QDir& dir,
+                           const QString& namePrefix,
+                           int fieldWidth,
+                           int framesPerSecond,
+                           const QString& outputFilename)
+{
+  if (m_ffmpegProcess->state() != QProcess::NotRunning) {
+    Q_EMIT error("Encoder is already running.");
+    return;
+  }
+
+  const auto& [program, arguments] = encodeDryRun(dir, namePrefix, fieldWidth, framesPerSecond, outputFilename);
   m_ffmpegProcess->start(program, arguments);
 }
 

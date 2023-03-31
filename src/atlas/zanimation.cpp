@@ -406,7 +406,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             true,
                                             sst,
                                             &m_cancelFlag,
-                                            nullptr);
+                                            nullptr,
+                                            false);
 
   progress->exec();
 }
@@ -424,63 +425,8 @@ void ZAnimation::export3DAnimation(const QString& fn,
   auto engine = dynamic_cast<Z3DRenderingEngine*>(m_engine);
   CHECK(engine);
 
-  QDir dir(QFileInfo(fn).absolutePath());
-  if (!dir.exists()) {
-    if (!dir.mkpath(".")) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Can not create folder %1").arg(dir.path()));
-      return;
-    }
-  }
-  if (dir.exists(fn)) {
-    QMessageBox msgBox(QApplication::activeWindow());
-    msgBox.setText(tr("File %1 exists, overwrite?").arg(fn));
-    msgBox.setInformativeText("");
-    msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::Cancel);
-    msgBox.setDefaultButton(QMessageBox::Cancel);
-    int ret = msgBox.exec();
-
-    if (ret == QMessageBox::Cancel) {
-      return;
-    }
-    if (!QFile::remove(dir.filePath(fn))) {
-      QMessageBox::critical(QApplication::activeWindow(),
-                            QApplication::applicationName(),
-                            QString("Can not replace %1").arg(dir.filePath(fn)));
-      return;
-    }
-  }
-
-  // todo: remove these and correctly handle these in Z3DRenderingEngine
-  m_doc.hideAnimation3DView();
-  m_doc.deselectAllObjs();
-
-  QString title = "Exporting 3D Animation as Video...";
-  if (sst == Z3DScreenShotType::HalfSideBySideStereoView) {
-    title = "Exporting 3D Animation as Half Side-By-Side Stereo Video...";
-  } else if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
-    title = "Exporting 3D Animation as Full Side-By-Side Stereo Video...";
-  }
-
-  auto progress = new QProgressDialog(title, "Cancel", 0, 100, QApplication::activeWindow());
-  progress->setAutoReset(false);
-  progress->setWindowModality(Qt::WindowModal);
-  progress->setAttribute(Qt::WA_DeleteOnClose);
-  QObject::disconnect(progress, &QProgressDialog::canceled, progress, &QProgressDialog::cancel);
-  connect(engine, &Z3DRenderingEngine::progressChanged, progress, &QProgressDialog::setValue);
-  connect(engine, &Z3DRenderingEngine::renderingError, progress, &QProgressDialog::reset);
-  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, progress, &QProgressDialog::reset);
-  connect(engine, &Z3DRenderingEngine::videoEncoderFinished, this, &ZAnimation::videoEncoderFinished);
-  connect(progress, &QProgressDialog::canceled, this, &ZAnimation::cancelButtonPressed);
-
-  QObject::disconnect(this, &ZAnimation::export3DAnimationInEngine, engine, &Z3DRenderingEngine::export3DAnimation);
-  connect(this, &ZAnimation::export3DAnimationInEngine, engine, &Z3DRenderingEngine::export3DAnimation);
-
-  m_cancelFlag = false;
-  Q_EMIT export3DAnimationInEngine(this, fn, framePerSecond, startTime, endTime, true, sst, &m_cancelFlag, nullptr);
-
-  progress->exec();
+  auto engineOutputSize = engine->outputSize();
+  exportFixedSize3DAnimation(fn, framePerSecond, startTime, endTime, engineOutputSize.x, engineOutputSize.y, sst);
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,

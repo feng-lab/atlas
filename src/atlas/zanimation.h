@@ -166,17 +166,8 @@ Q_SIGNALS:
                                           bool overwriteFileIfExist,
                                           Z3DScreenShotType sst,
                                           std::atomic_bool* cancelFlag,
-                                          const QString* imageOuputFolder);
-
-  void export3DAnimationInEngine(const ZAnimation* animation,
-                                 const QString& fn,
-                                 double framePerSecond,
-                                 double startTime,
-                                 double endTime,
-                                 bool overwriteFileIfExist,
-                                 Z3DScreenShotType sst,
-                                 std::atomic_bool* cancelFlag,
-                                 const QString* imageOuputFolder);
+                                          const QString* imageOuputFolder,
+                                          bool skipVideoCompression);
 
 protected:
   void disableAnimationOf(size_t id);

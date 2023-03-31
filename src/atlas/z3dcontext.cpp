@@ -11,7 +11,7 @@
 #include <EGL/eglext.h>
 
 DEFINE_bool(__use_EGL, false, "use EGL in linux console mode");
-DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering");
+DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering, default is 0 (the first one)");
 
 namespace {
 
