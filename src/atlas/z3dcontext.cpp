@@ -11,9 +11,14 @@
 #include <EGL/eglext.h>
 
 DEFINE_bool(__use_EGL, false, "use EGL in linux console mode");
+DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering");
+
+namespace {
 
 static const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
                                        EGL_PBUFFER_BIT,
+                                       EGL_ALPHA_SIZE,
+                                       8,
                                        EGL_BLUE_SIZE,
                                        8,
                                        EGL_GREEN_SIZE,
@@ -21,10 +26,57 @@ static const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
                                        EGL_RED_SIZE,
                                        8,
                                        EGL_DEPTH_SIZE,
-                                       8,
+                                       24,
                                        EGL_RENDERABLE_TYPE,
                                        EGL_OPENGL_BIT,
                                        EGL_NONE};
+
+void checkEGLError()
+{
+  if (auto res = eglGetError(); res != EGL_SUCCESS) {
+    switch (res) {
+      case EGL_NOT_INITIALIZED:
+        throw nim::ZGLException(
+          "EGL is not initialized, or could not be initialized, for the specified EGL display connection.");
+      case EGL_BAD_ACCESS:
+        throw nim::ZGLException(
+          "EGL cannot access a requested resource (for example a context is bound in another thread).");
+      case EGL_BAD_ALLOC:
+        throw nim::ZGLException("EGL failed to allocate resources for the requested operation.");
+      case EGL_BAD_ATTRIBUTE:
+        throw nim::ZGLException("An unrecognized attribute or attribute value was passed in the attribute list.");
+      case EGL_BAD_CONTEXT:
+        throw nim::ZGLException("An EGLContext argument does not name a valid EGL rendering context.");
+      case EGL_BAD_CONFIG:
+        throw nim::ZGLException("An EGLConfig argument does not name a valid EGL frame buffer configuration.");
+      case EGL_BAD_CURRENT_SURFACE:
+        throw nim::ZGLException(
+          "The current surface of the calling thread is a window, pixel buffer or pixmap that is no longer valid.");
+      case EGL_BAD_DISPLAY:
+        throw nim::ZGLException("An EGLDisplay argument does not name a valid EGL display connection.");
+      case EGL_BAD_SURFACE:
+        throw nim::ZGLException(
+          "An EGLSurface argument does not name a valid surface (window, pixel buffer or pixmap) configured for GL rendering.");
+      case EGL_BAD_MATCH:
+        throw nim::ZGLException(
+          "Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface).");
+      case EGL_BAD_PARAMETER:
+        throw nim::ZGLException("One or more argument values are invalid.");
+      case EGL_BAD_NATIVE_PIXMAP:
+        throw nim::ZGLException("A NativePixmapType argument does not refer to a valid native pixmap.");
+      case EGL_BAD_NATIVE_WINDOW:
+        throw nim::ZGLException("A NativeWindowType argument does not refer to a valid native window.");
+      case EGL_CONTEXT_LOST:
+        throw nim::ZGLException(
+          "A power management event has occurred. The application must destroy all contexts and reinitialise OpenGL ES state and objects to continue rendering.");
+      default:
+        throw nim::ZGLException("impossible egl error value");
+    }
+  }
+}
+
+} // namespace
+
 #endif
 
 namespace nim {
@@ -47,33 +99,56 @@ Z3DContext::Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* shar
 Z3DContext::Z3DContext()
 {
   CHECK(FLAGS___use_EGL);
-  static const int MAX_DEVICES = 4;
+  static const int MAX_DEVICES = 48;
   EGLDeviceEXT eglDevs[MAX_DEVICES];
   EGLint numDevices;
 
   PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT = (PFNEGLQUERYDEVICESEXTPROC)eglGetProcAddress("eglQueryDevicesEXT");
-
   eglQueryDevicesEXT(MAX_DEVICES, eglDevs, &numDevices);
-
+  checkEGLError();
   LOG(INFO) << "Detected " << numDevices << " EGL devices";
+  if (static_cast<EGLint>(FLAGS_use_gpu_device) >= numDevices) {
+    throw ZGLException(fmt::format("Specified GPU device {} is not available", FLAGS_use_gpu_device));
+    LOG(ERROR) << "Sepcified GPU device " << FLAGS_use_gpu_device << " is not available";
+  }
 
   // 1. Initialize EGL
   // EGLDisplay eglDpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-  m_eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[0], 0);
+  m_eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[FLAGS_use_gpu_device], nullptr);
+  if (m_eglDisplay == EGL_NO_DISPLAY) {
+    checkEGLError();
+    throw ZGLException("can not create EGL display");
+  }
   EGLint major, minor;
-  eglInitialize(m_eglDisplay, &major, &minor);
+  auto res = eglInitialize(m_eglDisplay, &major, &minor);
+  if (res == EGL_FALSE) {
+    checkEGLError();
+    throw ZGLException("can not initialize EGL");
+  }
   LOG(INFO) << "EGL " << major << "." << minor;
 
   // 2. Select an appropriate configuration
   EGLint numConfigs;
   EGLConfig eglCfg;
-  eglChooseConfig(m_eglDisplay, configAttribs, &eglCfg, 1, &numConfigs);
+  res = eglChooseConfig(m_eglDisplay, configAttribs, &eglCfg, 1, &numConfigs);
+  if (res == EGL_FALSE) {
+    checkEGLError();
+    throw ZGLException("EGL can not choose config");
+  }
 
   // 4. Bind the API
-  eglBindAPI(EGL_OPENGL_API);
+  res = eglBindAPI(EGL_OPENGL_API);
+  if (res == EGL_FALSE) {
+    checkEGLError();
+    throw ZGLException("EGL can not bind API");
+  }
 
   // 5. Create a context
   m_eglContext = eglCreateContext(m_eglDisplay, eglCfg, EGL_NO_CONTEXT, NULL);
+  if (m_eglContext == EGL_NO_CONTEXT) {
+    checkEGLError();
+    throw ZGLException("can not create EGL context");
+  }
 }
 #endif
 
@@ -94,10 +169,10 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
   }
 
 #if defined(__linux__)
-  if (m_context) {
-    return m_context->getProcAddress(name);
-  } else {
+  if (FLAGS___use_EGL) {
     return eglGetProcAddress(name);
+  } else {
+    return m_context->getProcAddress(name);
   }
 #else
   return m_context->getProcAddress(name);
@@ -107,10 +182,10 @@ ProcAddress Z3DContext::getProcAddress(const char* name) const
 void Z3DContext::makeCurrent() const
 {
 #if defined(__linux__)
-  if (m_context) {
-    m_context->makeCurrent(m_offscreenSurface);
-  } else {
+  if (FLAGS___use_EGL) {
     eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, m_eglContext);
+  } else {
+    m_context->makeCurrent(m_offscreenSurface);
   }
 #else
   m_context->makeCurrent(m_offscreenSurface);

@@ -899,7 +899,14 @@ void Z3DRenderingEngine::initGL()
   } else {
 #if defined(__linux__)
     if (FLAGS___use_EGL) {
-      m_context = std::make_unique<Z3DContext>();
+      try {
+        m_context = std::make_unique<Z3DContext>();
+      }
+      catch (const ZException& e) {
+        auto errMsg = fmt::format("Can not initialize 3d context: {}", e.what());
+        LOG(ERROR) << errMsg;
+        reportRenderingError(errMsg);
+      }
     } else {
       m_context = std::make_unique<Z3DContext>(*m_offscreenSurface);
     }
