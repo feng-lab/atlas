@@ -34,6 +34,12 @@ DEFINE_bool(atlas_log_glbinding_context_switch,
             false,
             "Whether to log glbinding context switch event, default is false");
 
+DEFINE_string(output_image_name_prefix, "video", "name prefix of the output images, default is video");
+
+DEFINE_int32(output_image_name_field_width,
+             8,
+             "number of decimals used for the name of output images after name prefix, default is 8");
+
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
 #endif
@@ -470,11 +476,12 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
 
     auto duration = endTime - startTime;
     int numFrame = std::ceil(duration * framePerSecond);
-    int fieldWidth = numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond)));
+    int fieldWidth = std::max(FLAGS_output_image_name_field_width,
+                              numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond))));
     double time = startTime;
     int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
     double timeIncrement = duration / numFrame;
-    QString namePrefix = "video";
+    QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     auto tempdir = std::make_shared<QTemporaryDir>();
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     for (int i = 0; i < numFrame; ++i) {
@@ -501,7 +508,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     ZVideoEncoder videoEncoder;
     if (skipVideoCompression) {
       LOG(INFO) << "video compression skipped, you can run the following command to get video:";
-      videoEncoder.encodeDryRun(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
+      ZVideoEncoder::encodeDryRun(tmpdir, namePrefix, fieldWidth, framePerSecond, dir.filePath(fn));
     } else {
       connect(&videoEncoder, &ZVideoEncoder::error, this, &Z3DRenderingEngine::renderingError);
       connect(&videoEncoder, &ZVideoEncoder::finished, this, &Z3DRenderingEngine::videoEncoderFinished);
