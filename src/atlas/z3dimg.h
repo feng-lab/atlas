@@ -7,6 +7,7 @@
 #include "z3dvolume.h"
 #include "zvertexbufferobject.h"
 #include "zbbox.h"
+#include <folly/CancellationToken.h>
 #include <QObject>
 #include <set>
 
@@ -154,7 +155,7 @@ public:
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           const std::vector<uint32_t>& usedBlockIDs,
                                           size_t c,
-                                          const std::atomic_bool& cancelFlag,
+                                          folly::CancellationToken cancellationToken,
                                           bool silenceExistingWarning = true);
 
 Q_SIGNALS:

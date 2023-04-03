@@ -203,7 +203,10 @@ public:
 
   void cancelLongRendering()
   {
-    m_globalParas->cancelLongRendering = true;
+    if (m_globalParas->cancellationSource && !m_globalParas->cancellationSource->isCancellationRequested()) {
+      // LOG(INFO) << "request cancel";
+      m_globalParas->cancellationSource->requestCancellation();
+    }
   }
 
   void reportRenderingError(const QString& error) const

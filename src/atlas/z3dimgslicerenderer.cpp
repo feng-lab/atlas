@@ -134,7 +134,9 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
   }
 
   if (!m_fastRendering && m_img->isVolumeDownsampled()) {
-    auto& cancelFlag = m_rendererBase.globalParas().cancelLongRendering;
+    auto cancellationToken = m_rendererBase.globalParas().cancellationSource
+                               ? m_rendererBase.globalParas().cancellationSource->getToken()
+                               : folly::CancellationToken();
 
     float n = m_rendererBase.camera().nearDist();
     glm::vec2 pixelEyeSpaceSize = m_rendererBase.camera().frustumNearPlaneSize() / glm::vec2(m_layerTarget->size());
@@ -205,7 +207,7 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
       LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
 
-      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, i, cancelFlag);
+      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, i, cancellationToken);
 
       bt.resetAndStart("render image3d slice");
       // render channels one by one

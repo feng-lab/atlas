@@ -404,7 +404,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   auto logGuard = folly::makeGuard([]() {
     LOG(INFO) << "end exporting video";
   });
-  m_globalParas->cancelLongRendering = false;
+
   CHECK(animation);
   if (startTime < 0 || startTime >= animation->duration()) {
     Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startTime));
@@ -877,7 +877,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   m_networkEvaluator->process(stereo, true);
   Q_EMIT progressChanged(100);
   QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
-  m_globalParas->cancelLongRendering = false;
+
   m_isRendering = false;
 }
 
@@ -892,20 +892,19 @@ void Z3DRenderingEngine::render(bool stereo)
   LOG(INFO) << "render";
   m_isRendering = true;
   getGLFocus();
-  if (!m_globalParas->cancelLongRendering.load()) {
     try {
+      m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();
       double progress = 0.1;
       Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       while (progress < 1.0) {
-        progress = m_networkEvaluator->process(stereo);
+        progress = m_networkEvaluator->process(stereo, false, m_globalParas->cancellationSource->getToken());
         Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
       }
     }
     catch (ZException& e) {
       LOG(INFO) << e.what();
     }
-  }
-  m_globalParas->cancelLongRendering = false;
+  m_globalParas->cancellationSource.reset();
   m_isRendering = false;
 }
 

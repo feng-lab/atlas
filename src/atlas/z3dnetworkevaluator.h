@@ -3,6 +3,7 @@
 #include "zbenchtimer.h"
 #include <QObject>
 #ifndef Q_MOC_RUN
+#include <folly/CancellationToken.h>
 #include <boost/graph/adjacency_list.hpp>
 #endif
 #include <vector>
@@ -41,7 +42,9 @@ public:
   // process the currently assigned network. The rendering order is determined internally
   // according the network topology and the invalidation levels of the filters.
   // stereo means run two passes for left and right eye
-  double process(bool stereo = false, bool fastRendering = false);
+  double process(bool stereo = false,
+                 bool fastRendering = false,
+                 folly::CancellationToken cancellationToken = folly::CancellationToken());
 
   // call when network topology changed
   void updateNetwork();
@@ -54,10 +57,6 @@ private:
   std::vector<Z3DFilter*> m_renderingOrder;
 
   std::vector<std::unique_ptr<Z3DFilterWrapper>> m_filterWrappers;
-
-  mutable bool m_locked = false;
-
-  bool m_processPending;
 
   Z3DCompositor& m_compositor;
 

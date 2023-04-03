@@ -5,6 +5,7 @@
 #include "zlog.h"
 #include <QRectF>
 #include <folly/futures/Future.h>
+#include <folly/CancellationToken.h>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/geometries/point.hpp>
@@ -177,7 +178,7 @@ public:
                                                        const ZImgInfo& resInfo,
                                                        double displayRangeMin,
                                                        double displayRangeMax,
-                                                       const std::atomic_bool& cancelFlag) const;
+                                                       folly::CancellationToken cancellationToken) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const

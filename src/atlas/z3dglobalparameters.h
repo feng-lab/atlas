@@ -6,6 +6,7 @@
 #include "z3dpickingmanager.h"
 #include "zoptionparameter.h"
 #include "z3dinteractionhandler.h"
+#include <folly/CancellationToken.h>
 #include <vector>
 #include <deque>
 #include <mutex>
@@ -135,7 +136,7 @@ public:
 
   std::mutex targetSwitchMutex;
   std::atomic_bool hasNewRendering = false;
-  std::atomic_bool cancelLongRendering = false;
+  std::unique_ptr<folly::CancellationSource> cancellationSource;
 
 private:
   std::vector<ZParameter*> m_parameters;

@@ -395,7 +395,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                                 const std::vector<uint32_t>& usedBlockIDs,
                                                 size_t c,
-                                                const std::atomic_bool& cancelFlag,
+                                                folly::CancellationToken cancellationToken,
                                                 bool silenceExistingWarning)
 {
   if (missingBlockIDs.empty()) {
@@ -442,7 +442,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     m_channelPageTableCacheManagers[c]->touch(key);
   }
 
-  if (cancelFlag.load(std::memory_order_consume)) {
+  if (cancellationToken.isCancellationRequested()) {
     LOG(INFO) << "cancel here";
     throw ZGLException("cancel");
   }
@@ -533,7 +533,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
         --numAvailablePageCacheBlock;
       } else {
-        m_channelImageCacheManagers[c]->popFront();
         LOG(ERROR) << "no space for new page table block, skip current image block";
         continue;
       }
@@ -572,7 +571,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
     });
 
-    if (cancelFlag.load(std::memory_order_consume)) {
+    if (cancellationToken.isCancellationRequested()) {
       LOG(INFO) << "cancel here";
       throw ZGLException("cancel");
     }
@@ -610,7 +609,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     });
 
     if (!pboPtr) {
-      if (cancelFlag.load(std::memory_order_consume)) {
+      if (cancellationToken.isCancellationRequested()) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
@@ -621,7 +620,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
         const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
         glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
-        blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo, &cancelFlag]() {
+        blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
           return m_imgPack
             .readRegionToImg(m_levelScales[blockImagePos.x].x,
                              m_levelScales[blockImagePos.x].z,
@@ -633,24 +632,22 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                              resInfo,
                              m_channelDisplayRanges[c].x,
                              m_channelDisplayRanges[c].y,
-                             cancelFlag)
-            .thenValueInline([=, &imgQueue, &cancelFlag](std::shared_ptr<ZImg>&& img) {
-              if (cancelFlag.load(std::memory_order_consume)) {
+                             cancellationToken)
+            .thenValueInline([=, &imgQueue](std::shared_ptr<ZImg>&& img) {
+              if (cancellationToken.isCancellationRequested()) {
                 throw ZGLException("cancel");
               }
               imgQueue.enqueue(std::make_tuple(i, std::move(img)));
             });
         }));
       }
-      auto f = folly::collectAll(blockFutures).via(cpuExecutor).thenValue([&cancelFlag](auto&& res) {
-        if (!cancelFlag.load(std::memory_order_consume) && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
-              return i.hasValue();
-            })) {
+      auto f = folly::collect(blockFutures).via(cpuExecutor).thenValue([=](auto&&) {
+        if (!cancellationToken.isCancellationRequested()) {
           LOG(INFO) << "image blocks reading finished.";
         }
       });
 
-      if (cancelFlag.load(std::memory_order_consume)) {
+      if (cancellationToken.isCancellationRequested()) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
       }
@@ -659,7 +656,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       auto lastLogTime = std::chrono::steady_clock::now();
       int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
       while (remainingBlocksToUpload > 0) {
-        if (cancelFlag.load(std::memory_order_consume)) {
+        if (cancellationToken.isCancellationRequested()) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
         }
@@ -727,7 +724,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     } else {
       // use PBO
-      if (cancelFlag.load(std::memory_order_consume)) {
+      if (cancellationToken.isCancellationRequested()) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
@@ -742,7 +739,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       int taskIdx = 0;
       while (taskIdx < static_cast<int>(pendingTasks.size())) {
-        if (cancelFlag.load(std::memory_order_consume)) {
+        if (cancellationToken.isCancellationRequested()) {
           glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
@@ -754,7 +751,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         for (; taskIdx < finalTaskIdx; ++taskIdx) {
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
           glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
-          blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty, &cancelFlag]() {
+          blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty]() {
             return m_imgPack
               .readRegionToImg(m_levelScales[blockImagePos.x].x,
                                m_levelScales[blockImagePos.x].z,
@@ -766,9 +763,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                                resInfo,
                                m_channelDisplayRanges[c].x,
                                m_channelDisplayRanges[c].y,
-                               cancelFlag)
-              .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty, &cancelFlag](std::shared_ptr<ZImg>&& img) {
-                if (cancelFlag.load(std::memory_order_consume)) {
+                               cancellationToken)
+              .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](std::shared_ptr<ZImg>&& img) {
+                if (cancellationToken.isCancellationRequested()) {
                   throw ZGLException("cancel");
                 }
                 if (!img) {
@@ -779,16 +776,20 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
               });
           }));
         }
-        auto f = folly::collectAll(blockFutures).via(cpuExecutor).thenValueInline([=, &cancelFlag](auto&& res) {
-          if (!cancelFlag.load(std::memory_order_consume) && std::all_of(res.cbegin(), res.cend(), [](const auto& i) {
-                return i.hasValue();
-              })) {
+        auto f = folly::collect(blockFutures).via(cpuExecutor).thenValueInline([=](auto&&) {
+          if (!cancellationToken.isCancellationRequested()) {
             LOG(INFO) << fmt::format("finish block {}", taskIdx);
           }
         });
 
         while (
           !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+          if (cancellationToken.isCancellationRequested()) {
+            glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+            LOG(INFO) << "cancel here";
+            throw ZGLException("cancel");
+          }
+
           auto poolStats = p->getPoolStats();
           LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
                                    poolStats.pendingTaskCount,
@@ -798,7 +799,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
       }
 
-      if (cancelFlag.load(std::memory_order_consume)) {
+      if (cancellationToken.isCancellationRequested()) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
@@ -810,7 +811,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       ZBenchTimer bt_pboUpload("PBO uploading");
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
-        if (cancelFlag.load(std::memory_order_consume)) {
+        if (cancellationToken.isCancellationRequested()) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
         }

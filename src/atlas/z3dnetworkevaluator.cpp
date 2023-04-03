@@ -15,7 +15,6 @@ namespace nim {
 
 Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* parent)
   : QObject(parent)
-  , m_processPending(false)
   , m_compositor(compositor)
 {
 #if defined(_DEBUG_)
@@ -28,7 +27,7 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   updateNetwork();
 }
 
-double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering)
+double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, folly::CancellationToken cancellationToken)
 {
   //  if (m_locked) {
   //    LOG(INFO) << "locked. Scheduling.";
@@ -53,6 +52,10 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering)
   //    }
   //  }
 
+  if (cancellationToken.isCancellationRequested()) {
+    throw ZGLException("cancel");
+  }
+
   // notify filter wrappers
   for (auto& filterWrapper : m_filterWrappers) {
     filterWrapper->beforeNetworkProcess();
@@ -64,6 +67,10 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering)
 
   // Iterate over filters in rendering order
   for (auto currentFilter : m_renderingOrder) {
+    if (cancellationToken.isCancellationRequested()) {
+      throw ZGLException("cancel");
+    }
+
     currentFilter->setFastRenderingMode(fastRendering, stereo);
 
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
@@ -138,7 +145,7 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering)
   }
   CHECK_GL_ERROR
 
-  m_locked = false;
+  // m_locked = false;
 
   //  // make sure that canvases are repainted, if their update has been blocked by the locked evaluator
   //  if (m_processPending) {
