@@ -70,7 +70,7 @@ include(LibsForImg)
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
 
 if (ATLAS_SANITIZE_ADDRESS)
-  set(CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE} " -g")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
 endif ()
 
 # subprojects
