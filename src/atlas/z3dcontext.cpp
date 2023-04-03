@@ -111,6 +111,7 @@ Z3DContext::Z3DContext()
     throw ZGLException(fmt::format("Specified GPU device {} is not available", FLAGS_use_gpu_device));
     LOG(ERROR) << "Sepcified GPU device " << FLAGS_use_gpu_device << " is not available";
   }
+  LOG(INFO) << "Use EGL Device " << FLAGS_use_gpu_device;
 
   // 1. Initialize EGL
   // EGLDisplay eglDpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
