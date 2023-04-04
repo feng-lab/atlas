@@ -29,6 +29,9 @@ DEFINE_bool(only_compress_video,
             "compress video if images are already in --output_image_folder_name, default is false, if true, "
             "--output_image_folder_name must be provided. In this mode, only --output_filename, --output_fps, and "
             "output_image_folder_name are required inputs.");
+DEFINE_bool(limit_memory_usage_to_64G,
+            false,
+            "limit memory usage to less than 64G, has no effect if the available memory is less than 64G, default is false");
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);

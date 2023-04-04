@@ -198,6 +198,8 @@ protected:
 
   std::vector<glm::vec3> m_voxelWorldDimensions;
   std::vector<float> m_voxelWorldSizes;
+  glm::vec3 m_volumeVoxelWorldDimension;
+  float m_volumeVoxelWorldSize;
 
 private:
   // std::unique_ptr<Z3DImgHistogramThread> m_histogramThread;

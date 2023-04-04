@@ -31,6 +31,7 @@ uniform sampler2D ray_exit_eye_coord;
 uniform sampler2D last_ray_depth;
 uniform sampler2D last_color;
 
+uniform sampler3D volume;
 uniform sampler1D transfer_function;
 
 #if GLSL_VERSION >= 330
@@ -74,6 +75,63 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
   if (rayDepth < 0.0)
     rayDepth = currentRayLength;
   return curResult + color;
+}
+
+#ifdef MIP
+void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+  inout float currentRayLength, inout bool finished, inout float ch1V, inout float rayDepth)
+#else
+void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+  inout float currentRayLength, inout bool finished, inout vec4 result, inout float rayDepth)
+#endif
+{
+  for (int loop0=0; !finished && loop0<255; loop0++) {
+    for (int loop1=0; !finished && loop1<255; loop1++) {
+      vec3 samplePos = startRayPosition + currentRayLength * rayVector;
+
+      #if GLSL_VERSION >= 130
+      float voxel = texture(volume, samplePos).r;
+      #else
+      float voxel = texture3D(volume, samplePos).r;
+      #endif
+
+
+      #ifdef MIP
+      #ifdef LOCAL_MIP
+      if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
+        finished = true;
+      } else if (voxel > ch1V) {
+        ch1V = voxel;
+        rayDepth = currentRayLength;
+      }
+      #else
+      if (voxel > ch1V) {
+        ch1V = voxel;
+        rayDepth = currentRayLength;
+      }
+      finished = ch1V >= 1.0;
+      #endif
+      #else
+      #if GLSL_VERSION >= 130
+      vec4 color = texture(transfer_function, voxel);
+      #else
+      vec4 color = texture1D(transfer_function, voxel);
+      #endif
+
+      if (color.a > 0.0) {
+        color.a / sampling_rate;
+        result = COMPOSITING(result, color, currentRayLength, rayDepth);
+        if (result.a >= 1.0) {
+          result.a = 1.0;
+          finished = true;
+        }
+      }
+      #endif // MIP
+
+      currentRayLength += stepSize;
+      finished = finished || (currentRayLength > 1.0);
+    }
+  }
 }
 
 #ifdef MIP
@@ -223,6 +281,19 @@ void main()
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
           stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
+
+        if (curLevel + 1 == LEVEL_COUNT) {
+#ifdef MIP
+          sampleVolume(startRayPosition, rayVector, stepSize,
+                       currentRayLength, finished, ch1V, rayDepth);
+#else
+          sampleVolume(startRayPosition, rayVector, stepSize,
+                       currentRayLength, finished, result, rayDepth);
+#endif
+          // finished = true;  // should be true
+          break;
+        }
+
         vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
         uvec3 pageTableCoord = uvec3(samplePos * image_dimensions[curLevel]) / image_block_size;

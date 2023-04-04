@@ -323,20 +323,40 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
   }
 
+  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumes[0]->spacing();
+  m_volumeVoxelWorldSize =
+    std::max(std::max(m_volumeVoxelWorldDimension.x, m_volumeVoxelWorldDimension.y), m_volumeVoxelWorldDimension.z);
+
   m_voxelWorldDimensions.resize(m_numLevels);
   m_voxelWorldSizes.resize(m_numLevels);
   for (size_t l = 0; l < m_numLevels; ++l) {
     m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
     m_voxelWorldSizes[l] =
       std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+    if (m_voxelWorldSizes[l] > m_volumeVoxelWorldSize) {
+      m_numLevels = l + 1;
+    }
   }
 
   for (size_t l = 0; l < m_numLevels; ++l) {
-    LOG(INFO) << l << " pageDirectoryDimension:" << m_pageDirectoryDimensions[l]
-              << " pageTableDimension:" << m_pageTableDimensions[l] << " imageDimension:" << m_imageDimensions[l]
-              << " levelScale:" << m_levelScales[l] << " posToBlockID:" << m_posToBlockIDs[l]
-              << " voxelWorldDimension:" << m_voxelWorldDimensions[l] << " voxelWorldSize:" << m_voxelWorldSizes[l];
+    LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
+              << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
+              << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
+              << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
   }
+  LOG(INFO) << "volumeDimension: " << m_volumes[0]->dimensions()
+            << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
+            << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
+
+  CHECK(m_numLevels > 0);
+  size_t l = m_numLevels - 1;
+  m_imageDimensions[l] = m_volumes[0]->dimensions();
+  m_imageBounds[l] = m_imageDimensions[l] - 1_u32;
+
+  LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
+            << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
+            << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
+            << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
 }
 
 void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRanges)
@@ -385,11 +405,12 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", m_imageBlockSize);
   shader.setUniform("image_address_to_normalized_texture_coord",
-                    1.f / glm::vec3(m_channelImageCacheTextures[0]->dimension() - 1_u32));
+                    1.f / glm::vec3(m_channelImageCacheTextures[c]->dimension() - 1_u32));
 
   shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
   shader.bindTexture("image_cache", m_channelImageCacheTextures[c].get());
+  shader.bindTexture("volume", m_volumes[c]->texture());
 }
 
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,

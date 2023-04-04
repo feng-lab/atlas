@@ -132,6 +132,11 @@ void main()
           numVoxels = abs(rayVector * image_dimensions[curLevel]);
           stepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
         }
+        if (curLevel + 1 == LEVEL_COUNT) {
+          missBlockIDs[missBlockIDsIndex++] = UINTMAX;
+          finished = true;
+          break;
+        }
         vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
         uvec3 pageTableCoord = uvec3(samplePos * image_dimensions[curLevel]) / image_block_size;

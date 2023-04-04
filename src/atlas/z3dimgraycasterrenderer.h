@@ -136,6 +136,16 @@ private:
   // transfer functions (grey or color depends on current number of channel)
   void resetTransferFunctions();
 
+  void render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
+  void render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
+  void render2DSliceOf3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
+  void render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
+  void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
 protected:
   //  Z3DShaderProgram m_raycasterShader;
   //  Z3DShaderProgram m_2dImageShader;
@@ -179,7 +189,7 @@ private:
   const Z3DTexture* m_exitEyeCoordTexture;
 
   bool m_opaque;
-  double m_alpha; // only takes effect when m_opaque is true
+  // double m_alpha; // only takes effect when m_opaque is true
   ZVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
