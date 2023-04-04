@@ -827,7 +827,7 @@ void Z3DRenderingEngine::rotateZM()
 
 bool Z3DRenderingEngine::event(QEvent* e)
 {
-  // LOG(INFO) << e->type();
+  LOG(INFO) << e->type();
   if (contains(m_eventTypes, e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       renderFast();
