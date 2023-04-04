@@ -863,6 +863,14 @@ void Z3DRenderingEngine::getGLFocus()
 
 void Z3DRenderingEngine::renderFast(bool stereo)
 {
+  if (m_globalParas->cancellationSource) {
+    if (!m_globalParas->cancellationSource->isCancellationRequested()) {
+      m_globalParas->cancellationSource->requestCancellation();
+    }
+    LOG(INFO) << "cancel rendering, schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+    return;
+  }
   if (m_isRendering) {
     LOG(INFO) << "in fast rendering, schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
@@ -882,29 +890,23 @@ void Z3DRenderingEngine::renderFast(bool stereo)
 
 void Z3DRenderingEngine::render(bool stereo)
 {
-  if (m_isRendering) {
-    LOG(INFO) << "in rendering, schedule a update later";
-    QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
-    return;
-  }
+  CHECK(!m_isRendering);
 
   LOG(INFO) << "render";
-  m_isRendering = true;
   getGLFocus();
-    try {
-      m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();
-      double progress = 0.1;
+  try {
+    m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();
+    double progress = 0.1;
+    Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+    while (progress < 1.0) {
+      progress = m_networkEvaluator->process(stereo, false, m_globalParas->cancellationSource->getToken());
       Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
-      while (progress < 1.0) {
-        progress = m_networkEvaluator->process(stereo, false, m_globalParas->cancellationSource->getToken());
-        Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
-      }
     }
-    catch (ZException& e) {
-      LOG(INFO) << e.what();
-    }
+  }
+  catch (ZException& e) {
+    LOG(INFO) << e.what();
+  }
   m_globalParas->cancellationSource.reset();
-  m_isRendering = false;
 }
 
 Z3DRenderTarget* Z3DRenderingEngine::monoReadyTarget() const

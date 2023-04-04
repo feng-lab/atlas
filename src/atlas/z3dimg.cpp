@@ -6,6 +6,7 @@
 #include "zkmeans.h"
 #include "zbenchtimer.h"
 #include "zexception.h"
+#include <QCoreApplication>
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -463,6 +464,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     m_channelPageTableCacheManagers[c]->touch(key);
   }
 
+  if (cancellationToken.canBeCancelled()) {
+    QCoreApplication::processEvents();
+  }
   if (cancellationToken.isCancellationRequested()) {
     LOG(INFO) << "cancel here";
     throw ZGLException("cancel");
@@ -592,6 +596,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
     });
 
+    if (cancellationToken.canBeCancelled()) {
+      QCoreApplication::processEvents();
+    }
     if (cancellationToken.isCancellationRequested()) {
       LOG(INFO) << "cancel here";
       throw ZGLException("cancel");
@@ -630,6 +637,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     });
 
     if (!pboPtr) {
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
@@ -668,6 +678,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
       });
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         LOG(INFO) << "cancel here";
         throw ZGLException("cancel");
@@ -677,6 +690,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       auto lastLogTime = std::chrono::steady_clock::now();
       int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
       while (remainingBlocksToUpload > 0) {
+        if (cancellationToken.canBeCancelled()) {
+          QCoreApplication::processEvents();
+        }
         if (cancellationToken.isCancellationRequested()) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");
@@ -745,6 +761,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     } else {
       // use PBO
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
@@ -760,6 +779,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       int taskIdx = 0;
       while (taskIdx < static_cast<int>(pendingTasks.size())) {
+        if (cancellationToken.canBeCancelled()) {
+          QCoreApplication::processEvents();
+        }
         if (cancellationToken.isCancellationRequested()) {
           glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
           LOG(INFO) << "cancel here";
@@ -805,6 +827,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
         while (
           !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+          if (cancellationToken.canBeCancelled()) {
+            QCoreApplication::processEvents();
+          }
           if (cancellationToken.isCancellationRequested()) {
             glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
             LOG(INFO) << "cancel here";
@@ -820,6 +845,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
         LOG(INFO) << "cancel here";
@@ -832,6 +860,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       ZBenchTimer bt_pboUpload("PBO uploading");
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
+        if (cancellationToken.canBeCancelled()) {
+          QCoreApplication::processEvents();
+        }
         if (cancellationToken.isCancellationRequested()) {
           LOG(INFO) << "cancel here";
           throw ZGLException("cancel");

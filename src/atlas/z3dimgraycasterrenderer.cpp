@@ -9,6 +9,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <QFileInfo>
+#include <QCoreApplication>
 
 DEFINE_bool(atlas_clear_image_cache_after_rendering,
             false,
@@ -622,6 +623,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       LOG(INFO) << "round " << round;
       ZBenchTimer btrb("render blockids");
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -672,6 +676,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       // glFinish();
       STOP_AND_LOG(btrb)
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -703,6 +710,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
                           ccSet.insert(range.begin(), range.end()); // inserts a sequence
                         });
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -738,6 +748,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         break;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -758,6 +771,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -777,6 +793,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -796,6 +815,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -815,6 +837,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -834,6 +859,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -854,6 +882,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         lastRound = !hasEnoughMissingIDs;
       }
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -881,6 +912,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
       STOP_AND_LOG(btcb)
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -888,6 +922,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       lastRound =
         m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancellationToken) && lastRound;
 
+      if (cancellationToken.canBeCancelled()) {
+        QCoreApplication::processEvents();
+      }
       if (cancellationToken.isCancellationRequested()) {
         throw ZGLException("cancel");
       }
@@ -943,6 +980,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       }
     }
 
+    if (cancellationToken.canBeCancelled()) {
+      QCoreApplication::processEvents();
+    }
     if (cancellationToken.isCancellationRequested()) {
       throw ZGLException("cancel");
     }
@@ -968,6 +1008,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
     }
   }
 
+  if (cancellationToken.canBeCancelled()) {
+    QCoreApplication::processEvents();
+  }
   if (cancellationToken.isCancellationRequested()) {
     throw ZGLException("cancel");
   }

@@ -21,8 +21,6 @@ class ZMainWindow;
 
 class Z3DCanvas;
 
-enum class Z3DScreenShotType;
-
 class Z3DMainWindow : public QMainWindow
 {
   Q_OBJECT
