@@ -29,7 +29,7 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   , m_cameraDirectionTimeInterval("Camera Direction Time Interval", .5, .1, 100)
 {
   setTransformEnabled(false);
-  m_visible.set(false);
+  // m_visible.set(false);
 
   m_colorMode.addOptions("Single Color", "Colormap Time");
   m_colorMode.select("Colormap Time");
