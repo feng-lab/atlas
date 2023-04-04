@@ -443,15 +443,14 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
       Q_EMIT renderingError(QString("Image output folder name %1 is empty, can not be used").arg(*imageOuputFolder));
       return;
     }
-    QFileInfo iof(*imageOuputFolder);
-    QDir iofDir(iof.absolutePath());
+    QDir iofDir(*imageOuputFolder);
     if (!iofDir.exists()) {
       if (!iofDir.mkpath(".")) {
         Q_EMIT renderingError(QString("Can not create image output folder %1").arg(*imageOuputFolder));
         return;
       }
     }
-    iof = QFileInfo(iofDir.absolutePath());
+    auto iof = QFileInfo(iofDir.absolutePath());
     if (!iof.isDir() || !iof.isWritable()) {
       Q_EMIT renderingError(QString("Image output folder %1 can not be used, not writable").arg(*imageOuputFolder));
       return;
