@@ -155,7 +155,7 @@ public:
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                           const std::vector<uint32_t>& usedBlockIDs,
                                           size_t c,
-                                          folly::CancellationToken cancellationToken,
+                                          const folly::CancellationToken& cancellationToken,
                                           bool silenceExistingWarning = true);
 
 Q_SIGNALS:

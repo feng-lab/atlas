@@ -416,7 +416,7 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
                                                 const std::vector<uint32_t>& usedBlockIDs,
                                                 size_t c,
-                                                folly::CancellationToken cancellationToken,
+                                                const folly::CancellationToken& cancellationToken,
                                                 bool silenceExistingWarning)
 {
   if (missingBlockIDs.empty()) {
