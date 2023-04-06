@@ -2,11 +2,10 @@
 
 #include "zimginterface.h"
 #include "zjson.h"
+#include "zlog.h"
 #include <vector>
 
 namespace nim {
-
-#pragma pack(push, 1)
 
 struct ZImgInfo
 {
@@ -98,66 +97,164 @@ struct ZImgInfo
   // access
   inline void setSize(Dimension dim, size_t size)
   {
-    (&width)[to_underlying(dim)] = size;
+    switch (to_underlying(dim)) {
+      case 0:
+        width = size;
+      case 1:
+        height = size;
+      case 2:
+        depth = size;
+      case 3:
+        numChannels = size;
+      case 4:
+        numTimes = size;
+      default:
+        CHECK(false);
+    }
+
     if (dim >= Dimension::C) {
       createDefaultDescriptions();
     }
   }
 
-  // sz should have at least numDimensions() elements
-  inline void setSize(size_t* sz)
-  {
-    std::memcpy(&width, sz, sizeof(size_t) * numDimensions());
-    createDefaultDescriptions();
-  }
-
   [[nodiscard]] inline size_t size(Dimension dim) const
   {
-    return (&width)[to_underlying(dim)];
+    switch (to_underlying(dim)) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   [[nodiscard]] inline size_t size(size_t dim) const
   {
-    return (&width)[dim];
+    switch (dim) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   // note: time stride is meaningless since the memory is not contiguous
   [[nodiscard]] inline size_t stride(Dimension dim) const
   {
-    size_t res = 1;
-    for (std::underlying_type<Dimension>::type i = 0; i < to_underlying(dim); ++i) {
-      res *= (&width)[i];
+    size_t res = width;
+    auto ddim = to_underlying(dim);
+    if (ddim > 1) {
+      res *= height;
+    }
+    if (ddim > 2) {
+      res *= depth;
+    }
+    if (ddim > 3) {
+      res *= numChannels;
     }
     return res;
   }
 
   [[nodiscard]] inline size_t stride(size_t dim) const
   {
-    size_t res = 1;
-    for (size_t i = 0; i < dim; ++i) {
-      res *= (&width)[i];
+    size_t res = width;
+    if (dim > 1) {
+      res *= height;
+    }
+    if (dim > 2) {
+      res *= depth;
+    }
+    if (dim > 3) {
+      res *= numChannels;
     }
     return res;
   }
 
   inline size_t& operator[](size_t i)
   {
-    return (&width)[i];
+    switch (i) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   inline const size_t& operator[](size_t i) const
   {
-    return (&width)[i];
+    switch (i) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   inline size_t& operator[](Dimension i)
   {
-    return (&width)[to_underlying(i)];
+    switch (to_underlying(i)) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   inline const size_t& operator[](Dimension i) const
   {
-    return (&width)[to_underlying(i)];
+    switch (to_underlying(i)) {
+      case 0:
+        return width;
+      case 1:
+        return height;
+      case 2:
+        return depth;
+      case 3:
+        return numChannels;
+      case 4:
+        return numTimes;
+      default:
+        CHECK(false);
+    }
   }
 
   [[nodiscard]] inline bool isAlphaChannel(size_t ch) const
@@ -327,8 +424,6 @@ struct ZImgInfo
     return std::make_pair(min, max);
   }
 };
-
-#pragma pack(pop)
 
 inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgInfo& info)
 {

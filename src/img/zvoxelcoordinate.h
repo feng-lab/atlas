@@ -11,7 +11,6 @@
 namespace nim {
 
 // multi-dimensional coordinate of a voxel, its value_type is a signed integer type
-#pragma pack(push, 1)
 
 struct ZVoxelCoordinate
 {
@@ -98,12 +97,38 @@ struct ZVoxelCoordinate
   // access
   inline value_type& operator[](size_t i)
   {
-    return (&x)[i];
+    switch (i) {
+      case 0:
+        return x;
+      case 1:
+        return y;
+      case 2:
+        return z;
+      case 3:
+        return c;
+      case 4:
+        return t;
+      default:
+        CHECK(false);
+    }
   }
 
   inline const value_type& operator[](size_t i) const
   {
-    return (&x)[i];
+    switch (i) {
+      case 0:
+        return x;
+      case 1:
+        return y;
+      case 2:
+        return z;
+      case 3:
+        return c;
+      case 4:
+        return t;
+      default:
+        CHECK(false);
+    }
   }
 
   [[nodiscard]] inline bool allGreaterThan(const ZVoxelCoordinate& other) const
@@ -346,8 +371,6 @@ struct ZVoxelCoordinate
     return ZVoxelCoordinate(ttsize[0] - 1, ttsize[1] - 1, ttsize[2] - 1, ttsize[3] - 1, ttsize[4] - 1);
   }
 };
-
-#pragma pack(pop)
 
 // Binary arithmetic operators
 inline ZVoxelCoordinate operator+(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
