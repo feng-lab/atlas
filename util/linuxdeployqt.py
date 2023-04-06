@@ -4,8 +4,6 @@ import subprocess
 import tempfile
 import glob
 
-import build_ext_libs
-
 
 def error(s):
     print("ERROR: " + s)
@@ -213,7 +211,7 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir, use_asan: bool = False):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -241,7 +239,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
 
     # Strip executable
-    if not build_ext_libs.use_asan():
+    if not use_asan:
         strip(dest_file)
     # https://github.com/NixOS/patchelf/issues/94
     # todo: check if it is needed as we set it in cmake already
@@ -321,7 +319,7 @@ def build_appimage(appdir, appimage):
     return res
 
 
-def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
+def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, use_asan: bool = False):
     blacklist = [
         'linux-vdso.so.1',
         'ld-linux-x86-64.so.2',
@@ -362,4 +360,4 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str):
     dependencies = merge_dicts(dependencies, exedeps)
 
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir)
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir, use_asan=use_asan)

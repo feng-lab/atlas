@@ -1,3 +1,5 @@
+import argparse
+
 from common_dirs import *
 import build_ext_libs
 
@@ -44,13 +46,13 @@ def get_cmake_cmd_common_part():
                     ]
 
 
-def build_atlas():
+def build_atlas(use_asan: bool = False):
     print('srcDIR:', atlas_repository_dir())
     print('buildDIR:', atlas_build_dir())
     print('useNinja:', use_ninja())
 
     cmakecmd = get_cmake_cmd_common_part()
-    if build_ext_libs.use_asan():
+    if use_asan:
         cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=ON',
                          ])
     cmakecmd.extend([atlas_repository_dir()])
@@ -90,10 +92,21 @@ def build_atlas():
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
         env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
-        if not build_ext_libs.use_asan():
+        if not use_asan:
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
 
 if __name__ == "__main__":
-    build_atlas()
+    parser = argparse.ArgumentParser(
+        epilog=f"""
+Examples:
+
+python build_atlas.py [--use-asan]
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
+    args = parser.parse_args()
+
+    build_atlas(use_asan=args.use_asan)

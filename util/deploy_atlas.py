@@ -1,4 +1,5 @@
 import os
+import argparse
 import sys
 import shutil
 import subprocess
@@ -31,7 +32,7 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
-def build_atlas_package():
+def build_atlas_package(use_asan: bool = False):
     print('current interpreter: ' + sys.executable)
 
     binary_dir = common_dirs.atlas_binary_dir()
@@ -71,7 +72,8 @@ def build_atlas_package():
         if os.path.exists(os.path.join(binary_dir, app_name)):
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
-                                        common_dirs.qt_base_dir())
+                                        common_dirs.qt_base_dir(),
+                                        use_asan=use_asan)
 
             subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
@@ -247,10 +249,21 @@ def build_atlas_installer():
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
 
 
-def deploy_atlas():
-    build_atlas_package()
+def deploy_atlas(use_asan: bool = False):
+    build_atlas_package(use_asan=use_asan)
     build_atlas_installer()
 
 
 if __name__ == "__main__":
-    deploy_atlas()
+    parser = argparse.ArgumentParser(
+        epilog=f"""
+Examples:
+
+python deploy_atlas.py [--use-asan]
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
+    args = parser.parse_args()
+
+    deploy_atlas(use_asan=args.use_asan)

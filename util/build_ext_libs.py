@@ -959,7 +959,7 @@ def build_libsodium(src_dir: str, install_dir: str):
         print('done')
 
 
-def build_folly(src_dir: str, install_dir: str):
+def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     build_dir = create_build_dir(src_dir)
 
     orig_file = bak_file = None
@@ -1074,7 +1074,7 @@ def build_folly(src_dir: str, install_dir: str):
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if (use_asan() or is_linux()) else 'OFF',
+                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if (use_asan or is_linux()) else 'OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -2257,7 +2257,7 @@ def build_skia(src_dir: str, install_dir: str):
         print('done')
 
 
-def build_libs(libs: OrderedDict):
+def build_libs(libs: OrderedDict, use_asan: bool):
     # print('extDIR:', ext_dir())
     # print('srcPackageDIR:', src_package_dir())
 
@@ -2464,7 +2464,7 @@ def build_libs(libs: OrderedDict):
 
         if lib_name == 'folly':
             src_dir = os.path.join(ext_dir(), 'folly')
-            build_folly(src_dir, ext_build_dir())
+            build_folly(src_dir, ext_build_dir(), use_asan=use_asan)
 
         if lib_name == 'suitesparse':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'SuiteSparse*'))
@@ -2712,7 +2712,7 @@ def parse_inputs(argv: list):
         epilog=f"""
 Examples:
 
-python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib]
+python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib] [--use-asan]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -2722,6 +2722,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                         help="a list of libs to exclude from building", )
     parser.add_argument("--start-from", choices=list(libs.keys()),
                         help="skip libs before the specified lib")
+    parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
 
     # parse arguments
     args = parser.parse_args(args=None if argv[1:] else ['--help'])
@@ -2764,7 +2765,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     elif is_mac():
         libs['curl'] = False
 
-    return libs
+    return libs, args.use_asan
 
 
 if __name__ == "__main__":
