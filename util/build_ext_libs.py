@@ -446,6 +446,7 @@ def build_boost(src_dir: str, install_dir: str):
                            cwd=src_dir, shell=False, check=True, env=env)
             if is_mac():
                 subprocess.run(['./b2',
+                                '--disable-icu',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                                 f'cxxflags={cbf["CXXFLAGS"]}',
                                 f'linkflags={cbf["LDFLAGS"]}',
@@ -455,6 +456,7 @@ def build_boost(src_dir: str, install_dir: str):
                                cwd=src_dir, shell=False, check=True, env=env)
             else:
                 subprocess.run(['./b2',
+                                '--disable-icu',
                                 'toolset=clang' if use_clang_in_linux() else '',
                                 'address-model=64',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',

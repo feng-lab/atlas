@@ -441,11 +441,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   checkPageSystemError();
 
   std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageTableKeys;
-  size_t level = 0;
   for (auto blockID : usedBlockIDs) { // blockID must be ordered, can not use unordered_set here
+    size_t level = 0;
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }
+    CHECK(level + 1 < m_numLevels);
 
     blockID -= m_posToBlockIDs[level].w;
     auto z = blockID / m_posToBlockIDs[level].z;
@@ -478,10 +479,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       break;
     }
 
-    level = 0;
+    size_t level = 0;
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
       ++level;
     }
+    CHECK(level + 1 < m_numLevels);
 
     glm::uvec4 pageTableEntryKey(level, blockID, 0, 0);
     pageTableEntryKey.y -= m_posToBlockIDs[level].w;
@@ -970,7 +972,7 @@ void Z3DImg::checkPageSystemError()
         }
       }
 
-      CHECK(level < 10000);
+      CHECK(level < m_numLevels);
 
       glm::uvec4 pageTableKey(level, pdLoc);
       CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
