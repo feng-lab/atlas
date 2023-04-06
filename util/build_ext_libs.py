@@ -2257,7 +2257,7 @@ def build_skia(src_dir: str, install_dir: str):
         print('done')
 
 
-def build_libs(libs: OrderedDict, update_src: bool):
+def build_libs(libs: OrderedDict):
     # print('extDIR:', ext_dir())
     # print('srcPackageDIR:', src_package_dir())
 
@@ -2365,54 +2365,38 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'eigen':
             src_dir = os.path.join(ext_dir(), 'eigen')
-            if update_src:
-                update_git_submodule(src_dir)
             build_eigen(src_dir, ext_build_dir())
 
         if lib_name == 'pybind11':
-            if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'pybind11'))
+            print('pybind11')
 
         if lib_name == 'glm':
-            if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'glm'))
+            print('glm')
 
         if lib_name == 'magic_enum':
-            if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'magic_enum'))
+            print('magic_enum')
 
         if lib_name == 'pocketfft':
             src_dir = os.path.join(ext_dir(), 'pocketfft')
-            if update_src:
-                update_git_submodule(src_dir)
             build_pocketfft(src_dir, ext_build_dir())
 
         if lib_name == 'googletest':
-            if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'googletest'))
+            print('googletest')
 
         if lib_name == 'cpuinfo':
             src_dir = os.path.join(ext_dir(), 'cpuinfo')
-            if update_src:
-                update_git_submodule(src_dir)
             build_cpuinfo(src_dir, ext_build_dir())
 
         if lib_name == 'gflags':
             gflags_src_dir = os.path.join(ext_dir(), 'gflags')
-            if update_src:
-                update_git_submodule(gflags_src_dir)
             build_gflags(gflags_src_dir, ext_build_dir())
 
         if lib_name == 'glog':
             src_dir = os.path.join(ext_dir(), 'glog')
-            if update_src:
-                update_git_submodule(src_dir)
             build_glog(src_dir, ext_build_dir())
 
         if lib_name == 'benchmark':
             src_dir = os.path.join(ext_dir(), 'benchmark')
-            if update_src:
-                update_git_submodule(src_dir)
             build_benchmark(src_dir, ext_build_dir())
 
         if lib_name == 'openssl':
@@ -2430,8 +2414,6 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'grpc':
             src_dir = os.path.join(ext_dir(), 'grpc')
-            if update_src:
-                update_git_submodule(src_dir)
             if is_windows():
                 nasm_dir = unpack_tool_to_target_dir(src_package_dir(), 'nasm*win64*', 'nasm-*')
             else:
@@ -2440,51 +2422,35 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'double-conversion':
             dc_src_dir = os.path.join(ext_dir(), 'double-conversion')
-            if update_src:
-                update_git_submodule(dc_src_dir)
             build_double_conversion(dc_src_dir, ext_build_dir())
 
         if lib_name == 'lz4':
             lz4_src_dir = os.path.join(ext_dir(), 'lz4')
-            if update_src:
-                update_git_submodule(lz4_src_dir)
             build_lz4(lz4_src_dir, ext_build_dir())
 
         # lzma
         if lib_name == 'xz':
             xz_src_dir = os.path.join(ext_dir(), 'xz')
-            if update_src:
-                update_git_submodule(xz_src_dir)
             build_xz(xz_src_dir, ext_build_dir())
 
         if lib_name == 'zstd':
             zstd_src_dir = os.path.join(ext_dir(), 'zstd')
-            if update_src:
-                update_git_submodule(zstd_src_dir)
             build_zstd(zstd_src_dir, ext_build_dir())
 
         if lib_name == 'fmt':
             fmt_src_dir = os.path.join(ext_dir(), 'fmt')
-            if update_src:
-                update_git_submodule(fmt_src_dir)
             build_fmt(fmt_src_dir, ext_build_dir())
 
         if lib_name == 'libevent':
             le_src_dir = os.path.join(ext_dir(), 'libevent')
-            if update_src:
-                update_git_submodule(le_src_dir)
             build_libevent(le_src_dir, ext_build_dir())
 
         if lib_name == 'snappy':
             snappy_src_dir = os.path.join(ext_dir(), 'snappy')
-            if update_src:
-                update_git_submodule(snappy_src_dir)
             build_snappy(snappy_src_dir, ext_build_dir())
 
         if lib_name == 'bzip2':
             bz2_src_dir = os.path.join(ext_dir(), 'bzip2')
-            if update_src:
-                update_git_submodule(bz2_src_dir)
             build_bzip2(bz2_src_dir, ext_build_dir())
 
         if lib_name == 'libsodium':
@@ -2498,8 +2464,6 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'folly':
             src_dir = os.path.join(ext_dir(), 'folly')
-            if update_src:
-                update_git_submodule(src_dir)
             build_folly(src_dir, ext_build_dir())
 
         if lib_name == 'suitesparse':
@@ -2513,14 +2477,10 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'ceres-solver':
             src_dir = os.path.join(ext_dir(), 'ceres-solver')
-            if update_src:
-                update_git_submodule(src_dir)
             build_ceres_solver(src_dir, ext_build_dir())
 
         if lib_name == 'glbinding':
             src_dir = os.path.join(ext_dir(), 'glbinding')
-            if update_src:
-                update_git_submodule(src_dir)
             build_glbinding(src_dir, ext_build_dir())
 
         if lib_name == 'libjpeg':
@@ -2569,18 +2529,13 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'jxrlib':
             src_dir = os.path.join(ext_dir(), 'jxrlib')
-            if update_src:
-                update_git_submodule(src_dir)
             build_jxrlib(src_dir, ext_build_dir())
 
         if lib_name == 'geometrictools':
-            if update_src:
-                update_git_submodule(os.path.join(ext_dir(), 'GeometricTools'))
+            print('geometrictools')
 
         if lib_name == 'assimp':
             src_dir = os.path.join(ext_dir(), 'assimp')
-            if update_src:
-                update_git_submodule(src_dir)
             build_assimp(src_dir, ext_build_dir())
 
         if lib_name == 'hdf5':
@@ -2595,7 +2550,7 @@ def build_libs(libs: OrderedDict, update_src: bool):
         if lib_name == 'freeimage':
             package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'freeimage-svn*'))
             src_dir = get_package_top_level_folder(package_name, ext_dir())
-            if update_src or not os.path.exists(src_dir):
+            if not os.path.exists(src_dir):
                 remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'freeimage-svn*'))
                 unpack_file_to_folder(package_name, ext_dir())
             assert os.path.exists(src_dir)
@@ -2603,28 +2558,19 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'itk':
             src_dir = os.path.join(ext_dir(), 'ITK')
-            if update_src:
-                update_git_submodule(src_dir)
             build_itk(src_dir, ext_build_dir())
 
         if lib_name == 'vtk':
             src_dir = os.path.join(ext_dir(), 'vtk')
-            if update_src:
-                update_git_submodule(src_dir)
             build_vtk(src_dir, ext_build_dir())
 
         if lib_name == 'opencv':
             src_dir = os.path.join(ext_dir(), 'opencv')
             src_contrib_dir = os.path.join(ext_dir(), 'opencv_contrib')
-            if update_src:
-                update_git_submodule(src_dir)
-                update_git_submodule(src_contrib_dir)
             build_opencv(src_dir, src_contrib_dir, ext_build_dir())
 
         # if lib_name == 'botan':
         #     src_dir = os.path.join(ext_dir(), 'botan')
-        #     if update_src:
-        #         update_or_clone_git_repository(src_dir, 'git@github.com:randombit/botan.git')
         #     assert os.path.exists(src_dir)
         #     build_botan(src_dir, ext_build_dir())
         #
@@ -2639,8 +2585,6 @@ def build_libs(libs: OrderedDict, update_src: bool):
         #         ispc_dir = unpack_tool_to_target_dir(src_package_dir(), 'ispc*osx*')
         #         embree_dir = unpack_tool_to_target_dir(src_package_dir(), 'embree*osx*')
         #     src_dir = os.path.join(ext_dir(), 'OSPRay')
-        #     if update_src:
-        #         update_or_clone_git_repository(src_dir, 'git@github.com:ospray/OSPRay.git')
         #     assert os.path.exists(src_dir)
         #     assert os.path.exists(ispc_dir)
         #     assert os.path.exists(embree_dir)
@@ -2710,14 +2654,10 @@ def build_libs(libs: OrderedDict, update_src: bool):
 
         if lib_name == 'llfio':
             src_dir = os.path.join(ext_dir(), 'llfio')
-            if update_src:
-                update_git_submodule(src_dir)
             build_llfio(src_dir, ext_build_dir())
 
         if lib_name == 'rocksdb':
             src_dir = os.path.join(ext_dir(), 'rocksdb')
-            if update_src:
-                update_git_submodule(src_dir)
             build_rocksdb(src_dir, ext_build_dir())
 
         if lib_name == 'conda-zimg':
@@ -2772,7 +2712,7 @@ def parse_inputs(argv: list):
         epilog=f"""
 Examples:
 
-python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib] [--update-src]
+python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-from] [lib]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -2782,7 +2722,6 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
                         help="a list of libs to exclude from building", )
     parser.add_argument("--start-from", choices=list(libs.keys()),
                         help="skip libs before the specified lib")
-    parser.add_argument("--update-src", action='store_true', help="update source files")
 
     # parse arguments
     args = parser.parse_args(args=None if argv[1:] else ['--help'])
@@ -2825,7 +2764,7 @@ python build_ext_libs.py [all or libs...] [--exclude-libs] [libs...] [--start-fr
     elif is_mac():
         libs['curl'] = False
 
-    return libs, args.update_src
+    return libs
 
 
 if __name__ == "__main__":
