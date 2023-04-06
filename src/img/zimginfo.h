@@ -100,14 +100,19 @@ struct ZImgInfo
     switch (to_underlying(dim)) {
       case 0:
         width = size;
+        break;
       case 1:
         height = size;
+        break;
       case 2:
         depth = size;
+        break;
       case 3:
         numChannels = size;
+        break;
       case 4:
         numTimes = size;
+        break;
       default:
         CHECK(false);
     }
