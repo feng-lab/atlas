@@ -130,7 +130,7 @@ void ZNeighborhood::set(size_t nb)
       set(1, 1, 1, true);
       return;
     default:
-      throw ZImgException(QString("Not supported neighborhood option: %1").arg(nb));
+      throw ZException(QString("Not supported neighborhood option: %1").arg(nb));
   }
 }
 

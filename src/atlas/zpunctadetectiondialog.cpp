@@ -39,25 +39,25 @@ void ZPunctaDetectionDialog::createWorker(ZImgProcess*& worker, QString& workerN
   if (!m_useCurrentActiveImage.get() && QFile::exists(m_inputImageFileWidget->getSelectedOpenFile())) {
     imgInfo = ZImg::readImgInfos(m_inputImageFileWidget->getSelectedOpenFile()).at(0);
   } else {
-    throw ZImgException(QString("No Image to detect."));
+    throw ZException(QString("No Image to detect."));
   }
   if (imgInfo.numTimes != 1) {
-    throw ZImgException(QString("Can not detect puncta from time sequence image."));
+    throw ZException(QString("Can not detect puncta from time sequence image."));
   }
   if (m_outputPunctaFileWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Result puncta file must be specified."));
+    throw ZException(QString("Result puncta file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Detection log file must be specified."));
+    throw ZException(QString("Detection log file must be specified."));
   }
   int punctaChannel = m_punctaChannel.get() - 1;
   int dendriteChannel = m_dendriteChannel.associatedData() - 1;
   if (punctaChannel == dendriteChannel) {
-    throw ZImgException(QString("Puncta and dendrite channels are not correct."));
+    throw ZException(QString("Puncta and dendrite channels are not correct."));
   }
   if (dendriteChannel >= 0) {
     if (m_voxelSize.get().x == 0.0 || m_voxelSize.get().y == 0.0 || m_voxelSize.get().z == 0.0) {
-      throw ZImgException(QString("Image Resolution is not correct."));
+      throw ZException(QString("Image Resolution is not correct."));
     }
     imgInfo.voxelSizeUnit = VoxelSizeUnit::um;
     imgInfo.voxelSizeX = m_voxelSize.get().x;

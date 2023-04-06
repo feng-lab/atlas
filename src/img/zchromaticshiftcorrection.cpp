@@ -27,24 +27,24 @@ void ZChromaticShiftCorrection::doWork()
 
   ZImg srcImg(m_imgFilename);
   if (srcImg.numChannels() <= 1) {
-    throw ZImgException(QString("Only one channel. Do not need correction"));
+    throw ZException(QString("Only one channel. Do not need correction"));
   }
   if (srcImg.numTimes() > 1) {
-    throw ZImgException(QString("Can not align time sequence image: %1").arg(srcImg.info().toQString()));
+    throw ZException(QString("Can not align time sequence image: %1").arg(srcImg.info().toQString()));
   }
 
   if (m_targetChannel >= 0 && static_cast<size_t>(m_targetChannel) < srcImg.numChannels() &&
       (m_method != "Registration" || m_targetChannel != m_referenceChannel)) {
     LOG(INFO) << "Target Channel: " << m_targetChannel + 1 << " (start from 1)";
   } else {
-    throw ZImgException(QString("Wrong target channel: %1. Abort").arg(m_targetChannel));
+    throw ZException(QString("Wrong target channel: %1. Abort").arg(m_targetChannel));
   }
 
   if (m_method == "Registration") {
     if (m_referenceChannel >= 0 && static_cast<size_t>(m_referenceChannel) < srcImg.numChannels()) {
       LOG(INFO) << "Reference Channel: " << m_referenceChannel + 1 << " (start from 1)";
     } else {
-      throw ZImgException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
+      throw ZException(QString("Wrong reference channel: %1. Abort").arg(m_referenceChannel));
     }
 
     LOG(INFO) << "Remove Background: " << m_removeBackground;
@@ -124,7 +124,7 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
 
   auto it = presetNameToParameters.find(presetName);
   if (it == presetNameToParameters.end()) {
-    throw ZImgException(QString("Unknown preset name: %1. Abort").arg(presetName));
+    throw ZException(QString("Unknown preset name: %1. Abort").arg(presetName));
   } else {
     LOG(INFO) << "Use " << it->first << " preset: " << json::value_from(it->second);
     transform->setParameters(it->second);

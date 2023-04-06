@@ -44,7 +44,7 @@ public:
   // stereo means run two passes for left and right eye
   double process(bool stereo = false,
                  bool fastRendering = false,
-                 folly::CancellationToken cancellationToken = folly::CancellationToken());
+                 const folly::CancellationToken& cancellationToken = folly::CancellationToken());
 
   // call when network topology changed
   void updateNetwork();

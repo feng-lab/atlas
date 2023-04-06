@@ -37,15 +37,14 @@ public:
     , m_centerVoxelPtr(nullptr)
   {
     if (!m_img->template isType<TVoxel>()) {
-      throw ZImgException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
+      throw ZException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
     }
     if (m_img->isEmpty()) {
       m_endIdx = -1;
     } else if (!m_region.isValid(m_img->info())) {
-      throw ZImgException(
-        QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
-          .arg(m_img->info().toQString())
-          .arg(m_region.toQString()));
+      throw ZException(QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
+                         .arg(m_img->info().toQString())
+                         .arg(m_region.toQString()));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {

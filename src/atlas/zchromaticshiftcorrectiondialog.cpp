@@ -44,13 +44,13 @@ void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QS
   focusNextChild();
 
   if (m_inputImagesFileWidget->getSelectedOpenFile().isEmpty()) {
-    throw ZImgException(QString("No input image. Abort."));
+    throw ZException(QString("No input image. Abort."));
   }
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Result image file must be specified."));
+    throw ZException(QString("Result image file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Correction log file must be specified."));
+    throw ZException(QString("Correction log file must be specified."));
   }
 
   auto refChannel = m_referenceChannel.associatedData() - 1;

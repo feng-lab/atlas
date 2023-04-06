@@ -41,7 +41,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
   size_t nStacks = 0;
 
   if (!QFile::exists(filename)) {
-    throw ZImgException(QString("file %1 doesn't exist").arg(filename));
+    throw ZException(QString("file %1 doesn't exist").arg(filename));
   }
 
   QStringList header;
@@ -65,20 +65,18 @@ size_t buildConnectionFromTextFile(const QString& filename,
         continue;
       }
       if (list.size() < header.size()) {
-        throw ZImgException(QString("Wrong number of items in line (%1), expected format: <%2>")
-                              .arg(list.join(','))
-                              .arg(header.join(',')));
+        throw ZException(QString("Wrong number of items in line (%1), expected format: <%2>")
+                           .arg(list.join(','))
+                           .arg(header.join(',')));
       }
       bool ok = false;
       auto idx1 = list[0].toInt(&ok);
       if (!ok || idx1 <= 0) {
-        throw ZImgException(
-          QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
       }
       auto idx2 = list[1].toInt(&ok);
       if (!ok || idx2 <= 0) {
-        throw ZImgException(
-          QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
+        throw ZException(QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
       }
       auto stackPair = std::make_pair<size_t, size_t>(idx1 - 1, idx2 - 1);
       nStacks = std::max<size_t>(nStacks, idx1);
@@ -93,7 +91,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
         } else if (pos.compare("Back", Qt::CaseInsensitive) == 0) {
           conn[stackPair] = conn[stackPair] | ZImgNCCMatch::PositionHint::Back;
         } else {
-          throw ZImgException(
+          throw ZException(
             QString("Can not parse line (%1) with format <%2>").arg(list.join(',')).arg(header.join(',')));
         }
       }
@@ -250,7 +248,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
 
   for (const auto& [key, val] : idxToMinConnDist) {
     if (val > 3) {
-      throw ZImgException(QString("Can not stitch because images are not connected. Abort."));
+      throw ZException(QString("Can not stitch because images are not connected. Abort."));
     }
   }
 
@@ -309,7 +307,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
   std::map<size_t, std::set<size_t>> idxToPrunedConn;
   for (const auto& [key, val] : idxToConn) {
     if (val.empty()) {
-      throw ZImgException(QString("Can not do restitching because images are not connected. Abort."));
+      throw ZException(QString("Can not do restitching because images are not connected. Abort."));
     }
     std::vector<std::pair<size_t, double>> valC = val;
     for (auto& p : valC) {
@@ -398,19 +396,19 @@ void ZStitchImage::doWork()
 
   QFileInfo outputFI(m_resFileName);
   if (m_resFileName.isEmpty() || !outputFI.absoluteDir().exists()) {
-    throw ZImgException("Please make sure the output folder exists.");
+    throw ZException("Please make sure the output folder exists.");
   }
   if (m_inputFilenames.empty()) {
-    throw ZImgException("No input image.");
+    throw ZException("No input image.");
   }
   bool hasStack2 = m_2ndInputFilenames.size() == m_inputFilenames.size();
 
   if (m_restitch) {
     if (hasStack2) {
-      throw ZImgException("restitch and two sets of input stacks are not compatible.");
+      throw ZException("restitch and two sets of input stacks are not compatible.");
     }
     if (m_concatenateOnly) {
-      throw ZImgException("restitch and concatenate-only are not compatible.");
+      throw ZException("restitch and concatenate-only are not compatible.");
     }
     doRestitch();
     return;
@@ -440,7 +438,7 @@ void ZStitchImage::doWork()
   std::vector<ZImgSource> inputStackSources;
   std::vector<ZImgSource> input2ndStackSources;
   if (nStacks == 0) {
-    throw ZImgException("No image to stitch.");
+    throw ZException("No image to stitch.");
   } else if (nStacks == 1) {
     if (hasStack2) {
       inputStackSources.emplace_back(m_inputFilenames[0], ZImgRegion(), m_scene);
@@ -448,11 +446,11 @@ void ZStitchImage::doWork()
       auto info = ZImg::readImgInfo(inputStackSources[0]);
       auto tmpInfo = ZImg::readImgInfo(input2ndStackSources[0]);
       if (!tmpInfo.isSameType(info)) {
-        throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                              .arg(inputStackSources[0].toQString())
-                              .arg(info.toQString())
-                              .arg(input2ndStackSources[0].toQString())
-                              .arg(tmpInfo.toQString()));
+        throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
+                           .arg(inputStackSources[0].toQString())
+                           .arg(info.toQString())
+                           .arg(input2ndStackSources[0].toQString())
+                           .arg(tmpInfo.toQString()));
       }
     } else {
       if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
@@ -468,7 +466,7 @@ void ZStitchImage::doWork()
         LOG(INFO) << QString("%1 saved.").arg(m_resFileName);
         return;
       }
-      throw ZImgException("Need at least two images to do stitching.");
+      throw ZException("Need at least two images to do stitching.");
     }
   } else {
     if (nStacks == size_t(m_inputFilenames.size())) {
@@ -480,11 +478,11 @@ void ZStitchImage::doWork()
       for (size_t i = 1; i < inputStackSources.size(); ++i) {
         auto tmpInfo = ZImg::readImgInfo(inputStackSources[i]);
         if (!tmpInfo.isSameType(info)) {
-          throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                                .arg(inputStackSources[0].toQString())
-                                .arg(info.toQString())
-                                .arg(inputStackSources[i].toQString())
-                                .arg(tmpInfo.toQString()));
+          throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
+                             .arg(inputStackSources[0].toQString())
+                             .arg(info.toQString())
+                             .arg(inputStackSources[i].toQString())
+                             .arg(tmpInfo.toQString()));
         }
       }
       if (hasStack2) {
@@ -494,11 +492,11 @@ void ZStitchImage::doWork()
         for (auto& input2ndStackSource : input2ndStackSources) {
           auto tmpInfo = ZImg::readImgInfo(input2ndStackSource);
           if (!tmpInfo.isSameType(info)) {
-            throw ZImgException(QString("Image type of %1 <%2> and %3 <%4> don't match")
-                                  .arg(inputStackSources[0].toQString())
-                                  .arg(info.toQString())
-                                  .arg(input2ndStackSource.toQString())
-                                  .arg(tmpInfo.toQString()));
+            throw ZException(QString("Image type of %1 <%2> and %3 <%4> don't match")
+                               .arg(inputStackSources[0].toQString())
+                               .arg(info.toQString())
+                               .arg(input2ndStackSource.toQString())
+                               .arg(tmpInfo.toQString()));
           }
         }
       }
@@ -525,7 +523,7 @@ void ZStitchImage::doWork()
               input2ndStackSources.emplace_back(m_2ndInputFilenames[0], rgn, m_2ndScene);
             }
           } else {
-            throw ZImgException("can not split 2nd stack input in the same way");
+            throw ZException("can not split 2nd stack input in the same way");
           }
         }
       } else if (info.depth % nStacks == 0) {
@@ -548,16 +546,16 @@ void ZStitchImage::doWork()
               input2ndStackSources.emplace_back(m_2ndInputFilenames[0], rgn, m_2ndScene);
             }
           } else {
-            throw ZImgException("can not split 2nd stack input in the same way");
+            throw ZException("can not split 2nd stack input in the same way");
           }
         }
       } else {
-        throw ZImgException(QString("do not know how to split the input image to %1 parts.").arg(nStacks));
+        throw ZException(QString("do not know how to split the input image to %1 parts.").arg(nStacks));
       }
     } else {
-      throw ZImgException(QString("number of inputs %1 does not match number of stacks %2 to stitch.")
-                            .arg(m_inputFilenames.size())
-                            .arg(nStacks));
+      throw ZException(QString("number of inputs %1 does not match number of stacks %2 to stitch.")
+                         .arg(m_inputFilenames.size())
+                         .arg(nStacks));
     }
 
     LOG(INFO) << QString("Stitching %1 images ...").arg(nStacks);
@@ -951,11 +949,11 @@ void ZStitchImage::doRestitch()
 {
   if (m_inputFilenames.size() != 1 || !m_2ndInputFilenames.empty() ||
       !m_inputFilenames[0].endsWith(".czi", Qt::CaseInsensitive)) {
-    throw ZImgException("restitching requires single czi file as input");
+    throw ZException("restitching requires single czi file as input");
   }
   std::vector<std::vector<ZImgRegion>> rgnss = ZImg::getInternalSubRegions(m_inputFilenames[0]);
   if (m_scene >= rgnss.size()) {
-    throw ZImgException("invalid scene");
+    throw ZException("invalid scene");
   }
   const auto& rgns = rgnss[m_scene];
 

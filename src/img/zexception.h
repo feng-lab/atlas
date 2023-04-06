@@ -78,23 +78,4 @@ public:
   }
 };
 
-// img operation exception
-class ZImgException : public ZException
-{
-public:
-  using ZException::ZException;
-};
-
-class ZProcessAbortException : public ZException
-{
-public:
-  using ZException::ZException;
-};
-
-class ZGLException : public ZException
-{
-public:
-  using ZException::ZException;
-};
-
 } // namespace nim

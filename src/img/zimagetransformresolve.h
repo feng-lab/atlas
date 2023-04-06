@@ -18,7 +18,7 @@ public:
   // idx2 has relative transform to idx1, if pair already exist, update its transform and cost
   void addImagePair(size_t fixedIdx, size_t movingIdx, const ZImageTransform* tfm, double transformCost = 0.);
 
-  // return transform for each idx, throw ZImgException if error
+  // return transform for each idx, throw ZException if error
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> resolve(QString* summary = nullptr) const;
 
 private:

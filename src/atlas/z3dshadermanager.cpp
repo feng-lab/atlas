@@ -28,13 +28,13 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
     } else if (filename.endsWith(".frag", Qt::CaseInsensitive)) {
       type = Z3DShader::Type::Fragment;
     } else {
-      throw ZGLException(
+      throw ZException(
         QString("Not supported file extension: %1. Use .vert, .geom or .frag as shader extension").arg(filename));
     }
 
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-      throw ZGLException(
+      throw ZException(
         QString("Can not open vertex shader file: %1.  Error String: %2").arg(filename).arg(file.errorString()));
     }
     QTextStream fileStream(&file);

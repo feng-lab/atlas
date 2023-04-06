@@ -31,7 +31,7 @@ namespace {
 inline void MKL_DFTI_CHECK(MKL_LONG status)
 {
   if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) {
-    throw nim::ZImgException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));
+    throw nim::ZException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));
   }
 }
 
@@ -44,7 +44,7 @@ namespace nim {
 ZComplexImg fft(const ZImg& img, size_t outWidth, size_t outHeight, size_t outDepth)
 {
   if (img.isEmpty() || img.numChannels() != 1 || img.numTimes() != 1) {
-    throw ZImgException(fmt::format("fft: input img dimension is not supported: <{}>", img.info().toString()));
+    throw ZException(fmt::format("fft: input img dimension is not supported: <{}>", img.info().toString()));
   }
 
   ZComplexImg res;

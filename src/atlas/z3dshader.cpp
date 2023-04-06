@@ -25,7 +25,7 @@ Z3DShader::Z3DShader(Z3DShader::Type type)
     m_id = glCreateShader(GL_COMPUTE_SHADER);
   }
   if (!m_id) {
-    throw ZGLException("Z3DShader: Could not create shader");
+    throw ZException("Z3DShader: Could not create shader");
   }
 }
 
@@ -99,10 +99,10 @@ void Z3DShader::compileSourceCode(const char* source)
         log += source;
         log += QString("\n***");
       }
-      throw ZGLException(log);
+      throw ZException(log);
     }
   } else {
-    throw ZGLException("Z3DShader: Share is not created yet");
+    throw ZException("Z3DShader: Share is not created yet");
   }
 }
 

@@ -216,7 +216,7 @@ QStringList ZImgMerge::resolveLocations()
   m_minCoord = ZVoxelCoordinate();
 
   if (m_imgCoords.empty() && m_imgPairs.empty()) {
-    throw ZImgException("Merge Imgs error: no Input Img");
+    throw ZException("Merge Imgs error: no Input Img");
   }
 
   const ZImgSubBlock* refImg = nullptr;
@@ -224,7 +224,7 @@ QStringList ZImgMerge::resolveLocations()
     if (!refImg) {
       refImg = imgCoord.first;
     } else if (!m_imgInfos.at(imgCoord.first).isSameType(m_imgInfos.at(refImg))) {
-      throw ZImgException("Merge Imgs error: imgs are not same type");
+      throw ZException("Merge Imgs error: imgs are not same type");
     }
   }
   double minCost = std::numeric_limits<double>::max();
@@ -233,7 +233,7 @@ QStringList ZImgMerge::resolveLocations()
     if (!refImg) {
       refImg = imgimgOffsetCost.first.first;
     } else if (!m_imgInfos.at(imgimgOffsetCost.first.first).isSameType(m_imgInfos.at(refImg))) {
-      throw ZImgException("Merge Imgs error: imgs are not same type");
+      throw ZException("Merge Imgs error: imgs are not same type");
     }
   }
 

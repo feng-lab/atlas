@@ -3,6 +3,7 @@
 #include <QDialog>
 #include <QProgressDialog>
 #include <QDialogButtonBox>
+#include <folly/CancellationToken.h>
 
 namespace nim {
 
@@ -16,11 +17,9 @@ public:
   explicit ZImgProcessDialog(QWidget* parent = nullptr);
 
 protected:
-  // subclass create worker, throw ZImgException if error
+  // subclass create worker, throw ZException if error
   // worker and workerName must be assigned to valid value if no exception was thrown
   virtual void createWorker(ZImgProcess*& worker, QString& workerName) = 0;
-
-  void processCanceled();
 
   void processFinished();
 
@@ -38,8 +37,8 @@ private:
 
 private:
   QString m_workerName;
-  bool m_isCanceled;
-  bool m_hasError;
+  std::unique_ptr<folly::CancellationSource> m_cancellationSource;
+  bool m_hasError = false;
 
   QProgressDialog* m_progressDialog = nullptr;
   ZImgProcess* m_worker = nullptr;

@@ -640,7 +640,7 @@ void ZImg::allocate()
       clearData();
       ZImgInfo info = m_info;
       m_info.clear();
-      throw ZImgException(fmt::format("Can not allocate memory for img <{}>", info.toString()));
+      throw ZException(fmt::format("Can not allocate memory for img <{}>", info.toString()));
     } else {
       std::memset(m_data[t], 0, timeByteNumber());
     }
@@ -721,7 +721,7 @@ ZImg ZImg::createView(index_t c, index_t t)
     rgn.end.t = t + 1;
   }
   if (!rgn.isValid(m_info)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn.toString(), m_info.toString()));
   }
   ZImg res;
@@ -746,7 +746,7 @@ ZImg ZImg::createView(index_t c, index_t t) const
     rgn.end.t = t + 1;
   }
   if (!rgn.isValid(m_info)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("Invalid view of img, c:{}, t:{}, rgn:{}, img:{}", c, t, rgn.toString(), m_info.toString()));
   }
   ZImg res;
@@ -769,7 +769,7 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t)
   rgn.start.t = t;
   rgn.end.t = t + 1;
   if (!rgn.isValid(m_info)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn.toString(), m_info.toString()));
   }
   ZImg res;
@@ -792,7 +792,7 @@ ZImg ZImg::createView(size_t z, size_t c, size_t t) const
   rgn.start.t = t;
   rgn.end.t = t + 1;
   if (!rgn.isValid(m_info)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("Invalid view of img, z:{}, c:{}, t:{}, rgn:{}, img:{}", z, c, t, rgn.toString(), m_info.toString()));
   }
   ZImg res;
@@ -844,9 +844,9 @@ std::vector<size_t> ZImg::histogram(size_t nbins, const ZImg& mask) const
   } else if (isSameSize(mask)) {
     IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, mask)
   } else {
-    throw ZImgException(fmt::format("histogram mask has different size <{}> than current img <{}>",
-                                    mask.info().toString(),
-                                    m_info.toString()));
+    throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>",
+                                 mask.info().toString(),
+                                 m_info.toString()));
   }
 
   return res;
@@ -860,8 +860,7 @@ ZImg ZImg::crop(const ZImgRegion& region) const
   }
   ZImgRegion rgn = region;
   if (!rgn.isValid(m_info)) {
-    throw ZImgException(
-      fmt::format("Try to crop img <{}> with invalid region <{}>", m_info.toString(), rgn.toString()));
+    throw ZException(fmt::format("Try to crop img <{}> with invalid region <{}>", m_info.toString(), rgn.toString()));
   }
 
   rgn.resolveRegionEnd(m_info);
@@ -1210,7 +1209,7 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
     resInfo.setSize(dim, resInfo.size(dim) + info.size(dim));
     info.setSize(dim, 0);
     if (!info.isSameType(firstInfo) || !info.isSameSize(firstInfo)) {
-      throw ZImgException(fmt::format("Can not concat img <{}> and img <{}>", info.toString(), firstInfo.toString()));
+      throw ZException(fmt::format("Can not concat img <{}> and img <{}>", info.toString(), firstInfo.toString()));
     }
   }
   if (dim == Dimension::C) {
@@ -1322,7 +1321,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   for (size_t idx = 1; idx < imgs.size(); ++idx) {
     ZImgInfo info = imgs[idx]->info();
     if (!info.isSameType(firstInfo) || !info.isSameSize(firstInfo)) {
-      throw ZImgException(fmt::format("Can not combine img <{}> and img <{}>", info.toString(), firstInfo.toString()));
+      throw ZException(fmt::format("Can not combine img <{}> and img <{}>", info.toString(), firstInfo.toString()));
     }
   }
 
@@ -1526,7 +1525,7 @@ template ZImg ZImg::castTo<double>() const;
       (vf == VoxelFormat::Signed && bytePerVoxel != 1 && bytePerVoxel != 2 && bytePerVoxel != 4 && bytePerVoxel != 8) ||
       ((vf == VoxelFormat::Unsigned) && bytePerVoxel != 1 && bytePerVoxel != 2 && bytePerVoxel != 4 &&
        bytePerVoxel != 8)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("Invalid combination of voxel format {} and bytesPerVoxel {}", enumToString(vf), bytePerVoxel));
   }
   ZImgInfo info = m_info;
@@ -1860,7 +1859,7 @@ ZImg ZImg::cumulativeSum(Dimension dim) const
 ZImg ZImg::blockSum(size_t twidth, size_t theight, size_t tdepth) const
 {
   if (twidth == 0 || theight == 0 || tdepth == 0) {
-    throw ZImgException(fmt::format("wrong template size input for blockSum: {}, {}, {})", twidth, theight, tdepth));
+    throw ZException(fmt::format("wrong template size input for blockSum: {}, {}, {})", twidth, theight, tdepth));
   }
   ZImg res;
   if (isEmpty()) {
@@ -1891,12 +1890,11 @@ ZImg ZImg::blockSumPart(size_t twidth,
                         size_t zEnd) const
 {
   if (twidth == 0 || theight == 0 || tdepth == 0) {
-    throw ZImgException(
-      fmt::format("wrong template size input for blockSumPart: {}, {}, {})", twidth, theight, tdepth));
+    throw ZException(fmt::format("wrong template size input for blockSumPart: {}, {}, {})", twidth, theight, tdepth));
   }
   if (xEnd <= xStart || xEnd > (m_info.width + twidth - 1) || yEnd <= yStart || yEnd > (m_info.height + theight - 1) ||
       zEnd <= zStart || zEnd > (m_info.depth + tdepth - 1)) {
-    throw ZImgException(
+    throw ZException(
       fmt::format("wrong region for blockSumPart: {}:{}, {}:{}, {}:{}", xStart, xEnd, yStart, yEnd, zStart, zEnd));
   }
   ZImg res;
@@ -1920,9 +1918,9 @@ ZImg ZImg::blockSumPart(size_t twidth,
 ZImg& ZImg::operator+=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(fmt::format("img addition requires same size img as input: this <{}>, other <{}>",
-                                    m_info.toString(),
-                                    rhs.info().toString()));
+    throw ZException(fmt::format("img addition requires same size img as input: this <{}>, other <{}>",
+                                 m_info.toString(),
+                                 rhs.info().toString()));
   }
   IMG_TYPED_CALL_2TYPE(addImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1931,9 +1929,9 @@ ZImg& ZImg::operator+=(const ZImg& rhs)
 ZImg& ZImg::operator-=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(fmt::format("img subtraction requires same size img as input: this <{}>, other <{}>",
-                                    m_info.toString(),
-                                    rhs.info().toString()));
+    throw ZException(fmt::format("img subtraction requires same size img as input: this <{}>, other <{}>",
+                                 m_info.toString(),
+                                 rhs.info().toString()));
   }
   IMG_TYPED_CALL_2TYPE(subImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1942,9 +1940,9 @@ ZImg& ZImg::operator-=(const ZImg& rhs)
 ZImg& ZImg::operator*=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(fmt::format("img multiplies requires same size img as input: this <{}>, other <{}>",
-                                    m_info.toString(),
-                                    rhs.info().toString()));
+    throw ZException(fmt::format("img multiplies requires same size img as input: this <{}>, other <{}>",
+                                 m_info.toString(),
+                                 rhs.info().toString()));
   }
   IMG_TYPED_CALL_2TYPE(mulImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1953,9 +1951,9 @@ ZImg& ZImg::operator*=(const ZImg& rhs)
 ZImg& ZImg::operator/=(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
-                                    m_info.toString(),
-                                    rhs.info().toString()));
+    throw ZException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
+                                 m_info.toString(),
+                                 rhs.info().toString()));
   }
   IMG_TYPED_CALL_2TYPE(divImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1964,9 +1962,9 @@ ZImg& ZImg::operator/=(const ZImg& rhs)
 ZImg& ZImg::secureDivideBy(const ZImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
-                                    m_info.toString(),
-                                    rhs.info().toString()));
+    throw ZException(fmt::format("img divides requires same size img as input: this <{}>, other <{}>",
+                                 m_info.toString(),
+                                 rhs.info().toString()));
   }
   IMG_TYPED_CALL_2TYPE(secureDivImg_Impl, m_info, rhs.info(), rhs)
   return *this;
@@ -1990,7 +1988,7 @@ bool ZImg::operator==(const ZImg& other) const
 ZVoxelCoordinate ZImg::indexToCoord(index_t idx, const ZImgInfo& info)
 {
   if (info.isEmpty()) {
-    throw ZImgException(fmt::format("Can not convert index to coord with empty img info <{}>", info.toString()));
+    throw ZException(fmt::format("Can not convert index to coord with empty img info <{}>", info.toString()));
   }
   ZVoxelCoordinate res;
   //  res.l = idx >= 0 ? (idx / info.locationVoxelNumber()) : (- 1 - ((-idx-1) / info.locationVoxelNumber()));
@@ -2105,7 +2103,7 @@ void ZImg::wrapCoord(ZVoxelCoordinate& coord, PadOption padOption) const
 void ZImg::checkConnInput(size_t& conn) const
 {
   if (conn != 4 && conn != 8 && conn != 6 && conn != 18 && conn != 26) {
-    throw ZImgException(fmt::format("invalid conn input: {}", conn));
+    throw ZException(fmt::format("invalid conn input: {}", conn));
   }
   if (is2DImg() && conn != 4 && conn != 8) {
     if (conn == 6) {
@@ -2672,7 +2670,7 @@ template<typename TVoxel>
 void ZImg::histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const
 {
   if (maxData <= minData) {
-    throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
+    throw ZException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
   }
 
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {
@@ -2739,7 +2737,7 @@ template<typename TVoxel, typename TMaskVoxel>
 void ZImg::histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const
 {
   if (maxData < minData) {
-    throw ZImgException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
+    throw ZException(QString("Invalid histogram range %1:%2").arg(minData).arg(maxData));
   }
 
   if constexpr (std::is_floating_point_v<std::remove_reference_t<TVoxel>>) {

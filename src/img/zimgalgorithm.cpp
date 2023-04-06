@@ -24,27 +24,18 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 
 void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
-  if (false && isCancelledFun && isCancelledFun()) {
-    auto it = m_itkOperations.find(static_cast<itk::ProcessObject*>(sender));
-    if (it != m_itkOperations.end()) {
-      (*it)->AbortGenerateDataOn();
-    } else {
-      throw ZProcessAbortException("");
-    }
-  } else {
-    auto it = m_subOperationsWeightProgress.find(sender);
-    if (it != m_subOperationsWeightProgress.end() &&
-        ((p - it->second.progress) * it->second.weight >= m_reportInterval || p == 1.0)) {
-      it->second.progress = p;
-      sendProgressSignal();
-    }
+  auto it = m_subOperationsWeightProgress.find(sender);
+  if (it != m_subOperationsWeightProgress.end() &&
+      ((p - it->second.progress) * it->second.weight >= m_reportInterval || p == 1.0)) {
+    it->second.progress = p;
+    sendProgressSignal();
   }
 }
 
 void ZImgAlgorithmBaseWithProgressReporter::reportProgress(double progress)
 {
-  if (isCancelledFun && isCancelledFun()) {
-    throw ZProcessAbortException("");
+  if (m_cancellationToken.isCancellationRequested()) {
+    throw ZException("cancelled by user");
   }
   if ((progress - m_progress) * m_weight >= m_reportInterval || progress == 1.0) {
     m_progress = progress;
@@ -58,7 +49,7 @@ void ZImgAlgorithmBaseWithProgressReporter::registerSubOperation(ZImgAlgorithmBa
   m_subOperationsWeightProgress[sender].weight = weight;
   m_subOperationsWeightProgress[sender].progress = 0.0;
   sender->setProgressReportInterval(m_reportInterval / weight);
-  sender->isCancelledFun = isCancelledFun;
+  sender->setCancellationToken(m_cancellationToken);
   sender->setParent(this);
 }
 
@@ -94,7 +85,7 @@ void ZImgAlgorithmBaseWithProgressReporter::processITKEvent(itk::Object* caller,
 {
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = dynamic_cast<itk::ProcessObject*>(caller)) {
-      if (isCancelledFun && isCancelledFun()) {
+      if (m_cancellationToken.isCancellationRequested()) {
         if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 1";
@@ -111,7 +102,7 @@ void ZImgAlgorithmBaseWithProgressReporter::constProcessITKEvent(const itk::Obje
 {
   if (itk::ProgressEvent().CheckEvent(&event)) {
     if (auto process = const_cast<itk::ProcessObject*>(dynamic_cast<const itk::ProcessObject*>(caller))) {
-      if (isCancelledFun && isCancelledFun()) {
+      if (m_cancellationToken.isCancellationRequested()) {
         if (!process->GetAbortGenerateData()) {
           process->AbortGenerateDataOn();
           LOG(INFO) << "abort itk 2";

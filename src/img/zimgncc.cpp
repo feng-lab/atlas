@@ -127,10 +127,10 @@ void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& 
 {
   if (fixedImg.isEmpty() || movingImg.isEmpty() || fixedImg.numChannels() != 1 || fixedImg.numTimes() != 1 ||
       movingImg.numChannels() != 1 || movingImg.numTimes() != 1) {
-    throw ZImgException(QString("%1 input img dimension is not supported: fixed img <%1>, moving img <%2>")
-                          .arg(name)
-                          .arg(fixedImg.info().toQString())
-                          .arg(movingImg.info().toQString()));
+    throw ZException(QString("%1 input img dimension is not supported: fixed img <%1>, moving img <%2>")
+                       .arg(name)
+                       .arg(fixedImg.info().toQString())
+                       .arg(movingImg.info().toQString()));
   }
 }
 
@@ -356,15 +356,15 @@ void normXCorrPart(ZImg& fixedImg,
   checkInputImgs(fixedImg, movingImg, "normXCorrPart");
   if (xStart >= xEnd || yStart >= yEnd || zStart >= zEnd || xEnd > fixedImg.width() + movingImg.width() - 1 ||
       yEnd > fixedImg.height() + movingImg.height() - 1 || zEnd > fixedImg.depth() + movingImg.depth() - 1) {
-    throw ZImgException(QString("normXCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                          .arg(xStart)
-                          .arg(xEnd)
-                          .arg(yStart)
-                          .arg(yEnd)
-                          .arg(zStart)
-                          .arg(zEnd)
-                          .arg(fixedImg.info().toQString())
-                          .arg(movingImg.info().toQString()));
+    throw ZException(QString("normXCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
+                       .arg(xStart)
+                       .arg(xEnd)
+                       .arg(yStart)
+                       .arg(yEnd)
+                       .arg(zStart)
+                       .arg(zEnd)
+                       .arg(fixedImg.info().toQString())
+                       .arg(movingImg.info().toQString()));
   }
 
   if (!fixedImg.isType<double>()) {
@@ -508,15 +508,15 @@ ZImg xCorrPart(const ZImg& fixedImg,
   checkInputImgs(fixedImg, movingImg, "xCorrPart");
   if (xStart >= xEnd || yStart >= yEnd || zStart >= zEnd || xEnd > fixedImg.width() + movingImg.width() - 1 ||
       yEnd > fixedImg.height() + movingImg.height() - 1 || zEnd > fixedImg.depth() + movingImg.depth() - 1) {
-    throw ZImgException(QString("xCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                          .arg(xStart)
-                          .arg(xEnd)
-                          .arg(yStart)
-                          .arg(yEnd)
-                          .arg(zStart)
-                          .arg(zEnd)
-                          .arg(fixedImg.info().toQString())
-                          .arg(movingImg.info().toQString()));
+    throw ZException(QString("xCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
+                       .arg(xStart)
+                       .arg(xEnd)
+                       .arg(yStart)
+                       .arg(yEnd)
+                       .arg(zStart)
+                       .arg(zEnd)
+                       .arg(fixedImg.info().toQString())
+                       .arg(movingImg.info().toQString()));
   }
 
   ZImgInfo info = fixedImg.info();
@@ -553,10 +553,10 @@ void cropOverlapSubImg(const ZImg& fixedImgIn,
   ZVoxelCoordinate fixedStart = max(offset, 0); // max of zero and offset
   ZVoxelCoordinate fixedEnd = min(offset + movingImgIn.endCoord(), fixedImgIn.endCoord());
   if (fixedEnd.anyLessEqual(fixedStart)) {
-    throw ZImgException(QString("Trying to crop overlap region of non-overlap img1 <%1> and img2 <%2> with offset: %3")
-                          .arg(fixedImgIn.info().toQString())
-                          .arg(movingImgIn.info().toQString())
-                          .arg(offset.toQString()));
+    throw ZException(QString("Trying to crop overlap region of non-overlap img1 <%1> and img2 <%2> with offset: %3")
+                       .arg(fixedImgIn.info().toQString())
+                       .arg(movingImgIn.info().toQString())
+                       .arg(offset.toQString()));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);
   subFixedImg = fixedImgIn.crop(fixedRegion);

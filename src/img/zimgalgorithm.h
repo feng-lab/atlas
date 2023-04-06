@@ -11,6 +11,7 @@
 #include <itkCommand.h>
 #include <itkProcessObject.h>
 #include <QObject>
+#include <folly/CancellationToken.h>
 #include <map>
 #include <set>
 #include <functional>
@@ -23,10 +24,6 @@ class ZImgAlgorithmBaseWithProgressReporter : public QObject
 
 public:
   ZImgAlgorithmBaseWithProgressReporter();
-
-  // if isCancelledFun returns true, current algorithm will abort and throw a ZProcessAbortException
-  // or itk::ProcessAborted
-  std::function<bool()> isCancelledFun;
 
   // default report 1 percent change
   // larger value can reduce the number of signals
@@ -41,6 +38,12 @@ public:
   inline void setTotalSubOperationWeight(double w)
   {
     m_weight = 1 - w;
+  }
+
+  // if cancelled, current algorithm will abort and throw a ZException or itk::ProcessAborted
+  void setCancellationToken(const folly::CancellationToken& token)
+  {
+    m_cancellationToken = token;
   }
 
 Q_SIGNALS:
@@ -108,6 +111,8 @@ protected:
   ZImgAlgorithmBaseWithProgressReporter* m_parent = nullptr;
 
   size_t m_numThreads = ZCpuInfo::instance().nLogicalCores;
+
+  folly::CancellationToken m_cancellationToken;
 };
 
 class ZImgAlgorithmBase

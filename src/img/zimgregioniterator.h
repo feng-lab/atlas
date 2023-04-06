@@ -29,15 +29,14 @@ public:
     , m_centerVoxelPtr(nullptr)
   {
     if (!m_img->template isType<TVoxel>()) {
-      throw ZImgException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
+      throw ZException(QString("Iterator type doesn't match image type <%1>").arg(m_img->info().toQString()));
     }
     if (m_img->isEmpty()) {
       m_endIdx = -1;
     } else if (!m_region.isValid(m_img->info())) {
-      throw ZImgException(
-        QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
-          .arg(m_img->info().toQString())
-          .arg(m_region.toQString()));
+      throw ZException(QString("Can not construct iterator over invalid image region. Image info: '%1', region: '%2'")
+                         .arg(m_img->info().toQString())
+                         .arg(m_region.toQString()));
     } else if (m_region.isEmpty()) {
       m_endIdx = -1;
     } else {
@@ -262,8 +261,8 @@ private:
 } // namespace impl
 
 // random_access_iterator that walk throught a sub region of img of type TVoxel, similar to itk iterator
-// if input img is not type TVoxel, a ZImgException will be thrown.
-// if input region is an invalid region (can not fit into img), a ZImgException will be thrown
+// if input img is not type TVoxel, a ZException will be thrown.
+// if input region is an invalid region (can not fit into img), a ZException will be thrown
 
 // for (ZImgRegionIterator<uint8_t> it = ZImgRegionIterator<uint8_t>(img, region);
 //      !it.isAtEnd(); it += 2) {

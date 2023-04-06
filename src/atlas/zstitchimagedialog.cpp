@@ -251,10 +251,10 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 
   bool hasStack2 = false;
   if (m_inputStack1Filenames.isEmpty()) {
-    throw ZImgException("no input");
+    throw ZException("no input");
   } else if (m_hasTwoInputStackSetCheckBox->isChecked()) {
     if (m_inputStack2Filenames.size() != m_inputStack1Filenames.size()) {
-      throw ZImgException("input 2 has different number of files than input 1");
+      throw ZException("input 2 has different number of files than input 1");
     }
     hasStack2 = true;
   }
@@ -379,7 +379,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     }
   } else if (m_useTileImageRadioButton->isChecked()) {
     if (m_tileMatrix.empty() || m_tileList.empty()) {
-      throw ZImgException("no tile selection image");
+      throw ZException("no tile selection image");
     }
     size_t numCols = m_tileMatrix[0].size();
     size_t numRows = m_tileMatrix.size();
@@ -397,7 +397,7 @@ void ZStitchImageDialog::createWorker(ZImgProcess*& worker, QString& workerName)
     workertmp->setTileGrid(tileGrid);
   } else if (m_useConnFileRadioButton->isChecked()) {
     if (m_connFileEdit->text().isEmpty()) {
-      throw ZImgException("no conn text file");
+      throw ZException("no conn text file");
     }
     workertmp->setConnInfoFromConnTextFile(m_connFileEdit->text());
   } else if (m_useFullConnectionRadioButton->isChecked()) {

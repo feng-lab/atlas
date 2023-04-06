@@ -145,16 +145,16 @@ ZImgGraph::ZImgGraph(const ZImg& img, const ZImgRegion& rgn)
   , m_region(rgn)
 {
   if (!rgn.isValid(m_img.info())) {
-    throw ZImgException(QString("Can not build graph with invalid region <%1> of img <%2>")
-                          .arg(m_region.toQString())
-                          .arg(m_img.info().toQString()));
+    throw ZException(QString("Can not build graph with invalid region <%1> of img <%2>")
+                       .arg(m_region.toQString())
+                       .arg(m_img.info().toQString()));
   }
 
   m_region.resolveRegionEnd(m_img.info());
   m_regionInfo = m_region.clip(m_img.info());
   if (m_regionInfo.numChannels > 1 || m_regionInfo.numTimes > 1) {
-    throw ZImgException(QString("Can only build graph with 3D or 2D single channel img region, current region: <%1>")
-                          .arg(m_region.toQString()));
+    throw ZException(QString("Can only build graph with 3D or 2D single channel img region, current region: <%1>")
+                       .arg(m_region.toQString()));
   }
 
   if (m_regionInfo.depth == 1) {
@@ -175,10 +175,10 @@ void ZImgGraph::setConnectivity(size_t n)
 std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t>* predecessor)
 {
   if (!m_graphIsValid) {
-    throw ZImgException("Img graph is not built yet");
+    throw ZException("Img graph is not built yet");
   }
   if (startIdx >= boost::num_vertices(m_graph)) {
-    throw ZImgException(
+    throw ZException(
       QString("Invalid start idx %1 for shortest path in img region <%2>").arg(startIdx).arg(m_region.toQString()));
   }
 
@@ -207,9 +207,9 @@ std::vector<double> ZImgGraph::shortestPaths(size_t startIdx, std::vector<size_t
 std::vector<double> ZImgGraph::shortestPaths(const ZVoxelCoordinate& startCoord, std::vector<size_t>* predecessor)
 {
   if (!m_region.containsCoord(startCoord, m_img.info())) {
-    throw ZImgException(QString("Invalid start coord %1 for shortest path in img region <%2>")
-                          .arg(startCoord.toQString())
-                          .arg(m_region.toQString()));
+    throw ZException(QString("Invalid start coord %1 for shortest path in img region <%2>")
+                       .arg(startCoord.toQString())
+                       .arg(m_region.toQString()));
   }
   size_t startIdx = ZImg::coordToIndex(startCoord - m_region.start, m_regionInfo);
   return shortestPaths(startIdx, predecessor);
@@ -219,18 +219,18 @@ std::tuple<double, size_t>
 ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs, std::vector<size_t>* resPath)
 {
   if (!m_graphIsValid) {
-    throw ZImgException("Img graph is not built yet");
+    throw ZException("Img graph is not built yet");
   }
   if (startIdx >= boost::num_vertices(m_graph)) {
-    throw ZImgException(
+    throw ZException(
       QString("Invalid start idx %1 for shortest path in img region <%2>").arg(startIdx).arg(m_region.toQString()));
   }
   if (targetIdxs.empty()) {
-    throw ZImgException("No target idxs");
+    throw ZException("No target idxs");
   }
   for (size_t idx : targetIdxs) {
     if (idx >= boost::num_vertices(m_graph)) {
-      throw ZImgException(
+      throw ZException(
         QString("Invalid target idx %1 for shortest path in img region <%2>").arg(idx).arg(m_region.toQString()));
     }
   }
@@ -273,7 +273,7 @@ ZImgGraph::shortestPath(size_t startIdx, const std::vector<size_t>& targetIdxs, 
     return std::make_tuple(distance[fg.v], fg.v);
   }
 
-  throw ZImgException(QString("Didn't find a path from %1 to target points").arg(startIdx));
+  throw ZException(QString("Didn't find a path from %1 to target points").arg(startIdx));
   return std::tuple<double, size_t>(-1, -1);
 }
 

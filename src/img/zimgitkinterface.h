@@ -8,19 +8,19 @@ namespace nim {
 
 // ZImg channel to 3d itk image
 // no memory copy, img still own the memory
-// throw ZImgException if TVoxel don't match img type
+// throw ZException if TVoxel don't match img type
 template<typename TVoxel>
 typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZImgException(
+    throw ZException(
       QString("wrapZImgChannelAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
   }
   if (c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZImgException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
-                          .arg(c)
-                          .arg(t)
-                          .arg(img.info().toQString()));
+    throw ZException(QString("wrapZImgChannelAsITKImg invalid pos of img, c:%1, t:%2, img:<%3>")
+                       .arg(c)
+                       .arg(t)
+                       .arg(img.info().toQString()));
   }
   using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
@@ -60,20 +60,20 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
 
 // ZImg plane to 2d itk image
 // no memory copy, img still own the memory
-// throw ZImgException if TVoxel don't match img type
+// throw ZException if TVoxel don't match img type
 template<typename TVoxel>
 typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, size_t z, size_t c = 0, size_t t = 0)
 {
   if (!img.isType<TVoxel>()) {
-    throw ZImgException(
+    throw ZException(
       QString("wrapZImgPlaneAsITKImg wrap img <%1> to wrong type of itk img").arg(img.info().toQString()));
   }
   if (z >= img.depth() || c >= img.numChannels() || t >= img.numTimes() || img.isEmpty()) {
-    throw ZImgException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
-                          .arg(z)
-                          .arg(c)
-                          .arg(t)
-                          .arg(img.info().toQString()));
+    throw ZException(QString("wrapZImgPlaneAsITKImg invalid pos of img, z:%1 c:%2, t:%3, img:<%4>")
+                       .arg(z)
+                       .arg(c)
+                       .arg(t)
+                       .arg(img.info().toQString()));
   }
   using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();

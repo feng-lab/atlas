@@ -41,13 +41,13 @@ void ZSectionsRegistrationDialog::createWorker(nim::ZImgProcess*& worker, QStrin
   focusNextChild();
 
   if (m_inputImagesFileWidget->getSelectedMultipleOpenFiles().isEmpty()) {
-    throw ZImgException(QString("No input images. Abort."));
+    throw ZException(QString("No input images. Abort."));
   }
   if (m_outputStackWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Result image file must be specified."));
+    throw ZException(QString("Result image file must be specified."));
   }
   if (m_outputLogFileWidget->getSelectedSaveFile().isEmpty()) {
-    throw ZImgException(QString("Registration log file must be specified."));
+    throw ZException(QString("Registration log file must be specified."));
   }
 
   int refChannel = m_referenceChannel.associatedData() - 1;

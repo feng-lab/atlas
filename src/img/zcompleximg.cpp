@@ -71,8 +71,8 @@ ZComplexImg& ZComplexImg::operator+=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(QString("complex img addition requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString(), rhs.toQString()));
+    throw ZException(QString("complex img addition requires same size img as input: this <1>, other <%2>")
+                       .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
   vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -107,8 +107,8 @@ ZComplexImg& ZComplexImg::operator-=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(QString("complex img subtraction requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString(), rhs.toQString()));
+    throw ZException(QString("complex img subtraction requires same size img as input: this <1>, other <%2>")
+                       .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
   vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -150,8 +150,8 @@ ZComplexImg& ZComplexImg::operator*=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(QString("complex img multiplies requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString(), rhs.toQString()));
+    throw ZException(QString("complex img multiplies requires same size img as input: this <1>, other <%2>")
+                       .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
   vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
@@ -186,8 +186,8 @@ ZComplexImg& ZComplexImg::operator/=(const std::complex<double>& rhs)
 ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
 {
   if (!isSameSize(rhs)) {
-    throw ZImgException(QString("complex img divides requires same size img as input: this <1>, other <%2>")
-                          .arg(toQString(), rhs.toQString()));
+    throw ZException(QString("complex img divides requires same size img as input: this <1>, other <%2>")
+                       .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
   vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());

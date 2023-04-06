@@ -14,14 +14,9 @@ ZImgProcessDialog::ZImgProcessDialog(QWidget* parent)
   : QDialog(parent)
 {}
 
-void ZImgProcessDialog::processCanceled()
-{
-  QMessageBox::critical(this, QApplication::applicationName(), QString("%1 is canceled by user.").arg(m_workerName));
-}
-
 void ZImgProcessDialog::processFinished()
 {
-  if (!m_isCanceled && !m_hasError) {
+  if (!m_hasError) {
     QMessageBox::information(this, QApplication::applicationName(), QString("%1 Finished.").arg(m_workerName));
   }
 }
@@ -29,13 +24,15 @@ void ZImgProcessDialog::processFinished()
 void ZImgProcessDialog::processError(const QString& e)
 {
   m_hasError = true;
-  QMessageBox::critical(this, QApplication::applicationName(), QString("Error during %1: %2").arg(m_workerName).arg(e));
+  QMessageBox::critical(this, QApplication::applicationName(), QString("Error during %1: %2").arg(m_workerName, e));
 }
 
 void ZImgProcessDialog::cancelButtonPressed()
 {
   m_progressDialog->setLabelText(QString("%1 Canceling...").arg(m_workerName));
-  m_isCanceled = true;
+  if (m_cancellationSource) {
+    m_cancellationSource->requestCancellation();
+  }
 }
 
 void ZImgProcessDialog::keyPressEvent(QKeyEvent* e)
@@ -65,7 +62,7 @@ QDialogButtonBox* ZImgProcessDialog::createButtonBox(const QString& runButtonNam
 void ZImgProcessDialog::runWorker()
 {
   try {
-    m_isCanceled = false;
+    m_cancellationSource = std::make_unique<folly::CancellationSource>();
     m_hasError = false;
 
     m_worker = nullptr;
@@ -74,7 +71,7 @@ void ZImgProcessDialog::runWorker()
     CHECK(m_worker);
     CHECK(!m_workerName.isEmpty());
 
-    m_worker->isCancelledFun = [this]() { return m_isCanceled; };
+    m_worker->setCancellationToken(m_cancellationSource->getToken());
 
     m_progressDialog = new QProgressDialog(this);
     m_progressDialog->setLabelText(QString("%1 Running...").arg(m_workerName));
@@ -82,13 +79,11 @@ void ZImgProcessDialog::runWorker()
     m_progressDialog->setAttribute(Qt::WA_DeleteOnClose);
     QObject::disconnect(m_progressDialog, &QProgressDialog::canceled, m_progressDialog, &QProgressDialog::cancel);
     connect(m_worker, qOverload<int>(&ZImgProcess::progressChanged), m_progressDialog, &QProgressDialog::setValue);
-    connect(m_worker, &ZImgProcess::canceled, this, &ZImgProcessDialog::processCanceled);
     connect(m_worker, &ZImgProcess::processError, this, &ZImgProcessDialog::processError);
     connect(m_progressDialog, &QProgressDialog::canceled, this, &ZImgProcessDialog::cancelButtonPressed);
 
     auto thread = new QThread(this);
     connect(thread, &QThread::started, m_worker, &ZImgProcess::run);
-    connect(m_worker, &ZImgProcess::canceled, thread, &QThread::quit);
     connect(m_worker, &ZImgProcess::finished, thread, &QThread::quit);
     connect(m_worker, &ZImgProcess::processError, thread, &QThread::quit);
     connect(thread, &QThread::finished, m_worker, &ZImgProcess::deleteLater);

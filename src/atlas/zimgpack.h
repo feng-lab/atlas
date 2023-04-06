@@ -178,7 +178,7 @@ public:
                                                        const ZImgInfo& resInfo,
                                                        double displayRangeMin,
                                                        double displayRangeMax,
-                                                       folly::CancellationToken cancellationToken) const;
+                                                       const folly::CancellationToken& cancellationToken) const;
 
   // only for non-disk-cached image
   bool isDiskCached() const

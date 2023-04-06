@@ -17,7 +17,7 @@ public:
   {
     m_info = img.readInfo();
     if (m_info.isEmpty()) {
-      throw ZImgException("No max coord for empty img");
+      throw ZException("No max coord for empty img");
     }
     ZVoxelCoordinate maxCoord(m_info.width - 1,
                               m_info.height - 1,

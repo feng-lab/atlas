@@ -10,7 +10,7 @@ namespace nim {
 
 class Z3DShader;
 
-// throw ZGLException if compile error
+// throw ZException if compile error
 class Z3DShaderManager
 {
 public:

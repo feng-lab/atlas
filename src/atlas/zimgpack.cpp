@@ -4,6 +4,7 @@
 #include "zlog.h"
 #include "zimgcache.h"
 #include "zimgregioncache.h"
+#include "zcancellation.h"
 #include <QFileInfo>
 #include <QPoint>
 #include <QDir>
@@ -464,7 +465,7 @@ ZImg ZImgPack::crop(const ZImgRegion& region) const
 
   ZImgRegion rgn = region;
   if (!rgn.isValid(m_imgInfo)) {
-    throw ZImgException(
+    throw ZException(
       QString("Try to crop img <%1> with invalid region <%2>").arg(m_imgInfo.toQString(), rgn.toQString()));
   }
 
@@ -534,15 +535,13 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                                                const ZImgInfo& resInfo,
                                                                double displayRangeMin,
                                                                double displayRangeMax,
-                                                               folly::CancellationToken cancellationToken) const
+                                                               const folly::CancellationToken& cancellationToken) const
 {
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   if (FLAGS_atlas_readRegionToImg_version == 0) {
     return folly::via(cpuExecutor, [=, &resInfo]() {
-      if (cancellationToken.isCancellationRequested()) {
-        throw ZGLException("cancel");
-      }
+      maybeCancel(cancellationToken);
 
       bool needToUpdateBlockInfo = false;
       if (auto it = m_blockInfo.find(
@@ -556,9 +555,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         needToUpdateBlockInfo = true;
       }
 
-      if (cancellationToken.isCancellationRequested()) {
-        throw ZGLException("cancel");
-      }
+      maybeCancel(cancellationToken);
 
       auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
                                                                              xyRatio,
@@ -577,9 +574,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return folly::makeFuture(img);
       }
 
-      if (cancellationToken.isCancellationRequested()) {
-        throw ZGLException("cancel");
-      }
+      maybeCancel(cancellationToken);
 
       auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
       std::vector<size_t> queryResult;
@@ -599,9 +594,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         return folly::makeFuture(std::shared_ptr<ZImg>());
       }
 
-      if (cancellationToken.isCancellationRequested()) {
-        throw ZGLException("cancel");
-      }
+      maybeCancel(cancellationToken);
 
       auto tmpResInfo = resInfo;
       tmpResInfo.width = std::ceil(resInfo.width * xyRatio * 1.0 / readRatio[0]);
@@ -612,39 +605,29 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       auto rres = std::make_shared<ZImg>(tmpResInfo); // will be captured by value to keep the image alive
       auto res = rres.get();
 
-      if (cancellationToken.isCancellationRequested()) {
-        throw ZGLException("cancel");
-      }
+      maybeCancel(cancellationToken);
 
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto tileIndex : queryResult) {
         const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
         tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
                                  std::round((tile->z * 1.0 / zRatio - sz) * zRatio / readRatio[2]),
                                  -ZVoxelCoordinate::value_type(sc),
                                  0);
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           res->pasteImg(*imgPtr, start);
         }));
       }
 
       return folly::collect(tileFutures).via(cpuExecutor).thenValue([=, &resInfo](auto&&) {
-        if (cancellationToken.isCancellationRequested()) {
-          throw ZGLException("cancel");
-        }
+        maybeCancel(cancellationToken);
 
         if (needToUpdateBlockInfo) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
 
           double minv;
           double maxv;
@@ -659,22 +642,16 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
 
         if (res->isSameType(resInfo)) {
           if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
-            if (cancellationToken.isCancellationRequested()) {
-              throw ZGLException("cancel");
-            }
+            maybeCancel(cancellationToken);
             res->normalize(displayRangeMin, displayRangeMax);
           }
         } else {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
         }
 
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           res->resize(resInfo.width,
                       resInfo.height,
                       resInfo.depth,
@@ -684,9 +661,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                       FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
         }
 
-        if (cancellationToken.isCancellationRequested()) {
-          throw ZGLException("cancel");
-        }
+        maybeCancel(cancellationToken);
 
         ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
                                                                        xyRatio,
@@ -706,9 +681,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       });
     });
   } else {
-    if (cancellationToken.isCancellationRequested()) {
-      throw ZGLException("cancel");
-    }
+    maybeCancel(cancellationToken);
 
     bool needToUpdateBlockInfo = false;
     if (auto it = m_blockInfo.find(
@@ -722,9 +695,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       needToUpdateBlockInfo = true;
     }
 
-    if (cancellationToken.isCancellationRequested()) {
-      throw ZGLException("cancel");
-    }
+    maybeCancel(cancellationToken);
 
     auto img = ZImgRegionCache::instance().get(ImageRegionCacheHashKeyType(this,
                                                                            xyRatio,
@@ -743,16 +714,12 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       return folly::makeFuture(img);
     }
 
-    if (cancellationToken.isCancellationRequested()) {
-      throw ZGLException("cancel");
-    }
+    maybeCancel(cancellationToken);
 
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
     return folly::via(cpuExecutor,
                       [=]() {
-                        if (cancellationToken.isCancellationRequested()) {
-                          throw ZGLException("cancel");
-                        }
+                        maybeCancel(cancellationToken);
 
                         std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
                         if (auto tiit =
@@ -768,19 +735,13 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                                                 queryResult.push_back(value.second);
                                               }));
 
-                          if (cancellationToken.isCancellationRequested()) {
-                            throw ZGLException("cancel");
-                          }
+                          maybeCancel(cancellationToken);
 
                           for (auto tileIndex : queryResult) {
-                            if (cancellationToken.isCancellationRequested()) {
-                              throw ZGLException("cancel");
-                            }
+                            maybeCancel(cancellationToken);
                             const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
                             tileFutures.push_back(folly::via(cpuExecutor, [=]() {
-                              if (cancellationToken.isCancellationRequested()) {
-                                throw ZGLException("cancel");
-                              }
+                              maybeCancel(cancellationToken);
                               return std::make_tuple(
                                 ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
                                                  std::round((tile->y * 1.0 / xyRatio - sy) * xyRatio / readRatio[1]),
@@ -795,9 +756,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                       })
       .via(cpuExecutor)
       .thenValue([=, &resInfo](auto&& tiles) {
-        if (cancellationToken.isCancellationRequested()) {
-          throw ZGLException("cancel");
-        }
+        maybeCancel(cancellationToken);
 
         if (tiles.empty()) {
           return std::shared_ptr<ZImg>();
@@ -810,22 +769,16 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         tmpResInfo.bytesPerVoxel = m_imgInfo.bytesPerVoxel;
         auto res = std::make_shared<ZImg>(tmpResInfo);
 
-        if (cancellationToken.isCancellationRequested()) {
-          throw ZGLException("cancel");
-        }
+        maybeCancel(cancellationToken);
 
         for (auto& [start, imgPtr] : tiles) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           res->pasteImg(*imgPtr, start);
           imgPtr.reset();
         }
 
         if (needToUpdateBlockInfo) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
 
           double minv;
           double maxv;
@@ -840,22 +793,16 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
 
         if (res->isSameType(resInfo)) {
           if (displayRangeMin != m_imgInfo.dataRangeMin() || displayRangeMax != m_imgInfo.dataRangeMax()) {
-            if (cancellationToken.isCancellationRequested()) {
-              throw ZGLException("cancel");
-            }
+            maybeCancel(cancellationToken);
             res->normalize(displayRangeMin, displayRangeMax);
           }
         } else {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           *res = res->convertTo(displayRangeMin, displayRangeMax, resInfo);
         }
 
         if (res->width() != resInfo.width || res->height() != resInfo.height || res->depth() != resInfo.depth) {
-          if (cancellationToken.isCancellationRequested()) {
-            throw ZGLException("cancel");
-          }
+          maybeCancel(cancellationToken);
           res->resize(resInfo.width,
                       resInfo.height,
                       resInfo.depth,
@@ -865,9 +812,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                       FLAGS_atlas_readRegionToImg_use_multithreaded_resize);
         }
 
-        if (cancellationToken.isCancellationRequested()) {
-          throw ZGLException("cancel");
-        }
+        maybeCancel(cancellationToken);
 
         ZImgRegionCache::instance().insert(ImageRegionCacheHashKeyType(this,
                                                                        xyRatio,

@@ -35,7 +35,7 @@ public:
   void removeImgPair(const ZImgSubBlock& img1, const ZImgSubBlock& img2);
 
   // return summary info
-  // throw ZImgException if error
+  // throw ZException if error
   QStringList resolveLocations();
 
   void setMergeMode(ImgMergeMode mode = ImgMergeMode::Max)

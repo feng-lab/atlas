@@ -53,8 +53,6 @@ public:
 
 Q_SIGNALS:
 
-  void canceled();
-
   void processError(QString);
 
   void finished();

@@ -187,7 +187,7 @@ void ZPunctaDetection::setInputFile(const QString& filename,
 
   auto infos = ZImg::readImgInfos(m_filename);
   if (m_scene >= infos.size()) {
-    throw ZImgException("invalid scene");
+    throw ZException("invalid scene");
   }
   m_imgInfo = infos[m_scene];
   if (voxelSizeInUmX > 0 || voxelSizeInUmY > 0 || VoxelSizeInUmZ > 0) {
@@ -212,7 +212,7 @@ void ZPunctaDetection::doWork()
   if (m_punctaChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Puncta Channel: " << m_punctaChannel + 1 << " (start from 1)";
   } else {
-    throw ZImgException(QString("Wrong puncta channel: %1. Abort.").arg(m_punctaChannel));
+    throw ZException(QString("Wrong puncta channel: %1. Abort.").arg(m_punctaChannel));
   }
 
   if (m_dendriteChannel != -1) {
@@ -221,11 +221,10 @@ void ZPunctaDetection::doWork()
       LOG(INFO) << "Dendrite Threshold: " << m_dendriteThreshold;
       LOG(INFO) << "Max Dendrite Tube Radius: " << m_maxDendriteTubeRadius << "um";
     } else {
-      throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
+      throw ZException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
     }
     if (m_imgInfo.voxelSizeUnit == VoxelSizeUnit::none) {
-      throw ZImgException(
-        "Voxel Size not set (need by soma detection and puncta-tree matching), Abort Puncta Detection.");
+      throw ZException("Voxel Size not set (need by soma detection and puncta-tree matching), Abort Puncta Detection.");
     }
   } else {
     LOG(INFO) << "No Dendrite Channel.";
@@ -1550,7 +1549,9 @@ void ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs,
       }
     }
     // remove empty group
-    erase_if(modelGroups, [](const auto& v) { return v.empty(); });
+    erase_if(modelGroups, [](const auto& v) {
+      return v.empty();
+    });
     // create new group
     if (currentModelGroup == -1) {
       std::vector<index_t> newGroup;

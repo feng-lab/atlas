@@ -43,7 +43,7 @@ std::string getFormatDesc(const ZImg& img)
       case 8:
         return py::format_descriptor<uint64_t>::format();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   } else if (img.voxelFormat() == VoxelFormat::Float) {
     switch (img.bytesPerVoxel()) {
@@ -52,7 +52,7 @@ std::string getFormatDesc(const ZImg& img)
       case 8:
         return py::format_descriptor<double>::format();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   } else {
     switch (img.bytesPerVoxel()) {
@@ -65,7 +65,7 @@ std::string getFormatDesc(const ZImg& img)
       case 8:
         return py::format_descriptor<int64_t>::format();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   }
 }
@@ -83,7 +83,7 @@ py::dtype getDType(const ZImg& img)
       case 8:
         return py::dtype::of<uint64_t>();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   } else if (img.voxelFormat() == VoxelFormat::Float) {
     switch (img.bytesPerVoxel()) {
@@ -92,7 +92,7 @@ py::dtype getDType(const ZImg& img)
       case 8:
         return py::dtype::of<double>();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   } else {
     switch (img.bytesPerVoxel()) {
@@ -105,15 +105,15 @@ py::dtype getDType(const ZImg& img)
       case 8:
         return py::dtype::of<int64_t>();
       default:
-        throw ZImgException("Incorrect Img Info");
+        throw ZException("Incorrect Img Info");
     }
   }
 }
 
 ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
 {
-  if (arr.ndim() != 4) { throw ZImgException("Only support 4d array: channel x depth x height x width"); }
-  if (arr.size() <= 0) { throw ZImgException("Empty ndarray"); }
+  if (arr.ndim() != 4) { throw ZException("Only support 4d array: channel x depth x height x width"); }
+  if (arr.size() <= 0) { throw ZException("Empty ndarray"); }
   ZImgInfo res = info_in;
   res.numTimes = 1;
   res.numChannels = arr.shape(0);
@@ -123,16 +123,16 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
   res.bytesPerVoxel = arr.itemsize();
 
   if (res.numChannels > 1 && static_cast<py::ssize_t>(res.channelByteNumber()) != arr.strides(0)) {
-    throw ZImgException("ndarray is not C_CONTIGUOUS");
+    throw ZException("ndarray is not C_CONTIGUOUS");
   }
   if (res.depth > 1 && static_cast<py::ssize_t>(res.planeByteNumber()) != arr.strides(1)) {
-    throw ZImgException("ndarray is not C_CONTIGUOUS");
+    throw ZException("ndarray is not C_CONTIGUOUS");
   }
   if (res.height > 1 && static_cast<py::ssize_t>(res.rowByteNumber()) != arr.strides(2)) {
-    throw ZImgException("ndarray is not C_CONTIGUOUS");
+    throw ZException("ndarray is not C_CONTIGUOUS");
   }
   if (res.width > 1 && static_cast<py::ssize_t>(res.voxelByteNumber()) != arr.strides(3)) {
-    throw ZImgException("ndarray is not C_CONTIGUOUS");
+    throw ZException("ndarray is not C_CONTIGUOUS");
   }
 
   switch (arr.dtype().kind()) {
@@ -146,7 +146,7 @@ ZImgInfo getImgInfoFromNdarray(const py::array& arr, const ZImgInfo& info_in)
       res.voxelFormat = VoxelFormat::Float;
       break;
     default:
-      throw ZImgException("ndarray dtype is not supported");
+      throw ZException("ndarray dtype is not supported");
   }
   res.createDefaultDescriptions();
 
@@ -369,7 +369,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("a", &col4::a)
     .def("__init__", [](col4& self, py::tuple t) {
       if (py::len(t) != 4)
-        throw ZImgException("col4 needs tuple with 4 values");
+        throw ZException("col4 needs tuple with 4 values");
       new(&self) col4(t[0].cast<uint8_t>(), t[1].cast<uint8_t>(), t[2].cast<uint8_t>(), t[3].cast<uint8_t>());
     })
     .def("__repr__", [](const col4& v) {
@@ -379,24 +379,12 @@ PYBIND11_MODULE(_imgpy, m)
 
   static py::exception<ZException> base_ex(m, "ZException");
   static py::exception<ZIOException> io_ex(m, "ZIOException", base_ex.ptr());
-  static py::exception<ZImgException> img_ex(m, "ZImgException", base_ex.ptr());
-  static py::exception<ZProcessAbortException> pa_ex(m, "ZProcessAbortException", base_ex.ptr());
-  static py::exception<ZGLException> gl_ex(m, "ZGLException", base_ex.ptr());
   py::register_exception_translator([](std::exception_ptr p) {
     try {
       if (p) std::rethrow_exception(p);
     }
     catch (const ZIOException& e) {
       io_ex(e.what());
-    }
-    catch (const ZImgException& e) {
-      img_ex(e.what());
-    }
-    catch (const ZProcessAbortException& e) {
-      pa_ex(e.what());
-    }
-    catch (const ZGLException& e) {
-      gl_ex(e.what());
     }
     catch (const ZException& e) {
       base_ex(e.what());
@@ -455,7 +443,7 @@ PYBIND11_MODULE(_imgpy, m)
     .def_readwrite("t", &ZVoxelCoordinate::t)
     .def("__init__", [](ZVoxelCoordinate& self, py::tuple t) {
       if (py::len(t) != 5)
-        throw ZImgException("ZVoxelCoordinate needs tuple with 5 values");
+        throw ZException("ZVoxelCoordinate needs tuple with 5 values");
       new(&self) ZVoxelCoordinate(t[0].cast<ZVoxelCoordinate::value_type>(), t[1].cast<ZVoxelCoordinate::value_type>(),
                                   t[2].cast<ZVoxelCoordinate::value_type>(), t[3].cast<ZVoxelCoordinate::value_type>(),
                                   t[4].cast<ZVoxelCoordinate::value_type>());
@@ -528,7 +516,7 @@ PYBIND11_MODULE(_imgpy, m)
         for (size_t t = 1; t < arrs.size(); ++t) {
           auto tmpinfo = getImgInfoFromNdarray(arrs[t], info_in);
           if (!tmpinfo.isSameType(info) || !tmpinfo.isSameSize(info)) {
-            throw ZImgException("ndarrays in the list are not compatible");
+            throw ZException("ndarrays in the list are not compatible");
           }
           data.push_back(const_cast<void*>(arrs[t].data()));
         }

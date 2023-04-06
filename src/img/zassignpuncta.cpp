@@ -16,7 +16,7 @@ ZAssignPuncta::ZAssignPuncta(const ZImg& img, size_t dendriteChannel, size_t t)
   , m_t(t)
 {
   if (!m_img->isType<uint8_t>()) {
-    throw ZImgException("puncta assign only support uint8_t img");
+    throw ZException("puncta assign only support uint8_t img");
   }
   m_imgInfo = m_img->info();
 }
@@ -36,7 +36,7 @@ ZAssignPuncta::ZAssignPuncta(QString filename,
 {
   auto infos = ZImg::readImgInfos(m_filename);
   if (m_scene >= infos.size()) {
-    throw ZImgException("invalid scene");
+    throw ZException("invalid scene");
   }
 }
 
@@ -85,7 +85,7 @@ void ZAssignPuncta::addSwcTrees(const std::vector<ZSwc>& trees)
 void ZAssignPuncta::doWork()
 {
   if (m_imgInfo.voxelSizeUnit == VoxelSizeUnit::none) {
-    throw ZImgException("Voxel Size not set, Abort Assign Puncta.");
+    throw ZException("Voxel Size not set, Abort Assign Puncta.");
   }
   if (m_dendriteChannel < m_imgInfo.numChannels) {
     LOG(INFO) << "Start Assign Puncta.";
@@ -99,7 +99,7 @@ void ZAssignPuncta::doWork()
     LOG(INFO) << "Number of Soma Puncta: " << m_somaPuncta.data.size();
     LOG(INFO) << "Number of Swc Trees: " << m_swcTreeToPuncta.size();
   } else {
-    throw ZImgException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
+    throw ZException(QString("Wrong dendrite channel: %1. Abort.").arg(m_dendriteChannel));
   }
   for (auto& treePuncta : m_swcTreeToPuncta) {
     treePuncta.second.clear();
@@ -124,7 +124,7 @@ ZPuncta ZAssignPuncta::getPunctaOfTree(const ZSwc* tree) const
   if (it != m_swcTreeToPuncta.end()) {
     return it->second;
   } else {
-    throw ZImgException("getPunctaOfTree: Input tree not found.");
+    throw ZException("getPunctaOfTree: Input tree not found.");
   }
 }
 
@@ -134,7 +134,7 @@ ZPuncta ZAssignPuncta::getSomaPunctaOfTree(const ZSwc* tree) const
   if (it != m_swcTreeToSomaPuncta.end()) {
     return it->second;
   } else {
-    throw ZImgException("getSomaPunctaOfTree: Input tree not found.");
+    throw ZException("getSomaPunctaOfTree: Input tree not found.");
   }
 }
 

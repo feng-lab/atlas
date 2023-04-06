@@ -219,7 +219,7 @@ void ZImgNCCMatch::disableRemoveBackgroundForAllMovingImgChannels()
 ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(double* maxNCC, double* maxWeightedNCC, double* numOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
+    throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
   ZVoxelCoordinate res;
   if (m_movingImgPosHint == PositionHint::None && m_maxOverlapRate < 1) {
@@ -277,7 +277,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffsetMR(size_t intvX,
                                                         double* lowResNumOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
+    throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
   ZVoxelCoordinate res;
   if (m_movingImgPosHint == PositionHint::None && m_maxOverlapRate < 1) {
@@ -375,12 +375,12 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& off
                                                      double* numOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
+    throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
   if (offset.x < 1 - static_cast<int>(m_movingImg.width()) || offset.x > static_cast<int>(m_fixedImg.width()) - 1 ||
       offset.y < 1 - static_cast<int>(m_movingImg.height()) || offset.y > static_cast<int>(m_fixedImg.height()) - 1 ||
       offset.z < 1 - static_cast<int>(m_movingImg.depth()) || offset.z > static_cast<int>(m_fixedImg.depth()) - 1) {
-    throw ZImgException("invalid offset");
+    throw ZException("invalid offset");
   }
   ZVoxelCoordinate res;
   double tmpMaxNCC;
@@ -415,12 +415,12 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& o
                                                        double* lowResNumOverlapVoxels)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeMovingImgOffset: Can not match empty imgs");
+    throw ZException("computeMovingImgOffset: Can not match empty imgs");
   }
   if (offset.x < 1 - static_cast<int>(m_movingImg.width()) || offset.x > static_cast<int>(m_fixedImg.width()) - 1 ||
       offset.y < 1 - static_cast<int>(m_movingImg.height()) || offset.y > static_cast<int>(m_fixedImg.height()) - 1 ||
       offset.z < 1 - static_cast<int>(m_movingImg.depth()) || offset.z > static_cast<int>(m_fixedImg.depth()) - 1) {
-    throw ZImgException("invalid offset");
+    throw ZException("invalid offset");
   }
   ZVoxelCoordinate res;
 
@@ -468,7 +468,7 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffsetMR(const ZVoxelCoordinate& o
 double ZImgNCCMatch::computeNCCOfOffset(const ZVoxelCoordinate& offset)
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeNCCOfOffset: Can not match empty imgs");
+    throw ZException("computeNCCOfOffset: Can not match empty imgs");
   }
 
   ZImg fixedImg;
@@ -484,11 +484,11 @@ ZVoxelCoordinate
 ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRateX, double exactOverlapRateY, double exactOverlapRateZ)
 {
   if (m_movingImgPosHint == PositionHint::None) {
-    throw ZImgException("Can not get offset without position hint");
+    throw ZException("Can not get offset without position hint");
   }
   if (exactOverlapRateX >= 1.0 || exactOverlapRateX < 0.0 || exactOverlapRateZ >= 1.0 || exactOverlapRateZ < 0.0 ||
       exactOverlapRateY >= 1.0 || exactOverlapRateY < 0.0) {
-    throw ZImgException("overlap rate should be between 0 and 1");
+    throw ZException("overlap rate should be between 0 and 1");
   }
   ZVoxelCoordinate movingImgOffset;
   if (is_flag_set(m_movingImgPosHint, PositionHint::Left)) {
@@ -518,7 +518,7 @@ ZImgNCCMatch::getMovingImgOffsetFromHint(double exactOverlapRateX, double exactO
 std::tuple<ZImg, ZImg> ZImgNCCMatch::computeNCC()
 {
   if (m_fixedImg.isEmpty() || m_movingImg.isEmpty()) {
-    throw ZImgException("computeNCC: Can not match empty imgs");
+    throw ZException("computeNCC: Can not match empty imgs");
   }
 
   ZImg fixedImg;
@@ -631,14 +631,14 @@ void ZImgNCCMatch::init()
 void ZImgNCCMatch::checkFixedImgChannel(size_t ch)
 {
   if (ch >= m_fixedImg.numChannels()) {
-    throw ZImgException(QString("Wrong channel %1 for fixed img <%2>").arg(ch).arg(m_fixedImg.info().toQString()));
+    throw ZException(QString("Wrong channel %1 for fixed img <%2>").arg(ch).arg(m_fixedImg.info().toQString()));
   }
 }
 
 void ZImgNCCMatch::checkMovingImgChannel(size_t ch)
 {
   if (ch >= m_movingImg.numChannels()) {
-    throw ZImgException(QString("Wrong channel %1 for moving img <%2>").arg(ch).arg(m_movingImg.info().toQString()));
+    throw ZException(QString("Wrong channel %1 for moving img <%2>").arg(ch).arg(m_movingImg.info().toQString()));
   }
 }
 

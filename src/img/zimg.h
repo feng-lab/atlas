@@ -82,56 +82,56 @@ class ZImgBlockProvider;
     }                                                        \
   }
 
-#define IMG_RETURN_TYPED_CALL(function, imgInfo, ...)                                        \
-  {                                                                                          \
-    if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                                      \
-      switch (imgInfo.bytesPerVoxel) {                                                       \
-        case 1:                                                                              \
-          return function<uint8_t>(__VA_ARGS__);                                             \
-          break;                                                                             \
-        case 2:                                                                              \
-          return function<uint16_t>(__VA_ARGS__);                                            \
-          break;                                                                             \
-        case 4:                                                                              \
-          return function<uint32_t>(__VA_ARGS__);                                            \
-          break;                                                                             \
-        case 8:                                                                              \
-          return function<uint64_t>(__VA_ARGS__);                                            \
-          break;                                                                             \
-        default:                                                                             \
-          throw ZImgException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                      \
-    } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                                  \
-      switch (imgInfo.bytesPerVoxel) {                                                       \
-        case 4:                                                                              \
-          return function<float>(__VA_ARGS__);                                               \
-          break;                                                                             \
-        case 8:                                                                              \
-          return function<double>(__VA_ARGS__);                                              \
-          break;                                                                             \
-        default:                                                                             \
-          throw ZImgException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                      \
-    } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {                                 \
-      switch (imgInfo.bytesPerVoxel) {                                                       \
-        case 1:                                                                              \
-          return function<int8_t>(__VA_ARGS__);                                              \
-          break;                                                                             \
-        case 2:                                                                              \
-          return function<int16_t>(__VA_ARGS__);                                             \
-          break;                                                                             \
-        case 4:                                                                              \
-          return function<int32_t>(__VA_ARGS__);                                             \
-          break;                                                                             \
-        case 8:                                                                              \
-          return function<int64_t>(__VA_ARGS__);                                             \
-          break;                                                                             \
-        default:                                                                             \
-          throw ZImgException(fmt::format("unsupported image type {}", imgInfo.toString())); \
-      }                                                                                      \
-    } else {                                                                                 \
-      throw ZImgException(fmt::format("unsupported image type {}", imgInfo.toString()));     \
-    }                                                                                        \
+#define IMG_RETURN_TYPED_CALL(function, imgInfo, ...)                                     \
+  {                                                                                       \
+    if (imgInfo.voxelFormat == VoxelFormat::Unsigned) {                                   \
+      switch (imgInfo.bytesPerVoxel) {                                                    \
+        case 1:                                                                           \
+          return function<uint8_t>(__VA_ARGS__);                                          \
+          break;                                                                          \
+        case 2:                                                                           \
+          return function<uint16_t>(__VA_ARGS__);                                         \
+          break;                                                                          \
+        case 4:                                                                           \
+          return function<uint32_t>(__VA_ARGS__);                                         \
+          break;                                                                          \
+        case 8:                                                                           \
+          return function<uint64_t>(__VA_ARGS__);                                         \
+          break;                                                                          \
+        default:                                                                          \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
+      }                                                                                   \
+    } else if (imgInfo.voxelFormat == VoxelFormat::Float) {                               \
+      switch (imgInfo.bytesPerVoxel) {                                                    \
+        case 4:                                                                           \
+          return function<float>(__VA_ARGS__);                                            \
+          break;                                                                          \
+        case 8:                                                                           \
+          return function<double>(__VA_ARGS__);                                           \
+          break;                                                                          \
+        default:                                                                          \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
+      }                                                                                   \
+    } else if (imgInfo.voxelFormat == VoxelFormat::Signed) {                              \
+      switch (imgInfo.bytesPerVoxel) {                                                    \
+        case 1:                                                                           \
+          return function<int8_t>(__VA_ARGS__);                                           \
+          break;                                                                          \
+        case 2:                                                                           \
+          return function<int16_t>(__VA_ARGS__);                                          \
+          break;                                                                          \
+        case 4:                                                                           \
+          return function<int32_t>(__VA_ARGS__);                                          \
+          break;                                                                          \
+        case 8:                                                                           \
+          return function<int64_t>(__VA_ARGS__);                                          \
+          break;                                                                          \
+        default:                                                                          \
+          throw ZException(fmt::format("unsupported image type {}", imgInfo.toString())); \
+      }                                                                                   \
+    } else {                                                                              \
+      throw ZException(fmt::format("unsupported image type {}", imgInfo.toString()));     \
+    }                                                                                     \
   }
 
 // for function that take 2 template argument
@@ -517,7 +517,7 @@ private:
 };
 
 // Dimension order of ZImg is XYZCT
-// this class might throw ZImgException or ZIOException if error
+// this class might throw ZException or ZIOException if error
 
 class ZImg
 {
@@ -540,7 +540,7 @@ public:
 
   ZImg(ZImg&& other) noexcept;
 
-  // read image from file, throw ZIOException if read failed, might throw ZImgException if can't allocate memory
+  // read image from file, throw ZIOException if read failed, might throw ZException if can't allocate memory
   explicit ZImg(const QString& filename,
                 ZImgRegion region = ZImgRegion(),
                 size_t scene = 0,
@@ -587,7 +587,7 @@ public:
 
   static bool fileExtensionWriteSupported(const QString& filename);
 
-  // throw ZIOException if io error or empty image, might throw ZImgException if can't allocate memory
+  // throw ZIOException if io error or empty image, might throw ZException if can't allocate memory
   void load(const QString& filename,
             size_t scene = 0,
             size_t xRatio = 1,
@@ -605,7 +605,7 @@ public:
 
   // load a sequence of imgs, cat these imgs along dimension "catDim"
   // imgs should have same size in other dimensions and have same type
-  // throw ZIOException if io error, might throw ZImgException if can't allocate memory or can't cat imgs
+  // throw ZIOException if io error, might throw ZException if can't allocate memory or can't cat imgs
   // expandXY can not be true if catDim is Dimension::X or Dimension::Y
   void load(const QStringList& fileList,
             Dimension catDim,
@@ -958,7 +958,7 @@ public:
   // remove old data and allocate data space based on current info
   // if voxel type is signed integer, data will be filled with that type's minimum negative value
   // otherwise data will be set to 0
-  // throw ZImgException if can not allocate memory
+  // throw ZException if can not allocate memory
   void allocate();
 
   template<typename T = uint8_t>
@@ -1151,9 +1151,9 @@ public:
     } else if (isSameSize(mask)) {
       IMG_TYPED_CALL_2TYPE(histogramMask_Impl, m_info, mask.info(), res, minData, maxData, mask)
     } else {
-      throw ZImgException(fmt::format("histogram mask has different size <{}> than current img <{}>",
-                                      mask.info().toString(),
-                                      m_info.toString()));
+      throw ZException(fmt::format("histogram mask has different size <{}> than current img <{}>",
+                                   mask.info().toString(),
+                                   m_info.toString()));
     }
 
     return res;
@@ -1182,16 +1182,16 @@ public:
     return m_info.dataRangeMax<TValue>();
   }
 
-  // some utils, these functions will throw ZImgException if input parameters is invalid
+  // some utils, these functions will throw ZException if input parameters is invalid
 
   // if region is empty, return empty img
-  // throw ZImgException if current img is empty or region is not valid
+  // throw ZException if current img is empty or region is not valid
   [[nodiscard]] ZImg crop(const ZImgRegion& region) const;
 
   // crop from start coordinate to end coordinate with outside pixel padded.
   // padValue is only used when padOption is PadOption::Constant, padValue will be cast to img voxel type
   // only requirement is that coord end should be large or equal (in this case return empty img) than coord start
-  // (valid) throw ZImgException if current img is empty or region goes wrong
+  // (valid) throw ZException if current img is empty or region goes wrong
   template<typename TPadValue = uint8_t>
   ZImg cropWithPad(const ZVoxelCoordinate& startCoord,
                    const ZVoxelCoordinate& endCoord,
@@ -1201,12 +1201,12 @@ public:
     ZImg res;
 
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not crop empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not crop empty img <{}>", m_info.toString()));
     }
     if (endCoord.anyLessThan(startCoord)) {
-      throw ZImgException(fmt::format("Try to crop pad img with invalid region <{}> to <{}>",
-                                      startCoord.toString(),
-                                      endCoord.toString()));
+      throw ZException(fmt::format("Try to crop pad img with invalid region <{}> to <{}>",
+                                   startCoord.toString(),
+                                   endCoord.toString()));
     }
     if (endCoord.anyEqual(startCoord)) {
       return res;
@@ -1276,7 +1276,7 @@ public:
   // cat a series of img along certain dimension
   // imgs should be same type and have same dimension size other than the dimension to cat
   // dim should be valid
-  // throw ZImgException if can not cat
+  // throw ZException if can not cat
   static ZImg cat(const std::vector<ZImg>& imgs, Dimension dim);
 
   static ZImg cat(const std::vector<ZImg*>& imgs, Dimension dim);
@@ -1502,12 +1502,12 @@ public:
   // calculate the sum of each 3D block defined by the template size. The
   // returned img will have size (width+twidth-1) x (height+theight-1) x (depth+tdepth-1) x c x t x l
   // all locations, times, channels are processed in the same way
-  // throw ZImgException if template size is 0
+  // throw ZException if template size is 0
   // note: for integer image perform saturate arithmetic, see below
   [[nodiscard]] ZImg blockSum(size_t twidth, size_t theight, size_t tdepth) const;
 
   // same as blockSum then crop [startX, endX) * [startY, endY) * [startZ, endZ)
-  // throw ZImgException if template size is 0 or range is wrong
+  // throw ZException if template size is 0 or range is wrong
   // note: for integer image perform saturate arithmetic, see below
   [[nodiscard]] ZImg blockSumPart(size_t twidth,
                                   size_t theight,
@@ -1580,12 +1580,12 @@ public:
 
   // if you know the img type
   // ForegroundPredictor take TVoxel as parameter and return bool
-  // throw ZImgException if type don't match
+  // throw ZException if type don't match
   template<typename TVoxel, typename ForegroundPredictor>
   ZImg typedBinarized(const ForegroundPredictor& isForeground) const
   {
     if (!isType<TVoxel>()) {
-      throw ZImgException("Call typedBinarized with wrong type");
+      throw ZException("Call typedBinarized with wrong type");
     }
 
     ZImgInfo info = m_info;
@@ -1610,7 +1610,7 @@ public:
     return *this;
   }
 
-  // add img, input should have same size, otherwise throw ZImgException
+  // add img, input should have same size, otherwise throw ZException
   ZImg& operator+=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -1631,7 +1631,7 @@ public:
     return *this;
   }
 
-  // sub img, input should have same size, otherwise throw ZImgException
+  // sub img, input should have same size, otherwise throw ZException
   ZImg& operator-=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -1654,7 +1654,7 @@ public:
     return *this;
   }
 
-  // multiply img, input should have same size, otherwise throw ZImgException
+  // multiply img, input should have same size, otherwise throw ZException
   ZImg& operator*=(const ZImg& rhs);
 
   template<typename TScalarOrZImg>
@@ -1666,19 +1666,19 @@ public:
   }
 
   template<typename TScalar>
-  // throw ZImgException if scalar is zero and not float
+  // throw ZException if scalar is zero and not float
   ZImg& operator/=(TScalar scalar)
   {
     static_assert(std::is_arithmetic_v<TScalar>, "Arithmetic not possible on this type");
     if (scalar != TScalar(0)) {
       IMG_TYPED_CALL(divScalar_Impl, m_info, scalar)
     } else {
-      throw ZImgException("Can not divide img by zero");
+      throw ZException("Can not divide img by zero");
     }
     return *this;
   }
 
-  // divide img, input should have same size, otherwise throw ZImgException
+  // divide img, input should have same size, otherwise throw ZException
   // might got hardware exception if rhs contains zero and both img is not float type
   ZImg& operator/=(const ZImg& rhs);
 
@@ -1690,7 +1690,7 @@ public:
     return res;
   }
 
-  // divide img, input should have same size, otherwise throw ZImgException
+  // divide img, input should have same size, otherwise throw ZException
   // result voxel is 0 if rhs voxel is 0
   ZImg& secureDivideBy(const ZImg& rhs);
 
@@ -1722,12 +1722,12 @@ public:
   // img.typedUnaryOperation<double>(someOpForDoubleVoxel);
   // op should be a unary function that accepts current voxel as argument and return the new voxel value
   // op can be either a function pointer or an instantiated function object (can have internal state)
-  // **note** throw ZImgException if type don't match
+  // **note** throw ZException if type don't match
   template<typename TVoxel, typename CustomUnaryOp>
   ZImg& typedUnaryOperation(const CustomUnaryOp& op)
   {
     if (!isType<TVoxel>()) {
-      throw ZImgException("Call typedUnaryOperation with wrong type");
+      throw ZException("Call typedUnaryOperation with wrong type");
     }
     unaryOp_Impl<TVoxel>(op);
     return *this;
@@ -1746,15 +1746,15 @@ public:
   // };
   // and it can be used like:
   // img.binaryOperation(someOp());
-  // make sure input img has same size as current img, otherwise ZImgException will be thrown
+  // make sure input img has same size as current img, otherwise ZException will be thrown
   // note: this will generate about 100 switch case branches in function because we need to determine two img type
   template<typename GenericCustomBinaryOp>
   ZImg& binaryOperation(const ZImg& other, const GenericCustomBinaryOp& op)
   {
     if (!isSameSize(other)) {
-      throw ZImgException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
-                                      m_info.toString(),
-                                      other.info().toString()));
+      throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
+                                   m_info.toString(),
+                                   other.info().toString()));
     }
     IMG_TYPED_CALL_2TYPE(binaryOp_Impl, m_info, other.info(), other, op)
     return *this;
@@ -1764,17 +1764,17 @@ public:
   // double someBinaryOp(double current, int8_t otherVoxel);
   // you can use the typed version which generate less code:
   // img.binaryTypedOp<double, int8_t>(other, someBinaryOp);
-  // **note** throw ZImgException if type don't match
+  // **note** throw ZException if type don't match
   template<typename TVoxel, typename TVoxelOther, typename CustomBinaryOp>
   ZImg& typedBinaryOperation(const ZImg& other, const CustomBinaryOp& op)
   {
     if (!isType<TVoxel>() || !other.isType<TVoxelOther>()) {
-      throw ZImgException("Call typedBinaryOperation with wrong type");
+      throw ZException("Call typedBinaryOperation with wrong type");
     }
     if (!isSameSize(other)) {
-      throw ZImgException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
-                                      m_info.toString(),
-                                      other.info().toString()));
+      throw ZException(fmt::format("img binary operation requires same size img as input: this <{}>, other <{}>",
+                                   m_info.toString(),
+                                   other.info().toString()));
     }
     binaryOp_Impl<TVoxel, TVoxelOther>(other, op);
     return *this;
@@ -1782,7 +1782,7 @@ public:
 
   // img coordinate
   // convert idx to coord
-  // **note** if info is empty, throw ZImgException
+  // **note** if info is empty, throw ZException
   // for out of bound idx, this return a coord with only last dimension (Dimension::L) invalid, which can be seen
   // as virtual extension of img
   static ZVoxelCoordinate indexToCoord(index_t idx, const ZImgInfo& info);
@@ -1807,11 +1807,11 @@ public:
     return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
   }
 
-  // max valid coord, **note** throw ZImgException for empty img
+  // max valid coord, **note** throw ZException for empty img
   [[nodiscard]] inline ZVoxelCoordinate maxCoord() const
   {
     if (isEmpty()) {
-      throw ZImgException("No max coord for empty img");
+      throw ZException("No max coord for empty img");
     }
     return ZVoxelCoordinate(m_info.width - 1,
                             m_info.height - 1,
@@ -1833,9 +1833,9 @@ public:
     ZVoxelCoordinate res;
     ZImgRegion rgn = region;
     if (rgn.isEmpty() || !rgn.isValid(m_info)) {
-      throw ZImgException(fmt::format("Try to find max value location of img <{}> within invalid region <{}>",
-                                      m_info.toString(),
-                                      rgn.toString()));
+      throw ZException(fmt::format("Try to find max value location of img <{}> within invalid region <{}>",
+                                   m_info.toString(),
+                                   rgn.toString()));
     }
     rgn.resolveRegionEnd(m_info);
     IMG_TYPED_CALL(firstMaxValueCoord_Impl, m_info, res, max, rgn)
@@ -1849,9 +1849,9 @@ public:
     std::vector<ZVoxelCoordinate> res;
     ZImgRegion rgn = region;
     if (rgn.isEmpty() || !rgn.isValid(m_info)) {
-      throw ZImgException(fmt::format("Try to find max value locations of img <{}> within invalid region <{}>",
-                                      m_info.toString(),
-                                      rgn.toString()));
+      throw ZException(fmt::format("Try to find max value locations of img <{}> within invalid region <{}>",
+                                   m_info.toString(),
+                                   rgn.toString()));
     }
     rgn.resolveRegionEnd(m_info);
     IMG_TYPED_CALL(maxValueCoords_Impl, m_info, res, max, rgn)
@@ -1859,19 +1859,19 @@ public:
   }
 
   // get value as type at coordinate
-  // **throw ZImgException** if coord is invalid or img is empty
+  // **throw ZException** if coord is invalid or img is empty
   // note: this might be slow because we need to find the correct data type and check if coordinate is valid
   // if you know the data type and don't need to check coord, use data<> function
   template<typename TValue = double>
   TValue value(const ZVoxelCoordinate& coord) const
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
     }
     if (isCoordValid(coord)) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, coord)
     } else {
-      throw ZImgException(fmt::format("value: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
+      throw ZException(fmt::format("value: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
     }
   }
 
@@ -1880,12 +1880,12 @@ public:
   TValue value(size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0) const
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth && c < m_info.numChannels && t < m_info.numTimes) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, x, y, z, c, t)
     } else {
-      throw ZImgException(
+      throw ZException(
         fmt::format("value: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info.toString()));
     }
   }
@@ -1895,12 +1895,12 @@ public:
   TValue value(size_t idx) const
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not get voxel value of empty img <{}>", m_info.toString()));
     }
     if (idx < voxelNumber()) {
       IMG_RETURN_TYPED_CALL(value_Impl, m_info, idx)
     } else {
-      throw ZImgException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
     }
   }
 
@@ -1932,18 +1932,17 @@ public:
   }
 
   // set value of coord to value, value will be cast to current img type before set
-  // **throw ZImgException** if coord is invalid or img is empty
+  // **throw ZException** if coord is invalid or img is empty
   template<typename TValue>
   void setValue(TValue value, const ZVoxelCoordinate& coord)
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
     }
     if (isCoordValid(coord)) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, coord)
     } else {
-      throw ZImgException(
-        fmt::format("setValue: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
+      throw ZException(fmt::format("setValue: Invalid coordinate {} of img <{}>", coord.toString(), m_info.toString()));
     }
   }
 
@@ -1952,12 +1951,12 @@ public:
   void setValue(TValue value, size_t x, size_t y, size_t z, size_t c = 0, size_t t = 0)
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
     }
     if (x < m_info.width && y < m_info.height && z < m_info.depth && c < m_info.numChannels && t < m_info.numTimes) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, x, y, z, c, t)
     } else {
-      throw ZImgException(
+      throw ZException(
         fmt::format("setValue: Invalid coordinate ({},{},{},{},{}) of img <{}>", x, y, z, c, t, m_info.toString()));
     }
   }
@@ -1967,16 +1966,16 @@ public:
   void setValue(TValue value, size_t idx)
   {
     if (isEmpty()) {
-      throw ZImgException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
+      throw ZException(fmt::format("Can not set voxel value to empty img <{}>", m_info.toString()));
     }
     if (idx < voxelNumber()) {
       IMG_TYPED_CALL(setValue_Impl, m_info, value, idx)
     } else {
-      throw ZImgException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
+      throw ZException(fmt::format("value: Invalid voxel idx {} of img <{}>", idx, m_info.toString()));
     }
   }
 
-  // similar to setValue, instead of throw ZImgException in case of error, this function do nothing and return false
+  // similar to setValue, instead of throw ZException in case of error, this function do nothing and return false
   // return true if succeed
   template<typename TValue>
   bool setValueNoThrow(TValue value, const ZVoxelCoordinate& coord)

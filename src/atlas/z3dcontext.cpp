@@ -36,41 +36,41 @@ void checkEGLError()
   if (auto res = eglGetError(); res != EGL_SUCCESS) {
     switch (res) {
       case EGL_NOT_INITIALIZED:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "EGL is not initialized, or could not be initialized, for the specified EGL display connection.");
       case EGL_BAD_ACCESS:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "EGL cannot access a requested resource (for example a context is bound in another thread).");
       case EGL_BAD_ALLOC:
-        throw nim::ZGLException("EGL failed to allocate resources for the requested operation.");
+        throw nim::ZException("EGL failed to allocate resources for the requested operation.");
       case EGL_BAD_ATTRIBUTE:
-        throw nim::ZGLException("An unrecognized attribute or attribute value was passed in the attribute list.");
+        throw nim::ZException("An unrecognized attribute or attribute value was passed in the attribute list.");
       case EGL_BAD_CONTEXT:
-        throw nim::ZGLException("An EGLContext argument does not name a valid EGL rendering context.");
+        throw nim::ZException("An EGLContext argument does not name a valid EGL rendering context.");
       case EGL_BAD_CONFIG:
-        throw nim::ZGLException("An EGLConfig argument does not name a valid EGL frame buffer configuration.");
+        throw nim::ZException("An EGLConfig argument does not name a valid EGL frame buffer configuration.");
       case EGL_BAD_CURRENT_SURFACE:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "The current surface of the calling thread is a window, pixel buffer or pixmap that is no longer valid.");
       case EGL_BAD_DISPLAY:
-        throw nim::ZGLException("An EGLDisplay argument does not name a valid EGL display connection.");
+        throw nim::ZException("An EGLDisplay argument does not name a valid EGL display connection.");
       case EGL_BAD_SURFACE:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "An EGLSurface argument does not name a valid surface (window, pixel buffer or pixmap) configured for GL rendering.");
       case EGL_BAD_MATCH:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "Arguments are inconsistent (for example, a valid context requires buffers not supplied by a valid surface).");
       case EGL_BAD_PARAMETER:
-        throw nim::ZGLException("One or more argument values are invalid.");
+        throw nim::ZException("One or more argument values are invalid.");
       case EGL_BAD_NATIVE_PIXMAP:
-        throw nim::ZGLException("A NativePixmapType argument does not refer to a valid native pixmap.");
+        throw nim::ZException("A NativePixmapType argument does not refer to a valid native pixmap.");
       case EGL_BAD_NATIVE_WINDOW:
-        throw nim::ZGLException("A NativeWindowType argument does not refer to a valid native window.");
+        throw nim::ZException("A NativeWindowType argument does not refer to a valid native window.");
       case EGL_CONTEXT_LOST:
-        throw nim::ZGLException(
+        throw nim::ZException(
           "A power management event has occurred. The application must destroy all contexts and reinitialise OpenGL ES state and objects to continue rendering.");
       default:
-        throw nim::ZGLException("impossible egl error value");
+        throw nim::ZException("impossible egl error value");
     }
   }
 }
@@ -108,7 +108,7 @@ Z3DContext::Z3DContext()
   checkEGLError();
   LOG(INFO) << "Detected " << numDevices << " EGL devices";
   if (static_cast<EGLint>(FLAGS_use_gpu_device) >= numDevices) {
-    throw ZGLException(fmt::format("Specified GPU device {} is not available", FLAGS_use_gpu_device));
+    throw ZException(fmt::format("Specified GPU device {} is not available", FLAGS_use_gpu_device));
     LOG(ERROR) << "Sepcified GPU device " << FLAGS_use_gpu_device << " is not available";
   }
   LOG(INFO) << "Use EGL Device " << FLAGS_use_gpu_device;
@@ -118,13 +118,13 @@ Z3DContext::Z3DContext()
   m_eglDisplay = eglGetPlatformDisplay(EGL_PLATFORM_DEVICE_EXT, eglDevs[FLAGS_use_gpu_device], nullptr);
   if (m_eglDisplay == EGL_NO_DISPLAY) {
     checkEGLError();
-    throw ZGLException("can not create EGL display");
+    throw ZException("can not create EGL display");
   }
   EGLint major, minor;
   auto res = eglInitialize(m_eglDisplay, &major, &minor);
   if (res == EGL_FALSE) {
     checkEGLError();
-    throw ZGLException("can not initialize EGL");
+    throw ZException("can not initialize EGL");
   }
   LOG(INFO) << "EGL " << major << "." << minor;
 
@@ -134,21 +134,21 @@ Z3DContext::Z3DContext()
   res = eglChooseConfig(m_eglDisplay, configAttribs, &eglCfg, 1, &numConfigs);
   if (res == EGL_FALSE) {
     checkEGLError();
-    throw ZGLException("EGL can not choose config");
+    throw ZException("EGL can not choose config");
   }
 
   // 4. Bind the API
   res = eglBindAPI(EGL_OPENGL_API);
   if (res == EGL_FALSE) {
     checkEGLError();
-    throw ZGLException("EGL can not bind API");
+    throw ZException("EGL can not bind API");
   }
 
   // 5. Create a context
   m_eglContext = eglCreateContext(m_eglDisplay, eglCfg, EGL_NO_CONTEXT, NULL);
   if (m_eglContext == EGL_NO_CONTEXT) {
     checkEGLError();
-    throw ZGLException("can not create EGL context");
+    throw ZException("can not create EGL context");
   }
 }
 #endif

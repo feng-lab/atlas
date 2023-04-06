@@ -11,7 +11,7 @@ template<typename TVoxel>
 TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const ZImg& imgIn, size_t c, size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
-    throw ZImgException("input img voxel type doesnot match provided type");
+    throw ZException("input img voxel type doesnot match provided type");
   }
 
   size_t conn = 18;
@@ -116,10 +116,10 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedTriangleThre(const QString& filen
 {
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
-    throw ZImgException("input scene incorrect");
+    throw ZException("input scene incorrect");
   }
   if (!infos[scene].isType<TVoxel>()) {
-    throw ZImgException("input img voxel type doesnot match provided type");
+    throw ZException("input img voxel type doesnot match provided type");
   }
 
   size_t conn = 18;
@@ -254,10 +254,10 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
 {
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {
-    throw ZImgException("input scene incorrect");
+    throw ZException("input scene incorrect");
   }
   //  if (!infos[scene].isType<uint8_t>()) {
-  //    throw ZImgException("input img voxel type is not uint8_t");
+  //    throw ZException("input img voxel type is not uint8_t");
   //  }
 
   size_t conn = 18;
@@ -393,7 +393,7 @@ TVoxel ZImgAutoThreshold<ReportProgress>::typedCentroidThre(double& cent1,
                                                             size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
-    throw ZImgException("input img voxel type doesnot match provided type");
+    throw ZException("input img voxel type doesnot match provided type");
   }
 
   ZImg img = imgIn.createView(c, t);
@@ -462,7 +462,7 @@ template<typename TVoxel>
 TVoxel ZImgAutoThreshold<ReportProgress>::typedMaxHistThre(const ZImg& imgIn, size_t c, size_t t)
 {
   if (!imgIn.isType<TVoxel>()) {
-    throw ZImgException("input img voxel type doesnot match provided type");
+    throw ZException("input img voxel type doesnot match provided type");
   }
 
   ZImg img = imgIn.createView(c, t);

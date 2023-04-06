@@ -12,7 +12,7 @@ ZImg ZImgRegionalExtrema<ReportProgress>::regionalExtrema(const ZImg& img, size_
   if (conn == 0) {
     conn = img.is2DImg() ? 8 : 26;
   } else if (conn != 4 && conn != 8 && conn != 6 && conn != 18 && conn != 26) {
-    throw ZImgException(QString("invalid conn input: %1").arg(conn));
+    throw ZException(QString("invalid conn input: %1").arg(conn));
   }
   if (img.is2DImg() && conn != 4 && conn != 8) {
     if (conn == 6) {

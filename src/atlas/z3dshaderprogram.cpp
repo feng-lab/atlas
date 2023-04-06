@@ -12,7 +12,7 @@ Z3DShaderProgram::Z3DShaderProgram()
 {
   m_id = glCreateProgram();
   if (!m_id) {
-    throw ZGLException("Z3DShaderProgram: Could not create shader program");
+    throw ZException("Z3DShaderProgram: Could not create shader program");
   }
 }
 
@@ -27,8 +27,7 @@ void Z3DShaderProgram::addShader(Z3DShader& shader)
     return;
   }
   if (m_context != shader.context()) {
-    throw ZGLException(
-      "Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
+    throw ZException("Z3DShaderProgram: Add shader failed as program and shader are not associated with same context");
   }
   glAttachShader(m_id, shader.shaderId());
   m_linked = false;
@@ -90,7 +89,7 @@ void Z3DShaderProgram::link()
     } else {
       log = "failed";
     }
-    throw ZGLException(QString("Z3DShaderProgram::Link: %1").arg(log));
+    throw ZException(QString("Z3DShaderProgram::Link: %1").arg(log));
   }
 }
 
