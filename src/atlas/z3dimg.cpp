@@ -474,6 +474,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   auto numAvailablePageCacheBlock =
     index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageTableKeys.size());
   CHECK(numAvailablePageCacheBlock >= 0);
+
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
       break;
