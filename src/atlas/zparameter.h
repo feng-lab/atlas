@@ -218,6 +218,7 @@ ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, const T& va
 template<class T>
 ZSingleValueParameter<T>::ZSingleValueParameter(const QString& name, QObject* parent)
   : ZParameter(name, parent)
+  , m_value{}
 {}
 
 template<class T>
