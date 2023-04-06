@@ -2,6 +2,7 @@
 
 #include "zglobal.h"
 #include "zjson.h"
+#include "zlog.h"
 
 namespace nim {
 
@@ -97,8 +98,6 @@ enum class VoxelSizeUnit
 };
 
 double unitSizeInMeter(VoxelSizeUnit vsu);
-
-#pragma pack(push, 1)
 
 struct col4
 {
@@ -216,12 +215,34 @@ struct col4
   // access
   inline value_type& operator[](size_t i)
   {
-    return (&r)[i];
+    switch (i) {
+      case 0:
+        return r;
+      case 1:
+        return g;
+      case 2:
+        return b;
+      case 3:
+        return a;
+      default:
+        CHECK(false);
+    }
   }
 
   inline const value_type& operator[](size_t i) const
   {
-    return (&r)[i];
+    switch (i) {
+      case 0:
+        return r;
+      case 1:
+        return g;
+      case 2:
+        return b;
+      case 3:
+        return a;
+      default:
+        CHECK(false);
+    }
   }
 
   [[nodiscard]] inline QString toQString() const
@@ -256,8 +277,6 @@ struct Location
 
   double x, y, z;
 };
-
-#pragma pack(pop)
 
 enum class FileFormat
 {
