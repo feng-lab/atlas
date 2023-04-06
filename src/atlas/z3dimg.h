@@ -167,6 +167,14 @@ protected:
 
   void checkPageSystemError();
 
+  // return image block cache position
+  glm::uvec3 insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4* pageTableEntry);
+
+  // return number of empty (all zero) image blocks
+  int readAndUploadImageBlocks(size_t c,
+                               const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                               const folly::CancellationToken& cancellationToken);
+
 protected:
   glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
