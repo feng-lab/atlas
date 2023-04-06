@@ -475,10 +475,13 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageTableKeys.size());
   CHECK(numAvailablePageCacheBlock >= 0);
 
+  LOG(INFO) << "1";
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
       break;
     }
+
+    LOG(INFO) << "1";
 
     size_t level = 0;
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
@@ -502,6 +505,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                                   pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
     glm::uvec3 pageTableEntryCoord;
 
+    LOG(INFO) << "1";
+
     if (pageDirectoryEntry.w > 0) {
       pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
       if (m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
@@ -519,12 +524,17 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     }
 
+    LOG(INFO) << "1";
+
     glm::uvec4* pageTableEntry = nullptr;
     if (pageDirectoryEntry.w == 0) { // page directory unmapped
       if (numAvailablePageCacheBlock > 0) { // construct new page table block
+        LOG(INFO) << "1";
         glm::uvec3 pageTableBlockCachePos =
           m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
+        LOG(INFO) << "1";
         pageDirectoryEntry = glm::uvec4(pageTableBlockCachePos, 1);
+        LOG(INFO) << "1";
 
         if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
           for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
@@ -546,6 +556,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                                         erasedKeyPageDirectoryEntryCoord.x];
           erasedKeyPageDirectoryEntry.w = 0;
         }
+        LOG(INFO) << "1";
 
         pageTableEntryCoord = pageDirectoryEntry.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
         pageTableEntry =
@@ -553,22 +564,28 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                                        pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
 
         --numAvailablePageCacheBlock;
+        LOG(INFO) << "1";
       } else {
         LOG(ERROR) << "no space for new page table block, skip current image block";
         continue;
       }
     } else { // page directory mapped
+      LOG(INFO) << "1";
       CHECK(pageDirectoryEntry.w > 0);
       pageTableEntry =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
       ++pageDirectoryEntry.w;
+      LOG(INFO) << "1";
     }
     CHECK(pageTableEntry);
 
+    LOG(INFO) << "1";
     pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntry));
     ++count;
+    LOG(INFO) << "1";
   }
+  LOG(INFO) << "1";
 
   //  for (size_t i = 0; i < pendingTasks.size(); ++i) {
   //    const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);

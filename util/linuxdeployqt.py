@@ -254,8 +254,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
         if details['type'] == 'lib':
             src = details['realpath']
             if details['so'].startswith('libstdc++.so') or details['so'].startswith('libgcc_s.so') or \
-                    details['so'].startswith('libicudata.so') or details['so'].startswith('libicui18n.so') or \
-                    details['so'].startswith('libicuuc.so') or details['so'].startswith('libatomic.so') or \
+                    details['so'].startswith('libatomic.so') or \
                     (not src.startswith('/usr/lib/') and not src.startswith('/lib/')):
                 dst = dest_dir + os.sep + appdir_libs + os.sep + dep
                 debug("Copying library " + dep + ": " + src + ' -> ' + dst)
