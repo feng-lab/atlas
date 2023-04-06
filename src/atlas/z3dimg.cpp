@@ -465,11 +465,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   }
 
   if (cancellationToken.canBeCancelled()) {
-    QCoreApplication::processEvents();
-  }
-  if (cancellationToken.isCancellationRequested()) {
-    LOG(INFO) << "cancel here";
-    throw ZGLException("cancel");
+    if (!cancellationToken.isCancellationRequested()) {
+      QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+    }
+    if (cancellationToken.isCancellationRequested()) {
+      throw ZGLException("cancel");
+    }
   }
 
   std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*,
@@ -597,11 +598,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     });
 
     if (cancellationToken.canBeCancelled()) {
-      QCoreApplication::processEvents();
-    }
-    if (cancellationToken.isCancellationRequested()) {
-      LOG(INFO) << "cancel here";
-      throw ZGLException("cancel");
+      if (!cancellationToken.isCancellationRequested()) {
+        QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+      }
+      if (cancellationToken.isCancellationRequested()) {
+        throw ZGLException("cancel");
+      }
     }
 
     LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
@@ -638,11 +640,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
     if (!pboPtr) {
       if (cancellationToken.canBeCancelled()) {
-        QCoreApplication::processEvents();
-      }
-      if (cancellationToken.isCancellationRequested()) {
-        LOG(INFO) << "cancel here";
-        throw ZGLException("cancel");
+        if (!cancellationToken.isCancellationRequested()) {
+          QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
+        if (cancellationToken.isCancellationRequested()) {
+          throw ZGLException("cancel");
+        }
       }
 
       folly::UMPSCQueue<std::tuple<size_t, std::shared_ptr<ZImg>>, true> imgQueue;
@@ -679,11 +682,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       });
 
       if (cancellationToken.canBeCancelled()) {
-        QCoreApplication::processEvents();
-      }
-      if (cancellationToken.isCancellationRequested()) {
-        LOG(INFO) << "cancel here";
-        throw ZGLException("cancel");
+        if (!cancellationToken.isCancellationRequested()) {
+          QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+        }
+        if (cancellationToken.isCancellationRequested()) {
+          throw ZGLException("cancel");
+        }
       }
 
       std::tuple<size_t, std::shared_ptr<ZImg>> elem;
@@ -691,12 +695,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       int remainingBlocksToUpload = static_cast<int>(pendingTasks.size());
       while (remainingBlocksToUpload > 0) {
         if (cancellationToken.canBeCancelled()) {
-          QCoreApplication::processEvents();
+          if (!cancellationToken.isCancellationRequested()) {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          }
+          if (cancellationToken.isCancellationRequested()) {
+            throw ZGLException("cancel");
+          }
         }
-        if (cancellationToken.isCancellationRequested()) {
-          LOG(INFO) << "cancel here";
-          throw ZGLException("cancel");
-        }
+
         if (imgQueue.try_dequeue_until(
               elem,
               std::chrono::steady_clock::now() +
@@ -761,111 +767,119 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     } else {
       // use PBO
-      if (cancellationToken.canBeCancelled()) {
-        QCoreApplication::processEvents();
-      }
-      if (cancellationToken.isCancellationRequested()) {
-        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-        LOG(INFO) << "cancel here";
-        throw ZGLException("cancel");
-      }
-
       boost::dynamic_bitset blockIsEmpty(pendingTasks.size(), 0);
 
-      int batchSize = FLAGS_atlas_batch_size_of_block_uploading;
-      if (batchSize <= 0) {
-        batchSize = pendingTasks.size();
-      }
-
-      int taskIdx = 0;
-      while (taskIdx < static_cast<int>(pendingTasks.size())) {
-        if (cancellationToken.canBeCancelled()) {
-          QCoreApplication::processEvents();
-        }
-        if (cancellationToken.isCancellationRequested()) {
+      {
+        // scope for glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+        auto bufferGuard = folly::makeGuard([]() {
           glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-          LOG(INFO) << "cancel here";
-          throw ZGLException("cancel");
-        }
-        int numberOfTasks = std::min(batchSize, static_cast<int>(pendingTasks.size()) - taskIdx);
-        std::vector<folly::Future<folly::Unit>> blockFutures;
-        blockFutures.reserve(numberOfTasks);
-        int finalTaskIdx = taskIdx + numberOfTasks;
-        for (; taskIdx < finalTaskIdx; ++taskIdx) {
-          const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
-          glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
-          blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty]() {
-            return m_imgPack
-              .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                               m_levelScales[blockImagePos.x].z,
-                               index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                               index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                               index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
-                               c,
-                               0,
-                               resInfo,
-                               m_channelDisplayRanges[c].x,
-                               m_channelDisplayRanges[c].y,
-                               cancellationToken)
-              .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](std::shared_ptr<ZImg>&& img) {
-                if (cancellationToken.isCancellationRequested()) {
-                  throw ZGLException("cancel");
-                }
-                if (!img) {
-                  blockIsEmpty.set(taskIdx);
-                } else {
-                  memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
-                }
-              });
-          }));
-        }
-        auto f = folly::collect(blockFutures).via(cpuExecutor).thenValueInline([=](auto&&) {
-          if (!cancellationToken.isCancellationRequested()) {
-            LOG(INFO) << fmt::format("finish block {}", taskIdx);
-          }
         });
 
-        while (
-          !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
-          if (cancellationToken.canBeCancelled()) {
-            QCoreApplication::processEvents();
+        if (cancellationToken.canBeCancelled()) {
+          if (!cancellationToken.isCancellationRequested()) {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
           }
           if (cancellationToken.isCancellationRequested()) {
-            glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-            LOG(INFO) << "cancel here";
             throw ZGLException("cancel");
           }
-
-          auto poolStats = p->getPoolStats();
-          LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
-                                   poolStats.pendingTaskCount,
-                                   poolStats.totalTaskCount,
-                                   poolStats.activeThreadCount,
-                                   poolStats.idleThreadCount);
         }
-      }
 
-      if (cancellationToken.canBeCancelled()) {
-        QCoreApplication::processEvents();
-      }
-      if (cancellationToken.isCancellationRequested()) {
-        glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-        LOG(INFO) << "cancel here";
-        throw ZGLException("cancel");
-      }
+        int batchSize = FLAGS_atlas_batch_size_of_block_uploading;
+        if (batchSize <= 0) {
+          batchSize = pendingTasks.size();
+        }
 
-      memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
-      LOG(INFO) << "image blocks reading finished.";
-      glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+        int taskIdx = 0;
+        while (taskIdx < static_cast<int>(pendingTasks.size())) {
+          if (cancellationToken.canBeCancelled()) {
+            if (!cancellationToken.isCancellationRequested()) {
+              QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            }
+            if (cancellationToken.isCancellationRequested()) {
+              throw ZGLException("cancel");
+            }
+          }
+
+          int numberOfTasks = std::min(batchSize, static_cast<int>(pendingTasks.size()) - taskIdx);
+          std::vector<folly::Future<folly::Unit>> blockFutures;
+          blockFutures.reserve(numberOfTasks);
+          int finalTaskIdx = taskIdx + numberOfTasks;
+          for (; taskIdx < finalTaskIdx; ++taskIdx) {
+            const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
+            glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+            blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty]() {
+              return m_imgPack
+                .readRegionToImg(m_levelScales[blockImagePos.x].x,
+                                 m_levelScales[blockImagePos.x].z,
+                                 index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                                 index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                                 index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                                 c,
+                                 0,
+                                 resInfo,
+                                 m_channelDisplayRanges[c].x,
+                                 m_channelDisplayRanges[c].y,
+                                 cancellationToken)
+                .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](std::shared_ptr<ZImg>&& img) {
+                  if (cancellationToken.isCancellationRequested()) {
+                    throw ZGLException("cancel");
+                  }
+                  if (!img) {
+                    blockIsEmpty.set(taskIdx);
+                  } else {
+                    memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
+                  }
+                });
+            }));
+          }
+          auto f = folly::collect(blockFutures).via(cpuExecutor).thenValueInline([=](auto&&) {
+            if (!cancellationToken.isCancellationRequested()) {
+              LOG(INFO) << fmt::format("finish block {}", taskIdx);
+            }
+          });
+
+          while (
+            !f.wait(std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds)).isReady()) {
+            if (cancellationToken.canBeCancelled()) {
+              if (!cancellationToken.isCancellationRequested()) {
+                QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+              }
+              if (cancellationToken.isCancellationRequested()) {
+                throw ZGLException("cancel");
+              }
+            }
+
+            auto poolStats = p->getPoolStats();
+            LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
+                                     poolStats.pendingTaskCount,
+                                     poolStats.totalTaskCount,
+                                     poolStats.activeThreadCount,
+                                     poolStats.idleThreadCount);
+          }
+        }
+
+        if (cancellationToken.canBeCancelled()) {
+          if (!cancellationToken.isCancellationRequested()) {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          }
+          if (cancellationToken.isCancellationRequested()) {
+            throw ZGLException("cancel");
+          }
+        }
+
+        memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
+        LOG(INFO) << "image blocks reading finished.";
+      }
 
       ZBenchTimer bt_pboUpload("PBO uploading");
       for (size_t i = 0; i < pendingTasks.size(); ++i) {
         if (cancellationToken.canBeCancelled()) {
-          QCoreApplication::processEvents();
-        }
-        if (cancellationToken.isCancellationRequested()) {
-          LOG(INFO) << "cancel here";
-          throw ZGLException("cancel");
+          if (!cancellationToken.isCancellationRequested()) {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+          }
+          if (cancellationToken.isCancellationRequested()) {
+            throw ZGLException("cancel");
+          }
         }
 
         if (blockIsEmpty.at(i)) {
