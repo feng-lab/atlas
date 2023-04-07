@@ -25,6 +25,10 @@ void ZLogCache::send(LogSeverity severity,
     if (m_unsendLogDataStart > 0) {
       --m_unsendLogDataStart;
     }
+    ++m_logCounter;
+    if (m_logCounter % 100000 == 0) {
+      m_logDatas.shrink_to_fit();
+    }
   }
   m_logDatas
     .emplace_back(severity, full_filename, base_filename, line, logmsgtime.tm(), message, message_len, prefix_len);

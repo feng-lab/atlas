@@ -64,6 +64,7 @@ private:
   size_t m_maxNumItems;
   QTimer* m_timer;
   size_t m_unsendLogDataStart = 0;
+  size_t m_logCounter = 0;
 };
 
 } // namespace nim
