@@ -445,6 +445,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
+      LOG(INFO) << "no space for new image block, skip the remaining image blocks";
       break;
     }
 
@@ -505,31 +506,32 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {
     if (count >= numBlocksToRead) {
+      LOG(INFO) << "no space for new image block, skip the remaining image blocks";
       break;
     }
 
-    // page table not mapped
-    if (numAvailablePageCacheBlock > 0) {
-      // construct new page table block
-      LOG(INFO) << "1";
-      insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
-      // after insertion, pageDirectoryEntryPtr->w will be 1 as 1 upload task will be in pendingTasks
-      LOG(INFO) << "1";
-
-      // now we have the updated pageDirectoryEntryPtr contains info about the new page table block
-      auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
-      auto pageTableEntryPtr =
-        &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                                     pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-
-      --numAvailablePageCacheBlock;
-
-      pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
-      ++count;
+    if (pageDirectoryEntryPtr->w > 0) {
+      // page table mapped in this for loop by earlier blocks, but image block is not mapped, will add a pendingTask
+      ++pageDirectoryEntryPtr->w;
     } else {
-      LOG(ERROR) << "no space for new page table block, skip the remaining image blocks";
-      break;
+      // pageDirectoryEntryPtr->w == 0, page table not mapped
+      if (numAvailablePageCacheBlock > 0) {
+        // we still have space, construct new page table block
+        insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
+        // after insertion, pageDirectoryEntryPtr->w == 1, will add a pendingTask
+        --numAvailablePageCacheBlock;
+      } else {
+        LOG(INFO) << "no space for new page table block, skip the current image block";
+        continue; // later image block in pendingBlocks might already be mapped so continue to process
+      }
     }
+
+    auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
+    auto pageTableEntryPtr =
+      &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                                   pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+    pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+    ++count;
   }
   clearAndDeallocate(pendingBlocks);
   LOG(INFO) << "1";
