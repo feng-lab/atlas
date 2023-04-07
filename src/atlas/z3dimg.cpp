@@ -491,6 +491,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // increase pageDirectoryEntryRef now, upload image blocks and update page table block later in pendingTasks
       ++pageDirectoryEntryRef.w;
       pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+      ++count;
     } else {
       // pageDirectoryEntryRef.w == 0, page table not mapped
       pendingBlocks.push_back(std::make_tuple(pageDirectoryEntryKey, &pageDirectoryEntryRef, pageTableEntryKey));
@@ -503,6 +504,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   clearAndDeallocate(usedPageDirectoryEntryKeys);
 
   for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {
+    if (count >= numBlocksToRead) {
+      break;
+    }
+
     // page table not mapped
     if (numAvailablePageCacheBlock > 0) {
       // construct new page table block
@@ -520,13 +525,13 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       --numAvailablePageCacheBlock;
 
       pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+      ++count;
     } else {
       LOG(ERROR) << "no space for new page table block, skip the remaining image blocks";
       break;
     }
   }
   clearAndDeallocate(pendingBlocks);
-  count += pendingTasks.size();
   LOG(INFO) << "1";
 
   //  for (size_t i = 0; i < pendingTasks.size(); ++i) {
