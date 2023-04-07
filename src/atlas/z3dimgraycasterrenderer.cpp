@@ -482,7 +482,6 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vect
 
     // render block ids
     std::vector<uint32_t> missingBlockIDs;
-    std::vector<uint32_t> usedBlockIDs;
     tbb::concurrent_unordered_set<uint32_t> ccSet;
 
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -506,30 +505,16 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vect
                         });
 
       ccSet.unsafe_erase(0_u32);
+      ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
       missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
       ccSet.clear();
-
-      //          m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER,
-      //                                                                                            GL_UNSIGNED_INT,
-      //                                                                                            m_blockIDs.data());
-      //          tbb::parallel_for(
-      //            tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-      //            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-      //              ccSet.insert(range.begin(), range.end()); // inserts a sequence
-      //            }
-      //          );
-      //          ccSet.unsafe_erase(0_u32);
-      //          usedBlockIDs.insert(ccSet.begin(), ccSet.end());
-      //          ccSet.clear();
     }
 
     m_image3DSliceWithTransferfunBlockIDsShader.release();
     // glFinish();
     STOP_AND_LOG(bt)
 
-    LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
-
-    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancellationToken);
+    m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
 
     bt.resetAndStart("render image3d slice");
     // render channels one by one
@@ -844,7 +829,6 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       }
 
       std::vector<uint32_t> missingBlockIDs;
-      std::vector<uint32_t> usedBlockIDs;
 
       ccSet.unsafe_erase(0_u32);
       ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
@@ -865,7 +849,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       processEventsAndMaybeCancel(cancellationToken);
 
       lastRound =
-        m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, c, cancellationToken) && lastRound;
+        m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
 
       processEventsAndMaybeCancel(cancellationToken);
 

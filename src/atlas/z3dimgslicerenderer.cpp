@@ -160,7 +160,6 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
       // render block ids
       std::vector<uint32_t> missingBlockIDs;
-      std::vector<uint32_t> usedBlockIDs;
       tbb::concurrent_unordered_set<uint32_t> ccSet;
 
       const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
@@ -184,30 +183,16 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
                           });
 
         ccSet.unsafe_erase(0_u32);
+        ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
         missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
         ccSet.clear();
-
-        //      m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->downloadTextureToBuffer(GL_RGBA_INTEGER,
-        //                                                                                        GL_UNSIGNED_INT,
-        //                                                                                        m_blockIDs.data());
-        //      tbb::parallel_for(
-        //        tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-        //        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-        //          ccSet.insert(range.begin(), range.end()); // inserts a sequence
-        //        }
-        //      );
-        //      ccSet.unsafe_erase(0_u32);
-        //      usedBlockIDs.insert(ccSet.begin(), ccSet.end());
-        //      ccSet.clear();
       }
 
       m_image3DSliceWithColorMapBlockIDsShader.release();
       // glFinish();
       STOP_AND_LOG(bt)
 
-      LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
-
-      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, usedBlockIDs, i, cancellationToken);
+      m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, i, cancellationToken);
 
       bt.resetAndStart("render image3d slice");
       // render channels one by one

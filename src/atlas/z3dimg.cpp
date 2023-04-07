@@ -414,73 +414,39 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 }
 
 bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
-                                                const std::vector<uint32_t>& usedBlockIDs,
                                                 size_t c,
-                                                const folly::CancellationToken& cancellationToken,
-                                                bool silenceExistingWarning)
+                                                const folly::CancellationToken& cancellationToken)
 {
   if (missingBlockIDs.empty()) {
     LOG(INFO) << "no missing blocks";
     return true;
   }
-  auto numBlocksToRead = int(m_channelImageCacheManagers[c]->size()) - int(usedBlockIDs.size());
-  if (silenceExistingWarning) {
-    CHECK(usedBlockIDs.empty());
-    LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " need " << missingBlockIDs.size();
-  } else {
-    LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " reuse " << usedBlockIDs.size() << " missing "
-              << missingBlockIDs.size() << " will upload " << std::min<int>(missingBlockIDs.size(), numBlocksToRead);
-  }
-  if (numBlocksToRead <= 0) {
-    LOG(INFO) << "not reading because of full image cache";
-    return false;
-  }
+  auto numBlocksToRead = m_channelImageCacheManagers[c]->size();
+  LOG(INFO) << "total " << m_channelImageCacheManagers[c]->size() << " need " << missingBlockIDs.size();
+  CHECK(numBlocksToRead > 0);
 
   ZBenchTimer bt("update page table");
 
   checkPageSystemError();
 
-  std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageTableKeys;
-  for (auto blockID : usedBlockIDs) { // blockID must be ordered, can not use unordered_set here
-    size_t level = 0;
-    while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
-      ++level;
-    }
-    CHECK(level + 1 < m_numLevels);
-
-    blockID -= m_posToBlockIDs[level].w;
-    auto z = blockID / m_posToBlockIDs[level].z;
-    blockID -= z * m_posToBlockIDs[level].z;
-    auto y = blockID / m_posToBlockIDs[level].y;
-    blockID -= y * m_posToBlockIDs[level].y;
-    glm::uvec4 blockKey(level, blockID, y, z);
-    if (!glm::all(glm::lessThan(blockKey.yzw(), m_pageTableDimensions[level]))) {
-      LOG(FATAL) << blockID << " " << blockKey << " " << m_pageTableDimensions[level];
-    }
-    usedPageTableKeys.insert(blockKey / glm::uvec4(1, m_pageTableBlockSize));
-    m_channelImageCacheManagers[c]->touch(blockKey);
-  }
-  for (const auto& key : usedPageTableKeys) {
-    m_channelPageTableCacheManagers[c]->touch(key);
-  }
-
   processEventsAndMaybeCancel(cancellationToken);
 
-  std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*,
-  auto count = 0;
-  auto alreadyMapped = 0;
-  // level = 0;
-  auto numAvailablePageCacheBlock =
-    index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageTableKeys.size());
-  CHECK(numAvailablePageCacheBlock >= 0);
+  size_t count = 0;
+  size_t alreadyMapped = 0;
 
   LOG(INFO) << "1";
+  // pageDirectoryEntryKey, pageDirectoryEntry*, pageTableEntryKey
+  std::vector<std::tuple<glm::uvec4, glm::uvec4*, glm::uvec4>> pendingBlocks;
+  // go through all blocks and touch used blocks and collect pendingTasks if page table is already mapped (only need
+  // image block)
+  std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*
+  // used to make sure used page table block will not be swapped out
+  std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageDirectoryEntryKeys;
+
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
       break;
     }
-
-    LOG(INFO) << "1";
 
     size_t level = 0;
     while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
@@ -503,62 +469,64 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
                                   pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
 
-    LOG(INFO) << "1";
-
-    glm::uvec4* pageTableEntryPtr = nullptr;
-
     if (pageDirectoryEntryRef.w > 0) {
       // page table mapped
       auto pageTableEntryCoord = pageDirectoryEntryRef.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
-      pageTableEntryPtr =
+      auto pageTableEntryPtr =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
 
       if (pageTableEntryPtr->w != 0) {
         // image block already mapped
-        if (silenceExistingWarning) {
-          m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
-          m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
-          ++alreadyMapped;
-          ++count;
-        } else {
-          LOG(ERROR) << "missing block is already mapped! " << pageTableEntryKey << " " << pageDirectoryEntryKey;
-        }
+        m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
+        m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
+        usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
+        ++alreadyMapped;
+        ++count;
+
         continue; // skip current image block and go to next
       }
 
       // page table mapped but image block is not mapped
       // increase pageDirectoryEntryRef now, upload image blocks and update page table block later in pendingTasks
       ++pageDirectoryEntryRef.w;
+      pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
     } else {
       // pageDirectoryEntryRef.w == 0, page table not mapped
-      if (numAvailablePageCacheBlock > 0) {
-        // construct new page table block
-        LOG(INFO) << "1";
-        insertPageTableBlockToCache(c, pageDirectoryEntryKey, pageDirectoryEntryRef);
-        // after insertion, pageDirectoryEntryRef.w will be 1 as 1 upload task will be in pendingTasks
-        LOG(INFO) << "1";
-
-        // now we have the updated pageDirectoryEntryRef contains info about the new page table block
-        auto pageTableEntryCoord = pageDirectoryEntryRef.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
-        pageTableEntryPtr =
-          &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
-                                       pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-
-        --numAvailablePageCacheBlock;
-        LOG(INFO) << "1";
-      } else {
-        LOG(ERROR) << "no space for new page table block, skip current image block";
-        continue; // skip current image block and go to next
-      }
+      pendingBlocks.push_back(std::make_tuple(pageDirectoryEntryKey, &pageDirectoryEntryRef, pageTableEntryKey));
     }
-    CHECK(pageTableEntryPtr);
-
-    LOG(INFO) << "1";
-    pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
-    ++count;
-    LOG(INFO) << "1";
   }
+  LOG(INFO) << "1";
+
+  auto numAvailablePageCacheBlock =
+    index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageDirectoryEntryKeys.size());
+  clearAndDeallocate(usedPageDirectoryEntryKeys);
+
+  for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {
+    // page table not mapped
+    if (numAvailablePageCacheBlock > 0) {
+      // construct new page table block
+      LOG(INFO) << "1";
+      insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
+      // after insertion, pageDirectoryEntryPtr->w will be 1 as 1 upload task will be in pendingTasks
+      LOG(INFO) << "1";
+
+      // now we have the updated pageDirectoryEntryPtr contains info about the new page table block
+      auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
+      auto pageTableEntryPtr =
+        &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
+                                     pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
+
+      --numAvailablePageCacheBlock;
+
+      pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+    } else {
+      LOG(ERROR) << "no space for new page table block, skip the remaining image blocks";
+      break;
+    }
+  }
+  clearAndDeallocate(pendingBlocks);
+  count += pendingTasks.size();
   LOG(INFO) << "1";
 
   //  for (size_t i = 0; i < pendingTasks.size(); ++i) {
@@ -574,7 +542,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   //  }
 
   // read image
-  int emptyBlockCount = 0;
+  size_t emptyBlockCount = 0;
   if (!pendingTasks.empty()) {
     emptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
   }
@@ -588,7 +556,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   // checkPageSystemError();
 
-  return count == int(missingBlockIDs.size());
+  return count == missingBlockIDs.size();
 }
 
 // #define ATLAS_uploadImageCache_USE_MPMCQueue
@@ -734,11 +702,11 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
   }
 }
 
-int Z3DImg::readAndUploadImageBlocks(size_t c,
-                                     const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                                     const folly::CancellationToken& cancellationToken)
+size_t Z3DImg::readAndUploadImageBlocks(size_t c,
+                                        const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                        const folly::CancellationToken& cancellationToken)
 {
-  int emptyBlockCount = 0;
+  size_t emptyBlockCount = 0;
 
   ZBenchTimer bti(fmt::format("upload image ch{} cache", c));
 

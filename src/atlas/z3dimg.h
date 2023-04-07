@@ -153,10 +153,8 @@ public:
   void bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const;
 
   bool updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& missingBlockIDs,
-                                          const std::vector<uint32_t>& usedBlockIDs,
                                           size_t c,
-                                          const folly::CancellationToken& cancellationToken,
-                                          bool silenceExistingWarning = true);
+                                          const folly::CancellationToken& cancellationToken);
 
 Q_SIGNALS:
 
@@ -171,9 +169,9 @@ protected:
   void insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef);
 
   // return number of empty (all zero) image blocks
-  int readAndUploadImageBlocks(size_t c,
-                               const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                               const folly::CancellationToken& cancellationToken);
+  size_t readAndUploadImageBlocks(size_t c,
+                                  const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                  const folly::CancellationToken& cancellationToken);
 
   void checkPageSystemError();
 
