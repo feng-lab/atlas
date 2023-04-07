@@ -42,10 +42,8 @@ def build_atlas_package(use_asan: bool = False):
 
     if common_dirs.is_mac():
         app_name = 'Atlas.app'
-        zip_name = 'atlas-macOS.zip'
+
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), app_name), ignore_errors=True)
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
             shutil.copytree(os.path.join(binary_dir, app_name),
@@ -56,36 +54,26 @@ def build_atlas_package(use_asan: bool = False):
 
             subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
                             os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
-
-            subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
     elif common_dirs.is_linux():
         app_name = "Atlas"
-        zip_name = "atlas-Linux.zip"
+
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'), ignore_errors=True)
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir(),
                                         use_asan=use_asan)
-
-            subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, 'Atlas.AppDir'],
-                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
     else:
         app_name = 'Atlas.exe'
-        zip_name = 'atlas-Windows.zip'
+
         shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), ignore_errors=True)
-        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
-            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
 
         if os.path.exists(os.path.join(binary_dir, app_name)):
             os.mkdir(os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
@@ -113,14 +101,41 @@ def build_atlas_package(use_asan: bool = False):
             env = build_ext_libs.get_vcvars_environment()
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
-
-            shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
-                                'zip',
-                                root_dir=common_dirs.deploy_target_dir(),
-                                base_dir='Atlas')
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
+
+
+def pack_atlas_package():
+    if common_dirs.is_mac():
+        app_name = 'Atlas.app'
+        zip_name = 'atlas-macOS.zip'
+
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
+        subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
+                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    elif common_dirs.is_linux():
+        app_name = "'Atlas.AppDir"
+        zip_name = "atlas-Linux.zip"
+
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
+        subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
+                       cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+    else:
+        app_name = 'Atlas'
+        zip_name = 'atlas-Windows.zip'
+
+        if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
+            os.remove(os.path.join(common_dirs.deploy_target_dir(), zip_name))
+
+        shutil.make_archive(os.path.join(common_dirs.deploy_target_dir(), zip_name[0:-4]),
+                            'zip',
+                            root_dir=common_dirs.deploy_target_dir(),
+                            base_dir=app_name)
 
 
 def build_atlas_installer():
@@ -251,7 +266,9 @@ def build_atlas_installer():
 
 def deploy_atlas(use_asan: bool = False):
     build_atlas_package(use_asan=use_asan)
-    build_atlas_installer()
+    if not use_asan:
+        pack_atlas_package()
+        build_atlas_installer()
 
 
 if __name__ == "__main__":
