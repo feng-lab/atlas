@@ -278,25 +278,25 @@ void ZCpuInfo::detectCpuInfo()
 
   // load bitset with flags for function 0x00000001
   if (nIds >= 1) {
-    f_1_EAX = data[1][0];
-    f_1_EBX = data[1][1];
-    f_1_ECX = data[1][2];
-    f_1_EDX = data[1][3];
+    f_1_EAX = static_cast<uint64_t>(data[1][0]);
+    f_1_EBX = static_cast<uint64_t>(data[1][1]);
+    f_1_ECX = static_cast<uint64_t>(data[1][2]);
+    f_1_EDX = static_cast<uint64_t>(data[1][3]);
   }
 
   // load bitset with flags for function 0x00000007
   if (nIds >= 7) {
-    f_7_EBX = data[7][1];
-    f_7_ECX = data[7][2];
+    f_7_EBX = static_cast<uint64_t>(data[7][1]);
+    f_7_ECX = static_cast<uint64_t>(data[7][2]);
   }
 
   // Calling __cpuid with 0x80000000 as the function_id argument
   // gets the number of the highest valid extended ID.
-  cpuid(cpui.data(), 0x80000000);
-  nExIds = cpui[0];
+  cpuid(cpui.data(), static_cast<int32_t>(0x80000000));
+  nExIds = static_cast<uint32_t>(cpui[0]);
 
   for (uint32_t i = 0x80000000; i <= nExIds; ++i) {
-    cpuidex(cpui.data(), i, 0);
+    cpuidex(cpui.data(), static_cast<int32_t>(i), 0);
     extdata.push_back(cpui);
   }
 

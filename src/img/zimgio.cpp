@@ -334,25 +334,26 @@ void ZImgIO::readInfos(const QStringList& fileList,
       for (size_t s = 1; s < res.size(); ++s) {
         // check whether type match
         if (!res[s].isSameType(res[0])) {
-          throw ZIOException(QString("Read sequence failed: image type don't match, can not cat Img <%1> to Img 0 <%2>")
-                               .arg(res[s].toQString())
-                               .arg(res[0].toQString()));
+          throw ZIOException(
+            fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
+                        res[s].toString(),
+                        res[0].toString()));
         }
         // check whether dimension size match
         for (auto dim : res[0].dimensions()) {
           if (expandXY) {
             if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
               throw ZIOException(
-                QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                  .arg(res[s].toQString())
-                  .arg(res[0].toQString()));
+                fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                            res[s].toString(),
+                            res[0].toString()));
             }
           } else {
             if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
               throw ZIOException(
-                QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                  .arg(res[s].toQString())
-                  .arg(res[0].toQString()));
+                fmt::format("Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                            res[s].toString(),
+                            res[0].toString()));
             }
           }
           if (dim == catDim) {
