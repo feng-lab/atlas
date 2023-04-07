@@ -522,7 +522,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         --numAvailablePageCacheBlock;
       } else {
         LOG(INFO) << "no space for new page table block, skip the current image block";
-        continue; // later image block in pendingBlocks might already be mapped so continue to process
+        continue; // later image block in pendingBlocks might already have mapped page table so continue to process
       }
     }
 

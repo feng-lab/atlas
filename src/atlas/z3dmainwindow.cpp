@@ -605,9 +605,11 @@ QWidget* Z3DMainWindow::createHelpWidget()
 
 void Z3DMainWindow::onProgressChanged(int v)
 {
-  if (v == 100 && m_progressBarAction->isVisible()) {
-    m_progressBarAction->setVisible(false);
-    m_cancelAction->setVisible(false);
+  if (v == 100) {
+    if (m_progressBarAction->isVisible()) {
+      m_progressBarAction->setVisible(false);
+      m_cancelAction->setVisible(false);
+    }
   } else {
     if (!m_progressBarAction->isVisible()) {
       m_progressBarAction->setVisible(true);
