@@ -10,7 +10,7 @@
 
 namespace nim {
 
-// multi-dimensional coordinate of a voxel, its value_type is a signed integer type
+// multidimensional coordinate of a voxel, its value_type is a signed integer type
 
 struct ZVoxelCoordinate
 {
@@ -84,12 +84,12 @@ struct ZVoxelCoordinate
     t = tin;
   }
 
-  [[nodiscard]] inline constexpr size_t size() const
+  [[nodiscard]] static inline constexpr size_t size()
   {
     return 5;
   }
 
-  [[nodiscard]] inline constexpr size_t length() const
+  [[nodiscard]] static inline constexpr size_t length()
   {
     return 5;
   }
@@ -279,7 +279,7 @@ struct ZVoxelCoordinate
 
   inline ZVoxelCoordinate operator-() const
   {
-    return ZVoxelCoordinate(-x, -y, -z, -c, -t);
+    return {-x, -y, -z, -c, -t};
   }
 
   inline ZVoxelCoordinate& operator*=(value_type rhs)
@@ -360,7 +360,7 @@ struct ZVoxelCoordinate
     value_type resz = ttsize[2] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[2] - 1);
     value_type resc = ttsize[3] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[3] - 1);
     value_type rest = ttsize[4] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[4] - 1);
-    return ZVoxelCoordinate(resx, resy, resz, resc, rest);
+    return {resx, resy, resz, resc, rest};
   }
 
   // return the last valid coord within size, ttsize[0] to ttsize[4] are the sizes of x to t
@@ -375,100 +375,92 @@ struct ZVoxelCoordinate
 // Binary arithmetic operators
 inline ZVoxelCoordinate operator+(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(a.x + b, a.y + b, a.z + b, a.c + b, a.t + b);
+  return {a.x + b, a.y + b, a.z + b, a.c + b, a.t + b};
 }
 
 inline ZVoxelCoordinate operator+(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(a.x + b, a.y + b, a.z + b, a.c + b, a.t + b);
+  return {a.x + b, a.y + b, a.z + b, a.c + b, a.t + b};
 }
 
 inline ZVoxelCoordinate operator+(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(a.x + b.x, a.y + b.y, a.z + b.z, a.c + b.c, a.t + b.t);
+  return {a.x + b.x, a.y + b.y, a.z + b.z, a.c + b.c, a.t + b.t};
 }
 
 inline ZVoxelCoordinate operator-(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(a.x - b, a.y - b, a.z - b, a.c - b, a.t - b);
+  return {a.x - b, a.y - b, a.z - b, a.c - b, a.t - b};
 }
 
 inline ZVoxelCoordinate operator-(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(b - a.x, b - a.y, b - a.z, b - a.c, b - a.t);
+  return {b - a.x, b - a.y, b - a.z, b - a.c, b - a.t};
 }
 
 inline ZVoxelCoordinate operator-(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(a.x - b.x, a.y - b.y, a.z - b.z, a.c - b.c, a.t - b.t);
+  return {a.x - b.x, a.y - b.y, a.z - b.z, a.c - b.c, a.t - b.t};
 }
 
 inline ZVoxelCoordinate operator*(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(a.x * b, a.y * b, a.z * b, a.c * b, a.t * b);
+  return {a.x * b, a.y * b, a.z * b, a.c * b, a.t * b};
 }
 
 inline ZVoxelCoordinate operator*(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(a.x * b, a.y * b, a.z * b, a.c * b, a.t * b);
+  return {a.x * b, a.y * b, a.z * b, a.c * b, a.t * b};
 }
 
 inline ZVoxelCoordinate operator*(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(a.x * b.x, a.y * b.y, a.z * b.z, a.c * b.c, a.t * b.t);
+  return {a.x * b.x, a.y * b.y, a.z * b.z, a.c * b.c, a.t * b.t};
 }
 
 inline ZVoxelCoordinate operator/(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(a.x / b, a.y / b, a.z / b, a.c / b, a.t / b);
+  return {a.x / b, a.y / b, a.z / b, a.c / b, a.t / b};
 }
 
 inline ZVoxelCoordinate operator/(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(b / a.x, b / a.y, b / a.z, b / a.c, b / a.t);
+  return {b / a.x, b / a.y, b / a.z, b / a.c, b / a.t};
 }
 
 inline ZVoxelCoordinate operator/(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(a.x / b.x, a.y / b.y, a.z / b.z, a.c / b.c, a.t / b.t);
+  return {a.x / b.x, a.y / b.y, a.z / b.z, a.c / b.c, a.t / b.t};
 }
 
 inline ZVoxelCoordinate max(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(std::max(a.x, b.x),
-                          std::max(a.y, b.y),
-                          std::max(a.z, b.z),
-                          std::max(a.c, b.c),
-                          std::max(a.t, b.t));
+  return {std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z), std::max(a.c, b.c), std::max(a.t, b.t)};
 }
 
 inline ZVoxelCoordinate max(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b));
+  return {std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b)};
 }
 
 inline ZVoxelCoordinate max(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b));
+  return {std::max(a.x, b), std::max(a.y, b), std::max(a.z, b), std::max(a.c, b), std::max(a.t, b)};
 }
 
 inline ZVoxelCoordinate min(const ZVoxelCoordinate& a, const ZVoxelCoordinate& b)
 {
-  return ZVoxelCoordinate(std::min(a.x, b.x),
-                          std::min(a.y, b.y),
-                          std::min(a.z, b.z),
-                          std::min(a.c, b.c),
-                          std::min(a.t, b.t));
+  return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.c, b.c), std::min(a.t, b.t)};
 }
 
 inline ZVoxelCoordinate min(const ZVoxelCoordinate& a, ZVoxelCoordinate::value_type b)
 {
-  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b));
+  return {std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b)};
 }
 
 inline ZVoxelCoordinate min(ZVoxelCoordinate::value_type b, const ZVoxelCoordinate& a)
 {
-  return ZVoxelCoordinate(std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b));
+  return {std::min(a.x, b), std::min(a.y, b), std::min(a.z, b), std::min(a.c, b), std::min(a.t, b)};
 }
 
 template<std::size_t Index>

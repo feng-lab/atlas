@@ -161,8 +161,11 @@ struct ZImgInfo
   // note: time stride is meaningless since the memory is not contiguous
   [[nodiscard]] inline size_t stride(Dimension dim) const
   {
-    size_t res = width;
+    size_t res = 1;
     auto ddim = to_underlying(dim);
+    if (ddim > 0) {
+      res = width;
+    }
     if (ddim > 1) {
       res *= height;
     }
@@ -177,7 +180,10 @@ struct ZImgInfo
 
   [[nodiscard]] inline size_t stride(size_t dim) const
   {
-    size_t res = width;
+    size_t res = 1;
+    if (dim > 0) {
+      res = width;
+    }
     if (dim > 1) {
       res *= height;
     }
