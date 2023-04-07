@@ -826,11 +826,11 @@ int Z3DImg::readAndUploadImageBlocks(size_t c,
             elem,
             std::chrono::steady_clock::now() +
               std::chrono::seconds(FLAGS_atlas_log_folly_global_executor_status_interval_in_seconds))) {
+        const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[std::get<0>(elem)];
         if (!std::get<1>(elem)) {
           ++emptyBlockCount;
-          *std::get<1>(pendingTasks[std::get<0>(elem)]) = glm::uvec4(0, 0, 0, m_emptyFlag);
+          *pageTableEntry = glm::uvec4(0, 0, 0, m_emptyFlag);
         } else {
-          const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[std::get<0>(elem)];
           insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntry);
           m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntry->xyz(),
                                                          imageBlockSize,

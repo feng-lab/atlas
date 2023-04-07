@@ -907,6 +907,7 @@ void Z3DRenderingEngine::render(bool stereo)
   catch (ZException& e) {
     LOG(INFO) << e.what();
   }
+  Q_EMIT progressChanged(100);
   m_globalParas->cancellationSource.reset();
 }
 

@@ -327,7 +327,6 @@ void Z3DCanvas::sceneParaUpdated()
 {
   // LOG(INFO) << "sceneParaUpdated";
   if (m_engine) {
-    // m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
 }
@@ -382,7 +381,6 @@ void Z3DCanvas::contextMenuEvent(QContextMenuEvent* e)
 void Z3DCanvas::mousePressEvent(QMouseEvent* e)
 {
   if (m_engine) {
-    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
@@ -423,7 +421,6 @@ void Z3DCanvas::keyPressEvent(QKeyEvent* e)
 {
   QGraphicsView::keyPressEvent(e);
   if (m_engine) {
-    m_engine->cancelLongRendering();
     QCoreApplication::postEvent(m_engine, e->clone());
   }
 }
