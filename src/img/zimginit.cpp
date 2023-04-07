@@ -51,12 +51,15 @@ void initImgLib(const char* argv0,
                 const QString& jdkDIR,
                 const QString& jarsDIR,
                 const QString& logFilename,
-                bool isApp)
+                bool isApp,
+                bool isGUIMode)
 {
   initLogging(argv0, logFilename);
 
   if (isApp) {
-    addLogSink(&ZLogCache::instance());
+    if (isGUIMode) {
+      addLogSink(&ZLogCache::instance());
+    }
     qInstallMessageHandler(myMessageOutput);
     LOG(INFO) << "--- App Log Start ---";
   }

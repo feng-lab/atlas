@@ -27,7 +27,7 @@ Z3DRendererBase::Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* pare
   , m_materialSpecular("Material Specular", glm::vec4(1.f, 1.f, 1.f, 1.f))
   , m_materialShininess("Material Shininess", 100.f, 1.f, 200.f)
   , m_hasCustomCamera(false)
-  , m_viewport(-1)
+  , m_viewport(0)
   , m_clipEnabled(true)
   , m_shaderHookType(ShaderHookType::Normal)
 {

@@ -99,11 +99,14 @@ int main(int argc, char* argv[])
     QDir logDir = nim::ZSystemInfo::logDir();
     nim::ZSystemInfo::removeOldLogs();
 
+    bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
     nim::initImgLib(argv[0],
                     nim::ZSystemInfo::resourcesDirPath(),
                     nim::ZSystemInfo::jdkDirPath(),
                     nim::ZSystemInfo::jarsDirPath(),
-                    logDir.filePath("atlas"));
+                    logDir.filePath("atlas"),
+                    true,
+                    isGUIMode);
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
       nim::shutdownImgLib();
     });
@@ -123,7 +126,16 @@ int main(int argc, char* argv[])
 
     // ZServiceManager sm;
 
-    if (FLAGS_run_benchmarks || FLAGS_run_export_3d_animation) {
+    if (isGUIMode) {
+      // start GUI version...
+      LOG(INFO) << "GUI mode";
+      nim::ZTheme::instance();
+
+      // ZMainWindow has Qt::WA_DeleteOnClose attribute
+      auto mainWin = new nim::ZMainWindow(GIT_VERSION);
+      QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
+      mainWin->show();
+    } else {
       // start non-GUI version...
       try {
         LOG(INFO) << "console mode";
@@ -142,15 +154,6 @@ int main(int argc, char* argv[])
         LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
         return 1;
       }
-    } else {
-      // start GUI version...
-      LOG(INFO) << "GUI mode";
-      nim::ZTheme::instance();
-
-      // ZMainWindow has Qt::WA_DeleteOnClose attribute
-      auto mainWin = new nim::ZMainWindow(GIT_VERSION);
-      QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
-      mainWin->show();
     }
 
     return app.exec();

@@ -282,7 +282,7 @@ PYBIND11_MODULE(_imgpy, m)
   initImgLib("_imgpy",
              qgetenv("Resources_DIR"),
              "", qgetenv("ZIMG_JARS_DIR"), "",
-             false);
+             false, false);
 
   m.doc() = R"pbdoc(
         Python interface to img lib.
