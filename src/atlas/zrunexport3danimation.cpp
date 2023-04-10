@@ -5,6 +5,7 @@
 #include "z3drenderingengine.h"
 #include "z3danimationdoc.h"
 #include "zvideoencoder.h"
+#include "zcpuinfo.h"
 #include <folly/ScopeGuard.h>
 
 DEFINE_bool(run_export_3d_animation, false, "run exporting 3d animation in command line mode");
@@ -29,9 +30,11 @@ DEFINE_bool(only_compress_video,
             "compress video if images are already in --output_image_folder_name, default is false, if true, "
             "--output_image_folder_name must be provided. In this mode, only --output_filename, --output_fps, and "
             "output_image_folder_name are required inputs.");
-DEFINE_bool(limit_memory_usage_to_64G,
-            false,
-            "limit memory usage to less than 64G, has no effect if the available memory is less than 64G, default is false");
+DEFINE_uint64(
+  limit_memory_usage_in_gb_to,
+  0,
+  "limit memory usage to less than XX GB, has no effect if the available memory is less than the input value, "
+  "only value larger than or equal to 32 will be accepted as valid limit, default is 0 means no limit");
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
@@ -45,6 +48,10 @@ int ZRunExport3DAnimation::run()
   auto guard = folly::makeGuard([]() {
     LOG(INFO) << "Export 3D Animation End";
   });
+
+  if (FLAGS_limit_memory_usage_in_gb_to >= 32) {
+    ZCpuInfo::instance().setMemoryLimitInBytes(FLAGS_limit_memory_usage_in_gb_to * 1024 * 1024 * 1024);
+  }
 
   auto outputFilename = QString::fromStdString(FLAGS_output_filename).trimmed();
   if (outputFilename.isEmpty()) {

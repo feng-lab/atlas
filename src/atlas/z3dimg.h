@@ -182,7 +182,7 @@ protected:
   glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
+  // const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
   const uint32_t m_emptyFlag = 40000;
 
   std::vector<std::vector<glm::uvec4>> m_channelPageDirectories;
@@ -219,6 +219,8 @@ private:
   ZVertexBufferObject m_PBO;
 
   std::vector<glm::dvec2> m_channelDisplayRanges;
+
+  size_t m_blockUploadingBatchSize = 100;
 };
 
 } // namespace nim

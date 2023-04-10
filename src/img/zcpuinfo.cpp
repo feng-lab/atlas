@@ -233,6 +233,17 @@ void ZCpuInfo::logCpuInfo() const
   LOG(INFO) << instructions;
 }
 
+void ZCpuInfo::setMemoryLimitInBytes(uint64_t n)
+{
+  if (n > m_realPhysicalRAM) {
+    LOG(INFO) << fmt::format("memory limit {} larger than real physical memory {}, ignore", n, m_realPhysicalRAM);
+    nPhysicalRAM = m_realPhysicalRAM;
+    return;
+  }
+  nPhysicalRAM = n;
+  LOG(INFO) << fmt::format("set memory usage limit to {} bytes", nPhysicalRAM);
+}
+
 void ZCpuInfo::detectCpuInfo()
 {
   std::array<int, 4> cpui{
@@ -697,6 +708,8 @@ void ZCpuInfo::detectCoreAndThreadNumber()
   }
 #endif
   nStdHardwareConcurrency = std::thread::hardware_concurrency();
+
+  m_realPhysicalRAM = nPhysicalRAM;
 }
 
 } // namespace nim

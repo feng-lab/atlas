@@ -15,6 +15,9 @@ public:
   // log useful cpu info
   void logCpuInfo() const;
 
+  // set to limit memory usage
+  void setMemoryLimitInBytes(uint64_t n);
+
 protected:
   void detectCpuInfo();
 
@@ -132,6 +135,9 @@ public:
   int32_t nExtendedfamily = 0;
   int32_t nMaxLogicalProcessors = 1;
   int32_t nAPICPhysicalID = 0;
+
+private:
+  uint64_t m_realPhysicalRAM = 0;
 };
 
 } // namespace nim

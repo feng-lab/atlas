@@ -6,6 +6,7 @@
 #include "zkmeans.h"
 #include "zbenchtimer.h"
 #include "zcancellation.h"
+#include "zcpuinfo.h"
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
@@ -22,10 +23,8 @@ DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
               0,
               "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
 
-DEFINE_int32(
-  atlas_batch_size_of_block_uploading,
-  1000,
-  "Upload image blocks in batch to limit memory usage, default is 1000, set to 0 or negative number to upload all at one batch");
+DECLARE_double(atlas_image_cache_memory_proportion);
+DECLARE_double(atlas_image_region_cache_memory_proportion);
 
 namespace nim {
 
@@ -105,6 +104,14 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
 
     setScale(scale);
     // setScale(glm::vec3(1,1,5));
+
+    auto calculatedBlockUploadingBatchSize = std::round(ZCpuInfo::instance().nPhysicalRAM *
+                                                        (1.0 - 0.1 - FLAGS_atlas_image_cache_memory_proportion -
+                                                         FLAGS_atlas_image_region_cache_memory_proportion) /
+                                                        (3.2 * 1024 * 1024 * 1024)) *
+                                             100.;
+    m_blockUploadingBatchSize = static_cast<size_t>(std::clamp(calculatedBlockUploadingBatchSize, 100., 32768.));
+    LOG(INFO) << fmt::format("use block uploading batch size: {}", m_blockUploadingBatchSize);
   }
 }
 
@@ -841,19 +848,19 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      int batchSize = FLAGS_atlas_batch_size_of_block_uploading;
-      if (batchSize <= 0) {
+      size_t batchSize = m_blockUploadingBatchSize;
+      if (batchSize == 0) {
         batchSize = pendingTasks.size();
       }
 
-      int taskIdx = 0;
-      while (taskIdx < static_cast<int>(pendingTasks.size())) {
+      size_t taskIdx = 0;
+      while (taskIdx < pendingTasks.size()) {
         processEventsAndMaybeCancel(cancellationToken);
 
-        int numberOfTasks = std::min(batchSize, static_cast<int>(pendingTasks.size()) - taskIdx);
+        size_t numberOfTasks = std::min(batchSize, pendingTasks.size() - taskIdx);
         std::vector<folly::Future<folly::Unit>> blockFutures;
         blockFutures.reserve(numberOfTasks);
-        int finalTaskIdx = taskIdx + numberOfTasks;
+        size_t finalTaskIdx = taskIdx + numberOfTasks;
         for (; taskIdx < finalTaskIdx; ++taskIdx) {
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
           glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
