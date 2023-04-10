@@ -479,7 +479,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) {
         // image block already mapped
-        m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
+        if (pageTableEntryPtr->w != m_emptyFlag) {
+          m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
+        }
         m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
         usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
         ++alreadyMapped;
@@ -973,7 +975,7 @@ void Z3DImg::checkPageSystemError()
                                           m_channelPageDirectories[c][i].x + x];
             if (pageTableEntry.w > 0) {
               ++numValidEntry;
-              if (pageTableEntry.w != static_cast<uint32_t>(m_emptyFlag)) {
+              if (pageTableEntry.w != m_emptyFlag) {
                 glm::uvec4 imageCacheKey(level, glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize);
                 CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
                 CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
