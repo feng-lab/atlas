@@ -49,8 +49,6 @@ void initLogging(const char* argv0, const QString& filename)
   // to the log files.
   // DECLARE_string(log_link);
 
-  // verbose
-  FLAGS_v = 0; // in vlog_is_on.cc
   // Sets the maximum log file size (in MB).
   FLAGS_max_log_size = 1800;
   // Sets whether to avoid logging to the disk if the disk is full.

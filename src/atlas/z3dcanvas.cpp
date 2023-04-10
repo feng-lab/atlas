@@ -340,7 +340,7 @@ void Z3DCanvas::renderingFinished()
 
 void Z3DCanvas::updateAll()
 {
-  LOG(INFO) << "update";
+  VLOG(1) << "update";
 #ifdef ATLAS_USE_OPENGLWINDOW
   m_glWindow->update();
 #else

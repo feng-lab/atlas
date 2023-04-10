@@ -774,7 +774,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
     m_rendererBase.globalParas().hasNewRendering = true;
   }
-  LOG(INFO) << m_fastRendering << " finished";
+  VLOG(1) << fmt::format("{} finished", m_fastRendering ? "fast rendering" : "rendering");
   Q_EMIT renderingFinished();
 
   return 1.0;

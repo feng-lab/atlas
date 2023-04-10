@@ -14,7 +14,7 @@ __forceinline void processEventsAndMaybeCancel(const folly::CancellationToken& c
       QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     }
     if (cancellationToken.isCancellationRequested()) {
-      throw ZException("cancel");
+      throw ZException("cancelled");
     }
   }
 }
@@ -22,7 +22,7 @@ __forceinline void processEventsAndMaybeCancel(const folly::CancellationToken& c
 __forceinline void maybeCancel(const folly::CancellationToken& cancellationToken)
 {
   if (cancellationToken.isCancellationRequested()) {
-    throw ZException("cancel");
+    throw ZException("cancelled");
   }
 }
 

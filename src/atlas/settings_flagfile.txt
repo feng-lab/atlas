@@ -48,6 +48,3 @@
 
 # Whether to log glbinding context switch event, default is false"
 --atlas_log_glbinding_context_switch=false
-
-# Upload image blocks in batch to limit memory usage, default is 1000, set to 0 or negative number to upload all at one batch
---atlas_batch_size_of_block_uploading=1000

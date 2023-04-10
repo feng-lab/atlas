@@ -877,7 +877,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
     return;
   }
 
-  LOG(INFO) << "renderFast";
+  VLOG(1) << "renderFast";
   m_isRendering = true;
   getGLFocus();
   Q_EMIT progressChanged(20);
@@ -893,7 +893,7 @@ void Z3DRenderingEngine::render(bool stereo)
   CHECK(!m_isRendering);
   CHECK(!m_globalParas->cancellationSource);
 
-  LOG(INFO) << "render";
+  VLOG(1) << "render";
   getGLFocus();
   try {
     m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();

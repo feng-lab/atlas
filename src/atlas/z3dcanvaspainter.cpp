@@ -44,7 +44,7 @@ void Z3DCanvasPainter::paint(bool stereo)
     m_rendererBase.render(Z3DEye::Mono, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();
-    LOG(INFO) << startTarget << " " << endTarget << " " << m_canvas.physicalSize();
+    VLOG(1) << startTarget << " " << endTarget << " " << m_canvas.physicalSize();
   }
 }
 
