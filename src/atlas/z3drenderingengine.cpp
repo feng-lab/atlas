@@ -34,11 +34,8 @@ DEFINE_bool(atlas_log_glbinding_context_switch,
             false,
             "Whether to log glbinding context switch event, default is false");
 
-DEFINE_string(output_image_name_prefix, "video", "name prefix of the output images, default is video");
-
-DEFINE_int32(output_image_name_field_width,
-             8,
-             "number of decimals used for the name of output images after name prefix, default is 8");
+DECLARE_string(output_image_name_prefix);
+DECLARE_int32(output_image_name_field_width);
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
@@ -478,7 +475,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     int fieldWidth = std::max(FLAGS_output_image_name_field_width,
                               numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond))));
     double time = startTime;
-    int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
+    int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
     double timeIncrement = duration / numFrame;
     QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     auto tempdir = std::make_shared<QTemporaryDir>();

@@ -18,6 +18,12 @@
 #include <QProgressDialog>
 #include <utility>
 
+DEFINE_string(output_image_name_prefix, "video", "name prefix of the output images, default is video");
+
+DEFINE_int32(output_image_name_field_width,
+             8,
+             "number of decimals used for the name of output images after name prefix, default is 8");
+
 namespace {
 // generic solution
 template<class T>
@@ -492,12 +498,12 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
-  int fieldWidth = numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond)));
+  int fieldWidth = std::max(FLAGS_output_image_name_field_width,
+                            numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond))));
   double time = startTime;
-  int startFrame = static_cast<int>(std::round(startTime * framePerSecond));
+  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
   double timeIncrement = duration / numFrame;
-  bool checkOverwrite = true;
-  QString namePrefix = "video";
+  QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
   auto tempdir = std::make_shared<QTemporaryDir>();
   QDir tmpdir(tempdir->path());
   QString err;
@@ -511,45 +517,9 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
     time += timeIncrement;
     QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
-
-        if (ret == QMessageBox::Yes) {
-        } else if (ret == QMessageBox::YesToAll) {
-          checkOverwrite = false;
-        } else {
-          break;
-        }
-      }
-    }
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {
       QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), err);
       break;
-    }
-  }
-  if (!progress->wasCanceled()) {
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(numFrame, fieldWidth, 10, QChar('0'));
-    QString filepath = tmpdir.filePath(filename);
-    if (checkOverwrite) {
-      if (tmpdir.exists(filename)) {
-        QMessageBox msgBox(QApplication::activeWindow());
-        msgBox.setText(tr("File %1 exists, overwrite?").arg(filepath));
-        msgBox.setInformativeText("");
-        msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::YesToAll | QMessageBox::Cancel);
-        msgBox.setDefaultButton(QMessageBox::Cancel);
-        int ret = msgBox.exec();
-
-        if (ret != QMessageBox::Cancel) {
-          return;
-        }
-        QFile::remove(tmpdir.filePath(filename));
-      }
     }
   }
 
