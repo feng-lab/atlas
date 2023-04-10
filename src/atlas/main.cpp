@@ -143,7 +143,8 @@ int main(int argc, char* argv[])
           return nim::ZRunBenchmark::run();
         }
         if (FLAGS_run_export_3d_animation) {
-          return nim::ZRunExport3DAnimation::run();
+          nim::ZRunExport3DAnimation rea;
+          return rea.run();
         }
       }
       catch (const nim::ZException& e) {

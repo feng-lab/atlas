@@ -33,8 +33,6 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   m_stereoImageType.addOptions("Full Side-By-Side", "Half Side-By-Side");
   m_stereoImageType.select("Half Side-By-Side");
   m_framePerSecond.setStyle("SPINBOX");
-  m_framePerSecond.setDecimal(2);
-  m_framePerSecond.setSingleStep(1);
   m_startTime.setStyle("SPINBOX");
   m_startTime.setDecimal(3);
   m_startTime.setSingleStep(.001);
@@ -214,7 +212,7 @@ void ZAnimationExportWidget::createWidget()
   m_captureButton->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   lo->addWidget(m_captureButton, 0, Qt::AlignHCenter | Qt::AlignVCenter);
 
-  QWidget* resWgt = new QWidget(this);
+  auto resWgt = new QWidget(this);
   if (m_group) {
     m_groupBox = new QGroupBox(tr("capture"), this);
     m_groupBox->setLayout(lo);

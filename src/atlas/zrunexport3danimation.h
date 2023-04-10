@@ -13,10 +13,13 @@ class ZRunExport3DAnimation : public QObject
 public:
   using QObject::QObject;
 
-  static int run();
+  int run();
 
 protected:
-  static void logError(const QString& err);
+  void logError(const QString& err);
+
+private:
+  bool m_hasError = false;
 };
 
 } // namespace nim

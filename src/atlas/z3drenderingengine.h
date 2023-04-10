@@ -93,7 +93,7 @@ public:
 
   void exportFixedSize3DAnimation(const ZAnimation* animation,
                                   const QString& fn,
-                                  double framePerSecond,
+                                  int framePerSecond,
                                   double startTime,
                                   double endTime,
                                   int width,

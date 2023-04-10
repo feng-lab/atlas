@@ -40,7 +40,7 @@ public:
 Q_SIGNALS:
 
   void exportFixedSize3DAnimation(const QString& filename,
-                                  double framePerSecond,
+                                  int framePerSecond,
                                   double startTime,
                                   double endTime,
                                   int width,
@@ -48,19 +48,19 @@ Q_SIGNALS:
                                   Z3DScreenShotType sst);
 
   void export3DAnimation(const QString& filename,
-                         double framePerSecond,
+                         int framePerSecond,
                          double startTime,
                          double endTime,
                          Z3DScreenShotType sst);
 
   void exportFixedSize2DAnimation(const QString& filename,
-                                  double framePerSecond,
+                                  int framePerSecond,
                                   double startTime,
                                   double endTime,
                                   int width,
                                   int height);
 
-  void export2DAnimation(const QString& filename, double framePerSecond, double startTime, double endTime);
+  void export2DAnimation(const QString& filename, int framePerSecond, double startTime, double endTime);
 
 private:
   void captureButtonPressed();
@@ -80,7 +80,7 @@ private:
   ZStringIntOptionParameter m_stereoImageType;
   ZBoolParameter m_useWindowSize;
   ZIVec2Parameter m_customSize;
-  ZDoubleParameter m_framePerSecond;
+  ZIntParameter m_framePerSecond;
   ZDoubleParameter m_startTime;
   ZDoubleParameter m_endTime;
 

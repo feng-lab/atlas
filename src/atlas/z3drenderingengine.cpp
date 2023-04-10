@@ -389,7 +389,7 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
 
 void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     const QString& fn,
-                                                    double framePerSecond,
+                                                    int framePerSecond,
                                                     double startTime,
                                                     double endTime,
                                                     int width,
@@ -880,7 +880,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   LOG(INFO) << "renderFast";
   m_isRendering = true;
   getGLFocus();
-  Q_EMIT progressChanged(0);
+  Q_EMIT progressChanged(20);
   m_networkEvaluator->process(stereo, true);
   Q_EMIT progressChanged(100);
   QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);

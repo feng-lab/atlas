@@ -29,7 +29,7 @@ std::tuple<QString, QStringList> ZVideoEncoder::encodeDryRun(const QDir& dir,
   QString program = ZSystemInfo::resourcesDir().absoluteFilePath("ffmpeg");
 #endif
   QStringList arguments;
-  arguments << "-r" << QString::number(framesPerSecond, 'f', 2) << "-i"
+  arguments << "-r" << QString::number(framesPerSecond) << "-i"
             << (QString("%1/%2% 0%3d.png").arg(dir.absolutePath()).arg(namePrefix).arg(fieldWidth).replace("% 0", "%0"))
             << "-c:v"
             << "libx264"
@@ -37,7 +37,7 @@ std::tuple<QString, QStringList> ZVideoEncoder::encodeDryRun(const QDir& dir,
             << "18"
             << "-pix_fmt"
             << "yuv420p"
-            << "-r" << QString::number(framesPerSecond, 'f', 2) << outputFilename;
+            << "-r" << QString::number(framesPerSecond) << outputFilename;
   LOG(INFO) << program << " " << arguments.join(" ");
   return std::make_tuple(program, arguments);
 }

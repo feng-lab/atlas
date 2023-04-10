@@ -322,7 +322,7 @@ void ZAnimation::releaseView()
 }
 
 void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
-                                            double framePerSecond,
+                                            int framePerSecond,
                                             double startTime,
                                             double endTime,
                                             int width,
@@ -413,7 +413,7 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
 }
 
 void ZAnimation::export3DAnimation(const QString& fn,
-                                   double framePerSecond,
+                                   int framePerSecond,
                                    double startTime,
                                    double endTime,
                                    Z3DScreenShotType sst)
@@ -430,7 +430,7 @@ void ZAnimation::export3DAnimation(const QString& fn,
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
-                                            double framePerSecond,
+                                            int framePerSecond,
                                             double startTime,
                                             double endTime,
                                             int width,
@@ -564,7 +564,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   }
 }
 
-void ZAnimation::export2DAnimation(const QString& fn, double framePerSecond, double startTime, double endTime)
+void ZAnimation::export2DAnimation(const QString& fn, int framePerSecond, double startTime, double endTime)
 {
   CHECK(m_engine);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_engine)->graphicsView();

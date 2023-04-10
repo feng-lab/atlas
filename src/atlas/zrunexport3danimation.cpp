@@ -11,9 +11,9 @@
 DEFINE_bool(run_export_3d_animation, false, "run exporting 3d animation in command line mode");
 DEFINE_string(filename, "", "input filename");
 DEFINE_string(output_filename, "", "output video filename");
-DEFINE_double(output_fps, 30, "frame per second of the output video, default is 30");
-DEFINE_double(output_start_time, 0., "start time of the output video in seconds, default is 0");
-DEFINE_double(output_end_time, -1., "end time of the output video in seconds, default is -1");
+DEFINE_int32(output_fps, 30, "frame per second of the output video, default is 30");
+DEFINE_double(output_start_time, 0., "start time of the output video in seconds, floating point value, default is 0.0");
+DEFINE_double(output_end_time, -1., "end time of the output video in seconds, floating point value, default is -1.0");
 DEFINE_int32(output_width, 3840, "width of the output video, default is 3840");
 DEFINE_int32(output_height, 2160, "height of the output video, default is 2160");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists, default is false");
@@ -49,6 +49,8 @@ int ZRunExport3DAnimation::run()
     LOG(INFO) << "Export 3D Animation End";
   });
 
+  m_hasError = false;
+
   if (FLAGS_limit_memory_usage_in_gb_to >= 32) {
     ZCpuInfo::instance().setMemoryLimitInBytes(FLAGS_limit_memory_usage_in_gb_to * 1024 * 1024 * 1024);
   }
@@ -66,7 +68,7 @@ int ZRunExport3DAnimation::run()
 
   if (FLAGS_only_compress_video) {
     ZVideoEncoder videoEncoder;
-    connect(&videoEncoder, &ZVideoEncoder::error, &ZRunExport3DAnimation::logError);
+    connect(&videoEncoder, &ZVideoEncoder::error, this, &ZRunExport3DAnimation::logError);
     QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     videoEncoder.encode(QDir(outputImageFolderName),
                         namePrefix,
@@ -101,7 +103,7 @@ int ZRunExport3DAnimation::run()
 
   doc.animation3DDoc().bindView(&engine);
 
-  connect(&engine, &Z3DRenderingEngine::renderingError, &ZRunExport3DAnimation::logError);
+  connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DAnimation::logError);
 
   engine.exportFixedSize3DAnimation(&doc.animation3DDoc().animation(id),
                                     outputFilename,
@@ -116,12 +118,13 @@ int ZRunExport3DAnimation::run()
                                     outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName,
                                     FLAGS_skip_video_compression);
 
-  return 0;
+  return m_hasError ? 1 : 0;
 }
 
 void ZRunExport3DAnimation::logError(const QString& err)
 {
   LOG(ERROR) << err;
+  m_hasError = true;
 }
 
 } // namespace nim
