@@ -29,10 +29,26 @@ DECLARE_bool(run_export_3d_animation);
 #ifdef _WIN32
 extern "C" {
 __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+
+#if !defined(ATLAS_SANITIZE_ADDRESS)
+const char* __asan_default_options()
+{
+  return "detect_leaks=0";
+}
+#endif
 }
 #endif
 
 using namespace nim;
+
+#if defined(__linux__) || defined(__APPLE__)
+#if !defined(ATLAS_SANITIZE_ADDRESS)
+const char* __asan_default_options()
+{
+  return "detect_leaks=0";
+}
+#endif
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -46,7 +62,7 @@ int main(int argc, char* argv[])
   QCoreApplication::setOrganizationName("fenglab");
   // On macOS and iOS, if both a name and an Internet domain are specified for the organization, the domain
   //  is preferred over the name. On other platforms, the name is preferred over the domain.
-#ifndef Q_OS_MACOS
+#ifndef __APPLE__
   QCoreApplication::setOrganizationDomain("fenglab.xyz");
 #endif
   QCoreApplication::setApplicationName("Atlas");

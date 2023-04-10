@@ -106,9 +106,9 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
     // setScale(glm::vec3(1,1,5));
 
     auto calculatedBlockUploadingBatchSize = std::round(ZCpuInfo::instance().nPhysicalRAM *
-                                                        (1.0 - 0.1 - FLAGS_atlas_image_cache_memory_proportion -
+                                                        (1.0 - 0.2 - FLAGS_atlas_image_cache_memory_proportion -
                                                          FLAGS_atlas_image_region_cache_memory_proportion) /
-                                                        (3.2 * 1024 * 1024 * 1024)) *
+                                                        (2.56 * 1024 * 1024 * 1024)) *
                                              100.;
     m_blockUploadingBatchSize = static_cast<size_t>(std::clamp(calculatedBlockUploadingBatchSize, 100., 32768.));
     LOG(INFO) << fmt::format("use block uploading batch size: {}", m_blockUploadingBatchSize);

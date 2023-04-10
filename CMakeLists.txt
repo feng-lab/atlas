@@ -47,6 +47,12 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
+option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
+
+if (ATLAS_SANITIZE_ADDRESS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+endif ()
+
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)
@@ -66,12 +72,6 @@ message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
 include(PrintCMakeTargetInfo)
 include(LibsForImg)
-
-option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
-
-if (ATLAS_SANITIZE_ADDRESS)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
-endif ()
 
 # subprojects
 add_subdirectory(src/img)
