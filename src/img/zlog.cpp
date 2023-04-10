@@ -23,31 +23,12 @@ void initLogging(const char* argv0, const QString& filename)
 
   // Set whether log messages go to stderr instead of logfiles
   FLAGS_logtostderr = filename.isEmpty();
-  // Set whether log messages go to stderr in addition to logfiles.
-  FLAGS_alsologtostderr = false;
-  // Set color messages logged to stderr (if supported by terminal).
-  FLAGS_colorlogtostderr = false;
   // Log messages at a level >= this flag are automatically sent to
   // stderr in addition to log files.
   FLAGS_stderrthreshold = google::GLOG_INFO;
-  // Set whether the log prefix should be prepended to each line of output.
-  FLAGS_log_prefix = true;
   // Log messages at a level <= this flag are buffered.
   // Log messages at a higher level are flushed immediately.
   FLAGS_logbuflevel = google::GLOG_INFO - 1;
-  // Sets the maximum number of seconds which logs may be buffered for.
-  FLAGS_logbufsecs = 30;
-  // Log suppression level: messages logged at a lower level than this
-  // are suppressed.
-  FLAGS_minloglevel = google::GLOG_INFO;
-  // If specified, logfiles are written into this directory instead of the
-  // default logging directory.
-  // DECLARE_string(log_dir);
-  // Set the log file mode.
-  // DECLARE_int32(logfile_mode);
-  // Sets the path of the directory into which to put additional links
-  // to the log files.
-  // DECLARE_string(log_link);
 
   // Sets the maximum log file size (in MB).
   FLAGS_max_log_size = 1800;
