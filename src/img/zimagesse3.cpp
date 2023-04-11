@@ -1,7 +1,6 @@
 #include "zimagesse3.h"
 
 #include "zglobal.h"
-#include <cmath>
 #include <simde/x86/sse3.h>
 
 namespace {

@@ -324,6 +324,7 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor)
   target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
   # target_compile_options(${LIBRARY_NAME} PUBLIC /Zi)
+  target_compile_options(${LIBRARY_NAME} PUBLIC Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 

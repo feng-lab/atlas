@@ -1,7 +1,6 @@
 #include "zimageavx.h"
 
 #include "zglobal.h"
-#include <cmath>
 #include <simde/x86/avx.h>
 
 namespace {
