@@ -1,6 +1,9 @@
 #include "zimageavx.h"
 
 #include "zglobal.h"
+#ifdef _MSC_VER
+#include <cmath> // for simde
+#endif
 #include <simde/x86/avx512.h>
 
 namespace nim {

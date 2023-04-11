@@ -79,7 +79,7 @@ public:
   void read(size_t id, const json::object& json);
 
   void write(size_t id, json::object& json) const;
-
+py
   void read(const json::object& json);
 
   void write(json::object& json) const;

@@ -1,6 +1,9 @@
 #include "zimagesse3.h"
 
 #include "zglobal.h"
+#ifdef _MSC_VER
+#include <cmath> // for simde
+#endif
 #include <simde/x86/sse3.h>
 
 namespace {
