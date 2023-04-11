@@ -34,7 +34,7 @@
 # Whether to create mmap file for nim format, default is false
 --zimg_use_mmap_file_for_hdf5=false
 
-# Whether to check opengl error after all gl calls, default is true, can set to false for better performance
+# Whether to check openGL error after all gl calls, default is true, can set to false for better performance
 --atlas_check_opengl_error_for_all_gl_calls=true
 
 # Whether to clear image cache after rendering, for test, default is false
@@ -46,5 +46,5 @@
 # Whether to squeeze image cache after rendering, default is false
 --atlas_squeeze_image_cache_after_rendering=false
 
-# Whether to log glbinding context switch event, default is false"
+# Whether to log openGL context switch event, default is false"
 --atlas_log_glbinding_context_switch=false

@@ -25,9 +25,9 @@ DECLARE_string(flagfile);
 DEFINE_bool(run_benchmarks, false, "run benchmarks");
 DECLARE_bool(run_export_3d_animation);
 
-// force NVidia Optimus to used dedicated graphics
 #ifdef _WIN32
 extern "C" {
+// force NVidia Optimus to used dedicated graphics
 __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 
 #if !defined(ATLAS_SANITIZE_ADDRESS)
@@ -67,9 +67,8 @@ int main(int argc, char* argv[])
 #endif
   QCoreApplication::setApplicationName("Atlas");
   try {
-    if (QString setting_filename = "user_settings_flagfile.txt";
-        nim::ZSystemInfo::configDir().exists(setting_filename)) {
-      FLAGS_flagfile = QFile::encodeName(nim::ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
+    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
+      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
     }
     std::string usage("Atlas is a brain map platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
@@ -101,9 +100,9 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_UseStyleSheetPropagationInWidgetStyles, true);
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
 
-    nim::ZApplication app(argc, argv);
+    ZApplication app(argc, argv);
 
-    if (!nim::ZCpuInfo::instance().bAVX) {
+    if (!ZCpuInfo::instance().bAVX) {
       QMessageBox::critical(nullptr,
                             QCoreApplication::applicationName(),
                             "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
@@ -112,19 +111,19 @@ int main(int argc, char* argv[])
     }
 
     // init the logging mechanism
-    QDir logDir = nim::ZSystemInfo::logDir();
-    nim::ZSystemInfo::removeOldLogs();
+    QDir logDir = ZSystemInfo::logDir();
+    ZSystemInfo::removeOldLogs();
 
     bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
-    nim::initImgLib(argv[0],
-                    nim::ZSystemInfo::resourcesDirPath(),
-                    nim::ZSystemInfo::jdkDirPath(),
-                    nim::ZSystemInfo::jarsDirPath(),
-                    logDir.filePath("atlas"),
-                    true,
-                    isGUIMode);
+    initImgLib(argv[0],
+               ZSystemInfo::resourcesDirPath(),
+               ZSystemInfo::jdkDirPath(),
+               ZSystemInfo::jarsDirPath(),
+               logDir.filePath("atlas"),
+               true,
+               isGUIMode);
     [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
-      nim::shutdownImgLib();
+      shutdownImgLib();
     });
 
     LOG(INFO) << "Version: " << GIT_VERSION;
@@ -138,32 +137,32 @@ int main(int argc, char* argv[])
     }
     LOG(INFO) << "current settings: \n" << gflags::CommandlineFlagsIntoString();
 
-    nim::ZSystemInfo::instance().logOSInfo();
+    ZSystemInfo::instance().logOSInfo();
 
     // ZServiceManager sm;
 
     if (isGUIMode) {
       // start GUI version...
       LOG(INFO) << "GUI mode";
-      nim::ZTheme::instance();
+      ZTheme::instance();
 
       // ZMainWindow has Qt::WA_DeleteOnClose attribute
-      auto mainWin = new nim::ZMainWindow(GIT_VERSION);
-      QObject::connect(&app, &nim::ZApplication::fileOpenRequest, mainWin, &nim::ZMainWindow::loadUrls);
+      auto mainWin = new ZMainWindow(GIT_VERSION);
+      QObject::connect(&app, &ZApplication::fileOpenRequest, mainWin, &ZMainWindow::loadUrls);
       mainWin->show();
     } else {
       // start non-GUI version...
       try {
         LOG(INFO) << "console mode";
         if (FLAGS_run_benchmarks) {
-          return nim::ZRunBenchmark::run();
+          return ZRunBenchmark::run();
         }
         if (FLAGS_run_export_3d_animation) {
-          nim::ZRunExport3DAnimation rea;
+          ZRunExport3DAnimation rea;
           return rea.run();
         }
       }
-      catch (const nim::ZException& e) {
+      catch (const ZException& e) {
         LOG(ERROR) << "exit with " << typeid(e).name() << ": " << e.what();
         return 1;
       }
@@ -175,7 +174,7 @@ int main(int argc, char* argv[])
 
     return app.exec();
   }
-  catch (const nim::ZException& e) {
+  catch (const ZException& e) {
     LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
   }
   catch (const std::exception& e) {

@@ -28,11 +28,11 @@
 DEFINE_bool(
   atlas_check_opengl_error_for_all_gl_calls,
   true,
-  "Whether to check opengl error after all gl calls, default is true, can set to false for better performance");
+  "Whether to check openGL error after all gl calls, default is true, can set to false for better performance");
 
 DEFINE_bool(atlas_log_glbinding_context_switch,
             false,
-            "Whether to log glbinding context switch event, default is false");
+            "Whether to log openGL context switch event, default is false");
 
 DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
