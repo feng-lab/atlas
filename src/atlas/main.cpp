@@ -139,6 +139,10 @@ int main(int argc, char* argv[])
 
     ZSystemInfo::instance().logOSInfo();
 
+#if !defined(ATLAS_SANITIZE_ADDRESS)
+    LOG(INFO) << __asan_default_options();
+#endif
+
     // ZServiceManager sm;
 
     if (isGUIMode) {
