@@ -13,7 +13,7 @@ DEFINE_string(filename, "", "input filename");
 DEFINE_string(output_filename, "", "output video filename");
 DEFINE_int32(output_fps, 30, "frame per second of the output video, default is 30");
 DEFINE_double(output_start_time, 0., "start time of the output video in seconds, floating point value, default is 0.0");
-DEFINE_double(output_end_time, -1., "end time of the output video in seconds, floating point value, default is -1.0");
+DEFINE_double(output_end_time, -1., "end time of the output video in seconds, floating point value, default is -1.0 represents the end of the animation");
 DEFINE_int32(output_width, 3840, "width of the output video, default is 3840");
 DEFINE_int32(output_height, 2160, "height of the output video, default is 2160");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists, default is false");
@@ -28,8 +28,9 @@ DECLARE_int32(output_image_name_field_width);
 DEFINE_bool(only_compress_video,
             false,
             "compress video if images are already in --output_image_folder_name, default is false, if true, "
-            "--output_image_folder_name must be provided. In this mode, only --output_filename, --output_fps, and "
-            "output_image_folder_name are required inputs.");
+            "--output_filename and --output_image_folder_name must be provided. --output_fps, "
+            "--output_image_name_prefix, and --output_image_name_field_width should match the image exporting settings"
+            "if the default values are not used.");
 DEFINE_uint64(
   limit_memory_usage_in_gb_to,
   0,

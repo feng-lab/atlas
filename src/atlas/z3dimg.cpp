@@ -441,7 +441,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   size_t count = 0;
   size_t alreadyMapped = 0;
 
-  VLOG(1) << "1";
   // pageDirectoryEntryKey, pageDirectoryEntry*, pageTableEntryKey
   std::vector<std::tuple<glm::uvec4, glm::uvec4*, glm::uvec4>> pendingBlocks;
   // go through all blocks and touch used blocks and collect pendingTasks if page table is already mapped (only need
@@ -507,7 +506,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       pendingBlocks.push_back(std::make_tuple(pageDirectoryEntryKey, &pageDirectoryEntryRef, pageTableEntryKey));
     }
   }
-  VLOG(1) << "1";
 
   auto numAvailablePageCacheBlock =
     index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageDirectoryEntryKeys.size());
@@ -543,7 +541,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     ++count;
   }
   clearAndDeallocate(pendingBlocks);
-  VLOG(1) << "1";
 
   //  for (size_t i = 0; i < pendingTasks.size(); ++i) {
   //    const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
@@ -654,12 +651,9 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                          const glm::uvec4& pageDirectoryEntryKey,
                                          glm::uvec4& pageDirectoryEntryRef)
 {
-  VLOG(1) << "1";
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
-  VLOG(1) << "1";
   pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 1);
-  VLOG(1) << "1";
 
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
     for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
@@ -680,7 +674,6 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                   erasedKeyPageDirectoryEntryCoord.x];
     erasedKeyPageDirectoryEntry.w = 0;
   }
-  VLOG(1) << "1";
 }
 
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
