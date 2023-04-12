@@ -46,7 +46,7 @@ def get_cmake_cmd_common_part():
                     ]
 
 
-def build_atlas(use_asan: bool = False, skip_tests: bool = False):
+def build_atlas(use_asan: bool = False, skip_test: bool = False):
     print('srcDIR:', atlas_repository_dir())
     print('buildDIR:', atlas_build_dir())
     print('useNinja:', use_ninja())
@@ -75,7 +75,7 @@ def build_atlas(use_asan: bool = False, skip_tests: bool = False):
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=atlas_build_dir(), shell=True, check=True, env=env)
 
-        if not skip_tests and not use_asan:
+        if not skip_test and not use_asan:
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
@@ -92,7 +92,7 @@ def build_atlas(use_asan: bool = False, skip_tests: bool = False):
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
-        if not skip_tests and not use_asan:
+        if not skip_test and not use_asan:
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
@@ -103,12 +103,12 @@ if __name__ == "__main__":
         epilog=f"""
 Examples:
 
-python build_atlas.py [--use-asan] [--skip-tests]
+python build_atlas.py [--use-asan] [--skip-test]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
-    parser.add_argument("--skip-tests", action='store_true', help="skip tests")
+    parser.add_argument("--skip-test", action='store_true', help="skip test")
     args = parser.parse_args()
 
-    build_atlas(use_asan=args.use_asan, skip_tests=args.skip_tests)
+    build_atlas(use_asan=args.use_asan, skip_test=args.skip_test)

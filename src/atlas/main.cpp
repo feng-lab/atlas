@@ -34,14 +34,14 @@ __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
 
 using namespace nim;
 
-extern "C" {
 #if !defined(ATLAS_SANITIZE_ADDRESS)
+extern "C" {
 const char* __asan_default_options()
 {
   return "detect_leaks=0";
 }
-#endif
 }
+#endif
 
 int main(int argc, char* argv[])
 {

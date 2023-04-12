@@ -9,13 +9,13 @@ if __name__ == "__main__":
         epilog=f"""
 Examples:
 
-python build_and_deploy_atlas.py [--use-asan] [--skip-tests]
+python build_and_deploy_atlas.py [--use-asan] [--skip-test]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
-    parser.add_argument("--skip-tests", action='store_true', help="skip tests")
+    parser.add_argument("--skip-test", action='store_true', help="skip test")
     args = parser.parse_args()
 
-    build_atlas.build_atlas(use_asan=args.use_asan, skip_tests=args.skip_tests)
+    build_atlas.build_atlas(use_asan=args.use_asan, skip_test=args.skip_test)
     deploy_atlas.deploy_atlas(use_asan=args.use_asan)
