@@ -29,26 +29,19 @@ DECLARE_bool(run_export_3d_animation);
 extern "C" {
 // force NVidia Optimus to used dedicated graphics
 __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
-
-#if !defined(ATLAS_SANITIZE_ADDRESS)
-const char* __asan_default_options()
-{
-  return "detect_leaks=0";
-}
-#endif
 }
 #endif
 
 using namespace nim;
 
-#if defined(__linux__) || defined(__APPLE__)
+extern "C" {
 #if !defined(ATLAS_SANITIZE_ADDRESS)
 const char* __asan_default_options()
 {
   return "detect_leaks=0";
 }
 #endif
-#endif
+}
 
 int main(int argc, char* argv[])
 {
