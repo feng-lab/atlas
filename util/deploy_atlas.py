@@ -117,7 +117,7 @@ def pack_atlas_package():
         subprocess.run(['zip', '--quiet', '--recurse-paths', '--symlinks', zip_name, app_name],
                        cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
     elif common_dirs.is_linux():
-        app_name = "'Atlas.AppDir"
+        app_name = "Atlas.AppDir"
         zip_name = "atlas-Linux.zip"
 
         if os.path.exists(os.path.join(common_dirs.deploy_target_dir(), zip_name)):
