@@ -628,7 +628,7 @@ if (WIN32)
 
   target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  # target_compile_options(${APP_NAME} PUBLIC /Wall)
+  target_compile_options(${APP_NAME} PUBLIC /W4)
   target_compile_options(${APP_NAME} PUBLIC /bigobj) # increases the number of sections that an object file can contain.
   target_compile_options(${APP_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
   target_compile_options(${APP_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
