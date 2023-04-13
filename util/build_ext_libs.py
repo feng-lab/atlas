@@ -187,9 +187,10 @@ def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization
             res[
                 'CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
     elif is_windows():
-        res['CFLAGS'] = f'/utf-8'
+        optimization = ' /O2' if with_optimization else ''
+        res['CFLAGS'] = f'/utf-8' + optimization
         res[
-            'CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX'
+            'CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX' + optimization
     return res
 
 
