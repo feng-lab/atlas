@@ -148,10 +148,10 @@ SIZE_T EnumerateUsingD3D9( IDirect3D9* pD3D9 )
 int main()
 {
 
-// DXGI is only available on Windows Vista or later. This method returns the 
-// amount of dedicated video memory, the amount of dedicated system memory, 
-// and the amount of shared system memory. DXGI is more reflective of the true 
-// system configuration than the other 4 methods. 
+// DXGI is only available on Windows Vista or later. This method returns the
+// amount of dedicated video memory, the amount of dedicated system memory,
+// and the amount of shared system memory. DXGI is more reflective of the true
+// system configuration than the other 4 methods.
 
 #ifndef FORCE_USE_D3D9
     HINSTANCE hDXGI = LoadLibrary( L"dxgi.dll" );
@@ -176,7 +176,7 @@ int main()
                 return -1;
             }
         }
-        
+
         HRESULT hr = pCreateDXGIFactory( __uuidof( IDXGIFactory ), ( LPVOID* )&pDXGIFactory );
 
         if ( SUCCEEDED(hr) )
@@ -238,7 +238,7 @@ uint64_t getDedicatedVideoMemoryMB()
       {
         FreeLibrary( hDXGI );
         wprintf( L"ERROR: dxgi.dll missing entry-point\n" );
-        return -1;
+        return 0;
       }
     }
 

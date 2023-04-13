@@ -395,7 +395,7 @@ void ZMainWindow::loadScene()
 {
   QString fn = QFileDialog::getOpenFileName(QApplication::activeWindow(),
                                             "Load scene",
-                                            m_doc->lastOpenedFilePath(),
+                                            ZDoc::lastOpenedFilePath(),
                                             tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;
@@ -421,7 +421,7 @@ void ZMainWindow::saveScene()
 
   QString fn = ZFileUtils::getSaveFileName(QApplication::activeWindow(),
                                            "Save scene to file",
-                                           m_doc->lastOpenedFilePath(),
+                                           ZDoc::lastOpenedFilePath(),
                                            tr("Scene file (*.scene)"));
   if (!fn.isEmpty()) {
     QString err;

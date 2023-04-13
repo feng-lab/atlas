@@ -44,8 +44,8 @@ ZTakeScreenShotWidget::ZTakeScreenShotWidget(bool is2D, bool group, QWidget* par
   m_stereoImageType.select("Full Side-By-Side");
   m_axis.addOptions("X", "Y", "Z");
   m_axis.select("Y");
-  QDateTime data = QDateTime::currentDateTime();
-  QString prefix = QString("neuTubeCapture") + data.toString("yyyyMMdd") + QString("_");
+  QDateTime dateTime = QDateTime::currentDateTime();
+  QString prefix = QString("neuTubeCapture") + dateTime.toString("yyyyMMdd") + QString("_");
   m_namePrefix.set(prefix);
   createWidget();
   connect(&m_mode, &ZStringIntOptionParameter::valueChanged, this, &ZTakeScreenShotWidget::adjustWidget);
