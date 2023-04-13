@@ -32,6 +32,8 @@ find_package(Protobuf CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using Protobuf ${Protobuf_VERSION}")
 print_target_properties(protobuf::libprotobuf)
+print_target_properties(protobuf::protoc)
+set(protobuf_PROTOC_EXE protobuf::protoc) # for protobuf_generate
 
 # Find gRPC installation
 # Looks for gRPCConfig.cmake file installed by gRPC's cmake installation.

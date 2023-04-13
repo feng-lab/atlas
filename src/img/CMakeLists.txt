@@ -49,6 +49,7 @@ set(TIFF_SOURCES
     ${TIFFDIR}/tif_zstd.c
     ${TIFFDIR}/tif_webp.c
     ${TIFFDIR}/tif_stream.cxx
+    ${TIFFDIR}/tif_hash_set.c
     )
 if (WIN32)
   set(TIFF_SOURCES ${TIFF_SOURCES} ${TIFFDIR}/tif_unix.c)
