@@ -158,7 +158,7 @@ void main()
 #endif
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-            // save missed blockid
+            // save used blockid
             if (missBlockIDsIndex < 32) {
               uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
               missBlockIDs[missBlockIDsIndex++] = blockID;
@@ -178,13 +178,14 @@ void main()
                 finished = missBlockIDsIndex == 32;
               }
 
+              // goto next block
               do {
                 currentRayLength += stepSize;
               } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               uint testPagingFlag = EMPTY;
-              while (testPagingFlag == EMPTY && nextNonEmptyLevel < LEVEL_COUNT) {
+              while (testPagingFlag == EMPTY && nextNonEmptyLevel + 1 < LEVEL_COUNT) {
                 uvec3 testVoxelCoord = uvec3(samplePos * image_dimensions[nextNonEmptyLevel]);
                 uvec3 testPageTableCoord = testVoxelCoord / image_block_size;
 
@@ -225,7 +226,8 @@ void main()
               finished = missBlockIDsIndex == 32;
             }
 
-            do { // skip empty space page table entry
+            // goto next block
+            do {
               currentRayLength += stepSize;
             } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength < 1.0);
           }

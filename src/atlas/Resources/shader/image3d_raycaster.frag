@@ -331,7 +331,7 @@ void main()
             } else { // empty block
               int nextNonEmptyLevel = curLevel + 1;
               uint testPagingFlag = EMPTY;
-              while (testPagingFlag == EMPTY && nextNonEmptyLevel < LEVEL_COUNT) {
+              while (testPagingFlag == EMPTY && nextNonEmptyLevel + 1 < LEVEL_COUNT) {
                 uvec3 testVoxelCoord = uvec3(samplePos * image_dimensions[nextNonEmptyLevel]);
                 uvec3 testPageTableCoord = testVoxelCoord / image_block_size;
 

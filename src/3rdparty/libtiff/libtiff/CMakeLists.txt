@@ -46,6 +46,7 @@ set(tiff_private_HEADERS
 
 
 add_library(tiff libtiff.def)
+add_library(TIFF::TIFF ALIAS tiff)
 
 target_sources(tiff PRIVATE
         ${tiff_public_HEADERS}
@@ -66,6 +67,7 @@ target_sources(tiff PRIVATE
         tif_fax3sm.c
         tif_flush.c
         tif_getimage.c
+        tif_hash_set.c
         tif_jbig.c
         tif_jpeg.c
         tif_jpeg_12.c
@@ -106,6 +108,14 @@ target_include_directories(tiff
         ${TIFF_INCLUDES}
 )
 
+# MSVC specific resource preparation
+if (WIN32 AND MSVC)
+  message(STATUS "Include resource version information for LibTIFF")
+  target_sources(tiff PRIVATE tif_win32_versioninfo.rc)
+  source_group("Resource Files" FILES tif_win32_versioninfo.rc)
+endif ()
+
+
 set(tiff_libs_private_list "") # cmake list
 set(tiff_requires_private "") # cmake string
 
@@ -120,7 +130,9 @@ endif()
 if(JPEG_SUPPORT)
   target_link_libraries(tiff PRIVATE JPEG::JPEG)
   string(APPEND tiff_requires_private " libjpeg")
-  if(JPEG_DUAL_MODE_8_12)
+  if(HAVE_JPEGTURBO_DUAL_MODE_8_12)
+    target_compile_definitions(tiff PRIVATE HAVE_JPEGTURBO_DUAL_MODE_8_12)
+  elseif(JPEG_DUAL_MODE_8_12)
     target_include_directories(tiff PRIVATE ${JPEG12_INCLUDE_DIR})
     target_link_libraries(tiff PRIVATE ${JPEG12_LIBRARIES})
   endif()
@@ -148,8 +160,8 @@ if(WEBP_SUPPORT)
   target_link_libraries(tiff PRIVATE WebP::WebP)
   string(APPEND tiff_requires_private " libwebp")
 endif()
-target_link_libraries(tiff PRIVATE CMath::CMath)
 if(CMath_LIBRARY)
+  target_link_libraries(tiff PRIVATE CMath::CMath)
   list(APPEND tiff_libs_private_list "${CMath_LIBRARY}")
 endif()
 
@@ -169,21 +181,23 @@ if(HAVE_LD_VERSION_SCRIPT)
                         "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libtiff.map")
 endif()
 
-export(TARGETS tiff NAMESPACE TIFF:: FILE "${CMAKE_CURRENT_BINARY_DIR}/libtiffTargets.cmake")
-install(TARGETS tiff EXPORT TiffTargets
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(tiff-install)
+  export(TARGETS tiff NAMESPACE TIFF:: FILE "${CMAKE_CURRENT_BINARY_DIR}/libtiffTargets.cmake")
+  install(TARGETS tiff EXPORT TiffTargets
+          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-install(FILES ${tiff_public_HEADERS}
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  install(FILES ${tiff_public_HEADERS}
+          DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 
-set(TIFF_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/tiff)
-install(EXPORT TiffTargets
-        FILE TiffTargets.cmake
-        NAMESPACE TIFF::
-        DESTINATION ${TIFF_CONFIGDIR}
-)
+  set(TIFF_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/tiff)
+  install(EXPORT TiffTargets
+          FILE TiffTargets.cmake
+          NAMESPACE TIFF::
+          DESTINATION ${TIFF_CONFIGDIR}
+  )
+endif()
 
 if(CXX_SUPPORT)
   set(tiffxx_HEADERS
@@ -195,6 +209,8 @@ if(CXX_SUPPORT)
   else()
       add_library(tiffxx ../placeholder.h)
   endif()
+
+  add_library(TIFF::CXX ALIAS tiffxx)
 
   target_sources(tiffxx PRIVATE
           ${tiffxx_HEADERS}
@@ -213,24 +229,26 @@ if(CXX_SUPPORT)
                           "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libtiffxx.map")
   endif()
 
-  install(TARGETS tiffxx
-          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  if(tiff-install)
+    install(TARGETS tiffxx
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-  install(FILES ${tiffxx_HEADERS}
-          DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
+    install(FILES ${tiffxx_HEADERS}
+            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  endif()
+      
 endif()
 
 if(NOT CMAKE_CROSSCOMPILING)
-  add_executable(mkg3states ../placeholder.h)
-  target_sources(mkg3states PRIVATE mkg3states.c tif_fax3.h)
-  target_link_libraries(mkg3states tiff port)
+  add_executable(tiff_mkg3states ../placeholder.h)
+  target_sources(tiff_mkg3states PRIVATE mkg3states.c tif_fax3.h)
+  target_link_libraries(tiff_mkg3states tiff tiff_port)
 
-  add_custom_target(faxtable
-          DEPENDS mkg3states
+  add_custom_target(tiff_faxtable
+          DEPENDS tiff_mkg3states
           COMMAND ${CMAKE_COMMAND} -E rm "tif_fax3sm.c"
-          COMMAND mkg3states -b -c const "tif_fax3sm.c"
+          COMMAND tiff_mkg3states -b -c const "tif_fax3sm.c"
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()

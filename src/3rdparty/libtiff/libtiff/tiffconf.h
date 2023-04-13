@@ -4,6 +4,12 @@
   from this file in your programs.
 */
 
+/* clang-format off */
+/* clang-format disabled because CMake scripts are very sensitive to the
+ * formatting of this file. configure_file variables of type "" are
+ * modified by clang-format and won't be substituted.
+ */
+
 #ifndef _TIFFCONF_
 #define _TIFFCONF_
 
@@ -247,3 +253,5 @@
 #endif
 
 #endif /* _TIFFCONF_ */
+
+/* clang-format on */

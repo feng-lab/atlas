@@ -202,4 +202,15 @@ LIBTIFF_4.4 {
 
 LIBTIFF_4.5 {
     _TIFFClampDoubleToUInt32;
+    TIFFClientOpenExt;
+    TIFFFdOpenExt;
+    TIFFOpenExt;
+    TIFFOpenWExt;
+    TIFFErrorExtR;
+    TIFFWarningExtR;
+    TIFFOpenOptionsAlloc;
+    TIFFOpenOptionsFree;
+    TIFFOpenOptionsSetMaxSingleMemAlloc;
+    TIFFOpenOptionsSetErrorHandlerExtR;
+    TIFFOpenOptionsSetWarningHandlerExtR;
 } LIBTIFF_4.4;

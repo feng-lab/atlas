@@ -30,9 +30,7 @@ DEFINE_bool(
   true,
   "Whether to check openGL error after all gl calls, default is true, can set to false for better performance");
 
-DEFINE_bool(atlas_log_glbinding_context_switch,
-            false,
-            "Whether to log openGL context switch event, default is false");
+DEFINE_bool(atlas_log_glbinding_context_switch, false, "Whether to log openGL context switch event, default is false");
 
 DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
@@ -418,6 +416,12 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     Q_EMIT renderingError("does not support output size larger than 7680x4320");
     return;
   }
+  LOG(INFO) << fmt::format("fps: {} width: {} height: {} startTime: {} endTime: {}",
+                           framePerSecond,
+                           width,
+                           height,
+                           startTime,
+                           endTime);
 
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
