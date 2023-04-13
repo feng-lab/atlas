@@ -99,7 +99,7 @@ def build_atlas_package(use_asan: bool = False):
                 os.path.join(common_dirs.deploy_target_dir(), 'Atlas'))
 
             env = build_ext_libs.get_vcvars_environment()
-            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), app_name],
+            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'windeployqt'), '--no-translations', app_name],
                            cwd=os.path.join(common_dirs.deploy_target_dir(), 'Atlas'), shell=False, check=True, env=env)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
