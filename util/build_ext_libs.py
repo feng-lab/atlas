@@ -659,28 +659,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     # finally:
     #     shutil.rmtree(sub_build_dir, ignore_errors=False)
 
-    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
-    sub_install_dir = ext_build_dir()
-    sub_build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
-        cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
-                         '-Dprotobuf_WITH_ZLIB:BOOL=ON',
-                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF',
-                         '-Dprotobuf_BUILD_SHARED_LIBS:BOOL=OFF'])
-
-        cmakecmd.extend([sub_src_dir])
-        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
-
-        orig_file_2 = os.path.join(sub_install_dir, 'lib', 'cmake', 'protobuf', 'protobuf-config.cmake')
-        if is_windows():
-            orig_file_2 = os.path.join(sub_install_dir, 'cmake', 'protobuf-config.cmake')
-        patch_file(orig_file_2,
-                   from_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_rel_dir}/${_basename}${_ext}'],
-                   to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
-    finally:
-        shutil.rmtree(sub_build_dir, ignore_errors=False)
-
     sub_src_dir = os.path.join(src_dir, 'third_party', 'abseil-cpp')
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
@@ -691,6 +669,29 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
 
         cmakecmd.extend([sub_src_dir])
         build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+    finally:
+        shutil.rmtree(sub_build_dir, ignore_errors=False)
+
+    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
+    sub_install_dir = ext_build_dir()
+    sub_build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+        cmakecmd.extend(['-Dprotobuf_BUILD_TESTS:BOOL=OFF',
+                         '-Dprotobuf_WITH_ZLIB:BOOL=ON',
+                         '-Dprotobuf_MSVC_STATIC_RUNTIME:BOOL=OFF',
+                         '-Dprotobuf_BUILD_SHARED_LIBS:BOOL=OFF',
+                         '-Dprotobuf_ABSL_PROVIDER=package'])
+
+        cmakecmd.extend([sub_src_dir])
+        build_and_install_cmakecmd(cmakecmd, sub_build_dir)
+
+        orig_file_2 = os.path.join(sub_install_dir, 'lib', 'cmake', 'protobuf', 'protobuf-config.cmake')
+        if is_windows():
+            orig_file_2 = os.path.join(sub_install_dir, 'cmake', 'protobuf-config.cmake')
+        patch_file(orig_file_2,
+                   from_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_rel_dir}/${_basename}${_ext}'],
+                   to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
