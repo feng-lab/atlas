@@ -709,7 +709,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
                          '-DgRPC_BUILD_TESTS:BOOL=OFF',
-                         '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF',
+                         '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF' if is_windows() else '',
                          '-DgRPC_ZLIB_PROVIDER:STRING=package',
                          '-DgRPC_PROTOBUF_PROVIDER=package',
                          '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
@@ -1838,6 +1838,8 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
     bak_file4 = orig_file4 = None
+    bak_file5 = orig_file5 = None
+    bak_file6 = orig_file6 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -1874,6 +1876,19 @@ def build_vtk(src_dir: str, install_dir: str):
                                          r'set(CMAKE_CXX_STANDARD 17)',
                                          ])
 
+        if is_windows():
+            orig_file5 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.txx')
+            bak_file5 = patch_file(orig_file5,
+                                   from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope();', ],
+                                   to_texts=['bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()\n'
+                                             '{ return vtkSMPThreadPool::GetInstance().IsParallelScope(); }\n'
+                                             'template<int> bool __dummyIsParallelScope() { return false; }', ])
+
+            orig_file6 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.cxx')
+            bak_file6 = patch_file(orig_file6,
+                                   from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
+                                   to_texts=['bool __dummyIsParallelScope<1>()', ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -1895,7 +1910,6 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
                          '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB',
                          '-DTBB_DIR:PATH=' + intel_sw_dir() + '/tbb/latest/lib/cmake/tbb',
-                         '-DKWSYS_CXX_STANDARD=14',
                          ])
 
         cmakecmd.extend([src_dir])
@@ -1906,6 +1920,9 @@ def build_vtk(src_dir: str, install_dir: str):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
+        if is_windows():
+            os.replace(bak_file5, orig_file5)
+            os.replace(bak_file6, orig_file6)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
