@@ -116,12 +116,12 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 * $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_CXX_STANDARD 17)
 
 ## Minimum macOS Defines
-* $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+* $Repository_DIR/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 * $Repository_DIR/util/build_ext_libs.py: def macos_min_version() ...
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: change all -mmacosx-version-min=10.15
-* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: change all -mmacosx-version-min=10.15
-* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
-* $SuiteSparse_Repo/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: change all -mmacosx-version-min=11.0
+* $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: change all -mmacosx-version-min=11.0
+* $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
+* $SuiteSparse_Repo/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 
 ## Visual Studio Update
 * $Repository_DIR/util/common_dirs.py: 200: def vs_install_dir() -> str ...

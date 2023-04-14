@@ -11,7 +11,7 @@ from common_dirs import *
 
 
 def macos_min_version():
-    return '10.15'
+    return '11.0'
 
 
 def cpp_standard() -> int:
