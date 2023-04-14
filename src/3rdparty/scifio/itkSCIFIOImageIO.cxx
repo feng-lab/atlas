@@ -476,6 +476,9 @@ bool SCIFIOImageIO::CanReadFile(const char* FileNameToRead)
 #ifdef _WIN32
   DWORD bytesWritten;
   bool r = WriteFile(m_Pipe[1], command.c_str(), command.size(), &bytesWritten, NULL);
+  if (!r) {
+    itkExceptionMacro(<< "Only wrote " << bytesWritten << " of " << command.size() << " bytes!");
+  }
 #else
   const ssize_t writtenBytes = write(m_Pipe[1], command.c_str(), command.size());
   if (writtenBytes < static_cast<ssize_t>(command.size())) {

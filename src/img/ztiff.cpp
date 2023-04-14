@@ -12,7 +12,6 @@
 #include <cmath>
 #include <set>
 #include <sstream>
-#include <bit>
 
 namespace {
 

@@ -4,7 +4,6 @@
 #include "zimgsliceprovider.h"
 #include "zlog.h"
 #include <boost/endian/conversion.hpp>
-#include <bit>
 
 namespace nim {
 

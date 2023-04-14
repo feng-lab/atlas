@@ -69,40 +69,40 @@ else ()
   print_target_properties(IPP::ipps)
   print_target_properties(IPP::ippvm)
   print_target_properties(IPP::ippcore)
-#  if (WIN32)
-#    set(IPP_PATH "${INTEL_PATH}\\ipp")
-#  else (WIN32)
-#    set(IPP_PATH ${INTEL_PATH}/ipp)
-#  endif (WIN32)
-#  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
-#  if (WIN32)
-#    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-#        ${IPP_PATH}/lib/intel64/ippimt.lib
-#        ${IPP_PATH}/lib/intel64/ippcoremt.lib
-#        ${IPP_PATH}/lib/intel64/ippvmmt.lib
-#        ${IPP_PATH}/lib/intel64/ippsmt.lib
-#        ${IPP_PATH}/lib/intel64/ippcvmt.lib
-#        ${IPP_PATH}/lib/intel64/ippccmt.lib)
-#  elseif (APPLE)
-#    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-#        ${IPP_PATH}/lib/libippi.a
-#        ${IPP_PATH}/lib/libippcore.a
-#        ${IPP_PATH}/lib/libippvm.a
-#        #${IPP_PATH}/lib/libipps.a
-#        ${IPP_PATH}/lib/libippcv.a
-#        ${IPP_PATH}/lib/libippcc.a
-#        ${INTEL_PATH}/lib/libirc.a
-#        ${INTEL_PATH}/lib/libsvml.a
-#        ${INTEL_PATH}/lib/libimf.a)
-#  else ()
-#    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-#        ${IPP_PATH}/lib/intel64/libippi.a
-#        ${IPP_PATH}/lib/intel64/libippcore.a
-#        ${IPP_PATH}/lib/intel64/libippvm.a
-#        ${IPP_PATH}/lib/intel64/libipps.a
-#        ${IPP_PATH}/lib/intel64/libippcv.a
-#        ${IPP_PATH}/lib/intel64/libippcc.a)
-#  endif ()
+  #  if (WIN32)
+  #    set(IPP_PATH "${INTEL_PATH}\\ipp")
+  #  else (WIN32)
+  #    set(IPP_PATH ${INTEL_PATH}/ipp)
+  #  endif (WIN32)
+  #  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
+  #  if (WIN32)
+  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+  #        ${IPP_PATH}/lib/intel64/ippimt.lib
+  #        ${IPP_PATH}/lib/intel64/ippcoremt.lib
+  #        ${IPP_PATH}/lib/intel64/ippvmmt.lib
+  #        ${IPP_PATH}/lib/intel64/ippsmt.lib
+  #        ${IPP_PATH}/lib/intel64/ippcvmt.lib
+  #        ${IPP_PATH}/lib/intel64/ippccmt.lib)
+  #  elseif (APPLE)
+  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+  #        ${IPP_PATH}/lib/libippi.a
+  #        ${IPP_PATH}/lib/libippcore.a
+  #        ${IPP_PATH}/lib/libippvm.a
+  #        #${IPP_PATH}/lib/libipps.a
+  #        ${IPP_PATH}/lib/libippcv.a
+  #        ${IPP_PATH}/lib/libippcc.a
+  #        ${INTEL_PATH}/lib/libirc.a
+  #        ${INTEL_PATH}/lib/libsvml.a
+  #        ${INTEL_PATH}/lib/libimf.a)
+  #  else ()
+  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+  #        ${IPP_PATH}/lib/intel64/libippi.a
+  #        ${IPP_PATH}/lib/intel64/libippcore.a
+  #        ${IPP_PATH}/lib/intel64/libippvm.a
+  #        ${IPP_PATH}/lib/intel64/libipps.a
+  #        ${IPP_PATH}/lib/intel64/libippcv.a
+  #        ${IPP_PATH}/lib/intel64/libippcc.a)
+  #  endif ()
   #message(STATUS "IPP_INCLUDE_DIRS: ${IPP_INCLUDE_DIRS}")
   #message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
 endif ()
@@ -242,23 +242,13 @@ find_package(Ceres REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(Ceres::ceres)
 
-if (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
-  set(Boost_USE_STATIC_LIBS ON)
-  find_package(Boost 1.73.0 REQUIRED
-               COMPONENTS
-               headers context filesystem program_options regex system thread
-               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-               )
-  print_target_properties(Boost::headers)
-else (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
-  set(Boost_USE_STATIC_LIBS ON)
-  find_package(Boost 1.73.0 REQUIRED
-               COMPONENTS
-               headers
-               PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-               )
-  print_target_properties(Boost::headers)
-endif (${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} LESS 3.17)
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost 1.82.0 REQUIRED
+             COMPONENTS
+             headers context filesystem program_options regex system thread
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
+             )
+print_target_properties(Boost::headers)
 
 find_package(Snappy REQUIRED
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)

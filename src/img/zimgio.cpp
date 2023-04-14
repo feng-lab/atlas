@@ -174,7 +174,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                     .arg(res[0].toQString()));
               }
               // check whether dimension size match
-              for (auto dim : res[0].dimensions()) {
+              for (auto dim : ZImgInfo::dimensions()) {
                 if (expandXY) {
                   if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                       res[s].size(dim) != res[0].size(dim)) {
@@ -244,7 +244,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                       .arg(res[s].toQString()));
                 }
                 // check whether dimension size match
-                for (auto dim : res[s].dimensions()) {
+                for (auto dim : ZImgInfo::dimensions()) {
                   if (expandXY) {
                     if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                         res[s].size(dim) != tmpInfo[s].size(dim)) {
@@ -340,7 +340,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                         res[0].toString()));
         }
         // check whether dimension size match
-        for (auto dim : res[0].dimensions()) {
+        for (auto dim : ZImgInfo::dimensions()) {
           if (expandXY) {
             if (dim != Dimension::X && dim != Dimension::Y && dim != catDim && res[s].size(dim) != res[0].size(dim)) {
               throw ZIOException(
@@ -413,7 +413,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
                 .arg(res[s].toQString()));
           }
           // check whether dimension size match
-          for (auto dim : res[s].dimensions()) {
+          for (auto dim : ZImgInfo::dimensions()) {
             if (expandXY) {
               if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                   res[s].size(dim) != tmpInfo[s].size(dim)) {
