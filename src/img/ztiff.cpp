@@ -443,7 +443,7 @@ QString ZTiffIFD::imageDescriptionAsQString() const
     return QString::fromUtf8(m_entries[i].dataArray<char>(), m_entries[i].count() - 1);
   }
 
-  return QString();
+  return {};
 }
 
 uint16_t ZTiffIFD::orientation() const

@@ -875,6 +875,12 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                 if (!img) {
                   blockIsEmpty.set(taskIdx);
                 } else {
+                  double minv;
+                  double maxv;
+                  img->computeMinMax(minv, maxv);
+                  if (minv == 255) {
+                    LOG(INFO) << "found saturated block: " << minv << " " << maxv;
+                  }
                   memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
                 }
               });
@@ -909,11 +915,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
       processEventsAndMaybeCancel(cancellationToken);
 
+      const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[i];
       if (blockIsEmpty.at(i)) {
-        *std::get<1>(pendingTasks[i]) = glm::uvec4(0, 0, 0, m_emptyFlag);
+        *pageTableEntry = glm::uvec4(0, 0, 0, m_emptyFlag);
         continue;
       }
-      const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[i];
       insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntry);
       m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntry->xyz(),
                                                      imageBlockSize,
