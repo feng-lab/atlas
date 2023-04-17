@@ -320,13 +320,12 @@ if (WIN32)
   else ()
     target_compile_options(${LIBRARY_NAME} PUBLIC /MD)
   endif ()
-  target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:inline) #
-  target_compile_options(${LIBRARY_NAME} PUBLIC /permissive-)
-  target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:preprocessor)
-  target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
-  # target_compile_options(${LIBRARY_NAME} PUBLIC /Zi)
+  # standard conformance
+  target_compile_options(${LIBRARY_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline /Zc:preprocessor /Zc:lambda)
+  target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
   target_compile_options(${LIBRARY_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
 
+  target_compile_options(${LIBRARY_NAME} PUBLIC /arch:AVX)
   target_link_options(${LIBRARY_NAME} PUBLIC /LTCG:STATUS)
 
   # for some files

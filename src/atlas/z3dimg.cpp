@@ -875,14 +875,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                 if (!img) {
                   blockIsEmpty.set(taskIdx);
                 } else {
-#if defined(__linux__)
-                  double minv;
-                  double maxv;
-                  img->computeMinMax(minv, maxv);
-                  if (minv == 255) {
-                    LOG(INFO) << "found saturated block: " << minv << " " << maxv;
-                  }
-#endif
                   memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
                 }
               });

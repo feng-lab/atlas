@@ -649,12 +649,13 @@ if (WIN32)
   else()
     target_compile_options(${APP_NAME} PUBLIC /MD)
   endif()
-  target_compile_options(${APP_NAME} PUBLIC /Zc:inline) #
-  target_compile_options(${APP_NAME} PUBLIC /permissive-)
-  target_compile_options(${APP_NAME} PUBLIC /Zc:preprocessor)
-  target_compile_options(${APP_NAME} PUBLIC /arch:AVX)
-  # target_compile_options(${APP_NAME} PUBLIC /Zi)
+  # standard conformance
+  target_compile_options(${APP_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline /Zc:preprocessor /Zc:lambda)
+  target_compile_options(${APP_NAME} PUBLIC /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
   target_compile_options(${APP_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
+
+  #
+  target_compile_options(${APP_NAME} PUBLIC /arch:AVX)
 
   #set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
