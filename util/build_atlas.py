@@ -51,6 +51,8 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
     print('buildDIR:', atlas_build_dir())
     print('useNinja:', use_ninja())
 
+    skip_test = skip_test or use_asan or debug_version
+
     cmakecmd = get_cmake_cmd_common_part()
     if use_asan:
         cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=ON',
@@ -78,7 +80,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
             subprocess.run(['MSBuild', 'ALL_BUILD.vcxproj', '/property:Configuration=Release', '/maxcpucount'],
                            cwd=atlas_build_dir(), shell=True, check=True, env=env)
 
-        if not skip_test and not use_asan:
+        if not skip_test:
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
@@ -95,7 +97,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
             subprocess.run(['make', '-j' + str(os.cpu_count())],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
 
-        if not skip_test and not use_asan:
+        if not skip_test:
             env['CTEST_PARALLEL_LEVEL'] = str(os.cpu_count())
             subprocess.run([get_ctest_binary(), '--extra-verbose'],
                            cwd=atlas_build_dir(), shell=False, check=True, env=env)
