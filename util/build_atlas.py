@@ -46,7 +46,7 @@ def get_cmake_cmd_common_part():
                     ]
 
 
-def build_atlas(use_asan: bool = False, skip_test: bool = False):
+def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: bool = False):
     print('srcDIR:', atlas_repository_dir())
     print('buildDIR:', atlas_build_dir())
     print('useNinja:', use_ninja())
@@ -54,6 +54,9 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False):
     cmakecmd = get_cmake_cmd_common_part()
     if use_asan:
         cmakecmd.extend(['-DATLAS_SANITIZE_ADDRESS:BOOL=ON',
+                         ])
+    if debug_version:
+        cmakecmd.extend(['-DATLAS_DEBUG_VERSION:BOOL=ON',
                          ])
     cmakecmd.extend([atlas_repository_dir()])
 
@@ -109,6 +112,7 @@ python build_atlas.py [--use-asan] [--skip-test]
     )
     parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
     parser.add_argument("--skip-test", action='store_true', help="skip test")
+    parser.add_argument("--debug-version", action='store_true', help="debug version")
     args = parser.parse_args()
 
-    build_atlas(use_asan=args.use_asan, skip_test=args.skip_test)
+    build_atlas(use_asan=args.use_asan, skip_test=args.skip_test, debug_version=args.debug_version)
