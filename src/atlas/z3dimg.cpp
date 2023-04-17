@@ -833,8 +833,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     // use PBO
     boost::dynamic_bitset blockIsEmpty(pendingTasks.size(), 0);
 
-    {
-      // scope for glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+    { // scope for glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       auto bufferGuard = folly::makeGuard([]() {
         glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       });
@@ -842,9 +841,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       processEventsAndMaybeCancel(cancellationToken);
 
       size_t batchSize = m_blockUploadingBatchSize;
-      if (batchSize == 0) {
-        batchSize = pendingTasks.size();
-      }
+      CHECK(batchSize > 0);
 
       size_t taskIdx = 0;
       while (taskIdx < pendingTasks.size()) {
