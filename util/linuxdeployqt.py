@@ -211,7 +211,8 @@ def create_desktop_file(path):
     text_file.close()
 
 
-def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir, use_asan: bool = False):
+def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
+                 is_debug_version: bool = False):
     from distutils.dir_util import copy_tree
 
     if not os.path.exists(dest_dir):
@@ -239,7 +240,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
     shutil.copy2(os.path.join(os.path.dirname(executable), 'Atlas.png'), dest_dir)
 
     # Strip executable
-    if not use_asan:
+    if not is_debug_version:
         strip(dest_file)
     # https://github.com/NixOS/patchelf/issues/94
     # todo: check if it is needed as we set it in cmake already
@@ -319,7 +320,7 @@ def build_appimage(appdir, appimage):
     return res
 
 
-def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, use_asan: bool = False):
+def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, is_debug_version: bool = False):
     blacklist = [
         'linux-vdso.so.1',
         'ld-linux-x86-64.so.2',
@@ -360,4 +361,5 @@ def linuxdeployqt(binary_name: str, deploy_dir: str, qt_base_dir: str, use_asan:
     dependencies = merge_dicts(dependencies, exedeps)
 
     info("Building AppDir in '%s'" % deploy_dir)
-    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir, use_asan=use_asan)
+    build_appdir(deploy_dir, binary_name, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
+                 is_debug_version=is_debug_version)

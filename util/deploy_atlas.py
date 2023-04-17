@@ -32,7 +32,7 @@ def update_maintenance_pacakge_xml_version(template_file: str, file: str):
     tree.write(file, encoding="utf-8", xml_declaration=True)
 
 
-def build_atlas_package(use_asan: bool = False):
+def build_atlas_package(is_debug_version: bool = False):
     print('current interpreter: ' + sys.executable)
 
     binary_dir = common_dirs.atlas_binary_dir()
@@ -66,7 +66,7 @@ def build_atlas_package(use_asan: bool = False):
             linuxdeployqt.linuxdeployqt(os.path.join(binary_dir, app_name),
                                         os.path.join(common_dirs.deploy_target_dir(), 'Atlas.AppDir'),
                                         common_dirs.qt_base_dir(),
-                                        use_asan=use_asan)
+                                        is_debug_version=is_debug_version)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
@@ -264,9 +264,9 @@ def build_atlas_installer():
             shutil.move(os.path.join(common_dirs.deploy_target_dir(), suffix), target_folder)
 
 
-def deploy_atlas(use_asan: bool = False):
-    build_atlas_package(use_asan=use_asan)
-    if not use_asan:
+def deploy_atlas(is_debug_version: bool = False):
+    build_atlas_package(is_debug_version=is_debug_version)
+    if not is_debug_version:
         pack_atlas_package()
         build_atlas_installer()
 
@@ -276,11 +276,11 @@ if __name__ == "__main__":
         epilog=f"""
 Examples:
 
-python deploy_atlas.py [--use-asan]
+python deploy_atlas.py [--debug-version]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--use-asan", action='store_true', help="use sanitizers")
+    parser.add_argument("--debug-version", action='store_true', help="debug version")
     args = parser.parse_args()
 
-    deploy_atlas(use_asan=args.use_asan)
+    deploy_atlas(is_debug_version=args.debug_version)
