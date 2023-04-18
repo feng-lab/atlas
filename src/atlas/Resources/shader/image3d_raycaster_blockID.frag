@@ -17,9 +17,7 @@ uniform float sampling_rate;
 uniform float ze_to_screen_pixel_voxel_size;
 
 uniform sampler2D ray_entry_tex_coord;
-uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
-uniform sampler2D ray_exit_eye_coord;
 
 uniform sampler2D last_ray_depth;
 
@@ -90,20 +88,8 @@ void main()
   } else {
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-//#if GLSL_VERSION >= 130
-//    float zeFront = texture(ray_entry_eye_coord, texCoords).z;
-//    float zeBack = texture(ray_exit_eye_coord, texCoords).z;
-//#else
-//    float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
-//    float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
-//#endif
-#if GLSL_VERSION >= 130
-    float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-    float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-#else
-    float zeFront = texelFetch2D(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-    float zeBack = texelFetch2D(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-#endif
+    float zeFront = entryTexCoordAndZ.w;
+    float zeBack = exitTexCoordAndZ.w;
     int curLevel = 0;
 
 //    uint missBlockIDs[16] = uint[16](0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u, 0u,0u,0u,0u);

@@ -1121,11 +1121,11 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 #endif
 
     // render back texture
-    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
 
     m_exitTarget.resize(currentOutport.size());
     m_exitTarget.bind();
-    glDrawBuffers(2, g_drawBuffers);
+    glDrawBuffers(1, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_BACK : GL_FRONT);
 
@@ -1137,7 +1137,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     // render front texture
     m_entryTarget.resize(currentOutport.size());
     m_entryTarget.bind();
-    glDrawBuffers(2, g_drawBuffers);
+    glDrawBuffers(1, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_FRONT : GL_BACK);
 
@@ -1150,10 +1150,10 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
 
+    // m_entryTarget.attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
+
     m_imgRaycasterRenderer.setEntryExitInfo(m_entryTarget.attachment(GL_COLOR_ATTACHMENT0),
-                                            m_entryTarget.attachment(GL_COLOR_ATTACHMENT1),
-                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT0),
-                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT1));
+                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT0));
   }
 
   glEnable(GL_BLEND);

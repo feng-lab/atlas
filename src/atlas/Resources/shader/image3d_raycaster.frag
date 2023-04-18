@@ -24,9 +24,7 @@ uniform float ze_to_zw_b;
 uniform float ze_to_screen_pixel_voxel_size;
 
 uniform sampler2D ray_entry_tex_coord;
-uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
-uniform sampler2D ray_exit_eye_coord;
 
 uniform sampler2D last_ray_depth;
 uniform sampler2D last_color;
@@ -252,13 +250,8 @@ void main()
 
     //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
     // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-#if GLSL_VERSION >= 130
-    float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-    float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-#else
-    float zeFront = texelFetch2D(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-    float zeBack = texelFetch2D(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-#endif
+    float zeFront = entryTexCoordAndZ.w;
+    float zeBack = exitTexCoordAndZ.w;
     int curLevel = 0;
 
     vec3 rayVector = exitRayPosition - startRayPosition;
@@ -400,7 +393,7 @@ void main()
       fragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
-      fragDepth = entryTexCoordAndZ.w;
+      fragDepth = ze_to_zw_a / zeFront + ze_to_zw_b;
 #else
       fragDepth = 1.0;
 #endif

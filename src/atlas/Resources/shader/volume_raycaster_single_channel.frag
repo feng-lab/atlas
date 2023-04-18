@@ -12,9 +12,7 @@ uniform float ze_to_zw_a;
 uniform float ze_to_zw_b;
 
 uniform sampler2D ray_entry_tex_coord;
-uniform sampler2D ray_entry_eye_coord;
 uniform sampler2D ray_exit_tex_coord;
-uniform sampler2D ray_exit_eye_coord;
 
 uniform sampler3D volume_1;
 uniform vec3 volume_dimensions_1;
@@ -154,18 +152,13 @@ void main()
     if (rayDepth >= 0.0) {
       //http://www.opengl.org/archives/resources/faq/technical/depthbuffer.htm
       // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
-#if GLSL_VERSION >= 130
-      float zeFront = texelFetch(ray_entry_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-      float zeBack = texelFetch(ray_exit_eye_coord, ivec2(gl_FragCoord.xy), 0).z;
-#else
-      float zeFront = texture2D(ray_entry_eye_coord, texCoords).z;
-      float zeBack = texture2D(ray_exit_eye_coord, texCoords).z;
-#endif
+      float zeFront = entryTexCoordAndZ.w;
+      float zeBack = exitTexCoordAndZ.w;
       float ze = zeFront + rayDepth * (zeBack-zeFront);
       gl_FragDepth = ze_to_zw_a / ze + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
-      gl_FragDepth = entryTexCoordAndZ.w;
+      gl_FragDepth = ze_to_zw_a / entryTexCoordAndZ.w + ze_to_zw_b;
 #else
       gl_FragDepth = 1.0;
 #endif

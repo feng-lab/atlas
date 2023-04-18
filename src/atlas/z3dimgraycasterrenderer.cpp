@@ -29,10 +29,8 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
   , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_compositingMode("Compositing")
-  , m_entryTexCoordTexture(nullptr)
-  , m_entryEyeCoordTexture(nullptr)
-  , m_exitTexCoordTexture(nullptr)
-  , m_exitEyeCoordTexture(nullptr)
+  , m_entryTexCoordAndZeTexture(nullptr)
+  , m_exitTexCoordAndZeTexture(nullptr)
   , m_opaque(false)
   // , m_alpha(1.0)
   , m_VAO(1)
@@ -163,21 +161,15 @@ void Z3DImgRaycasterRenderer::addQuad(const ZMesh& quad)
     return;
   }
   m_quads.push_back(quad);
-  m_entryTexCoordTexture = nullptr;
-  m_entryEyeCoordTexture = nullptr;
-  m_exitTexCoordTexture = nullptr;
-  m_exitEyeCoordTexture = nullptr;
+  m_entryTexCoordAndZeTexture = nullptr;
+  m_exitTexCoordAndZeTexture = nullptr;
 }
 
-void Z3DImgRaycasterRenderer::setEntryExitInfo(const Z3DTexture* entryTexCoordTexture,
-                                               const Z3DTexture* entryEyeCoordTexture,
-                                               const Z3DTexture* exitTexCoordTexture,
-                                               const Z3DTexture* exitEyeCoordTexture)
+void Z3DImgRaycasterRenderer::setEntryExitInfo(const Z3DTexture* entryTexCoordAndZeTexture,
+                                               const Z3DTexture* exitTexCoordAndZeTexture)
 {
-  m_entryTexCoordTexture = entryTexCoordTexture;
-  m_entryEyeCoordTexture = entryEyeCoordTexture;
-  m_exitTexCoordTexture = exitTexCoordTexture;
-  m_exitEyeCoordTexture = exitEyeCoordTexture;
+  m_entryTexCoordAndZeTexture = entryTexCoordAndZeTexture;
+  m_exitTexCoordAndZeTexture = exitTexCoordAndZeTexture;
   m_quads.clear();
 }
 
@@ -317,8 +309,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   }
 
   if (m_quads.empty()) {
-    if (m_entryTexCoordTexture == nullptr || m_entryEyeCoordTexture == nullptr || m_exitTexCoordTexture == nullptr ||
-        m_exitEyeCoordTexture == nullptr) {
+    if (m_entryTexCoordAndZeTexture == nullptr || m_exitTexCoordAndZeTexture == nullptr) {
       return;
     }
   } else {
@@ -616,10 +607,8 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       m_image3DRaycasterBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+      m_image3DRaycasterBlockIDsShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
+      m_image3DRaycasterBlockIDsShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
 
       m_image3DRaycasterBlockIDsShader.setUniform("sampling_rate", m_samplingRate.get());
 
@@ -864,10 +853,8 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       m_image3DRaycasterShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
-      m_image3DRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-      m_image3DRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-      m_image3DRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
-      m_image3DRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+      m_image3DRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
+      m_image3DRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
 
       m_image3DRaycasterShader.bindTexture("last_color", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
       m_image3DRaycasterShader.bindTexture("last_ray_depth", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1));
@@ -960,10 +947,8 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye eye, const std::vector<si
   m_scRaycasterShader.setUniform("ze_to_zw_a", a);
 
   // entry exit points
-  m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordTexture);
-  m_scRaycasterShader.bindTexture("ray_entry_eye_coord", m_entryEyeCoordTexture);
-  m_scRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordTexture);
-  m_scRaycasterShader.bindTexture("ray_exit_eye_coord", m_exitEyeCoordTexture);
+  m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
+  m_scRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
 
   if (m_compositingMode.get() == "ISO Surface") {
     m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());

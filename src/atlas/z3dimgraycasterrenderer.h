@@ -54,10 +54,8 @@ public:
 
   // For 3D Raycasting rendering, once called, 2d quads will be cleared and renderer
   // switch to 3D mode
-  void setEntryExitInfo(const Z3DTexture* entryTexCoordTexture,
-                        const Z3DTexture* entryEyeCoordTexture,
-                        const Z3DTexture* exitTexCoordTexture,
-                        const Z3DTexture* exitEyeCoordTexture);
+  void setEntryExitInfo(const Z3DTexture* entryTexCoordAndZeTexture,
+                        const Z3DTexture* exitTexCoordAndZeTexture);
 
   void setFastRendering(bool v)
   {
@@ -183,10 +181,8 @@ protected:
 
 private:
   std::vector<ZMesh> m_quads;
-  const Z3DTexture* m_entryTexCoordTexture;
-  const Z3DTexture* m_entryEyeCoordTexture;
-  const Z3DTexture* m_exitTexCoordTexture;
-  const Z3DTexture* m_exitEyeCoordTexture;
+  const Z3DTexture* m_entryTexCoordAndZeTexture;
+  const Z3DTexture* m_exitTexCoordAndZeTexture;
 
   bool m_opaque;
   // double m_alpha; // only takes effect when m_opaque is true
