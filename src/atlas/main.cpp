@@ -41,6 +41,13 @@ const char* __asan_default_options()
   return "detect_leaks=0";
 }
 }
+#else
+extern "C" {
+const char* __asan_default_options()
+{
+  return "detect_leaks=1:log_path=asan.log";
+}
+}
 #endif
 
 int main(int argc, char* argv[])
@@ -132,9 +139,7 @@ int main(int argc, char* argv[])
 
     ZSystemInfo::instance().logOSInfo();
 
-#if !defined(ATLAS_SANITIZE_ADDRESS)
-    LOG(INFO) << __asan_default_options();
-#endif
+    LOG(INFO) << "ASAN_OPTIONS: " << __asan_default_options();
 
     // ZServiceManager sm;
 
