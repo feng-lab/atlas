@@ -48,10 +48,15 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
+
+if (ATLAS_SANITIZE_ADDRESS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+endif ()
+
 option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols." OFF)
 
-if (ATLAS_SANITIZE_ADDRESS OR ATLAS_DEBUG_VERSION)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+if (ATLAS_DEBUG_VERSION)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O1")
 endif ()
 
 # generate a version string from git tag-hash and current build time

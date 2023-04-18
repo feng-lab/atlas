@@ -22,7 +22,7 @@ ZImgCache::ZImgCache()
 #else
 ZImgCache& ZImgCache::instance()
 {
-  static ZImgCache imgCache(true);
+  static ZImgCache imgCache(false);
   return imgCache;
 }
 

@@ -10,7 +10,7 @@ namespace nim {
 
 ZImgRegionCache& ZImgRegionCache::instance()
 {
-  static ZImgRegionCache imgRegionCache(true);
+  static ZImgRegionCache imgRegionCache(false);
   return imgRegionCache;
 }
 
