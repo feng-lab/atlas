@@ -2240,9 +2240,9 @@ template<typename TVoxel, typename TVoxelImg>
 void ZImg::pasteImgMax_Impl(const ZImg& img, const ZVoxelCoordinate& start)
 {
   using TCoordinate = ZVoxelCoordinate::value_type;
-  size_t desX = std::max(start.x, TCoordinate(0));
+  auto desX = std::max(start.x, TCoordinate(0));
   size_t srcX = desX - start.x;
-  size_t desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
+  auto desXEnd = std::min(start.x + static_cast<TCoordinate>(img.width()), static_cast<TCoordinate>(width()));
   size_t rowVoxelNumber = desXEnd - desX;
 
   for (TCoordinate desT = std::max(start.t, TCoordinate(0));

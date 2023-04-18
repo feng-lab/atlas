@@ -831,6 +831,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       std::vector<uint32_t> missingBlockIDs;
 
       ccSet.unsafe_erase(0_u32);
+      if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end() || attachment0ContainsLastBlock) {
+        VLOG(1) << "use last block";
+      }
       ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
       if (!ccSet.empty()) {
         CHECK(ccSet.size() < m_img->numCachedImages(c) * 10);
