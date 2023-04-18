@@ -337,6 +337,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
               this,
               &Z3DImgFilter::channelRangeChanged);
     }
+    channelRangeChanged();
 
     bool is2DImage = m_3dImg->is2DData();
     glm::uvec3 volDim = m_3dImg->dimensions();

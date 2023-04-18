@@ -26,6 +26,7 @@ void Z3DAnimationDoc::bindView(Z3DRenderingEngine* v)
   connect(m_view, &Z3DRenderingEngine::destroyed, this, &Z3DAnimationDoc::releaseView);
   for (const auto& idPack : m_idToAnimationPacks) {
     idPack.second->animation->bindView(m_view);
+    idPack.second->animation->setCurrentTime(0);
   }
   LOG(INFO) << "bind 3d view done";
 }

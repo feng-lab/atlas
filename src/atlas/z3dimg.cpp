@@ -34,12 +34,38 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
                QObject* parent)
   : QObject(parent)
   , m_imgPack(imgPack)
-  , m_isVolumeDownsampled(false)
   , m_channelDisplayRanges(displayRanges)
 {
-  CHECK(m_imgPack.imgInfo().numChannels == m_channelDisplayRanges.size())
-    << m_imgPack.imgInfo().numChannels << " " << m_channelDisplayRanges.size();
-  readVolumes();
+  const ZImgInfo& info = m_imgPack.imgInfo();
+  if (info.depth > 1) {
+    m_widthScale = info.width <= 512_uz ? 1.0 : 512.0 / info.width;
+    m_heightScale = info.height <= 512_uz ? 1.0 : 512.0 / info.height;
+    m_depthScale = info.depth <= 512_uz ? 1.0 : 512.0 / info.depth;
+  } else {
+    Z3DGpuInfo::instance()
+      .getDataScaleForTexture(info.width, info.height, info.depth, m_widthScale, m_heightScale, m_depthScale);
+  }
+  m_isVolumeDownsampled = m_widthScale != 1.0 || m_heightScale != 1.0 || m_depthScale != 1.0;
+
+  m_volumeDimension = glm::uvec3(info.width * m_widthScale, info.height * m_heightScale, info.depth * m_depthScale);
+  m_volumeSpacing = glm::vec3(1.f / m_widthScale, 1.f / m_heightScale, 1.f / m_depthScale);
+
+  m_nChannels = m_imgPack.imgInfo().numChannels;
+
+#if 0
+  // shader limit is 20 channels
+  // limited by Max FS Texture Image Units
+  // see https://www.opengl.org/wiki/Shader#Resource_limitations
+  size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
+#else
+  size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
+#endif
+  if (m_nChannels > maxPossibleChannels) {
+    QString errMsg =
+      QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels);
+    LOG(WARNING) << errMsg;
+    m_nChannels = maxPossibleChannels;
+  }
 
   if (m_isVolumeDownsampled) {
     auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
@@ -330,7 +356,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
   }
 
-  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumes[0]->spacing();
+  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
   m_volumeVoxelWorldSize =
     std::max(std::max(m_volumeVoxelWorldDimension.x, m_volumeVoxelWorldDimension.y), m_volumeVoxelWorldDimension.z);
 
@@ -351,13 +377,12 @@ void Z3DImg::setScale(const glm::vec3& scale)
               << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
               << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
   }
-  LOG(INFO) << "volumeDimension: " << m_volumes[0]->dimensions()
-            << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
+  LOG(INFO) << "volumeDimension: " << m_volumeDimension << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
             << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
 
   CHECK(m_numLevels > 0);
   size_t l = m_numLevels - 1;
-  m_imageDimensions[l] = m_volumes[0]->dimensions();
+  m_imageDimensions[l] = m_volumeDimension;
   m_imageBounds[l] = m_imageDimensions[l] - 1_u32;
 
   LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
@@ -577,42 +602,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 void Z3DImg::readVolumes()
 {
   m_volumes.clear();
-  const ZImgInfo& info = m_imgPack.imgInfo();
-  m_nChannels = info.numChannels;
 
-#if 0
-  // shader limit is 20 channels
-  // limited by Max FS Texture Image Units
-  // see https://www.opengl.org/wiki/Shader#Resource_limitations
-  size_t maxPossibleChannels = std::min(20, (Z3DGpuInfoInstance.maxTextureImageUnits() - 4) / 2);
-#else
-  size_t maxPossibleChannels = Z3DGpuInfo::instance().maxArrayTextureLayers();
-#endif
-  if (m_nChannels > maxPossibleChannels) {
-    Q_EMIT renderingError(
-      QString("Due to hardware limit, only first %1 channels of this image will be shown").arg(maxPossibleChannels));
-    m_nChannels = maxPossibleChannels;
-  }
-
-  double widthScale = 1.0;
-  double heightScale = 1.0;
-  double depthScale = 1.0;
-  Z3DGpuInfo::instance()
-    .getDataScaleForTexture(info.width, info.height, info.depth, widthScale, heightScale, depthScale);
-
-  if (widthScale != 1.0 || heightScale != 1.0 || depthScale != 1.0) {
-    m_isVolumeDownsampled = true;
-
-    if (m_imgPack.imgInfo().depth > 1) {
-      widthScale = info.width <= 512_uz ? 1.0 : 512.0 / info.width;
-      heightScale = info.height <= 512_uz ? 1.0 : 512.0 / info.height;
-      depthScale = info.depth <= 512_uz ? 1.0 : 512.0 / info.depth;
-    }
-
-    // return;
-  }
-
-  ZImg img = m_imgPack.resizedImg(info.width * widthScale, info.height * heightScale, info.depth * depthScale, 0);
+  ZImg img = m_imgPack.resizedImg(m_volumeDimension.x, m_volumeDimension.y, m_volumeDimension.z, 0);
 
   if (m_nChannels == 1) {
     if (!img.isType<uint8_t>()) {
@@ -621,8 +612,7 @@ void Z3DImg::readVolumes()
       img.normalize(m_channelDisplayRanges[0].x, m_channelDisplayRanges[0].y);
     }
 
-    auto vh =
-      std::make_unique<Z3DVolume>(img, glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale), glm::vec3(.0));
+    auto vh = std::make_unique<Z3DVolume>(img, m_volumeSpacing, glm::vec3(.0));
 
     m_volumes.emplace_back(std::move(vh));
   } else {
@@ -633,17 +623,16 @@ void Z3DImg::readVolumes()
       } else if (cImg.validBitCount() != 0 && cImg.validBitCount() != 8 && cImg.validBitCount() != 16) {
         cImg.normalize(m_channelDisplayRanges[i].x, m_channelDisplayRanges[i].y);
       }
-      auto vh = std::make_unique<Z3DVolume>(cImg,
-                                            glm::vec3(1.f / widthScale, 1.f / heightScale, 1.f / depthScale),
-                                            glm::vec3(.0));
+      auto vh = std::make_unique<Z3DVolume>(cImg, m_volumeSpacing, glm::vec3(.0));
 
       m_volumes.emplace_back(std::move(vh));
     } // for each cannel
   }
 
   for (size_t i = 0; i < m_nChannels; ++i) {
-    m_volumes[i]->setVolColor(
-      glm::vec3(info.channelColors[i].r / 255., info.channelColors[i].g / 255., info.channelColors[i].b / 255.));
+    m_volumes[i]->setVolColor(glm::vec3(m_imgPack.imgInfo().channelColors[i].r / 255.,
+                                        m_imgPack.imgInfo().channelColors[i].g / 255.,
+                                        m_imgPack.imgInfo().channelColors[i].b / 255.));
   }
 }
 

@@ -221,6 +221,13 @@ private:
   std::vector<glm::dvec2> m_channelDisplayRanges;
 
   size_t m_blockUploadingBatchSize = 100;
+
+  // scale for downsampled volumes
+  double m_widthScale = 1.0;
+  double m_heightScale = 1.0;
+  double m_depthScale = 1.0;
+  glm::uvec3 m_volumeDimension;
+  glm::vec3 m_volumeSpacing;
 };
 
 } // namespace nim

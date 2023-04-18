@@ -108,7 +108,7 @@ if __name__ == "__main__":
         epilog=f"""
 Examples:
 
-python build_atlas.py [--use-asan] [--skip-test]
+python build_atlas.py [--use-asan] [--skip-test] [--debug-version]
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
