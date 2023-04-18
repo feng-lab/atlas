@@ -22,10 +22,6 @@ def use_clang_in_linux() -> bool:
     return is_linux()
 
 
-def use_asan() -> bool:
-    return False
-
-
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
@@ -1076,7 +1072,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                          '-DBUILD_TESTS:BOOL=OFF',
                          '-DBOOST_LINK_STATIC=ON',
                          '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if (use_asan or is_linux()) else 'OFF',
+                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan else 'OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:

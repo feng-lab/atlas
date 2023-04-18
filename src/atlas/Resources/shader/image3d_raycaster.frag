@@ -89,34 +89,34 @@ void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize
     for (int loop1=0; !finished && loop1<255; loop1++) {
       vec3 samplePos = startRayPosition + currentRayLength * rayVector;
 
-      #if GLSL_VERSION >= 130
+#if GLSL_VERSION >= 130
       float voxel = texture(volume, samplePos).r;
-      #else
+#else
       float voxel = texture3D(volume, samplePos).r;
-      #endif
+#endif
 
 
-      #ifdef MIP
-      #ifdef LOCAL_MIP
+#ifdef MIP
+#ifdef LOCAL_MIP
       if (voxel <= ch1V && ch1V >= local_MIP_threshold) {
         finished = true;
       } else if (voxel > ch1V) {
         ch1V = voxel;
         rayDepth = currentRayLength;
       }
-      #else
+#else
       if (voxel > ch1V) {
         ch1V = voxel;
         rayDepth = currentRayLength;
       }
       finished = ch1V >= 1.0;
-      #endif
-      #else
-      #if GLSL_VERSION >= 130
+#endif
+#else
+#if GLSL_VERSION >= 130
       vec4 color = texture(transfer_function, voxel);
-      #else
+#else
       vec4 color = texture1D(transfer_function, voxel);
-      #endif
+#endif
 
       if (color.a > 0.0) {
         color.a / sampling_rate;
@@ -126,7 +126,7 @@ void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize
           finished = true;
         }
       }
-      #endif // MIP
+#endif // MIP
 
       currentRayLength += stepSize;
       finished = finished || (currentRayLength > 1.0);

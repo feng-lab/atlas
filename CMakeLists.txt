@@ -48,8 +48,9 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
+option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols." OFF)
 
-if (ATLAS_SANITIZE_ADDRESS)
+if (ATLAS_SANITIZE_ADDRESS OR ATLAS_DEBUG_VERSION)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
 endif ()
 
@@ -79,6 +80,6 @@ add_subdirectory(src/img)
 add_subdirectory(src/atlas)
 
 option(BUILD_TESTING "Enable tests" ON)
-if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS))
+if (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS) AND (NOT ATLAS_DEBUG_VERSION))
   include(test/test.cmake)
-endif (BUILD_TESTING AND (NOT ATLAS_SANITIZE_ADDRESS))
+endif ()
