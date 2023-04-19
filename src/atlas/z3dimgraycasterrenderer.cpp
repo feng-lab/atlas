@@ -593,11 +593,12 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
   CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size())
     << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();
 
-  static int dummyidx = 0;
+  static int dummyidx = -1;
   ++dummyidx;
 
   size_t idx = 0;
   for (auto c : visibleIdxs) {
+    LOG(INFO) << "channel " << c;
     for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
       LOG(INFO) << "round " << round;
       ZBenchTimer btrb("render blockids");
