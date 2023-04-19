@@ -529,7 +529,7 @@ public:
   };
 
   // create empty image
-  ZImg();
+  ZImg() noexcept = default;
 
   // create image with size and attribute specified by info and set all data to default value
   // see allocate() for default voxel value
@@ -538,7 +538,7 @@ public:
   //
   ZImg(const ZImg& other);
 
-  ZImg(ZImg&& other) noexcept;
+  ZImg(ZImg&& other) noexcept = default;
 
   // read image from file, throw ZIOException if read failed, might throw ZException if can't allocate memory
   explicit ZImg(const QString& filename,
@@ -2463,6 +2463,11 @@ private:
   ZImgMetadata m_metadata;
   bool m_ownData = true;
 };
+
+inline void swap(ZImg& a, ZImg& b) noexcept
+{
+  a.swap(b);
+}
 
 template<typename TPixel>
 void image2DWrite(const TPixel* data, size_t width, size_t height, const QString& filename)

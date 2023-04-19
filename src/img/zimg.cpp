@@ -13,7 +13,6 @@
 #include <boost/endian/conversion.hpp>
 #ifdef ZIMG_USE_IPP
 #include <ippcore.h>
-#include <ippvm.h>
 #include <ipps.h>
 #include <ippi.h>
 #endif
@@ -197,7 +196,7 @@ ZImgSource tag_invoke(const json::value_to_tag<ZImgSource>&, const json::value& 
   if (jo.contains("expandWithMaxValue")) {
     expandWithMaxValue = jo.at("expandWithMaxValue").as_bool();
   }
-  return ZImgSource(filenames, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue);
+  return {filenames, catDim, catScenes, region, scene, format, expandXY, expandWithMaxValue};
 }
 
 ZImgSubBlock::~ZImgSubBlock() = default;
@@ -241,9 +240,9 @@ ZImgInfo ZImgTileSubBlock::readInfo() const
 {
   ZImgInfo info;
   ZImgIO::instance().readInfo(m_source, info);
-  info.voxelSizeX *= m_xRatio;
-  info.voxelSizeY *= m_yRatio;
-  info.voxelSizeZ *= m_zRatio;
+  info.voxelSizeX *= static_cast<double>(m_xRatio);
+  info.voxelSizeY *= static_cast<double>(m_yRatio);
+  info.voxelSizeZ *= static_cast<double>(m_zRatio);
   info.width = (info.width + m_xRatio - 1) / m_xRatio;
   info.height = (info.height + m_yRatio - 1) / m_yRatio;
   info.depth = (info.depth + m_zRatio - 1) / m_zRatio;
@@ -252,24 +251,17 @@ ZImgInfo ZImgTileSubBlock::readInfo() const
 
 //-----------------------------------------------------------------------------------
 
-ZImg::ZImg()
-  : m_ownData(true)
-{}
-
 ZImg::ZImg(ZImgInfo info)
   : m_info(std::move(info))
-  , m_ownData(true)
 {
   allocate();
 }
 
 ZImg::ZImg(const ZImg& other)
+  : m_thumbnail(other.m_thumbnail)
+  , m_info(other.m_info)
+  , m_metadata(other.m_metadata)
 {
-  m_info = other.m_info;
-  m_metadata = other.m_metadata;
-  m_thumbnail = other.m_thumbnail;
-  // m_ownData = other.m_ownData;
-  m_ownData = true;
   if (m_ownData) { // deep copy
     allocate();
     for (size_t t = 0; t < numTimes(); ++t) {
@@ -281,11 +273,6 @@ ZImg::ZImg(const ZImg& other)
       m_data[t] = other.m_data[t];
     }
   }
-}
-
-ZImg::ZImg(ZImg&& other) noexcept
-{
-  swap(other);
 }
 
 ZImg::ZImg(const QString& filename,
@@ -1193,7 +1180,7 @@ ZImg ZImg::cat(const std::vector<const ZImg*>& imgsIn, Dimension dim)
   }
 
   if (imgs.empty()) {
-    return ZImg();
+    return {};
   }
   if (imgs.size() == 1) {
     return *(imgs[0]);

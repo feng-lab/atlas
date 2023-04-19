@@ -1150,7 +1150,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
 
-    // m_entryTarget.attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
+    // m_entryTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
 
     m_imgRaycasterRenderer.setEntryExitInfo(m_entryTarget.attachment(GL_COLOR_ATTACHMENT0),
                                             m_exitTarget.attachment(GL_COLOR_ATTACHMENT0));

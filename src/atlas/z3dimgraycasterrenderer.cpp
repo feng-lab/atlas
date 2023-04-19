@@ -839,8 +839,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      lastRound =
-        m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
+      lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
 
       processEventsAndMaybeCancel(cancellationToken);
 

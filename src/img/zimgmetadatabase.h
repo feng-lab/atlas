@@ -40,7 +40,7 @@ public:
 
   ZImgMetadataBase(ZImgMetadataBase&&) noexcept = default;
 
-  ZImgMetadataBase& operator=(ZImgMetadataBase&&) = default;
+  ZImgMetadataBase& operator=(ZImgMetadataBase&&) noexcept = default;
 
   ZImgMetadataBase(const ZImgMetadataBase&) = default;
 

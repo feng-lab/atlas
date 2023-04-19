@@ -23,9 +23,9 @@ struct ZImgInfo
 
   void swap(ZImgInfo& other) noexcept;
 
-  ZImgInfo(ZImgInfo&&) = default;
+  ZImgInfo(ZImgInfo&&) noexcept = default;
 
-  ZImgInfo& operator=(ZImgInfo&&) = default;
+  ZImgInfo& operator=(ZImgInfo&&) noexcept = default;
 
   ZImgInfo(const ZImgInfo&) = default;
 
