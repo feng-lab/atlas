@@ -1,3 +1,1 @@
 #define GIT_VERSION "@GIT_VERSION@"
-
-#cmakedefine ATLAS_SANITIZE_ADDRESS

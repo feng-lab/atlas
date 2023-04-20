@@ -47,18 +47,6 @@ LIST(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/src/cmake)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
-option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled." OFF)
-
-if (ATLAS_SANITIZE_ADDRESS)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
-endif ()
-
-option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols." OFF)
-
-if (ATLAS_DEBUG_VERSION)
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O1")
-endif ()
-
 # generate a version string from git tag-hash and current build time
 include(GetGitRevisionDescription)
 git_describe(GIT_VERSION)
@@ -75,6 +63,20 @@ if (NOT CMAKE_DEBUG_POSTFIX)
   set(CMAKE_DEBUG_POSTFIX d)
 endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
+
+option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled and debug symbols." OFF)
+
+if (ATLAS_SANITIZE_ADDRESS)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+  add_compile_definitions(ATLAS_SANITIZE_ADDRESS)
+endif ()
+
+option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols and O1." OFF)
+
+if (ATLAS_DEBUG_VERSION)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O1")
+  add_compile_definitions(ATLAS_DEBUG_VERSION)
+endif ()
 
 include(PrintCMakeTargetInfo)
 include(LibsForImg)
