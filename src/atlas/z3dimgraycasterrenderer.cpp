@@ -593,8 +593,10 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
   CHECK(m_lastImageRenderTarget->size() == m_blockIDsRenderTarget->size())
     << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();
 
+#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
   static int dummyidx = -1;
   ++dummyidx;
+#endif
 
   size_t idx = 0;
   for (auto c : visibleIdxs) {
@@ -886,10 +888,12 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       // glFinish();
       STOP_AND_LOG(btri)
 
+#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
       auto filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
       m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
       filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
       m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBAFloatImage(filen);
+#endif
 
       std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
 
