@@ -2027,7 +2027,6 @@ double ZImg::sum() const
 
 void ZImg::allocate(bool init)
 {
-  clearData();
   if (m_info.isEmpty()) {
     return;
   }
