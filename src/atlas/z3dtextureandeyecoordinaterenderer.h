@@ -3,8 +3,6 @@
 #include "z3dprimitiverenderer.h"
 #include "z3dshaderprogram.h"
 
-class ZMesh;
-
 namespace nim {
 
 // render 3d texture coordinates as color

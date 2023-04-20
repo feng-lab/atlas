@@ -349,14 +349,14 @@ void main()
               float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
               do {
                 currentRayLength += testStepSize;
-              } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength < 1.0);
+              } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength <= 1.0);
             }
           }
         } else {
           if (pagingFlag == EMPTY) {
             do { // skip empty space page directory entry
               currentRayLength += stepSize;
-            } while (page_directory_bases[curLevel] + uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength < 1.0);
+            } while (page_directory_bases[curLevel] + uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
           } else { // pagingFlag == UNMAPPED
             hitMissedBlock = true;
           }
