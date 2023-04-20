@@ -892,13 +892,10 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       auto filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
       m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
       filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
-      m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBAFloatImage(filen);
+      m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
 #endif
 
       std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
-
-      // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(QString("/Users/feng/Downloads/att1_repeat%1.nim").arg(round));
-      // m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(QString("/Users/feng/Downloads/att2_repeat%1.nim").arg(round));
 
       if (lastRound) {
         break;
