@@ -10,7 +10,6 @@
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
-#include <boost/dynamic_bitset.hpp>
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -820,7 +819,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     }
   } else {
     // use PBO
-    boost::dynamic_bitset blockIsEmpty(pendingTasks.size(), 0);
+    std::vector<uint8_t> blockIsEmpty(pendingTasks.size(), 0);
 
     { // scope for glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
       auto bufferGuard = folly::makeGuard([]() {
@@ -859,7 +858,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
               .thenValueInline([=, &pboLocalBuffer, &blockIsEmpty](std::shared_ptr<ZImg>&& img) {
                 maybeCancel(cancellationToken);
                 if (!img) {
-                  blockIsEmpty.set(taskIdx);
+                  blockIsEmpty[taskIdx] = 1;
                 } else {
                   memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
                 }
@@ -896,7 +895,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       processEventsAndMaybeCancel(cancellationToken);
 
       const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[i];
-      if (blockIsEmpty.at(i)) {
+      if (blockIsEmpty[i]) {
         *pageTableEntry = glm::uvec4(0, 0, 0, m_emptyFlag);
         continue;
       }
@@ -907,7 +906,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     }
     STOP_AND_LOG(bt_pboUpload)
 
-    emptyBlockCount = blockIsEmpty.count();
+    emptyBlockCount = std::accumulate(blockIsEmpty.begin(), blockIsEmpty.end(), 0);
   }
   STOP_AND_LOG(bt_async)
 

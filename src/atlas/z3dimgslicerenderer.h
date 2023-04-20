@@ -25,7 +25,7 @@ public:
     m_fastRendering = v;
   }
 
-  bool isFastRendering() const
+  [[nodiscard]] bool isFastRendering() const
   {
     return m_fastRendering;
   }

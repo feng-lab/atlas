@@ -54,7 +54,12 @@ public:
 
   // For 3D Raycasting rendering, once called, 2d quads will be cleared and renderer
   // switch to 3D mode
-  void setEntryExitInfo(const Z3DTexture* entryTexCoordAndZeTexture, const Z3DTexture* exitTexCoordAndZeTexture);
+  void setEntryExitInfo(const Z3DTexture* entryTexCoordAndZeTexture, const Z3DTexture* exitTexCoordAndZeTexture)
+  {
+    m_entryTexCoordAndZeTexture = entryTexCoordAndZeTexture;
+    m_exitTexCoordAndZeTexture = exitTexCoordAndZeTexture;
+    m_quads.clear();
+  }
 
   void setFastRendering(bool v)
   {

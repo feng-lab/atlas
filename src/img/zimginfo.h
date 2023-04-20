@@ -23,14 +23,6 @@ struct ZImgInfo
 
   void swap(ZImgInfo& other) noexcept;
 
-  ZImgInfo(ZImgInfo&&) noexcept = default;
-
-  ZImgInfo& operator=(ZImgInfo&&) noexcept = default;
-
-  ZImgInfo(const ZImgInfo&) = default;
-
-  ZImgInfo& operator=(const ZImgInfo&) = default;
-
   [[nodiscard]] inline QString toQString() const
   {
     return jsonToQString(*this);

@@ -15,7 +15,7 @@ class Z3DPrimitiveRenderer : public QObject
 public:
   explicit Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase);
 
-  virtual ~Z3DPrimitiveRenderer();
+  ~Z3DPrimitiveRenderer() override;
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
   // for opengl mode only, if set, display list will be build in opengl mode.
@@ -40,7 +40,7 @@ public:
     m_needLighting = v;
   }
 
-  inline bool needLighting()
+  inline bool needLighting() const
   {
     return m_needLighting;
   }
@@ -64,7 +64,7 @@ public:
     m_followSizeScale = v;
   }
 
-  inline glm::mat4 coordTransform() const
+  [[nodiscard]] inline glm::mat4 coordTransform() const
   {
     if (m_followCoordTransform) {
       return m_rendererBase.coordTransform();
