@@ -955,12 +955,6 @@ public:
     return m_info.timeStamps[t];
   }
 
-  // remove old data and allocate data space based on current info
-  // if voxel type is signed integer, data will be filled with that type's minimum negative value
-  // otherwise data will be set to 0
-  // throw ZException if can not allocate memory
-  void allocate();
-
   template<typename T = uint8_t>
   inline T* timeData(size_t t)
   {
@@ -2026,6 +2020,12 @@ public:
 #endif
 
 protected:
+  // remove old data and allocate data space based on current info
+  // if voxel type is signed integer, data will be filled with that type's minimum negative value if init is ture
+  // otherwise data will be set to 0 if init is true
+  // throw ZException if it can not allocate memory
+  void allocate(bool init = true);
+
   void clearData();
 
   // wrap a pixel coordinate to a valid pixel coordinate inside current image using padOption

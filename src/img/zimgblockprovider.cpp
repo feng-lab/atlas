@@ -4,10 +4,7 @@ namespace nim {
 
 ZImg ZImgBlockProvider::wholeImg() const
 {
-  ZImg res;
-
-  res.infoRef() = imgInfo();
-  res.allocate();
+  ZImg res(imgInfo());
 
   for (size_t b = 0; b < numBlocks(); ++b) {
     res.pasteImg(block(b), blockCoord(b));

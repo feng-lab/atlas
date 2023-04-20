@@ -454,10 +454,7 @@ ZVoxelCoordinate ZImgMerge::blockCoord(size_t blockIdx) const
 
 ZImg ZImgMerge::wholeImg() const
 {
-  ZImg res;
-
-  res.infoRef() = m_imgInfo;
-  res.allocate();
+  ZImg res(m_imgInfo);
 
   ZVoxelCoordinate minCoord = m_minCoord;
   for (const auto& m_tile : m_tiles) {
@@ -621,14 +618,14 @@ void ZImgMerge::mergeImgs(ZImg& res,
   allRegion.getBoundBox(minCoord, maxCoord);
   ZVoxelCoordinate resSize = maxCoord - minCoord + 1;
   // create result with correct meta info (channel color, time stamp, voxel size...)
-  res.infoRef() = tiles[0].imgInfo();
-  res.infoRef().width = resSize.x;
-  res.infoRef().height = resSize.y;
-  res.infoRef().depth = resSize.z;
-  res.infoRef().numChannels = resSize.c;
-  res.infoRef().numTimes = resSize.t;
-  res.infoRef().createDefaultDescriptions();
-  res.allocate();
+  auto info = tiles[0].imgInfo();
+  info.width = resSize.x;
+  info.height = resSize.y;
+  info.depth = resSize.z;
+  info.numChannels = resSize.c;
+  info.numTimes = resSize.t;
+  info.createDefaultDescriptions();
+  res = ZImg(info);
 
   // to get correct meta info from tile img
   std::set<size_t> neededChannelInfo;

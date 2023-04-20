@@ -258,19 +258,15 @@ ZImg::ZImg(ZImgInfo info)
 }
 
 ZImg::ZImg(const ZImg& other)
-  : m_thumbnail(other.m_thumbnail)
+  : m_data(other.m_data) // shallow copy
+  , m_thumbnail(other.m_thumbnail)
   , m_info(other.m_info)
   , m_metadata(other.m_metadata)
 {
   if (m_ownData) { // deep copy
-    allocate();
+    allocate(false);
     for (size_t t = 0; t < numTimes(); ++t) {
       std::memcpy(timeData<uint8_t>(t), other.timeData<uint8_t>(t), timeByteNumber());
-    }
-  } else { // shallow copy
-    m_data.resize(numTimes());
-    for (size_t t = 0; t < numTimes(); ++t) {
-      m_data[t] = other.m_data[t];
     }
   }
 }
@@ -611,47 +607,6 @@ template void ZImg::wrapData(int64_t*, size_t, size_t, size_t, size_t, size_t);
 template void ZImg::wrapData(float*, size_t, size_t, size_t, size_t, size_t);
 
 template void ZImg::wrapData(double*, size_t, size_t, size_t, size_t, size_t);
-
-void ZImg::allocate()
-{
-  clearData();
-  if (m_info.isEmpty()) {
-    return;
-  }
-  m_data.resize(m_info.numTimes);
-
-  for (size_t t = 0; t < m_info.numTimes; ++t) {
-    m_data[t] = static_cast<uint8_t*>(boost::alignment::aligned_alloc(64, timeByteNumber()));
-
-    if (m_data[t] == nullptr) {
-      clearData();
-      ZImgInfo info = m_info;
-      m_info.clear();
-      throw ZException(fmt::format("Can not allocate memory for img <{}>", info.toString()));
-    } else {
-      std::memset(m_data[t], 0, timeByteNumber());
-    }
-  }
-
-  if (m_info.voxelFormat == VoxelFormat::Signed) {
-    switch (m_info.bytesPerVoxel) {
-      case 1:
-        fill(std::numeric_limits<int8_t>::min());
-        break;
-      case 2:
-        fill(std::numeric_limits<int16_t>::min());
-        break;
-      case 4:
-        fill(std::numeric_limits<int32_t>::min());
-        break;
-      case 8:
-        fill(std::numeric_limits<int64_t>::min());
-        break;
-      default:
-        break;
-    }
-  }
-}
 
 void ZImg::reverseEndianness()
 {
@@ -2067,6 +2022,47 @@ double ZImg::sum_Impl() const
 double ZImg::sum() const
 {
   IMG_RETURN_TYPED_CALL(sum_Impl, m_info)
+}
+
+void ZImg::allocate(bool init)
+{
+  clearData();
+  if (m_info.isEmpty()) {
+    return;
+  }
+  m_data.resize(m_info.numTimes);
+
+  for (size_t t = 0; t < m_info.numTimes; ++t) {
+    m_data[t] = static_cast<uint8_t*>(boost::alignment::aligned_alloc(64, timeByteNumber()));
+
+    if (m_data[t] == nullptr) {
+      clearData();
+      ZImgInfo info = m_info;
+      m_info.clear();
+      throw ZException(fmt::format("Can not allocate memory for img <{}>", info.toString()));
+    } else if (init) {
+      std::memset(m_data[t], 0, timeByteNumber());
+    }
+  }
+
+  if (init && m_info.voxelFormat == VoxelFormat::Signed) {
+    switch (m_info.bytesPerVoxel) {
+      case 1:
+        fill(std::numeric_limits<int8_t>::min());
+        break;
+      case 2:
+        fill(std::numeric_limits<int16_t>::min());
+        break;
+      case 4:
+        fill(std::numeric_limits<int32_t>::min());
+        break;
+      case 8:
+        fill(std::numeric_limits<int64_t>::min());
+        break;
+      default:
+        break;
+    }
+  }
 }
 
 void ZImg::clearData()
