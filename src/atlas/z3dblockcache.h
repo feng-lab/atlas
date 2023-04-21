@@ -52,27 +52,27 @@ public:
     return last->second;
   }
 
-  inline void remove(const KeyType& key)
-  {
-    auto it = m_cacheItemsMap.find(key);
-    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, it->second);
-    it->second->first = m_invalidKey;
-    m_cacheItemsMap.erase(it);
-    if (m_numValidItems > 0) {
-      --m_numValidItems;
-    }
-  }
-
-  inline void popFront()
-  {
-    auto first = m_cacheItemsList.begin();
-    m_cacheItemsMap.erase(first->first);
-    first->first = m_invalidKey;
-    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, first);
-    if (m_numValidItems > 0) {
-      --m_numValidItems;
-    }
-  }
+  //  inline void remove(const KeyType& key)
+  //  {
+  //    auto it = m_cacheItemsMap.find(key);
+  //    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, it->second);
+  //    it->second->first = m_invalidKey;
+  //    m_cacheItemsMap.erase(it);
+  //    if (m_numValidItems > 0) {
+  //      --m_numValidItems;
+  //    }
+  //  }
+  //
+  //  inline void popFront()
+  //  {
+  //    auto first = m_cacheItemsList.begin();
+  //    m_cacheItemsMap.erase(first->first);
+  //    first->first = m_invalidKey;
+  //    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, first);
+  //    if (m_numValidItems > 0) {
+  //      --m_numValidItems;
+  //    }
+  //  }
 
   inline const glm::uvec3& get(const KeyType& key) const
   {
