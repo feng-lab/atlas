@@ -180,6 +180,28 @@ public:
                                                        double displayRangeMax,
                                                        const folly::CancellationToken& cancellationToken) const;
 
+  __forceinline bool isEmptyBlock(index_t xyRatio,
+                                  index_t zRatio,
+                                  index_t sx,
+                                  index_t sy,
+                                  index_t sz,
+                                  size_t sc,
+                                  size_t t,
+                                  size_t width,
+                                  size_t height,
+                                  size_t depth,
+                                  double displayRangeMin) const
+  {
+    if (auto it = m_blockInfo.find(std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, width, height, depth));
+        it != m_blockInfo.end()) {
+      const auto [minv, maxv] = it->second;
+      if (maxv <= displayRangeMin) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // only for non-disk-cached image
   bool isDiskCached() const
   {

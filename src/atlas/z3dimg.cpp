@@ -473,6 +473,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   // used to make sure used page table block will not be swapped out
   std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageDirectoryEntryKeys;
 
+  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
+  size_t emptyBlockCount = 0;
+
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead) {
       LOG(INFO) << "no space for new image block, skip the remaining image blocks";
@@ -523,7 +526,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // page table mapped but image block is not mapped
       // increase pageDirectoryEntryRef now, upload image blocks and update page table block later in pendingTasks
       ++pageDirectoryEntryRef.w;
-      pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+      if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
+        *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+        ++emptyBlockCount;
+      } else {
+        pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+      }
       ++count;
     } else {
       // pageDirectoryEntryRef.w == 0, page table not mapped
@@ -561,7 +569,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     auto pageTableEntryPtr =
       &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                    pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
-    pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+    if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
+      *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+      ++emptyBlockCount;
+    } else {
+      pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+    }
     ++count;
   }
   clearAndDeallocate(pendingBlocks);
@@ -579,15 +592,17 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   //  }
 
   // read image
-  size_t emptyBlockCount = 0;
+  size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty()) {
-    emptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
+    readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
   }
 
-  LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks)",
+  LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks, read {} blocks ({} empty))",
                            count,
                            alreadyMapped,
-                           emptyBlockCount);
+                           emptyBlockCount,
+                           pendingTasks.size(),
+                           readEmptyBlockCount);
   // glFinish();
   STOP_AND_LOG(bt)
 
@@ -897,6 +912,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       const auto& [pageTableEntryKey, pageTableEntry] = pendingTasks[i];
       if (blockIsEmpty[i]) {
         *pageTableEntry = glm::uvec4(0, 0, 0, m_emptyFlag);
+        ++emptyBlockCount;
         continue;
       }
       insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntry);
@@ -905,8 +921,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                      (const void*)(i * blockSizeInByte));
     }
     STOP_AND_LOG(bt_pboUpload)
-
-    emptyBlockCount = std::accumulate(blockIsEmpty.begin(), blockIsEmpty.end(), 0);
   }
   STOP_AND_LOG(bt_async)
 

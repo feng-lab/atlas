@@ -163,6 +163,22 @@ Q_SIGNALS:
 protected:
   void readVolumes();
 
+  __forceinline bool isImageBlockEmpty(size_t c, const glm::uvec4& pageTableEntryKey, const glm::uvec3& imageBlockSize)
+  {
+    glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+    return m_imgPack.isEmptyBlock(m_levelScales[blockImagePos.x].x,
+                                  m_levelScales[blockImagePos.x].z,
+                                  index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
+                                  index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
+                                  index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+                                  c,
+                                  0,
+                                  imageBlockSize.x,
+                                  imageBlockSize.y,
+                                  imageBlockSize.z,
+                                  m_channelDisplayRanges[c].x);
+  }
+
   void
   insertPageTableBlockToCache(size_t c, const glm::uvec4& pageDirectoryEntryKey, glm::uvec4& pageDirectoryEntryRef);
 
