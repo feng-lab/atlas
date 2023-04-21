@@ -18,7 +18,7 @@ uniform uvec3 page_table_block_size;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform uvec3 image_block_size;
-uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
+uniform uvec3 pos_to_block_ids[LEVEL_COUNT];
 
 uniform float ze_to_screen_pixel_voxel_size;
 
@@ -43,7 +43,7 @@ void main()
   }
 
   uvec3 pageTableCoord = uvec3(texCoord0 * image_dimensions[curLevel]) / image_block_size;
-  uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
+  uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
 #if GLSL_VERSION >= 130
   uvec4 pageDirEntry = texelFetch(page_directory, ivec3(page_directory_bases[curLevel] + pageTableCoord / page_table_block_size), 0);
 #else
