@@ -10,7 +10,7 @@ uniform uvec3 page_table_block_size;
 uniform uvec3 image_dimensions[LEVEL_COUNT];
 uniform float voxel_world_sizes[LEVEL_COUNT];
 uniform uvec3 image_block_size;
-uniform uvec4 pos_to_block_ids[LEVEL_COUNT];
+uniform uvec3 pos_to_block_ids[LEVEL_COUNT];
 
 // uniform vec2 screen_dim_RCP;
 uniform float sampling_rate;
@@ -146,7 +146,7 @@ void main()
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
             // save used blockid
             if (missBlockIDsIndex < 32) {
-              uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
+              uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
               missBlockIDs[missBlockIDsIndex++] = blockID;
               finished = missBlockIDsIndex == 32;
             }
@@ -159,7 +159,7 @@ void main()
             if (pagingFlag == UNMAPPED) {
               // save missed blockid
               if (missBlockIDsIndex < 32) {
-                uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
+                uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
                 missBlockIDs[missBlockIDsIndex++] = blockID;
                 finished = missBlockIDsIndex == 32;
               }
@@ -207,7 +207,7 @@ void main()
           } else { // pagingFlag == UNMAPPED
             // save missed blockid
             if (missBlockIDsIndex < 32) {
-              uint blockID = pos_to_block_ids[curLevel].w + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
+              uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
               missBlockIDs[missBlockIDsIndex++] = blockID;
               finished = missBlockIDsIndex == 32;
             }

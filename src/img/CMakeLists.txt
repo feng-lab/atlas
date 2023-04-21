@@ -377,7 +377,6 @@ else (WIN32)
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-but-set-variable")
   endif ()
 
-  message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
   if (ATLAS_SANITIZE_ADDRESS)
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
       target_compile_options(${LIBRARY_NAME} PUBLIC -fsanitize=address,undefined,integer,nullability -fno-omit-frame-pointer -fno-sanitize=unsigned-integer-overflow)

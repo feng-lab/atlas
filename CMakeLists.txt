@@ -65,18 +65,18 @@ endif ()
 message(STATUS "CMAKE_DEBUG_POSTFIX: " ${CMAKE_DEBUG_POSTFIX})
 
 option(ATLAS_SANITIZE_ADDRESS "Build Atlas with Address Sanitizer enabled and debug symbols." OFF)
-
 if (ATLAS_SANITIZE_ADDRESS)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
   add_compile_definitions(ATLAS_SANITIZE_ADDRESS)
 endif ()
+message(STATUS "ATLAS_SANITIZE_ADDRESS: ${ATLAS_SANITIZE_ADDRESS}")
 
 option(ATLAS_DEBUG_VERSION "Build Atlas with debug symbols and O1." OFF)
-
 if (ATLAS_DEBUG_VERSION)
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -O1")
   add_compile_definitions(ATLAS_DEBUG_VERSION)
 endif ()
+message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
 include(PrintCMakeTargetInfo)
 include(LibsForImg)

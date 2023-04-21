@@ -299,12 +299,11 @@ void Z3DImg::setScale(const glm::vec3& scale)
 
     // id starts from 1
     m_posToBlockIDs[l] =
-      glm::uvec4(1,
+      glm::uvec3(l == 0 ? 1
+                        : (m_posToBlockIDs[l - 1].x + m_pageTableDimensions[l - 1].x * m_pageTableDimensions[l - 1].y *
+                                                        m_pageTableDimensions[l - 1].z),
                  m_pageTableDimensions[l].x,
-                 m_pageTableDimensions[l].x * m_pageTableDimensions[l].y,
-                 l == 0 ? 1
-                        : (m_posToBlockIDs[l - 1].w + m_pageTableDimensions[l - 1].x * m_pageTableDimensions[l - 1].y *
-                                                        m_pageTableDimensions[l - 1].z));
+                 m_pageTableDimensions[l].x * m_pageTableDimensions[l].y);
     if (l == 0) {
       m_pageDirectoryBases[l] = glm::uvec3(0, 0, 0);
     } else if (l == 1) {
@@ -483,29 +482,29 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
 
     size_t level = 0;
-    while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].w) {
+    while (level + 1 < m_numLevels && blockID >= m_posToBlockIDs[level + 1].x) {
       ++level;
     }
     CHECK(level + 1 < m_numLevels);
 
-    glm::uvec4 pageTableEntryKey(level, blockID, 0, 0);
-    pageTableEntryKey.y -= m_posToBlockIDs[level].w;
-    pageTableEntryKey.w = pageTableEntryKey.y / m_posToBlockIDs[level].z;
-    pageTableEntryKey.y -= pageTableEntryKey.w * m_posToBlockIDs[level].z;
-    pageTableEntryKey.z = pageTableEntryKey.y / m_posToBlockIDs[level].y;
-    pageTableEntryKey.y -= pageTableEntryKey.z * m_posToBlockIDs[level].y;
-    if (!glm::all(glm::lessThan(pageTableEntryKey.yzw(), m_pageTableDimensions[level]))) {
+    glm::uvec4 pageTableEntryKey(blockID, 0, 0, level);
+    pageTableEntryKey.x -= m_posToBlockIDs[level].x;
+    pageTableEntryKey.z = pageTableEntryKey.x / m_posToBlockIDs[level].z;
+    pageTableEntryKey.x -= pageTableEntryKey.z * m_posToBlockIDs[level].z;
+    pageTableEntryKey.y = pageTableEntryKey.x / m_posToBlockIDs[level].y;
+    pageTableEntryKey.x -= pageTableEntryKey.y * m_posToBlockIDs[level].y;
+    if (!glm::all(glm::lessThan(pageTableEntryKey.xyz(), m_pageTableDimensions[level]))) {
       LOG(FATAL) << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
     }
-    glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(1, m_pageTableBlockSize);
-    glm::uvec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.x] + pageDirectoryEntryKey.yzw();
+    glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
+    glm::uvec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
     glm::uvec4& pageDirectoryEntryRef =
       m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.x * m_pageDirectorySize.y +
                                   pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
 
     if (pageDirectoryEntryRef.w > 0) {
       // page table mapped
-      auto pageTableEntryCoord = pageDirectoryEntryRef.xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
+      auto pageTableEntryCoord = pageDirectoryEntryRef.xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
       auto pageTableEntryPtr =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
@@ -565,7 +564,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
     }
 
-    auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.yzw() % m_pageTableBlockSize;
+    auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
     auto pageTableEntryPtr =
       &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.x * m_pageTableCacheSize.y +
                                    pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
@@ -769,14 +768,14 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     blockFutures.reserve(pendingTasks.size());
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
       const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
-      glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+      glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
       blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
         return m_imgPack
-          .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                           m_levelScales[blockImagePos.x].z,
-                           index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                           index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                           index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+          .readRegionToImg(m_levelScales[blockImagePos.w].x,
+                           m_levelScales[blockImagePos.w].z,
+                           index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                           index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                           index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
                            c,
                            0,
                            resInfo,
@@ -856,14 +855,14 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         size_t finalTaskIdx = taskIdx + numberOfTasks;
         for (; taskIdx < finalTaskIdx; ++taskIdx) {
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
-          glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(1, glm::ivec3(m_imageBlockSize));
+          glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
           blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer, &blockIsEmpty]() {
             return m_imgPack
-              .readRegionToImg(m_levelScales[blockImagePos.x].x,
-                               m_levelScales[blockImagePos.x].z,
-                               index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.x) / 2,
-                               index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.y) / 2,
-                               index_t(blockImagePos.w) - index_t(m_imageBlockSizePad.z) / 2,
+              .readRegionToImg(m_levelScales[blockImagePos.w].x,
+                               m_levelScales[blockImagePos.w].z,
+                               index_t(blockImagePos.x) - index_t(m_imageBlockSizePad.x) / 2,
+                               index_t(blockImagePos.y) - index_t(m_imageBlockSizePad.y) / 2,
+                               index_t(blockImagePos.z) - index_t(m_imageBlockSizePad.z) / 2,
                                c,
                                0,
                                resInfo,
@@ -958,7 +957,7 @@ void Z3DImg::checkPageSystemError()
 
       CHECK(level < m_numLevels);
 
-      glm::uvec4 pageTableKey(level, pdLoc);
+      glm::uvec4 pageTableKey(pdLoc, level);
       CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
       CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
       CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz(), m_pageTableCacheSize)));
@@ -975,7 +974,7 @@ void Z3DImg::checkPageSystemError()
             if (pageTableEntry.w > 0) {
               ++numValidEntry;
               if (pageTableEntry.w != m_emptyFlag) {
-                glm::uvec4 imageCacheKey(level, glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize);
+                glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
                 CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
                 CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
                 CHECK(glm::all(glm::lessThan(pageTableEntry.xyz(), m_channelImageCacheTextures[c]->dimension())));
