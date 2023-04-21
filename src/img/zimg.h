@@ -365,19 +365,16 @@ struct ZImgWriteParameters
   double jpegXRQuality = 0.8;
 };
 
-class ZImgMetadata : public ZImgMetadataBase<ZImgMetatag>
-{
-public:
-  [[nodiscard]] QString toQString() const;
-};
+template<>
+QString ZImgMetadataBase<ZImgMetatag>::toQString() const;
 
 class ZImg;
 
-class ZImgThumbernail : public ZImgMetadataBase<ZImg>
-{
-public:
-  [[nodiscard]] QString toQString() const;
-};
+template<>
+QString ZImgMetadataBase<ZImg>::toQString() const;
+
+using ZImgMetadata = ZImgMetadataBase<ZImgMetatag>;
+using ZImgThumbernail = ZImgMetadataBase<ZImg>;
 
 // throw ZIOException if file does not exist
 struct ZImgSource

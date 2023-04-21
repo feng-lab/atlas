@@ -42,7 +42,8 @@ struct MaxOp
 
 namespace nim {
 
-QString ZImgMetadata::toQString() const
+template<>
+QString ZImgMetadataBase<ZImgMetatag>::toQString() const
 {
   QString res;
 
@@ -61,7 +62,8 @@ QString ZImgMetadata::toQString() const
   return res;
 }
 
-QString ZImgThumbernail::toQString() const
+template<>
+QString ZImgMetadataBase<ZImg>::toQString() const
 {
   QString res;
 

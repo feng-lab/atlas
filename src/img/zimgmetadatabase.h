@@ -36,15 +36,10 @@ protected:
 public:
   ZImgMetadataBase() = default;
 
-  virtual ~ZImgMetadataBase() = default;
-
-  ZImgMetadataBase(ZImgMetadataBase&&) noexcept = default;
-
-  ZImgMetadataBase& operator=(ZImgMetadataBase&&) noexcept = default;
-
-  ZImgMetadataBase(const ZImgMetadataBase&) = default;
-
-  ZImgMetadataBase& operator=(const ZImgMetadataBase&) = default;
+  [[nodiscard]] QString toQString() const
+  {
+    return {};
+  }
 
   inline void swap(ZImgMetadataBase& other) noexcept
   {

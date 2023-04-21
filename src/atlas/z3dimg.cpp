@@ -580,7 +580,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
       ++emptyBlockCount;
     } else {
-      // pageTableEntryPtr->w must be 0 here
+      // pageTableEntryPtr->w must be 0 here because of the memset in function insertPageTableBlockToCache
+      CHECK(pageTableEntryPtr->w == 0);
       pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
     }
     ++count;
