@@ -477,7 +477,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   size_t emptyBlockCount = 0;
 
   for (auto blockID : missingBlockIDs) {
-    if (count >= numBlocksToRead) {
+    if (count >= numBlocksToRead + emptyBlockCount) {
       LOG(INFO) << "no space for new image block, skip the remaining image blocks";
       break;
     }
@@ -544,7 +544,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   clearAndDeallocate(usedPageDirectoryEntryKeys);
 
   for (const auto& [pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey] : pendingBlocks) {
-    if (count >= numBlocksToRead) {
+    if (count >= numBlocksToRead + emptyBlockCount) {
       LOG(INFO) << "no space for new image block, skip the remaining image blocks";
       break;
     }
