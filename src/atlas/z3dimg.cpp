@@ -868,7 +868,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         for (; taskIdx < finalTaskIdx; ++taskIdx) {
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
           auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
-          CHECK(*pageTableEntryPtr == glm::uvec4(0)) << *pageTableEntryPtr;
+          CHECK(pageTableEntryPtr->w == 0) << *pageTableEntryPtr;
           glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
           blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer]() {
             return m_imgPack
