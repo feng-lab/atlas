@@ -515,7 +515,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-          CHECK(false); // block id shader should not collect mapped empty block
+          CHECK(false) << *pageTableEntryPtr; // block id shader should not collect mapped empty block
           ++emptyBlockCount;
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
@@ -605,6 +605,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   if (!pendingTasks.empty()) {
     readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
   }
+
+  checkPageSystemError();
 
   LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks, read {} blocks ({} empty))",
                            count,
@@ -765,7 +767,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     if (!pboPtr) {
       LOG(WARNING) << "glMapBuffer failed on PBO";
     } else {
-      pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size());
+      pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size(), 128);
     }
   }
   auto pboGuard = folly::makeGuard([=]() {
@@ -866,6 +868,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         for (; taskIdx < finalTaskIdx; ++taskIdx) {
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
           auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
+          CHECK(*pageTableEntryPtr == glm::uvec4(0)) << *pageTableEntryPtr;
           glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
           blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer]() {
             return m_imgPack
