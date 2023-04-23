@@ -91,10 +91,3 @@ static const struct
     {(float)0.010490, 40, 16197},  {(float)0.016994, 31, 16237},
     {(float)0.023659, 21, 16268},
 };
-/*
- * Local Variables:
- * mode: c
- * c-basic-offset: 8
- * fill-column: 78
- * End:
- */

@@ -491,9 +491,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     pageTableEntryKey.x -= pageTableEntryKey.z * m_posToBlockIDs[level].z;
     pageTableEntryKey.y = pageTableEntryKey.x / m_posToBlockIDs[level].y;
     pageTableEntryKey.x -= pageTableEntryKey.y * m_posToBlockIDs[level].y;
-    if (!glm::all(glm::lessThan(pageTableEntryKey.xyz(), m_pageTableDimensions[level]))) {
-      LOG(FATAL) << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
-    }
+    CHECK(glm::all(glm::lessThan(pageTableEntryKey.xyz(), m_pageTableDimensions[level])))
+      << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
     glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
     glm::uvec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
     glm::uvec4& pageDirectoryEntryRef =
@@ -598,10 +597,17 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   //              << m_levelScales[blockImagePos.x].z * imageBlockSize.z;
   //  }
 
-  // read image
   size_t readEmptyBlockCount = 0;
-  if (!pendingTasks.empty()) {
-    readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
+  if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
+    auto uploadGuard = folly::makeGuard([=]() {
+      m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
+      m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+    });
+
+    // read image
+    if (!pendingTasks.empty()) {
+      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
+    }
   }
 
   LOG(INFO) << fmt::format("filled {} blocks ({} already mapped, {} empty blocks, read {} blocks ({} empty))",
@@ -727,11 +733,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
   ZBenchTimer bti(fmt::format("upload image ch{} cache", c));
 
-  auto uploadGuard = folly::makeGuard([=]() {
-    m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
-    m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
-  });
-
   processEventsAndMaybeCancel(cancellationToken);
 
   LOG(INFO) << "reading " << pendingTasks.size() << " image blocks...";
@@ -743,8 +744,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   //  if (auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get()); p) {
   //    LOG(INFO) << "number of priorities: " << static_cast<int>(p->getNumPriorities());
   //  }
-
-  ZBenchTimer bt_async(fmt::format("async reading image blocks for image ch{}", c));
 
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
   ZImgInfo resInfo(imageBlockSize.x, imageBlockSize.y, imageBlockSize.z, 1);
@@ -925,8 +924,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     }
     STOP_AND_LOG(bt_pboUpload)
   }
-  STOP_AND_LOG(bt_async)
-
   STOP_AND_LOG(bti)
 
   return emptyBlockCount;
