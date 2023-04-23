@@ -19,7 +19,6 @@ public:
     : m_numValidItems(0)
     , m_blockSize(blockSize)
     , m_numBlocks(numBlocks)
-    , m_invalidKey(invalidKey)
   {
     CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 && m_blockSize.x > 0 && m_blockSize.y > 0 &&
           m_blockSize.z > 0)
@@ -30,7 +29,7 @@ public:
       for (uint32_t y = 0; y < m_numBlocks.y; ++y) {
         for (uint32_t x = 0; x < m_numBlocks.x; ++x) {
           m_cacheItemsList.push_front(
-            KeyValuePairType(m_invalidKey, glm::uvec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
+            KeyValuePairType(invalidKey, glm::uvec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
         }
       }
     }
@@ -103,7 +102,6 @@ private:
   size_t m_size;
   glm::uvec3 m_blockSize;
   glm::uvec3 m_numBlocks;
-  KeyType m_invalidKey;
 };
 
 } // namespace nim

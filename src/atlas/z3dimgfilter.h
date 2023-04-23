@@ -149,14 +149,14 @@ private:
   Z3DRenderTarget m_layerTarget;
   Z3DTexture m_layerColorTexture;
   Z3DTexture m_layerDepthTexture;
+  Z3DTexture m_missBlocksTexture0;
   Z3DTexture m_missBlocksTexture1;
   Z3DTexture m_missBlocksTexture2;
   Z3DTexture m_missBlocksTexture3;
   Z3DTexture m_missBlocksTexture4;
-  Z3DTexture m_usedBlocksTexture1;
-  Z3DTexture m_usedBlocksTexture2;
-  Z3DTexture m_usedBlocksTexture3;
-  Z3DTexture m_usedBlocksTexture4;
+  Z3DTexture m_missBlocksTexture5;
+  Z3DTexture m_missBlocksTexture6;
+  Z3DTexture m_missBlocksTexture7;
   Z3DRenderTarget m_blockIDsRenderTarget;
   Z3DRenderTarget m_imageRenderTarget1;
   Z3DRenderTarget m_imageRenderTarget2;

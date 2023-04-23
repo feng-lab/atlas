@@ -317,49 +317,20 @@ void main()
               startRayPosition, rayVector, stepSize,
               currentRayLength, samplePos, finished, result, rayDepth);
 #endif
-          } else {
-            // skip empty space page table entry recursive
-            if (pagingFlag == UNMAPPED) {
-              hitMissedBlock = true;
-            } else { // empty block
-              int nextNonEmptyLevel = curLevel + 1;
-              uint testPagingFlag = EMPTY;
-              while (testPagingFlag == EMPTY && nextNonEmptyLevel + 1 < LEVEL_COUNT) {
-                uvec3 testVoxelCoord = uvec3(samplePos * image_dimensions[nextNonEmptyLevel]);
-                uvec3 testPageTableCoord = testVoxelCoord / image_block_size;
-
-#if GLSL_VERSION >= 130
-                uvec4 testPageDirEntry = texelFetch(page_directory, ivec3(page_directory_bases[nextNonEmptyLevel] + testPageTableCoord / page_table_block_size), 0);
-#else
-                uvec4 testPageDirEntry = texelFetch3D(page_directory, ivec3(page_directory_bases[nextNonEmptyLevel] + testPageTableCoord / page_table_block_size), 0);
-#endif
-                testPagingFlag = testPageDirEntry.w;
-                if (testPagingFlag != UNMAPPED && testPagingFlag != EMPTY) {
-#if GLSL_VERSION >= 130
-                  testPagingFlag = texelFetch(page_table_cache, ivec3(testPageDirEntry.xyz + testPageTableCoord % page_table_block_size), 0).w;
-#else
-                  testPagingFlag = texelFetch3D(page_table_cache, ivec3(testPageDirEntry.xyz + testPageTableCoord % page_table_block_size), 0).w;
-#endif
-                }
-                ++nextNonEmptyLevel;
-              }
-
-              uvec3 prevBlock = uvec3(samplePos * image_dimensions[nextNonEmptyLevel-1]) / image_block_size;
-              numVoxels = abs(rayVector * image_dimensions[nextNonEmptyLevel-1]);
-              float testStepSize = 1.0 / (sampling_rate * max(max(numVoxels.x, numVoxels.y), numVoxels.z));
-              do {
-                currentRayLength += testStepSize;
-              } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[nextNonEmptyLevel-1]) / image_block_size == prevBlock && currentRayLength <= 1.0);
-            }
-          }
-        } else {
-          if (pagingFlag == EMPTY) {
-            do { // skip empty space page directory entry
-              currentRayLength += stepSize;
-            } while (page_directory_bases[curLevel] + uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
-          } else { // pagingFlag == UNMAPPED
+          } else if (pagingFlag == UNMAPPED) { // unmapped block
             hitMissedBlock = true;
+          } else { // empty block
+            // goto next block
+            do {
+              currentRayLength += stepSize;
+            } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
           }
+        } else if (pagingFlag == UNMAPPED) { // unmapped page directory
+          hitMissedBlock = true;
+        } else { // empty page directory
+          do { // skip empty space page directory entry
+            currentRayLength += stepSize;
+          } while (page_directory_bases[curLevel] + uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
         }
 
         finished = finished || hitMissedBlock || (currentRayLength > 1.0);
