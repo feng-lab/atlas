@@ -11,6 +11,7 @@
 #include <queue>
 
 // #define PROFILE3DRENDERERS
+#define CHECKOPENGLSTATE
 
 namespace nim {
 
@@ -18,7 +19,7 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   : QObject(parent)
   , m_compositor(compositor)
 {
-#if defined(_DEBUG_)
+#if defined(CHECKOPENGLSTATE) || defined(ATLAS_SANITIZE_ADDRESS)
   m_filterWrappers.emplace_back(std::make_unique<Z3DCheckOpenGLStateFilterWrapper>());
 #endif
 #if defined(PROFILE3DRENDERERS)

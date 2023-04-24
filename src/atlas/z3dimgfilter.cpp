@@ -734,6 +734,9 @@ double Z3DImgFilter::process(Z3DEye eye)
   }
 
   glEnable(GL_DEPTH_TEST);
+  auto openGLStateGuard = folly::makeGuard([]() {
+    glDisable(GL_DEPTH_TEST);
+  });
 
   if (hasImage()) {
     renderImage(eye);
@@ -744,8 +747,6 @@ double Z3DImgFilter::process(Z3DEye eye)
   if (hasSlices()) {
     renderSlices(eye);
   }
-
-  glDisable(GL_DEPTH_TEST);
 
   CHECK_GL_ERROR
 
@@ -1163,15 +1164,17 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
+  auto openGLStateGuard = folly::makeGuard([&currentOutport]() {
+    currentOutport.releaseTarget();
+
+    glBlendFunc(GL_ONE, GL_ZERO);
+    glDisable(GL_BLEND);
+  });
+
   m_rendererBase.render(eye, m_imgRaycasterRenderer);
 
   renderBoundBox(eye);
   CHECK_GL_ERROR
-
-  currentOutport.releaseTarget();
-
-  glBlendFunc(GL_ONE, GL_ZERO);
-  glDisable(GL_BLEND);
 }
 
 bool Z3DImgFilter::onlyBoundBox() const

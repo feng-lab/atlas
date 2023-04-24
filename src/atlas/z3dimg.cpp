@@ -470,6 +470,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   // used to make sure used page table block will not be swapped out
   std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageDirectoryEntryKeys;
 
+#ifdef ATLAS_CHECK_CACHE
+  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
+  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageTableEntry;
+#endif
+
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
   size_t emptyBlockCount = 0;
 
@@ -517,8 +522,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;
+#ifdef ATLAS_CHECK_CACHE
+          usedPageTableEntry.insert(pageTableEntryPtr->xyz());
+#endif
         }
         usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
+#ifdef ATLAS_CHECK_CACHE
+        usedPageDirectoryEntry.insert(pageDirectoryEntryRef.xyz());
+#endif
         ++count;
 
         continue; // skip current image block and go to next
@@ -561,6 +572,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       if (numAvailablePageCacheBlock > 0) {
         // we still have space, construct new page table block
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
+#ifdef ATLAS_CHECK_CACHE
+        CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << pageDirectoryEntryPtr->xyz();
+        usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
+#endif
         // after insertion, pageDirectoryEntryPtr->w == 1, will add a pendingTask
         --numAvailablePageCacheBlock;
       } else {
@@ -606,7 +621,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
     // read image
     if (!pendingTasks.empty()) {
+#ifdef ATLAS_CHECK_CACHE
+      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken, usedPageTableEntry);
+#else
       readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
+#endif
     }
   }
 
@@ -725,9 +744,16 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
   }
 }
 
+#ifdef ATLAS_CHECK_CACHE
+size_t Z3DImg::readAndUploadImageBlocks(size_t c,
+                                        const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
+                                        const folly::CancellationToken& cancellationToken,
+                                        std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>>& usedPageTableEntry)
+#else
 size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                         const folly::CancellationToken& cancellationToken)
+#endif
 {
   size_t emptyBlockCount = 0;
 
@@ -918,6 +944,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         continue;
       }
       insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
+#ifdef ATLAS_CHECK_CACHE
+      CHECK(!contains(usedPageTableEntry, pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
+      usedPageTableEntry.insert(pageTableEntryPtr->xyz());
+#endif
       m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntryPtr->xyz(),
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
