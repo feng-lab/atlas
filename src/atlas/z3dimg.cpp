@@ -952,6 +952,9 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
     }
+#ifdef ATLAS_CHECK_CACHE
+    VLOG(1) << usedPageTableEntry.size();
+#endif
     STOP_AND_LOG(bt_pboUpload)
   }
   STOP_AND_LOG(bti)
