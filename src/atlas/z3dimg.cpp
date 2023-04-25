@@ -615,6 +615,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
     auto uploadGuard = folly::makeGuard([=]() {
+      checkPageSystemError(false);
       m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
       m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
     });
@@ -727,7 +728,7 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
                                   erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
                                   erasedKeyPageDirectoryEntryCoord.x];
 
-    CHECK(erasedKeyPageDirectoryEntry.w != m_emptyFlag);
+    CHECK(erasedKeyPageDirectoryEntry.w != m_emptyFlag) << erasedKeyPageDirectoryEntry;
     if (erasedKeyPageDirectoryEntry.w > 0) {
       glm::uvec3 erasedKeyPageTableEntryCoord =
         erasedKeyPageDirectoryEntry.xyz() + erasedKey.xyz() % m_pageTableBlockSize;
@@ -735,8 +736,9 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
         m_channelPageTableCaches[c][erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                     erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
                                     erasedKeyPageTableEntryCoord.x];
-      CHECK(erasedKeyPageTableEntry.w != m_emptyFlag);
+      CHECK(erasedKeyPageTableEntry.w != m_emptyFlag) << erasedKeyPageTableEntry;
       if (erasedKeyPageTableEntry.w > 0) {
+        CHECK(erasedKeyPageTableEntry.w == 1) << erasedKeyPageTableEntry;
         erasedKeyPageTableEntry.w = 0;
         --erasedKeyPageDirectoryEntry.w;
       }
@@ -962,7 +964,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   return emptyBlockCount;
 }
 
-void Z3DImg::checkPageSystemError()
+void Z3DImg::checkPageSystemError(bool strict)
 {
   for (size_t c = 0; c < m_nChannels; ++c) {
     for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
@@ -1017,11 +1019,16 @@ void Z3DImg::checkPageSystemError()
           }
         }
       }
-      CHECK(numValidEntry <= m_channelPageDirectories[c][i].w)
-        << numValidEntry << " " << m_channelPageDirectories[c][i].w;
-      if (numValidEntry != m_channelPageDirectories[c][i].w) {
-        LOG(INFO) << "Fixing cancellation caused inconsistency";
-        m_channelPageDirectories[c][i].w = numValidEntry;
+      if (strict) {
+        CHECK(numValidEntry == m_channelPageDirectories[c][i].w)
+          << numValidEntry << " " << m_channelPageDirectories[c][i].w;
+      } else {
+        CHECK(numValidEntry <= m_channelPageDirectories[c][i].w)
+          << numValidEntry << " " << m_channelPageDirectories[c][i].w;
+        if (numValidEntry != m_channelPageDirectories[c][i].w) {
+          LOG(INFO) << "Fixing cancellation caused inconsistency";
+          m_channelPageDirectories[c][i].w = numValidEntry;
+        }
       }
     }
   }

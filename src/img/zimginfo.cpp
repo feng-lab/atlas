@@ -12,17 +12,10 @@ ZImgInfo::ZImgInfo(size_t w, size_t h, size_t d, size_t c, size_t t, size_t byte
   , depth(d)
   , numChannels(c)
   , numTimes(t)
+  , bytesPerVoxel(bytePerVox)
+  , voxelFormat(vf)
+  , validBitCount(0)
 {
-  bytesPerVoxel = bytePerVox;
-  voxelFormat = vf;
-  validBitCount = 0;
-
-  voxelSizeUnit = VoxelSizeUnit::none;
-  voxelSizeX = 1;
-  voxelSizeY = 1;
-  voxelSizeZ = 1;
-  lastChannelIsAlphaChannel = false;
-
   createDefaultDescriptions();
 }
 

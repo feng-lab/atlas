@@ -11,7 +11,9 @@
 #include <QObject>
 #include <set>
 
+#if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
+#endif
 
 namespace nim {
 
@@ -199,7 +201,7 @@ protected:
                                   const folly::CancellationToken& cancellationToken);
 #endif
 
-  void checkPageSystemError();
+  void checkPageSystemError(bool strict = true);
 
 protected:
   glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);

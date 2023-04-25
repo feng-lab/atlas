@@ -21,6 +21,10 @@ DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
               "Maximum number of rounds for volume rendering, default is 100");
 
+#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
+DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
+#endif
+
 namespace nim {
 
 Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
@@ -587,8 +591,10 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
     << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();
 
 #if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
-  static int dummyidx = -1;
-  ++dummyidx;
+  if (FLAGS_atlas_debug_texture_output) {
+    static int dummyidx = -1;
+    ++dummyidx;
+  }
 #endif
 
   size_t idx = 0;
@@ -882,15 +888,22 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       STOP_AND_LOG(btri)
 
 #if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
-      auto filen =
-        QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
-      m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
-      filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
-      m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
-      filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_entry.tif", dummyidx, c, round));
-      m_entryTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
-      filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_exit.tif", dummyidx, c, round));
-      m_exitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+      if (FLAGS_atlas_debug_texture_output) {
+        auto filen =
+          QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
+        m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
+        filen =
+          QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
+        m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
+        if (round == 0) {
+          filen =
+            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
+          m_entryTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+          filen =
+            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_exit.tif", dummyidx, c));
+          m_exitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+        }
+      }
 #endif
 
       std::swap(m_lastImageRenderTarget, m_currentImageRenderTarget);
