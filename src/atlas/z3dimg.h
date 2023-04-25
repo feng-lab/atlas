@@ -87,7 +87,7 @@ public:
   // Useful coordinate L->Left U->Up F->Front R->Right D->Down B->Back
   [[nodiscard]] glm::vec3 physicalLUF() const
   {
-    return glm::vec3(0, 0, 0);
+    return {0, 0, 0};
   }
 
   [[nodiscard]] glm::vec3 physicalRDB() const
@@ -188,18 +188,10 @@ protected:
 
   void insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef);
 
-#ifdef ATLAS_CHECK_CACHE
-  // return number of empty (all zero) image blocks
-  size_t readAndUploadImageBlocks(size_t c,
-                                  const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                                  const folly::CancellationToken& cancellationToken,
-                                  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>>& usedPageTableEntry);
-#else
   // return number of empty (all zero) image blocks
   size_t readAndUploadImageBlocks(size_t c,
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                   const folly::CancellationToken& cancellationToken);
-#endif
 
   void checkPageSystemError(bool strict = true);
 
@@ -256,6 +248,10 @@ private:
   double m_depthScale = 1.0;
   glm::uvec3 m_volumeDimension;
   glm::vec3 m_volumeSpacing;
+
+#ifdef ATLAS_CHECK_CACHE
+  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> m_usedPageTableEntry;
+#endif
 };
 
 } // namespace nim

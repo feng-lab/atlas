@@ -268,9 +268,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       m_widgetsGroup->removeChild(*para);
     }
-    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-      m_widgetsGroup->removeChild(*para);
-    }
+    //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    //      m_widgetsGroup->removeChild(*para);
+    //    }
     for (const auto& cm : m_sliceColormaps) {
       m_widgetsGroup->removeChild(*cm);
     }
@@ -397,9 +397,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
       addParameter(*para);
     }
-    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-      addParameter(*para);
-    }
+    //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    //      addParameter(*para);
+    //    }
     for (const auto& cm : m_sliceColormaps) {
       addParameter(*cm);
     }
@@ -414,9 +414,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       for (const auto& para : m_imgRaycasterRenderer.transferFuncParas()) {
         m_widgetsGroup->addChild(*para, 3);
       }
-      for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-        m_widgetsGroup->addChild(*para, 15);
-      }
+      //      for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+      //        m_widgetsGroup->addChild(*para, 15);
+      //      }
       for (const auto& cm : m_sliceColormaps) {
         m_widgetsGroup->addChild(*cm, 11);
       }
@@ -455,9 +455,9 @@ std::shared_ptr<ZWidgetsGroup> Z3DImgFilter::widgetsGroup()
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.isoValuePara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.localMIPThresholdPara(), 4);
     m_widgetsGroup->addChild(m_imgRaycasterRenderer.samplingRatePara(), 15);
-    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
-      m_widgetsGroup->addChild(*para, 15);
-    }
+    //    for (const auto& para : m_imgRaycasterRenderer.texFilterModeParas()) {
+    //      m_widgetsGroup->addChild(*para, 15);
+    //    }
 
     m_widgetsGroup->addChild(m_xCut, 12);
     m_widgetsGroup->addChild(m_yCut, 12);

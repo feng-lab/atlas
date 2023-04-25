@@ -135,7 +135,7 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
     m_transferFuncUniformNames.clear();
     m_channelVisibleParas.clear();
     m_transferFuncParas.clear();
-    m_texFilterModeParas.clear();
+    // m_texFilterModeParas.clear();
     for (size_t i = 0; i < m_img->numChannels(); ++i) {
       m_volumeUniformNames.push_back(QString("volume_%1").arg(i + 1));
       m_volumeDimensionNames.push_back(QString("volume_dimensions_%1").arg(i + 1));
@@ -145,11 +145,14 @@ void Z3DImgRaycasterRenderer::setData(Z3DImg& img)
       m_transferFuncParas.emplace_back(
         std::make_unique<Z3DTransferFunctionParameter>(QString("Transfer Function %1").arg(i + 1)));
       // m_transferFuncParas[i]->setVolume(m_img->volumes()[i].get());
-      m_texFilterModeParas.emplace_back(
-        std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
-      m_texFilterModeParas[i]->addOptionsWithData(std::make_pair(QString("Nearest"), static_cast<int>(GL_NEAREST)),
-                                                  std::make_pair(QString("Linear"), static_cast<int>(GL_LINEAR)));
-      m_texFilterModeParas[i]->select("Linear");
+
+      //      m_texFilterModeParas.emplace_back(
+      //        std::make_unique<ZStringIntOptionParameter>(QString("Texture Filtering %1").arg(i + 1)));
+      //      m_texFilterModeParas[i]->addOptionsWithData(std::make_pair(QString("Nearest"),
+      //      static_cast<int>(GL_NEAREST)),
+      //                                                  std::make_pair(QString("Linear"),
+      //                                                  static_cast<int>(GL_LINEAR)));
+      //      m_texFilterModeParas[i]->select("Linear");
     }
   }
   compile();
@@ -187,10 +190,7 @@ void Z3DImgRaycasterRenderer::bindVolumesAndTransferFuncs(Z3DShaderProgram& shad
     }
 
     // volumes
-    shader.bindTexture(m_volumeUniformNames[idx],
-                       m_img->volumes()[i]->texture(),
-                       m_texFilterModeParas[i]->associatedData(),
-                       m_texFilterModeParas[i]->associatedData());
+    shader.bindTexture(m_volumeUniformNames[idx], m_img->volumes()[i]->texture());
     shader.setUniform(m_volumeDimensionNames[idx], glm::vec3(m_img->volumes()[i]->dimensions()));
 
     // transfer functions
@@ -206,10 +206,7 @@ void Z3DImgRaycasterRenderer::bindVolumeAndTransferFunc(Z3DShaderProgram& shader
 {
   shader.setLogUniformLocationError(false);
 
-  shader.bindTexture(m_volumeUniformNames[0],
-                     m_img->volumes()[idx]->texture(),
-                     m_texFilterModeParas[idx]->associatedData(),
-                     m_texFilterModeParas[idx]->associatedData());
+  shader.bindTexture(m_volumeUniformNames[0], m_img->volumes()[idx]->texture());
   shader.setUniform(m_volumeDimensionNames[0], glm::vec3(m_img->volumes()[idx]->dimensions()));
 
   // transfer functions
@@ -896,11 +893,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
           QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
         m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
         if (round == 0) {
-          filen =
-            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
+          filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
           m_entryTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
-          filen =
-            QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_exit.tif", dummyidx, c));
+          filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_exit.tif", dummyidx, c));
           m_exitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
         }
       }

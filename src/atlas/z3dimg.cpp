@@ -472,7 +472,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
 #ifdef ATLAS_CHECK_CACHE
   std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
-  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageTableEntry;
+  m_usedPageTableEntry.clear();
 #endif
 
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
@@ -523,7 +523,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;
 #ifdef ATLAS_CHECK_CACHE
-          usedPageTableEntry.insert(pageTableEntryPtr->xyz());
+          m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
         }
         usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
@@ -622,11 +622,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
     // read image
     if (!pendingTasks.empty()) {
-#ifdef ATLAS_CHECK_CACHE
-      readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken, usedPageTableEntry);
-#else
       readEmptyBlockCount = readAndUploadImageBlocks(c, pendingTasks, cancellationToken);
-#endif
     }
   }
 
@@ -746,16 +742,9 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
   }
 }
 
-#ifdef ATLAS_CHECK_CACHE
-size_t Z3DImg::readAndUploadImageBlocks(size_t c,
-                                        const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
-                                        const folly::CancellationToken& cancellationToken,
-                                        std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>>& usedPageTableEntry)
-#else
 size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                         const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                         const folly::CancellationToken& cancellationToken)
-#endif
 {
   size_t emptyBlockCount = 0;
 
@@ -786,7 +775,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     if (!pboPtr) {
       LOG(WARNING) << "glMapBuffer failed on PBO";
     } else {
-      pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size(), 128);
+      pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size());
     }
   }
   auto pboGuard = folly::makeGuard([=]() {
@@ -947,15 +936,15 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       }
       insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
-      CHECK(!contains(usedPageTableEntry, pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
-      usedPageTableEntry.insert(pageTableEntryPtr->xyz());
+      CHECK(!contains(m_usedPageTableEntry, pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
+      m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
       m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntryPtr->xyz(),
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
     }
 #ifdef ATLAS_CHECK_CACHE
-    VLOG(1) << usedPageTableEntry.size();
+    VLOG(1) << m_usedPageTableEntry.size();
 #endif
     STOP_AND_LOG(bt_pboUpload)
   }

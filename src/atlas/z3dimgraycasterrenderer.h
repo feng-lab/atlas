@@ -111,10 +111,10 @@ public:
     return m_transferFuncParas;
   }
 
-  [[nodiscard]] const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
-  {
-    return m_texFilterModeParas;
-  }
+  //  [[nodiscard]] const std::vector<std::unique_ptr<ZStringIntOptionParameter>>& texFilterModeParas() const
+  //  {
+  //    return m_texFilterModeParas;
+  //  }
 
   void compile() override;
 
@@ -181,7 +181,7 @@ protected:
   std::vector<QString> m_transferFuncUniformNames;
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<Z3DTransferFunctionParameter>> m_transferFuncParas;
-  std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
+  // std::vector<std::unique_ptr<ZStringIntOptionParameter>> m_texFilterModeParas;
 
 private:
   std::vector<ZMesh> m_quads;
