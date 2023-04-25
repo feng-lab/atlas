@@ -48,3 +48,6 @@
 
 # Whether to log openGL context switch event, default is false"
 --atlas_log_glbinding_context_switch=false
+
+# define the width, height, and depth of image blocks in the 3D image cache system, can be 64, 128 (default), 256 or 512
+--atlas_image_block_size=128

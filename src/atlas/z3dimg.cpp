@@ -22,6 +22,11 @@ DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
               0,
               "Use PBO when number of blocks to upload is larger than this threshold, default is 0");
 
+DEFINE_uint32(
+  atlas_image_block_size,
+  128,
+  "define the width, height, and depth of image blocks in the 3D image cache system, can be 64, 128 (default), 256 or 512");
+
 DECLARE_double(atlas_image_cache_memory_proportion);
 DECLARE_double(atlas_image_region_cache_memory_proportion);
 
@@ -67,6 +72,14 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
   }
 
   if (m_isVolumeDownsampled) {
+    if (FLAGS_atlas_image_block_size == 64 || FLAGS_atlas_image_block_size == 128 ||
+        FLAGS_atlas_image_block_size == 256 || FLAGS_atlas_image_block_size == 512) {
+      m_imageBlockSize = glm::uvec3(FLAGS_atlas_image_block_size) - m_imageBlockSizePad;
+    } else {
+      LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}", FLAGS_atlas_image_block_size, 128);
+      m_imageBlockSize = glm::uvec3(128) - m_imageBlockSizePad;
+    }
+
     auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
 
     glm::uvec3 imageCacheSize;
@@ -97,10 +110,10 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
       imageCacheSize = glm::uvec3(1024, 1024, 512); // 0.5G
       m_pageTableCacheSize = glm::uvec3(256, 256, 128); // 256*256*128*4*4   134MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1000) {
-      imageCacheSize = glm::uvec3(1024, 1024, 256); // 0.25G
+      imageCacheSize = glm::uvec3(1024, 512, 512); // 0.25G
       m_pageTableCacheSize = glm::uvec3(256, 128, 128); // 256*128*128*4*4   67MB
     } else {
-      imageCacheSize = glm::uvec3(1024, 1024, 128); // 0.125G
+      imageCacheSize = glm::uvec3(512, 512, 512); // 0.125G
       m_pageTableCacheSize = glm::uvec3(128, 128, 128); // 128*128*128*4*4   34MB
     }
     m_imageCacheNumBlocks = imageCacheSize / imageBlockTotalSize;
