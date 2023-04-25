@@ -197,7 +197,8 @@ protected:
 protected:
   glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
-  glm::uvec3 m_imageBlockSize = glm::uvec3(60, 60, 60);
+  // glm::uvec3 m_imageBlockSize = glm::uvec3(60, 60, 60);
+  glm::uvec3 m_imageBlockSize = glm::uvec3(124, 124, 124);
   glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
