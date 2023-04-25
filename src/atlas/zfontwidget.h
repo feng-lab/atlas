@@ -22,7 +22,6 @@ public:
   void set_Font(const QFont& font);
 
 Q_SIGNALS:
-
   void fontChanged(QFont font);
 
 protected:

@@ -68,7 +68,6 @@ public:
   void readValue(const json::value& jsonValue) override;
 
 Q_SIGNALS:
-
   void eventTriggered(QEvent* e, int w, int h);
 
   void mouseEventTriggered(QMouseEvent* e, int w, int h);

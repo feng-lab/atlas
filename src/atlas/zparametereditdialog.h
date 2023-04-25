@@ -14,8 +14,6 @@ class ZParameterEditDialog : public QDialog
 public:
   explicit ZParameterEditDialog(ZParameter& para, QWidget* parent = nullptr);
 
-Q_SIGNALS:
-
 protected:
   void raiseAndActivate();
 

@@ -38,7 +38,6 @@ public:
   void renderTransparent(Z3DEye eye) override;
 
 Q_SIGNALS:
-
   void punctumSelected(const ZPunctum*, bool append);
 
   void showPunctaContextMenu(QPoint globalPos);

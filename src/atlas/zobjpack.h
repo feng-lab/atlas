@@ -25,7 +25,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void visibleStateChanged(bool v);
 
   void lockedStateChanged(bool v);

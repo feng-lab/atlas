@@ -88,7 +88,6 @@ public:
   void renderTransparent(Z3DEye eye) override;
 
 Q_SIGNALS:
-
   void pointInVolumeLeftClicked(QPoint pt, glm::ivec3 pos3D);
 
   void pointInVolumeRightClicked(QPoint pt, glm::ivec3 pos3D);

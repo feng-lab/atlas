@@ -132,7 +132,6 @@ protected:
   void connectSelectedNodes();
 
 Q_SIGNALS:
-
   void selectionChanged();
 
   void swcChanged();

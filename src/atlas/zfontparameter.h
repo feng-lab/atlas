@@ -30,7 +30,6 @@ public:
   void readValue(const json::value& jsonValue) override;
 
 Q_SIGNALS:
-
   void valueWillChange(QFont);
 
 protected:

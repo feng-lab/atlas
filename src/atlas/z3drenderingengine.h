@@ -230,7 +230,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void objViewReady(size_t id);
 
   void sceneParaUpdated();

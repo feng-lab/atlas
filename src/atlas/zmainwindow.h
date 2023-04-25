@@ -80,7 +80,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void window3DReady();
 
 protected:

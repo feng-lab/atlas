@@ -66,7 +66,6 @@ public:
   void exitSubregionView();
 
 Q_SIGNALS:
-
   void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
 
 protected:
@@ -91,9 +90,9 @@ protected:
 
   void setClipPlanes() override {}
 
-//  void enterFastMode();
-//
-//  void exitFastMode();
+  //  void enterFastMode();
+  //
+  //  void exitFastMode();
 
   double process(Z3DEye eye) override;
 

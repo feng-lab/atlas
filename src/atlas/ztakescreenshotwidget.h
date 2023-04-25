@@ -37,7 +37,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void takeFixedSize2DScreenShot(const QString& filename, int width, int height);
 
   void take2DScreenShot(const QString& filename);

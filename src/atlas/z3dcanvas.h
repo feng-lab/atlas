@@ -82,7 +82,6 @@ public:
   }
 
 Q_SIGNALS:
-
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(int w, int h);
 
@@ -199,7 +198,6 @@ public:
   }
 
 Q_SIGNALS:
-
   // w and h is physical size not logical size, opengl works in physical pixel
   void canvasSizeChanged(size_t w, size_t h);
 

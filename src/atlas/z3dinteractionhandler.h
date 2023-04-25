@@ -44,7 +44,6 @@ public:
   void onEvent(QEvent* e, int w, int h);
 
 Q_SIGNALS:
-
   void cameraMoved();
 
 //  void enterInteractionMode();
@@ -155,7 +154,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void objectsMoved(double x, double y, double z);
 
 protected:

@@ -151,7 +151,6 @@ public:
   void setValue(int v);
 
 Q_SIGNALS:
-
   void valueWillChange(int);
 
   void intChanged(int);
@@ -180,7 +179,6 @@ public:
   void setValue(double v);
 
 Q_SIGNALS:
-
   void valueWillChange(double);
 
   void doubleChanged(double);
@@ -209,7 +207,6 @@ public:
   void setValue(double v);
 
 Q_SIGNALS:
-
   void valueWillChange(double);
 
   void floatChanged(double);
@@ -411,7 +408,6 @@ public:
   void setValue2(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -442,7 +438,6 @@ public:
   void setValue3(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -485,7 +480,6 @@ public:
   void setValue4(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -518,7 +512,6 @@ public:
   void setValue2(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -549,7 +542,6 @@ public:
   void setValue3(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -584,7 +576,6 @@ public:
   void setValue4(double v);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);
@@ -613,7 +604,6 @@ public:
   void setValue2(int v);
 
 Q_SIGNALS:
-
   void value1WillChange(int);
 
   void value2WillChange(int);
@@ -640,7 +630,6 @@ public:
   void setValue3(int v);
 
 Q_SIGNALS:
-
   void value1WillChange(int);
 
   void value2WillChange(int);
@@ -875,7 +864,6 @@ public:
   void setUpperValue(int v);
 
 Q_SIGNALS:
-
   void lowerValueWillChange(int);
 
   void upperValueWillChange(int);
@@ -904,7 +892,6 @@ public:
   void setUpperValue(double v);
 
 Q_SIGNALS:
-
   void lowerValueWillChange(double);
 
   void upperValueWillChange(double);
@@ -933,7 +920,6 @@ public:
   void setUpperValue(double v);
 
 Q_SIGNALS:
-
   void lowerValueWillChange(double);
 
   void upperValueWillChange(double);

@@ -28,7 +28,6 @@ public:
   explicit ZClickableLabel(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
 Q_SIGNALS:
-
   void clicked();
 
 protected:

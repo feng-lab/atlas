@@ -33,7 +33,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void error(QString);
 
   void finished();

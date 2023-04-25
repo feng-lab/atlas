@@ -68,7 +68,6 @@ public:
   void renderTransparent(Z3DEye eye) override;
 
 Q_SIGNALS:
-
   void treeNodeSelected(const ZSwc::SwcTreeNode*, bool append, bool extend);
 
   void connectingSwcTreeNode(ZSwc::SwcTreeNode);

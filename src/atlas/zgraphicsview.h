@@ -51,7 +51,6 @@ public:
   void checkViewport();
 
 Q_SIGNALS:
-
   void scaleChanged(double s);
 
   void viewportChanged();

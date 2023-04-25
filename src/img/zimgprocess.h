@@ -52,7 +52,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void processError(QString);
 
   void finished();

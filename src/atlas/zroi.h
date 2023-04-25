@@ -540,7 +540,6 @@ public:
   void save(H5::Group& allGrp) const;
 
 Q_SIGNALS:
-
   void roiChanged(int slice,
                   const std::set<size_t>& newShapes,
                   const std::set<size_t>& deletedShapes,

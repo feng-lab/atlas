@@ -24,8 +24,6 @@ public:
 
   void setInitialValue();
 
-Q_SIGNALS:
-
 protected:
   void accept() override;
 

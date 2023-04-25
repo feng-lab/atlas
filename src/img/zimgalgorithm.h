@@ -47,7 +47,6 @@ public:
   }
 
 Q_SIGNALS:
-
   // progress from 1 to 100, used for QProgressbar
   void progressChanged(int);
 

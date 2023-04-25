@@ -139,7 +139,6 @@ public:
   void export2DAnimation(const QString& fn, int framePerSecond, double startTime, double endTime);
 
 Q_SIGNALS:
-
   void durationChanged(double v);
 
   void objChanged();

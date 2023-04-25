@@ -422,7 +422,6 @@ public:
   glm::mat4 voxelToTextureMatrix() const;
 
 Q_SIGNALS:
-
   void histogramFinished();
 
 protected:

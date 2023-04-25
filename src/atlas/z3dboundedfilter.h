@@ -236,7 +236,6 @@ public:
   [[nodiscard]] ZBBox<glm::dvec3> notTransformedBoundBoxAfterClipping() const;
 
 Q_SIGNALS:
-
   void boundBoxChanged();
 
   void objSelected(bool append);

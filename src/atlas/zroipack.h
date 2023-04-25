@@ -85,7 +85,6 @@ protected:
   void createContextMenu();
 
 Q_SIGNALS:
-
   void selectionChanged();
 
   void ROIChanged();

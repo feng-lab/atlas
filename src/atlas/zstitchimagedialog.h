@@ -119,7 +119,6 @@ public:
   ~ZStitchImageDialog() override;
 
 Q_SIGNALS:
-
   void resultReady(QString path);
 
 protected:

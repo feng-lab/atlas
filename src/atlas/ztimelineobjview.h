@@ -17,7 +17,6 @@ public:
   void setScrollEnabled(bool v);
 
 Q_SIGNALS:
-
   void vScrollBarValueChanged(int v);
 
 protected:

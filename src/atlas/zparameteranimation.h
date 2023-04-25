@@ -106,7 +106,6 @@ public:
   void removeRedundantKeys();
 
 Q_SIGNALS:
-
   void colorChanged(ZParameterAnimation* pa);
 
   void keysChanged();

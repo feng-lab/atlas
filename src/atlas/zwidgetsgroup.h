@@ -102,7 +102,6 @@ public:
   void emitWidgetsGroupChangedSignal();
 
 Q_SIGNALS:
-
   void requestAdvancedWidget(const QString& name);
 
   void widgetsGroupChanged();

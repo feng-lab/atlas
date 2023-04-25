@@ -256,7 +256,6 @@ public:
   void copySelectedObjsPathToClipboard();
 
 Q_SIGNALS:
-
   void showViewSetting(size_t id);
 
   void hideViewSetting();

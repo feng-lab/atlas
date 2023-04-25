@@ -40,7 +40,6 @@ public:
   virtual std::shared_ptr<ZWidgetsGroup> viewSettingWidgetsGroupOf(size_t id);
 
 Q_SIGNALS:
-
   void objViewReady(size_t id);
 
 protected:

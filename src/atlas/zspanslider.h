@@ -36,7 +36,6 @@ public:
   void setDataRange(int min, int max);
 
 Q_SIGNALS:
-
   void lowerValueChanged(int lower);
 
   void upperValueChanged(int upper);
@@ -79,7 +78,6 @@ public:
   void setDataRange(double min, double max);
 
 Q_SIGNALS:
-
   void lowerValueChanged(double lower);
 
   void upperValueChanged(double upper);

@@ -69,7 +69,6 @@ public:
   [[nodiscard]] virtual int maxViewPrecedence() const = 0;
 
 Q_SIGNALS:
-
   void objViewReady(size_t id);
 
 protected:

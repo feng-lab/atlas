@@ -84,7 +84,6 @@ public:
   [[nodiscard]] QPointF mapFromScene(QPointF p) const;
 
 Q_SIGNALS:
-
   void boundBoxChanged();
 
   void objSelected(bool append);

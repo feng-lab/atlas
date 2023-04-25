@@ -83,8 +83,6 @@ class ZTimelineObjScene : public QGraphicsScene
 public:
   explicit ZTimelineObjScene(ZTimelineWidget& timeline, QObject* parent = nullptr);
 
-Q_SIGNALS:
-
 private:
   void updateItems();
 

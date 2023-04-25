@@ -70,7 +70,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void changed();
 
 private:

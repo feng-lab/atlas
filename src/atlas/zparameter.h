@@ -103,7 +103,6 @@ public:
   void updateFromSender();
 
 Q_SIGNALS:
-
   void nameChanged(const QString&);
 
   void valueChanged();
@@ -282,7 +281,6 @@ public:
   void setValue(bool v);
 
 Q_SIGNALS:
-
   void valueWillChange(bool);
 
   void boolChanged(bool);

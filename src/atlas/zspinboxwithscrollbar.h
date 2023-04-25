@@ -29,7 +29,6 @@ public:
   void setDataRange(int min, int max);
 
 Q_SIGNALS:
-
   void valueChanged(int);
 
 protected:

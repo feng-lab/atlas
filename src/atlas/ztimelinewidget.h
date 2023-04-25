@@ -71,7 +71,6 @@ public:
   void setCurrentTime(double t);
 
 Q_SIGNALS:
-
   void exportButtonToggled(bool);
 
   void eventViewWidthChanged();

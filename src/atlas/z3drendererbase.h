@@ -349,7 +349,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void coordTransformChanged();
 
   void sizeScaleChanged();

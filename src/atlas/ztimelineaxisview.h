@@ -27,8 +27,6 @@ class ZTimelineAxisView : public QGraphicsView
 public:
   explicit ZTimelineAxisView(ZTimelineWidget& parent);
 
-Q_SIGNALS:
-
 protected:
   void updateAxisScene();
 

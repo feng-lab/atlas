@@ -14,7 +14,6 @@ public:
   ZQuatParameter(const QString& name, glm::quat value, QObject* parent = nullptr);
 
 Q_SIGNALS:
-
   void value1WillChange(double);
 
   void value2WillChange(double);

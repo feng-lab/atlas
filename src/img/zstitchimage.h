@@ -140,7 +140,6 @@ public:
   }
 
 Q_SIGNALS:
-
   void resultReady(QString path);
 
 protected:

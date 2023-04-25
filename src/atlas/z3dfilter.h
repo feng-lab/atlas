@@ -128,7 +128,6 @@ public:
   }
 
 Q_SIGNALS:
-
   // Q_EMIT this only if resize starts from current filter.
   void requestUpstreamSizeChange(Z3DFilter*);
 

@@ -18,8 +18,6 @@ class ZPunctaDetectionDialog : public ZImgProcessDialog
 public:
   explicit ZPunctaDetectionDialog(QWidget* parent = nullptr);
 
-Q_SIGNALS:
-
 protected:
   void createWorker(ZImgProcess*& worker, QString& workerName) override;
 

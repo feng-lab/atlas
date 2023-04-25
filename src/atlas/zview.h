@@ -242,7 +242,6 @@ public:
   void takeScreenShot(const QString& filename);
 
 Q_SIGNALS:
-
   void objViewReady(size_t id);
 
   void viewportChanged();

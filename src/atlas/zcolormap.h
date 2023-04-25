@@ -373,7 +373,6 @@ public:
   void create1DTexture(size_t width = 256) const;
 
 Q_SIGNALS:
-
   void changed();
 
 protected:

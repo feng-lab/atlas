@@ -161,7 +161,6 @@ public:
                                           const folly::CancellationToken& cancellationToken);
 
 Q_SIGNALS:
-
   void renderingError(const QString& error) const;
 
 protected:

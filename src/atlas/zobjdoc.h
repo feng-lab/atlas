@@ -157,7 +157,6 @@ public:
   void setLastOpenedObjPath(const QString& path) const;
 
 Q_SIGNALS:
-
   void objAdded(size_t id, ZObjDoc* doc);
 
   void objAboutToBeRemoved(size_t id, ZObjDoc* doc);

@@ -36,7 +36,6 @@ public:
   void buildSpline();
 
 Q_SIGNALS:
-
   void interpolationMethodChanged();
 
 protected:

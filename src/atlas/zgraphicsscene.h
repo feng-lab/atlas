@@ -36,7 +36,6 @@ public:
   void escKeyPressed();
 
 Q_SIGNALS:
-
   void mousePressed(QPointF, Qt::KeyboardModifiers);
 
   void mouseMoved(QPointF, Qt::KeyboardModifiers);
