@@ -76,8 +76,11 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
         FLAGS_atlas_image_block_size == 256 || FLAGS_atlas_image_block_size == 512) {
       m_imageBlockSize = glm::uvec3(FLAGS_atlas_image_block_size) - m_imageBlockSizePad;
     } else {
-      LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}", FLAGS_atlas_image_block_size, 128);
-      m_imageBlockSize = glm::uvec3(128) - m_imageBlockSizePad;
+      constexpr uint32_t defaultImageBlockSize = 128;
+      LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}",
+                               FLAGS_atlas_image_block_size,
+                               defaultImageBlockSize);
+      m_imageBlockSize = glm::uvec3(defaultImageBlockSize) - m_imageBlockSizePad;
     }
 
     auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
