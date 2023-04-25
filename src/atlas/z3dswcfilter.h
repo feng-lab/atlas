@@ -79,6 +79,8 @@ Q_SIGNALS:
 
   void extendSwcTreeNode(double x, double y, double z);
 
+  void showSwcContextMenu(QPoint globalPos);
+
 protected:
   void prepareColor();
 

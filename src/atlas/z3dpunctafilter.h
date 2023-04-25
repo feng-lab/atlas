@@ -41,6 +41,8 @@ Q_SIGNALS:
 
   void punctumSelected(const ZPunctum*, bool append);
 
+  void showPunctaContextMenu(QPoint globalPos);
+
 protected:
   void prepareColor();
 

@@ -106,6 +106,8 @@ public:
 
   void deleteSelectedNodes();
 
+  void showSwcContextMenu(QPoint globalPos);
+
 protected:
   void updateViewRelatedData();
 

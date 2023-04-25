@@ -181,6 +181,11 @@ void ZPunctaPack::splitSelectedPunctum()
   }
 }
 
+void ZPunctaPack::showPunctaContextMenu(QPoint globalPos)
+{
+  contextMenu().popup(globalPos);
+}
+
 void ZPunctaPack::updateDerivedData()
 {
   m_info.clear();

@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QPoint>
 #include <QDir>
+#include <QMenu>
 #include <tbb/parallel_for.h>
 #include <boost/iterator/function_output_iterator.hpp>
 #include <cmath>
@@ -66,7 +67,8 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
 }
 
 ZImgPack::ZImgPack(ZImgSource imgSource)
-  : m_imgSource(std::move(imgSource))
+  : QObject()
+  , m_imgSource(std::move(imgSource))
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
@@ -842,6 +844,22 @@ const ZImg& ZImgPack::maxZProjectedImg(size_t zStart, size_t zEnd) const
     m_mipZEnd = zEnd;
   }
   return m_maximumProjectedAlongZImg;
+}
+
+void ZImgPack::show3DImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit)
+{
+  QMenu menu;
+  QAction* enterSubregionViewAction = enter ? menu.addAction("Enter Subregion View") : nullptr;
+  QAction* exitSubregionViewAction = exit ? menu.addAction("Exit Subregion View") : nullptr;
+  if (menu.isEmpty()) {
+    return;
+  }
+  QAction* selectedAction = menu.exec(globalPos);
+  if (enterSubregionViewAction && selectedAction == enterSubregionViewAction) {
+    Q_EMIT enterSubregionView(x, y, z);
+  } else if (exitSubregionViewAction && selectedAction == exitSubregionViewAction) {
+    Q_EMIT exitSubregionView();
+  }
 }
 
 ZImg ZImgPack::slice(size_t z, size_t t) const

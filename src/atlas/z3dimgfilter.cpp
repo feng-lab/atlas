@@ -422,6 +422,10 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
       }
       m_widgetsGroup->emitWidgetsGroupChangedSignal();
     }
+
+    connect(this, &Z3DImgFilter::showImgContextMenu, &imgPack, &ZImgPack::show3DImgContextMenu);
+    connect(&imgPack, &ZImgPack::enterSubregionView, this, &Z3DImgFilter::enterSubregionView);
+    connect(&imgPack, &ZImgPack::exitSubregionView, this, &Z3DImgFilter::exitSubregionView);
   }
   catch (const ZException& e) {
     m_3dImg.reset();
@@ -574,6 +578,28 @@ void Z3DImgFilter::setFastRenderingMode(bool v, bool stereo)
   }
 }
 
+void Z3DImgFilter::enterSubregionView(float x, float y, float z)
+{
+  glm::vec3 pos3D(x, y, z);
+  LOG(INFO) << "open subregion at image coord " << pos3D;
+  auto minCoord = pos3D - 64.f;
+  auto maxCoord = pos3D + 64.f;
+  m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
+  m_yCut.set(glm::vec2(minCoord.y, maxCoord.y));
+  m_zCut.set(glm::vec2(minCoord.z, maxCoord.z));
+  m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBoxAfterClipping());
+  m_fullResolutionRendering.set(true);
+}
+
+void Z3DImgFilter::exitSubregionView()
+{
+  m_fullResolutionRendering.set(false);
+  m_xCut.set(m_xCut.range());
+  m_yCut.set(m_yCut.range());
+  m_zCut.set(m_zCut.range());
+  m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
+}
+
 void Z3DImgFilter::updateSize()
 {
   Z3DBoundedFilter::updateSize();
@@ -638,32 +664,14 @@ void Z3DImgFilter::contextMenuEvent(QContextMenuEvent* event, int w, int h)
                                w * m_rendererBase.globalParas().devicePixelRatio.get(),
                                h * m_rendererBase.globalParas().devicePixelRatio.get(),
                                success);
-    QMenu menu;
-    QAction* enterSubregionViewAction = success ? menu.addAction("Enter Subregion View") : nullptr;
-    QAction* exitSubregionViewAction = nullptr;
-    if (m_xCut.get() != m_xCut.range() || m_yCut.get() != m_yCut.range() || m_zCut.get() != m_zCut.range()) {
-      exitSubregionViewAction = menu.addAction("Exit Subregion View");
-    }
-    if (menu.isEmpty()) {
+
+    bool enter = success;
+    bool exit = m_xCut.get() != m_xCut.range() || m_yCut.get() != m_yCut.range() || m_zCut.get() != m_zCut.range();
+    if (!enter && !exit) {
       return;
     }
-    QAction* selectedAction = menu.exec(event->globalPos());
-    if (enterSubregionViewAction && selectedAction == enterSubregionViewAction) {
-      LOG(INFO) << "open subregion at image coord " << pos3D;
-      auto minCoord = pos3D - 64.f;
-      auto maxCoord = pos3D + 64.f;
-      m_xCut.set(glm::vec2(minCoord.x, maxCoord.x));
-      m_yCut.set(glm::vec2(minCoord.y, maxCoord.y));
-      m_zCut.set(glm::vec2(minCoord.z, maxCoord.z));
-      m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBoxAfterClipping());
-      m_fullResolutionRendering.set(true);
-    } else if (exitSubregionViewAction && selectedAction == exitSubregionViewAction) {
-      m_fullResolutionRendering.set(false);
-      m_xCut.set(m_xCut.range());
-      m_yCut.set(m_yCut.range());
-      m_zCut.set(m_zCut.range());
-      m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
-    }
+
+    Q_EMIT showImgContextMenu(event->globalPos(), pos3D.x, pos3D.y, pos3D.z, enter, exit);
   }
 }
 

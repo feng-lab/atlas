@@ -435,6 +435,11 @@ void ZSwcPack::deleteSelectedNodes()
     new ZSwcEditCommand(QString("Deleted Selected %1 Nodes").arg(m_selectedNodes.size()), *this, swcBeforeChange));
 }
 
+void ZSwcPack::showSwcContextMenu(QPoint globalPos)
+{
+  contextMenu().popup(globalPos);
+}
+
 void ZSwcPack::setSelectedNodeAsRoot()
 {
   if (m_selectedNodes.size() != 1) {

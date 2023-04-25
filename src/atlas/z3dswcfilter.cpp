@@ -165,6 +165,7 @@ void Z3DSwcFilter::setData(ZSwcPack& swcPack)
   connect(this, &Z3DSwcFilter::treeNodeSelected, m_swcPack, &ZSwcPack::onTreeNodeSelected);
   connect(m_swcPack, &ZSwcPack::swcChanged, this, &Z3DSwcFilter::updateData);
   connect(m_swcPack, &ZSwcPack::lockedStateChanged, this, &Z3DSwcFilter::invalidateResult);
+  connect(this, &Z3DSwcFilter::showSwcContextMenu, m_swcPack, &ZSwcPack::showSwcContextMenu);
 }
 
 bool Z3DSwcFilter::isReady(Z3DEye eye) const
@@ -689,7 +690,7 @@ void Z3DSwcFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
       return;
     }
 
-    m_swcPack->contextMenu().popup(e->globalPos());
+    Q_EMIT showSwcContextMenu(e->globalPos());
   }
 }
 

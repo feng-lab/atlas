@@ -180,6 +180,7 @@ void Z3DPunctaFilter::setData(ZPunctaPack& puncta)
   connect(this, &Z3DPunctaFilter::punctumSelected, m_punctaPack, &ZPunctaPack::onPunctumSelected);
   connect(m_punctaPack, &ZPunctaPack::punctaChanged, this, &Z3DPunctaFilter::updateData);
   connect(m_punctaPack, &ZPunctaPack::lockedStateChanged, this, &Z3DPunctaFilter::invalidateResult);
+  connect(this, &Z3DPunctaFilter::showPunctaContextMenu, m_punctaPack, &ZPunctaPack::showPunctaContextMenu);
 }
 
 bool Z3DPunctaFilter::isReady(Z3DEye eye) const
@@ -563,7 +564,7 @@ void Z3DPunctaFilter::contextMenuEvent(QContextMenuEvent* e, int, int)
       return;
     }
 
-    m_punctaPack->contextMenu().popup(e->globalPos());
+    Q_EMIT showPunctaContextMenu(e->globalPos());
   }
 }
 

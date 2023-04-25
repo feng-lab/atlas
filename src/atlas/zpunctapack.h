@@ -87,6 +87,8 @@ public:
 
   void splitSelectedPunctum();
 
+  void showPunctaContextMenu(QPoint globalPos);
+
 protected:
   void updateViewRelatedData();
 

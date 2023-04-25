@@ -61,6 +61,14 @@ public:
 
   void setFastRenderingMode(bool v, bool stereo) override;
 
+  void enterSubregionView(float x, float y, float z);
+
+  void exitSubregionView();
+
+Q_SIGNALS:
+
+  void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
+
 protected:
   void updateSize() override;
 

@@ -40,8 +40,12 @@ protected:
 };
 
 // might throw Exception
-class ZImgPack : public ZImgSliceProvider
+class ZImgPack
+  : public QObject
+  , public ZImgSliceProvider
 {
+  Q_OBJECT
+
 public:
   enum class MinMaxState
   {
@@ -216,6 +220,8 @@ public:
 
   const ZImg& maxZProjectedImg(size_t zStart, size_t zEnd) const;
 
+  void show3DImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
+
   // ZImgSliceProvider interface
 
 public:
@@ -229,6 +235,11 @@ public:
   ZImg allSlices(size_t t) const override;
 
   ZImg wholeImg() const override;
+
+Q_SIGNALS:
+  void enterSubregionView(float x, float y, float z);
+
+  void exitSubregionView();
 
 protected:
   // will take ownership of img
