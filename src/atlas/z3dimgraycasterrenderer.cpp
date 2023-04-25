@@ -591,8 +591,8 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
     << m_lastImageRenderTarget->size() << " " << m_blockIDsRenderTarget->size();
 
 #if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
+  static int dummyidx = -1;
   if (FLAGS_atlas_debug_texture_output) {
-    static int dummyidx = -1;
     ++dummyidx;
   }
 #endif
