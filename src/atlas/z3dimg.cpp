@@ -24,8 +24,8 @@ DEFINE_uint32(atlas_number_of_blocks_to_use_PBO_threashold,
 
 DEFINE_uint32(
   atlas_image_block_size,
-  128,
-  "define the width, height, and depth of image blocks in the 3D image cache system, can be 64, 128 (default), 256 or 512");
+  64,
+  "define the width, height, and depth of image blocks in the 3D image cache system, can be 64 (default), 128, 256 or 512");
 
 DECLARE_double(atlas_image_cache_memory_proportion);
 DECLARE_double(atlas_image_region_cache_memory_proportion);
@@ -76,7 +76,7 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
         FLAGS_atlas_image_block_size == 256 || FLAGS_atlas_image_block_size == 512) {
       m_imageBlockSize = glm::uvec3(FLAGS_atlas_image_block_size) - m_imageBlockSizePad;
     } else {
-      constexpr uint32_t defaultImageBlockSize = 128;
+      constexpr uint32_t defaultImageBlockSize = 64;
       LOG(INFO) << fmt::format("atlas_image_block_size {} is not supported, use {}",
                                FLAGS_atlas_image_block_size,
                                defaultImageBlockSize);
