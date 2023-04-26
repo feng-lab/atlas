@@ -1,7 +1,3 @@
-#if GLSL_VERSION < 130
-#extension GL_EXT_gpu_shader4 : enable
-#endif
-
 #if GLSL_VERSION >= 130
 in vec3 texCoord0;
 in vec4 eyeCoord;

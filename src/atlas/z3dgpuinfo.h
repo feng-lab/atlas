@@ -154,10 +154,6 @@ public:
 
   [[nodiscard]] bool needScaleDataForTexture(size_t width, size_t height, size_t depth);
 
-  [[nodiscard]] bool isFrameBufferObjectSupported() const;
-
-  [[nodiscard]] bool isNonPowerOfTwoTextureSupported() const;
-
   [[nodiscard]] bool isGeometryShaderSupported() const;
 
   [[nodiscard]] bool isTessellationShaderSupported() const;
@@ -168,18 +164,6 @@ public:
 
   // for glBlendEquation
   [[nodiscard]] bool isImagingSupported() const;
-
-  [[nodiscard]] bool isColorBufferFloatSupported() const;
-
-  [[nodiscard]] bool isDepthBufferFloatSupported() const;
-
-  [[nodiscard]] bool isTextureFloatSupported() const;
-
-  [[nodiscard]] bool isTextureRGSupported() const;
-
-  [[nodiscard]] bool isVAOSupported() const;
-
-  [[nodiscard]] bool isGPUShader4Supported() const;
 
   [[nodiscard]] bool isGeometryShader4Supported() const;
 

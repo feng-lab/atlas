@@ -126,16 +126,6 @@ QString Z3DGpuInfo::glExtensionsString() const
   return m_glExtensionsString;
 }
 
-bool Z3DGpuInfo::isFrameBufferObjectSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_EXT_framebuffer_object");
-}
-
-bool Z3DGpuInfo::isNonPowerOfTwoTextureSupported() const
-{
-  return GLVersionGE(2, 0) || isExtensionSupported("GL_ARB_texture_non_power_of_two");
-}
-
 bool Z3DGpuInfo::isGeometryShaderSupported() const
 {
   return GLVersionGE(3, 2) || isExtensionSupported("GL_ARB_geometry_shader4") ||
@@ -160,37 +150,6 @@ bool Z3DGpuInfo::isTextureRectangleSupported() const
 bool Z3DGpuInfo::isImagingSupported() const
 {
   return isExtensionSupported("GL_ARB_imaging");
-}
-
-bool Z3DGpuInfo::isColorBufferFloatSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_ARB_color_buffer_float");
-}
-
-bool Z3DGpuInfo::isDepthBufferFloatSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_ARB_depth_buffer_float");
-}
-
-bool Z3DGpuInfo::isTextureFloatSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_ARB_texture_float");
-}
-
-bool Z3DGpuInfo::isTextureRGSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_ARB_texture_rg");
-}
-
-bool Z3DGpuInfo::isVAOSupported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_ARB_vertex_array_object") ||
-         isExtensionSupported("GL_APPLE_vertex_array_object");
-}
-
-bool Z3DGpuInfo::isGPUShader4Supported() const
-{
-  return GLVersionGE(3, 0) || isExtensionSupported("GL_EXT_gpu_shader4");
 }
 
 bool Z3DGpuInfo::isGeometryShader4Supported() const
@@ -271,22 +230,17 @@ void Z3DGpuInfo::logGpuInfo() const
 
 bool Z3DGpuInfo::isWeightedAverageSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRGSupported() && Z3DGpuInfo::instance().isTextureRectangleSupported() &&
-         Z3DGpuInfo::instance().isTextureFloatSupported() && Z3DGpuInfo::instance().isColorBufferFloatSupported() &&
-         Z3DGpuInfo::instance().maxColorAttachments() >= 2;
+  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 2;
 }
 
 bool Z3DGpuInfo::isWeightedBlendedSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().isTextureFloatSupported() &&
-         Z3DGpuInfo::instance().isColorBufferFloatSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 2;
+  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 2;
 }
 
 bool Z3DGpuInfo::isDualDepthPeelingSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRGSupported() && Z3DGpuInfo::instance().isTextureRectangleSupported() &&
-         Z3DGpuInfo::instance().isTextureFloatSupported() && Z3DGpuInfo::instance().isColorBufferFloatSupported() &&
-         Z3DGpuInfo::instance().maxColorAttachments() >= 8;
+  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 8;
 }
 
 bool Z3DGpuInfo::isLinkedListSupported() const
@@ -320,28 +274,13 @@ void Z3DGpuInfo::detectGpuInfo()
     m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
   }
 
-  if (GLVersionGE(2, 1)) {
-    if (!isFrameBufferObjectSupported()) {
-      m_isSupported = false;
-      m_notSupportedReason = "Frame Buffer Object (FBO) is not supported by current openGL context.";
-      return;
-    }
-    if (!isGPUShader4Supported()) {
-      m_isSupported = false;
-      m_notSupportedReason = "GPU Shader 4 is not supported by current openGL context.";
-      return;
-    }
+  if (GLVersionGE(3, 0)) {
     if (!isGeometryShader4Supported()) {
       m_isSupported = false;
       m_notSupportedReason = "Geometry Shader 4 is not supported by current openGL context.";
       return;
     }
-    if (!isNonPowerOfTwoTextureSupported()) { // not necessary, NPOT texture is supported since opengl 2.0
-      m_isSupported = false;
-      m_notSupportedReason = "Non power of two texture is not supported by current openGL context.";
-      return;
-    }
-    if (gpuVendor() == GpuVendor::AMD && isNonPowerOfTwoTextureSupported() &&
+    if (gpuVendor() == GpuVendor::AMD &&
         (m_glRendererString.contains("RADEON X", Qt::CaseInsensitive) ||
          m_glRendererString.contains("RADEON 9",
                                      Qt::CaseInsensitive))) { // from http://www.opengl.org/wiki/NPOT_Texture
@@ -351,7 +290,7 @@ void Z3DGpuInfo::detectGpuInfo()
         "but only if the texture has no mipmaps.";
       return;
     }
-    if (gpuVendor() == GpuVendor::NVIDIA && isNonPowerOfTwoTextureSupported() &&
+    if (gpuVendor() == GpuVendor::NVIDIA &&
         m_glRendererString.contains("GeForce FX",
                                     Qt::CaseInsensitive)) { // from http://www.opengl.org/wiki/NPOT_Texture
       m_isSupported = false;
@@ -393,11 +332,7 @@ void Z3DGpuInfo::detectGpuInfo()
       glGetIntegerv(GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT, &m_maxGeometryOutputVertices);
     }
 
-    if (GLVersionGE(3, 0) || isExtensionSupported("GL_EXT_texture_array")) {
-      glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &m_maxArrayTextureLayers);
-    } else {
-      m_maxArrayTextureLayers = 0;
-    }
+    glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &m_maxArrayTextureLayers);
 
     //
     glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &m_maxViewportDims);
@@ -450,7 +385,7 @@ void Z3DGpuInfo::detectGpuInfo()
   } else {
     m_isSupported = false;
     m_notSupportedReason =
-      "Minimum OpenGL version required is 2.1, while current openGL version is: \"" + m_glVersionString + "\"";
+      "Minimum OpenGL version required is 3.0, while current openGL version is: \"" + m_glVersionString + "\"";
   }
 }
 

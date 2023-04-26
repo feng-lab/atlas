@@ -1,7 +1,3 @@
-#if GLSL_VERSION < 130
-#extension GL_EXT_gpu_shader4 : enable
-#endif
-
 uniform usampler3D page_directory;
 uniform uvec3 page_directory_bases[LEVEL_COUNT];
 uniform usampler3D page_table_cache;

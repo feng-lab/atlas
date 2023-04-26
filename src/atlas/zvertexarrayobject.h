@@ -28,7 +28,6 @@ public:
   void resize(GLsizei n);
 
 private:
-  bool m_hardwareSupportVAO;
   std::vector<GLuint> m_arrays;
 
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS

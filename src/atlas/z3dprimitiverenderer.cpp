@@ -16,7 +16,7 @@ Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
   , m_followCoordTransform(true)
   , m_followOpacity(true)
   , m_followSizeScale(true)
-  , m_hardwareSupportVAO(Z3DGpuInfo::instance().isVAOSupported())
+  , m_hardwareSupportVAO(true)
 {
   m_rendererBase.registerRenderer(this);
 }
