@@ -144,7 +144,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 {
   bool blockFinished = false;
   vec3 voxelAddress;
-#if GLSL_VERSION >= 130
+#if GLSL_VERSION >= 930
   vec3 fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
   uvec3 voxelCoord = uvec3(voxelAddress);
 #else
@@ -195,7 +195,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
     currentRayLength += stepSize;
 
     samplePos = startRayPosition + currentRayLength * rayVector;
-#if GLSL_VERSION >= 130
+#if GLSL_VERSION >= 930
     fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
     voxelCoord = uvec3(voxelAddress);
 #else
