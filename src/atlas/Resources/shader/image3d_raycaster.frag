@@ -202,7 +202,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
     voxelCoord = uvec3(samplePos * image_dimensions[curLevel]);
     fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
 #endif
-    blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength >= 1.0;
+    blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
   }
 }
 
