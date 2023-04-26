@@ -123,7 +123,7 @@ void main()
           finished = true;
           break;
         }
-        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
+        vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
 
         uvec3 pageTableCoord = uvec3(samplePos * image_dimensions[curLevel]) / image_block_size;
         uvec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
@@ -155,12 +155,14 @@ void main()
           // goto next block
           do {
             currentRayLength += stepSize;
-          } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+            samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+          } while (uvec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
         } else {
           if (pagingFlag == EMPTY) {
             do { // skip empty space page directory entry
               currentRayLength += stepSize;
-            } while (page_directory_bases[curLevel] + uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+              samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+            } while (page_directory_bases[curLevel] + uvec3(samplePos * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
           } else { // pagingFlag == UNMAPPED
             // save missed blockid
             if (missBlockIDsIndex < 32) {
@@ -172,7 +174,8 @@ void main()
             // goto next block
             do {
               currentRayLength += stepSize;
-            } while (uvec3((startRayPosition + currentRayLength * rayVector) * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+              samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+            } while (uvec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
           }
         }
 

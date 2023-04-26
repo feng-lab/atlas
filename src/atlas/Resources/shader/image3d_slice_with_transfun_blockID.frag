@@ -32,6 +32,7 @@ varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
 
 #define UNMAPPED 0
 #define EMPTY 40000
+#define UINTMAX 4294967295U
 
 void main()
 {
@@ -40,6 +41,11 @@ void main()
   int curLevel = 0;
   while (curLevel+1 < LEVEL_COUNT && voxel_world_sizes[curLevel+1] <= desiredVoxelSize) {
     ++curLevel;
+  }
+
+  if (curLevel + 1 == LEVEL_COUNT) {
+    FragData0 = uvec4(UINTMAX, 0, 0, 0);
+    return;
   }
 
   uvec3 pageTableCoord = uvec3(texCoord0 * image_dimensions[curLevel]) / image_block_size;

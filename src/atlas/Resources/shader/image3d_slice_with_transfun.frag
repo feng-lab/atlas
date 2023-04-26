@@ -22,6 +22,7 @@ uniform vec3 image_address_to_normalized_texture_coord;
 
 uniform float ze_to_screen_pixel_voxel_size;
 
+uniform sampler3D volume;
 uniform sampler1D transfer_function;
 
 #if GLSL_VERSION >= 330
@@ -46,8 +47,28 @@ void main()
   }
 
   vec4 color = vec4(0.0);
-  vec3 voxelAddress;
+
+  if (curLevel + 1 == LEVEL_COUNT) {
 #if GLSL_VERSION >= 130
+    color = texture(transfer_function, texture(volume, texCoord0).r);
+#else
+    color = texture1D(transfer_function, texture3D(volume, texCoord0).r);
+#endif
+
+#ifdef RESULT_OPAQUE
+    if (color.a == 0.0) {
+      color = vec4(0.0);
+    }
+    color.a = 1.0;
+#else
+    color.rgb *= color.a;
+#endif
+    FragData0 = color;
+    return;
+  }
+
+  vec3 voxelAddress;
+#if GLSL_VERSION >= 930
   vec3 fFracVoxelCoord = modf(texCoord0 * image_dimensions[curLevel], voxelAddress);
   uvec3 voxelCoord = uvec3(voxelAddress);
 #else
