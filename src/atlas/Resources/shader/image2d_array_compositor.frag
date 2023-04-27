@@ -1,7 +1,3 @@
-#if GLSL_VERSION < 130
-#extension GL_EXT_gpu_shader4 : enable
-#endif
-
 uniform sampler2DArray color_texture;
 uniform sampler2DArray depth_texture;
 

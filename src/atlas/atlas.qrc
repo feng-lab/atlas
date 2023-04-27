@@ -8,7 +8,6 @@
         <file>Resources/shader/compositor.frag</file>
         <file>Resources/shader/copyimage.frag</file>
         <file>Resources/shader/copy_raycaster_image.frag</file>
-        <file>Resources/shader/Fxaa3_11.frag</file>
         <file>Resources/shader/image2d_with_transfun.frag</file>
         <file>Resources/shader/line.frag</file>
         <file>Resources/shader/line.vert</file>
