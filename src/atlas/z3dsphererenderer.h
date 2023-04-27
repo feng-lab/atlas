@@ -54,10 +54,10 @@ private:
 
   // std::vector<GLuint> m_VBOs;
   // std::vector<GLuint> m_pickingVBOs;
-  ZVertexArrayObject m_VAOs;
-  ZVertexArrayObject m_pickingVAOs;
-  std::vector<ZVertexBufferObject> m_VBOs;
-  std::vector<ZVertexBufferObject> m_pickingVBOs;
+  Z3DVertexArrayObject m_VAOs;
+  Z3DVertexArrayObject m_pickingVAOs;
+  std::vector<Z3DVertexBufferObject> m_VBOs;
+  std::vector<Z3DVertexBufferObject> m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
   size_t m_oneBatchNumber;

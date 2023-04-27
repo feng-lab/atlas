@@ -52,7 +52,7 @@ protected:
   bool m_discardTransparent = true;
 
   OutputColorOption m_mode;
-  ZVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_VAO;
 };
 
 } // namespace nim

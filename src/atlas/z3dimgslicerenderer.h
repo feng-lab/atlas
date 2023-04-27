@@ -82,7 +82,7 @@ protected:
 
 private:
   std::vector<ZMesh> m_slices;
-  ZVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_VAO;
 
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = true;

@@ -452,7 +452,7 @@ void Z3DMeshRenderer::render(Z3DEye eye)
   auto attr_normal = shader.normalAttributeLocation();
   auto attr_color = shader.colorAttributeLocation();
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAOs.resize(m_meshPt->size());
 
@@ -776,7 +776,7 @@ void Z3DMeshRenderer::renderPicking(Z3DEye eye)
   auto attr_vertex = shader.vertexAttributeLocation();
   auto attr_normal = shader.normalAttributeLocation();
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAOs.resize(m_meshPt->size());
 

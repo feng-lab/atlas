@@ -64,7 +64,7 @@ protected:
   ZFloatParameter m_blurScale;
   ZFloatParameter m_blurStrength;
 
-  ZVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_VAO;
 };
 
 } // namespace nim

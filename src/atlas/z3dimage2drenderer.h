@@ -61,7 +61,7 @@ protected:
 
 private:
   std::vector<ZMesh> m_quads;
-  ZVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_VAO;
 };
 
 } // namespace nim

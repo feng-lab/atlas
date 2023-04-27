@@ -5,7 +5,7 @@
 #include "z3dblockcache.h"
 #include "z3dtexture.h"
 #include "z3dvolume.h"
-#include "zvertexbufferobject.h"
+#include "z3dvertexbufferobject.h"
 #include "zbbox.h"
 #include <folly/CancellationToken.h>
 #include <QObject>
@@ -236,7 +236,7 @@ private:
   size_t m_nChannels = 0;
   bool m_isVolumeDownsampled;
 
-  ZVertexBufferObject m_PBO;
+  Z3DVertexBufferObject m_PBO;
 
   std::vector<glm::dvec2> m_channelDisplayRanges;
 

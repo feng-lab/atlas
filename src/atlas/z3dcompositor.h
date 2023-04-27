@@ -213,7 +213,7 @@ private:
 
   std::shared_ptr<ZWidgetsGroup> m_axisWidgetsGroup;
 
-  ZVertexArrayObject m_screenQuadVAO;
+  Z3DVertexArrayObject m_screenQuadVAO;
 
   glm::vec4 m_region;
 

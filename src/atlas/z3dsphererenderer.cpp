@@ -216,7 +216,7 @@ void Z3DSphereRenderer::render(Z3DEye eye)
 
   size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / m_oneBatchNumber);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAOs.resize(numBatch);
 
@@ -387,7 +387,7 @@ void Z3DSphereRenderer::renderPicking(Z3DEye eye)
 
   size_t numBatch = std::ceil(m_pointAndRadius.size() * 1.0 / m_oneBatchNumber);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAOs.resize(numBatch);
 

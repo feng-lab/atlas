@@ -96,10 +96,10 @@ private:
   bool m_dataChanged;
   bool m_pickingDataChanged;
   // one VAO for each mesh
-  ZVertexArrayObject m_VAOs;
-  ZVertexArrayObject m_pickingVAOs;
-  std::vector<ZVertexBufferObject> m_VBOs;
-  std::vector<ZVertexBufferObject> m_pickingVBOs;
+  Z3DVertexArrayObject m_VAOs;
+  Z3DVertexArrayObject m_pickingVAOs;
+  std::vector<Z3DVertexBufferObject> m_VBOs;
+  std::vector<Z3DVertexBufferObject> m_pickingVBOs;
 
   ZStringIntOptionParameter m_wireframeMode;
   ZVec4Parameter m_wireframeColor;

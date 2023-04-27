@@ -126,12 +126,6 @@ QString Z3DGpuInfo::glExtensionsString() const
   return m_glExtensionsString;
 }
 
-bool Z3DGpuInfo::isGeometryShaderSupported() const
-{
-  return GLVersionGE(3, 2) || isExtensionSupported("GL_ARB_geometry_shader4") ||
-         isExtensionSupported("GL_EXT_geometry_shader4");
-}
-
 bool Z3DGpuInfo::isTessellationShaderSupported() const
 {
   return GLVersionGE(4, 0);
@@ -142,19 +136,9 @@ bool Z3DGpuInfo::isTextureFilterAnisotropicSupported() const
   return isExtensionSupported("GL_EXT_texture_filter_anisotropic");
 }
 
-bool Z3DGpuInfo::isTextureRectangleSupported() const
-{
-  return GLVersionGE(3, 1) || isExtensionSupported("GL_ARB_texture_rectangle");
-}
-
 bool Z3DGpuInfo::isImagingSupported() const
 {
   return isExtensionSupported("GL_ARB_imaging");
-}
-
-bool Z3DGpuInfo::isGeometryShader4Supported() const
-{
-  return GLVersionGE(3, 2) || isExtensionSupported("GL_EXT_geometry_shader4");
 }
 
 QStringList Z3DGpuInfo::gpuInfo() const
@@ -193,11 +177,11 @@ QStringList Z3DGpuInfo::gpuInfo() const
   info << QString("Max 3D Texture Size:           %1 (use %2)").arg(m_max3DTextureSize).arg(max3DTextureSize());
   info << QString("Max Color Attachments:         %1").arg(m_maxColorAttachments);
   info << QString("Max Draw Buffer:               %1").arg(m_maxDrawBuffer);
-  if (isGeometryShaderSupported() && m_maxGeometryOutputVertices > 0) {
+  if (m_maxGeometryOutputVertices > 0) {
     info << QString("Max GS Output Vertices:        %1").arg(m_maxGeometryOutputVertices);
   }
   info << QString("Max VS Texture Image Units:    %1").arg(m_maxVertexTextureImageUnits);
-  if (isGeometryShaderSupported() && m_maxGeometryTextureImageUnits > 0) {
+  if (m_maxGeometryTextureImageUnits > 0) {
     info << QString("Max GS Texture Image Units:    %1").arg(m_maxGeometryTextureImageUnits);
   }
   info << QString("Max FS Texture Image Units:    %1").arg(m_maxTextureImageUnits);
@@ -230,17 +214,17 @@ void Z3DGpuInfo::logGpuInfo() const
 
 bool Z3DGpuInfo::isWeightedAverageSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 2;
+  return Z3DGpuInfo::instance().maxColorAttachments() >= 2;
 }
 
 bool Z3DGpuInfo::isWeightedBlendedSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 2;
+  return Z3DGpuInfo::instance().maxColorAttachments() >= 2;
 }
 
 bool Z3DGpuInfo::isDualDepthPeelingSupported() const
 {
-  return Z3DGpuInfo::instance().isTextureRectangleSupported() && Z3DGpuInfo::instance().maxColorAttachments() >= 8;
+  return Z3DGpuInfo::instance().maxColorAttachments() >= 8;
 }
 
 bool Z3DGpuInfo::isLinkedListSupported() const
@@ -274,31 +258,7 @@ void Z3DGpuInfo::detectGpuInfo()
     m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
   }
 
-  if (GLVersionGE(3, 0)) {
-    if (!isGeometryShader4Supported()) {
-      m_isSupported = false;
-      m_notSupportedReason = "Geometry Shader 4 is not supported by current openGL context.";
-      return;
-    }
-    if (gpuVendor() == GpuVendor::AMD &&
-        (m_glRendererString.contains("RADEON X", Qt::CaseInsensitive) ||
-         m_glRendererString.contains("RADEON 9",
-                                     Qt::CaseInsensitive))) { // from http://www.opengl.org/wiki/NPOT_Texture
-      m_isSupported = false;
-      m_notSupportedReason =
-        "The R300 and R400-based cards (Radeon 9500+ and X500+) are incapable of generic NPOT usage. You can use NPOTs, "
-        "but only if the texture has no mipmaps.";
-      return;
-    }
-    if (gpuVendor() == GpuVendor::NVIDIA &&
-        m_glRendererString.contains("GeForce FX",
-                                    Qt::CaseInsensitive)) { // from http://www.opengl.org/wiki/NPOT_Texture
-      m_isSupported = false;
-      m_notSupportedReason =
-        "NV30-based cards (GeForce FX of any kind) are incapable of NPOTs at all, despite implementing OpenGL 2.0 "
-        "(which requires NPOT). It will do software rendering if you try to use it. ";
-      return;
-    }
+  if (GLVersionGE(3, 2)) {
     m_isSupported = true;
 
     // Prevent segfault
@@ -328,9 +288,7 @@ void Z3DGpuInfo::detectGpuInfo()
     }
 
     m_maxGeometryOutputVertices = -1;
-    if (isGeometryShaderSupported()) {
-      glGetIntegerv(GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT, &m_maxGeometryOutputVertices);
-    }
+    glGetIntegerv(GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT, &m_maxGeometryOutputVertices);
 
     glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &m_maxArrayTextureLayers);
 
@@ -343,10 +301,10 @@ void Z3DGpuInfo::detectGpuInfo()
     // http://www.opengl.org/wiki/Textures_-_more
     glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &m_maxTextureImageUnits);
     glGetIntegerv(GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS, &m_maxVertexTextureImageUnits);
+
     m_maxGeometryTextureImageUnits = -1;
-    if (isGeometryShaderSupported()) {
-      glGetIntegerv(GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS, &m_maxGeometryTextureImageUnits);
-    }
+    glGetIntegerv(GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS, &m_maxGeometryTextureImageUnits);
+
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_maxCombinedTextureImageUnits);
     if (!GLVersionGE(3, 1)) {
       glGetIntegerv(GL_MAX_TEXTURE_COORDS, &m_maxTextureCoords);
@@ -385,7 +343,7 @@ void Z3DGpuInfo::detectGpuInfo()
   } else {
     m_isSupported = false;
     m_notSupportedReason =
-      "Minimum OpenGL version required is 3.0, while current openGL version is: \"" + m_glVersionString + "\"";
+      "Minimum OpenGL version required is 3.2, while current openGL version is: \"" + m_glVersionString + "\"";
   }
 }
 

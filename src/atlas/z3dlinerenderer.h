@@ -120,10 +120,10 @@ protected:
 private:
   std::vector<glm::vec4> m_lineColors;
 
-  ZVertexArrayObject m_VAO;
-  ZVertexArrayObject m_pickingVAO;
-  ZVertexBufferObject m_VBOs;
-  ZVertexBufferObject m_pickingVBOs;
+  Z3DVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_pickingVAO;
+  Z3DVertexBufferObject m_VBOs;
+  Z3DVertexBufferObject m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
   bool m_isLineStrip;
@@ -144,10 +144,10 @@ private:
   std::vector<GLfloat> m_allFlags;
   std::vector<GLuint> m_indexs;
 
-  ZVertexArrayObject m_VAOs;
-  ZVertexArrayObject m_pickingVAOs;
-  std::vector<ZVertexBufferObject> m_batchVBOs;
-  std::vector<ZVertexBufferObject> m_batchPickingVBOs;
+  Z3DVertexArrayObject m_VAOs;
+  Z3DVertexArrayObject m_pickingVAOs;
+  std::vector<Z3DVertexBufferObject> m_batchVBOs;
+  std::vector<Z3DVertexBufferObject> m_batchPickingVBOs;
   size_t m_oneBatchNumber;
   bool m_useGeomLineShader;
 };

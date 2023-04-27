@@ -55,7 +55,7 @@ protected:
   Z3DShaderProgram m_blendTextureShader;
 
   ZStringStringOptionParameter m_blendMode;
-  ZVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_VAO;
 };
 
 } // namespace nim

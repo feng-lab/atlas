@@ -36,7 +36,7 @@ void Z3DTextureAndEyeCoordinateRenderer::render(Z3DEye eye)
   m_renderTextureAndEyeCoordinateShader.bind();
   m_rendererBase.setGlobalShaderParameters(m_renderTextureAndEyeCoordinateShader, eye);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
       auto attr_vertex = m_renderTextureAndEyeCoordinateShader.vertexAttributeLocation();

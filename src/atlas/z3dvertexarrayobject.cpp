@@ -1,4 +1,4 @@
-#include "zvertexarrayobject.h"
+#include "z3dvertexarrayobject.h"
 
 #include "z3dgpuinfo.h"
 
@@ -13,14 +13,14 @@
 
 namespace nim {
 
-ZVertexArrayObject::ZVertexArrayObject(GLsizei n)
+Z3DVertexArrayObject::Z3DVertexArrayObject(GLsizei n)
   : m_arrays(n, 0)
 {
   CHECK(n > 0);
   glGenVertexArrays(m_arrays.size(), m_arrays.data());
 }
 
-ZVertexArrayObject::~ZVertexArrayObject()
+Z3DVertexArrayObject::~Z3DVertexArrayObject()
 {
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
   CHECK(m_context == Z3DContext());
@@ -28,7 +28,7 @@ ZVertexArrayObject::~ZVertexArrayObject()
   glDeleteVertexArrays(m_arrays.size(), m_arrays.data());
 }
 
-void ZVertexArrayObject::bind(size_t idx) const
+void Z3DVertexArrayObject::bind(size_t idx) const
 {
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
   CHECK(m_context == Z3DContext());
@@ -36,7 +36,7 @@ void ZVertexArrayObject::bind(size_t idx) const
   glBindVertexArray(m_arrays[idx]);
 }
 
-void ZVertexArrayObject::release() const
+void Z3DVertexArrayObject::release() const
 {
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS
   CHECK(m_context == Z3DContext());
@@ -44,7 +44,7 @@ void ZVertexArrayObject::release() const
   glBindVertexArray(0);
 }
 
-void ZVertexArrayObject::resize(GLsizei n)
+void Z3DVertexArrayObject::resize(GLsizei n)
 {
   CHECK(n > 0);
 #ifdef CHECK_OPENGL_ERROR_FOR_ALL_GL_CALLS

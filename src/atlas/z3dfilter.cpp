@@ -7,7 +7,7 @@
 #include "z3dshaderprogram.h"
 #include "zeventlistenerparameter.h"
 #include "zparameter.h"
-#include "zvertexarrayobject.h"
+#include "z3dvertexarrayobject.h"
 
 namespace nim {
 
@@ -211,7 +211,7 @@ void Z3DFilter::addInteractionHandler(Z3DInteractionHandler& handler)
   m_interactionHandlers.push_back(&handler);
 }
 
-void Z3DFilter::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
+void Z3DFilter::renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
   if (!shader.isLinked()) {
     return;

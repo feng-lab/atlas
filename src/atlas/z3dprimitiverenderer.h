@@ -2,8 +2,8 @@
 
 #include "z3drendererbase.h"
 #include "z3dshadergroup.h"
-#include "zvertexarrayobject.h"
-#include "zvertexbufferobject.h"
+#include "z3dvertexarrayobject.h"
+#include "z3dvertexbufferobject.h"
 #include <QObject>
 
 namespace nim {
@@ -40,7 +40,7 @@ public:
     m_needLighting = v;
   }
 
-  inline bool needLighting() const
+  [[nodiscard]] inline bool needLighting() const
   {
     return m_needLighting;
   }
@@ -75,10 +75,10 @@ public:
 
   // commonly used render functions
   // Render a screen-aligned quad (whole screen)
-  static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
+  static void renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // render a trianglelist with whatever it contains
-  static void renderTriangleList(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader, const ZMesh& mesh);
+  static void renderTriangleList(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader, const ZMesh& mesh);
 
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
 Q_SIGNALS:
@@ -111,15 +111,15 @@ protected:
 
 protected:
   Z3DRendererBase& m_rendererBase;
-  bool m_needLighting;
+  bool m_needLighting = true;
 #if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  bool m_useDisplayList;
+  bool m_useDisplayList = false;
 #endif
-  bool m_followCoordTransform;
-  bool m_followOpacity;
-  bool m_followSizeScale;
+  bool m_followCoordTransform = true;
+  bool m_followOpacity = true;
+  bool m_followSizeScale = true;
 
-  bool m_hardwareSupportVAO;
+  bool m_useVAO = true;
 };
 
 } // namespace nim

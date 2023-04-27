@@ -35,7 +35,7 @@ Z3DBackgroundRenderer::Z3DBackgroundRenderer(Z3DRendererBase& rendererBase)
   m_backgroundShaderGrp.init(allshaders, m_rendererBase.generateHeader() + generateHeader(), "", normalShaders);
   m_backgroundShaderGrp.addAllSupportedPostShaders();
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     m_VAO.bind();
     const GLfloat vertices[] = {-1.f,
                                 1.f,
@@ -150,7 +150,7 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
     shader.setRegionUniform(m_region);
   }
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     m_VAO.bind();
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     m_VAO.release();

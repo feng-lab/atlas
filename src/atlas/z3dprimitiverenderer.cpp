@@ -9,14 +9,6 @@ namespace nim {
 
 Z3DPrimitiveRenderer::Z3DPrimitiveRenderer(Z3DRendererBase& rendererBase)
   : m_rendererBase(rendererBase)
-  , m_needLighting(true)
-#if !defined(ATLAS_USE_CORE_PROFILE) && defined(ATLAS_SUPPORT_FIXED_PIPELINE)
-  , m_useDisplayList(false)
-#endif
-  , m_followCoordTransform(true)
-  , m_followOpacity(true)
-  , m_followSizeScale(true)
-  , m_hardwareSupportVAO(true)
 {
   m_rendererBase.registerRenderer(this);
 }
@@ -26,7 +18,7 @@ Z3DPrimitiveRenderer::~Z3DPrimitiveRenderer()
   m_rendererBase.unregisterRenderer(this);
 }
 
-void Z3DPrimitiveRenderer::renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader)
+void Z3DPrimitiveRenderer::renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader)
 {
   if (!shader.isLinked()) {
     return;
@@ -66,7 +58,7 @@ void Z3DPrimitiveRenderer::renderScreenQuad(const ZVertexArrayObject& vao, const
   vao.release();
 }
 
-void Z3DPrimitiveRenderer::renderTriangleList(const ZVertexArrayObject& vao,
+void Z3DPrimitiveRenderer::renderTriangleList(const Z3DVertexArrayObject& vao,
                                               const Z3DShaderProgram& shader,
                                               const ZMesh& mesh)
 {

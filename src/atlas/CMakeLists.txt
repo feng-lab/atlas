@@ -292,8 +292,8 @@ set(SOURCES
     zcolormap.h
     zcolormapeditor.h
     zcolormapwidgetwitheditorwindow.h
-    zvertexarrayobject.h
-    zvertexbufferobject.h
+    z3dvertexarrayobject.h
+    z3dvertexbufferobject.h
     z3dpickingmanager.h
     z3dfilterview.h
     zroi.h
@@ -468,8 +468,8 @@ set(SOURCES
     zcolormap.cpp
     zcolormapeditor.cpp
     zcolormapwidgetwitheditorwindow.cpp
-    zvertexarrayobject.cpp
-    zvertexbufferobject.cpp
+    z3dvertexarrayobject.cpp
+    z3dvertexbufferobject.cpp
     z3dpickingmanager.cpp
     zroi.cpp
     zroidoc.cpp

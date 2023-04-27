@@ -29,7 +29,7 @@ class Z3DTexture;
 
 class Z3DShaderProgram;
 
-class ZVertexArrayObject;
+class Z3DVertexArrayObject;
 
 class Z3DFilter
   : public QObject
@@ -178,7 +178,7 @@ protected:
 
   virtual void exitInteractionMode() {}
 
-  static void renderScreenQuad(const ZVertexArrayObject& vao, const Z3DShaderProgram& shader);
+  static void renderScreenQuad(const Z3DVertexArrayObject& vao, const Z3DShaderProgram& shader);
 
   // 1. for each outport, get all expected size from all connected inports, and use the maximum one
   //    as the new size of the outport

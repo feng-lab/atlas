@@ -185,7 +185,7 @@ void Z3DFontRenderer::render(Z3DEye eye)
     shader.setUniform("shadow_color", m_fontShadowColor.get());
   }
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
       // set vertex data

@@ -443,7 +443,7 @@ void Z3DLineRenderer::render(Z3DEye eye)
     shader.bindTexture("texture", m_texture);
   }
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
       auto attr_vertex = shader.vertexAttributeLocation();
@@ -580,7 +580,7 @@ void Z3DLineRenderer::renderPicking(Z3DEye eye)
   setPickingShaderParameters(shader);
   shader.setLineWidthUniform(m_lineWidth);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAO.bind();
       auto attr_vertex = shader.vertexAttributeLocation();
@@ -681,7 +681,7 @@ void Z3DLineRenderer::renderSmooth(Z3DEye eye)
 
   size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / m_oneBatchNumber);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAOs.resize(numBatch);
 
@@ -852,7 +852,7 @@ void Z3DLineRenderer::renderSmoothPicking(Z3DEye eye)
 
   size_t numBatch = std::ceil(m_smoothLineP0s.size() * 1.0 / m_oneBatchNumber);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAOs.resize(numBatch);
 

@@ -154,18 +154,12 @@ public:
 
   [[nodiscard]] bool needScaleDataForTexture(size_t width, size_t height, size_t depth);
 
-  [[nodiscard]] bool isGeometryShaderSupported() const;
-
   [[nodiscard]] bool isTessellationShaderSupported() const;
 
   [[nodiscard]] bool isTextureFilterAnisotropicSupported() const;
 
-  [[nodiscard]] bool isTextureRectangleSupported() const;
-
   // for glBlendEquation
   [[nodiscard]] bool isImagingSupported() const;
-
-  [[nodiscard]] bool isGeometryShader4Supported() const;
 
   [[nodiscard]] float maxTextureAnisotropy() const
   {

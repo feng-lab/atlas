@@ -61,10 +61,10 @@ private:
 
   bool m_useConeShader2;
 
-  ZVertexArrayObject m_VAO;
-  ZVertexArrayObject m_pickingVAO;
-  ZVertexBufferObject m_VBOs;
-  ZVertexBufferObject m_pickingVBOs;
+  Z3DVertexArrayObject m_VAO;
+  Z3DVertexArrayObject m_pickingVAO;
+  Z3DVertexBufferObject m_VBOs;
+  Z3DVertexBufferObject m_pickingVBOs;
   bool m_dataChanged;
   bool m_pickingDataChanged;
 };

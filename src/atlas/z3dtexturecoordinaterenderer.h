@@ -31,8 +31,8 @@ protected:
 
   Z3DShaderProgram m_renderTextureCoordinateShader;
 
-  ZVertexBufferObject m_VBOs;
-  ZVertexArrayObject m_VAO;
+  Z3DVertexBufferObject m_VBOs;
+  Z3DVertexArrayObject m_VAO;
   bool m_dataChanged;
 };
 

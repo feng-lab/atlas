@@ -337,7 +337,7 @@ void Z3DConeRenderer::render(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setShaderParameters(shader);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_dataChanged) {
       m_VAO.bind();
       // set vertex data
@@ -500,7 +500,7 @@ void Z3DConeRenderer::renderPicking(Z3DEye eye)
   m_rendererBase.setGlobalShaderParameters(shader, eye);
   setPickingShaderParameters(shader);
 
-  if (m_hardwareSupportVAO) {
+  if (m_useVAO) {
     if (m_pickingDataChanged) {
       m_pickingVAO.bind();
       // set vertex data
