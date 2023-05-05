@@ -881,7 +881,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       m_currentImageRenderTarget->release();
 
       m_image3DRaycasterShader.release();
-      // glFinish();
+      glFinish();
       STOP_AND_LOG(btri)
 
 #if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
