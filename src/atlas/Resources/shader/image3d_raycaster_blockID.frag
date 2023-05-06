@@ -16,7 +16,6 @@ uniform sampler2D ray_exit_tex_coord;
 
 uniform sampler2D last_ray_depth;
 
-#if GLSL_VERSION >= 330
 layout(location = 0) out uvec4 FragData0;
 layout(location = 1) out uvec4 FragData1;
 layout(location = 2) out uvec4 FragData2;
@@ -25,25 +24,6 @@ layout(location = 4) out uvec4 FragData4;
 layout(location = 5) out uvec4 FragData5;
 layout(location = 6) out uvec4 FragData6;
 layout(location = 7) out uvec4 FragData7;
-#elif GLSL_VERSION >= 130
-out uvec4 FragData0;  // call glBindFragDataLocation before linking
-out uvec4 FragData1;  // call glBindFragDataLocation before linking
-out uvec4 FragData2;  // call glBindFragDataLocation before linking
-out uvec4 FragData3;  // call glBindFragDataLocation before linking
-out uvec4 FragData4;  // call glBindFragDataLocation before linking
-out uvec4 FragData5;  // call glBindFragDataLocation before linking
-out uvec4 FragData6;  // call glBindFragDataLocation before linking
-out uvec4 FragData7;  // call glBindFragDataLocation before linking
-#else
-varying out uvec4 FragData0;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData1;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData2;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData3;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData4;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData5;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData6;  // call glBindFragDataLocationForce before linking
-varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
-#endif
 
 #define UNMAPPED 0
 #define EMPTY 40000
@@ -51,30 +31,16 @@ varying out uvec4 FragData7;  // call glBindFragDataLocationForce before linking
 
 void main()
 {
-#if GLSL_VERSION >= 130
   float currentRayLength = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).x;
-#else
-  float currentRayLength = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).x;
-#endif
   if (currentRayLength >= 1.0) {
     discard;
   }
 
 //  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
-//#if GLSL_VERSION >= 130
 //  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
 //  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
-//#else
-//  vec4 entryTexCoordAndZ = texture2D(ray_entry_tex_coord, texCoords);
-//  vec4 exitTexCoordAndZ = texture2D(ray_exit_tex_coord, texCoords);
-//#endif
-#if GLSL_VERSION >= 130
   vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
   vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
-#else
-  vec4 entryTexCoordAndZ = texelFetch2D(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
-  vec4 exitTexCoordAndZ = texelFetch2D(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
-#endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
@@ -124,19 +90,11 @@ void main()
         uvec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
-#if GLSL_VERSION >= 130
           pageDirEntry = texelFetch(page_directory, ivec3(pageDirAddress), 0);
-#else
-          pageDirEntry = texelFetch3D(page_directory, ivec3(pageDirAddress), 0);
-#endif
         }
         uint pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-#if GLSL_VERSION >= 130
           uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
-#else
-          uvec4 pageTableEntry = texelFetch3D(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
-#endif
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != EMPTY) { // unmapped or (mapped and not empty)
             // save used or missed blockid

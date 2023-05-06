@@ -20,7 +20,6 @@ Z3DTextureBlendRenderer::Z3DTextureBlendRenderer(Z3DRendererBase& rendererBase, 
   m_blendMode.select(mode);
   connect(&m_blendMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureBlendRenderer::compile);
 
-  m_blendTextureShader.bindFragDataLocation(0, "FragData0");
   m_blendTextureShader.loadFromSourceFile("pass.vert",
                                           "compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());

@@ -42,7 +42,7 @@ public:
   // overriding bind() to reset texture unit manager
   void bind();
 
-  void release();
+  void release() const;
 
   unsigned int programId() const
   {
@@ -53,16 +53,6 @@ public:
   {
     return m_context;
   }
-
-  void setGeometryInputType(GLenum t);
-
-  void setGeometryOutputType(GLenum t);
-
-  void setGeometryOutputVertexCount(int value);
-
-  void bindFragDataLocation(GLuint colorNumber, const QString& name);
-
-  void bindFragDataLocationForce(GLuint colorNumber, const QString& name);
 
   // bind samplers
   void bindTexture(const QString& name, const Z3DTexture* texture);

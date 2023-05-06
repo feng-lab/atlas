@@ -28,16 +28,8 @@ uniform sampler2D last_color;
 uniform sampler3D volume;
 uniform sampler1D transfer_function;
 
-#if GLSL_VERSION >= 330
 layout(location = 0) out vec4 FragData0;
 layout(location = 1) out vec4 FragData1;
-#elif GLSL_VERSION >= 130
-out vec4 FragData0;  // call glBindFragDataLocation before linking
-out vec4 FragData1;  // call glBindFragDataLocation before linking
-#else
-#define FragData0 gl_FragData[0]
-#define FragData1 gl_FragData[1]
-#endif
 
 vec4 compositeDVR(in vec4 curResult, in vec4 color, in float currentRayLength, inout float rayDepth)
 {
@@ -83,12 +75,7 @@ void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize
     for (int loop1=0; !finished && loop1<255; loop1++) {
       vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
 
-#if GLSL_VERSION >= 130
       float voxel = texture(volume, samplePos).r;
-#else
-      float voxel = texture3D(volume, samplePos).r;
-#endif
-
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -106,11 +93,7 @@ void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize
       finished = ch1V >= 1.0;
 #endif
 #else
-#if GLSL_VERSION >= 130
       vec4 color = texture(transfer_function, voxel);
-#else
-      vec4 color = texture1D(transfer_function, voxel);
-#endif
 
       if (color.a > 0.0) {
         color.a / sampling_rate;
@@ -149,11 +132,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 #endif
   for (int loop0=0; !blockFinished && loop0<255; loop0++) {
     voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
-#if GLSL_VERSION >= 130
     float voxel = texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
-#else
-    float voxel = texture3D(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
-#endif
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -171,11 +150,7 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
     finished = ch1V >= 1.;
 #endif
 #else
-#if GLSL_VERSION >= 130
     vec4 color = texture(transfer_function, voxel);
-#else
-    vec4 color = texture1D(transfer_function, voxel);
-#endif
 
     if (color.a > 0.0) {
       color.a /= sampling_rate;
@@ -206,13 +181,8 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 
 void main()
 {
-#if GLSL_VERSION >= 130
   vec2 lastRayDepth = texelFetch(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xy;
   vec4 result = texelFetch(last_color, ivec2(gl_FragCoord.xy), 0);
-#else
-  vec2 lastRayDepth = texelFetch2D(last_ray_depth, ivec2(gl_FragCoord.xy), 0).xy;
-  vec4 result = texelFetch2D(last_color, ivec2(gl_FragCoord.xy), 0);
-#endif
   float currentRayLength = lastRayDepth.x;
   float rayDepth = lastRayDepth.y;
   if (currentRayLength >= 1.0) {
@@ -224,13 +194,8 @@ void main()
     rayDepth = -1.0;
   }
 
-#if GLSL_VERSION >= 130
   vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
   vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
-#else
-  vec4 entryTexCoordAndZ = texelFetch2D(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
-  vec4 exitTexCoordAndZ = texelFetch2D(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
-#endif
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 
@@ -287,19 +252,11 @@ void main()
         uvec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
-#if GLSL_VERSION >= 130
           pageDirEntry = texelFetch(page_directory, ivec3(pageDirAddress), 0);
-#else
-          pageDirEntry = texelFetch3D(page_directory, ivec3(pageDirAddress), 0);
-#endif
         }
         uint pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-#if GLSL_VERSION >= 130
           uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
-#else
-          uvec4 pageTableEntry = texelFetch3D(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
-#endif
           pagingFlag = pageTableEntry.w;
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
 #ifdef MIP
@@ -344,11 +301,7 @@ void main()
     }
 
 #ifdef MIP
-#if GLSL_VERSION >= 130
     result = texture(transfer_function, ch1V);
-#else
-    result = texture1D(transfer_function, ch1V);
-#endif
 #endif // MIP
 
 #ifdef RESULT_OPAQUE

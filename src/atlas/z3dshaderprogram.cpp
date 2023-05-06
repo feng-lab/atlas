@@ -103,44 +103,9 @@ void Z3DShaderProgram::bind()
   glUseProgram(m_id);
 }
 
-void Z3DShaderProgram::release()
+void Z3DShaderProgram::release() const
 {
   glUseProgram(0);
-}
-
-void Z3DShaderProgram::setGeometryInputType(GLenum t)
-{
-  if (!GLVersionGE(3, 2)) {
-    glProgramParameteri(m_id, GL_GEOMETRY_INPUT_TYPE_EXT, static_cast<int>(t));
-  }
-}
-
-void Z3DShaderProgram::setGeometryOutputType(GLenum t)
-{
-  if (!GLVersionGE(3, 2)) {
-    glProgramParameteri(m_id, GL_GEOMETRY_OUTPUT_TYPE_EXT, static_cast<int>(t));
-  }
-}
-
-void Z3DShaderProgram::setGeometryOutputVertexCount(int value)
-{
-  if (!GLVersionGE(3, 2)) {
-    glProgramParameteri(m_id, GL_GEOMETRY_VERTICES_OUT_EXT, value);
-  }
-}
-
-void Z3DShaderProgram::bindFragDataLocation(GLuint colorNumber, const QString& name)
-{
-  if (GLVersionGE(3, 0) && !GLVersionGE(3, 3)) {
-    glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
-  }
-}
-
-void Z3DShaderProgram::bindFragDataLocationForce(GLuint colorNumber, const QString& name)
-{
-  if (!GLVersionGE(3, 3)) {
-    glBindFragDataLocation(programId(), colorNumber, qUtf8Printable(name));
-  }
 }
 
 void Z3DShaderProgram::bindTexture(const QString& name, const Z3DTexture* texture)

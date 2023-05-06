@@ -33,7 +33,7 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   , m_VAOs(1)
   , m_pickingVAOs(1)
   , m_oneBatchNumber(4e6)
-  , m_useGeomLineShader(GLVersionGE(3, 2))
+  , m_useGeomLineShader(true)
 {
   updateLineWidth();
   connect(&m_rendererBase.geometriesMultisampleModePara(),
@@ -54,12 +54,6 @@ Z3DLineRenderer::Z3DLineRenderer(Z3DRendererBase& rendererBase)
   m_lineShaderGrp.addAllSupportedPostShaders();
 
   if (m_useGeomLineShader) {
-    if (!GLVersionGE(3, 2)) {
-      // don't need in glsl 1.5
-      m_smoothLineShaderGrp.setGeometryInputType(GL_LINES);
-      m_smoothLineShaderGrp.setGeometryOutputType(GL_TRIANGLE_STRIP);
-      m_smoothLineShaderGrp.setGeometryOutputVertexCount(4);
-    }
     allshaders.clear();
     allshaders << "wideline.vert"
                << "wideline.geom"

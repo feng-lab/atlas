@@ -60,60 +60,40 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
 
   adjustWidgets();
 
-  //  m_raycasterShader.bindFragDataLocation(0, "FragData0");
   //  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
   //                                       m_rendererBase.generateHeader() + generateHeader());
-  //  m_2dImageShader.bindFragDataLocation(0, "FragData0");
   //  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
   //                                     m_rendererBase.generateHeader() + generateHeader());
-  //  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   //  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert",
   //  "volume_slice_with_transfun.frag",
   //                                                        m_rendererBase.generateHeader() + generateHeader());
 
-  m_scRaycasterShader.bindFragDataLocation(0, "FragData0");
   m_scRaycasterShader.loadFromSourceFile("pass.vert",
                                          "volume_raycaster_single_channel.frag",
                                          m_rendererBase.generateHeader() + generateHeader());
-  m_sc2dImageShader.bindFragDataLocation(0, "FragData0");
   m_sc2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert",
                                        "image2d_with_transfun_single_channel.frag",
                                        m_rendererBase.generateHeader() + generateHeader());
-  m_scVolumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                                           "volume_slice_with_transfun_single_channel.frag",
                                                           m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocationForce(0, "FragData0");
-  // m_image3DSliceWithTransferfunBlockIDsShader.bindFragDataLocationForce(1, "FragData1");
   m_image3DSliceWithTransferfunBlockIDsShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                                  "image3d_slice_with_transfun_blockID.frag",
                                                                  m_rendererBase.generateHeader() + generateHeader());
-  m_image3DSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   m_image3DSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                          "image3d_slice_with_transfun.frag",
                                                          m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(0, "FragData0");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(1, "FragData1");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(2, "FragData2");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(3, "FragData3");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(4, "FragData4");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(5, "FragData5");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(6, "FragData6");
-  m_image3DRaycasterBlockIDsShader.bindFragDataLocationForce(7, "FragData7");
   m_image3DRaycasterBlockIDsShader.loadFromSourceFile("pass.vert",
                                                       "image3d_raycaster_blockID.frag",
                                                       m_rendererBase.generateHeader() + generateHeader());
-  m_image3DRaycasterShader.bindFragDataLocation(0, "FragData0");
   m_image3DRaycasterShader.loadFromSourceFile("pass.vert",
                                               "image3d_raycaster.frag",
                                               m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert",
                                           "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
-  m_copyTextureShader.bindFragDataLocation(0, "FragData0");
   m_copyTextureShader.loadFromSourceFile("pass.vert",
                                          "copy_raycaster_image.frag",
                                          m_rendererBase.generateHeader() + generateHeader());
@@ -944,13 +924,9 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
   LOG(INFO) << "image block cache size: " << ZImgRegionCache::instance().size();
 }
 
-void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs)
+void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vector<size_t>& visibleIdxs)
 {
   m_scRaycasterShader.bind();
-
-  if (!GLVersionGE(3, 0)) {
-    m_rendererBase.setGlobalShaderParameters(m_scRaycasterShader, eye);
-  }
 
   float n = m_rendererBase.camera().nearDist();
   float f = m_rendererBase.camera().farDist();

@@ -63,7 +63,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundRenderer.gradientOrientationPara());
 
   if (Z3DGpuInfo::instance().isWeightedAverageSupported()) {
-    m_waFinalShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_waFinalShader.loadFromSourceFile("pass.vert",
                                        "wavg_final.frag",
@@ -74,7 +73,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 
   if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
-    m_wbFinalShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_wbFinalShader.loadFromSourceFile("pass.vert",
                                        "wblended_final.frag",
@@ -85,7 +83,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   }
 
   if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
-    m_ddpBlendShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_ddpBlendShader.loadFromSourceFile("pass.vert",
                                         "dual_peeling_blend.frag",
@@ -93,7 +90,6 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
 #else
     m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 #endif
-    m_ddpFinalShader.bindFragDataLocation(0, "FragData0");
 #ifdef USE_RECT_TEX
     m_ddpFinalShader.loadFromSourceFile("pass.vert",
                                         "dual_peeling_final.frag",

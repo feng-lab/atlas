@@ -277,8 +277,6 @@ private:
   int m_maxGeometryTextureImageUnits;
   // The following is VS + GS + FS (available since GL 2.0)
   int m_maxCombinedTextureImageUnits;
-  // and the following is the number of texture coordinates available which usually is 8
-  int m_maxTextureCoords;
 
   float m_minSmoothPointSize;
   float m_maxSmoothPointSize;

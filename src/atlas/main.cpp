@@ -78,7 +78,7 @@ int main(int argc, char* argv[])
 
     QSurfaceFormat format;
 #if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
-    format.setVersion(3, 2);
+    format.setVersion(3, 3);
     format.setProfile(QSurfaceFormat::CoreProfile);
 #endif
     // format.setStereo(true);

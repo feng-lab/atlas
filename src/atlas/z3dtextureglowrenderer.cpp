@@ -21,11 +21,9 @@ Z3DTextureGlowRenderer::Z3DTextureGlowRenderer(Z3DRendererBase& rendererBase)
   m_glowMode.select("Screen");
   connect(&m_glowMode, &ZStringStringOptionParameter::valueChanged, this, &Z3DTextureGlowRenderer::compile);
 
-  m_blurXTextureShader.bindFragDataLocation(0, "FragData0");
   m_blurXTextureShader.loadFromSourceFile("pass.vert",
                                           "blur.frag",
                                           m_rendererBase.generateHeader() + "#define ORIENTATION_X\n");
-  m_blurYTextureShader.bindFragDataLocation(0, "FragData0");
   m_blurYTextureShader.loadFromSourceFile("pass.vert",
                                           "blur.frag",
                                           m_rendererBase.generateHeader() + "#define ORIENTATION_Y\n");

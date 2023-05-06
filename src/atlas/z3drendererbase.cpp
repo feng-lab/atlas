@@ -202,9 +202,7 @@ QString Z3DRendererBase::generateHeader() const
   if (!m_clipPlanes.empty()) {
     header += QString("#define HAS_CLIP_PLANE\n");
   }
-  if (GLVersionGE(3, 0)) {
-    header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
-  }
+  header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
 
   if (m_globalParas.fogMode.isSelected("Linear")) {
     header += "#define USE_LINEAR_FOG\n";
@@ -227,18 +225,12 @@ QString Z3DRendererBase::generateGeomHeader() const
 
   QString header = QString("#version %1\n").arg(glslVer);
 
-  if (!GLVersionGE(3, 2)) {
-    header += QString("#extension GL_EXT_geometry_shader4 : enable\n");
-  }
-
   header += QString("#define GLSL_VERSION %1\n").arg(glslVer);
 
   if (!m_clipPlanes.empty()) {
     header += QString("#define HAS_CLIP_PLANE\n");
   }
-  if (GLVersionGE(3, 0)) {
-    header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
-  }
+  header += QString("#define CLIP_PLANE_COUNT %1\n").arg(m_clipPlanes.size());
 
   return header;
 }

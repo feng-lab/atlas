@@ -12,7 +12,6 @@ Z3DTextureAndEyeCoordinateRenderer::Z3DTextureAndEyeCoordinateRenderer(Z3DRender
   , m_VAO(1)
   , m_dataChanged(false)
 {
-  m_renderTextureAndEyeCoordinateShader.bindFragDataLocation(0, "FragData0");
   m_renderTextureAndEyeCoordinateShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                            "render_3dtexture_coordinate_and_eye_coordinate.frag",
                                                            m_rendererBase.generateHeader());

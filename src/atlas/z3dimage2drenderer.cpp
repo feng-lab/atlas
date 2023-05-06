@@ -10,15 +10,11 @@ Z3DImage2DRenderer::Z3DImage2DRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-  //  m_image2DShader.bindFragDataLocation(0, "FragData0");
   //  m_image2DShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_colormap.frag",
   //                                     m_rendererBase.generateHeader() + generateHeader());
-
-  m_scImage2DShader.bindFragDataLocation(0, "FragData0");
   m_scImage2DShader.loadFromSourceFile("transform_with_2dtexture.vert",
                                        "image2d_with_colormap_single_channel.frag",
                                        m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert",
                                           "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());

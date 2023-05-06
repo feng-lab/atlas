@@ -11,15 +11,12 @@ Z3DVolumeSliceRenderer::Z3DVolumeSliceRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-  //  m_volumeSliceShader.bindFragDataLocation(0, "FragData0");
   //  m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag",
   //                                         m_rendererBase.generateHeader() + generateHeader());
 
-  m_scVolumeSliceShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                            "volume_slice_with_colormap_single_channel.frag",
                                            m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert",
                                           "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());

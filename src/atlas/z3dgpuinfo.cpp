@@ -258,7 +258,7 @@ void Z3DGpuInfo::detectGpuInfo()
     m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
   }
 
-  if (GLVersionGE(3, 2)) {
+  if (GLVersionGE(3, 3)) {
     m_isSupported = true;
 
     // Prevent segfault
@@ -306,9 +306,6 @@ void Z3DGpuInfo::detectGpuInfo()
     glGetIntegerv(GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS, &m_maxGeometryTextureImageUnits);
 
     glGetIntegerv(GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS, &m_maxCombinedTextureImageUnits);
-    if (!GLVersionGE(3, 1)) {
-      glGetIntegerv(GL_MAX_TEXTURE_COORDS, &m_maxTextureCoords);
-    }
 
     if (isTextureFilterAnisotropicSupported()) {
       glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &m_maxTextureAnisotropy);
@@ -343,7 +340,7 @@ void Z3DGpuInfo::detectGpuInfo()
   } else {
     m_isSupported = false;
     m_notSupportedReason =
-      "Minimum OpenGL version required is 3.2, while current openGL version is: \"" + m_glVersionString + "\"";
+      "Minimum OpenGL version required is 3.3, while current openGL version is: \"" + m_glVersionString + "\"";
   }
 }
 

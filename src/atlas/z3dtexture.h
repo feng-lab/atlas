@@ -13,7 +13,7 @@ public:
              GLenum dataFormat,
              GLenum dataType);
 
-  // derive teture target as 1D, 2D or 3D
+  // derive texture target as 1D, 2D or 3D
   Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum dataFormat, GLenum dataType);
 
   ~Z3DTexture();

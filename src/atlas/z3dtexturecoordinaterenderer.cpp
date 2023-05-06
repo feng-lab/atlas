@@ -12,7 +12,6 @@ Z3DTextureCoordinateRenderer::Z3DTextureCoordinateRenderer(Z3DRendererBase& rend
   , m_VAO(1)
   , m_dataChanged(false)
 {
-  m_renderTextureCoordinateShader.bindFragDataLocation(0, "FragData0");
   m_renderTextureCoordinateShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                                      "render_3dtexture_coordinate.frag",
                                                      m_rendererBase.generateHeader());

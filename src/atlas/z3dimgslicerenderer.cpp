@@ -13,25 +13,19 @@ Z3DImgSliceRenderer::Z3DImgSliceRenderer(Z3DRendererBase& rendererBase)
   : Z3DPrimitiveRenderer(rendererBase)
   , m_VAO(1)
 {
-  //  m_volumeSliceShader.bindFragDataLocation(0, "FragData0");
   //  m_volumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert", "volume_slice_with_colormap.frag",
   //                                         m_rendererBase.generateHeader() + generateHeader());
 
-  m_scVolumeSliceShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                            "volume_slice_with_colormap_single_channel.frag",
                                            m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert",
                                           "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());
 
-  m_image3DSliceWithColorMapBlockIDsShader.bindFragDataLocation(0, "FragData0");
-  // m_image3DSliceWithColorMapBlockIDsShader.bindFragDataLocation(1, "FragData1");
   m_image3DSliceWithColorMapBlockIDsShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                               "image3d_slice_with_transfun_blockID.frag",
                                                               m_rendererBase.generateHeader() + generateHeader());
-  m_image3DSliceWithColorMapShader.bindFragDataLocation(0, "FragData0");
   m_image3DSliceWithColorMapShader.loadFromSourceFile("transform_with_3dtexture_and_eye_coordinate.vert",
                                                       "image3d_slice_with_colormap.frag",
                                                       m_rendererBase.generateHeader() + generateHeader());
