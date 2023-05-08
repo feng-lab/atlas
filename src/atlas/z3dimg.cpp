@@ -384,6 +384,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
 
   for (size_t l = 0; l < m_numLevels; ++l) {
     LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
+              << " m_pageDirectoryBases: " << m_pageDirectoryBases[l]
               << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
               << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
               << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
@@ -394,8 +395,11 @@ void Z3DImg::setScale(const glm::vec3& scale)
   CHECK(m_numLevels > 0);
   size_t l = m_numLevels - 1;
   m_imageDimensions[l] = m_volumeDimension;
+  m_voxelWorldDimensions[l] = m_volumeVoxelWorldDimension;
+  m_voxelWorldSizes[l] = m_volumeVoxelWorldSize;
 
   LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
+            << " m_pageDirectoryBases: " << m_pageDirectoryBases[l]
             << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
             << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
             << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
