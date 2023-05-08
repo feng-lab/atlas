@@ -64,16 +64,16 @@ vec4 compositeXRay(in vec4 curResult, in vec4 color, in float currentRayLength, 
 }
 
 #ifdef MIP
-void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+void sampleVolume(in vec3 startRayPosition, in vec3 exitRayPosition, in float stepSize,
   inout float currentRayLength, inout bool finished, inout float ch1V, inout float rayDepth)
 #else
-void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+void sampleVolume(in vec3 startRayPosition, in vec3 exitRayPosition, in float stepSize,
   inout float currentRayLength, inout bool finished, inout vec4 result, inout float rayDepth)
 #endif
 {
   for (int loop0=0; !finished && loop0<255; loop0++) {
     for (int loop1=0; !finished && loop1<255; loop1++) {
-      vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+      vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
 
       float voxel = texture(volume, samplePos).r;
 
@@ -113,15 +113,15 @@ void sampleVolume(in vec3 startRayPosition, in vec3 rayVector, in float stepSize
 
 #ifdef MIP
 void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoord,
-  in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+  in vec3 startRayPosition, in vec3 exitRayPosition, in float stepSize,
   inout float currentRayLength, inout bool finished, inout float ch1V, inout float rayDepth)
 #else
 void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoord,
-  in vec3 startRayPosition, in vec3 rayVector, in float stepSize,
+  in vec3 startRayPosition, in vec3 exitRayPosition, in float stepSize,
   inout float currentRayLength, inout bool finished, inout vec4 result, inout float rayDepth)
 #endif
 {
-  vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+  vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
   uvec3 voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
   bool blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
 
@@ -159,7 +159,7 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 #endif // MIP
     currentRayLength += stepSize;
 
-    samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+    samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
     voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
     blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
   }
@@ -226,17 +226,17 @@ void main()
 
         if (curLevel + 1 == LEVEL_COUNT) {
 #ifdef MIP
-          sampleVolume(startRayPosition, rayVector, stepSize,
+          sampleVolume(startRayPosition, exitRayPosition, stepSize,
                        currentRayLength, finished, ch1V, rayDepth);
 #else
-          sampleVolume(startRayPosition, rayVector, stepSize,
+          sampleVolume(startRayPosition, exitRayPosition, stepSize,
                        currentRayLength, finished, result, rayDepth);
 #endif
           // finished = true;  // should be true
           break;
         }
 
-        vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+        vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
         uvec3 voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
 
         uvec3 pageTableCoord = voxelCoord / image_block_size;
@@ -252,11 +252,11 @@ void main()
           if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
 #ifdef MIP
             sampleBlock(pageTableEntry, curLevel, pageTableCoord,
-              startRayPosition, rayVector, stepSize,
+              startRayPosition, exitRayPosition, stepSize,
               currentRayLength, finished, ch1V, rayDepth);
 #else
             sampleBlock(pageTableEntry, curLevel, pageTableCoord,
-              startRayPosition, rayVector, stepSize,
+              startRayPosition, exitRayPosition, stepSize,
               currentRayLength, finished, result, rayDepth);
 #endif
           } else if (pagingFlag == UNMAPPED) { // unmapped block
@@ -265,7 +265,7 @@ void main()
             // goto next block
             do {
               currentRayLength += stepSize;
-              samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+              samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
               voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
             } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
           }
@@ -274,7 +274,7 @@ void main()
         } else { // empty page directory
           do { // skip empty space page directory entry
             currentRayLength += stepSize;
-            samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+            samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
             voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
           } while (page_directory_bases[curLevel] + voxelCoord / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
         }

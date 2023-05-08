@@ -80,8 +80,7 @@ void main()
     float ch1V = 0.0;
 #endif
 
-    vec3 rayVector = exitRayPosition - startRayPosition;
-    vec3 numVoxels = abs(rayVector * volume_dimensions_1);
+    vec3 numVoxels = abs((exitRayPosition - startRayPosition) * volume_dimensions_1);
     float numVoxel = max(max(numVoxels.x, numVoxels.y), numVoxels.z);
     float stepSize = 1.0 / (sampling_rate * numVoxel);
 
@@ -91,7 +90,7 @@ void main()
     for (int loop0=0; !finished && loop0<255; loop0++) {
       for (int loop1=0; !finished && loop1<255; loop1++) {
         float voxel;
-        vec3 samplePos = startRayPosition + currentRayLength * rayVector;
+        vec3 samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
 
 #if GLSL_VERSION >= 130
         voxel = texture(volume_1, samplePos).r;
@@ -154,8 +153,7 @@ void main()
       // zw = a/ze + b;  ze = a/(zw - b);  a = f*n/(f-n);  b = 0.5*(f+n)/(f-n) + 0.5;
       float zeFront = entryTexCoordAndZ.w;
       float zeBack = exitTexCoordAndZ.w;
-      float ze = zeFront + rayDepth * (zeBack-zeFront);
-      gl_FragDepth = ze_to_zw_a / ze + ze_to_zw_b;
+      gl_FragDepth = ze_to_zw_a / mix(zeFront, zeBack, rayDepth) + ze_to_zw_b;
     } else {
 #ifdef RESULT_OPAQUE
       gl_FragDepth = ze_to_zw_a / entryTexCoordAndZ.w + ze_to_zw_b;

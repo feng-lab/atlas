@@ -8,7 +8,6 @@
         <file>Resources/shader/compositor.frag</file>
         <file>Resources/shader/copyimage.frag</file>
         <file>Resources/shader/copy_raycaster_image.frag</file>
-        <file>Resources/shader/image2d_with_transfun.frag</file>
         <file>Resources/shader/line.frag</file>
         <file>Resources/shader/line.vert</file>
         <file>Resources/shader/mesh.frag</file>
@@ -20,14 +19,10 @@
         <file>Resources/shader/sphere.vert</file>
         <file>Resources/shader/transform_with_2dtexture.vert</file>
         <file>Resources/shader/transform_with_3dtexture.vert</file>
-        <file>Resources/shader/volume_raycaster.frag</file>
-        <file>Resources/shader/volume_slice_with_transfun.frag</file>
-        <file>Resources/shader/volume_slice.frag</file>
         <file>Resources/fonts/segoeui.ttf_sdf.png</file>
         <file>Resources/fonts/segoeui.ttf_sdf.txt</file>
         <file>Resources/shader/cone.frag</file>
         <file>Resources/shader/cone.vert</file>
-        <file>Resources/shader/image2d.frag</file>
         <file>Resources/shader/ellipsoid.frag</file>
         <file>Resources/shader/ellipsoid.vert</file>
         <file>Resources/shader/dual_peeling_blend.frag</file>
@@ -123,8 +118,6 @@
         <file>icons/ellipse-dark.svg</file>
         <file>Resources/shader/lighting2.frag</file>
         <file>Resources/shader/copyimage_func.frag</file>
-        <file>Resources/shader/image2d_with_colormap.frag</file>
-        <file>Resources/shader/volume_slice_with_colormap.frag</file>
         <file>icons/camcoder.svg</file>
         <file>icons/camcoder-dark.svg</file>
         <file>icons/run-command.svg</file>

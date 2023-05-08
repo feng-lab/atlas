@@ -1215,8 +1215,7 @@ void Z3DImgFilter::renderOnlyBoundBox(nim::Z3DEye eye)
 void Z3DImgFilter::updateNotTransformedBoundBoxImpl()
 {
   m_notTransformedBoundBox.setMinCorner(glm::dvec3(0.0));
-  m_notTransformedBoundBox.setMaxCorner(
-    glm::dvec3(m_3dImg->dimensions().x, m_3dImg->dimensions().y, m_3dImg->dimensions().z));
+  m_notTransformedBoundBox.setMaxCorner(glm::dvec3(m_3dImg->dimensions()));
 }
 
 void Z3DImgFilter::updateBlockIDTarget()
