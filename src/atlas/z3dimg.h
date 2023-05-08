@@ -94,7 +94,7 @@ public:
   {
     return glm::max(
       glm::vec3(1, 1, 1),
-      glm::vec3(m_imgPack.imgInfo().width - 1, m_imgPack.imgInfo().height - 1, m_imgPack.imgInfo().depth - 1));
+      glm::vec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth));
   }
 
   [[nodiscard]] glm::vec3 physicalLDF() const
@@ -220,7 +220,6 @@ protected:
   std::vector<glm::uvec3> m_pageDirectoryDimensions;
   std::vector<glm::uvec3> m_pageTableDimensions;
   std::vector<glm::uvec3> m_imageDimensions;
-  std::vector<glm::uvec3> m_imageBounds;
   std::vector<glm::uvec3> m_levelScales;
   std::vector<glm::uvec3> m_posToBlockIDs;
 

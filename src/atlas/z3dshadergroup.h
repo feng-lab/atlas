@@ -24,21 +24,6 @@ public:
 
   void addWeightedBlendedShaders();
 
-  void setGeometryInputType(GLenum inputType)
-  {
-    m_geometryInputType = inputType;
-  }
-
-  void setGeometryOutputType(GLenum outputType)
-  {
-    m_geometryOutputType = outputType;
-  }
-
-  void setGeometryOutputVertexCount(int count)
-  {
-    m_geometryOutputVertexCount = count;
-  }
-
   void bind();
 
   void release();
@@ -65,10 +50,6 @@ private:
   Z3DRendererBase& m_base;
   QStringList m_normalShaderFiles;
   std::map<Z3DRendererBase::ShaderHookType, std::unique_ptr<Z3DShaderProgram>> m_shaders;
-
-  GLenum m_geometryInputType;
-  GLenum m_geometryOutputType;
-  int m_geometryOutputVertexCount;
 };
 
 } // namespace nim

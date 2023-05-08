@@ -152,7 +152,7 @@ public:
                               double& heightScale,
                               double& depthScale) const;
 
-  [[nodiscard]] bool needScaleDataForTexture(size_t width, size_t height, size_t depth);
+  [[nodiscard]] bool needScaleDataForTexture(size_t width, size_t height, size_t depth) const;
 
   [[nodiscard]] bool isTessellationShaderSupported() const;
 

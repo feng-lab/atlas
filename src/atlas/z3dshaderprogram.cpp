@@ -343,7 +343,7 @@ void Z3DShaderProgram::storeUniformLocations()
   glGetProgramiv(programId(), GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
   for (auto i = 0; i < count; ++i) {
-    Uniform u;
+    Uniform u{};
     glGetActiveUniform(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetUniformLocation(programId(), name.data());
     QString nm(name.data());
@@ -454,7 +454,7 @@ void Z3DShaderProgram::storeAttributeLocations()
   glGetProgramiv(programId(), GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxLength);
   std::vector<char> name(maxLength);
   for (auto i = 0; i < count; ++i) {
-    Attribute u;
+    Attribute u{};
     glGetActiveAttrib(programId(), i, maxLength, nullptr, &u.size, &u.type, name.data());
     u.location = glGetAttribLocation(programId(), name.data());
     m_attributes.insert_or_assign(name.data(), u);

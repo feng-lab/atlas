@@ -45,30 +45,23 @@ Z3DVolumeRaycasterRenderer::Z3DVolumeRaycasterRenderer(Z3DRendererBase& renderer
 
   adjustWidgets();
 
-  //  m_raycasterShader.bindFragDataLocation(0, "FragData0");
   //  m_raycasterShader.loadFromSourceFile("pass.vert", "volume_raycaster.frag",
   //                                       m_rendererBase.generateHeader() + generateHeader());
-  //  m_2dImageShader.bindFragDataLocation(0, "FragData0");
   //  m_2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert", "image2d_with_transfun.frag",
   //                                     m_rendererBase.generateHeader() + generateHeader());
-  //  m_volumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   //  m_volumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert",
   //  "volume_slice_with_transfun.frag",
   //                                                        m_rendererBase.generateHeader() + generateHeader());
 
-  m_scRaycasterShader.bindFragDataLocation(0, "FragData0");
   m_scRaycasterShader.loadFromSourceFile("pass.vert",
                                          "volume_raycaster_single_channel.frag",
                                          m_rendererBase.generateHeader() + generateHeader());
-  m_sc2dImageShader.bindFragDataLocation(0, "FragData0");
   m_sc2dImageShader.loadFromSourceFile("transform_with_2dtexture.vert",
                                        "image2d_with_transfun_single_channel.frag",
                                        m_rendererBase.generateHeader() + generateHeader());
-  m_scVolumeSliceWithTransferfunShader.bindFragDataLocation(0, "FragData0");
   m_scVolumeSliceWithTransferfunShader.loadFromSourceFile("transform_with_3dtexture.vert",
                                                           "volume_slice_with_transfun_single_channel.frag",
                                                           m_rendererBase.generateHeader() + generateHeader());
-  m_mergeChannelShader.bindFragDataLocation(0, "FragData0");
   m_mergeChannelShader.loadFromSourceFile("pass.vert",
                                           "image2d_array_compositor.frag",
                                           m_rendererBase.generateHeader() + generateHeader());

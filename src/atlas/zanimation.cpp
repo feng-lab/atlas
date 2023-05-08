@@ -308,7 +308,7 @@ void ZAnimation::rebindView()
       continue;
     }
     std::shared_ptr<ZWidgetsGroup> wg = m_engine->viewSettingWidgetsGroupOf(id);
-    CHECK(wg);
+    CHECK(wg) << id;
     connect(wg.get(), &ZWidgetsGroup::widgetsGroupChanged, this, &ZAnimation::rebindView);
     sorted = bind(obj->objParaAnimations, wg->getParameterList()) || sorted;
   }

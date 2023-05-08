@@ -187,7 +187,7 @@ public:
 
   glm::vec3 physicalRDB() const
   {
-    return offset() + cubeSize() - spacing();
+    return offset() + cubeSize();
   }
 
   glm::vec3 physicalLDF() const
@@ -276,7 +276,7 @@ public:
 
   glm::vec3 parentVolPhysicalRDB() const
   {
-    return m_parentVolumeOffset + (glm::vec3(m_parentVolumeDimensions) - 1.f);
+    return m_parentVolumeOffset + glm::vec3(m_parentVolumeDimensions);
   }
 
   glm::vec3 parentVolPhysicalLDF() const

@@ -123,16 +123,13 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 {
   bool blockFinished = false;
   vec3 voxelAddress;
-#if GLSL_VERSION >= 930
-  vec3 fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
-  uvec3 voxelCoord = uvec3(voxelAddress);
-#else
-  uvec3 voxelCoord = uvec3(samplePos * image_dimensions[curLevel]);
+
+  uvec3 voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
   vec3 fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
-#endif
+
   for (int loop0=0; !blockFinished && loop0<255; loop0++) {
-    voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
-    float voxel = texture(image_cache, (voxelAddress)*image_address_to_normalized_texture_coord).r;
+    voxelAddress = pageTableEntry + voxelCoord % image_block_size + fFracVoxelCoord + 2.0 + 0.5;
+    float voxel = texture(image_cache, voxelAddress * image_address_to_normalized_texture_coord).r;
 
 #ifdef MIP
 #ifdef LOCAL_MIP
@@ -164,13 +161,10 @@ void sampleBlock(in uvec3 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
     currentRayLength += stepSize;
 
     samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-#if GLSL_VERSION >= 930
-    fFracVoxelCoord = modf(samplePos * image_dimensions[curLevel], voxelAddress);
-    voxelCoord = uvec3(voxelAddress);
-#else
-    voxelCoord = uvec3(samplePos * image_dimensions[curLevel]);
+
+    voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
     fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
-#endif
+
     blockFinished = finished || voxelCoord / image_block_size != pageTableCoord || currentRayLength > 1.0;
   }
 }
@@ -247,8 +241,9 @@ void main()
         }
 
         vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+        uvec3 voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
 
-        uvec3 pageTableCoord = uvec3(samplePos * image_dimensions[curLevel]) / image_block_size;
+        uvec3 pageTableCoord = voxelCoord / image_block_size;
         uvec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
@@ -275,7 +270,8 @@ void main()
             do {
               currentRayLength += stepSize;
               samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-            } while (uvec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+              voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+            } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
           }
         } else if (pagingFlag == UNMAPPED) { // unmapped page directory
           hitMissedBlock = true;
@@ -283,7 +279,8 @@ void main()
           do { // skip empty space page directory entry
             currentRayLength += stepSize;
             samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-          } while (page_directory_bases[curLevel] + uvec3(samplePos * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+            voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+          } while (page_directory_bases[curLevel] + voxelCoord / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
         }
 
         finished = finished || hitMissedBlock || (currentRayLength > 1.0);

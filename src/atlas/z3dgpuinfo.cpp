@@ -112,7 +112,7 @@ void Z3DGpuInfo::getDataScaleForTexture(size_t width,
   }
 }
 
-bool Z3DGpuInfo::needScaleDataForTexture(size_t width, size_t height, size_t depth)
+bool Z3DGpuInfo::needScaleDataForTexture(size_t width, size_t height, size_t depth) const
 {
   double s1 = 1.0;
   double s2 = 1.0;
@@ -239,22 +239,18 @@ void Z3DGpuInfo::detectGpuInfo()
   m_glVendorString = QString(reinterpret_cast<const char*>(glGetString(GL_VENDOR)));
   m_glRendererString = QString(reinterpret_cast<const char*>(glGetString(GL_RENDERER)));
 
-  if (GLVersionGE(3, 0)) {
-    GLint contextFlags;
-    glGetIntegerv(GL_CONTEXT_FLAGS, &contextFlags);
-    m_contextFlagForwardCompatibleBit = contextFlags & GLint(GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT);
-    m_contextFlagDebugBit = contextFlags & GLint(GL_CONTEXT_FLAG_DEBUG_BIT);
-    m_contextFlagRobustAccessBit = contextFlags & GLint(GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT);
-    if (GLVersionGE(3, 2)) {
-      GLint contextProfileMask;
-      glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &contextProfileMask);
-      m_contextCoreProfileBit = contextProfileMask & GLint(GL_CONTEXT_CORE_PROFILE_BIT);
-      m_contextCompatibilityProfileBit = contextProfileMask & GLint(GL_CONTEXT_COMPATIBILITY_PROFILE_BIT);
-    }
-    if (!m_contextFlagForwardCompatibleBit) {
-      m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
-    }
-  } else {
+  GLint contextFlags;
+  glGetIntegerv(GL_CONTEXT_FLAGS, &contextFlags);
+  m_contextFlagForwardCompatibleBit = contextFlags & GLint(GL_CONTEXT_FLAG_FORWARD_COMPATIBLE_BIT);
+  m_contextFlagDebugBit = contextFlags & GLint(GL_CONTEXT_FLAG_DEBUG_BIT);
+  m_contextFlagRobustAccessBit = contextFlags & GLint(GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT);
+
+  GLint contextProfileMask;
+  glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &contextProfileMask);
+  m_contextCoreProfileBit = contextProfileMask & GLint(GL_CONTEXT_CORE_PROFILE_BIT);
+  m_contextCompatibilityProfileBit = contextProfileMask & GLint(GL_CONTEXT_COMPATIBILITY_PROFILE_BIT);
+
+  if (!m_contextFlagForwardCompatibleBit) {
     m_glExtensionsString = QString(reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS)));
   }
 

@@ -341,11 +341,11 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
     bool is2DImage = m_3dImg->is2DData();
     glm::uvec3 volDim = m_3dImg->dimensions();
-    m_xCut.setRange(-1, volDim.x);
+    m_xCut.setRange(0, volDim.x);
     m_xCut.set(m_xCut.range());
-    m_yCut.setRange(-1, volDim.y);
+    m_yCut.setRange(0, volDim.y);
     m_yCut.set(m_yCut.range());
-    m_zCut.setRange(-1, volDim.z);
+    m_zCut.setRange(0, volDim.z);
     m_zCut.set(m_zCut.range());
 
     m_obliqueSliceDistanceToOrigin.setRange(-glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)),
@@ -353,7 +353,7 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     m_obliqueSlice2DistanceToOrigin.setRange(-glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)),
                                              glm::length(glm::vec3(volDim.x, volDim.y, volDim.z)));
 
-    m_rendererBase.setRotationCenter(glm::vec3(volDim.x - 1, volDim.y - 1, volDim.z - 1) / 2.f);
+    m_rendererBase.setRotationCenter(glm::vec3(volDim.x, volDim.y, volDim.z) / 2.f);
 
     m_zSlicePosition.setRange(0, volDim.z - 1);
     m_ySlicePosition.setRange(0, volDim.y - 1);
@@ -910,7 +910,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     }
   }
   if (m_showZSlice.get()) {
-    float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z - 1);
+    float zTexCoord = (m_zSlicePosition.get() + .5f) / volDim.z;
     float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
@@ -918,7 +918,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showYSlice.get()) {
-    float yTexCoord = m_ySlicePosition.get() / static_cast<float>(volDim.y - 1);
+    float yTexCoord = (m_ySlicePosition.get() + .5f) / volDim.y;
     float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
@@ -926,7 +926,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showXSlice.get()) {
-    float xTexCoord = m_xSlicePosition.get() / static_cast<float>(volDim.x - 1);
+    float xTexCoord = (m_xSlicePosition.get() + .5f) / volDim.x;
     float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
@@ -948,7 +948,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     }
   }
   if (m_showZSlice2.get()) {
-    float zTexCoord = m_zSlice2Position.get() / static_cast<float>(volDim.z - 1);
+    float zTexCoord = (m_zSlice2Position.get() + .5f) / volDim.z;
     float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
@@ -956,7 +956,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showYSlice2.get()) {
-    float yTexCoord = m_ySlice2Position.get() / static_cast<float>(volDim.y - 1);
+    float yTexCoord = (m_ySlice2Position.get() + .5f) / volDim.y;
     float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
@@ -964,7 +964,7 @@ void Z3DImgFilter::renderSlices(Z3DEye eye)
     m_imgSliceRenderer.addSlice(slice);
   }
   if (m_showXSlice2.get()) {
-    float xTexCoord = m_xSlice2Position.get() / static_cast<float>(volDim.x - 1);
+    float xTexCoord = (m_xSlice2Position.get() + .5f) / volDim.x;
     float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
 
     ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
@@ -994,16 +994,16 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
   glm::vec3 coordLuf = m_3dImg->physicalLUF();
   glm::vec3 coordRdb = m_3dImg->physicalRDB();
 
-  float xTexCoordStart = std::max(m_xCut.lowerValue(), m_xCut.minimum() + 1) / (volDim.x - 1.f);
-  float xTexCoordEnd = std::min(m_xCut.upperValue(), m_xCut.maximum() - 1) / (volDim.x - 1.f);
+  float xTexCoordStart = m_xCut.lowerValue() / volDim.x;
+  float xTexCoordEnd = m_xCut.upperValue() / volDim.x;
   float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
   float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
-  float yTexCoordStart = std::max(m_yCut.lowerValue(), m_yCut.minimum() + 1) / (volDim.y - 1.f);
-  float yTexCoordEnd = std::min(m_yCut.upperValue(), m_yCut.maximum() - 1) / (volDim.y - 1.f);
+  float yTexCoordStart = m_yCut.lowerValue() / volDim.y;
+  float yTexCoordEnd = m_yCut.upperValue() / volDim.y;
   float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
   float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
-  float zTexCoordStart = std::max(m_zCut.lowerValue(), m_zCut.minimum() + 1) / (volDim.z - 1.f);
-  float zTexCoordEnd = std::min(m_zCut.upperValue(), m_zCut.maximum() - 1) / (volDim.z - 1.f);
+  float zTexCoordStart = m_zCut.lowerValue() / volDim.z;
+  float zTexCoordEnd = m_zCut.upperValue() / volDim.z;
   float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
   float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 

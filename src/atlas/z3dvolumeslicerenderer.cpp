@@ -84,7 +84,7 @@ QString Z3DVolumeSliceRenderer::generateHeader()
 {
   QString headerSource;
 
-  if (m_vols && m_vols->size() > 0) {
+  if (m_vols && !m_vols->empty()) {
     headerSource += QString("#define NUM_VOLUMES %1\n").arg(m_vols->size());
   } else {
     headerSource += QString("#define NUM_VOLUMES 0\n");
@@ -99,7 +99,7 @@ QString Z3DVolumeSliceRenderer::generateHeader()
 
 void Z3DVolumeSliceRenderer::render(Z3DEye eye)
 {
-  bool needRender = m_vols && m_vols->size() > 0 && !m_quads.empty();
+  bool needRender = m_vols && !m_vols->empty() && !m_quads.empty();
   if (!needRender) {
     return;
   }
@@ -109,8 +109,8 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
 
   if (m_vols->size() == 1) {
     bindVolume(m_scVolumeSliceShader, 0);
-    for (size_t i = 0; i < m_quads.size(); ++i) {
-      renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
+    for (const auto& quad : m_quads) {
+      renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
     }
   } else {
     for (size_t j = 0; j < m_vols->size(); ++j) {
@@ -119,8 +119,8 @@ void Z3DVolumeSliceRenderer::render(Z3DEye eye)
       m_layerTarget->clear();
 
       bindVolume(m_scVolumeSliceShader, j);
-      for (size_t i = 0; i < m_quads.size(); ++i) {
-        renderTriangleList(m_VAO, m_scVolumeSliceShader, m_quads[i]);
+      for (const auto& quad : m_quads) {
+        renderTriangleList(m_VAO, m_scVolumeSliceShader, quad);
       }
 
       m_layerTarget->release();

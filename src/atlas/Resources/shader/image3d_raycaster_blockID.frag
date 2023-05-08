@@ -85,8 +85,9 @@ void main()
           break;
         }
         vec3 samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
+        uvec3 voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
 
-        uvec3 pageTableCoord = uvec3(samplePos * image_dimensions[curLevel]) / image_block_size;
+        uvec3 pageTableCoord = voxelCoord / image_block_size;
         uvec3 curPageDirAddress = page_directory_bases[curLevel] + pageTableCoord / page_table_block_size;
         if (curPageDirAddress != pageDirAddress) {
           pageDirAddress = curPageDirAddress;
@@ -109,13 +110,15 @@ void main()
           do {
             currentRayLength += stepSize;
             samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-          } while (uvec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+            voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+          } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
         } else {
           if (pagingFlag == EMPTY) {
             do { // skip empty space page directory entry
               currentRayLength += stepSize;
               samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-            } while (page_directory_bases[curLevel] + uvec3(samplePos * image_dimensions[curLevel]) / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
+              voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+            } while (page_directory_bases[curLevel] + voxelCoord / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
           } else { // pagingFlag == UNMAPPED
             // save missed blockid
             if (missBlockIDsIndex < 32) {
@@ -128,7 +131,8 @@ void main()
             do {
               currentRayLength += stepSize;
               samplePos = clamp(startRayPosition + currentRayLength * rayVector, 0.0, 1.0);
-            } while (uvec3(samplePos * image_dimensions[curLevel]) / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+              voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+            } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
           }
         }
 

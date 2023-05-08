@@ -676,12 +676,7 @@ void Z3DRendererBase::activateClipPlanesGLSL()
     return;
   }
   for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
-    if (GLVersionGE(3, 0)) {
-      glEnable(GL_CLIP_DISTANCE0 + i);
-    } else {
-      glClipPlane(GL_CLIP_PLANE0 + i, glm::value_ptr(m_doubleClipPlanes[i]));
-      glEnable(GL_CLIP_PLANE0 + i);
-    }
+    glEnable(GL_CLIP_DISTANCE0 + i);
   }
 }
 
@@ -691,11 +686,7 @@ void Z3DRendererBase::deactivateClipPlanesGLSL()
     return;
   }
   for (size_t i = 0; i < m_clipPlanes.size(); ++i) {
-    if (GLVersionGE(3, 0)) {
-      glDisable(GL_CLIP_DISTANCE0 + i);
-    } else {
-      glDisable(GL_CLIP_PLANE0 + i);
-    }
+    glDisable(GL_CLIP_DISTANCE0 + i);
   }
 }
 

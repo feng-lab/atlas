@@ -10,9 +10,6 @@ namespace nim {
 
 Z3DShaderGroup::Z3DShaderGroup(Z3DRendererBase& rendererBase)
   : m_base(rendererBase)
-  , m_geometryInputType(GL_LINES_ADJACENCY)
-  , m_geometryOutputType(GL_TRIANGLE_STRIP)
-  , m_geometryOutputVertexCount(24)
 {}
 
 void Z3DShaderGroup::init(const QStringList& shaderFiles,

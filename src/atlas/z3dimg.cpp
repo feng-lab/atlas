@@ -278,7 +278,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_pageDirectorySize = glm::uvec3(0, 0, 0);
   m_levelScales.resize(m_numLevels);
   m_imageDimensions.resize(m_numLevels);
-  m_imageBounds.resize(m_numLevels);
   m_pageTableDimensions.resize(m_numLevels);
   m_pageDirectoryDimensions.resize(m_numLevels);
   m_posToBlockIDs.resize(m_numLevels);
@@ -308,7 +307,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                       (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                       (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
-    m_imageBounds[l] = m_imageDimensions[l] - 1_u32;
     m_pageTableDimensions[l] = (m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
     m_pageDirectoryDimensions[l] = (m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
 
@@ -396,7 +394,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
   CHECK(m_numLevels > 0);
   size_t l = m_numLevels - 1;
   m_imageDimensions[l] = m_volumeDimension;
-  m_imageBounds[l] = m_imageDimensions[l] - 1_u32;
 
   LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
             << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
@@ -433,7 +430,7 @@ void Z3DImg::bindFullResBlockIDsShader(Z3DShaderProgram& shader, size_t c) const
 {
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
-  shader.setUniformArray("image_dimensions", m_imageBounds.data(), m_numLevels);
+  shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", m_imageBlockSize);
   shader.setUniformArray("pos_to_block_ids", m_posToBlockIDs.data(), m_numLevels);
@@ -446,11 +443,11 @@ void Z3DImg::bindFullResRenderShader(Z3DShaderProgram& shader, size_t c) const
 {
   shader.setUniformArray("page_directory_bases", m_pageDirectoryBases.data(), m_numLevels);
   shader.setUniform("page_table_block_size", m_pageTableBlockSize);
-  shader.setUniformArray("image_dimensions", m_imageBounds.data(), m_numLevels);
+  shader.setUniformArray("image_dimensions", m_imageDimensions.data(), m_numLevels);
   shader.setUniformArray("voxel_world_sizes", m_voxelWorldSizes.data(), m_numLevels);
   shader.setUniform("image_block_size", m_imageBlockSize);
   shader.setUniform("image_address_to_normalized_texture_coord",
-                    1.f / glm::vec3(m_channelImageCacheTextures[c]->dimension() - 1_u32));
+                    1.f / glm::vec3(m_channelImageCacheTextures[c]->dimension()));
 
   shader.bindTexture("page_directory", m_channelPageDirectoryTextures[c].get());
   shader.bindTexture("page_table_cache", m_channelPageTableCacheTextures[c].get());
@@ -533,7 +530,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-          CHECK(false) << *pageTableEntryPtr << " " << pageTableEntryKey << " " << emptyBlockCount; // block id shader should not collect mapped empty block
+          CHECK(false) << *pageTableEntryPtr << " " << pageTableEntryKey << " "
+                       << emptyBlockCount; // block id shader should not collect mapped empty block
           ++emptyBlockCount;
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
