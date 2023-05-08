@@ -60,7 +60,7 @@ void main()
     uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
     pagingFlag = pageTableEntry.w;
     if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
-      voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 2.0 + 0.5;
+      voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
       color = texture(transfer_function, texture(image_cache, voxelAddress * image_address_to_normalized_texture_coord).r);
 
 #ifdef RESULT_OPAQUE

@@ -127,7 +127,7 @@ void sampleBlock(in uvec4 pageTableEntry, in int curLevel, in uvec3 pageTableCoo
 
   for (int loop0=0; !blockFinished && loop0<255; loop0++) {
     vec3 fFracVoxelCoord = samplePos * image_dimensions[curLevel] - vec3(voxelCoord);
-    vec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 2.0 + 0.5;
+    vec3 voxelAddress = pageTableEntry.xyz + voxelCoord % image_block_size + fFracVoxelCoord + 2.0;
     float voxel = texture(image_cache, voxelAddress * image_address_to_normalized_texture_coord).r;
 
 #ifdef MIP
