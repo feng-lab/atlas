@@ -33,8 +33,6 @@ Z3DImgRaycasterRenderer::Z3DImgRaycasterRenderer(Z3DRendererBase& rendererBase)
   , m_isoValue("ISO Value", 0.5f, 0.0f, 1.0f)
   , m_localMIPThreshold("Local MIP Threshold", 0.8f, 0.01f, 1.f)
   , m_compositingMode("Compositing")
-  , m_entryTexCoordAndZeTexture(nullptr)
-  , m_exitTexCoordAndZeTexture(nullptr)
   , m_opaque(false)
   // , m_alpha(1.0)
   , m_VAO(1)
@@ -148,8 +146,7 @@ void Z3DImgRaycasterRenderer::addQuad(const ZMesh& quad)
     return;
   }
   m_quads.push_back(quad);
-  m_entryTexCoordAndZeTexture = nullptr;
-  m_exitTexCoordAndZeTexture = nullptr;
+  m_entryExitTexCoordAndZeTexture = nullptr;
 }
 
 void Z3DImgRaycasterRenderer::adjustWidgets()
@@ -282,7 +279,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   }
 
   if (m_quads.empty()) {
-    if (m_entryTexCoordAndZeTexture == nullptr || m_exitTexCoordAndZeTexture == nullptr) {
+    if (m_entryExitTexCoordAndZeTexture == nullptr) {
       return;
     }
   } else {
@@ -601,8 +598,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       m_image3DRaycasterBlockIDsShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
-      m_image3DRaycasterBlockIDsShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
+      m_image3DRaycasterBlockIDsShader.bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
 
       m_image3DRaycasterBlockIDsShader.setUniform("sampling_rate", m_samplingRate.get());
 
@@ -846,8 +842,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       m_image3DRaycasterShader.setUniform("ze_to_screen_pixel_voxel_size", ze_to_screen_pixel_voxel_size);
 
       // entry exit points
-      m_image3DRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
-      m_image3DRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
+      m_image3DRaycasterShader.bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
 
       m_image3DRaycasterShader.bindTexture("last_color", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT0));
       m_image3DRaycasterShader.bindTexture("last_ray_depth", m_lastImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1));
@@ -886,7 +881,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         m_currentImageRenderTarget->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
         if (round == 0) {
           filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
-          m_entryTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
+          m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
           filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_exit.tif", dummyidx, c));
           m_exitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
         }
@@ -950,8 +945,7 @@ void Z3DImgRaycasterRenderer::render3DImageFast(Z3DEye /*eye*/, const std::vecto
   m_scRaycasterShader.setUniform("ze_to_zw_a", a);
 
   // entry exit points
-  m_scRaycasterShader.bindTexture("ray_entry_tex_coord", m_entryTexCoordAndZeTexture);
-  m_scRaycasterShader.bindTexture("ray_exit_tex_coord", m_exitTexCoordAndZeTexture);
+  m_scRaycasterShader.bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
 
   if (m_compositingMode.get() == "ISO Surface") {
     m_scRaycasterShader.setUniform("iso_value", m_isoValue.get());

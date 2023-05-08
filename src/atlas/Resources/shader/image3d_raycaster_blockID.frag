@@ -11,8 +11,7 @@ uniform uvec3 pos_to_block_ids[LEVEL_COUNT];
 uniform float sampling_rate;
 uniform float ze_to_screen_pixel_voxel_size;
 
-uniform sampler2D ray_entry_tex_coord;
-uniform sampler2D ray_exit_tex_coord;
+uniform sampler2DArray ray_entry_exit_tex_coord;
 
 uniform sampler2D last_ray_depth;
 
@@ -36,11 +35,8 @@ void main()
     discard;
   }
 
-//  vec2 texCoords = gl_FragCoord.xy * screen_dim_RCP;
-//  vec4 entryTexCoordAndZ = texture(ray_entry_tex_coord, texCoords);
-//  vec4 exitTexCoordAndZ = texture(ray_exit_tex_coord, texCoords);
-  vec4 entryTexCoordAndZ = texelFetch(ray_entry_tex_coord, ivec2(gl_FragCoord.xy), 0);
-  vec4 exitTexCoordAndZ = texelFetch(ray_exit_tex_coord, ivec2(gl_FragCoord.xy), 0);
+  vec4 entryTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 0), 0);
+  vec4 exitTexCoordAndZ = texelFetch(ray_entry_exit_tex_coord, ivec3(gl_FragCoord.xy, 1), 0);
   vec3 startRayPosition = entryTexCoordAndZ.xyz;
   vec3 exitRayPosition = exitTexCoordAndZ.xyz;
 

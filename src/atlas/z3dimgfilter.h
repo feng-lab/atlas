@@ -151,8 +151,7 @@ private:
   // ZIntParameter m_interactionDownsample;      // screen space downsample during interaction
   // ZBoolParameter m_smoothInteraction;
 
-  Z3DRenderTarget m_entryTarget;
-  Z3DRenderTarget m_exitTarget;
+  Z3DRenderTarget m_entryExitTarget;
   Z3DRenderTarget m_layerTarget;
   Z3DTexture m_layerColorTexture;
   Z3DTexture m_layerDepthTexture;

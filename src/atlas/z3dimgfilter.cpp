@@ -23,8 +23,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_numParas(0)
   //, m_interactionDownsample("Interaction Downsample", 1, 1, 16)
   //, m_smoothInteraction("Smooth Interaction", true)
-  , m_entryTarget(glm::uvec2(32, 32))
-  , m_exitTarget(glm::uvec2(32, 32))
+  , m_entryExitTarget(glm::uvec2(32, 32))
   , m_layerTarget(glm::uvec2(32, 32))
   , m_layerColorTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA16), glm::uvec3(32, 32, 3), GL_RGBA, GL_FLOAT)
   , m_layerDepthTexture(GL_TEXTURE_2D_ARRAY,
@@ -93,24 +92,13 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   // addParameter(m_smoothInteraction);
 
   Z3DTexture* g_TexId[2];
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
+
+  g_TexId[0] = new Z3DTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA32F), glm::uvec3(32, 32, 2), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
-  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[1]->uploadImage();
-  m_entryTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
-  m_entryTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
-  m_entryTarget.isFBOComplete();
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
-  g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[0]->uploadImage();
-  g_TexId[1] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
-  g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[1]->uploadImage();
-  m_exitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
-  m_exitTarget.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1);
-  m_exitTarget.isFBOComplete();
+  m_entryExitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
+  m_entryExitTarget.isFBOComplete();
+
   m_layerColorTexture.uploadImage();
   m_layerDepthTexture.uploadImage();
   m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
@@ -1069,7 +1057,7 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     // enable culling
     glEnable(GL_CULL_FACE);
 
-    m_rendererBase.setViewport(m_exitTarget.size());
+    m_rendererBase.setViewport(currentOutport.size());
     CHECK_GL_ERROR
 
     std::vector<glm::vec3> planeNormals;
@@ -1131,38 +1119,38 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
 
     // render back texture
     const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+    m_entryExitTarget.resize(currentOutport.size());
 
-    m_exitTarget.resize(currentOutport.size());
-    m_exitTarget.bind();
+    m_entryExitTarget.attachSlice(1);
+    m_entryExitTarget.bind();
     glDrawBuffers(1, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_BACK : GL_FRONT);
 
     m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-    m_exitTarget.release();
+    m_entryExitTarget.release();
     CHECK_GL_ERROR
 
     // render front texture
-    m_entryTarget.resize(currentOutport.size());
-    m_entryTarget.bind();
+    m_entryExitTarget.attachSlice(0);
+    m_entryExitTarget.bind();
     glDrawBuffers(1, g_drawBuffers);
     glClear(GL_COLOR_BUFFER_BIT);
     glCullFace(flipped ? GL_FRONT : GL_BACK);
 
     m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
     m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-    m_entryTarget.release();
+    m_entryExitTarget.release();
     CHECK_GL_ERROR
 
     // restore OpenGL state
     glCullFace(GL_BACK);
     glDisable(GL_CULL_FACE);
 
-    // m_entryTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
+    // m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
 
-    m_imgRaycasterRenderer.setEntryExitInfo(m_entryTarget.attachment(GL_COLOR_ATTACHMENT0),
-                                            m_exitTarget.attachment(GL_COLOR_ATTACHMENT0));
+    m_imgRaycasterRenderer.setEntryExitInfo(m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0));
   }
 
   glEnable(GL_BLEND);
