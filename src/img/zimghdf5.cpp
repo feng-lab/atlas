@@ -618,6 +618,11 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
   std::shared_ptr<ZImg> res;
   try {
     if (m_hdf5Tiles.size() == m_tiles.size()) {
+      if (true) {
+        res = std::make_shared<ZImg>(m_info);
+        res->fill(10000);
+        return res;
+      }
       if (m_emptyBlock) {
         res = std::make_shared<ZImg>(m_info);
         return res;
