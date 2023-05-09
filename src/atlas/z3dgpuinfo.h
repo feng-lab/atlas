@@ -224,13 +224,6 @@ public:
 
   [[nodiscard]] QStringList gpuInfo() const;
 
-  // check avalibility of some special effect
-  [[nodiscard]] bool isWeightedAverageSupported() const;
-
-  [[nodiscard]] bool isWeightedBlendedSupported() const;
-
-  [[nodiscard]] bool isDualDepthPeelingSupported() const;
-
   [[nodiscard]] bool isLinkedListSupported() const;
 
 protected:
@@ -267,6 +260,8 @@ private:
   int m_maxDrawBuffer;
   int m_maxGeometryOutputVertices;
   int m_maxArrayTextureLayers;
+
+  int m_maxTextureBufferSize;
 
   // Return a value such as 16 or 32. That is the number of image samplers that your GPU supports in the fragment
   // shader.

@@ -34,28 +34,22 @@ void Z3DShaderGroup::addAllSupportedPostShaders()
 
 void Z3DShaderGroup::addDualDepthPeelingShaders()
 {
-  if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit] = std::make_unique<Z3DShaderProgram>();
-    m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel] = std::make_unique<Z3DShaderProgram>();
-    buildDualDepthPeelingInitShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].get());
-    buildDualDepthPeelingPeelShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].get());
-  }
+  m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit] = std::make_unique<Z3DShaderProgram>();
+  m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel] = std::make_unique<Z3DShaderProgram>();
+  buildDualDepthPeelingInitShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingInit].get());
+  buildDualDepthPeelingPeelShader(m_shaders[Z3DRendererBase::ShaderHookType::DualDepthPeelingPeel].get());
 }
 
 void Z3DShaderGroup::addWeightedAverageShaders()
 {
-  if (Z3DGpuInfo::instance().isWeightedAverageSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit] = std::make_unique<Z3DShaderProgram>();
-    buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].get());
-  }
+  m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit] = std::make_unique<Z3DShaderProgram>();
+  buildWeightedAverageShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedAverageInit].get());
 }
 
 void Z3DShaderGroup::addWeightedBlendedShaders()
 {
-  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
-    m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit] = std::make_unique<Z3DShaderProgram>();
-    buildWeightedBlendedShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit].get());
-  }
+  m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit] = std::make_unique<Z3DShaderProgram>();
+  buildWeightedBlendedShader(m_shaders[Z3DRendererBase::ShaderHookType::WeightedBlendedInit].get());
 }
 
 void Z3DShaderGroup::bind()

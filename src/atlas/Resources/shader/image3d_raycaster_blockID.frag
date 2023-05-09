@@ -108,28 +108,26 @@ void main()
             samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
             voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
           } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
-        } else {
-          if (pagingFlag == EMPTY) {
-            do { // skip empty space page directory entry
-              currentRayLength += stepSize;
-              samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-              voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
-            } while (page_directory_bases[curLevel] + voxelCoord / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
-          } else { // pagingFlag == UNMAPPED
-            // save missed blockid
-            if (missBlockIDsIndex < 32) {
-              uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
-              missBlockIDs[missBlockIDsIndex++] = blockID;
-              finished = missBlockIDsIndex == 32;
-            }
-
-            // goto next block
-            do {
-              currentRayLength += stepSize;
-              samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
-              voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
-            } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+        } else if (pagingFlag == UNMAPPED) { // unmapped page directory
+          // save missed blockid
+          if (missBlockIDsIndex < 32) {
+            uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;
+            missBlockIDs[missBlockIDsIndex++] = blockID;
+            finished = missBlockIDsIndex == 32;
           }
+
+          // goto next block
+          do {
+            currentRayLength += stepSize;
+            samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
+            voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+          } while (voxelCoord / image_block_size == pageTableCoord && currentRayLength <= 1.0);
+        } else { // empty page directory
+          do { // skip empty space page directory entry
+            currentRayLength += stepSize;
+            samplePos = mix(startRayPosition, exitRayPosition, currentRayLength);
+            voxelCoord = clamp(uvec3(samplePos * image_dimensions[curLevel]), uvec3(0, 0, 0), image_dimensions[curLevel] - 1);
+          } while (page_directory_bases[curLevel] + voxelCoord / image_block_size / page_table_block_size == pageDirAddress && currentRayLength <= 1.0);
         }
 
         finished = finished || (currentRayLength > 1.0);

@@ -62,42 +62,36 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundRenderer.secondColorPara());
   addParameter(m_backgroundRenderer.gradientOrientationPara());
 
-  if (Z3DGpuInfo::instance().isWeightedAverageSupported()) {
 #ifdef USE_RECT_TEX
-    m_waFinalShader.loadFromSourceFile("pass.vert",
-                                       "wavg_final.frag",
-                                       m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+  m_waFinalShader.loadFromSourceFile("pass.vert",
+                                     "wavg_final.frag",
+                                     m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
-    m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
+  m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
 #endif
-  }
 
-  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
 #ifdef USE_RECT_TEX
-    m_wbFinalShader.loadFromSourceFile("pass.vert",
-                                       "wblended_final.frag",
-                                       m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+  m_wbFinalShader.loadFromSourceFile("pass.vert",
+                                     "wblended_final.frag",
+                                     m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
-    m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
+  m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
 #endif
-  }
 
-  if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
 #ifdef USE_RECT_TEX
-    m_ddpBlendShader.loadFromSourceFile("pass.vert",
-                                        "dual_peeling_blend.frag",
-                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+  m_ddpBlendShader.loadFromSourceFile("pass.vert",
+                                      "dual_peeling_blend.frag",
+                                      m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
-    m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
+  m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
 #endif
 #ifdef USE_RECT_TEX
-    m_ddpFinalShader.loadFromSourceFile("pass.vert",
-                                        "dual_peeling_final.frag",
-                                        m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
+  m_ddpFinalShader.loadFromSourceFile("pass.vert",
+                                      "dual_peeling_final.frag",
+                                      m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
 #else
-    m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
+  m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
 #endif
-  }
 
   globalParas.setPickingTarget(m_pickingRenderTarget);
   addInteractionHandler(globalParas.interactionHandler);

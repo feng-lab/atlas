@@ -33,18 +33,12 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   transparencyMethod.addOption("Blend No Depth Mask");
   transparencyMethod.select("Blend Delayed");
 
-  if (Z3DGpuInfo::instance().isWeightedAverageSupported()) {
-    transparencyMethod.addOption("Weighted Average");
-    transparencyMethod.select("Weighted Average");
-  }
+  transparencyMethod.addOption("Weighted Average");
+  transparencyMethod.select("Weighted Average");
 
-  if (Z3DGpuInfo::instance().isWeightedBlendedSupported()) {
-    transparencyMethod.addOption("Weighted Blended");
-  }
+  transparencyMethod.addOption("Weighted Blended");
 
-  if (Z3DGpuInfo::instance().isDualDepthPeelingSupported()) {
-    transparencyMethod.addOption("Dual Depth Peeling");
-  }
+  transparencyMethod.addOption("Dual Depth Peeling");
   // weightedBlendedDepthScale.setStyle("SPINBOX");
 
   //  if (Z3DGpuInfoInstance.isLinkedListSupported())

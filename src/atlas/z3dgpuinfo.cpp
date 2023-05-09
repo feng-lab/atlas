@@ -199,6 +199,8 @@ QStringList Z3DGpuInfo::gpuInfo() const
   info << QString("Smooth Line Width Granularity: %1").arg(m_smoothLineWidthGranularity);
   info << QString("Aliased Line Width Range:      (%1, %2)").arg(m_minAliasedLineWidth).arg(m_maxAliasedLineWidth);
 
+  info << QString("Max Texture Buffer Size:       %1").arg(m_maxTextureBufferSize);
+
   return info;
 }
 
@@ -210,21 +212,6 @@ void Z3DGpuInfo::logGpuInfo() const
   }
 
   LOG(INFO) << "";
-}
-
-bool Z3DGpuInfo::isWeightedAverageSupported() const
-{
-  return Z3DGpuInfo::instance().maxColorAttachments() >= 2;
-}
-
-bool Z3DGpuInfo::isWeightedBlendedSupported() const
-{
-  return Z3DGpuInfo::instance().maxColorAttachments() >= 2;
-}
-
-bool Z3DGpuInfo::isDualDepthPeelingSupported() const
-{
-  return Z3DGpuInfo::instance().maxColorAttachments() >= 8;
 }
 
 bool Z3DGpuInfo::isLinkedListSupported() const
@@ -287,6 +274,8 @@ void Z3DGpuInfo::detectGpuInfo()
     glGetIntegerv(GL_MAX_GEOMETRY_OUTPUT_VERTICES_EXT, &m_maxGeometryOutputVertices);
 
     glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &m_maxArrayTextureLayers);
+
+    glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &m_maxTextureBufferSize);
 
     //
     glGetIntegerv(GL_MAX_VIEWPORT_DIMS, &m_maxViewportDims);
