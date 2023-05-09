@@ -386,7 +386,7 @@ void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
     std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 3);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
-    img.wrapData(depthBuffer.data(), width(), height(), 1, 3);
+    img.wrapData(depthBuffer.data(), width(), height(), depth(), 3);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg);
     tmpImg.flip(nim::Dimension::Y);
@@ -405,7 +405,7 @@ void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
     std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 4);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     nim::ZImg img;
-    img.wrapData(depthBuffer.data(), width(), height(), 1, 4);
+    img.wrapData(depthBuffer.data(), width(), height(), depth(), 4);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg);
     tmpImg.flip(nim::Dimension::Y);

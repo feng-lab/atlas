@@ -882,8 +882,6 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
         if (round == 0) {
           filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
           m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
-          filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_exit.tif", dummyidx, c));
-          m_exitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
         }
       }
 #endif
