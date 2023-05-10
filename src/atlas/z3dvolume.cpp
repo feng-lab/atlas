@@ -281,7 +281,14 @@ void Z3DVolume::generateTexture() const
   }
 
   // Create texture
-  m_texture = std::make_unique<Z3DTexture>(internalFormat, dimensions(), format, dataType, m_img.channelData(0));
+  m_texture = std::make_unique<Z3DTexture>(internalFormat,
+                                           dimensions(),
+                                           format,
+                                           dataType,
+                                           m_img.channelData(0),
+                                           GLint(GL_LINEAR),
+                                           GLint(GL_LINEAR),
+                                           GLint(GL_CLAMP_TO_BORDER));
 
   CHECK_GL_ERROR
 }
