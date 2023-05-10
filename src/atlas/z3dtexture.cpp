@@ -13,7 +13,10 @@ Z3DTexture::Z3DTexture(GLenum textureTarget,
                        const glm::uvec3& dimension,
                        GLenum dataFormat,
                        GLenum dataType,
-                       const GLvoid* data)
+                       const GLvoid* data,
+                       GLint minFilter,
+                       GLint magFilter,
+                       GLint wrap)
   : m_textureTarget(textureTarget)
   , m_dimension(dimension)
   , m_internalFormat(internalFormat)
@@ -23,8 +26,10 @@ Z3DTexture::Z3DTexture(GLenum textureTarget,
   CHECK(m_dimension.x > 0 && m_dimension.y > 0 && m_dimension.z > 0);
   getType();
   glGenTextures(1, &m_id);
-  setFilter();
-  setWrap();
+  setFilter(minFilter, magFilter);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_BASE_LEVEL, 0);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
+  setWrap(wrap);
   initializeImage(data);
 }
 
@@ -32,7 +37,10 @@ Z3DTexture::Z3DTexture(GLint internalFormat,
                        const glm::uvec3& dimension,
                        GLenum dataFormat,
                        GLenum dataType,
-                       const GLvoid* data)
+                       const GLvoid* data,
+                       GLint minFilter,
+                       GLint magFilter,
+                       GLint wrap)
   : m_dimension(dimension)
   , m_internalFormat(internalFormat)
   , m_dataFormat(dataFormat)
@@ -48,8 +56,10 @@ Z3DTexture::Z3DTexture(GLint internalFormat,
   }
   getType();
   glGenTextures(1, &m_id);
-  setFilter();
-  setWrap();
+  setFilter(minFilter, magFilter);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_BASE_LEVEL, 0);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
+  setWrap(wrap);
   initializeImage(data);
 }
 
@@ -65,8 +75,6 @@ void Z3DTexture::setFilter(GLint minFilter, GLint magFilter) const
   bind();
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, minFilter);
-  // glTexParameteri(m_textureTarget, GL_TEXTURE_BASE_LEVEL, 0);
-  // glTexParameteri(m_textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
 }
 
 void Z3DTexture::setWrap(GLint wrap) const

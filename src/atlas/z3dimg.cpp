@@ -350,8 +350,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                                        m_pageDirectorySize,
                                                                        GL_RGBA_INTEGER,
                                                                        GL_UNSIGNED_INT,
-                                                                       m_channelPageDirectories[c].data());
-      m_channelPageDirectoryTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+                                                                       m_channelPageDirectories[c].data(),
+                                                                       GLint(GL_NEAREST),
+                                                                       GLint(GL_NEAREST));
     }
 
     m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y *
@@ -364,8 +365,9 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                                         m_pageTableCacheSize,
                                                                         GL_RGBA_INTEGER,
                                                                         GL_UNSIGNED_INT,
-                                                                        m_channelPageTableCaches[c].data());
-      m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+                                                                        m_channelPageTableCaches[c].data(),
+                                                                        GLint(GL_NEAREST),
+                                                                        GLint(GL_NEAREST));
     }
   }
 

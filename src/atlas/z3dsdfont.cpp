@@ -196,8 +196,10 @@ void Z3DSDFont::createTexture()
                                            glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
                                            GL_BGRA,
                                            GL_UNSIGNED_INT_8_8_8_8_REV,
-                                           m_GLFormattedImage.bits());
-  m_texture->setWrap(GLint(GL_REPEAT));
+                                           m_GLFormattedImage.bits(),
+                                           GLint(GL_LINEAR),
+                                           GLint(GL_LINEAR),
+                                           GLint(GL_REPEAT));
 }
 
 } // namespace nim

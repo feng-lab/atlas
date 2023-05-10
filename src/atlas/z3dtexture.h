@@ -12,14 +12,20 @@ public:
              const glm::uvec3& dimension,
              GLenum dataFormat,
              GLenum dataType,
-             const GLvoid* data = nullptr);
+             const GLvoid* data = nullptr,
+             GLint minFilter = GLint(GL_LINEAR),
+             GLint magFilter = GLint(GL_LINEAR),
+             GLint wrap = GLint(GL_CLAMP_TO_EDGE));
 
   // derive texture target as 1D, 2D or 3D
   Z3DTexture(GLint internalFormat,
              const glm::uvec3& dimension,
              GLenum dataFormat,
              GLenum dataType,
-             const GLvoid* data = nullptr);
+             const GLvoid* data = nullptr,
+             GLint minFilter = GLint(GL_LINEAR),
+             GLint magFilter = GLint(GL_LINEAR),
+             GLint wrap = GLint(GL_CLAMP_TO_EDGE));
 
   ~Z3DTexture();
 
