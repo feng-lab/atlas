@@ -124,16 +124,15 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
     LOG(INFO) << "imageCacheNumBlocks: " << m_imageCacheNumBlocks
               << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
 
-    std::vector<uint8_t> imageCacheBuffer(size_t(imageCacheSize.x) * imageCacheSize.y * imageCacheSize.z, 0);
+    // std::vector<uint8_t> imageCacheBuffer(size_t(imageCacheSize.x) * imageCacheSize.y * imageCacheSize.z, 0);
     for (size_t c = 0; c < m_nChannels; ++c) {
       m_channelImageCacheTextures.emplace_back(
         std::make_unique<Z3DTexture>(GLint(GL_R8),
                                      (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
                                      GL_RED,
-                                     GL_UNSIGNED_BYTE,
-                                     imageCacheBuffer.data()));
+                                     GL_UNSIGNED_BYTE));
     }
-    clearAndDeallocate(imageCacheBuffer);
+    // clearAndDeallocate(imageCacheBuffer);
 
     setScale(scale);
     // setScale(glm::vec3(1,1,5));
