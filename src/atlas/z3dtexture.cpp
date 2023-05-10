@@ -65,6 +65,8 @@ void Z3DTexture::setFilter(GLint minFilter, GLint magFilter) const
   bind();
   glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, magFilter);
   glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, minFilter);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_BASE_LEVEL, 0);
+  // glTexParameteri(m_textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
 }
 
 void Z3DTexture::setWrap(GLint wrap) const
