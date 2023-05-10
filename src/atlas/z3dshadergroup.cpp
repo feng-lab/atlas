@@ -130,19 +130,11 @@ void Z3DShaderGroup::buildDualDepthPeelingInitShader(Z3DShaderProgram* shader)
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
 }
 
-// #define USE_RECT_TEX
-
 void Z3DShaderGroup::buildDualDepthPeelingPeelShader(Z3DShaderProgram* shader)
 {
   QStringList allshaders(m_shaderFiles);
   allshaders << "dual_peeling_peel.frag";
-#ifdef USE_RECT_TEX
-  QString header = m_header;
-  header += "#define USE_RECT_TEX\n";
-  shader->loadFromSourceFile(allshaders, header, m_geomHeader);
-#else
   shader->loadFromSourceFile(allshaders, m_header, m_geomHeader);
-#endif
 }
 
 void Z3DShaderGroup::buildWeightedAverageShader(Z3DShaderProgram* shader)

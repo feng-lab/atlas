@@ -5,7 +5,6 @@
 #include "zmesh.h"
 #include "z3dshaderprogram.h"
 #include "z3drendertarget.h"
-#include <boost/align/aligned_allocator.hpp>
 
 namespace nim {
 
@@ -36,7 +35,7 @@ public:
     m_currentImageRenderTarget = &target2;
   }
 
-  // quad or entryexit texture should be set before rendering
+  // quad or entry_exit texture should be set before rendering
 
   // For 2D Image rendering, once set, entry exit textures will be cleared and
   // renderer switch to 2D mode

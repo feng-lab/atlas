@@ -4,7 +4,6 @@
 #include "z3dgpuinfo.h"
 #include "zimg.h"
 #include "zimgformat.h"
-#include <QImage>
 
 namespace nim {
 
@@ -407,11 +406,15 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    auto colorBuffer = make_unique_for_overwrite<uint8_t[]>(bypePerPixel(dataFormat, dataType) * numPixels());
-    downloadTextureToBuffer(dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), width(), height(), QImage::Format_ARGB32);
-    QImage image = upsideDownImage.mirrored(false, true);
-    ZImg::fromQImage(image).save(filename);
+    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(bypePerPixel(dataFormat, dataType) * numPixels());
+    downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
+    ZImg img;
+    img.wrapData(colorBuffer.data(), width(), height(), depth(), 4);
+    ZImg tmpImg(img.info());
+    ZImgFormat::CXYZtoXYZC(img, tmpImg, true);
+    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.infoRef().lastChannelIsAlphaChannel = true;
+    tmpImg.save(filename);
   }
   catch (ZException const& e) {
     LOG(ERROR) << "Exception: " << e.what();
@@ -425,7 +428,7 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
     GLenum dataType = GL_UNSIGNED_INT;
     std::vector<uint32_t, boost::alignment::aligned_allocator<uint32_t, 64>> depthBuffer(numPixels());
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
-    nim::ZImg img;
+    ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), 1);
     img.flip(nim::Dimension::Y);
     img.save(filename);
@@ -442,7 +445,7 @@ void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
     GLenum dataType = GL_FLOAT;
     std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 3);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
-    nim::ZImg img;
+    ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), depth(), 3);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg);

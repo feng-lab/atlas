@@ -10,8 +10,6 @@
 
 namespace nim {
 
-// #define USE_RECT_TEX
-
 Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   : Z3DBoundedFilter(globalParas, parent)
   , m_alphaBlendRenderer(m_rendererBase, "DepthTestBlending")
@@ -62,36 +60,13 @@ Z3DCompositor::Z3DCompositor(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_backgroundRenderer.secondColorPara());
   addParameter(m_backgroundRenderer.gradientOrientationPara());
 
-#ifdef USE_RECT_TEX
-  m_waFinalShader.loadFromSourceFile("pass.vert",
-                                     "wavg_final.frag",
-                                     m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
-#else
   m_waFinalShader.loadFromSourceFile("pass.vert", "wavg_final.frag", m_rendererBase.generateHeader());
-#endif
 
-#ifdef USE_RECT_TEX
-  m_wbFinalShader.loadFromSourceFile("pass.vert",
-                                     "wblended_final.frag",
-                                     m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
-#else
   m_wbFinalShader.loadFromSourceFile("pass.vert", "wblended_final.frag", m_rendererBase.generateHeader());
-#endif
 
-#ifdef USE_RECT_TEX
-  m_ddpBlendShader.loadFromSourceFile("pass.vert",
-                                      "dual_peeling_blend.frag",
-                                      m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
-#else
   m_ddpBlendShader.loadFromSourceFile("pass.vert", "dual_peeling_blend.frag", m_rendererBase.generateHeader());
-#endif
-#ifdef USE_RECT_TEX
-  m_ddpFinalShader.loadFromSourceFile("pass.vert",
-                                      "dual_peeling_final.frag",
-                                      m_rendererBase.generateHeader() + "#define USE_RECT_TEX\n");
-#else
+
   m_ddpFinalShader.loadFromSourceFile("pass.vert", "dual_peeling_final.frag", m_rendererBase.generateHeader());
-#endif
 
   globalParas.setPickingTarget(m_pickingRenderTarget);
   addInteractionHandler(globalParas.interactionHandler);
@@ -1075,10 +1050,10 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
 
     m_ddpBlendShader.bind();
     m_ddpBlendShader.bindTexture("TempTex", g_dualBackTempTexId[currId]);
-#if !defined(USE_RECT_TEX)
+
     m_rendererBase.setViewport(m_ddpRT->size());
     m_rendererBase.setGlobalShaderParameters(m_ddpBlendShader, eye);
-#endif
+
     renderScreenQuad(m_screenQuadVAO, m_ddpBlendShader);
     m_ddpBlendShader.release();
 
@@ -1124,10 +1099,10 @@ void Z3DCompositor::renderTransparentDDP(const std::vector<Z3DBoundedFilter*>& f
   m_ddpFinalShader.bindTexture("DepthTex", g_depthTex);
   m_ddpFinalShader.bindTexture("FrontBlenderTex", g_dualFrontBlenderTexId[currId]);
   m_ddpFinalShader.bindTexture("BackBlenderTex", g_dualBackBlenderTexId);
-#if !defined(USE_RECT_TEX)
+
   m_rendererBase.setViewport(m_ddpRT->size());
   m_rendererBase.setGlobalShaderParameters(m_ddpFinalShader, eye);
-#endif
+
   renderScreenQuad(m_screenQuadVAO, m_ddpFinalShader);
   m_ddpFinalShader.release();
   renderTarget.release();
@@ -1144,59 +1119,6 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
   Z3DTexture* g_dualBackBlenderTexId;
   Z3DTexture* g_depthTex;
 
-#ifdef USE_RECT_TEX
-  for (auto i = 0; i < 2; ++i) {
-    g_dualDepthTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                         GL_TEXTURE_RECTANGLE,
-                                         GL_RG,
-                                         GL_RG32F,
-                                         GL_FLOAT,
-                                         GL_NEAREST,
-                                         GL_NEAREST,
-                                         GL_CLAMP_TO_EDGE);
-    g_dualDepthTexId[i]->uploadTexture();
-
-    g_dualFrontBlenderTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                                GL_TEXTURE_RECTANGLE,
-                                                GL_RGBA,
-                                                GL_RGBA16,
-                                                GL_UNSIGNED_SHORT,
-                                                GL_NEAREST,
-                                                GL_NEAREST,
-                                                GL_CLAMP_TO_EDGE);
-    g_dualFrontBlenderTexId[i]->uploadTexture();
-
-    g_dualBackTempTexId[i] = new Z3DTexture(glm::ivec3(size, 1),
-                                            GL_TEXTURE_RECTANGLE,
-                                            GL_RGBA,
-                                            GL_RGBA16,
-                                            GL_UNSIGNED_SHORT,
-                                            GL_NEAREST,
-                                            GL_NEAREST,
-                                            GL_CLAMP_TO_EDGE);
-    g_dualBackTempTexId[i]->uploadTexture();
-  }
-
-  g_dualBackBlenderTexId = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_TEXTURE_RECTANGLE,
-                                          GL_RGBA,
-                                          GL_RGBA16,
-                                          GL_UNSIGNED_SHORT,
-                                          GL_NEAREST,
-                                          GL_NEAREST,
-                                          GL_CLAMP_TO_EDGE);
-  g_dualBackBlenderTexId->uploadTexture();
-
-  g_depthTex = new Z3DTexture(glm::ivec3(size, 1),
-                              GL_TEXTURE_RECTANGLE,
-                              GL_RED,
-                              GL_R32F,
-                              GL_FLOAT,
-                              GL_NEAREST,
-                              GL_NEAREST,
-                              GL_CLAMP_TO_EDGE);
-  g_depthTex->uploadTexture();
-#else
   for (auto i = 0; i < 2; ++i) {
     g_dualDepthTexId[i] = new Z3DTexture(GLint(GL_RG32F),
                                          glm::uvec3(size, 1),
@@ -1238,7 +1160,6 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
                               nullptr,
                               GLint(GL_NEAREST),
                               GLint(GL_NEAREST));
-#endif
 
   auto j = 0;
   m_ddpRT->attachTextureToFBO(g_dualDepthTexId[j], GL_COLOR_ATTACHMENT0);
@@ -1344,10 +1265,10 @@ void Z3DCompositor::renderTransparentWA(const std::vector<Z3DBoundedFilter*>& fi
   m_waFinalShader.bind();
   m_waFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
   m_waFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
-#if !defined(USE_RECT_TEX)
+
   m_rendererBase.setViewport(m_waRT->size());
   m_rendererBase.setGlobalShaderParameters(m_waFinalShader, eye);
-#endif
+
   renderScreenQuad(m_screenQuadVAO, m_waFinalShader);
   m_waFinalShader.release();
   renderTarget.release();
@@ -1360,26 +1281,6 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
   m_waRT = std::make_unique<Z3DRenderTarget>(size);
   Z3DTexture* g_accumulationTexId[2];
 
-#ifdef USE_RECT_TEX
-  g_accumulationTexId[0] = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_TEXTURE_RECTANGLE,
-                                          (GLint)GL_RGBA,
-                                          GL_RGBA32F,
-                                          GL_FLOAT,
-                                          (GLint)GL_NEAREST,
-                                          (GLint)GL_NEAREST,
-                                          (GLint)GL_CLAMP_TO_EDGE);
-  g_accumulationTexId[0]->uploadTexture();
-  g_accumulationTexId[1] = new Z3DTexture(glm::ivec3(size, 1),
-                                          GL_TEXTURE_RECTANGLE,
-                                          (GLint)GL_RG,
-                                          GL_RG32F,
-                                          GL_FLOAT,
-                                          (GLint)GL_NEAREST,
-                                          (GLint)GL_NEAREST,
-                                          (GLint)GL_CLAMP_TO_EDGE);
-  g_accumulationTexId[1]->uploadTexture();
-#else
   g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA32F),
                                           glm::uvec3(size, 1),
                                           GL_RGBA,
@@ -1394,7 +1295,6 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
                                           nullptr,
                                           GLint(GL_NEAREST),
                                           GLint(GL_NEAREST));
-#endif
 
   m_waRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
   m_waRT->attachTextureToFBO(g_accumulationTexId[1], GL_COLOR_ATTACHMENT1);
@@ -1496,10 +1396,10 @@ void Z3DCompositor::renderTransparentWB(const std::vector<Z3DBoundedFilter*>& fi
   m_wbFinalShader.bind();
   m_wbFinalShader.bindTexture("ColorTex0", g_accumulationTexId[0]);
   m_wbFinalShader.bindTexture("ColorTex1", g_accumulationTexId[1]);
-#if !defined(USE_RECT_TEX)
+
   m_rendererBase.setViewport(m_wbRT->size());
   m_rendererBase.setGlobalShaderParameters(m_wbFinalShader, eye);
-#endif
+
   renderScreenQuad(m_screenQuadVAO, m_wbFinalShader);
   m_wbFinalShader.release();
   renderTarget.release();
