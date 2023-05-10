@@ -940,12 +940,12 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      if (true) {
-        auto [minv, maxv] = std::minmax_element(pboLocalBuffer.begin(), pboLocalBuffer.end());
-        if (*maxv > 200) {
-          CHECK(false) << *maxv << " " << *minv;
-        }
-      }
+      //      if (true) {
+      //        auto [minv, maxv] = std::minmax_element(pboLocalBuffer.begin(), pboLocalBuffer.end());
+      //        if (*maxv > 200) {
+      //          CHECK(false) << *maxv << " " << *minv;
+      //        }
+      //      }
       memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
       clearAndDeallocate(pboLocalBuffer);
       LOG(INFO) << "image blocks reading finished.";
