@@ -12,7 +12,8 @@ Z3DTexture::Z3DTexture(GLenum textureTarget,
                        GLint internalFormat,
                        const glm::uvec3& dimension,
                        GLenum dataFormat,
-                       GLenum dataType)
+                       GLenum dataType,
+                       const GLvoid* data)
   : m_textureTarget(textureTarget)
   , m_dimension(dimension)
   , m_internalFormat(internalFormat)
@@ -24,9 +25,14 @@ Z3DTexture::Z3DTexture(GLenum textureTarget,
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
+  initializeImage(data);
 }
 
-Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum dataFormat, GLenum dataType)
+Z3DTexture::Z3DTexture(GLint internalFormat,
+                       const glm::uvec3& dimension,
+                       GLenum dataFormat,
+                       GLenum dataType,
+                       const GLvoid* data)
   : m_dimension(dimension)
   , m_internalFormat(internalFormat)
   , m_dataFormat(dataFormat)
@@ -44,6 +50,7 @@ Z3DTexture::Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum
   glGenTextures(1, &m_id);
   setFilter();
   setWrap();
+  initializeImage(data);
 }
 
 Z3DTexture::~Z3DTexture()

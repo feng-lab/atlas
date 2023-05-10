@@ -195,9 +195,9 @@ void Z3DSDFont::createTexture()
   m_texture = std::make_unique<Z3DTexture>(GLint(GL_RGBA8),
                                            glm::uvec3(m_GLFormattedImage.width(), m_GLFormattedImage.height(), 1),
                                            GL_BGRA,
-                                           GL_UNSIGNED_INT_8_8_8_8_REV);
+                                           GL_UNSIGNED_INT_8_8_8_8_REV,
+                                           m_GLFormattedImage.bits());
   m_texture->setWrap(GLint(GL_REPEAT));
-  m_texture->initializeImage(m_GLFormattedImage.bits());
 }
 
 } // namespace nim

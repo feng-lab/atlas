@@ -895,7 +895,6 @@ void ZColorMap::create1DTexture(size_t width) const
   }
   m_texture =
     std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(width, 1, 1), GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV);
-  m_texture->initializeImage();
 }
 
 void ZColorMap::update1DTexture() const

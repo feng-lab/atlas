@@ -11,10 +11,15 @@ public:
              GLint internalFormat,
              const glm::uvec3& dimension,
              GLenum dataFormat,
-             GLenum dataType);
+             GLenum dataType,
+             const GLvoid* data = nullptr);
 
   // derive texture target as 1D, 2D or 3D
-  Z3DTexture(GLint internalFormat, const glm::uvec3& dimension, GLenum dataFormat, GLenum dataType);
+  Z3DTexture(GLint internalFormat,
+             const glm::uvec3& dimension,
+             GLenum dataFormat,
+             GLenum dataType,
+             const GLvoid* data = nullptr);
 
   ~Z3DTexture();
 
@@ -29,29 +34,37 @@ public:
   //
   void generateMipmap() const;
 
-  // changes made by the following four functions will take effect after next call of initializeImage()
-  void setDimension(const glm::uvec3& dimension)
+  void setDimension(const glm::uvec3& dimension, const GLvoid* data = nullptr)
   {
-    m_dimension = dimension;
+    if (m_dimension != dimension) {
+      m_dimension = dimension;
+      initializeImage(data);
+    }
   }
 
-  void setInternalFormat(GLint internalformat)
+  void setInternalFormat(GLint internalformat, const GLvoid* data = nullptr)
   {
-    m_internalFormat = internalformat;
+    if (m_internalFormat != internalformat) {
+      m_internalFormat = internalformat;
+      initializeImage(data);
+    }
   }
 
-  void setDataFormat(GLenum format)
+  void setDataFormat(GLenum format, const GLvoid* data = nullptr)
   {
-    m_dataFormat = format;
+    if (m_dataFormat != format) {
+      m_dataFormat = format;
+      initializeImage(data);
+    }
   }
 
-  void setDataType(GLenum dataType)
+  void setDataType(GLenum dataType, const GLvoid* data = nullptr)
   {
-    m_dataType = dataType;
+    if (m_dataType != dataType) {
+      m_dataType = dataType;
+      initializeImage(data);
+    }
   }
-
-  // Input data must match current dataFormat and dataType.
-  void initializeImage(const GLvoid* data = nullptr) const;
 
   // glTexSubImage*D
   void updateImage(const GLvoid* data) const;
@@ -144,6 +157,9 @@ private:
   [[nodiscard]] bool is3DTexture() const;
 
   void getType();
+
+  // Input data must match current dataFormat and dataType.
+  void initializeImage(const GLvoid* data = nullptr) const;
 
 private:
   GLenum m_textureTarget;

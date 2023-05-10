@@ -1200,24 +1200,19 @@ bool Z3DCompositor::createDDPRenderTarget(const glm::uvec2& size)
   for (auto i = 0; i < 2; ++i) {
     g_dualDepthTexId[i] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(size, 1), GL_RG, GL_FLOAT);
     g_dualDepthTexId[i]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-    g_dualDepthTexId[i]->initializeImage();
 
     g_dualFrontBlenderTexId[i] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
     g_dualFrontBlenderTexId[i]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-    g_dualFrontBlenderTexId[i]->initializeImage();
 
     g_dualBackTempTexId[i] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
     g_dualBackTempTexId[i]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-    g_dualBackTempTexId[i]->initializeImage();
   }
 
   g_dualBackBlenderTexId = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(size, 1), GL_RGBA, GL_UNSIGNED_SHORT);
   g_dualBackBlenderTexId->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_dualBackBlenderTexId->initializeImage();
 
   g_depthTex = new Z3DTexture(GLint(GL_R32F), glm::uvec3(size, 1), GL_RED, GL_FLOAT);
   g_depthTex->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_depthTex->initializeImage();
 #endif
 
   auto j = 0;
@@ -1362,10 +1357,8 @@ bool Z3DCompositor::createWARenderTarget(const glm::uvec2& size)
 #else
   g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA32F), glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);
   g_accumulationTexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_accumulationTexId[0]->initializeImage();
   g_accumulationTexId[1] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(size, 1), GL_RG, GL_FLOAT);
   g_accumulationTexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_accumulationTexId[1]->initializeImage();
 #endif
 
   m_waRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
@@ -1486,10 +1479,8 @@ bool Z3DCompositor::createWBRenderTarget(const glm::uvec2& size)
 
   g_accumulationTexId[0] = new Z3DTexture(GLint(GL_RGBA16F), glm::uvec3(size, 1), GL_RGBA, GL_FLOAT);
   g_accumulationTexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_accumulationTexId[0]->initializeImage();
   g_accumulationTexId[1] = new Z3DTexture(GLint(GL_R16F), glm::uvec3(size, 1), GL_RED, GL_FLOAT);
   g_accumulationTexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_accumulationTexId[1]->initializeImage();
 
   m_wbRT->attachTextureToFBO(g_accumulationTexId[0], GL_COLOR_ATTACHMENT0);
   m_wbRT->attachTextureToFBO(g_accumulationTexId[1], GL_COLOR_ATTACHMENT1);

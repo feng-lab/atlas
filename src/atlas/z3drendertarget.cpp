@@ -51,7 +51,6 @@ void Z3DRenderTarget::createColorAttachment(GLint internalColorFormat, GLenum at
 
   glm::uvec3 size3(m_size, 1);
   colorTex = std::make_unique<Z3DTexture>(internalColorFormat, size3, GL_RGBA, GL_FLOAT);
-  colorTex->initializeImage();
 
   attachTextureToFBO(colorTex.release(), attachment);
 
@@ -77,7 +76,6 @@ void Z3DRenderTarget::createDepthAttachment(GLint internalDepthFormat)
 
   glm::uvec3 size3(m_size, 1);
   depthTex = std::make_unique<Z3DTexture>(internalDepthFormat, size3, GL_DEPTH_COMPONENT, GL_FLOAT);
-  depthTex->initializeImage();
 
   attachTextureToFBO(depthTex.release(), GL_DEPTH_ATTACHMENT);
 
@@ -209,7 +207,6 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
   for (const auto& enumAttach : m_attachments) {
     if (enumAttach.second) {
       enumAttach.second->setDimension(glm::uvec3(m_size.x, m_size.y, enumAttach.second->depth()));
-      enumAttach.second->initializeImage();
     }
   }
   isFBOComplete();
@@ -235,7 +232,6 @@ void Z3DRenderTarget::changeColorAttachmentFormat(GLint internalColorFormat, GLe
   }
 
   m_attachments[attachment]->setInternalFormat(internalColorFormat);
-  m_attachments[attachment]->initializeImage();
 
   //  if (m_multisample) {
   //    glBindRenderbuffer(GL_RENDERBUFFER, m_colorBufferID);
@@ -257,7 +253,6 @@ void Z3DRenderTarget::changeDepthAttachmentFormat(GLint internalDepthFormat)
   }
 
   m_attachments[GL_DEPTH_ATTACHMENT]->setInternalFormat(internalDepthFormat);
-  m_attachments[GL_DEPTH_ATTACHMENT]->initializeImage();
 }
 
 bool Z3DRenderTarget::isFBOComplete()

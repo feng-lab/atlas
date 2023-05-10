@@ -145,7 +145,6 @@ void Z3DTransferFunction::createTexture() const
 {
   m_texture =
     std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
-  m_texture->initializeImage();
 }
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const

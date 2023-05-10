@@ -130,8 +130,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
         std::make_unique<Z3DTexture>(GLint(GL_R8),
                                      (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
                                      GL_RED,
-                                     GL_UNSIGNED_BYTE));
-      m_channelImageCacheTextures[c]->initializeImage(imageCacheBuffer.data());
+                                     GL_UNSIGNED_BYTE,
+                                     imageCacheBuffer.data()));
     }
     clearAndDeallocate(imageCacheBuffer);
 
@@ -344,30 +344,31 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                                                  invalidKey);
 
     // content of RGBA32I texture
-    if (!m_channelPageDirectoryTextures[c] ||
-        m_channelPageDirectoryTextures[c]->dimension() != glm::uvec3(m_pageDirectorySize)) {
+    m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
+    std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
+    if (!m_channelPageDirectoryTextures[c] || m_channelPageDirectoryTextures[c]->dimension() != m_pageDirectorySize) {
       m_channelPageDirectoryTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
                                                                        GLint(GL_RGBA32UI),
-                                                                       glm::uvec3(m_pageDirectorySize),
+                                                                       m_pageDirectorySize,
                                                                        GL_RGBA_INTEGER,
-                                                                       GL_UNSIGNED_INT);
+                                                                       GL_UNSIGNED_INT,
+                                                                       m_channelPageDirectories[c].data());
       m_channelPageDirectoryTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     }
 
-    m_channelPageDirectories[c].resize(m_channelPageDirectoryTextures[c]->numPixels());
-    std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
-    m_channelPageDirectoryTextures[c]->initializeImage(m_channelPageDirectories[c].data());
-
+    m_channelPageTableCaches[c].resize(size_t(m_pageTableCacheSize.x) * m_pageTableCacheSize.y *
+                                       m_pageTableCacheSize.z);
+    std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
     if (!m_channelPageTableCacheTextures[c] ||
-        m_channelPageTableCacheTextures[c]->dimension() != glm::uvec3(m_pageTableCacheSize)) {
-      m_channelPageTableCacheTextures[c] =
-        std::make_unique<Z3DTexture>(GLint(GL_RGBA32UI), m_pageTableCacheSize, GL_RGBA_INTEGER, GL_UNSIGNED_INT);
+        m_channelPageTableCacheTextures[c]->dimension() != m_pageTableCacheSize) {
+      m_channelPageTableCacheTextures[c] = std::make_unique<Z3DTexture>(GL_TEXTURE_3D,
+                                                                        GLint(GL_RGBA32UI),
+                                                                        m_pageTableCacheSize,
+                                                                        GL_RGBA_INTEGER,
+                                                                        GL_UNSIGNED_INT,
+                                                                        m_channelPageTableCaches[c].data());
       m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
     }
-
-    m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels());
-    std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
-    m_channelPageTableCacheTextures[c]->initializeImage(m_channelPageTableCaches[c].data());
   }
 
   m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
