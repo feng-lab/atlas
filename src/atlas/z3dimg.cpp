@@ -130,8 +130,8 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
         std::make_unique<Z3DTexture>(GLint(GL_R8),
                                      (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
                                      GL_RED,
-                                     GL_UNSIGNED_BYTE,
-                                     imageCacheBuffer.data()));
+                                     GL_UNSIGNED_BYTE));
+      m_channelImageCacheTextures[c]->updateImage(imageCacheBuffer.data());
     }
     clearAndDeallocate(imageCacheBuffer);
     glFinish();
