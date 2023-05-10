@@ -282,7 +282,7 @@ void Z3DVolume::generateTexture() const
 
   // Create texture
   m_texture.reset(new Z3DTexture(internalFormat, dimensions(), format, dataType));
-  m_texture->uploadImage(m_img.channelData(0));
+  m_texture->initializeImage(m_img.channelData(0));
 
   CHECK_GL_ERROR
 }

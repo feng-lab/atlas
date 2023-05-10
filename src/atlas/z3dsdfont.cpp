@@ -197,7 +197,7 @@ void Z3DSDFont::createTexture()
                                            GL_BGRA,
                                            GL_UNSIGNED_INT_8_8_8_8_REV);
   m_texture->setWrap(GLint(GL_REPEAT));
-  m_texture->uploadImage(m_GLFormattedImage.bits());
+  m_texture->initializeImage(m_GLFormattedImage.bits());
 }
 
 } // namespace nim

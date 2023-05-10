@@ -95,12 +95,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   g_TexId[0] = new Z3DTexture(GL_TEXTURE_2D_ARRAY, GLint(GL_RGBA32F), glm::uvec3(32, 32, 2), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[0]->uploadImage();
+  g_TexId[0]->initializeImage();
   m_entryExitTarget.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0);
   m_entryExitTarget.isFBOComplete();
 
-  m_layerColorTexture.uploadImage();
-  m_layerDepthTexture.uploadImage();
+  m_layerColorTexture.initializeImage();
+  m_layerDepthTexture.initializeImage();
   m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
   m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
   m_layerTarget.isFBOComplete();
@@ -113,14 +113,14 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_missBlocksTexture5.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_missBlocksTexture6.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
   m_missBlocksTexture7.setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  m_missBlocksTexture0.uploadImage();
-  m_missBlocksTexture1.uploadImage();
-  m_missBlocksTexture2.uploadImage();
-  m_missBlocksTexture3.uploadImage();
-  m_missBlocksTexture4.uploadImage();
-  m_missBlocksTexture5.uploadImage();
-  m_missBlocksTexture6.uploadImage();
-  m_missBlocksTexture7.uploadImage();
+  m_missBlocksTexture0.initializeImage();
+  m_missBlocksTexture1.initializeImage();
+  m_missBlocksTexture2.initializeImage();
+  m_missBlocksTexture3.initializeImage();
+  m_missBlocksTexture4.initializeImage();
+  m_missBlocksTexture5.initializeImage();
+  m_missBlocksTexture6.initializeImage();
+  m_missBlocksTexture7.initializeImage();
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture0, GL_COLOR_ATTACHMENT0, false);
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture1, GL_COLOR_ATTACHMENT1, false);
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture2, GL_COLOR_ATTACHMENT2, false);
@@ -133,19 +133,19 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
 
   g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[0]->uploadImage();
+  g_TexId[0]->initializeImage();
   g_TexId[1] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(32, 32, 1), GL_RG, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[1]->uploadImage();
+  g_TexId[1]->initializeImage();
   m_imageRenderTarget1.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
   m_imageRenderTarget1.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
   m_imageRenderTarget1.isFBOComplete();
   g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16), glm::uvec3(32, 32, 1), GL_RGBA, GL_FLOAT);
   g_TexId[0]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[0]->uploadImage();
+  g_TexId[0]->initializeImage();
   g_TexId[1] = new Z3DTexture(GLint(GL_RG32F), glm::uvec3(32, 32, 1), GL_RG, GL_FLOAT);
   g_TexId[1]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-  g_TexId[1]->uploadImage();
+  g_TexId[1]->initializeImage();
   m_imageRenderTarget2.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
   m_imageRenderTarget2.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
   m_imageRenderTarget2.isFBOComplete();
@@ -288,10 +288,10 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
     if (m_3dImg->numChannels() > m_layerColorTexture.depth()) {
       m_layerColorTexture.setDimension(
         glm::uvec3(m_layerColorTexture.width(), m_layerColorTexture.height(), m_3dImg->numChannels()));
-      m_layerColorTexture.uploadImage();
+      m_layerColorTexture.initializeImage();
       m_layerDepthTexture.setDimension(
         glm::uvec3(m_layerDepthTexture.width(), m_layerDepthTexture.height(), m_3dImg->numChannels()));
-      m_layerDepthTexture.uploadImage();
+      m_layerDepthTexture.initializeImage();
       m_layerTarget.attachTextureToFBO(&m_layerColorTexture, GL_COLOR_ATTACHMENT0, false);
       m_layerTarget.attachTextureToFBO(&m_layerDepthTexture, GL_DEPTH_ATTACHMENT, false);
       m_layerTarget.isFBOComplete();

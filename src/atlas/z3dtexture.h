@@ -29,7 +29,7 @@ public:
   //
   void generateMipmap() const;
 
-  // changes made by the following four functions will take effect after next call of uploadImage()
+  // changes made by the following four functions will take effect after next call of initializeImage()
   void setDimension(const glm::uvec3& dimension)
   {
     m_dimension = dimension;
@@ -51,10 +51,13 @@ public:
   }
 
   // Input data must match current dataFormat and dataType.
-  void uploadImage(const GLvoid* data = nullptr) const;
+  void initializeImage(const GLvoid* data = nullptr) const;
 
   // glTexSubImage*D
-  void uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
+  void updateImage(const GLvoid* data) const;
+
+  // glTexSubImage*D
+  void updateSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
 
   void bind() const
   {

@@ -74,7 +74,7 @@ void Z3DTexture::generateMipmap() const
   glGenerateMipmap(m_textureTarget);
 }
 
-void Z3DTexture::uploadImage(const GLvoid* data) const
+void Z3DTexture::initializeImage(const void* data) const
 {
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
@@ -112,9 +112,42 @@ void Z3DTexture::uploadImage(const GLvoid* data) const
   }
 }
 
-void Z3DTexture::uploadSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const
+void Z3DTexture::updateImage(const GLvoid* data) const
 {
   // CHECK(data);  should not check when we use PBO
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+  bind();
+
+  switch (m_type) {
+    case 3:
+      glTexSubImage3D(m_textureTarget,
+                      0,
+                      0,
+                      0,
+                      0,
+                      m_dimension.x,
+                      m_dimension.y,
+                      m_dimension.z,
+                      m_dataFormat,
+                      m_dataType,
+                      data);
+      break;
+    case 2:
+      glTexSubImage2D(m_textureTarget, 0, 0, 0, m_dimension.x, m_dimension.y, m_dataFormat, m_dataType, data);
+      break;
+    case 1:
+      glTexSubImage1D(m_textureTarget, 0, 0, m_dimension.x, m_dataFormat, m_dataType, data);
+      break;
+    default:
+      break;
+  }
+}
+
+void Z3DTexture::updateSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const
+{
+  // CHECK(data);  should not check when we use PBO
+  CHECK(glm::all(glm::lessThanEqual(offset + size, m_dimension))) << offset << " " << size << " " << m_dimension;
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();

@@ -136,7 +136,7 @@ void Z3DTransferFunction::updateTexture() const
   for (size_t x = 0; x < tfData.size(); ++x) {
     tfData[x] = mappedColorBGRA(static_cast<double>(x) / (tfData.size() - 1.));
   }
-  m_texture->uploadImage(tfData.data());
+  m_texture->updateImage(tfData.data());
 
   m_textureIsInvalid = false;
 }
@@ -145,6 +145,7 @@ void Z3DTransferFunction::createTexture() const
 {
   m_texture =
     std::make_unique<Z3DTexture>(GLint(GL_RGBA8), glm::uvec3(m_dimensions), m_textureFormat, m_textureDataType);
+  m_texture->initializeImage();
 }
 
 bool Z3DTransferFunction::isValidDomainMin(double min) const

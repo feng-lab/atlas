@@ -124,23 +124,16 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
     LOG(INFO) << "imageCacheNumBlocks: " << m_imageCacheNumBlocks
               << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
 
-    m_channelPageTableCaches.resize(m_nChannels);
+    std::vector<uint8_t> imageCacheBuffer(size_t(imageCacheSize.x) * imageCacheSize.y * imageCacheSize.z, 0);
     for (size_t c = 0; c < m_nChannels; ++c) {
-      m_channelPageTableCacheTextures.emplace_back(
-        std::make_unique<Z3DTexture>(GLint(GL_RGBA32UI), m_pageTableCacheSize, GL_RGBA_INTEGER, GL_UNSIGNED_INT));
-      m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
-
-      m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels());
-      // m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());  // will do this in
-      // setScale
-
       m_channelImageCacheTextures.emplace_back(
         std::make_unique<Z3DTexture>(GLint(GL_R8),
                                      (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
                                      GL_RED,
                                      GL_UNSIGNED_BYTE));
-      m_channelImageCacheTextures[c]->uploadImage();
+      m_channelImageCacheTextures[c]->initializeImage(imageCacheBuffer.data());
     }
+    clearAndDeallocate(imageCacheBuffer);
 
     setScale(scale);
     // setScale(glm::vec3(1,1,5));
@@ -338,6 +331,8 @@ void Z3DImg::setScale(const glm::vec3& scale)
   if (m_channelPageTableCacheManagers.size() != m_nChannels) {
     m_channelPageTableCacheManagers.resize(m_nChannels);
     m_channelImageCacheManagers.resize(m_nChannels);
+    m_channelPageTableCacheTextures.resize(m_nChannels);
+    m_channelPageTableCaches.resize(m_nChannels);
     m_channelPageDirectoryTextures.resize(m_nChannels);
     m_channelPageDirectories.resize(m_nChannels);
   }
@@ -361,10 +356,18 @@ void Z3DImg::setScale(const glm::vec3& scale)
 
     m_channelPageDirectories[c].resize(m_channelPageDirectoryTextures[c]->numPixels());
     std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
-    m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
+    m_channelPageDirectoryTextures[c]->initializeImage(m_channelPageDirectories[c].data());
 
+    if (!m_channelPageTableCacheTextures[c] ||
+        m_channelPageTableCacheTextures[c]->dimension() != glm::uvec3(m_pageTableCacheSize)) {
+      m_channelPageTableCacheTextures[c] =
+        std::make_unique<Z3DTexture>(GLint(GL_RGBA32UI), m_pageTableCacheSize, GL_RGBA_INTEGER, GL_UNSIGNED_INT);
+      m_channelPageTableCacheTextures[c]->setFilter(GLint(GL_NEAREST), GLint(GL_NEAREST));
+    }
+
+    m_channelPageTableCaches[c].resize(m_channelPageTableCacheTextures[c]->numPixels());
     std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
-    m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+    m_channelPageTableCacheTextures[c]->initializeImage(m_channelPageTableCaches[c].data());
   }
 
   m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
@@ -422,10 +425,10 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
                                                     m_imageCacheNumBlocks,
                                                     invalidKey);
       std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
-      m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
+      m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
 
       std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
-      m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+      m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
     }
   }
 }
@@ -634,8 +637,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
     auto uploadGuard = folly::makeGuard([=]() {
       checkPageSystemError(false);
-      m_channelPageDirectoryTextures[c]->uploadImage(m_channelPageDirectories[c].data());
-      m_channelPageTableCacheTextures[c]->uploadImage(m_channelPageTableCaches[c].data());
+      m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
+      m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
     });
 
     // read image
@@ -851,7 +854,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
           *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
         } else {
           insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
-          m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntryPtr->xyz(),
+          m_channelImageCacheTextures[c]->updateSubImage(pageTableEntryPtr->xyz(),
                                                          imageBlockSize,
                                                          std::get<1>(elem)->channelData(0));
         }
@@ -938,9 +941,11 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      auto [minv, maxv] = std::minmax_element(pboLocalBuffer.begin(), pboLocalBuffer.end());
-      if (*maxv > 200) {
-        CHECK(false) << *maxv << " " << *minv;
+      if (true) {
+        auto [minv, maxv] = std::minmax_element(pboLocalBuffer.begin(), pboLocalBuffer.end());
+        if (*maxv > 200) {
+          CHECK(false) << *maxv << " " << *minv;
+        }
       }
       memcpy(pboPtr, pboLocalBuffer.data(), pboLocalBuffer.size());
       clearAndDeallocate(pboLocalBuffer);
@@ -961,7 +966,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       CHECK(!contains(m_usedPageTableEntry, pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
       m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
-      m_channelImageCacheTextures[c]->uploadSubImage(pageTableEntryPtr->xyz(),
+      m_channelImageCacheTextures[c]->updateSubImage(pageTableEntryPtr->xyz(),
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
     }
