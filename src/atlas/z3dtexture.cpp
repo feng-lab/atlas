@@ -186,6 +186,13 @@ void Z3DTexture::updateSubImage(const glm::uvec3& offset, const glm::uvec3& size
   }
 }
 
+void Z3DTexture::clearImage() const
+{
+  if (GLVersionGE(4, 4) || Z3DGpuInfo::instance().isExtensionSupported("GL_ARB_clear_texture")) {
+    glClearTexImage(m_id, 0, m_dataFormat, m_dataType, nullptr);
+  }
+}
+
 size_t Z3DTexture::bypePerPixel(GLenum dataFormat, GLenum dataType)
 {
   int numChannels = 0;

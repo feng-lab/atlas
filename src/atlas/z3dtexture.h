@@ -72,6 +72,9 @@ public:
   // glTexSubImage*D
   void updateSubImage(const glm::uvec3& offset, const glm::uvec3& size, const GLvoid* data) const;
 
+  // clear image with 0
+  void clearImage() const;
+
   void bind() const
   {
     glBindTexture(m_textureTarget, m_id);
