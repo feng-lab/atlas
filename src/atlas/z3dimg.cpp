@@ -660,6 +660,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
                            emptyBlockCount,
                            pendingTasks.size(),
                            readEmptyBlockCount);
+
+#ifdef ATLAS_CHECK_CACHE
+  CHECK(m_usedPageTableEntry.size() == alreadyMapped + pendingTasks.size() - readEmptyBlockCount)
+    << m_usedPageTableEntry.size();
+#endif
   // glFinish();
   STOP_AND_LOG(bt)
 
@@ -977,9 +982,6 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                                      imageBlockSize,
                                                      (const void*)(i * blockSizeInByte));
     }
-#ifdef ATLAS_CHECK_CACHE
-    VLOG(1) << m_usedPageTableEntry.size();
-#endif
     STOP_AND_LOG(bt_pboUpload)
   }
   STOP_AND_LOG(bti)
