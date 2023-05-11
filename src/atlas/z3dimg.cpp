@@ -641,9 +641,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
     auto uploadGuard = folly::makeGuard([=]() {
+      ZBenchTimer btu("upload page table");
       checkPageSystemError(false);
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
       m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+      STOP_AND_LOG(btu)
     });
 
     // read image
