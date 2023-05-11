@@ -329,7 +329,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
   }
 
-  glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
   if (m_channelPageTableCacheManagers.size() != m_nChannels) {
     m_channelPageTableCacheManagers.resize(m_nChannels);
     m_channelImageCacheManagers.resize(m_nChannels);
@@ -340,10 +339,10 @@ void Z3DImg::setScale(const glm::vec3& scale)
   }
   for (size_t c = 0; c < m_nChannels; ++c) {
     m_channelPageTableCacheManagers[c] =
-      std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
+      std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
     m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
                                                                                  m_imageCacheNumBlocks,
-                                                                                 invalidKey);
+                                                                                 m_invalidKey);
 
     // content of RGBA32I texture
     m_channelPageDirectories[c].resize(size_t(m_pageDirectorySize.x) * m_pageDirectorySize.y * m_pageDirectorySize.z);
@@ -421,14 +420,13 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
   readVolumes();
 
   if (m_isVolumeDownsampled) {
-    glm::uvec4 invalidKey(std::numeric_limits<uint32_t>::max());
     for (size_t c = 0; c < m_nChannels; ++c) {
       m_channelPageTableCacheManagers[c] =
-        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, invalidKey);
+        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
       m_channelImageCacheManagers[c] =
         std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
                                                     m_imageCacheNumBlocks,
-                                                    invalidKey);
+                                                    m_invalidKey);
       std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
 
@@ -565,7 +563,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // increase pageDirectoryEntryRef now, upload image blocks and update page table block later in pendingTasks
       ++pageDirectoryEntryRef.w;
       if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
-        *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+        *pageTableEntryPtr = m_emptyPageTableEntry;
         ++emptyBlockCount;
       } else {
         // pageTableEntryPtr->w must be 0 here
@@ -615,7 +613,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                    pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
     if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
-      *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+      *pageTableEntryPtr = m_emptyPageTableEntry;
       ++emptyBlockCount;
     } else {
       // pageTableEntryPtr->w must be 0 here
@@ -863,7 +861,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
         const auto& [pageTableEntryKey, pageTableEntryPtr] = pendingTasks[std::get<0>(elem)];
         if (!std::get<1>(elem)) {
           ++emptyBlockCount;
-          *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+          *pageTableEntryPtr = m_emptyPageTableEntry;
         } else {
           insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
           m_channelImageCacheTextures[c]->updateSubImage(pageTableEntryPtr->xyz(),
@@ -926,7 +924,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
               .thenValueInline([=, &pboLocalBuffer](std::shared_ptr<ZImg>&& img) {
                 maybeCancel(cancellationToken);
                 if (!img) {
-                  *pageTableEntryPtr = glm::uvec4(0, 0, 0, m_emptyFlag);
+                  *pageTableEntryPtr = m_emptyPageTableEntry;
                 } else {
                   memcpy(pboLocalBuffer.data() + taskIdx * blockSizeInByte, img->channelData(0), blockSizeInByte);
                 }

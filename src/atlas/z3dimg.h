@@ -92,9 +92,8 @@ public:
 
   [[nodiscard]] glm::vec3 physicalRDB() const
   {
-    return glm::max(
-      glm::vec3(1, 1, 1),
-      glm::vec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth));
+    return glm::max(glm::vec3(1, 1, 1),
+                    glm::vec3(m_imgPack.imgInfo().width, m_imgPack.imgInfo().height, m_imgPack.imgInfo().depth));
   }
 
   [[nodiscard]] glm::vec3 physicalLDF() const
@@ -251,6 +250,12 @@ private:
 #ifdef ATLAS_CHECK_CACHE
   std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> m_usedPageTableEntry;
 #endif
+
+  const glm::uvec4 m_invalidKey = glm::uvec4(std::numeric_limits<uint32_t>::max());
+  const glm::uvec4 m_emptyPageTableEntry = glm::uvec4(std::numeric_limits<uint32_t>::max(),
+                                                      std::numeric_limits<uint32_t>::max(),
+                                                      std::numeric_limits<uint32_t>::max(),
+                                                      m_emptyFlag);
 };
 
 } // namespace nim
