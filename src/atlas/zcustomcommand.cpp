@@ -1946,13 +1946,21 @@ void imgResizeBenchmark()
   }
 }
 
+void someTest()
+{
+  glm::uvec4 pageTableEntryKey(67,44,9,1);
+  glm::uvec3 m_pageTableBlockSize(32, 32, 32);
+  glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
+  LOG(INFO) << pageDirectoryEntryKey;
+}
+
 } // namespace nim
 
 namespace nim {
 
 void ZCustomCommand::run()
 {
-  imgResizeBenchmark();
+  someTest();
   LOG(INFO) << "done";
 }
 
