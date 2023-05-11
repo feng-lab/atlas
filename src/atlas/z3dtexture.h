@@ -118,7 +118,7 @@ public:
 
   [[nodiscard]] size_t numPixels() const
   {
-    return m_dimension.x * m_dimension.y * m_dimension.z;
+    return size_t(m_dimension.x) * m_dimension.y * m_dimension.z;
   }
 
   [[nodiscard]] GLenum dataFormat() const

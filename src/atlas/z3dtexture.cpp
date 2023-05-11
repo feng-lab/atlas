@@ -92,9 +92,8 @@ void Z3DTexture::generateMipmap() const
 
 void Z3DTexture::initializeImage(const void* data) const
 {
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-
   bind();
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
     case 3:
@@ -131,9 +130,9 @@ void Z3DTexture::initializeImage(const void* data) const
 void Z3DTexture::updateImage(const GLvoid* data) const
 {
   // CHECK(data);  should not check when we use PBO
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
     case 3:
@@ -164,9 +163,9 @@ void Z3DTexture::updateSubImage(const glm::uvec3& offset, const glm::uvec3& size
 {
   // CHECK(data);  should not check when we use PBO
   CHECK(glm::all(glm::lessThanEqual(offset + size, m_dimension))) << offset << " " << size << " " << m_dimension;
-  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   bind();
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   switch (m_type) {
     case 3:
@@ -398,6 +397,7 @@ size_t Z3DTexture::bypePerPixel(GLint internalFormat)
 void Z3DTexture::downloadTextureToBuffer(GLenum dataFormat, GLenum dataType, GLvoid* buffer) const
 {
   bind();
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glGetTexImage(m_textureTarget, 0, dataFormat, dataType, buffer);
 }
 

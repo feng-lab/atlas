@@ -5,7 +5,7 @@
 #include "zbenchtimer.h"
 #include "z3dgpuinfo.h"
 #include "zimg.h"
-#include <QImage>
+#include "zimgformat.h"
 #include <memory>
 
 namespace nim {
@@ -382,14 +382,19 @@ void Z3DRenderTarget::saveAsColorImage(const QString& filename)
   CHECK(!isBound());
   bind();
   try {
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    auto colorBuffer =
-      make_unique_for_overwrite<uint8_t[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * m_size.x * m_size.y);
-    glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, colorBuffer.get());
-    QImage upsideDownImage(colorBuffer.get(), m_size.x, m_size.y, QImage::Format_ARGB32);
-    QImage image = upsideDownImage.mirrored(false, true);
-    ZImg::fromQImage(image).save(filename);
+    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
+      Z3DTexture::bypePerPixel(dataFormat, dataType) * m_size.x * m_size.y);
+    glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, colorBuffer.data());
+    ZImg img;
+    img.wrapData(colorBuffer.data(), m_size.x, m_size.y, 1, 4);
+    ZImg tmpImg(img.info());
+    ZImgFormat::CXYZtoXYZC(img, tmpImg, true);
+    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.infoRef().lastChannelIsAlphaChannel = true;
+    tmpImg.save(filename);
   }
   catch (ZException const& e) {
     release();
@@ -403,6 +408,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString& filename)
   CHECK(!isBound());
   bind();
   try {
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
     GLenum dataFormat = GL_DEPTH_COMPONENT;
     GLenum dataType = GL_UNSIGNED_INT;
 
