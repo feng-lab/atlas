@@ -406,7 +406,8 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
   try {
     GLenum dataFormat = GL_BGRA;
     GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;
-    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(bypePerPixel(dataFormat, dataType) * numPixels());
+    std::vector<uint8_t, boost::alignment::aligned_allocator<uint8_t, 64>> colorBuffer(
+      bypePerPixel(dataFormat, dataType) * numPixels());
     downloadTextureToBuffer(dataFormat, dataType, colorBuffer.data());
     ZImg img;
     img.wrapData(colorBuffer.data(), width(), height(), depth(), 4);
