@@ -83,58 +83,37 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
       m_imageBlockSize = glm::uvec3(defaultImageBlockSize) - m_imageBlockSizePad;
     }
 
-    auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
-
-    glm::uvec3 imageCacheSize;
     if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 32000) {
 #ifdef Q_OS_MACOS
-      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
+      m_maxMemoryForImageCache = 1_uz * 2048 * 2048 * 2048; // 8G
 #else
-      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
-      // imageCacheSize = glm::uvec3(3072, 2048, 2048); // 12G
+      m_maxMemoryForImageCache = 1_uz * 2048 * 2048 * 2048; // 8G
 #endif
-      m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 512 * 512 * 256; // 1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 20000) {
-      imageCacheSize = glm::uvec3(2048, 2048, 2048); // 8G
-      m_pageTableCacheSize = glm::uvec3(512, 512, 256); // 512*512*256*4*4   1073MB
+      m_maxMemoryForImageCache = 1_uz * 2048 * 2048 * 2048; // 8G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 512 * 512 * 256; // 1073MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 16000) {
-      imageCacheSize = glm::uvec3(2048, 2048, 1536); // 6G
-      m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
+      m_maxMemoryForImageCache = 1_uz * 2048 * 2048 * 1536; // 6G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 512 * 256 * 256; // 536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 12000) {
-      imageCacheSize = glm::uvec3(2048, 2048, 1024); // 4G
-      m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
+      m_maxMemoryForImageCache = 1_uz * 2048 * 2048 * 1024; // 4G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 512 * 256 * 256; // 536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 8000) {
-      imageCacheSize = glm::uvec3(2048, 1024, 1024); // 2G
-      m_pageTableCacheSize = glm::uvec3(512, 256, 256); // 512*256*256*4*4   536MB
+      m_maxMemoryForImageCache = 1_uz * 2048 * 1024 * 1024; // 2G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 512 * 256 * 256; // 536MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 4000) {
-      imageCacheSize = glm::uvec3(1024, 1024, 1024); // 1G
-      m_pageTableCacheSize = glm::uvec3(256, 256, 256); // 256*256*256*4*4   268MB
+      m_maxMemoryForImageCache = 1_uz * 1024 * 1024 * 1024; // 1G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 256 * 256 * 256; // 268MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 2000) {
-      imageCacheSize = glm::uvec3(1024, 1024, 512); // 0.5G
-      m_pageTableCacheSize = glm::uvec3(256, 256, 128); // 256*256*128*4*4   134MB
+      m_maxMemoryForImageCache = 1_uz * 512 * 1024 * 1024; // 0.5G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 256 * 256 * 128; // 134MB
     } else if (Z3DGpuInfo::instance().dedicatedVideoMemoryMB() >= 1000) {
-      imageCacheSize = glm::uvec3(1024, 512, 512); // 0.25G
-      m_pageTableCacheSize = glm::uvec3(256, 128, 128); // 256*128*128*4*4   67MB
+      m_maxMemoryForImageCache = 1_uz * 512 * 512 * 1024; // 0.25G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 256 * 128 * 128; // 67MB
     } else {
-      imageCacheSize = glm::uvec3(512, 512, 512); // 0.125G
-      m_pageTableCacheSize = glm::uvec3(128, 128, 128); // 128*128*128*4*4   34MB
-    }
-    m_imageCacheNumBlocks = imageCacheSize / imageBlockTotalSize;
-    m_pageTableCacheNumBlocks = m_pageTableCacheSize / m_pageTableBlockSize;
-    LOG(INFO) << "imageCacheNumBlocks: " << m_imageCacheNumBlocks
-              << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
-
-    for (size_t c = 0; c < m_nChannels; ++c) {
-      m_channelImageCacheTextures.emplace_back(
-        std::make_unique<Z3DTexture>(GLint(GL_R8),
-                                     (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
-                                     GL_RED,
-                                     GL_UNSIGNED_BYTE,
-                                     nullptr,
-                                     GLint(GL_LINEAR),
-                                     GLint(GL_LINEAR),
-                                     GLint(GL_CLAMP_TO_BORDER)));
-      m_channelImageCacheTextures[c]->clearImage();
+      m_maxMemoryForImageCache = 1_uz * 512 * 512 * 512; // 0.125G
+      m_maxMemoryForPageTableCache = 4_uz * 4 * 128 * 128 * 128; // 34MB
     }
 
     setScale(scale);
@@ -270,6 +249,12 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
   }
 
+  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
+  m_volumeVoxelWorldSize =
+    std::max(std::max(m_volumeVoxelWorldDimension.x, m_volumeVoxelWorldDimension.y), m_volumeVoxelWorldDimension.z);
+  LOG(INFO) << "volumeDimension: " << m_volumeDimension << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
+            << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
+
   m_pageDirectorySize = glm::uvec3(0, 0, 0);
   m_levelScales.resize(m_numLevels);
   m_imageDimensions.resize(m_numLevels);
@@ -277,6 +262,10 @@ void Z3DImg::setScale(const glm::vec3& scale)
   m_pageDirectoryDimensions.resize(m_numLevels);
   m_posToBlockIDs.resize(m_numLevels);
   m_pageDirectoryBases.resize(m_numLevels);
+  m_voxelWorldDimensions.resize(m_numLevels);
+  m_voxelWorldSizes.resize(m_numLevels);
+  size_t numImageBlocks = 0;
+  size_t numPageTableBlocks = 0;
   for (size_t l = 0; l < m_numLevels; ++l) {
     if (l == 0) {
       m_levelScales[l] = glm::uvec3(1, 1, 1);
@@ -299,11 +288,30 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
     CHECK(m_levelScales[l].x == m_levelScales[l].y);
 
+    m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
+    m_voxelWorldSizes[l] =
+      std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
+    if (m_voxelWorldSizes[l] > m_volumeVoxelWorldSize) {
+      m_numLevels = l + 1;
+      m_imageDimensions[l] = m_volumeDimension;
+      m_voxelWorldDimensions[l] = m_volumeVoxelWorldDimension;
+      m_voxelWorldSizes[l] = m_volumeVoxelWorldSize;
+      m_pageTableDimensions[l] = glm::uvec3(0);
+      m_pageDirectoryDimensions[l] = glm::uvec3(0);
+      m_posToBlockIDs[l] = glm::uvec3(1 + numImageBlocks, 0, 0);
+      m_pageDirectoryBases[l] = glm::uvec3(std::numeric_limits<uint32_t>::max());
+      break;
+    }
+
     m_imageDimensions[l] = glm::uvec3((info.width + m_levelScales[l].x - 1) / m_levelScales[l].x,
                                       (info.height + m_levelScales[l].y - 1) / m_levelScales[l].y,
                                       (info.depth + m_levelScales[l].z - 1) / m_levelScales[l].z);
     m_pageTableDimensions[l] = (m_imageDimensions[l] + m_imageBlockSize - 1_u32) / m_imageBlockSize;
     m_pageDirectoryDimensions[l] = (m_pageTableDimensions[l] + m_pageTableBlockSize - 1_u32) / m_pageTableBlockSize;
+
+    numImageBlocks += size_t(m_pageTableDimensions[l].x) * m_pageTableDimensions[l].y * m_pageTableDimensions[l].z;
+    numPageTableBlocks +=
+      size_t(m_pageDirectoryDimensions[l].x) * m_pageDirectoryDimensions[l].y * m_pageDirectoryDimensions[l].z;
 
     // id starts from 1
     m_posToBlockIDs[l] =
@@ -329,6 +337,65 @@ void Z3DImg::setScale(const glm::vec3& scale)
     }
   }
 
+  LOG(INFO) << "pageDirectorySize: " << m_pageDirectorySize << " numPageTableBlocks: " << numPageTableBlocks
+            << " numImageBlocks: " << numImageBlocks;
+
+  m_pageTableCacheNumBlocks = glm::uvec3(0);
+  for (size_t z = 1; z <= 512_u32 / m_pageTableBlockSize.z; ++z) {
+    for (size_t y = z; y <= 512_u32 / m_pageTableBlockSize.y; ++y) {
+      for (size_t x = y; x <= 512_u32 / m_pageTableBlockSize.x; ++x) {
+        if (x * y * z * m_pageTableBlockSize.x * m_pageTableBlockSize.y * m_pageTableBlockSize.z * 4 * 4 >
+            m_maxMemoryForPageTableCache) {
+          continue;
+        }
+        auto currentNumBlocks =
+          size_t(m_pageTableCacheNumBlocks.x) * m_pageTableCacheNumBlocks.y * m_pageTableCacheNumBlocks.z;
+        auto candidateNumBlocks = x * y * z;
+        if (currentNumBlocks < numPageTableBlocks) {
+          if (candidateNumBlocks > currentNumBlocks) {
+            m_pageTableCacheNumBlocks = glm::uvec3(x, y, z);
+          }
+        } else if (currentNumBlocks > numPageTableBlocks) {
+          if (candidateNumBlocks >= numPageTableBlocks && candidateNumBlocks < currentNumBlocks) {
+            m_pageTableCacheNumBlocks = glm::uvec3(x, y, z);
+          }
+        }
+      }
+    }
+  }
+
+  auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
+  m_imageCacheNumBlocks = glm::uvec3(0);
+  for (size_t z = 1; z <= 2048_u32 / imageBlockTotalSize.z; ++z) {
+    for (size_t y = z; y <= 2048_u32 / imageBlockTotalSize.y; ++y) {
+      for (size_t x = y; x <= 2048_u32 / imageBlockTotalSize.x; ++x) {
+        if (x * y * z * imageBlockTotalSize.x * imageBlockTotalSize.y * imageBlockTotalSize.z >
+            m_maxMemoryForImageCache) {
+          continue;
+        }
+        auto currentNumBlocks =
+          size_t(m_imageCacheNumBlocks.x) * m_imageCacheNumBlocks.y * m_imageCacheNumBlocks.z;
+        auto candidateNumBlocks = x * y * z;
+        if (currentNumBlocks < numImageBlocks) {
+          if (candidateNumBlocks > currentNumBlocks) {
+            m_imageCacheNumBlocks = glm::uvec3(x, y, z);
+          }
+        } else if (currentNumBlocks > numImageBlocks) {
+          if (candidateNumBlocks >= numImageBlocks && candidateNumBlocks < currentNumBlocks) {
+            m_imageCacheNumBlocks = glm::uvec3(x, y, z);
+          }
+        }
+      }
+    }
+  }
+  m_pageTableCacheSize = m_pageTableCacheNumBlocks * m_pageTableBlockSize;
+  auto imageCacheSize = m_imageCacheNumBlocks * imageBlockTotalSize;
+  LOG(INFO) << "m_maxMemoryForImageCache: " << m_maxMemoryForImageCache
+            << " m_maxMemoryForPageTableCache: " << m_maxMemoryForPageTableCache;
+  LOG(INFO) << "imageCacheSize: " << imageCacheSize << " imageCacheNumBlocks: " << m_imageCacheNumBlocks
+            << " m_pageTableCacheSize: " << m_pageTableCacheSize
+            << " pageTableCacheNumBlocks: " << m_pageTableCacheNumBlocks;
+
   if (m_channelPageTableCacheManagers.size() != m_nChannels) {
     m_channelPageTableCacheManagers.resize(m_nChannels);
     m_channelImageCacheManagers.resize(m_nChannels);
@@ -336,6 +403,7 @@ void Z3DImg::setScale(const glm::vec3& scale)
     m_channelPageTableCaches.resize(m_nChannels);
     m_channelPageDirectoryTextures.resize(m_nChannels);
     m_channelPageDirectories.resize(m_nChannels);
+    m_channelImageCacheTextures.resize(m_nChannels);
   }
   for (size_t c = 0; c < m_nChannels; ++c) {
     m_channelPageTableCacheManagers[c] =
@@ -372,20 +440,17 @@ void Z3DImg::setScale(const glm::vec3& scale)
                                                                         GLint(GL_NEAREST),
                                                                         GLint(GL_NEAREST));
     }
-  }
 
-  m_volumeVoxelWorldDimension = glm::abs(scale) * m_volumeSpacing;
-  m_volumeVoxelWorldSize =
-    std::max(std::max(m_volumeVoxelWorldDimension.x, m_volumeVoxelWorldDimension.y), m_volumeVoxelWorldDimension.z);
-
-  m_voxelWorldDimensions.resize(m_numLevels);
-  m_voxelWorldSizes.resize(m_numLevels);
-  for (size_t l = 0; l < m_numLevels; ++l) {
-    m_voxelWorldDimensions[l] = glm::abs(scale) * glm::vec3(m_levelScales[l]);
-    m_voxelWorldSizes[l] =
-      std::min(std::min(m_voxelWorldDimensions[l].x, m_voxelWorldDimensions[l].y), m_voxelWorldDimensions[l].z);
-    if (m_voxelWorldSizes[l] > m_volumeVoxelWorldSize) {
-      m_numLevels = l + 1;
+    if (!m_channelImageCacheTextures[c] || m_channelImageCacheTextures[c]->dimension() != imageCacheSize) {
+      m_channelImageCacheTextures[c] = std::make_unique<Z3DTexture>(GLint(GL_R8),
+                                                                    imageCacheSize,
+                                                                    GL_RED,
+                                                                    GL_UNSIGNED_BYTE,
+                                                                    nullptr,
+                                                                    GLint(GL_LINEAR),
+                                                                    GLint(GL_LINEAR),
+                                                                    GLint(GL_CLAMP_TO_BORDER));
+      m_channelImageCacheTextures[c]->clearImage();
     }
   }
 
@@ -396,20 +461,6 @@ void Z3DImg::setScale(const glm::vec3& scale)
               << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
               << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
   }
-  LOG(INFO) << "volumeDimension: " << m_volumeDimension << " volumeVoxelWorldDimension: " << m_volumeVoxelWorldDimension
-            << " volumeVoxelWorldSize: " << m_volumeVoxelWorldSize;
-
-  CHECK(m_numLevels > 0);
-  size_t l = m_numLevels - 1;
-  m_imageDimensions[l] = m_volumeDimension;
-  m_voxelWorldDimensions[l] = m_volumeVoxelWorldDimension;
-  m_voxelWorldSizes[l] = m_volumeVoxelWorldSize;
-
-  LOG(INFO) << l << " pageDirectoryDimension: " << m_pageDirectoryDimensions[l]
-            << " m_pageDirectoryBases: " << m_pageDirectoryBases[l]
-            << " pageTableDimension: " << m_pageTableDimensions[l] << " imageDimension: " << m_imageDimensions[l]
-            << " levelScale: " << m_levelScales[l] << " posToBlockID: " << m_posToBlockIDs[l]
-            << " voxelWorldDimension: " << m_voxelWorldDimensions[l] << " voxelWorldSize: " << m_voxelWorldSizes[l];
 }
 
 void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRanges)

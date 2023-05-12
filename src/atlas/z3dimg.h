@@ -256,6 +256,9 @@ private:
                                                       std::numeric_limits<uint32_t>::max(),
                                                       std::numeric_limits<uint32_t>::max(),
                                                       m_emptyFlag);
+
+  size_t m_maxMemoryForPageTableCache;
+  size_t m_maxMemoryForImageCache;
 };
 
 } // namespace nim
