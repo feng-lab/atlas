@@ -15,7 +15,7 @@ public:
              const GLvoid* data = nullptr,
              GLint minFilter = GLint(GL_LINEAR),
              GLint magFilter = GLint(GL_LINEAR),
-             GLint wrap = GLint(GL_CLAMP_TO_BORDER));
+             GLint wrap = GLint(GL_CLAMP_TO_EDGE));
 
   // derive texture target as 1D, 2D or 3D
   Z3DTexture(GLint internalFormat,
@@ -25,7 +25,7 @@ public:
              const GLvoid* data = nullptr,
              GLint minFilter = GLint(GL_LINEAR),
              GLint magFilter = GLint(GL_LINEAR),
-             GLint wrap = GLint(GL_CLAMP_TO_BORDER));
+             GLint wrap = GLint(GL_CLAMP_TO_EDGE));
 
   ~Z3DTexture();
 
@@ -33,9 +33,9 @@ public:
   // note: openGL default is GL_NEAREST_MIPMAP_LINEAR and GL_LINEAR.
   void setFilter(GLint minFilter = GLint(GL_LINEAR), GLint magFilter = GLint(GL_LINEAR)) const;
 
-  // default is GL_CLAMP_TO_BORDER
+  // default is GL_CLAMP_TO_EDGE
   // note: openGL default is GL_REPEAT
-  void setWrap(GLint wrap = GLint(GL_CLAMP_TO_BORDER)) const;
+  void setWrap(GLint wrap = GLint(GL_CLAMP_TO_EDGE)) const;
 
   //
   void generateMipmap() const;

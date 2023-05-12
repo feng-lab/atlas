@@ -129,7 +129,11 @@ Z3DImg::Z3DImg(const ZImgPack& imgPack,
         std::make_unique<Z3DTexture>(GLint(GL_R8),
                                      (m_imageBlockSize + m_imageBlockSizePad) * m_imageCacheNumBlocks,
                                      GL_RED,
-                                     GL_UNSIGNED_BYTE));
+                                     GL_UNSIGNED_BYTE,
+                                     nullptr,
+                                     GLint(GL_LINEAR),
+                                     GLint(GL_LINEAR),
+                                     GLint(GL_CLAMP_TO_BORDER)));
       m_channelImageCacheTextures[c]->clearImage();
     }
 
