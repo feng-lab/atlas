@@ -191,14 +191,14 @@ protected:
                                   const std::vector<std::tuple<glm::uvec4, glm::uvec4*>>& pendingTasks,
                                   const folly::CancellationToken& cancellationToken);
 
-  void checkPageSystemError(bool strict = true);
+  void checkPageSystemError(size_t c, bool strict = true);
 
 protected:
-  glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
+  const glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
   // glm::uvec3 m_imageBlockSize = glm::uvec3(60, 60, 60);
   glm::uvec3 m_imageBlockSize;
-  glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
+  const glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
   // const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
@@ -259,6 +259,7 @@ private:
 
   size_t m_maxMemoryForPageTableCache;
   size_t m_maxMemoryForImageCache;
+  bool m_hasSufficientPageTableCacheSpace = false;
 };
 
 } // namespace nim

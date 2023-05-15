@@ -363,6 +363,8 @@ void Z3DImg::setScale(const glm::vec3& scale)
       }
     }
   }
+  m_hasSufficientPageTableCacheSpace =
+    m_pageTableCacheNumBlocks.x * m_pageTableCacheNumBlocks.y * m_pageTableCacheNumBlocks.z >= numPageTableBlocks;
 
   auto imageBlockTotalSize = m_imageBlockSize + m_imageBlockSizePad;
   m_imageCacheNumBlocks = glm::uvec3(0);
@@ -530,12 +532,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   ZBenchTimer bt("update page table");
 
-  checkPageSystemError();
+  checkPageSystemError(c, true);
 
   processEventsAndMaybeCancel(cancellationToken);
 
   size_t count = 0;
   size_t alreadyMapped = 0;
+  size_t emptyBlockCount = 0;
+  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
 
   // pageDirectoryEntryKey, pageDirectoryEntry*, pageTableEntryKey
   std::vector<std::tuple<glm::uvec4, glm::uvec4*, glm::uvec4>> pendingBlocks;
@@ -549,9 +553,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
   m_usedPageTableEntry.clear();
 #endif
-
-  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
-  size_t emptyBlockCount = 0;
 
   for (auto blockID : missingBlockIDs) {
     if (count >= numBlocksToRead + emptyBlockCount) {
@@ -573,19 +574,19 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     pageTableEntryKey.x -= pageTableEntryKey.y * m_posToBlockIDs[level].y;
     CHECK(glm::all(glm::lessThan(pageTableEntryKey.xyz(), m_pageTableDimensions[level])))
       << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
-    glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
-    glm::uvec3 pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
-    glm::uvec4& pageDirectoryEntryRef =
-      m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.y * m_pageDirectorySize.x +
-                                  pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
+    auto pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
+    auto pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
+    auto pageDirectoryEntryPtr =
+      &m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.y * m_pageDirectorySize.x +
+                                   pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
 
-    if (pageDirectoryEntryRef.w == m_emptyFlag) { // page table is empty block
+    if (pageDirectoryEntryPtr->w == m_emptyFlag) { // page table is empty block
       CHECK(false); // empty page table is not supported yet
       ++emptyBlockCount;
       ++count;
       continue;
-    } else if (pageDirectoryEntryRef.w > 0) { // page table mapped
-      auto pageTableEntryCoord = pageDirectoryEntryRef.xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
+    } else if (pageDirectoryEntryPtr->w > 0) { // page table mapped
+      auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
       auto pageTableEntryPtr =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
@@ -604,7 +605,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         }
         usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
 #ifdef ATLAS_CHECK_CACHE
-        usedPageDirectoryEntry.insert(pageDirectoryEntryRef.xyz());
+        usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
 #endif
         ++count;
 
@@ -612,8 +613,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       }
 
       // page table mapped but image block is not mapped
-      // increase pageDirectoryEntryRef now, upload image blocks and update page table block later in pendingTasks
-      ++pageDirectoryEntryRef.w;
+      // increase pageDirectoryEntryPtr now, upload image blocks and update page table block later in pendingTasks
+      ++pageDirectoryEntryPtr->w;
       if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
         *pageTableEntryPtr = m_emptyPageTableEntry;
         ++emptyBlockCount;
@@ -622,8 +623,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
       }
       ++count;
-    } else { // pageDirectoryEntryRef.w == 0, page table not mapped
-      pendingBlocks.push_back(std::make_tuple(pageDirectoryEntryKey, &pageDirectoryEntryRef, pageTableEntryKey));
+    } else { // pageDirectoryEntryPtr.w == 0, page table not mapped
+      pendingBlocks.push_back(std::make_tuple(pageDirectoryEntryKey, pageDirectoryEntryPtr, pageTableEntryKey));
     }
   }
 
@@ -652,7 +653,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << pageDirectoryEntryPtr->xyz();
         usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
 #endif
-        // after insertion, pageDirectoryEntryPtr->w == 1, will add a pendingTask
+        // after insertion, pageDirectoryEntryPtr->w == 0, will add a pendingTask
+        ++pageDirectoryEntryPtr->w;
         --numAvailablePageCacheBlock;
       } else {
         LOG(INFO) << "no space for new page table block, skip the current image block";
@@ -692,7 +694,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
     auto uploadGuard = folly::makeGuard([=]() {
       ZBenchTimer btu("upload page table");
-      checkPageSystemError(false);
+      checkPageSystemError(c, false);
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
       m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
       STOP_AND_LOG(btu)
@@ -768,9 +770,10 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 {
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
-  pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 1);
+  pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 0);
 
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
+    CHECK(!m_hasSufficientPageTableCacheSpace) << "page table block swapped out";
     for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
       for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
         std::memset(
@@ -808,6 +811,9 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
                                   erasedKeyPageDirectoryEntryCoord.x];
 
     CHECK(erasedKeyPageDirectoryEntry.w != m_emptyFlag) << erasedKeyPageDirectoryEntry;
+    if (m_hasSufficientPageTableCacheSpace) {
+      CHECK(erasedKeyPageDirectoryEntry.w > 0) << erasedKeyPageDirectoryEntry;
+    }
     if (erasedKeyPageDirectoryEntry.w > 0) {
       glm::uvec3 erasedKeyPageTableEntryCoord =
         erasedKeyPageDirectoryEntry.xyz() + erasedKey.xyz() % m_pageTableBlockSize;
@@ -816,6 +822,9 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
                                     erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
                                     erasedKeyPageTableEntryCoord.x];
       CHECK(erasedKeyPageTableEntry.w != m_emptyFlag) << erasedKeyPageTableEntry;
+      if (m_hasSufficientPageTableCacheSpace) {
+        CHECK(erasedKeyPageTableEntry.w > 0) << erasedKeyPageTableEntry;
+      }
       if (erasedKeyPageTableEntry.w > 0) {
         CHECK(erasedKeyPageTableEntry.w == 1) << erasedKeyPageTableEntry;
         erasedKeyPageTableEntry.w = 0;
@@ -1039,71 +1048,72 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
   return emptyBlockCount;
 }
 
-void Z3DImg::checkPageSystemError(bool strict)
+void Z3DImg::checkPageSystemError(size_t c, bool strict)
 {
-  for (size_t c = 0; c < m_nChannels; ++c) {
-    for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
-      if (m_channelPageDirectories[c][i].w == 0) {
-        continue;
+  for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
+    if (m_channelPageDirectories[c][i].w == 0) {
+      continue;
+    }
+    CHECK(m_channelPageDirectories[c][i].w > 0);
+
+    glm::uvec3 pdLoc;
+    pdLoc.x = i;
+    pdLoc.z = pdLoc.x / m_pageDirectorySize.x / m_pageDirectorySize.y;
+    pdLoc.x -= pdLoc.z * m_pageDirectorySize.x * m_pageDirectorySize.y;
+    pdLoc.y = pdLoc.x / m_pageDirectorySize.x;
+    pdLoc.x -= pdLoc.y * m_pageDirectorySize.x;
+
+    size_t level = 100000;
+
+    for (size_t l = 0; l < m_numLevels; ++l) {
+      if (glm::all(glm::greaterThanEqual(pdLoc, m_pageDirectoryBases[l])) &&
+          glm::all(glm::lessThan(pdLoc, m_pageDirectoryBases[l] + m_pageDirectoryDimensions[l]))) {
+        level = l;
+        pdLoc -= m_pageDirectoryBases[l];
+        break;
       }
-      CHECK(m_channelPageDirectories[c][i].w > 0);
+    }
 
-      glm::uvec3 pdLoc;
-      pdLoc.x = i;
-      pdLoc.z = pdLoc.x / m_pageDirectorySize.x / m_pageDirectorySize.y;
-      pdLoc.x -= pdLoc.z * m_pageDirectorySize.x * m_pageDirectorySize.y;
-      pdLoc.y = pdLoc.x / m_pageDirectorySize.x;
-      pdLoc.x -= pdLoc.y * m_pageDirectorySize.x;
+    CHECK(level + 1 < m_numLevels);
 
-      size_t level = 100000;
+    glm::uvec4 pageTableKey(pdLoc, level);
+    CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
+    CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
+    CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz(), m_pageTableCacheSize)));
 
-      for (size_t l = 0; l < m_numLevels; ++l) {
-        if (glm::all(glm::greaterThanEqual(pdLoc, m_pageDirectoryBases[l])) &&
-            glm::all(glm::lessThan(pdLoc, m_pageDirectoryBases[l] + m_pageDirectoryDimensions[l]))) {
-          level = l;
-          pdLoc -= m_pageDirectoryBases[l];
-          break;
-        }
-      }
-
-      CHECK(level < m_numLevels);
-
-      glm::uvec4 pageTableKey(pdLoc, level);
-      CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
-      CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
-      CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz(), m_pageTableCacheSize)));
-
-      uint32_t numValidEntry = 0;
-      for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
-        for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
-          for (size_t x = 0; x < m_pageTableBlockSize.x; ++x) {
-            glm::uvec4 pageTableEntry =
-              m_channelPageTableCaches[c][(m_channelPageDirectories[c][i].z + z) * m_pageTableCacheSize.y *
-                                            m_pageTableCacheSize.x +
-                                          (m_channelPageDirectories[c][i].y + y) * m_pageTableCacheSize.x +
-                                          m_channelPageDirectories[c][i].x + x];
-            if (pageTableEntry.w > 0) {
-              ++numValidEntry;
-              if (pageTableEntry.w != m_emptyFlag) {
-                glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
-                CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
-                CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
-                CHECK(glm::all(glm::lessThan(pageTableEntry.xyz(), m_channelImageCacheTextures[c]->dimension())));
-              }
+    uint32_t numValidEntry = 0;
+    uint32_t numEmptyEntry = 0;
+    for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
+      for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
+        for (size_t x = 0; x < m_pageTableBlockSize.x; ++x) {
+          glm::uvec4 pageTableEntry =
+            m_channelPageTableCaches[c][(m_channelPageDirectories[c][i].z + z) * m_pageTableCacheSize.y *
+                                          m_pageTableCacheSize.x +
+                                        (m_channelPageDirectories[c][i].y + y) * m_pageTableCacheSize.x +
+                                        m_channelPageDirectories[c][i].x + x];
+          if (pageTableEntry.w > 0) {
+            ++numValidEntry;
+            if (pageTableEntry.w != m_emptyFlag) {
+              glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
+              CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
+              CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
+              CHECK(glm::all(glm::lessThan(pageTableEntry.xyz(), m_channelImageCacheTextures[c]->dimension())));
+            } else {
+              ++numEmptyEntry;
             }
           }
         }
       }
-      if (strict) {
-        CHECK(numValidEntry == m_channelPageDirectories[c][i].w)
-          << numValidEntry << " " << m_channelPageDirectories[c][i].w;
-      } else {
-        CHECK(numValidEntry <= m_channelPageDirectories[c][i].w)
-          << numValidEntry << " " << m_channelPageDirectories[c][i].w;
-        if (numValidEntry != m_channelPageDirectories[c][i].w) {
-          LOG(INFO) << "Fixing cancellation caused inconsistency";
-          m_channelPageDirectories[c][i].w = numValidEntry;
-        }
+    }
+    if (strict) {
+      CHECK(numValidEntry == m_channelPageDirectories[c][i].w)
+        << numValidEntry << " " << m_channelPageDirectories[c][i].w << " " << i << " " << numEmptyEntry;
+    } else {
+      CHECK(numValidEntry <= m_channelPageDirectories[c][i].w)
+        << numValidEntry << " " << m_channelPageDirectories[c][i].w << " " << i << " " << numEmptyEntry;
+      if (numValidEntry != m_channelPageDirectories[c][i].w) {
+        LOG(INFO) << "Fixing cancellation caused inconsistency";
+        m_channelPageDirectories[c][i].w = numValidEntry;
       }
     }
   }
