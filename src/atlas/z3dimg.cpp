@@ -650,7 +650,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         // we still have space, construct new page table block
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
-        CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << pageDirectoryEntryPtr->xyz();
+        CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
         usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
 #endif
         // after insertion, pageDirectoryEntryPtr->w == 0, will add a pendingTask
@@ -954,14 +954,13 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      size_t batchSize = m_blockUploadingBatchSize;
-      CHECK(batchSize > 0);
+      CHECK(m_blockUploadingBatchSize > 0);
 
       size_t taskIdx = 0;
       while (taskIdx < pendingTasks.size()) {
         processEventsAndMaybeCancel(cancellationToken);
 
-        size_t numberOfTasks = std::min(batchSize, pendingTasks.size() - taskIdx);
+        size_t numberOfTasks = std::min(m_blockUploadingBatchSize, pendingTasks.size() - taskIdx);
         std::vector<folly::Future<folly::Unit>> blockFutures;
         blockFutures.reserve(numberOfTasks);
         size_t finalTaskIdx = taskIdx + numberOfTasks;
@@ -1050,6 +1049,10 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 
 void Z3DImg::checkPageSystemError(size_t c, bool strict)
 {
+#ifdef ATLAS_CHECK_CACHE
+  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
+  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageTableEntry;
+#endif
   for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
     if (m_channelPageDirectories[c][i].w == 0) {
       continue;
@@ -1080,6 +1083,10 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
     CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
     CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
     CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz(), m_pageTableCacheSize)));
+#ifdef ATLAS_CHECK_CACHE
+    CHECK(usedPageDirectoryEntry.find(m_channelPageDirectories[c][i].xyz()) == usedPageDirectoryEntry.end());
+    usedPageDirectoryEntry.insert(m_channelPageDirectories[c][i].xyz());
+#endif
 
     uint32_t numValidEntry = 0;
     uint32_t numEmptyEntry = 0;
@@ -1098,6 +1105,10 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
               CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
               CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
               CHECK(glm::all(glm::lessThan(pageTableEntry.xyz(), m_channelImageCacheTextures[c]->dimension())));
+#ifdef ATLAS_CHECK_CACHE
+              CHECK(usedPageTableEntry.find(pageTableEntry.xyz()) == usedPageTableEntry.end());
+              usedPageTableEntry.insert(pageTableEntry.xyz());
+#endif
             } else {
               ++numEmptyEntry;
             }
