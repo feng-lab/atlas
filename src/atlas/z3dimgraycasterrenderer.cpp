@@ -667,27 +667,18 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
 
       processEventsAndMaybeCancel(cancellationToken);
 
-      bool attachment0ContainsValidMissingBlocks = ccSet.size() > 2;
-      bool attachment0ContainsLastBlock = false;
-      if (!attachment0ContainsValidMissingBlocks) {
-        attachment0ContainsLastBlock = ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end();
-        ccSet.unsafe_erase(0_u32);
-        ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-        attachment0ContainsValidMissingBlocks = !ccSet.empty();
-      }
-
-      size_t numberBlock = ccSet.size();
-      bool hasEnoughMissingIDs = numberBlock > m_img->numCachedImages(c);
-
-      bool lastRound = !attachment0ContainsValidMissingBlocks && !attachment0ContainsLastBlock;
+      CHECK(!ccSet.empty());
+      bool lastRound = ccSet.size() == 1 && ccSet.find(0_u32) != ccSet.end();  // ccSet contains only 0
       if (lastRound) {
         STOP_AND_LOG(btcb)
         LOG(INFO) << "no blocks to render";
         break;
       }
 
+      bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
+
       for (auto att = 1; !hasEnoughMissingIDs && !lastRound && att < 8; ++att) {
-        numberBlock = ccSet.size();
+        auto numberBlock = ccSet.size();
         m_blockIDsRenderTarget->attachment(g_drawBuffers[att])
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
@@ -712,7 +703,7 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       std::vector<uint32_t> missingBlockIDs;
 
       ccSet.unsafe_erase(0_u32);
-      if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end() || attachment0ContainsLastBlock) {
+      if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end()) {
         VLOG(1) << "use last block";
       }
       ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
