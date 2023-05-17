@@ -92,32 +92,33 @@ std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator l
 }
 
 template<typename Iterator, typename Compare>
-std::pair<typename Iterator::value_type, typename Iterator::value_type>
+std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     throw ZException("Empty range"); // handle empty range
   }
 
- return tbb::parallel_reduce(
+  using value_type = typename std::iterator_traits<Iterator>::value_type;
+
+  return tbb::parallel_reduce(
     tbb::blocked_range<Iterator>(first, last),
     std::make_pair(*first, *first),
     [&](const tbb::blocked_range<Iterator>& r,
-        std::pair<typename Iterator::value_type, typename Iterator::value_type> init)
-      -> std::pair<typename Iterator::value_type, typename Iterator::value_type> {
+        std::pair<value_type, value_type> init) -> std::pair<value_type, value_type> {
       auto minmax = std::minmax_element(r.begin(), r.end(), comp);
       return std::make_pair(comp(*minmax.first, init.first) ? *minmax.first : init.first,
                             comp(init.second, *minmax.second) ? *minmax.second : init.second);
     },
-    [comp](std::pair<typename Iterator::value_type, typename Iterator::value_type> x,
-           std::pair<typename Iterator::value_type, typename Iterator::value_type> y)
-      -> std::pair<typename Iterator::value_type, typename Iterator::value_type> {
+    [comp](std::pair<value_type, value_type> x,
+           std::pair<value_type, value_type> y) -> std::pair<value_type, value_type> {
       return std::make_pair(comp(x.first, y.first) ? x.first : y.first, comp(y.second, x.second) ? x.second : y.second);
     });
 }
 
 template<typename Iterator>
-std::pair<typename Iterator::value_type, typename Iterator::value_type> parallel_minmax(Iterator first, Iterator last)
+std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
+parallel_minmax(Iterator first, Iterator last)
 {
   return parallel_minmax(first, last, std::less<>());
 }

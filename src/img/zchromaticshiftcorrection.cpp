@@ -370,9 +370,10 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
   size_t length = srcImg.channelVoxelNumber();
   for (size_t i = 0; i < srcImg.numChannels(); ++i) {
     const auto* data = srcImg.channelData<ImagePixelType>(i);
-    std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
-    m_channelInfos[i].min = *minmax.first;
-    m_channelInfos[i].max = *minmax.second;
+    //    std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
+    //    m_channelInfos[i].min = *minmax.first;
+    //    m_channelInfos[i].max = *minmax.second;
+    std::tie(m_channelInfos[i].min, m_channelInfos[i].max) = parallel_minmax(data, data + length);
     m_minValue = std::min(m_minValue, m_channelInfos[i].min);
     m_maxValue = std::max(m_maxValue, m_channelInfos[i].max);
     std::vector<ImagePixelType> dataWithoutZero;

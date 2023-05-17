@@ -2590,13 +2590,14 @@ void ZImg::computeMinMax_Impl(TValue& minV, TValue& maxV) const
   }
   for (size_t t = 0; t < numTimes(); ++t) {
     auto data = timeData<TVoxel>(t);
-    std::pair<const TVoxel*, const TVoxel*> res = minMaxElement(data, data + timeVoxelNumber(), true);
+    // std::pair<const TVoxel*, const TVoxel*> res = minMaxElement(data, data + timeVoxelNumber(), true);
+    auto [resMin, resMax] = parallel_minmax(data, data + timeVoxelNumber());
     if (t == 0) {
-      minV = static_cast<TValue>(*res.first);
-      maxV = static_cast<TValue>(*res.second);
+      minV = static_cast<TValue>(resMin);
+      maxV = static_cast<TValue>(resMax);
     } else {
-      minV = std::min(minV, static_cast<TValue>(*res.first));
-      maxV = std::max(maxV, static_cast<TValue>(*res.second));
+      minV = std::min(minV, static_cast<TValue>(resMin));
+      maxV = std::max(maxV, static_cast<TValue>(resMax));
     }
   }
 }

@@ -379,9 +379,10 @@ void ZSectionsRegistration::calcSecInfs(const ZImg& srcImg)
   size_t length = srcImg.planeVoxelNumber();
   for (size_t i = 0; i < srcImg.depth(); ++i) {
     const ImagePixelType* data = srcImg.planeData<ImagePixelType>(i, m_referenceChannel);
-    std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
-    m_sectionInfos[i].min = *minmax.first;
-    m_sectionInfos[i].max = *minmax.second;
+    // std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
+    // m_sectionInfos[i].min = *minmax.first;
+    // m_sectionInfos[i].max = *minmax.second;
+    std::tie(m_sectionInfos[i].min, m_sectionInfos[i].max) = parallel_minmax(data, data + length);
     m_minValue = std::min(m_minValue, m_sectionInfos[i].min);
     m_maxValue = std::max(m_maxValue, m_sectionInfos[i].max);
     std::vector<ImagePixelType> dataWithoutZero;
