@@ -77,3 +77,7 @@ gtest_discover_tests(zsaturateoperationtest)
 add_executable(ztreetest ${CMAKE_CURRENT_LIST_DIR}/ztreetest.cpp)
 target_link_libraries(ztreetest GTest::gtest_main img)
 gtest_discover_tests(ztreetest)
+
+add_executable(zstatisticsutilstest ${CMAKE_CURRENT_LIST_DIR}/zstatisticsutilstest.cpp)
+target_link_libraries(zstatisticsutilstest GTest::gtest_main img)
+gtest_discover_tests(zstatisticsutilstest)

@@ -14,6 +14,114 @@ namespace nim {
 
 #define MULTITHREAD_THRESHOLD 1e8
 
+template<typename Iterator, typename Compare>
+Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
+{
+  if (first == last) {
+    return first; // handle empty range
+  }
+
+  return tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    first,
+    [&](const tbb::blocked_range<Iterator>& r, Iterator init) -> Iterator {
+      auto min = std::min_element(r.begin(), r.end(), comp);
+      return comp(*min, *init) ? min : init;
+    },
+    [comp](Iterator x, Iterator y) -> Iterator {
+      return comp(*x, *y) ? x : y;
+    });
+}
+
+template<typename Iterator>
+Iterator parallel_min_element(Iterator first, Iterator last)
+{
+  return parallel_min_element(first, last, std::less<>());
+}
+
+template<typename Iterator, typename Compare>
+Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
+{
+  if (first == last) {
+    return first; // handle empty range
+  }
+
+  return tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    first,
+    [&](const tbb::blocked_range<Iterator>& r, Iterator init) -> Iterator {
+      auto max = std::max_element(r.begin(), r.end(), comp);
+      return comp(*init, *max) ? max : init;
+    },
+    [comp](Iterator x, Iterator y) -> Iterator {
+      return comp(*y, *x) ? x : y;
+    });
+}
+
+template<typename Iterator>
+Iterator parallel_max_element(Iterator first, Iterator last)
+{
+  return parallel_max_element(first, last, std::less<>());
+}
+
+template<typename Iterator, typename Compare>
+std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
+{
+  if (first == last) {
+    return std::make_pair(first, first); // handle empty range
+  }
+
+  return tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    std::make_pair(first, first),
+    [&](const tbb::blocked_range<Iterator>& r, std::pair<Iterator, Iterator> init) -> std::pair<Iterator, Iterator> {
+      auto minmax = std::minmax_element(r.begin(), r.end(), comp);
+      return std::make_pair(comp(*minmax.first, *init.first) ? minmax.first : init.first,
+                            comp(*init.second, *minmax.second) ? minmax.second : init.second);
+    },
+    [comp](std::pair<Iterator, Iterator> x, std::pair<Iterator, Iterator> y) -> std::pair<Iterator, Iterator> {
+      return std::make_pair(comp(*x.first, *y.first) ? x.first : y.first,
+                            comp(*y.second, *x.second) ? x.second : y.second);
+    });
+}
+
+template<typename Iterator>
+std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
+{
+  return parallel_minmax_element(first, last, std::less<>());
+}
+
+template<typename Iterator, typename Compare>
+std::pair<typename Iterator::value_type, typename Iterator::value_type>
+parallel_minmax(Iterator first, Iterator last, Compare comp)
+{
+  if (first == last) {
+    throw ZException("Empty range"); // handle empty range
+  }
+
+ return tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    std::make_pair(*first, *first),
+    [&](const tbb::blocked_range<Iterator>& r,
+        std::pair<typename Iterator::value_type, typename Iterator::value_type> init)
+      -> std::pair<typename Iterator::value_type, typename Iterator::value_type> {
+      auto minmax = std::minmax_element(r.begin(), r.end(), comp);
+      return std::make_pair(comp(*minmax.first, init.first) ? *minmax.first : init.first,
+                            comp(init.second, *minmax.second) ? *minmax.second : init.second);
+    },
+    [comp](std::pair<typename Iterator::value_type, typename Iterator::value_type> x,
+           std::pair<typename Iterator::value_type, typename Iterator::value_type> y)
+      -> std::pair<typename Iterator::value_type, typename Iterator::value_type> {
+      return std::make_pair(comp(x.first, y.first) ? x.first : y.first, comp(y.second, x.second) ? x.second : y.second);
+    });
+}
+
+template<typename Iterator>
+std::pair<typename Iterator::value_type, typename Iterator::value_type> parallel_minmax(Iterator first, Iterator last)
+{
+  return parallel_minmax(first, last, std::less<>());
+}
+
 template<typename RandomAccessIterator>
 class MinMaxElementReduce_Impl
 {
@@ -132,7 +240,9 @@ public:
     std::transform(m_begin + range.begin(),
                    m_begin + range.end(),
                    m_diffbegin + range.begin(),
-                   [meanVLocal](ResultType v) { return v - meanVLocal; });
+                   [meanVLocal](ResultType v) {
+                     return v - meanVLocal;
+                   });
     m_sqSum +=
       std::inner_product(m_diffbegin + range.begin(), m_diffbegin + range.end(), m_diffbegin + range.begin(), 0.0);
   }
@@ -173,7 +283,9 @@ void meanAndStandardDeviation(RandomAccessIterator begin,
   meanV = mean(begin, end, useMultithreading);
   ResultType sq_sum;
   if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
-    std::transform(begin, end, diff.begin(), [meanV](ResultType v) { return v - meanV; });
+    std::transform(begin, end, diff.begin(), [meanV](ResultType v) {
+      return v - meanV;
+    });
     sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
   } else {
     StandardDeviationReduce_Impl<RandomAccessIterator, std::vector<ResultType>::iterator, ResultType> sqsum(

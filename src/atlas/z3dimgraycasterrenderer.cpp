@@ -7,6 +7,7 @@
 #include "zimgregioncache.h"
 #include "zlog.h"
 #include "zcancellation.h"
+#include "zstatisticsutils.h"
 #include <tbb/parallel_for.h>
 #include <tbb/concurrent_unordered_set.h>
 #include <QCoreApplication>
@@ -676,33 +677,18 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
       }
 
       size_t numberBlock = ccSet.size();
-      bool hasEnoughMissingIDs = false;
+      bool hasEnoughMissingIDs = numberBlock > m_img->numCachedImages(c);
 
-      if (attachment0ContainsValidMissingBlocks) {
-        hasEnoughMissingIDs = numberBlock > m_img->numCachedImages(c);
-        if (!hasEnoughMissingIDs) {
-          m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT1)
-            ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-          tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                            [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                              ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                            });
-
-          hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-        }
-      } else if (!attachment0ContainsLastBlock) {
+      bool lastRound = !attachment0ContainsValidMissingBlocks && !attachment0ContainsLastBlock;
+      if (lastRound) {
         STOP_AND_LOG(btcb)
         LOG(INFO) << "no blocks to render";
         break;
       }
 
-      processEventsAndMaybeCancel(cancellationToken);
-
-      bool lastRound = false;
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
+      for (auto att = 1; !hasEnoughMissingIDs && !lastRound && att < 8; ++att) {
         numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT2)
+        m_blockIDsRenderTarget->attachment(g_drawBuffers[att])
           ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
         tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
@@ -711,100 +697,16 @@ void Z3DImgRaycasterRenderer::render3DImage(Z3DEye /*eye*/, const std::vector<si
                           });
 
         hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
 
-      processEventsAndMaybeCancel(cancellationToken);
+        lastRound = !hasEnoughMissingIDs && numberBlock == ccSet.size();
+        if (lastRound) { // confirm
+          lastRound = *parallel_max_element(m_blockIDs.begin(), m_blockIDs.end()) == 0;
+        }
+        if (lastRound) {
+          VLOG(1) << "last att: " << att;
+        }
 
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
-        numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT3)
-          ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
-
-        hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
-
-      processEventsAndMaybeCancel(cancellationToken);
-
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
-        numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT4)
-          ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
-
-        hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
-
-      processEventsAndMaybeCancel(cancellationToken);
-
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
-        numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT5)
-          ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
-
-        hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
-
-      processEventsAndMaybeCancel(cancellationToken);
-
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
-        numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT6)
-          ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
-
-        hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
-
-      processEventsAndMaybeCancel(cancellationToken);
-
-      if (!hasEnoughMissingIDs && numberBlock != ccSet.size()) {
-        numberBlock = ccSet.size();
-        m_blockIDsRenderTarget->attachment(GL_COLOR_ATTACHMENT7)
-          ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
-
-        tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                          [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                            ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                          });
-
-        hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
-        // LOG(INFO) << m_img->numCachedImages() << " " << numberBlock << " " << ccSet.size();
-      } else {
-        lastRound = !hasEnoughMissingIDs;
-      }
-
-      processEventsAndMaybeCancel(cancellationToken);
-
-      if (!hasEnoughMissingIDs && numberBlock == ccSet.size()) {
-        lastRound = true;
+        processEventsAndMaybeCancel(cancellationToken);
       }
 
       std::vector<uint32_t> missingBlockIDs;
