@@ -14,6 +14,8 @@ DEFINE_string(output_filename, "", "output video filename");
 DEFINE_int32(output_fps, 30, "frame per second of the output video, default is 30");
 DEFINE_double(output_start_time, 0., "start time of the output video in seconds, floating point value, default is 0.0");
 DEFINE_double(output_end_time, -1., "end time of the output video in seconds, floating point value, default is -1.0 represents the end of the animation");
+DEFINE_int32(output_start_frame, 0, "start frame of the output video, integer value, default is 0");
+DEFINE_int32(output_end_frame, -1, "end frame of the output video, integer value, default is -1 represents the end of the animation");
 DEFINE_int32(output_width, 3840, "width of the output video, default is 3840");
 DEFINE_int32(output_height, 2160, "height of the output video, default is 2160");
 DEFINE_bool(overwrite, false, "whether to overwrite output file if it already exists, default is false");
@@ -102,6 +104,15 @@ int ZRunExport3DAnimation::run()
     return 1;
   }
 
+  if (FLAGS_output_start_frame == 0 && FLAGS_output_end_frame == -1) {
+    if (FLAGS_output_start_time != 0.) {
+      FLAGS_output_start_frame = FLAGS_output_start_time * FLAGS_output_fps;
+    }
+    if (FLAGS_output_end_time != -1.) {
+      FLAGS_output_end_frame = FLAGS_output_end_time * FLAGS_output_fps;
+    }
+  }
+
   doc.animation3DDoc().bindView(&engine);
 
   connect(&engine, &Z3DRenderingEngine::renderingError, this, &ZRunExport3DAnimation::logError);
@@ -109,8 +120,8 @@ int ZRunExport3DAnimation::run()
   engine.exportFixedSize3DAnimation(&doc.animation3DDoc().animation(id),
                                     outputFilename,
                                     FLAGS_output_fps,
-                                    FLAGS_output_start_time,
-                                    FLAGS_output_end_time,
+                                    FLAGS_output_start_frame,
+                                    FLAGS_output_end_frame,
                                     FLAGS_output_width,
                                     FLAGS_output_height,
                                     FLAGS_overwrite,

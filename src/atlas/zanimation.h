@@ -120,23 +120,22 @@ public:
 
   void exportFixedSize3DAnimation(const QString& fn,
                                   int framePerSecond,
-                                  double startTime,
-                                  double endTime,
+                                  int startFrame,
+                                  int endFrame,
                                   int width,
                                   int height,
                                   Z3DScreenShotType sst);
 
-  void
-  export3DAnimation(const QString& fn, int framePerSecond, double startTime, double endTime, Z3DScreenShotType sst);
+  void export3DAnimation(const QString& fn, int framePerSecond, int startFrame, int endFrame, Z3DScreenShotType sst);
 
   void exportFixedSize2DAnimation(const QString& fn,
                                   int framePerSecond,
-                                  double startTime,
-                                  double endTime,
+                                  int startFrame,
+                                  int endFrame,
                                   int width,
                                   int height);
 
-  void export2DAnimation(const QString& fn, int framePerSecond, double startTime, double endTime);
+  void export2DAnimation(const QString& fn, int framePerSecond, int startFrame, int endFrame);
 
 Q_SIGNALS:
   void durationChanged(double v);
@@ -158,8 +157,8 @@ Q_SIGNALS:
   void exportFixedSize3DAnimationInEngine(const ZAnimation* animation,
                                           const QString& fn,
                                           int framePerSecond,
-                                          double startTime,
-                                          double endTime,
+                                          int startFrame,
+                                          int endFrame,
                                           int width,
                                           int height,
                                           bool overwriteFileIfExist,

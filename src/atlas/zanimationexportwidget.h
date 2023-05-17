@@ -40,26 +40,23 @@ public:
 Q_SIGNALS:
   void exportFixedSize3DAnimation(const QString& filename,
                                   int framePerSecond,
-                                  double startTime,
-                                  double endTime,
+                                  int startFrame,
+                                  int endFrame,
                                   int width,
                                   int height,
                                   Z3DScreenShotType sst);
 
-  void export3DAnimation(const QString& filename,
-                         int framePerSecond,
-                         double startTime,
-                         double endTime,
-                         Z3DScreenShotType sst);
+  void
+  export3DAnimation(const QString& filename, int framePerSecond, int startFrame, int endFrame, Z3DScreenShotType sst);
 
   void exportFixedSize2DAnimation(const QString& filename,
                                   int framePerSecond,
-                                  double startTime,
-                                  double endTime,
+                                  int startFrame,
+                                  int endFrame,
                                   int width,
                                   int height);
 
-  void export2DAnimation(const QString& filename, int framePerSecond, double startTime, double endTime);
+  void export2DAnimation(const QString& filename, int framePerSecond, int startFrame, int endFrame);
 
 private:
   void captureButtonPressed();
@@ -80,8 +77,8 @@ private:
   ZBoolParameter m_useWindowSize;
   ZIVec2Parameter m_customSize;
   ZIntParameter m_framePerSecond;
-  ZDoubleParameter m_startTime;
-  ZDoubleParameter m_endTime;
+  ZIntParameter m_startFrame;
+  ZIntParameter m_endFrame;
 
   ZSelectFileWidget* m_filenameWidget = nullptr;
   QPushButton* m_captureButton = nullptr;

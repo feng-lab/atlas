@@ -329,8 +329,8 @@ void ZAnimation::releaseView()
 
 void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             int framePerSecond,
-                                            double startTime,
-                                            double endTime,
+                                            int startFrame,
+                                            int endFrame,
                                             int width,
                                             int height,
                                             Z3DScreenShotType sst)
@@ -405,8 +405,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
   Q_EMIT exportFixedSize3DAnimationInEngine(this,
                                             fn,
                                             framePerSecond,
-                                            startTime,
-                                            endTime,
+                                            startFrame,
+                                            endFrame,
                                             width,
                                             height,
                                             true,
@@ -420,8 +420,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
 
 void ZAnimation::export3DAnimation(const QString& fn,
                                    int framePerSecond,
-                                   double startTime,
-                                   double endTime,
+                                   int startFrame,
+                                   int endFrame,
                                    Z3DScreenShotType sst)
 {
   if (!m_engine) {
@@ -432,28 +432,29 @@ void ZAnimation::export3DAnimation(const QString& fn,
   CHECK(engine);
 
   auto engineOutputSize = engine->outputSize();
-  exportFixedSize3DAnimation(fn, framePerSecond, startTime, endTime, engineOutputSize.x, engineOutputSize.y, sst);
+  exportFixedSize3DAnimation(fn, framePerSecond, startFrame, endFrame, engineOutputSize.x, engineOutputSize.y, sst);
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
                                             int framePerSecond,
-                                            double startTime,
-                                            double endTime,
+                                            int startFrame,
+                                            int endFrame,
                                             int width,
                                             int height)
 {
-  if (startTime < 0 || startTime >= m_duration) {
+  int totalNumFrames = std::max(1, static_cast<int>(std::ceil(m_duration * framePerSecond)));
+  if (startFrame < 0 || startFrame >= totalNumFrames) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
-                          QString("Video start time %1 is not correct").arg(startTime));
+                          QString("Video start frame %1 is not correct").arg(startFrame));
   }
-  if (endTime >= 0 && endTime <= startTime) {
+  if (endFrame >= 0 && endFrame <= startFrame) {
     QMessageBox::critical(QApplication::activeWindow(),
                           QApplication::applicationName(),
-                          QString("Video end time %1 is not correct").arg(endTime));
+                          QString("Video end frame %1 is not correct").arg(endFrame));
   }
-  if (endTime < 0 || endTime > m_duration) {
-    endTime = m_duration;
+  if (endFrame < 0 || endFrame > totalNumFrames) {
+    endFrame = totalNumFrames;
   }
   CHECK(m_engine);
   QDir dir(QFileInfo(fn).absolutePath());
@@ -491,31 +492,27 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   }
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_engine)->graphicsView();
 
-  auto duration = endTime - startTime;
-  int numFrame = std::ceil(duration * framePerSecond);
   QString title = "Exporting 2D Animation As Images...";
-  auto progress = new QProgressDialog(title, "Cancel", 0, numFrame, QApplication::activeWindow());
+  auto progress = new QProgressDialog(title, "Cancel", 0, endFrame - startFrame, QApplication::activeWindow());
   progress->setWindowModality(Qt::WindowModal);
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
-  int fieldWidth = std::max(FLAGS_output_image_name_field_width,
-                            numDigits(static_cast<int>(std::ceil(m_duration * framePerSecond))));
-  double time = startTime;
-  int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
-  double timeIncrement = duration / numFrame;
+  int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
+  double time = static_cast<double>(startFrame) / framePerSecond;
+  double timeIncrement = totalNumFrames > 1 ? m_duration / totalNumFrames : 0.;
   QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
   auto tempdir = std::make_shared<QTemporaryDir>();
   QDir tmpdir(tempdir->path());
   QString err;
-  for (int i = 0; i < numFrame; ++i) {
-    progress->setValue(i);
+  for (int i = startFrame; i < endFrame; ++i) {
+    progress->setValue(i - startFrame);
     if (progress->wasCanceled()) {
       break;
     }
 
     setCurrentTime(time);
     time += timeIncrement;
-    QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
+    QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {
       QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), err);
@@ -534,14 +531,14 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   }
 }
 
-void ZAnimation::export2DAnimation(const QString& fn, int framePerSecond, double startTime, double endTime)
+void ZAnimation::export2DAnimation(const QString& fn, int framePerSecond, int startFrame, int endFrame)
 {
   CHECK(m_engine);
   ZGraphicsView& canvasPainter = static_cast<ZView*>(m_engine)->graphicsView();
   exportFixedSize2DAnimation(fn,
                              framePerSecond,
-                             startTime,
-                             endTime,
+                             startFrame,
+                             endFrame,
                              canvasPainter.viewportSize().width(),
                              canvasPainter.viewportSize().height());
 }

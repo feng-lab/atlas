@@ -385,8 +385,8 @@ void Z3DRenderingEngine::takeScreenShot(const QString& filename, Z3DScreenShotTy
 void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     const QString& fn,
                                                     int framePerSecond,
-                                                    double startTime,
-                                                    double endTime,
+                                                    int startFrame,
+                                                    int endFrame,
                                                     int width,
                                                     int height,
                                                     bool overwriteFileIfExist,
@@ -401,27 +401,30 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
   });
 
   CHECK(animation);
-  if (startTime < 0 || startTime >= animation->duration()) {
-    Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startTime));
+  int totalNumFrames = std::max(1, static_cast<int>(std::ceil(animation->duration() * framePerSecond)));
+  if (startFrame < 0 || startFrame >= totalNumFrames) {
+    Q_EMIT renderingError(QString("Video start time %1 is not correct").arg(startFrame));
     return;
   }
-  if (endTime >= 0 && endTime <= startTime) {
-    Q_EMIT renderingError(QString("Video end time %1 is not correct").arg(endTime));
+  if (endFrame >= 0 && endFrame <= startFrame) {
+    Q_EMIT renderingError(QString("Video end time %1 is not correct").arg(endFrame));
     return;
   }
-  if (endTime < 0 || endTime > animation->duration()) {
-    endTime = animation->duration();
+  if (endFrame < 0 || endFrame > totalNumFrames) {
+    endFrame = totalNumFrames;
   }
   if (width > 7680 || height > 4320) {
     Q_EMIT renderingError("does not support output size larger than 7680x4320");
     return;
   }
-  LOG(INFO) << fmt::format("fps: {} width: {} height: {} startTime: {} endTime: {}",
+  LOG(INFO) << fmt::format("fps: {} width: {} height: {} startFrame: {} endFrame: {} startTime: {} endTime: {}",
                            framePerSecond,
                            width,
                            height,
-                           startTime,
-                           endTime);
+                           startFrame,
+                           endFrame,
+                           static_cast<double>(startFrame) / framePerSecond,
+                           static_cast<double>(endFrame) / framePerSecond);
 
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -474,18 +477,15 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     m_doc.hideAnimation3DView();
     m_doc.deselectAllObjs();
 
-    auto duration = endTime - startTime;
-    int numFrame = std::ceil(duration * framePerSecond);
-    int fieldWidth = std::max(FLAGS_output_image_name_field_width,
-                              numDigits(static_cast<int>(std::ceil(animation->duration() * framePerSecond))));
-    double time = startTime;
-    int startFrame = static_cast<int>(std::floor(startTime * framePerSecond));
-    double timeIncrement = duration / numFrame;
+    int numFrame = endFrame - startFrame;
+    int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
+    double time = static_cast<double>(startFrame) / framePerSecond;
+    double timeIncrement = totalNumFrames > 1 ? animation->duration() / totalNumFrames : 0.;
     QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     auto tempdir = std::make_shared<QTemporaryDir>();
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
-    for (int i = 0; i < numFrame; ++i) {
-      Q_EMIT progressChanged(std::clamp<int>(std::floor(i * 1. / numFrame * 100.), 0, 100));
+    for (int i = startFrame; i < endFrame; ++i) {
+      Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 100));
       if (cancelFlag && cancelFlag->load()) {
         reportCancelError();
         return;
@@ -493,7 +493,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
 
       animation->setCurrentTime(time);
       time += timeIncrement;
-      QString filename = QString("%1%2.png").arg(namePrefix).arg(i + startFrame, fieldWidth, 10, QChar('0'));
+      QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
       QString filepath = tmpdir.filePath(filename);
 
       takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
