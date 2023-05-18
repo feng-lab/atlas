@@ -150,6 +150,7 @@ inline double parallel_mean(Iterator first, Iterator last)
 template<class ForwardIterator>
 inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
 {
+  CHECK(first != last) << "At least one sample is required";
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
     std::tuple<double, double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results), std::get<1>(results) / std::get<4>(results));
@@ -158,6 +159,7 @@ inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator firs
 template<class ForwardIterator>
 inline std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
 {
+  CHECK(first != last) << "At least one sample is required";
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
     std::tuple<double, double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results), std::get<1>(results) / (std::get<4>(results) - double(1)));
@@ -188,6 +190,7 @@ inline double mean(Iterator first, Iterator last)
 template<class ForwardIterator>
 inline std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
 {
+  CHECK(first != last) << "At least one sample is required";
   const auto results =
     boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results), std::get<3>(results) * std::get<2>(results) / std::get<3>(results));
@@ -196,6 +199,7 @@ inline std::pair<double, double> mean_and_variance(const ForwardIterator first, 
 template<class ForwardIterator>
 inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
 {
+  CHECK(first != last) << "At least one sample is required";
   const auto results =
     boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
   return std::make_pair(std::get<0>(results),
