@@ -18,7 +18,7 @@ namespace nim {
 #define MULTITHREAD_THRESHOLD 1e7
 
 template<typename Iterator, typename Compare>
-Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
+inline Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return first; // handle empty range
@@ -37,13 +37,13 @@ Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
 }
 
 template<typename Iterator>
-Iterator parallel_min_element(Iterator first, Iterator last)
+inline Iterator parallel_min_element(Iterator first, Iterator last)
 {
   return parallel_min_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
+inline Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return first; // handle empty range
@@ -62,13 +62,13 @@ Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
 }
 
 template<typename Iterator>
-Iterator parallel_max_element(Iterator first, Iterator last)
+inline Iterator parallel_max_element(Iterator first, Iterator last)
 {
   return parallel_max_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
+inline std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return std::make_pair(first, first); // handle empty range
@@ -89,13 +89,14 @@ std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator l
 }
 
 template<typename Iterator>
-std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
+inline std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
 {
   return parallel_minmax_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
+inline std::pair<typename std::iterator_traits<Iterator>::value_type,
+                 typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
@@ -120,14 +121,15 @@ parallel_minmax(Iterator first, Iterator last, Compare comp)
 }
 
 template<typename Iterator>
-std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
+inline std::pair<typename std::iterator_traits<Iterator>::value_type,
+                 typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last)
 {
   return parallel_minmax(first, last, std::less<>());
 }
 
 template<typename Iterator>
-auto mean(Iterator first, Iterator last)
+inline double mean(Iterator first, Iterator last)
 {
   if (first == last) {
     throw ZException("Empty range");
@@ -142,7 +144,7 @@ auto mean(Iterator first, Iterator last)
 }
 
 template<typename Iterator>
-auto parallel_mean(Iterator first, Iterator last)
+inline double parallel_mean(Iterator first, Iterator last)
 {
   if (first == last) {
     throw ZException("Empty range");
@@ -165,7 +167,7 @@ auto parallel_mean(Iterator first, Iterator last)
 }
 
 template<class ForwardIterator>
-inline auto parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
+inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
 {
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
     std::tuple<double, double, double, double, double>>(first, last);
@@ -173,7 +175,7 @@ inline auto parallel_mean_and_variance(ForwardIterator first, ForwardIterator la
 }
 
 template<class ForwardIterator>
-inline auto parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
+inline std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
 {
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
     std::tuple<double, double, double, double, double>>(first, last);
@@ -181,14 +183,15 @@ inline auto parallel_mean_and_sample_variance(ForwardIterator first, ForwardIter
 }
 
 template<class ForwardIterator>
-inline auto parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+inline std::pair<double, double> parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = parallel_mean_and_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
 template<class ForwardIterator>
-inline auto parallel_mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
+inline std::pair<double, double> parallel_mean_and_sample_standard_deviation(ForwardIterator first,
+                                                                             ForwardIterator last)
 {
   const auto result = parallel_mean_and_sample_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
@@ -196,7 +199,7 @@ inline auto parallel_mean_and_sample_standard_deviation(ForwardIterator first, F
 
 // will change input data
 template<class RandomAccessIterator>
-double median(RandomAccessIterator first, RandomAccessIterator last)
+inline double median(RandomAccessIterator first, RandomAccessIterator last)
 {
   if (first == last) {
     throw ZException("Empty range");
