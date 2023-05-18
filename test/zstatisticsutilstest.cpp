@@ -45,7 +45,6 @@ TEST(ParallelTest, TestEmptyRange)
   EXPECT_EQ(nim::parallel_min_element(data.begin(), data.end()), data.end());
   EXPECT_EQ(nim::parallel_minmax_element(data.begin(), data.end()).first, data.end());
   EXPECT_EQ(nim::parallel_minmax_element(data.begin(), data.end()).second, data.end());
-  EXPECT_THROW(nim::parallel_minmax(data.begin(), data.end()), nim::ZException);
 }
 
 TEST(ParallelTest, TestParallelMaxElementWithComp)
@@ -110,13 +109,6 @@ TEST(ParallelTest, TestParallelMeanWithDoubles)
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
   result = nim::mean(data.begin(), data.end());
   EXPECT_NEAR(result, 5000.5, 1e-5); // the exact mean is 5000.5
-}
-
-TEST(ParallelTest, TestParallelMeanWithEmptyRange)
-{
-  std::vector<int> data;
-  EXPECT_THROW(nim::parallel_mean(data.begin(), data.end()), nim::ZException);
-  EXPECT_THROW(nim::mean(data.begin(), data.end()), nim::ZException);
 }
 
 TEST(ParallelTest, TestParallelMeanAndVarianceWithInts)
@@ -186,12 +178,6 @@ TEST(MedianTest, TestMedianSingleElement)
   std::vector<int> data{7};
   double result = nim::median(data.begin(), data.end());
   EXPECT_EQ(result, 7);
-}
-
-TEST(MedianTest, TestMedianEmptyRange)
-{
-  std::vector<int> data;
-  EXPECT_THROW(nim::median(data.begin(), data.end()), nim::ZException);
 }
 
 TEST(MedianTest, TestMedianLargeNumberOfElements)

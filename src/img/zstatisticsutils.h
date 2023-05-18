@@ -99,9 +99,7 @@ inline std::pair<typename std::iterator_traits<Iterator>::value_type,
                  typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last, Compare comp)
 {
-  if (first == last) {
-    throw ZException("Empty range"); // handle empty range
-  }
+  CHECK(first != last) << "At least one sample is required";
 
   using value_type = typename std::iterator_traits<Iterator>::value_type;
 
@@ -129,57 +127,9 @@ parallel_minmax(Iterator first, Iterator last)
 }
 
 template<typename Iterator>
-inline double mean(Iterator first, Iterator last)
-{
-  if (first == last) {
-    throw ZException("Empty range");
-  }
-
-  std::size_t size = std::distance(first, last);
-  // using OriginalType = typename std::iterator_traits<Iterator>::value_type;
-  // using ValueType = std::conditional_t<std::is_integral_v<OriginalType>, double, OriginalType>;
-  using ValueType = double;
-
-  return std::accumulate(first, last, ValueType(0)) / static_cast<ValueType>(size);
-}
-
-template<class ForwardIterator>
-inline std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
-{
-  const auto results =
-    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
-  return std::make_pair(std::get<0>(results), std::get<3>(results) * std::get<2>(results) / std::get<3>(results));
-}
-
-template<class ForwardIterator>
-inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
-{
-  const auto results =
-    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
-  return std::make_pair(std::get<0>(results),
-                        std::get<3>(results) * std::get<2>(results) / (std::get<3>(results) - 1.0));
-}
-
-template<class ForwardIterator>
-inline std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
-{
-  const auto result = mean_and_variance(first, last);
-  return std::make_pair(result.first, std::sqrt(result.second));
-}
-
-template<class ForwardIterator>
-inline std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
-{
-  const auto result = mean_and_sample_variance(first, last);
-  return std::make_pair(result.first, std::sqrt(result.second));
-}
-
-template<typename Iterator>
 inline double parallel_mean(Iterator first, Iterator last)
 {
-  if (first == last) {
-    throw ZException("Empty range");
-  }
+  CHECK(first != last) << "At least one sample is required";
 
   std::size_t size = std::distance(first, last);
   // using OriginalType = typename std::iterator_traits<Iterator>::value_type;
@@ -228,13 +178,49 @@ inline std::pair<double, double> parallel_mean_and_sample_standard_deviation(For
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
+template<typename Iterator>
+inline double mean(Iterator first, Iterator last)
+{
+  CHECK(first != last) << "At least one sample is required";
+  return boost::math::statistics::detail::mean_sequential_impl<double>(first, last);
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
+{
+  const auto results =
+    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results), std::get<3>(results) * std::get<2>(results) / std::get<3>(results));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
+{
+  const auto results =
+    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results),
+                        std::get<3>(results) * std::get<2>(results) / (std::get<3>(results) - 1.0));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = mean_and_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = mean_and_sample_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
 // will change input data
 template<class RandomAccessIterator>
 inline double median(RandomAccessIterator first, RandomAccessIterator last)
 {
-  if (first == last) {
-    throw ZException("Empty range");
-  }
+  CHECK(first != last) << "At least one sample is required";
 
   const auto num_elems = std::distance(first, last);
   if (num_elems & 1) {
