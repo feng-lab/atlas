@@ -386,11 +386,13 @@ void ZChromaticShiftCorrection::calcChannelInfs(const ZImg& srcImg)
       m_channelInfos[i].std = 0;
       m_channelInfos[i].median = 0;
     } else {
-      meanAndStandardDeviation(dataWithoutZero.begin(),
-                               dataWithoutZero.end(),
-                               m_channelInfos[i].mean,
-                               m_channelInfos[i].std);
-      m_channelInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
+      //      meanAndStandardDeviation(dataWithoutZero.begin(),
+      //                               dataWithoutZero.end(),
+      //                               m_channelInfos[i].mean,
+      //                               m_channelInfos[i].std);
+      std::tie(m_channelInfos[i].mean, m_channelInfos[i].std) =
+        parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
+      m_channelInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
     }
   }
 }

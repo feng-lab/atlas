@@ -3,16 +3,19 @@
 #include "zlog.h"
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
+#include <boost/math/statistics/univariate_statistics.hpp>
+#include <boost/math/statistics/detail/single_pass.hpp>
 #include <vector>
 #include <utility>
 #include <functional>
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <type_traits>
 
 namespace nim {
 
-#define MULTITHREAD_THRESHOLD 1e8
+#define MULTITHREAD_THRESHOLD 1e7
 
 template<typename Iterator, typename Compare>
 Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
@@ -123,6 +126,96 @@ parallel_minmax(Iterator first, Iterator last)
   return parallel_minmax(first, last, std::less<>());
 }
 
+template<typename Iterator>
+auto mean(Iterator first, Iterator last)
+{
+  if (first == last) {
+    throw ZException("Empty range");
+  }
+
+  std::size_t size = std::distance(first, last);
+  // using OriginalType = typename std::iterator_traits<Iterator>::value_type;
+  // using ValueType = std::conditional_t<std::is_integral_v<OriginalType>, double, OriginalType>;
+  using ValueType = double;
+
+  return std::accumulate(first, last, ValueType(0)) / static_cast<ValueType>(size);
+}
+
+template<typename Iterator>
+auto parallel_mean(Iterator first, Iterator last)
+{
+  if (first == last) {
+    throw ZException("Empty range");
+  }
+
+  std::size_t size = std::distance(first, last);
+  // using OriginalType = typename std::iterator_traits<Iterator>::value_type;
+  // using ValueType = std::conditional_t<std::is_integral_v<OriginalType>, double, OriginalType>;
+  using ValueType = double;
+
+  ValueType sum = tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    ValueType{},
+    [](const tbb::blocked_range<Iterator>& r, ValueType value) -> ValueType {
+      return std::accumulate(r.begin(), r.end(), value);
+    },
+    std::plus<>());
+
+  return sum / static_cast<ValueType>(size);
+}
+
+template<class ForwardIterator>
+inline auto parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
+{
+  const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
+    std::tuple<double, double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results), std::get<1>(results) / std::get<4>(results));
+}
+
+template<class ForwardIterator>
+inline auto parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
+{
+  const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
+    std::tuple<double, double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results), std::get<1>(results) / (std::get<4>(results) - double(1)));
+}
+
+template<class ForwardIterator>
+inline auto parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = parallel_mean_and_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+template<class ForwardIterator>
+inline auto parallel_mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = parallel_mean_and_sample_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+// will change input data
+template<class RandomAccessIterator>
+double median(RandomAccessIterator first, RandomAccessIterator last)
+{
+  if (first == last) {
+    throw ZException("Empty range");
+  }
+
+  const auto num_elems = std::distance(first, last);
+  if (num_elems & 1) {
+    auto middle = first + (num_elems - 1) / 2;
+    std::nth_element(first, middle, last);
+    return *middle;
+  } else {
+    auto middle = first + num_elems / 2 - 1;
+    std::nth_element(first, middle, last);
+    std::nth_element(middle, middle + 1, last);
+    return (double(*middle) + *(middle + 1)) / 2.;
+  }
+}
+
+#if 0
 template<typename RandomAccessIterator, typename ResultType>
 class SumRangeReduce_Impl
 {
@@ -161,14 +254,14 @@ sumRange(RandomAccessIterator begin, RandomAccessIterator end, ResultType init, 
   }
 }
 
-template<class RandomAccessIterator>
-double mean(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
-{
-  using ResultType = double;
+ template<class RandomAccessIterator>
+ double mean(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
+ {
+   using ResultType = double;
 
-  ResultType sum = sumRange(begin, end, static_cast<ResultType>(0), useMultithreading);
-  return sum / (end - begin);
-}
+   ResultType sum = sumRange(begin, end, static_cast<ResultType>(0), useMultithreading);
+   return sum / (end - begin);
+ }
 
 template<typename RandomAccessIterator, typename DiffIterator, typename ResultType>
 class StandardDeviationReduce_Impl
@@ -300,5 +393,6 @@ double medianInPlace(RandomAccessIterator begin, RandomAccessIterator end)
   ResultType a = *target;
   return (a + *std::max_element(begin, target)) / 2.0;
 }
+#endif
 
 } // namespace nim

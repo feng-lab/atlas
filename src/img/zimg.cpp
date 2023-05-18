@@ -2325,7 +2325,7 @@ ZImg ZImg::combine_Impl(const std::vector<const ZImg*>& imgs, ImgMergeMode mode)
           auto srcData = imgs[i]->timeData<TVoxel>(t);
           buf[i] = srcData[v];
         }
-        resData[v] = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.end()));
+        resData[v] = static_cast<TVoxel>(median(buf.begin(), buf.end()));
       }
     }
     return res;
@@ -2490,7 +2490,7 @@ void ZImg::blockDownsampled_Impl(ZImg& res, size_t blockWidth, size_t blockHeigh
                 }
                 srcOffset += planeVoxelNumber() - (yEnd - yStart) * rowVoxelNumber();
               }
-              resData[resOffset++] = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.begin() + bufIdx));
+              resData[resOffset++] = static_cast<TVoxel>(median(buf.begin(), buf.begin() + bufIdx));
             }
           }
         }

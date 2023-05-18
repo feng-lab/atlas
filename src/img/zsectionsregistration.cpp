@@ -396,11 +396,13 @@ void ZSectionsRegistration::calcSecInfs(const ZImg& srcImg)
       m_sectionInfos[i].std = 0;
       m_sectionInfos[i].median = 0;
     } else {
-      meanAndStandardDeviation(dataWithoutZero.begin(),
-                               dataWithoutZero.end(),
-                               m_sectionInfos[i].mean,
-                               m_sectionInfos[i].std);
-      m_sectionInfos[i].median = medianInPlace(dataWithoutZero.begin(), dataWithoutZero.end());
+      //      meanAndStandardDeviation(dataWithoutZero.begin(),
+      //                               dataWithoutZero.end(),
+      //                               m_sectionInfos[i].mean,
+      //                               m_sectionInfos[i].std);
+      std::tie(m_sectionInfos[i].mean, m_sectionInfos[i].std) =
+        parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
+      m_sectionInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
     }
   }
 }

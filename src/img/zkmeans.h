@@ -307,7 +307,7 @@ struct ZDistanceManhattan
     for (size_t i = 0; i < sepMats.size(); ++i) {
       // get median of each col
       for (Eigen::Index c = 0; c < sepMats[i]->cols(); ++c) {
-        centroids(i, c) = medianInPlace(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i));
+        centroids(i, c) = median(sepMats[i]->col(c).data(), sepMats[i]->col(c).data() + counts(i));
       }
     }
   }

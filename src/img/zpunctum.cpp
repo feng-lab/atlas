@@ -33,9 +33,11 @@ void ZPunctum::updateFromVoxelsList(double conf)
 
   m_volSize = m_voxelLocations.rows();
   m_mass = m_voxelIntensities.sum();
-  m_meanIntensity = m_mass / m_volSize;
-  m_sDevOfIntensity =
-    standardDeviation(m_voxelIntensities.data(), m_voxelIntensities.data() + m_voxelIntensities.size());
+  //  m_meanIntensity = m_mass / m_volSize;
+  //  m_sDevOfIntensity =
+  //    standardDeviation(m_voxelIntensities.data(), m_voxelIntensities.data() + m_voxelIntensities.size());
+  std::tie(m_meanIntensity, m_sDevOfIntensity) =
+    parallel_mean_and_sample_variance(m_voxelIntensities.data(), m_voxelIntensities.data() + m_voxelIntensities.size());
   m_maxIntensity = m_voxelIntensities.maxCoeff();
 
   Eigen::MatrixXd locs = m_voxelLocations.cast<double>();

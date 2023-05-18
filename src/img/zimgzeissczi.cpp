@@ -570,10 +570,10 @@ ZImg ZImgZeissCZI::correctShading(const QString& filename,
   double meanV = 0;
   double meanZ = 0;
   if (cm == CorrectionMode::IntensityRangeCorrected || cm == CorrectionMode::ZeroLightPreserved) {
-    meanV = mean(modelV.channelData<double>(0), modelV.channelData<double>(0) + modelV.channelVoxelNumber());
+    meanV = parallel_mean(modelV.channelData<double>(0), modelV.channelData<double>(0) + modelV.channelVoxelNumber());
   }
   if (cm == CorrectionMode::ZeroLightPreserved) {
-    meanZ = mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
+    meanZ = parallel_mean(modelZ.channelData<double>(0), modelZ.channelData<double>(0) + modelZ.channelVoxelNumber());
   }
   for (const auto& tile : m_sceneTiles[scene]) {
     if (tile.ratio == 1_uz && tile.start.c == static_cast<int>(ch)) {

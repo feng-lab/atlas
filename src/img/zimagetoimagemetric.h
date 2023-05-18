@@ -228,8 +228,10 @@ double ZImageToImageMetric::value(const TPixel1* img1, const TPixel2* img2, size
 
   double mean1 = 0, mean2 = 0, std1 = 0, std2 = 0;
   if (m_type == Type::NormalizedCrossCorrelation) {
-    meanAndStandardDeviation(img1, img1 + size, mean1, std1, true);
-    meanAndStandardDeviation(img2, img2 + size, mean2, std2, true);
+    //    meanAndStandardDeviation(img1, img1 + size, mean1, std1, true);
+    //    meanAndStandardDeviation(img2, img2 + size, mean2, std2, true);
+    std::tie(mean1, std1) = parallel_mean_and_standard_deviation(img1, img1 + size);
+    std::tie(mean2, std2) = parallel_mean_and_standard_deviation(img2, img2 + size);
     if (std1 == 0.0 || std2 == 0.0) {
       return 0;
     }

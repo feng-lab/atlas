@@ -111,7 +111,7 @@ void mergeMedian_Impl(const ZVoxelRegion& region,
     CHECK(buf.size() > 1);
 
     ZVoxelCoordinate locInRes = coord - minCoord;
-    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(medianInPlace(buf.begin(), buf.end()));
+    *res.data<TVoxel>(locInRes) = static_cast<TVoxel>(median(buf.begin(), buf.end()));
   }
   for (auto& tile : tiles) {
     tile.clearImgCache();
