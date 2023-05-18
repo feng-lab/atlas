@@ -10,7 +10,6 @@
 #include "zimagetransformresolve.h"
 #include <algorithm>
 #include <memory>
-#include <utility>
 
 namespace nim {
 

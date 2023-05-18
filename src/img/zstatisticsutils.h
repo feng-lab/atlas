@@ -9,6 +9,10 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#ifndef __APPLE__
+#include <execution>
+#include <boost/math/statistics/univariate_statistics.hpp>
+#endif
 
 namespace nim {
 
@@ -121,61 +125,6 @@ std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::ite
 parallel_minmax(Iterator first, Iterator last)
 {
   return parallel_minmax(first, last, std::less<>());
-}
-
-template<typename RandomAccessIterator>
-class MinMaxElementReduce_Impl
-{
-  RandomAccessIterator m_begin;
-
-public:
-  std::pair<RandomAccessIterator, RandomAccessIterator> m_minmax;
-
-  void operator()(const tbb::blocked_range<RandomAccessIterator>& range)
-  {
-    for (RandomAccessIterator it = range.begin(); it != range.end(); ++it) {
-      if (*it < *m_minmax.first) {
-        m_minmax.first = it;
-      }
-      if (*it > *m_minmax.second) {
-        m_minmax.second = it;
-      }
-    }
-  }
-
-  MinMaxElementReduce_Impl(MinMaxElementReduce_Impl& x, tbb::split /*unused*/)
-    : m_begin(x.m_begin)
-    , m_minmax(m_begin, m_begin)
-  {}
-
-  void join(const MinMaxElementReduce_Impl& y)
-  {
-    if (*y.m_minmax.first < *m_minmax.first) {
-      m_minmax.first = y.m_minmax.first;
-    }
-    if (*y.m_minmax.second > *m_minmax.second) {
-      m_minmax.second = y.m_minmax.second;
-    }
-  }
-
-  explicit MinMaxElementReduce_Impl(RandomAccessIterator begin)
-    : m_begin(begin)
-    , m_minmax(m_begin, m_begin)
-  {}
-};
-
-template<typename RandomAccessIterator>
-std::pair<RandomAccessIterator, RandomAccessIterator>
-minMaxElement(RandomAccessIterator begin, RandomAccessIterator end, bool useMultithreading = true)
-{
-  CHECK(end > begin);
-  if (!useMultithreading || end - begin < MULTITHREAD_THRESHOLD) {
-    return std::minmax_element(begin, end);
-  } else {
-    MinMaxElementReduce_Impl<RandomAccessIterator> minmax(begin);
-    tbb::parallel_reduce(tbb::blocked_range<RandomAccessIterator>(begin, end), minmax);
-    return minmax.m_minmax;
-  }
 }
 
 template<typename RandomAccessIterator, typename ResultType>
