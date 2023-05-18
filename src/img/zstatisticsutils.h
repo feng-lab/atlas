@@ -9,10 +9,6 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
-#ifndef __APPLE__
-#include <execution>
-#include <boost/math/statistics/univariate_statistics.hpp>
-#endif
 
 namespace nim {
 
