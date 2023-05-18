@@ -125,7 +125,9 @@ TEST(ParallelTest, TestParallelMeanAndVarianceWithInts)
   std::iota(data.begin(), data.end(), 1);
   auto result = nim::parallel_mean_and_variance(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
-  // Add a similar assertion for variance once you know the exact expected variance
+  EXPECT_NEAR(result.second, 8333333.25, 1e-5);
+  result = nim::mean_and_variance(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 8333333.25, 1e-5);
 }
 
@@ -135,7 +137,9 @@ TEST(ParallelTest, TestParallelMeanAndSampleVarianceWithInts)
   std::iota(data.begin(), data.end(), 1);
   auto result = nim::parallel_mean_and_sample_variance(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
-  // Add a similar assertion for sample variance once you know the exact expected sample variance
+  EXPECT_NEAR(result.second, 8334166.666666667, 1e-5);
+  result = nim::mean_and_sample_variance(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 8334166.666666667, 1e-5);
 }
 
@@ -145,7 +149,9 @@ TEST(ParallelTest, TestParallelMeanAndStandardDeviationWithInts)
   std::iota(data.begin(), data.end(), 1);
   auto result = nim::parallel_mean_and_standard_deviation(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
-  // Add a similar assertion for variance once you know the exact expected variance
+  EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
+  result = nim::mean_and_standard_deviation(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 2886.751331514372, 1e-5);
 }
 
@@ -155,7 +161,9 @@ TEST(ParallelTest, TestParallelMeanAndSampleStandardDeviationWithInts)
   std::iota(data.begin(), data.end(), 1);
   auto result = nim::parallel_mean_and_sample_standard_deviation(data.begin(), data.end());
   EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
-  // Add a similar assertion for sample variance once you know the exact expected sample variance
+  EXPECT_NEAR(result.second, 2886.8956799071675, 1e-5);
+  result = nim::mean_and_sample_standard_deviation(data.begin(), data.end());
+  EXPECT_NEAR(result.first, 5000.5, 1e-5); // the exact mean is 5000.5
   EXPECT_NEAR(result.second, 2886.8956799071675, 1e-5);
 }
 

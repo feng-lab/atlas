@@ -143,6 +143,37 @@ inline double mean(Iterator first, Iterator last)
   return std::accumulate(first, last, ValueType(0)) / static_cast<ValueType>(size);
 }
 
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
+{
+  const auto results =
+    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results), std::get<3>(results) * std::get<2>(results) / std::get<3>(results));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
+{
+  const auto results =
+    boost::math::statistics::detail::variance_sequential_impl<std::tuple<double, double, double, double>>(first, last);
+  return std::make_pair(std::get<0>(results),
+                        std::get<3>(results) * std::get<2>(results) / (std::get<3>(results) - 1.0));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = mean_and_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
+template<class ForwardIterator>
+inline std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
+{
+  const auto result = mean_and_sample_variance(first, last);
+  return std::make_pair(result.first, std::sqrt(result.second));
+}
+
 template<typename Iterator>
 inline double parallel_mean(Iterator first, Iterator last)
 {
