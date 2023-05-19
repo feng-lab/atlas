@@ -668,7 +668,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
-    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf', 'cmake')
+    sub_src_dir = os.path.join(src_dir, 'third_party', 'protobuf')
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
     try:
@@ -682,12 +682,12 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         cmakecmd.extend([sub_src_dir])
         build_and_install_cmakecmd(cmakecmd, sub_build_dir)
 
-        orig_file_2 = os.path.join(sub_install_dir, 'lib', 'cmake', 'protobuf', 'protobuf-config.cmake')
-        if is_windows():
-            orig_file_2 = os.path.join(sub_install_dir, 'cmake', 'protobuf-config.cmake')
-        patch_file(orig_file_2,
-                   from_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_rel_dir}/${_basename}${_ext}'],
-                   to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
+        # orig_file_2 = os.path.join(sub_install_dir, 'lib', 'cmake', 'protobuf', 'protobuf-config.cmake')
+        # if is_windows():
+        #     orig_file_2 = os.path.join(sub_install_dir, 'cmake', 'protobuf-config.cmake')
+        # patch_file(orig_file_2,
+        #            from_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_rel_dir}/${_basename}${_ext}'],
+        #            to_texts=[r'${protobuf_generate_PROTOC_OUT_DIR}/${_basename}${_ext}'])
     finally:
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
@@ -1136,8 +1136,8 @@ def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     orig_file = bak_file = None
-    orig_file_1 = bak_file_1 = None
-    orig_file_2 = bak_file_2 = None
+    # orig_file_1 = bak_file_1 = None
+    # orig_file_2 = bak_file_2 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -1155,26 +1155,26 @@ def build_eigen(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        if is_windows():
-            orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'Default',
-                                       'GenericPacketMathFunctions.h')
-            patch_file(orig_file_1,
-                       from_texts=[r'(M_PI_2)',
-                                   r'(M_PI_4)',
-                                   ],
-                       to_texts=[r'(EIGEN_PI/2.)',
-                                 r'(EIGEN_PI/4.)',
-                                 ])
-
-            orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'functors',
-                                       'BinaryFunctors.h')
-            patch_file(orig_file_2,
-                       from_texts=[r'(M_PI_2)',
-                                   r'(M_PI_4)',
-                                   ],
-                       to_texts=[r'(EIGEN_PI/2.)',
-                                 r'(EIGEN_PI/4.)',
-                                 ])
+        # if is_windows():
+        #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'Default',
+        #                                'GenericPacketMathFunctions.h')
+        #     patch_file(orig_file_1,
+        #                from_texts=[r'(M_PI_2)',
+        #                            r'(M_PI_4)',
+        #                            ],
+        #                to_texts=[r'(EIGEN_PI/2.)',
+        #                          r'(EIGEN_PI/4.)',
+        #                          ])
+        #
+        #     orig_file_2 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'functors',
+        #                                'BinaryFunctors.h')
+        #     patch_file(orig_file_2,
+        #                from_texts=[r'(M_PI_2)',
+        #                            r'(M_PI_4)',
+        #                            ],
+        #                to_texts=[r'(EIGEN_PI/2.)',
+        #                          r'(EIGEN_PI/4.)',
+        #                          ])
 
         # if is_linux():
         #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'Core', 'arch', 'AVX',
@@ -1190,21 +1190,18 @@ def build_eigen(src_dir: str, install_dir: str):
         #                          '#endif\n',
         #                          ])
 
-        if is_mac():
-            orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'misc', 'lapacke_helpers.h')
-            bak_file_1 = patch_file(orig_file_1,
-                                    from_texts=[r'template<UpLoType mode> char translate_mode',
-                                                r"template<> constexpr char translate_mode<Upper> = 'U';"
-                                                ],
-                                    to_texts=['namespace{\ntemplate<UpLoType mode> char translate_mode',
-                                              "template<> constexpr char translate_mode<Upper> = 'U';\n}"
-                                              ])
+        # if is_mac():
+        #     orig_file_1 = os.path.join(install_dir, 'include', 'eigen3', 'Eigen', 'src', 'misc', 'lapacke_helpers.h')
+        #     bak_file_1 = patch_file(orig_file_1,
+        #                             from_texts=[r'template<UpLoType mode> char translate_mode',
+        #                                         r"template<> constexpr char translate_mode<Upper> = 'U';"
+        #                                         ],
+        #                             to_texts=['namespace{\ntemplate<UpLoType mode> char translate_mode',
+        #                                       "template<> constexpr char translate_mode<Upper> = 'U';\n}"
+        #                                       ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
-        # if is_mac():
-        #     os.replace(bak_file_1, orig_file_1)
-        #     os.replace(bak_file_2, orig_file_2)
 
 
 def build_pocketfft(src_dir: str, install_dir: str):
@@ -1734,14 +1731,14 @@ def build_botan(src_dir: str, install_dir: str):
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
+    # orig_file = bak_file = None
     # orig_file_1 = bak_file_1 = None
     # orig_file4 = bak_file4 = None
     try:
-        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'Expat', 'src', 'expat', 'CMakeLists.txt')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r'${ITK3P_EXPAT_SOURCE_DIR}/expat_config.h'],
-                              to_texts=[r'${ITK3P_EXPAT_BINARY_DIR}/expat_config.h'])
+        # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'Expat', 'src', 'expat', 'CMakeLists.txt')
+        # bak_file = patch_file(orig_file,
+        #                       from_texts=[r'${ITK3P_EXPAT_SOURCE_DIR}/expat_config.h'],
+        #                       to_texts=[r'${ITK3P_EXPAT_BINARY_DIR}/expat_config.h'])
 
         # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
         # bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
@@ -1821,7 +1818,7 @@ def build_itk(src_dir: str, install_dir: str):
         #              os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
+        # os.replace(bak_file, orig_file)
         # # os.replace(bak_file4, orig_file4)
         # if is_windows():
         #     os.replace(bak_file_1, orig_file_1)
