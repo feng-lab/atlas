@@ -659,7 +659,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
     try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, cpp_standard=(20 if is_windows() else cpp_standard()))
         cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
                          '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE', ])
 
