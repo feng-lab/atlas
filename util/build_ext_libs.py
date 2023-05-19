@@ -2170,7 +2170,7 @@ def build_rocksdb(src_dir: str, install_dir: str):
                          '-DROCKSDB_BUILD_SHARED:BOOL=OFF',
                          '-DROCKSDB_SKIP_THIRDPARTY:BOOL=ON',
                          '-DWITH_GFLAGS:BOOL=ON',
-                         '-DPORTABLE:BOOL=ON',
+                         '-DPORTABLE=haswell',
                          '-DFORCE_AVX:BOOL=ON',
                          '-DWITH_TBB:BOOL=ON',
                          '-DUSE_COROUTINES:BOOL=OFF',
@@ -2683,8 +2683,8 @@ def parse_inputs(argv: list):
                 'openssl', 'grpc', 'double-conversion', 'lz4', 'xz', 'zstd', 'fmt', 'libevent', 'snappy', 'bzip2',
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
-                'opencv', 'botan', 'ospray', 'java', 'ants', 'conda-opencv', 'skia',
-                'neuTube', 'llfio', 'rocksdb', 'conda-zimg'
+                'opencv', 'botan', 'ospray', 'java', 'ants', 'skia',
+                'neuTube', 'rocksdb', 'llfio', 'conda-zimg', 'conda-opencv'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
