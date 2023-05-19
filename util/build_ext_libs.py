@@ -659,7 +659,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
     try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, cpp_standard=(20 if is_windows() else cpp_standard()))
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir)
         cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
                          '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE', ])
 
@@ -692,15 +692,15 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         shutil.rmtree(sub_build_dir, ignore_errors=False)
 
     build_dir = create_build_dir(src_dir)
-    orig_file = bak_file = None
+    # orig_file = bak_file = None
     try:
-        if is_linux() and not use_clang_in_linux():
-            orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'constexpr const char MetadataQuery',
-                                              ],
-                                  to_texts=[r'const char MetadataQuery',
-                                            ])
+        # if is_linux() and not use_clang_in_linux():
+        #     orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
+        #     bak_file = patch_file(orig_file,
+        #                           from_texts=[r'constexpr const char MetadataQuery',
+        #                                       ],
+        #                           to_texts=[r'const char MetadataQuery',
+        #                                     ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
@@ -721,8 +721,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_linux() and not use_clang_in_linux():
-            os.replace(bak_file, orig_file)
+        # if is_linux() and not use_clang_in_linux():
+        #     os.replace(bak_file, orig_file)
 
 
 def build_bzip2(src_dir: str, install_dir: str):
