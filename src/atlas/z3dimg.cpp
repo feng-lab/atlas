@@ -773,7 +773,7 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
   pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 0);
 
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
-    CHECK(!m_hasSufficientPageTableCacheSpace) << "page table block swapped out";
+    CHECK(!m_hasSufficientPageTableCacheSpace) << "page table block swapped out" << pageDirectoryEntryKey << erasedKey;
     for (size_t z = 0; z < m_pageTableBlockSize.z; ++z) {
       for (size_t y = 0; y < m_pageTableBlockSize.y; ++y) {
         std::memset(
