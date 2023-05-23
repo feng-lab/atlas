@@ -766,7 +766,8 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                          glm::uvec4& pageDirectoryEntryRef)
 {
   CHECK(!m_channelPageTableCacheManagers[c]->exists(pageDirectoryEntryKey))
-    << pageDirectoryEntryKey << " " << m_channelPageTableCacheManagers[c]->get(pageDirectoryEntryKey);
+    << pageDirectoryEntryKey << " " << m_channelPageTableCacheManagers[c]->get(pageDirectoryEntryKey) << " "
+    << pageDirectoryEntryRef;
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
   pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 0);
@@ -796,7 +797,7 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
   CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
-    << pageTableEntryKey << " " << m_channelImageCacheManagers[c]->get(pageTableEntryKey);
+    << pageTableEntryKey << " " << m_channelImageCacheManagers[c]->get(pageTableEntryKey) << " " << pageTableEntryRef;
   glm::uvec4 erasedKey;
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
