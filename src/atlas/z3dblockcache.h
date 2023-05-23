@@ -37,7 +37,6 @@ public:
 
   inline glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
   {
-    CHECK(m_cacheItemsMap.find(key) == m_cacheItemsMap.end()) << key;
     auto last = std::prev(m_cacheItemsList.end());
     if (m_numValidItems == m_size) {
       m_cacheItemsMap.erase(last->first);

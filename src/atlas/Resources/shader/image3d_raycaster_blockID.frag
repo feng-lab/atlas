@@ -92,8 +92,7 @@ void main()
         uint pagingFlag = pageDirEntry.w;
         if (pagingFlag != UNMAPPED && pagingFlag != EMPTY) {
           uvec4 pageTableEntry = texelFetch(page_table_cache, ivec3(pageDirEntry.xyz + pageTableCoord % page_table_block_size), 0);
-          pagingFlag = pageTableEntry.w;
-          if (pagingFlag != EMPTY) { // unmapped or (mapped and not empty)
+          if (pageTableEntry.w != EMPTY) { // unmapped or (mapped and not empty)
             // save used or missed blockid
             if (missBlockIDsIndex < 32) {
               uint blockID = pos_to_block_ids[curLevel].x + pageTableCoord.x + pos_to_block_ids[curLevel].y * pageTableCoord.y + pos_to_block_ids[curLevel].z * pageTableCoord.z;

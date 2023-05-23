@@ -475,17 +475,7 @@ void Z3DImg::setChannelDisplayRanges(const std::vector<glm::dvec2>& displayRange
 
   if (m_isVolumeDownsampled) {
     for (size_t c = 0; c < m_nChannels; ++c) {
-      m_channelPageTableCacheManagers[c] =
-        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
-      m_channelImageCacheManagers[c] =
-        std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
-                                                    m_imageCacheNumBlocks,
-                                                    m_invalidKey);
-      std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
-      m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
-
-      std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
-      m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
+      resetCacheSystem(c);
     }
   }
 }
@@ -595,12 +585,15 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-          CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
-            << pageTableEntryKey << " " << *pageDirectoryEntryPtr;
-          CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
-                       << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
-                       << pageTableEntryCoord; // block id shader should not collect mapped empty block
-          ++emptyBlockCount;
+          CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey)) << pageTableEntryKey;
+          LOG(ERROR)
+            << "Error: block id shader should not collect mapped empty block. Will reset the cache system and try again.";
+          resetCacheSystem(c);
+          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+          // CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
+          //              << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
+          //              << pageTableEntryCoord; // block id shader should not collect mapped empty block
+          // ++emptyBlockCount;
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;
@@ -773,6 +766,7 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                          const glm::uvec4& pageDirectoryEntryKey,
                                          glm::uvec4& pageDirectoryEntryRef)
 {
+  CHECK(!m_channelPageTableCacheManagers[c]->exists(pageDirectoryEntryKey)) << pageDirectoryEntryKey;
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
   pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 0);
@@ -801,6 +795,7 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
+  CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey)) << pageTableEntryKey;
   glm::uvec4 erasedKey;
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
@@ -1136,6 +1131,20 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
       }
     }
   }
+}
+
+void Z3DImg::resetCacheSystem(size_t c)
+{
+  m_channelPageTableCacheManagers[c] =
+    std::make_unique<Z3DBlockCache<glm::uvec4>>(m_pageTableBlockSize, m_pageTableCacheNumBlocks, m_invalidKey);
+  m_channelImageCacheManagers[c] = std::make_unique<Z3DBlockCache<glm::uvec4>>(m_imageBlockSize + m_imageBlockSizePad,
+                                                                               m_imageCacheNumBlocks,
+                                                                               m_invalidKey);
+  std::memset(m_channelPageDirectories[c].data(), 0, m_channelPageDirectories[c].size() * sizeof(glm::uvec4));
+  m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
+
+  std::memset(m_channelPageTableCaches[c].data(), 0, m_channelPageTableCaches[c].size() * sizeof(glm::uvec4));
+  m_channelPageTableCacheTextures[c]->updateImage(m_channelPageTableCaches[c].data());
 }
 
 } // namespace nim

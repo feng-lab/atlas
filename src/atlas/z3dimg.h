@@ -193,6 +193,8 @@ protected:
 
   void checkPageSystemError(size_t c, bool strict = true);
 
+  void resetCacheSystem(size_t c);
+
 protected:
   const glm::uvec3 m_pageTableBlockSize = glm::uvec3(32, 32, 32);
   glm::uvec3 m_pageTableCacheNumBlocks;
