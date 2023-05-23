@@ -577,6 +577,11 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       ++count;
       continue;
     } else if (pageDirectoryEntryPtr->w > 0) { // page table mapped
+      usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
+#ifdef ATLAS_CHECK_CACHE
+      usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
+#endif
+
       auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
       CHECK(glm::all(glm::lessThan(pageTableEntryCoord, m_pageTableCacheSize)));
       auto pageTableEntryPtr =
@@ -587,7 +592,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         if (pageTableEntryPtr->w == m_emptyFlag) {
           CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey)) << pageTableEntryKey;
           LOG(ERROR)
-            << "Error: block id shader should not collect mapped empty block. Will reset the cache system and try again.";
+            << "Error: block id shader should not collect mapped empty block, will reset the cache system and try again.";
           resetCacheSystem(c);
           return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
           // CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
@@ -601,10 +606,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
           m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
         }
-        usedPageDirectoryEntryKeys.insert(pageDirectoryEntryKey);
-#ifdef ATLAS_CHECK_CACHE
-        usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
-#endif
         ++count;
 
         continue; // skip current image block and go to next
