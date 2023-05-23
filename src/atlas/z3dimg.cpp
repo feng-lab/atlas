@@ -596,7 +596,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
           CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
             << pageTableEntryKey << " " << *pageDirectoryEntryPtr;
           CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
-                       << emptyBlockCount; // block id shader should not collect mapped empty block
+                       << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
+                       << pageTableEntryCoord; // block id shader should not collect mapped empty block
           ++emptyBlockCount;
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
