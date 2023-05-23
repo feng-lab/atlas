@@ -19,6 +19,7 @@ public:
     : m_numValidItems(0)
     , m_blockSize(blockSize)
     , m_numBlocks(numBlocks)
+  , m_invalidKey(invalidKey)
   {
     CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 && m_blockSize.x > 0 && m_blockSize.y > 0 &&
           m_blockSize.z > 0)
@@ -37,6 +38,7 @@ public:
 
   inline glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
   {
+    CHECK(key != m_invalidKey);
     CHECK(m_cacheItemsMap.find(key) == m_cacheItemsMap.end()) << key;
     auto last = std::prev(m_cacheItemsList.end());
     if (m_numValidItems == m_size) {
@@ -75,6 +77,7 @@ public:
 
   inline const glm::uvec3& get(const KeyType& key) const
   {
+    CHECK(key != m_invalidKey);
     auto it = m_cacheItemsMap.at(key);
     CHECK(it->first == key);
     return it->second;
@@ -82,6 +85,7 @@ public:
 
   inline void touch(const KeyType& key)
   {
+    CHECK(key != m_invalidKey);
     CHECK(m_cacheItemsMap.at(key)->first == key);
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, m_cacheItemsMap.at(key));
     CHECK(m_cacheItemsMap[key] == m_cacheItemsList.begin());
@@ -89,6 +93,7 @@ public:
 
   inline bool exists(const KeyType& key) const
   {
+    CHECK(key != m_invalidKey);
     return m_cacheItemsMap.find(key) != m_cacheItemsMap.end();
   }
 
@@ -105,6 +110,8 @@ private:
   size_t m_size;
   glm::uvec3 m_blockSize;
   glm::uvec3 m_numBlocks;
+
+  KeyType m_invalidKey;
 };
 
 } // namespace nim
