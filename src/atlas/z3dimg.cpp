@@ -1088,7 +1088,8 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
     glm::uvec4 pageTableKey(pdLoc, level);
     CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
     CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
-    CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz() + m_pageTableBlockSize, m_pageTableCacheSize)));
+    CHECK(
+      glm::all(glm::lessThanEqual(m_channelPageDirectories[c][i].xyz() + m_pageTableBlockSize, m_pageTableCacheSize)));
 #ifdef ATLAS_CHECK_CACHE
     CHECK(usedPageDirectoryEntry.find(m_channelPageDirectories[c][i].xyz()) == usedPageDirectoryEntry.end());
     usedPageDirectoryEntry.insert(m_channelPageDirectories[c][i].xyz());
@@ -1110,8 +1111,8 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
               glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
               CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
               CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
-              CHECK(glm::all(
-                glm::lessThan(pageTableEntry.xyz() + imageBlockSize, m_channelImageCacheTextures[c]->dimension())));
+              CHECK(glm::all(glm::lessThanEqual(pageTableEntry.xyz() + imageBlockSize,
+                                                m_channelImageCacheTextures[c]->dimension())));
 #ifdef ATLAS_CHECK_CACHE
               CHECK(usedPageTableEntry.find(pageTableEntry.xyz()) == usedPageTableEntry.end());
               usedPageTableEntry.insert(pageTableEntry.xyz());
