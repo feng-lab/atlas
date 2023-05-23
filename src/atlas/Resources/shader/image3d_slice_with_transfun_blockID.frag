@@ -14,8 +14,8 @@ uniform float ze_to_screen_pixel_voxel_size;
 
 layout(location = 0) out uvec4 FragData0;
 
-#define UNMAPPED 0
-#define EMPTY 40000
+#define UNMAPPED 0U
+#define EMPTY 40000U
 #define UINTMAX 4294967295U
 
 void main()

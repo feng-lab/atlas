@@ -24,8 +24,8 @@ layout(location = 5) out uvec4 FragData5;
 layout(location = 6) out uvec4 FragData6;
 layout(location = 7) out uvec4 FragData7;
 
-#define UNMAPPED 0
-#define EMPTY 40000
+#define UNMAPPED 0U
+#define EMPTY 40000U
 #define UINTMAX 4294967295U
 
 void main()
