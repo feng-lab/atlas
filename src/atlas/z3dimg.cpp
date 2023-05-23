@@ -576,6 +576,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
     auto pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
     auto pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
+    CHECK(glm::all(glm::lessThan(pageDirectoryEntryCoord, m_pageDirectorySize)));
     auto pageDirectoryEntryPtr =
       &m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.y * m_pageDirectorySize.x +
                                    pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
@@ -587,6 +588,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       continue;
     } else if (pageDirectoryEntryPtr->w > 0) { // page table mapped
       auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
+      CHECK(glm::all(glm::lessThan(pageTableEntryCoord, m_pageTableCacheSize)));
       auto pageTableEntryPtr =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
@@ -1056,6 +1058,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
   std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
   std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageTableEntry;
 #endif
+  auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
   for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
     if (m_channelPageDirectories[c][i].w == 0) {
       continue;
@@ -1085,7 +1088,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
     glm::uvec4 pageTableKey(pdLoc, level);
     CHECK(m_channelPageTableCacheManagers[c]->exists(pageTableKey));
     CHECK(m_channelPageTableCacheManagers[c]->get(pageTableKey) == m_channelPageDirectories[c][i].xyz());
-    CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz(), m_pageTableCacheSize)));
+    CHECK(glm::all(glm::lessThan(m_channelPageDirectories[c][i].xyz() + m_pageTableBlockSize, m_pageTableCacheSize)));
 #ifdef ATLAS_CHECK_CACHE
     CHECK(usedPageDirectoryEntry.find(m_channelPageDirectories[c][i].xyz()) == usedPageDirectoryEntry.end());
     usedPageDirectoryEntry.insert(m_channelPageDirectories[c][i].xyz());
@@ -1107,7 +1110,8 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
               glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
               CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
               CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
-              CHECK(glm::all(glm::lessThan(pageTableEntry.xyz(), m_channelImageCacheTextures[c]->dimension())));
+              CHECK(glm::all(
+                glm::lessThan(pageTableEntry.xyz() + imageBlockSize, m_channelImageCacheTextures[c]->dimension())));
 #ifdef ATLAS_CHECK_CACHE
               CHECK(usedPageTableEntry.find(pageTableEntry.xyz()) == usedPageTableEntry.end());
               usedPageTableEntry.insert(pageTableEntry.xyz());
