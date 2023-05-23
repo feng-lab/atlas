@@ -606,20 +606,16 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
           m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
         }
-        ++count;
-
-        continue; // skip current image block and go to next
-      }
-
-      // page table mapped but image block is not mapped
-      // increase pageDirectoryEntryPtr now, upload image blocks and update page table block later in pendingTasks
-      ++pageDirectoryEntryPtr->w;
-      if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
-        *pageTableEntryPtr = m_emptyPageTableEntry;
-        ++emptyBlockCount;
-      } else {
-        // pageTableEntryPtr->w must be 0 here
-        pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+      } else { // page table mapped but image block is not mapped
+        // increase pageDirectoryEntryPtr now, upload image blocks and update page table block later in pendingTasks
+        ++pageDirectoryEntryPtr->w;
+        if (isImageBlockEmpty(c, pageTableEntryKey, imageBlockSize)) {
+          *pageTableEntryPtr = m_emptyPageTableEntry;
+          ++emptyBlockCount;
+        } else {
+          // pageTableEntryPtr->w must be 0 here
+          pendingTasks.push_back(std::make_tuple(pageTableEntryKey, pageTableEntryPtr));
+        }
       }
       ++count;
     } else { // pageDirectoryEntryPtr.w == 0, page table not mapped
