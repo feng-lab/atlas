@@ -625,6 +625,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   // if (!m_hasSufficientPageTableCacheSpace) {
   for (const auto& pageDirectoryEntryKey : usedPageDirectoryEntryKeys) {
+    VLOG(1) << pageDirectoryEntryKey;
     m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
   }
   //}
