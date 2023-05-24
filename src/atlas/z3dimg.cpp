@@ -10,6 +10,7 @@
 #include <folly/concurrency/UnboundedQueue.h>
 #include <folly/MPMCQueue.h>
 #include <folly/executors/CPUThreadPoolExecutor.h>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <algorithm>
 #include <chrono>
 #include <memory>
@@ -537,10 +538,10 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
   // image block)
   std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*
   // used to make sure used page table block will not be swapped out
-  std::set<glm::uvec4, Vec4Compare<uint32_t, glm::highp>> usedPageDirectoryEntryKeys;
+  boost::unordered_flat_set<glm::uvec4> usedPageDirectoryEntryKeys;
 
 #ifdef ATLAS_CHECK_CACHE
-  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
+  boost::unordered_flat_set<glm::uvec3> usedPageDirectoryEntry;
   m_usedPageTableEntry.clear();
 #endif
 
@@ -590,15 +591,14 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-          CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey)) << pageTableEntryKey;
-          LOG(ERROR)
-            << "Error: block id shader should not collect mapped empty block, will reset the cache system and try again.";
-          resetCacheSystem(c);
-          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
-          // CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
-          //              << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
-          //              << pageTableEntryCoord; // block id shader should not collect mapped empty block
-          // ++emptyBlockCount;
+          // LOG(ERROR)
+          //   << "Error: block id shader should not collect mapped empty block, will reset the cache system and try again.";
+          // resetCacheSystem(c);
+          // return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+          CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
+                       << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
+                       << pageTableEntryCoord; // block id shader should not collect mapped empty block
+          ++emptyBlockCount;
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;
@@ -646,12 +646,13 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // pageDirectoryEntryPtr->w == 0, page table not mapped
       if (numAvailablePageCacheBlock > 0) {
         // we still have space, construct new page table block
+        VLOG(1) << pageDirectoryEntryKey;
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
         CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
         usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
 #endif
-        // after insertion, pageDirectoryEntryPtr->w == 0, will add a pendingTask
+        // after insertion, pageDirectoryEntryPtr->w == 1 (not count as mapped page tables), will add a pendingTask
         ++pageDirectoryEntryPtr->w;
         --numAvailablePageCacheBlock;
       } else {
@@ -771,7 +772,8 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
     << pageDirectoryEntryRef;
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
-  pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 0);
+  // when page table mapped but no image blocks is mapped yet, pageDirectoryEntry.w == 1
+  pageDirectoryEntryRef = glm::uvec4(pageTableBlockCachePos, 1);
 
   if (erasedKey.x != std::numeric_limits<uint32_t>::max()) {
     CHECK(!m_hasSufficientPageTableCacheSpace) << "page table block swapped out" << pageDirectoryEntryKey << erasedKey;
@@ -832,6 +834,7 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
         CHECK(erasedKeyPageTableEntry.w == 1) << erasedKeyPageTableEntry;
         erasedKeyPageTableEntry.w = 0;
         --erasedKeyPageDirectoryEntry.w;
+        CHECK(erasedKeyPageDirectoryEntry.w >= 1); // if page table mapped without any image block, then this should be 1
       }
     }
   }
@@ -1053,15 +1056,15 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
 void Z3DImg::checkPageSystemError(size_t c, bool strict)
 {
 #ifdef ATLAS_CHECK_CACHE
-  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageDirectoryEntry;
-  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> usedPageTableEntry;
+  boost::unordered_flat_set<glm::uvec3> usedPageDirectoryEntry;
+  boost::unordered_flat_set<glm::uvec3> usedPageTableEntry;
 #endif
   auto imageBlockSize = m_imageBlockSize + m_imageBlockSizePad;
   for (size_t i = 0; i < m_channelPageDirectories[c].size(); ++i) {
     if (m_channelPageDirectories[c][i].w == 0) {
       continue;
     }
-    CHECK(m_channelPageDirectories[c][i].w > 0);
+    CHECK(m_channelPageDirectories[c][i].w != m_emptyFlag);
 
     glm::uvec3 pdLoc;
     pdLoc.x = i;
@@ -1123,14 +1126,14 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
       }
     }
     if (strict) {
-      CHECK(numValidEntry == m_channelPageDirectories[c][i].w)
+      CHECK(numValidEntry + 1 == m_channelPageDirectories[c][i].w)
         << numValidEntry << " " << m_channelPageDirectories[c][i].w << " " << i << " " << numEmptyEntry;
     } else {
-      CHECK(numValidEntry <= m_channelPageDirectories[c][i].w)
+      CHECK(numValidEntry + 1 <= m_channelPageDirectories[c][i].w)
         << numValidEntry << " " << m_channelPageDirectories[c][i].w << " " << i << " " << numEmptyEntry;
-      if (numValidEntry != m_channelPageDirectories[c][i].w) {
+      if (numValidEntry + 1 != m_channelPageDirectories[c][i].w) {
         LOG(INFO) << "Fixing cancellation caused inconsistency";
-        m_channelPageDirectories[c][i].w = numValidEntry;
+        m_channelPageDirectories[c][i].w = numValidEntry + 1;
       }
     }
   }

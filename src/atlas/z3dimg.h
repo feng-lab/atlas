@@ -10,6 +10,9 @@
 #include <folly/CancellationToken.h>
 #include <QObject>
 #include <set>
+#ifdef ATLAS_CHECK_CACHE
+#include <boost/unordered/unordered_flat_set.hpp>
+#endif
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
@@ -203,7 +206,8 @@ protected:
   const glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  // const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped
+  // const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped, for page directory entry,
+  // 2 - 32769
   const uint32_t m_emptyFlag = 40000;
 
   std::vector<std::vector<glm::uvec4>> m_channelPageDirectories;
@@ -250,7 +254,7 @@ private:
   glm::vec3 m_volumeSpacing;
 
 #ifdef ATLAS_CHECK_CACHE
-  std::set<glm::uvec3, Vec3Compare<uint32_t, glm::highp>> m_usedPageTableEntry;
+  boost::unordered_flat_set<glm::uvec3> m_usedPageTableEntry;
 #endif
 
   const glm::uvec4 m_invalidKey = glm::uvec4(std::numeric_limits<uint32_t>::max());

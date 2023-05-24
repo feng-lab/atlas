@@ -4,7 +4,7 @@
 #include "zglmutils.h"
 #include <cstddef>
 #include <list>
-#include <unordered_map>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 namespace nim {
 
@@ -16,20 +16,18 @@ public:
   using ListIteratorType = typename std::list<KeyValuePairType>::iterator;
 
   Z3DBlockCache(const glm::uvec3& blockSize, const glm::uvec3& numBlocks, const KeyType& invalidKey)
-    : m_numValidItems(0)
-    , m_blockSize(blockSize)
-    , m_numBlocks(numBlocks)
+    : m_invalidKey(invalidKey)
   {
-    CHECK(m_numBlocks.x > 0 && m_numBlocks.y > 0 && m_numBlocks.z > 0 && m_blockSize.x > 0 && m_blockSize.y > 0 &&
-          m_blockSize.z > 0)
+    CHECK(numBlocks.x > 0 && numBlocks.y > 0 && numBlocks.z > 0 && blockSize.x > 0 && blockSize.y > 0 &&
+          blockSize.z > 0)
       << blockSize << numBlocks;
 
-    m_size = m_numBlocks.x * m_numBlocks.y * m_numBlocks.z;
-    for (uint32_t z = 0; z < m_numBlocks.z; ++z) {
-      for (uint32_t y = 0; y < m_numBlocks.y; ++y) {
-        for (uint32_t x = 0; x < m_numBlocks.x; ++x) {
+    m_size = numBlocks.x * numBlocks.y * numBlocks.z;
+    for (uint32_t z = 0; z < numBlocks.z; ++z) {
+      for (uint32_t y = 0; y < numBlocks.y; ++y) {
+        for (uint32_t x = 0; x < numBlocks.x; ++x) {
           m_cacheItemsList.push_front(
-            KeyValuePairType(invalidKey, glm::uvec3(x * m_blockSize.x, y * m_blockSize.y, z * m_blockSize.z)));
+            KeyValuePairType(invalidKey, glm::uvec3(x * blockSize.x, y * blockSize.y, z * blockSize.z)));
         }
       }
     }
@@ -37,16 +35,23 @@ public:
 
   inline glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
   {
-    auto last = std::prev(m_cacheItemsList.end());
-    if (m_numValidItems == m_size) {
-      m_cacheItemsMap.erase(last->first);
-    } else {
-      ++m_numValidItems;
+    if (exists(key)) {
+      erasedKey = m_invalidKey;
+      auto it = m_cacheItemsMap.at(key);
+      m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, it);
+      return it->second;
     }
+    auto last = std::prev(m_cacheItemsList.end());
     erasedKey = last->first;
+    if (erasedKey != m_invalidKey) {
+      CHECK(m_cacheItemsMap.size() == m_size) << m_cacheItemsMap.size() << " " << m_size;
+      m_cacheItemsMap.erase(erasedKey);
+    } else {
+      CHECK(m_cacheItemsMap.size() < m_size) << m_cacheItemsMap.size() << " " << m_size;
+    }
     last->first = key;
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, last);
-    m_cacheItemsMap[key] = m_cacheItemsList.begin();
+    m_cacheItemsMap[key] = last;
     return last->second;
   }
 
@@ -74,16 +79,12 @@ public:
 
   inline const glm::uvec3& get(const KeyType& key) const
   {
-    auto it = m_cacheItemsMap.at(key);
-    CHECK(it->first == key);
-    return it->second;
+    return m_cacheItemsMap.at(key)->second;
   }
 
   inline void touch(const KeyType& key)
   {
-    CHECK(m_cacheItemsMap.at(key)->first == key);
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, m_cacheItemsMap.at(key));
-    CHECK(m_cacheItemsMap[key] == m_cacheItemsList.begin());
   }
 
   inline bool exists(const KeyType& key) const
@@ -98,12 +99,10 @@ public:
 
 private:
   std::list<KeyValuePairType> m_cacheItemsList;
-  std::unordered_map<KeyType, ListIteratorType> m_cacheItemsMap;
-  size_t m_numValidItems;
+  boost::unordered_flat_map<KeyType, ListIteratorType> m_cacheItemsMap;
 
   size_t m_size;
-  glm::uvec3 m_blockSize;
-  glm::uvec3 m_numBlocks;
+  KeyType m_invalidKey;
 };
 
 } // namespace nim
