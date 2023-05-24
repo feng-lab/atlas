@@ -206,9 +206,14 @@ protected:
   const glm::uvec3 m_imageBlockSizePad = glm::uvec3(4, 4, 4);
   // glm::ivec3 m_imageBlockReadSize;
   glm::uvec3 m_imageCacheNumBlocks;
-  // const uint32_t m_unmappedFlag = 0; // 1 - 32*32*32(32768) means number of blocks mapped, for page directory entry,
-  // 2 - 32769
+  // const uint32_t m_unmappedFlag = 0;
   const uint32_t m_emptyFlag = 40000;
+  // for page directory entry, 0 means page table block is not mapped,
+  // 1 means page table is mapped but no image blocks are mapped, 40000 means page directory is empty, where
+  // all regions in this page directory (can be up to m_pageTableBlockSize * imageBlockSize) contain no signal,
+  // value 2 - 1 + 32*32*32(32768) means (1-32768) number of image blocks are mapped
+  // for page table entry, 0 means image block is not mapped,
+  // 1 means image block is mapped, 40000 means image block is empty (contains no signal)
 
   std::vector<std::vector<glm::uvec4>> m_channelPageDirectories;
   glm::uvec3 m_pageDirectorySize;

@@ -534,8 +534,6 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   // pageDirectoryEntryKey, pageDirectoryEntry*, pageTableEntryKey
   std::vector<std::tuple<glm::uvec4, glm::uvec4*, glm::uvec4>> pendingBlocks;
-  // go through all blocks and touch used blocks and collect pendingTasks if page table is already mapped (only need
-  // image block)
   std::vector<std::tuple<glm::uvec4, glm::uvec4*>> pendingTasks; // pageTableEntryKey, pageTableEntry*
   // used to make sure used page table block will not be swapped out
   boost::unordered_flat_set<glm::uvec4> usedPageDirectoryEntryKeys;
@@ -567,7 +565,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       << blockID << " " << pageTableEntryKey << " " << m_pageTableDimensions[level];
     auto pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
     auto pageDirectoryEntryCoord = m_pageDirectoryBases[pageDirectoryEntryKey.w] + pageDirectoryEntryKey.xyz();
+#ifdef ATLAS_CHECK_CACHE
     CHECK(glm::all(glm::lessThan(pageDirectoryEntryCoord, m_pageDirectorySize)));
+#endif
     auto pageDirectoryEntryPtr =
       &m_channelPageDirectories[c][pageDirectoryEntryCoord.z * m_pageDirectorySize.y * m_pageDirectorySize.x +
                                    pageDirectoryEntryCoord.y * m_pageDirectorySize.x + pageDirectoryEntryCoord.x];
@@ -584,7 +584,9 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 #endif
 
       auto pageTableEntryCoord = pageDirectoryEntryPtr->xyz() + pageTableEntryKey.xyz() % m_pageTableBlockSize;
+#ifdef ATLAS_CHECK_CACHE
       CHECK(glm::all(glm::lessThan(pageTableEntryCoord, m_pageTableCacheSize)));
+#endif
       auto pageTableEntryPtr =
         &m_channelPageTableCaches[c][pageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                      pageTableEntryCoord.y * m_pageTableCacheSize.x + pageTableEntryCoord.x];
@@ -592,7 +594,8 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
           // LOG(ERROR)
-          //   << "Error: block id shader should not collect mapped empty block, will reset the cache system and try again.";
+          //   << "Error: block id shader should not collect mapped empty block, will reset the cache system and try
+          //   again.";
           // resetCacheSystem(c);
           // return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
           CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
@@ -623,12 +626,12 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
     }
   }
 
-  // if (!m_hasSufficientPageTableCacheSpace) {
-  for (const auto& pageDirectoryEntryKey : usedPageDirectoryEntryKeys) {
-    VLOG(1) << pageDirectoryEntryKey;
-    m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
+  if (!m_hasSufficientPageTableCacheSpace) {
+    for (const auto& pageDirectoryEntryKey : usedPageDirectoryEntryKeys) {
+      // VLOG(1) << pageDirectoryEntryKey;
+      m_channelPageTableCacheManagers[c]->touch(pageDirectoryEntryKey);
+    }
   }
-  //}
   auto numAvailablePageCacheBlock =
     index_t(m_channelPageTableCacheManagers[c]->size()) - index_t(usedPageDirectoryEntryKeys.size());
   clearAndDeallocate(usedPageDirectoryEntryKeys);
@@ -646,7 +649,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
       // pageDirectoryEntryPtr->w == 0, page table not mapped
       if (numAvailablePageCacheBlock > 0) {
         // we still have space, construct new page table block
-        VLOG(1) << pageDirectoryEntryKey;
+        // VLOG(1) << pageDirectoryEntryKey;
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
         CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
@@ -767,9 +770,11 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
                                          const glm::uvec4& pageDirectoryEntryKey,
                                          glm::uvec4& pageDirectoryEntryRef)
 {
+#ifdef ATLAS_CHECK_CACHE
   CHECK(!m_channelPageTableCacheManagers[c]->exists(pageDirectoryEntryKey))
     << pageDirectoryEntryKey << " " << m_channelPageTableCacheManagers[c]->get(pageDirectoryEntryKey) << " "
     << pageDirectoryEntryRef;
+#endif
   glm::uvec4 erasedKey;
   glm::uvec3 pageTableBlockCachePos = m_channelPageTableCacheManagers[c]->insert(pageDirectoryEntryKey, erasedKey);
   // when page table mapped but no image blocks is mapped yet, pageDirectoryEntry.w == 1
@@ -799,8 +804,10 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
+#ifdef ATLAS_CHECK_CACHE
   CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
     << pageTableEntryKey << " " << m_channelImageCacheManagers[c]->get(pageTableEntryKey) << " " << pageTableEntryRef;
+#endif
   glm::uvec4 erasedKey;
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
@@ -815,10 +822,13 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
                                   erasedKeyPageDirectoryEntryCoord.y * m_pageDirectorySize.x +
                                   erasedKeyPageDirectoryEntryCoord.x];
 
+#ifdef ATLAS_CHECK_CACHE
     CHECK(erasedKeyPageDirectoryEntry.w != m_emptyFlag) << erasedKeyPageDirectoryEntry;
     if (m_hasSufficientPageTableCacheSpace) {
-      CHECK(erasedKeyPageDirectoryEntry.w > 0) << erasedKeyPageDirectoryEntry;
+      CHECK(erasedKeyPageDirectoryEntry.w > 1)
+        << erasedKeyPageDirectoryEntry; // should be mapped and has at least one image block so > 1
     }
+#endif
     if (erasedKeyPageDirectoryEntry.w > 0) {
       glm::uvec3 erasedKeyPageTableEntryCoord =
         erasedKeyPageDirectoryEntry.xyz() + erasedKey.xyz() % m_pageTableBlockSize;
@@ -826,15 +836,19 @@ void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryK
         m_channelPageTableCaches[c][erasedKeyPageTableEntryCoord.z * m_pageTableCacheSize.y * m_pageTableCacheSize.x +
                                     erasedKeyPageTableEntryCoord.y * m_pageTableCacheSize.x +
                                     erasedKeyPageTableEntryCoord.x];
+#ifdef ATLAS_CHECK_CACHE
       CHECK(erasedKeyPageTableEntry.w != m_emptyFlag) << erasedKeyPageTableEntry;
       if (m_hasSufficientPageTableCacheSpace) {
         CHECK(erasedKeyPageTableEntry.w > 0) << erasedKeyPageTableEntry;
       }
+#endif
       if (erasedKeyPageTableEntry.w > 0) {
+#ifdef ATLAS_CHECK_CACHE
         CHECK(erasedKeyPageTableEntry.w == 1) << erasedKeyPageTableEntry;
+#endif
         erasedKeyPageTableEntry.w = 0;
         --erasedKeyPageDirectoryEntry.w;
-        CHECK(erasedKeyPageDirectoryEntry.w >= 1); // if page table mapped without any image block, then this should be 1
+        CHECK(erasedKeyPageDirectoryEntry.w >= 1);
       }
     }
   }

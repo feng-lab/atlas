@@ -44,11 +44,12 @@ public:
     auto last = std::prev(m_cacheItemsList.end());
     erasedKey = last->first;
     if (erasedKey != m_invalidKey) {
-      CHECK(m_cacheItemsMap.size() == m_size) << m_cacheItemsMap.size() << " " << m_size;
+      // CHECK(m_cacheItemsMap.size() == m_size) << m_cacheItemsMap.size() << " " << m_size;
       m_cacheItemsMap.erase(erasedKey);
-    } else {
-      CHECK(m_cacheItemsMap.size() < m_size) << m_cacheItemsMap.size() << " " << m_size;
     }
+    // else {
+    //   CHECK(m_cacheItemsMap.size() < m_size) << m_cacheItemsMap.size() << " " << m_size;
+    // }
     last->first = key;
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, last);
     m_cacheItemsMap[key] = last;
