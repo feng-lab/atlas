@@ -8,7 +8,7 @@
 #include <QObject>
 #include <QEvent>
 #include <QMutexLocker>
-#include <set>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 class QOffscreenSurface;
 
@@ -316,7 +316,7 @@ private:
 
   std::deque<Z3DCanvasEventListener*> m_listeners;
 
-  std::set<QEvent::Type> m_eventTypes;
+  boost::unordered_flat_set<QEvent::Type> m_eventTypes;
 
   bool m_isRendering = false;
 

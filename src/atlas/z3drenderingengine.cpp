@@ -174,16 +174,16 @@ Z3DRenderingEngine::Z3DRenderingEngine(ZDoc& doc, QObject* parent)
   , m_doc(doc)
   , m_numObjsBefore(m_doc.numObjs())
 {
-  m_eventTypes = std::set<QEvent::Type>{QEvent::ContextMenu,
-                                        QEvent::MouseButtonPress,
-                                        QEvent::MouseButtonRelease,
-                                        QEvent::MouseMove,
-                                        QEvent::MouseButtonDblClick,
-                                        QEvent::Wheel,
-                                        QEvent::KeyPress,
-                                        QEvent::KeyRelease,
-                                        QEvent::UpdateRequest,
-                                        QEvent::LayoutRequest};
+  m_eventTypes = boost::unordered_flat_set<QEvent::Type>{QEvent::ContextMenu,
+                                                         QEvent::MouseButtonPress,
+                                                         QEvent::MouseButtonRelease,
+                                                         QEvent::MouseMove,
+                                                         QEvent::MouseButtonDblClick,
+                                                         QEvent::Wheel,
+                                                         QEvent::KeyPress,
+                                                         QEvent::KeyRelease,
+                                                         QEvent::UpdateRequest,
+                                                         QEvent::LayoutRequest};
 
 #if defined(__linux__)
   if (FLAGS___use_EGL) {
@@ -829,7 +829,7 @@ void Z3DRenderingEngine::rotateZM()
 bool Z3DRenderingEngine::event(QEvent* e)
 {
   // LOG(INFO) << e->type();
-  if (contains(m_eventTypes, e->type())) {
+  if (m_eventTypes.contains(e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       renderFast();
       e->accept();

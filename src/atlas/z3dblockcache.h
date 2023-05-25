@@ -1,6 +1,6 @@
 #pragma once
 
-#include "zexception.h"
+#include "zlog.h"
 #include "zglmutils.h"
 #include <cstddef>
 #include <list>
@@ -90,7 +90,7 @@ public:
 
   inline bool exists(const KeyType& key) const
   {
-    return m_cacheItemsMap.find(key) != m_cacheItemsMap.end();
+    return m_cacheItemsMap.contains(key);
   }
 
   [[nodiscard]] inline size_t size() const

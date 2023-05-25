@@ -15,7 +15,7 @@
 #include <folly/compression/Compression.h>
 #include <folly/io/IOBuf.h>
 #include <utility>
-#include <unordered_map>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for nim format, default is false");
 
@@ -470,11 +470,11 @@ void writeRatiosToGrp(H5::Group& grp, const std::set<size_t>& ratios)
 
 namespace nim {
 
-std::unordered_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo>
+boost::unordered_flat_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo>
 parseHDF5Chunks(const QString& filename)
 {
   // level, t, c, z, y, x
-  std::unordered_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> res;
+  boost::unordered_flat_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> res;
 
   if (ZImgGlobal::instance().resourcesDIR.isEmpty()) {
     return res;
@@ -792,7 +792,7 @@ void ZImgHDF5::readInfo(const QString& filename,
                         std::vector<ZImgInfo>& infos,
                         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
-  std::unordered_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> hdf5Chunks;
+  boost::unordered_flat_map<std::tuple<size_t, size_t, size_t, size_t, size_t, size_t>, HDF5ChunkInfo> hdf5Chunks;
   if (subBlocks) {
     if (FLAGS_zimg_use_mmap_file_for_hdf5) {
       ZMemoryMappedFileCache::instance().getOrCreateMemoryMappedFile(filename);

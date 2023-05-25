@@ -84,7 +84,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
 
 std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm::ivec2& pos, int radius, bool ascend)
 {
-  std::map<glm::col4, int, Col4Compare> col2dist;
+  boost::unordered_flat_map<glm::col4, int> col2dist;
   const Z3DTexture* tex = m_renderTarget->attachment(GL_COLOR_ATTACHMENT0);
   GLenum dataFormat = GL_BGRA;
   GLenum dataType = GL_UNSIGNED_INT_8_8_8_8_REV;

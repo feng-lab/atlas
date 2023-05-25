@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <map>
 #include <vector>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 namespace nim {
 
@@ -61,27 +62,27 @@ public:
 
   static void clearTarget();
 
-  Z3DRenderTarget& renderTarget() const
+  [[nodiscard]] Z3DRenderTarget& renderTarget() const
   {
     return *m_renderTarget;
   }
 
   bool isRegistered(const void* obj)
   {
-    return m_objectToColor.find(obj) != m_objectToColor.end();
+    return m_objectToColor.contains(obj);
   }
 
   bool isRegistered(const glm::col4& col)
   {
-    return m_colorToObject.find(col) != m_colorToObject.end();
+    return m_colorToObject.contains(col);
   }
 
 private:
   void increaseColor();
 
 private:
-  std::map<glm::col4, const void*, Col4Compare> m_colorToObject;
-  std::map<const void*, glm::col4> m_objectToColor;
+  boost::unordered_flat_map<glm::col4, const void*> m_colorToObject;
+  boost::unordered_flat_map<const void*, glm::col4> m_objectToColor;
   Z3DRenderTarget* m_renderTarget = nullptr;
   glm::col4 m_currentColor{0, 0, 0, 128};
   double m_devicePixelRatio = 1.;

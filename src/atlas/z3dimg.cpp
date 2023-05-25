@@ -652,7 +652,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
         // VLOG(1) << pageDirectoryEntryKey;
         insertPageTableBlockToCache(c, pageDirectoryEntryKey, *pageDirectoryEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
-        CHECK(!contains(usedPageDirectoryEntry, pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
+        CHECK(!usedPageDirectoryEntry.contains(pageDirectoryEntryPtr->xyz())) << *pageDirectoryEntryPtr;
         usedPageDirectoryEntry.insert(pageDirectoryEntryPtr->xyz());
 #endif
         // after insertion, pageDirectoryEntryPtr->w == 1 (not count as mapped page tables), will add a pendingTask
@@ -1053,7 +1053,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       }
       insertImageBlockToCache(c, pageTableEntryKey, *pageTableEntryPtr);
 #ifdef ATLAS_CHECK_CACHE
-      CHECK(!contains(m_usedPageTableEntry, pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
+      CHECK(!m_usedPageTableEntry.contains(pageTableEntryPtr->xyz())) << pageTableEntryPtr->xyz();
       m_usedPageTableEntry.insert(pageTableEntryPtr->xyz());
 #endif
       m_channelImageCacheTextures[c]->updateSubImage(pageTableEntryPtr->xyz(),
@@ -1106,7 +1106,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
     CHECK(
       glm::all(glm::lessThanEqual(m_channelPageDirectories[c][i].xyz() + m_pageTableBlockSize, m_pageTableCacheSize)));
 #ifdef ATLAS_CHECK_CACHE
-    CHECK(usedPageDirectoryEntry.find(m_channelPageDirectories[c][i].xyz()) == usedPageDirectoryEntry.end());
+    CHECK(!usedPageDirectoryEntry.contains(m_channelPageDirectories[c][i].xyz()));
     usedPageDirectoryEntry.insert(m_channelPageDirectories[c][i].xyz());
 #endif
 
@@ -1129,7 +1129,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
               CHECK(glm::all(glm::lessThanEqual(pageTableEntry.xyz() + imageBlockSize,
                                                 m_channelImageCacheTextures[c]->dimension())));
 #ifdef ATLAS_CHECK_CACHE
-              CHECK(usedPageTableEntry.find(pageTableEntry.xyz()) == usedPageTableEntry.end());
+              CHECK(!usedPageTableEntry.contains(pageTableEntry.xyz()));
               usedPageTableEntry.insert(pageTableEntry.xyz());
 #endif
             } else {
