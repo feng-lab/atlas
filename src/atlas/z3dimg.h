@@ -10,9 +10,7 @@
 #include <folly/CancellationToken.h>
 #include <QObject>
 #include <set>
-#ifdef ATLAS_CHECK_CACHE
 #include <boost/unordered/unordered_flat_set.hpp>
-#endif
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
