@@ -1,6 +1,5 @@
 #include "zcpuinfo.h"
 
-#include "zbitset.h"
 #include "zlog.h"
 #include "zimginterface.h"
 #include <QProcess>
@@ -176,7 +175,7 @@ void ZCpuInfo::detectCpuInfo()
   bAVX2 = cpuinfo_has_x86_avx2();
   bMOVBE = cpuinfo_has_x86_movbe();
 
-  bAESNI = cpuinfo_has_x86_aes();
+  bAES = cpuinfo_has_x86_aes();
   bPCLMULQDQ = cpuinfo_has_x86_pclmulqdq();
   bRDRAND = cpuinfo_has_x86_rdrand();;
   bF16C = cpuinfo_has_x86_f16c();;
@@ -192,6 +191,10 @@ void ZCpuInfo::detectCpuInfo()
   bAVX512CD = cpuinfo_has_x86_avx512cd();
   bAVX512BW = cpuinfo_has_x86_avx512bw();
   bAVX512VL = cpuinfo_has_x86_avx512vl();
+  bAVX512VBMI = cpuinfo_has_x86_avx512vbmi();
+  bMPX = cpuinfo_has_x86_mpx();
+  bAVX512_4FMADDPS = cpuinfo_has_x86_avx512_4fmaps();
+  bAVX512_4VNNIW = cpuinfo_has_x86_avx512_4vnniw();
 
   detectCoreAndThreadNumber();
 }

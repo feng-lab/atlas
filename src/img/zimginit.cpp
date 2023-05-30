@@ -169,7 +169,7 @@ void initImgLib(const char* argv0,
           featureMask |= ippCPUID_AVX;
           featureMask |= ippAVX_ENABLEDBYOS;
         }
-        if (nim::ZCpuInfo::instance().bAESNI) {
+        if (nim::ZCpuInfo::instance().bAES) {
           featureMask |= ippCPUID_AES;
         }
         if (nim::ZCpuInfo::instance().bPCLMULQDQ) {
@@ -216,6 +216,18 @@ void initImgLib(const char* argv0,
         }
         if (nim::ZCpuInfo::instance().bAVX512VL) {
           featureMask |= ippCPUID_AVX512VL;
+        }
+        if (nim::ZCpuInfo::instance().bAVX512VBMI) {
+          featureMask |= ippCPUID_AVX512VBMI;
+        }
+        if (nim::ZCpuInfo::instance().bMPX) {
+          featureMask |= ippCPUID_MPX;
+        }
+        if (nim::ZCpuInfo::instance().bAVX512_4FMADDPS) {
+          featureMask |= ippCPUID_AVX512_4FMADDPS;
+        }
+        if (nim::ZCpuInfo::instance().bAVX512_4VNNIW) {
+          featureMask |= ippCPUID_AVX512_4VNNIW;
         }
         LOG(INFO) << ippSetCpuFeatures(featureMask);
       }

@@ -26,8 +26,8 @@ protected:
   static void runProgram(const QString& programName) ;
 
 public:
-  int32_t nPhysicalCores = 1;
-  int32_t nLogicalCores = 1;
+  size_t nPhysicalCores = 1;
+  size_t nLogicalCores = 1;
   size_t nStdHardwareConcurrency = 1;
 
   uint64_t nPhysicalRAM = 0;
@@ -43,7 +43,7 @@ public:
   bool bAVX2 = false;
   bool bMOVBE = false;
 
-  bool bAESNI = false;
+  bool bAES = false;
   bool bPCLMULQDQ = false;
   bool bRDRAND = false;
   bool bF16C = false;
@@ -59,6 +59,10 @@ public:
   bool bAVX512CD = false;
   bool bAVX512BW = false;
   bool bAVX512VL = false;
+  bool bAVX512VBMI = false;
+  bool bMPX = false;
+  bool bAVX512_4FMADDPS = false;
+  bool bAVX512_4VNNIW = false;
 
 private:
   uint64_t m_realPhysicalRAM = 0;
