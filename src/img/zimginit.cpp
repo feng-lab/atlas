@@ -64,8 +64,6 @@ void initImgLib(const char* argv0,
     LOG(INFO) << "--- App Log Start ---";
   }
 
-  ZCpuInfo::instance().logCpuInfo();
-
   // if jarsDIR exist and is valid, try jdkDIR first, then try JAVA_HOME
   ZImgGlobal::instance().jarsDIR = "";
   ZImgGlobal::instance().jdkDIR = "";
@@ -117,6 +115,8 @@ void initImgLib(const char* argv0,
   }
   ZImgGlobal::instance().resourcesDIR = resourcesDIR;
   LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
+
+  ZCpuInfo::instance().logCpuInfo();
 
 #ifdef ZIMG_USE_MKL
   // todo: check this for amd cpu
