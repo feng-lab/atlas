@@ -6,7 +6,7 @@ namespace nim {
 
 void initImgLib(const char* argv0,
                 const QString& resourcesDIR = "",
-                const QString& jdkDIR = "",
+                const QString& jreDIR = "",
                 const QString& jarsDIR = "",
                 const QString& logFilename = "",
                 bool isApp = true,

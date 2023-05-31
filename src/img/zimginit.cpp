@@ -48,7 +48,7 @@ void myMessageOutput(QtMsgType type, const QMessageLogContext& context, const QS
 
 void initImgLib(const char* argv0,
                 const QString& resourcesDIR,
-                const QString& jdkDIR,
+                const QString& jreDIR,
                 const QString& jarsDIR,
                 const QString& logFilename,
                 bool isApp,
@@ -64,9 +64,9 @@ void initImgLib(const char* argv0,
     LOG(INFO) << "--- App Log Start ---";
   }
 
-  // if jarsDIR exist and is valid, try jdkDIR first, then try JAVA_HOME
+  // if jarsDIR exist and is valid, try jreDIR first, then try JAVA_HOME
   ZImgGlobal::instance().jarsDIR = "";
-  ZImgGlobal::instance().jdkDIR = "";
+  ZImgGlobal::instance().jreDIR = "";
   if (jarsDIR.isEmpty()) {
     LOG(INFO) << "no java support";
   } else {
@@ -74,8 +74,8 @@ void initImgLib(const char* argv0,
     if (!jarsD.exists() || !jarsD.exists("bioformats_package.jar") || !jarsD.exists("scifio-itk-bridge.jar")) {
       throw ZIOException(QString("invalid jarsDIR: %1").arg(jarsDIR));
     }
-    QDir jdkD;
-    QString javahome = jdkDIR;
+    QDir jreD;
+    QString javahome = jreDIR;
     if (javahome.isEmpty()) {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
       javahome = qEnvironmentVariable("JAVA_HOME");
@@ -85,32 +85,32 @@ void initImgLib(const char* argv0,
       if (javahome.isEmpty()) {
         ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
         LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
-        LOG(INFO) << "no jdkDIR and enviroment variable JAVA_HOME, will try to use java in system path";
+        LOG(INFO) << "no jreDIR and enviroment variable JAVA_HOME, will try to use java in system path";
       } else {
         LOG(INFO) << "try java from JAVA_HOME: " << javahome << ", note: might crash if the java version is too low";
-        jdkD = QDir(javahome);
+        jreD = QDir(javahome);
       }
     } else {
-      jdkD = QDir(javahome);
+      jreD = QDir(javahome);
     }
 
     if (!javahome.isEmpty()) {
-      if (!jdkD.exists() || !jdkD.exists("release") || !jdkD.exists("bin")) {
-        throw ZIOException(QString("invalid jdkDIR: %1").arg(jdkD.absolutePath()));
+      if (!jreD.exists() || !jreD.exists("release") || !jreD.exists("bin")) {
+        throw ZIOException(QString("invalid jreDIR: %1").arg(jreD.absolutePath()));
       }
 #ifdef _WIN32
-      if (!jdkD.exists("bin/javaw.exe"))
+      if (!jreD.exists("bin/javaw.exe"))
 #else
-      if (!jdkD.exists("bin/java"))
+      if (!jreD.exists("bin/java"))
 #endif
       {
-        throw ZIOException(QString("no java in jdkDIR: %1").arg(jdkD.absolutePath()));
+        throw ZIOException(QString("no java in jreDIR: %1").arg(jreD.absolutePath()));
       }
 
       ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
       LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
-      ZImgGlobal::instance().jdkDIR = jdkD.absolutePath();
-      LOG(INFO) << "jdkDIR: " << ZImgGlobal::instance().jdkDIR;
+      ZImgGlobal::instance().jreDIR = jreD.absolutePath();
+      LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
     }
   }
   ZImgGlobal::instance().resourcesDIR = resourcesDIR;

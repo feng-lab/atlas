@@ -11,7 +11,7 @@ class ZImgGlobal
 public:
   static ZImgGlobal& instance();
 
-  QString jdkDIR;
+  QString jreDIR;
   QString jarsDIR;
   QString resourcesDIR;
 

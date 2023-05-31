@@ -301,7 +301,7 @@ SCIFIOImageIO::SCIFIOImageIO()
 #else
   std::string javaCmd = "java";
 #endif
-  std::string javaHome = nim::ZImgGlobal::instance().jdkDIR.toStdString();
+  std::string javaHome = nim::ZImgGlobal::instance().jreDIR.toStdString();
   if (!CheckJavaPath(javaHome, javaCmd)) {
     javaHome = "";
   }

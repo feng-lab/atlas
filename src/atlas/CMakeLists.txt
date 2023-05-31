@@ -698,8 +698,8 @@ if (WIN32)
                      "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
-                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk"
-                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk")
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre"
+                     "$<TARGET_FILE_DIR:${APP_NAME}>/Resources/jre")
   add_custom_command(TARGET ${APP_NAME}
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars"
@@ -770,8 +770,12 @@ else (WIN32)
                           )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk/Contents/Home
-                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jdk)
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre/Contents/Home
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jre)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre-arm/Contents/Home
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/jre-arm)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars
@@ -817,8 +821,8 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jdk
-                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jdk)
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/jre)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars

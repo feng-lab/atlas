@@ -21,7 +21,9 @@ public:
 
   static QString resourcesDirPath();
 
-  static QString jdkDirPath();
+  static QString jreDirPath();
+
+  static QString jreArmDirPath();
 
   static QString jarsDirPath();
 

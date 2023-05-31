@@ -2616,26 +2616,45 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
 
             if is_mac():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*mac*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*mac*'))
             elif is_linux():
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*linux*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*linux*'))
             else:
-                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jdk_x64*windows*'))
-            jdk_dir = get_package_top_level_folder(package_name, ext_build_dir())
-            print(jdk_dir)
-            if not os.path.exists(jdk_dir):
-                if os.path.exists(os.path.join(ext_build_dir(), 'jdk')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jdk'))
-                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jdk*'))
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*windows*'))
+            jre_dir = get_package_top_level_folder(package_name, ext_build_dir())
+            print(jre_dir)
+            if not os.path.exists(jre_dir):
+                if os.path.exists(os.path.join(ext_build_dir(), 'jre')):
+                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                remove_old_src_folder_with_glob(os.path.join(ext_build_dir(), 'jre*'))
                 unpack_file_to_folder(package_name, ext_build_dir())
-                assert os.path.exists(jdk_dir)
-                if os.path.lexists(os.path.join(ext_build_dir(), 'jdk')):
-                    os.unlink(os.path.join(ext_build_dir(), 'jdk'))
-                    print('link jdk')
-                    os.symlink(jdk_dir, os.path.join(ext_build_dir(), 'jdk'))
-            if not os.path.lexists(os.path.join(ext_build_dir(), 'jdk')):
-                print('link jdk')
-                os.symlink(jdk_dir, os.path.join(ext_build_dir(), 'jdk'))
+                assert os.path.exists(jre_dir)
+                if os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
+                    os.unlink(os.path.join(ext_build_dir(), 'jre'))
+                    print('link jre')
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
+            if not os.path.lexists(os.path.join(ext_build_dir(), 'jre')):
+                print('link jre')
+                os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre'))
+
+            if is_mac():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_aarch64*mac*'))
+                if not os.path.lexists(os.path.join(ext_build_dir(), 'jrearm')):
+                    os.mkdir(os.path.join(ext_build_dir(), 'jrearm'))
+                jre_dir = get_package_top_level_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
+                print(jre_dir)
+                if not os.path.exists(jre_dir):
+                    if os.path.exists(os.path.join(ext_build_dir(), 'jre-arm')):
+                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                    unpack_file_to_folder(package_name, os.path.join(ext_build_dir(), 'jrearm'))
+                    assert os.path.exists(jre_dir)
+                    if os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
+                        os.unlink(os.path.join(ext_build_dir(), 'jre-arm'))
+                        print('link jre-arm')
+                        os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
+                if not os.path.lexists(os.path.join(ext_build_dir(), 'jre-arm')):
+                    print('link jre-arm')
+                    os.symlink(jre_dir, os.path.join(ext_build_dir(), 'jre-arm'))
 
         if lib_name == 'ants':
             src_dir = os.path.join(atlas_repository_dir(), '..', 'ANTs')

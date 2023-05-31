@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
     bool isGUIMode = !(FLAGS_run_benchmarks || FLAGS_run_export_3d_animation);
     initImgLib(argv[0],
                ZSystemInfo::resourcesDirPath(),
-               ZSystemInfo::jdkDirPath(),
+               ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                ZSystemInfo::jarsDirPath(),
                logDir.filePath("atlas"),
                true,

@@ -84,9 +84,14 @@ QString ZSystemInfo::resourcesDirPath()
   return resourcesDir().absolutePath();
 }
 
-QString ZSystemInfo::jdkDirPath()
+QString ZSystemInfo::jreDirPath()
 {
-  return resourcesDir().absoluteFilePath("jdk");
+  return resourcesDir().absoluteFilePath("jre");
+}
+
+QString ZSystemInfo::jreArmDirPath()
+{
+  return resourcesDir().absoluteFilePath("jre-arm");
 }
 
 QString ZSystemInfo::jarsDirPath()
