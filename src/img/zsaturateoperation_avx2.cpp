@@ -13,15 +13,15 @@ void saturate_add_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epu8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epu8(l, r));
     }
   } else if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu8(l, r));
     }
   }
 
@@ -36,16 +36,16 @@ void saturate_add_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
-    auto r = _mm256_set1_epi8(y);
+    auto r = simde_mm256_set1_epi8(y);
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epu8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epu8(l, r));
     }
   } else if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu8(l, r));
     }
   }
 
@@ -61,15 +61,15 @@ void saturate_add_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* r
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epi8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epi8(l, r));
     }
   } else if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi8(l, r));
     }
   }
 
@@ -84,16 +84,16 @@ void saturate_add_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
-    auto r = _mm256_set1_epi8(y);
+    auto r = simde_mm256_set1_epi8(y);
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epi8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epi8(l, r));
     }
   } else if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi8(l, r));
     }
   }
 
@@ -109,15 +109,15 @@ void saturate_add_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint1
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epu16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epu16(l, r));
     }
   } else if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu16(l, r));
     }
   }
 
@@ -132,16 +132,16 @@ void saturate_add_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* re
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm256_set1_epi16(y);
+    auto r = simde_mm256_set1_epi16(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epu16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epu16(l, r));
     }
   } else if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu16(l, r));
     }
   }
 
@@ -157,15 +157,15 @@ void saturate_add_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epi16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epi16(l, r));
     }
   } else if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi16(l, r));
     }
   }
 
@@ -180,16 +180,16 @@ void saturate_add_avx2(const int16_t* x, int16_t y, size_t count, int16_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm256_set1_epi16(y);
+    auto r = simde_mm256_set1_epi16(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_adds_epi16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_adds_epi16(l, r));
     }
   } else if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi16(l, r));
     }
   }
 
@@ -205,15 +205,15 @@ void saturate_sub_avx2(const uint8_t* x, const uint8_t* y, size_t count, uint8_t
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epu8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epu8(l, r));
     }
   } else if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu8(l, r));
     }
   }
 
@@ -228,16 +228,16 @@ void saturate_sub_avx2(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
-    auto r = _mm256_set1_epi8(y);
+    auto r = simde_mm256_set1_epi8(y);
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epu8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epu8(l, r));
     }
   } else if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu8(l, r));
     }
   }
 
@@ -253,15 +253,15 @@ void saturate_sub_avx2(const int8_t* x, const int8_t* y, size_t count, int8_t* r
   size_t i = 0;
   if (count >= 32) {
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epi8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epi8(l, r));
     }
   } else if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi8(l, r));
     }
   }
 
@@ -276,16 +276,16 @@ void saturate_sub_avx2(const int8_t* x, int8_t y, size_t count, int8_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
-    auto r = _mm256_set1_epi8(y);
+    auto r = simde_mm256_set1_epi8(y);
     for (; i < count - 31; i += 32) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epi8(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epi8(l, r));
     }
   } else if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi8(l, r));
     }
   }
 
@@ -301,15 +301,15 @@ void saturate_sub_avx2(const uint16_t* x, const uint16_t* y, size_t count, uint1
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epu16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epu16(l, r));
     }
   } else if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu16(l, r));
     }
   }
 
@@ -324,16 +324,16 @@ void saturate_sub_avx2(const uint16_t* x, uint16_t y, size_t count, uint16_t* re
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm256_set1_epi16(y);
+    auto r = simde_mm256_set1_epi16(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epu16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epu16(l, r));
     }
   } else if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu16(l, r));
     }
   }
 
@@ -349,15 +349,15 @@ void saturate_sub_avx2(const int16_t* x, const int16_t* y, size_t count, int16_t
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      auto r = _mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epi16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      auto r = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(y + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epi16(l, r));
     }
   } else if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi16(l, r));
     }
   }
 
@@ -372,16 +372,16 @@ void saturate_sub_avx2(const int16_t* x, int16_t y, size_t count, int16_t* res)
   CHECK(is_aligned(x, 32) && is_aligned(res, 32)) << x << " " << res;
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm256_set1_epi16(y);
+    auto r = simde_mm256_set1_epi16(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
-      _mm256_store_si256(reinterpret_cast<__m256i*>(res + i), _mm256_subs_epi16(l, r));
+      auto l = simde_mm256_load_si256(reinterpret_cast<const __m256i*>(x + i));
+      simde_mm256_store_si256(reinterpret_cast<__m256i*>(res + i), simde_mm256_subs_epi16(l, r));
     }
   } else if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi16(l, r));
     }
   }
 

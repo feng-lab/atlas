@@ -244,7 +244,7 @@ void initImgLib(const char* argv0,
   itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
   mt.Print(std::cout);
 
-  if (!ZCpuInfo::instance().bAVX) {
+  if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {
     LOG(FATAL) << "CPU not supported. This program requires CPU with AVX support.";
   }
 

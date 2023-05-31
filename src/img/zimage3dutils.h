@@ -321,7 +321,7 @@ struct Image3DFilterForOneBlock<double, double>
                                       m_imgOutHeight,
                                       range.begin(),
                                       range.end());
-    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+    } else if (m_kernelWidth >= 4) {
       Image3DFilterForOneBlock_AVX(m_padImg,
                                    m_padImgWidth,
                                    m_padImgHeight,
@@ -460,7 +460,7 @@ struct Image3DRowFilterForOneBlock<double, double>
                                          m_imgOutHeight,
                                          range.begin(),
                                          range.end());
-    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+    } else if (m_kernelWidth >= 4) {
       Image3DRowFilterForOneBlock_AVX(m_padImg,
                                       m_padImgWidth,
                                       m_padImgHeight,

@@ -121,3 +121,6 @@
 [submodule "src/3rdparty/GeometricTools"]
 	path = src/3rdparty/GeometricTools
 	url = https://github.com/davideberly/GeometricTools.git
+[submodule "src/3rdparty/oneTBB"]
+	path = src/3rdparty/oneTBB
+	url = https://github.com/oneapi-src/oneTBB.git

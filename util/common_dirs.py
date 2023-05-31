@@ -335,7 +335,8 @@ def get_package_top_level_folder(file: str, folder: str):
     if file.lower().endswith('.zip'):
         with zipfile.ZipFile(file, mode='r') as zf:
             # print(zf.namelist())
-            res = os.path.join(folder, os.path.commonpath([nm for nm in zf.namelist() if not nm.endswith('/')]))
+            res = os.path.join(folder, os.path.commonpath(
+                [nm for nm in zf.namelist() if not nm.endswith('/') and not nm.startswith('__MACOSX')]))
     elif file.lower().endswith('.tar.gz') or file.lower().endswith('.tar.bz2') or file.lower().endswith('.tar.xz') \
             or file.lower().endswith('.tgz'):
         with tarfile.open(file, mode='r|*') as tf:
@@ -379,6 +380,7 @@ def unpack_tool_to_target_dir(tool_package_folder: str, tool_package_glob_name: 
         tool_folder_glob_name = tool_package_glob_name
     package_name = find_src_package_with_glob(os.path.join(tool_package_folder, tool_package_glob_name))
     package_unpack_folder = get_package_top_level_folder(package_name, target_dir)
+    print(package_unpack_folder)
     if not os.path.exists(package_unpack_folder):
         remove_old_src_folder_with_glob(os.path.join(target_dir, tool_folder_glob_name))
         unpack_file_to_folder(package_name, target_dir)
@@ -416,19 +418,29 @@ def install_ffmpeg():
     elif is_linux():
         unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*linux*')
     else:
-        folder = unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*macOS*')
+        if os.path.lexists(os.path.join(ext_build_dir(), 'ffmpeg')):
+            os.unlink(os.path.join(ext_build_dir(), 'ffmpeg'))
+        unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*intel*')
+        os.rename(os.path.join(ext_build_dir(), 'ffmpeg'), os.path.join(ext_build_dir(), 'ffmpeg-intel'))
+        unpack_tool_to_target_dir(src_package_dir(), 'ffmpeg*arm*')
+        os.rename(os.path.join(ext_build_dir(), 'ffmpeg'), os.path.join(ext_build_dir(), 'ffmpeg-arm'))
+        subprocess.run(['lipo', '-create', os.path.join(ext_build_dir(), 'ffmpeg-intel'),
+                        os.path.join(ext_build_dir(), 'ffmpeg-arm'), '-output',
+                        os.path.join(ext_build_dir(), 'ffmpeg')], cwd=ext_build_dir(), shell=False, check=True)
+        os.unlink(os.path.join(ext_build_dir(), 'ffmpeg-intel'))
+        os.unlink(os.path.join(ext_build_dir(), 'ffmpeg-arm'))
+        subprocess.run(['xattr', '-cr', os.path.join(ext_build_dir(), 'ffmpeg')], cwd=ext_build_dir(), shell=False,
+                       check=True)
+        subprocess.run(['codesign', '--force', '--deep', '--sign', '-', os.path.join(ext_build_dir(), 'ffmpeg')],
+                       cwd=ext_build_dir(),
+                       shell=False,
+                       check=True)
+        os.chmod(os.path.join(ext_build_dir(), 'ffmpeg'), stat.S_IRWXU or stat.S_IXGRP or stat.S_IRGRP or stat.S_IROTH)
         if 'feng' in os.path.expanduser("~"):
-            if True:  # from https://evermeet.cx/ffmpeg/
-                if os.path.lexists('/usr/local/bin/ffmpeg'):
-                    os.unlink('/usr/local/bin/ffmpeg')
-                os.symlink(folder, '/usr/local/bin/ffmpeg')
-            else:
-                os.chmod(os.path.join(folder, 'bin', 'ffmpeg'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-                os.chmod(os.path.join(folder, 'bin', 'ffplay'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-                os.chmod(os.path.join(folder, 'bin', 'ffprobe'), stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-                if os.path.lexists('/usr/local/bin/ffmpeg'):
-                    os.unlink('/usr/local/bin/ffmpeg')
-                os.symlink(os.path.join(folder, 'bin', 'ffmpeg'), '/usr/local/bin/ffmpeg')
+            # from https://evermeet.cx/ffmpeg/
+            if os.path.lexists('/usr/local/bin/ffmpeg'):
+                os.unlink('/usr/local/bin/ffmpeg')
+            os.symlink(os.path.join(ext_build_dir(), 'ffmpeg'), '/usr/local/bin/ffmpeg')
 
 
 def get_cmake_binary() -> str:
@@ -475,12 +487,12 @@ def get_ffmpeg_binary() -> str:
 
 
 def handleRemoveReadonly(func, path, exc):
-  excvalue = exc[1]
-  if func in (os.rmdir, os.unlink, os.remove) and excvalue.errno == errno.EACCES:
-      os.chmod(path, stat.S_IRWXU| stat.S_IRWXG| stat.S_IRWXO) # 0777
-      func(path)
-  else:
-      raise
+    excvalue = exc[1]
+    if func in (os.rmdir, os.unlink, os.remove) and excvalue.errno == errno.EACCES:
+        os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 0777
+        func(path)
+    else:
+        raise
 
 
 if __name__ == "__main__":

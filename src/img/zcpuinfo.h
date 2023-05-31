@@ -32,6 +32,8 @@ public:
 
   uint64_t nPhysicalRAM = 0;
 
+  bool isX86_64 = false;
+
   bool bMMX = false;
   bool bSSE = false;
   bool bSSE2 = false;

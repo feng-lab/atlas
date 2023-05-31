@@ -22,9 +22,9 @@ void saturate_add<uint8_t, const uint8_t>(const uint8_t* x, const uint8_t* y, si
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu8(l, r));
     }
   }
 
@@ -47,10 +47,10 @@ void saturate_add<uint8_t, uint8_t>(const uint8_t* x, uint8_t y, size_t count, u
 
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu8(l, r));
     }
   }
 
@@ -74,9 +74,9 @@ void saturate_add<int8_t, const int8_t>(const int8_t* x, const int8_t* y, size_t
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi8(l, r));
     }
   }
 
@@ -99,10 +99,10 @@ void saturate_add<int8_t, int8_t>(const int8_t* x, int8_t y, size_t count, int8_
 
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi8(l, r));
     }
   }
 
@@ -126,9 +126,9 @@ void saturate_add<uint16_t, const uint16_t>(const uint16_t* x, const uint16_t* y
   size_t i = 0;
   if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu16(l, r));
     }
   }
 
@@ -151,10 +151,10 @@ void saturate_add<uint16_t, uint16_t>(const uint16_t* x, uint16_t y, size_t coun
 
   size_t i = 0;
   if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epu16(l, r));
     }
   }
 
@@ -178,9 +178,9 @@ void saturate_add<int16_t, const int16_t>(const int16_t* x, const int16_t* y, si
   size_t i = 0;
   if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi16(l, r));
     }
   }
 
@@ -203,10 +203,10 @@ void saturate_add<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, i
 
   size_t i = 0;
   if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_adds_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_adds_epi16(l, r));
     }
   }
 
@@ -230,9 +230,9 @@ void saturate_sub<uint8_t, const uint8_t>(const uint8_t* x, const uint8_t* y, si
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu8(l, r));
     }
   }
 
@@ -255,10 +255,10 @@ void saturate_sub<uint8_t, uint8_t>(const uint8_t* x, uint8_t y, size_t count, u
 
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu8(l, r));
     }
   }
 
@@ -282,9 +282,9 @@ void saturate_sub<int8_t, const int8_t>(const int8_t* x, const int8_t* y, size_t
   size_t i = 0;
   if (count >= 16) {
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi8(l, r));
     }
   }
 
@@ -307,10 +307,10 @@ void saturate_sub<int8_t, int8_t>(const int8_t* x, int8_t y, size_t count, int8_
 
   size_t i = 0;
   if (count >= 16) {
-    auto r = _mm_set1_epi8(y);
+    auto r = simde_mm_set1_epi8(y);
     for (; i < count - 15; i += 16) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi8(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi8(l, r));
     }
   }
 
@@ -334,9 +334,9 @@ void saturate_sub<uint16_t, const uint16_t>(const uint16_t* x, const uint16_t* y
   size_t i = 0;
   if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu16(l, r));
     }
   }
 
@@ -359,10 +359,10 @@ void saturate_sub<uint16_t, uint16_t>(const uint16_t* x, uint16_t y, size_t coun
 
   size_t i = 0;
   if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epu16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epu16(l, r));
     }
   }
 
@@ -386,9 +386,9 @@ void saturate_sub<int16_t, const int16_t>(const int16_t* x, const int16_t* y, si
   size_t i = 0;
   if (count >= 8) {
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      auto r = _mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      auto r = simde_mm_load_si128(reinterpret_cast<const __m128i*>(y + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi16(l, r));
     }
   }
 
@@ -411,10 +411,10 @@ void saturate_sub<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, i
 
   size_t i = 0;
   if (count >= 8) {
-    auto r = _mm_set1_epi16(y);
+    auto r = simde_mm_set1_epi16(y);
     for (; i < count - 7; i += 8) {
-      auto l = _mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
-      _mm_store_si128(reinterpret_cast<__m128i*>(res + i), _mm_subs_epi16(l, r));
+      auto l = simde_mm_load_si128(reinterpret_cast<const __m128i*>(x + i));
+      simde_mm_store_si128(reinterpret_cast<__m128i*>(res + i), simde_mm_subs_epi16(l, r));
     }
   }
 

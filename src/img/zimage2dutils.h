@@ -435,7 +435,7 @@ struct Image2DFilterForOneBlock<double, double>
                                       m_imgOutWidth,
                                       range.begin(),
                                       range.end());
-    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+    } else if (m_kernelWidth >= 4) {
       Image2DFilterForOneBlock_AVX(m_padImg,
                                    m_padImgWidth,
                                    m_kernel,
@@ -543,7 +543,7 @@ struct Image2DRowFilterForOneBlock<double, double>
                                          m_imgOutWidth,
                                          range.begin(),
                                          range.end());
-    } else if (ZCpuInfo::instance().bAVX && m_kernelWidth >= 4) {
+    } else if (m_kernelWidth >= 4) {
       Image2DRowFilterForOneBlock_AVX(m_padImg,
                                       m_padImgWidth,
                                       m_kernel,

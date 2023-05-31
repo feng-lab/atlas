@@ -164,6 +164,9 @@ void ZCpuInfo::setMemoryLimitInBytes(uint64_t n)
 
 void ZCpuInfo::detectCpuInfo()
 {
+#if CPUINFO_ARCH_X86_64
+  isX86_64 = true;
+
   bMMX = cpuinfo_has_x86_mmx();
   bSSE = cpuinfo_has_x86_sse();;
   bSSE2 = cpuinfo_has_x86_sse2();
@@ -195,6 +198,11 @@ void ZCpuInfo::detectCpuInfo()
   bMPX = cpuinfo_has_x86_mpx();
   bAVX512_4FMADDPS = cpuinfo_has_x86_avx512_4fmaps();
   bAVX512_4VNNIW = cpuinfo_has_x86_avx512_4vnniw();
+#endif
+
+#if CPUINFO_ARCH_ARM64
+  bAVX2 = true;
+#endif
 
   detectCoreAndThreadNumber();
 }

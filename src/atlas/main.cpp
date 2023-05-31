@@ -102,7 +102,7 @@ int main(int argc, char* argv[])
 
     ZApplication app(argc, argv);
 
-    if (!ZCpuInfo::instance().bAVX) {
+    if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {
       QMessageBox::critical(nullptr,
                             QCoreApplication::applicationName(),
                             "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
