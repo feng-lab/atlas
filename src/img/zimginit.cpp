@@ -11,6 +11,7 @@
 #endif
 #include <itkMultiThreaderBase.h>
 #include <QDir>
+#include <cpuinfo.h>
 
 #ifdef ZIMG_USE_IPP
 #include <ippcore.h>
@@ -141,92 +142,92 @@ void initImgLib(const char* argv0,
       if (st == ippStsNotSupportedCpu) {
         LOG(WARNING) << "IPP error: not supported cpu.";
         // manual set mask
-        if (nim::ZCpuInfo::instance().bMMX) {
+        if (cpuinfo_has_x86_mmx()) {
           featureMask |= ippCPUID_MMX;
         }
-        if (nim::ZCpuInfo::instance().bSSE) {
+        if (cpuinfo_has_x86_sse()) {
           featureMask |= ippCPUID_SSE;
         }
-        if (nim::ZCpuInfo::instance().bSSE2) {
+        if (cpuinfo_has_x86_sse2()) {
           featureMask |= ippCPUID_SSE2;
         }
-        if (nim::ZCpuInfo::instance().bSSE3) {
+        if (cpuinfo_has_x86_sse3()) {
           featureMask |= ippCPUID_SSE3;
         }
-        if (nim::ZCpuInfo::instance().bSSSE3) {
+        if (cpuinfo_has_x86_ssse3()) {
           featureMask |= ippCPUID_SSSE3;
         }
-        if (nim::ZCpuInfo::instance().bMOVBE) {
+        if (cpuinfo_has_x86_movbe()) {
           featureMask |= ippCPUID_MOVBE;
         }
-        if (nim::ZCpuInfo::instance().bSSE41) {
+        if (cpuinfo_has_x86_sse4_1()) {
           featureMask |= ippCPUID_SSE41;
         }
-        if (nim::ZCpuInfo::instance().bSSE42) {
+        if (cpuinfo_has_x86_sse4_2()) {
           featureMask |= ippCPUID_SSE42;
         }
-        if (nim::ZCpuInfo::instance().bAVX) {
+        if (cpuinfo_has_x86_avx()) {
           featureMask |= ippCPUID_AVX;
           featureMask |= ippAVX_ENABLEDBYOS;
         }
-        if (nim::ZCpuInfo::instance().bAES) {
+        if (cpuinfo_has_x86_aes()) {
           featureMask |= ippCPUID_AES;
         }
-        if (nim::ZCpuInfo::instance().bPCLMULQDQ) {
+        if (cpuinfo_has_x86_pclmulqdq()) {
           featureMask |= ippCPUID_CLMUL;
         }
-        if (nim::ZCpuInfo::instance().bRDRAND) {
+        if (cpuinfo_has_x86_rdrand()) {
           featureMask |= ippCPUID_RDRAND;
         }
-        if (nim::ZCpuInfo::instance().bF16C) {
+        if (cpuinfo_has_x86_f16c()) {
           featureMask |= ippCPUID_F16C;
         }
-        if (nim::ZCpuInfo::instance().bAVX2) {
+        if (cpuinfo_has_x86_avx2()) {
           featureMask |= ippCPUID_AVX2;
         }
-        if (nim::ZCpuInfo::instance().bADX) {
+        if (cpuinfo_has_x86_adx()) {
           featureMask |= ippCPUID_ADCOX;
         }
-        if (nim::ZCpuInfo::instance().bRDSEED) {
+        if (cpuinfo_has_x86_rdseed()) {
           featureMask |= ippCPUID_RDSEED;
         }
-        if (nim::ZCpuInfo::instance().bPREFTEHCHW) {
+        if (cpuinfo_has_x86_prefetchw()) {
           featureMask |= ippCPUID_PREFETCHW;
         }
-        if (nim::ZCpuInfo::instance().bSHA) {
+        if (cpuinfo_has_x86_sha()) {
           featureMask |= ippCPUID_SHA;
         }
-        if (nim::ZCpuInfo::instance().bAVX512F) {
+        if (cpuinfo_has_x86_avx512f()) {
           featureMask |= ippCPUID_AVX512F;
         }
-        if (nim::ZCpuInfo::instance().bAVX512CD) {
+        if (cpuinfo_has_x86_avx512cd()) {
           featureMask |= ippCPUID_AVX512CD;
         }
-        if (nim::ZCpuInfo::instance().bAVX512ER) {
+        if (cpuinfo_has_x86_avx512er()) {
           featureMask |= ippCPUID_AVX512ER;
         }
-        if (nim::ZCpuInfo::instance().bAVX512PF) {
+        if (cpuinfo_has_x86_avx512pf()) {
           featureMask |= ippCPUID_AVX512PF;
         }
-        if (nim::ZCpuInfo::instance().bAVX512BW) {
+        if (cpuinfo_has_x86_avx512bw()) {
           featureMask |= ippCPUID_AVX512BW;
         }
-        if (nim::ZCpuInfo::instance().bAVX512DQ) {
+        if (cpuinfo_has_x86_avx512dq()) {
           featureMask |= ippCPUID_AVX512DQ;
         }
-        if (nim::ZCpuInfo::instance().bAVX512VL) {
+        if (cpuinfo_has_x86_avx512vl()) {
           featureMask |= ippCPUID_AVX512VL;
         }
-        if (nim::ZCpuInfo::instance().bAVX512VBMI) {
+        if (cpuinfo_has_x86_avx512vbmi()) {
           featureMask |= ippCPUID_AVX512VBMI;
         }
-        if (nim::ZCpuInfo::instance().bMPX) {
+        if (cpuinfo_has_x86_mpx()) {
           featureMask |= ippCPUID_MPX;
         }
-        if (nim::ZCpuInfo::instance().bAVX512_4FMADDPS) {
+        if (cpuinfo_has_x86_avx512_4fmaps()) {
           featureMask |= ippCPUID_AVX512_4FMADDPS;
         }
-        if (nim::ZCpuInfo::instance().bAVX512_4VNNIW) {
+        if (cpuinfo_has_x86_avx512_4vnniw()) {
           featureMask |= ippCPUID_AVX512_4VNNIW;
         }
         LOG(INFO) << ippSetCpuFeatures(featureMask);

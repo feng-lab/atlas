@@ -34,37 +34,11 @@ public:
 
   bool isX86_64 = false;
 
-  bool bMMX = false;
-  bool bSSE = false;
-  bool bSSE2 = false;
-  bool bSSE3 = false;
-  bool bSSSE3 = false;
-  bool bSSE41 = false;
-  bool bSSE42 = false;
   bool bAVX = false;
   bool bAVX2 = false;
-  bool bMOVBE = false;
-
-  bool bAES = false;
-  bool bPCLMULQDQ = false;
-  bool bRDRAND = false;
-  bool bF16C = false;
-  bool bRDSEED = false;
-  bool bADX = false;
-  bool bPREFTEHCHW = false;
-  bool bSHA = false;
 
   bool bAVX512F = false;
-  bool bAVX512DQ = false;
-  bool bAVX512PF = false;
-  bool bAVX512ER = false;
-  bool bAVX512CD = false;
   bool bAVX512BW = false;
-  bool bAVX512VL = false;
-  bool bAVX512VBMI = false;
-  bool bMPX = false;
-  bool bAVX512_4FMADDPS = false;
-  bool bAVX512_4VNNIW = false;
 
 private:
   uint64_t m_realPhysicalRAM = 0;

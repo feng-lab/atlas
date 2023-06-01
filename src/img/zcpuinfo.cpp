@@ -167,37 +167,11 @@ void ZCpuInfo::detectCpuInfo()
 #if CPUINFO_ARCH_X86_64
   isX86_64 = true;
 
-  bMMX = cpuinfo_has_x86_mmx();
-  bSSE = cpuinfo_has_x86_sse();;
-  bSSE2 = cpuinfo_has_x86_sse2();
-  bSSE3 = cpuinfo_has_x86_sse3();
-  bSSSE3 = cpuinfo_has_x86_ssse3();
-  bSSE41 = cpuinfo_has_x86_sse4_1();
-  bSSE42 = cpuinfo_has_x86_sse4_2();
   bAVX = cpuinfo_has_x86_avx();
   bAVX2 = cpuinfo_has_x86_avx2();
-  bMOVBE = cpuinfo_has_x86_movbe();
 
-  bAES = cpuinfo_has_x86_aes();
-  bPCLMULQDQ = cpuinfo_has_x86_pclmulqdq();
-  bRDRAND = cpuinfo_has_x86_rdrand();;
-  bF16C = cpuinfo_has_x86_f16c();;
-  bRDSEED = cpuinfo_has_x86_rdseed();;
-  bADX = cpuinfo_has_x86_adx();;
-  bPREFTEHCHW = cpuinfo_has_x86_prefetchw();;
-  bSHA = cpuinfo_has_x86_sha();;
-
-  bAVX512F = cpuinfo_has_x86_avx512f();
-  bAVX512DQ = cpuinfo_has_x86_avx512dq();
-  bAVX512PF = cpuinfo_has_x86_avx512pf();
-  bAVX512ER = cpuinfo_has_x86_avx512er();
-  bAVX512CD = cpuinfo_has_x86_avx512cd();
-  bAVX512BW = cpuinfo_has_x86_avx512bw();
-  bAVX512VL = cpuinfo_has_x86_avx512vl();
-  bAVX512VBMI = cpuinfo_has_x86_avx512vbmi();
-  bMPX = cpuinfo_has_x86_mpx();
-  bAVX512_4FMADDPS = cpuinfo_has_x86_avx512_4fmaps();
-  bAVX512_4VNNIW = cpuinfo_has_x86_avx512_4vnniw();
+//  bAVX512F = cpuinfo_has_x86_avx512f();
+//  bAVX512BW = cpuinfo_has_x86_avx512bw();
 #endif
 
 #if CPUINFO_ARCH_ARM64
