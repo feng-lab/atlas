@@ -13,8 +13,10 @@ if (BUILD_WITH_CONDA)
 else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
-  # tbb
-  set(TBB_DIR ${INTEL_PATH}/tbb/latest/lib/cmake/tbb)
+  if (NOT APPLE)
+    # tbb
+    set(TBB_DIR ${INTEL_PATH}/tbb/latest/lib/cmake/tbb)
+  endif ()
   # ipp
   set(IPP_DIR ${INTEL_PATH}/ipp/latest/lib/cmake/ipp)
 endif ()

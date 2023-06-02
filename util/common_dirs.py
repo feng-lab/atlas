@@ -269,6 +269,13 @@ def intel_sw_dir() -> str:
     return res
 
 
+def tbb_dir() -> str:
+    if is_mac():
+        return ext_build_dir()
+    else:
+        return intel_sw_dir() + '/tbb/latest/lib/cmake/tbb'
+
+
 def tbb_redist_dir() -> str:
     assert sys.platform.startswith('win32')
 
