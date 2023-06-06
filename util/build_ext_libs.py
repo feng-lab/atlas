@@ -89,21 +89,31 @@ def create_arm64_install_dir(src_dir: str):
     return install_dir
 
 
-def create_universal_binaries(arm64_install_dir, final_install_dir):
+def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib: bool = False):
     assert is_mac()
     print(f'{arm64_install_dir} to {final_install_dir}')
     for root, dirs, files in os.walk(arm64_install_dir):
         for name in files:
             filename = os.path.join(root, name)
             if Path(filename).is_symlink():
+                if remove_dylib and filename.endswith('.dylib'):
+                    target_filename = filename.replace(arm64_install_dir, final_install_dir)
+                    print(f'deleting {target_filename}')
+                    os.unlink(target_filename)
                 continue
             if filename.endswith('.a') or filename.endswith('.dylib') or root.endswith('bin'):
                 if name == 'c_rehash':  # text file
                     continue
+                if name == 'libpng16-config':
+                    continue
                 target_filename = filename.replace(arm64_install_dir, final_install_dir)
-                print(f'merge {filename} to {target_filename}')
-                subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
-                               shell=False, check=True)
+                if remove_dylib and filename.endswith('.dylib'):
+                    print(f'deleting {target_filename}')
+                    os.unlink(target_filename)
+                else:
+                    print(f'merge {filename} to {target_filename}')
+                    subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
+                                   shell=False, check=True)
 
 
 def get_bak_file_name(orig_file: str):
@@ -163,6 +173,7 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
         print(stdout, flush=True)
         print(stderr, flush=True)
         raise Exception("Got error code {} from subprocess.".format(exitcode))
+    # print(stdout.strip())
     env = json.loads(stdout.strip())
     if remove_conda_from_path:
         remove_path_contains('miniconda', env)
@@ -176,48 +187,53 @@ def get_enviroment_from_shell_script(script: str, para: str = '', start_env=os.e
 
 def get_tbb_env():
     env = {}
-    env['TBBROOT'] = os.path.join(intel_sw_dir(), 'tbb', 'latest')
+    env['TBBROOT'] = ext_build_dir() if is_mac() else os.path.join(intel_sw_dir(), 'tbb', 'latest')
     env['TBB_ROOT'] = env['TBBROOT']
     return env
 
 
 def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization: bool = False, universal: bool = False,
-                           arm64_only: bool = False):
+                           arm64_only: bool = False, no_hidden_visibility: bool = False):
     res = {}
     optimization = ' -O3' if with_optimization else ''
     if is_mac():
         osx_sysroot = r'/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk'
         assert os.path.exists(osx_sysroot)
+
         arch_flag = ' -mavx '
         if universal:
             arch_flag = ' -mavx -mcpu=apple-m1 '
         elif arm64_only:
             arch_flag = ' -mcpu=apple-m1 '
+
         res['CC'] = 'clang'
         res['CFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                        f'-fPIC -fvisibility=hidden {arch_flag}' + optimization
+                        f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} {arch_flag}' + optimization
         res['LDFLAGS'] = '-stdlib=libc++'
         res['CXX'] = 'clang++'
         res['CXXFLAGS'] = f'-stdlib=libc++ -std=c++{cpp_standard} ' \
                           f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()} ' \
-                          f'-fPIC -fvisibility=hidden -fvisibility-inlines-hidden {arch_flag}' + optimization
+                          f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
+                          f'-fPIC {arch_flag}' + optimization
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
             res['CC'] = 'clang'
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx' + optimization
+            res['CFLAGS'] = f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} -mavx' + optimization
             res['CXX'] = 'clang++'
-            res[
-                'CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC ' \
+                              f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
+                              f'-mavx' + optimization
         else:
-            res['CFLAGS'] = f'-fPIC -fvisibility=hidden -mavx' + optimization
-            res[
-                'CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC -fvisibility=hidden -fvisibility-inlines-hidden -mavx' + optimization
+            res['CFLAGS'] = f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} -mavx' + optimization
+            res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC ' \
+                              f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
+                              f'-mavx' + optimization
     elif is_windows():
         optimization = ' /O2' if with_optimization else ''
         res['CFLAGS'] = f'/utf-8' + optimization
-        res[
-            'CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS /DNOMINMAX /arch:AVX' + optimization
+        res['CXXFLAGS'] = f'/utf-8 /std:c++{cpp_standard} /EHsc /D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS ' \
+                          f'/DNOMINMAX /arch:AVX' + optimization
     return res
 
 
@@ -226,12 +242,13 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
                             remove_scoop_from_path: bool = True,
                             with_optimization: bool = True,
                             universal: bool = False,
-                            arm64_only: bool = False
+                            arm64_only: bool = False,
+                            no_hidden_visibility: bool = False
                             ):
     env = get_vcvars_environment(remove_conda_from_path=remove_conda_from_path,
                                  remove_scoop_from_path=remove_scoop_from_path) if is_windows() else os.environ.copy()
     cbf = get_common_build_flags(cpp_standard=cpp_standard, with_optimization=with_optimization, universal=universal,
-                                 arm64_only=arm64_only)
+                                 arm64_only=arm64_only, no_hidden_visibility=no_hidden_visibility)
     if is_mac():
         env['CC'] = cbf['CC']
         env['CFLAGS'] = cbf['CFLAGS']
@@ -254,9 +271,10 @@ def get_env_for_config_make(cpp_standard: int = cpp_standard(),
 
 
 def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja(), cpp_standard: int = cpp_standard(),
-                              cpp_extention: bool = False, universal: bool = False, arm64_only: bool = False):
+                              cpp_extention: bool = False, universal: bool = False, arm64_only: bool = False,
+                              no_hidden_visibility: bool = False):
     cbf = get_common_build_flags(cpp_standard=cpp_standard, with_optimization=False, universal=universal,
-                                 arm64_only=arm64_only)
+                                 arm64_only=arm64_only, no_hidden_visibility=no_hidden_visibility)
     if is_windows():
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
@@ -264,9 +282,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                # '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
-               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
-               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '' if no_hidden_visibility else '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                f'-DCMAKE_CXX_STANDARD={cpp_standard}',
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
                '-DCMAKE_CXX_EXTENSIONS=OFF',
@@ -289,9 +307,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
-               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
-               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '' if no_hidden_visibility else '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                f'-DCMAKE_CXX_STANDARD={cpp_standard}',
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
                '-DCMAKE_CXX_EXTENSIONS=' + ('ON' if cpp_extention else 'OFF'),
@@ -317,9 +335,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
-               '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
-               '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
-               '-DCMAKE_C_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
+               '' if no_hidden_visibility else '-DCMAKE_CXX_VISIBILITY_PRESET=hidden',
+               '' if no_hidden_visibility else '-DCMAKE_C_VISIBILITY_PRESET=hidden',
                f'-DCMAKE_CXX_STANDARD={cpp_standard}',
                '-DCMAKE_CXX_STANDARD_REQUIRED=ON',
                '-DCMAKE_CXX_EXTENSIONS=OFF',
@@ -516,10 +534,9 @@ def build_tbb(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True, no_hidden_visibility=True)
         cmakecmd.extend(['-DTBB_TEST:BOOL=OFF',
-                         '-DTBB_STRICT:BOOL=OFF',
-                         '-DCMAKE_CXX_VISIBILITY_PRESET=default'])
+                         '-DTBB_STRICT:BOOL=OFF'])
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -1272,6 +1289,22 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
 
+    if is_mac():
+        build_dir = create_build_dir(src_dir)
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
+                             src_dir])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+
+            create_universal_binaries(arm64_install_dir=arm64_install_dir, final_install_dir=install_dir)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
 
 def build_eigen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
@@ -1287,7 +1320,7 @@ def build_eigen(src_dir: str, install_dir: str):
                               to_texts=[r'set(blas',
                                         r'set(lapack'])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
                          '-DEIGEN_BUILD_DOC:BOOL=OFF',
@@ -1368,18 +1401,182 @@ inline void aligned_dealloc(void *ptr)
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
+    cmakecmd_options = ['-DBLA_STATIC:BOOL=ON',
+                        '-DNFORTRAN:BOOL=ON',
+                        '-DNOPENMP:BOOL=ON',
+                        '-DENABLE_CUDA:BOOL=OFF',
+                        '-DNSTATIC:BOOL=OFF',
+                        ]
+
     build_dir = create_build_dir(src_dir)
-
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        cmakecmd.extend(['-DINTEL_PATH=' + intel_sw_dir(),
-                         ])
-
-        cmakecmd.extend([src_dir])
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'SuiteSparse_config')])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             # '-DBLA_VENDOR=APPLE',
+                             # '-DBLA_SIZEOF_INTEGER=4',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'SuiteSparse_config')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'COLAMD')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'COLAMD')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'AMD')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'AMD')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'CCOLAMD')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'CCOLAMD')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'CAMD')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'CAMD')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'CHOLMOD')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'CHOLMOD')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+
+    build_dir = create_build_dir(src_dir)
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
+        cmakecmd.extend(cmakecmd_options)
+        cmakecmd.extend([os.path.join(src_dir, 'SPQR')])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        build_dir = create_build_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend(['-DARM64_BUILD:BOOL=ON',
+                             ])
+            cmakecmd.extend([os.path.join(src_dir, 'SPQR')])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+        finally:
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
@@ -1441,22 +1638,38 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
+                            '-DSUITESPARSE:BOOL=ON',
+                            '-DACCELERATESPARSE:BOOL=ON',
+                            '-DEIGENMETIS:BOOL=OFF',
+                            '-DBUILD_EXAMPLES:BOOL=OFF',
+                            '-DBUILD_BENCHMARKS:BOOL=OFF',
+                            '-DBUILD_SHARED_LIBS:BOOL=OFF',
+                            '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
+                            ]
 
-        cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
-                         '-DSUITESPARSE:BOOL=ON',
-                         '-DACCELERATESPARSE:BOOL=OFF',
-                         '-DEIGENMETIS:BOOL=OFF',
-                         '-DBUILD_EXAMPLES:BOOL=OFF',
-                         '-DBUILD_BENCHMARKS:BOOL=OFF',
-                         '-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         ])
-
+        cmakecmd.extend(cmakecmd_options)
         cmakecmd.extend([src_dir])
 
         env = {}
         env['MKLROOT'] = os.path.join(intel_sw_dir(), 'mkl', 'latest')
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
+
+        if is_mac():
+            shutil.rmtree(build_dir, ignore_errors=False)
+            build_dir = create_build_dir(src_dir)
+            arm64_install_dir = create_arm64_install_dir(src_dir)
+
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+
+                cmakecmd.extend(cmakecmd_options)
+                cmakecmd.extend([src_dir])
+
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
         # on linux, cmake complains about could not find the fake target SuiteSparse::Partition
         orig_file3 = os.path.join(install_dir, 'lib', 'cmake', 'Ceres', 'CeresTargets.cmake')
@@ -1514,6 +1727,23 @@ def build_libpng(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_mac():
+            shutil.rmtree(build_dir, ignore_errors=False)
+            build_dir = create_build_dir(src_dir)
+            arm64_install_dir = create_arm64_install_dir(src_dir)
+
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+
+                cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
+                                 '-DPNG_SHARED:BOOL=OFF'])
+                cmakecmd.extend([src_dir])
+
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         os.replace(bak_file, orig_file)
         if is_mac() and os.path.exists('/usr/include'):
@@ -1536,7 +1766,7 @@ def build_openjpeg(src_dir: str, install_dir: str):
                                         '#define OPJ_STATIC\n'
                                         '#endif\n'])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DBUILD_STATIC_LIBS:BOOL=ON',
                          '-DBUILD_DOC:BOOL=OFF',
@@ -1552,28 +1782,41 @@ def build_openjpeg(src_dir: str, install_dir: str):
 
 
 def build_libwebp(src_dir: str, install_dir: str):
-    build_dir = create_build_dir(src_dir)
+    cmakecmd_options = ['-DWEBP_BUILD_ANIM_UTILS:BOOL=OFF',
+                        '-DWEBP_BUILD_CWEBP:BOOL=OFF',
+                        '-DWEBP_BUILD_DWEBP:BOOL=OFF',
+                        '-DWEBP_BUILD_GIF2WEBP:BOOL=OFF',
+                        '-DWEBP_BUILD_IMG2WEBP:BOOL=OFF',
+                        '-DWEBP_BUILD_VWEBP:BOOL=OFF',
+                        '-DWEBP_BUILD_WEBPINFO:BOOL=OFF',
+                        '-DWEBP_BUILD_WEBPMUX:BOOL=OFF',
+                        '-DWEBP_BUILD_EXTRAS:BOOL=OFF',
+                        '-DWEBP_BUILD_WEBP_JS:BOOL=OFF',
+                        ]
 
+    build_dir = create_build_dir(src_dir)
     try:
         cmakecmd = get_cmake_cmd_common_part(install_dir)
-
-        cmakecmd.extend(['-DWEBP_BUILD_ANIM_UTILS:BOOL=OFF',
-                         '-DWEBP_BUILD_CWEBP:BOOL=OFF',
-                         '-DWEBP_BUILD_DWEBP:BOOL=OFF',
-                         '-DWEBP_BUILD_GIF2WEBP:BOOL=OFF',
-                         '-DWEBP_BUILD_IMG2WEBP:BOOL=OFF',
-                         '-DWEBP_BUILD_VWEBP:BOOL=OFF',
-                         '-DWEBP_BUILD_WEBPINFO:BOOL=OFF',
-                         '-DWEBP_BUILD_WEBPMUX:BOOL=OFF',
-                         '-DWEBP_BUILD_EXTRAS:BOOL=OFF',
-                         '-DWEBP_BUILD_WEBP_JS:BOOL=OFF',
-                         ])
-
+        cmakecmd.extend(cmakecmd_options)
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
+
+    if is_mac():
+        build_dir = create_build_dir(src_dir)
+        arm64_install_dir = create_arm64_install_dir(src_dir)
+        try:
+            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+            cmakecmd.extend(cmakecmd_options)
+            cmakecmd.extend([src_dir])
+            build_and_install_cmakecmd(cmakecmd, build_dir)
+            create_universal_binaries(arm64_install_dir, install_dir)
+        finally:
+            print('done')
+            shutil.rmtree(build_dir, ignore_errors=False)
+            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
 def build_jxrlib(src_dir: str, install_dir: str):
@@ -1618,8 +1861,8 @@ def build_jxrlib(src_dir: str, install_dir: str):
                 to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
                             r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx']
             else:
-                to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx '
+                to_texts = [r'CFLAGS=-arch x86_64 -arch arm64 -I. -Icommon/include -I$(DIR_SYS) '
+                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx -mcpu=apple-m1 '
                             r'-mmacosx-version-min={0}'.format(macos_min_version())]
 
             bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
@@ -1682,7 +1925,7 @@ def build_assimp(src_dir: str, install_dir: str):
         #         r'@CMAKE_SHARED_LIBRARY_SUFFIX@']
         #     bak_file_4 = patch_file(orig_file_4, from_texts=from_texts, to_texts=to_texts)
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DASSIMP_BUILD_ASSIMP_TOOLS:BOOL=OFF',
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DASSIMP_BUILD_FRAMEWORK:BOOL=OFF',
@@ -1832,43 +2075,6 @@ def build_freeimage(src_dir: str, install_dir: str):
                 os.replace(bak_file_4, orig_file_4)
 
 
-def build_botan(src_dir: str, install_dir: str):
-    try:
-        python = sys.executable
-
-        if is_windows():
-            env = get_vcvars_environment()
-            subprocess.run([python, src_dir + '/configure.py', '--cc=msvc',
-                            '--prefix=' + install_dir],
-                           cwd=src_dir, shell=False, check=True, env=env)
-            subprocess.run(['nmake'],
-                           cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(['botan-test'],
-                           cwd=src_dir, shell=True, check=True, env=env)
-            subprocess.run(['nmake', 'install'],
-                           cwd=src_dir, shell=False, check=True, env=env)  # todo: install not working
-        elif is_linux():
-            subprocess.run([python, src_dir + '/configure.py', '--with-zlib',
-                            '--prefix=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', 'clean'],
-                           cwd=src_dir, shell=False, check=True)
-        else:
-            subprocess.run([python, src_dir + '/configure.py', '--cc=clang', '--with-zlib',
-                            '--cc-abi-flags=-mmacosx-version-min=' + macos_min_version(),
-                            '--prefix=' + install_dir],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', '-j' + str(os.cpu_count()), 'install'],
-                           cwd=src_dir, shell=False, check=True)
-            subprocess.run(['make', 'clean'],
-                           cwd=src_dir, shell=False, check=True)
-    finally:
-        shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
-        os.remove(os.path.join(src_dir, 'Makefile'))
-
-
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
@@ -1896,7 +2102,7 @@ def build_itk(src_dir: str, install_dir: str):
         # bak_file4 = patch_file(orig_file4, from_texts=[r'find_package(OpenJPEG 2.0.0 REQUIRED)'],
         #                        to_texts=[r'find_package(OpenJPEG REQUIRED)'])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
                          '-DITK_USE_64BITS_IDS:BOOL=ON',
@@ -2023,7 +2229,7 @@ def build_vtk(src_dir: str, install_dir: str):
                                    from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
                                    to_texts=['bool __dummyIsParallelScope<1>()', ])
 
-        cmakecmd = get_cmake_cmd_common_part(install_dir)
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
@@ -2201,7 +2407,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             '-DBUILD_opencv_xfeatures2d:BOOL=ON',
             '-DBUILD_opencv_freetype:BOOL=OFF',
 
-            '-DCPU_BASELINE=AVX',
             '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
         ])
 
