@@ -3,12 +3,18 @@
 #include "zsaturateoperation.h"
 #include "zglobal.h"
 #include "zlog.h"
+#include <cpuinfo.h>
+#include <folly/CPortability.h>
 #include <simde/x86/avx512.h>
 
 namespace nim {
 
+FOLLY_PUSH_WARNING
+FOLLY_CLANG_DISABLE_WARNING("-Wunused-parameter")
+
 void saturate_add_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -35,10 +41,14 @@ void saturate_add_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -65,10 +75,14 @@ void saturate_add_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -95,10 +109,14 @@ void saturate_add_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t*
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -125,10 +143,14 @@ void saturate_add_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -155,10 +177,14 @@ void saturate_add_avx512(const uint16_t* x, const uint16_t* y, size_t count, uin
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -185,10 +211,14 @@ void saturate_add_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* 
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -215,10 +245,14 @@ void saturate_add_avx512(const int16_t* x, const int16_t* y, size_t count, int16
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_add_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -245,10 +279,14 @@ void saturate_add_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res
   for (; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -275,10 +313,14 @@ void saturate_sub_avx512(const uint8_t* x, const uint8_t* y, size_t count, uint8
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -305,10 +347,14 @@ void saturate_sub_avx512(const uint8_t* x, uint8_t y, size_t count, uint8_t* res
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -335,10 +381,14 @@ void saturate_sub_avx512(const int8_t* x, const int8_t* y, size_t count, int8_t*
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 64) {
@@ -365,10 +415,14 @@ void saturate_sub_avx512(const int8_t* x, int8_t y, size_t count, int8_t* res)
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const uint16_t* x, const uint16_t* y, size_t count, uint16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -395,10 +449,14 @@ void saturate_sub_avx512(const uint16_t* x, const uint16_t* y, size_t count, uin
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -425,10 +483,14 @@ void saturate_sub_avx512(const uint16_t* x, uint16_t y, size_t count, uint16_t* 
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const int16_t* x, const int16_t* y, size_t count, int16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(y, 64) && is_aligned(res, 64)) << x << " " << y << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -455,10 +517,14 @@ void saturate_sub_avx512(const int16_t* x, const int16_t* y, size_t count, int16
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void saturate_sub_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res)
 {
+#if CPUINFO_ARCH_X86_64
   CHECK(is_aligned(x, 64) && is_aligned(res, 64)) << x << " " << res;
   size_t i = 0;
   if (count >= 32) {
@@ -485,6 +551,11 @@ void saturate_sub_avx512(const int16_t* x, int16_t y, size_t count, int16_t* res
   for (; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
+
+FOLLY_POP_WARNING
 
 } // namespace nim

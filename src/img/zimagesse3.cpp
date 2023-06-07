@@ -8,7 +8,7 @@
 
 namespace {
 
-__forceinline double hsum_double_sse2(__m128d vd)
+__forceinline double hsum_double_sse2(simde__m128d vd)
 { // v = [ B | A ]
   auto undef =
     simde_mm_undefined_ps(); // don't worry, we only use addSD, never touching the garbage bits with an FP add
@@ -17,7 +17,7 @@ __forceinline double hsum_double_sse2(__m128d vd)
   return simde_mm_cvtsd_f64(simde_mm_add_sd(vd, shuf));
 }
 
-[[maybe_unused]] __forceinline float hsum_float_sse3(__m128 v)
+[[maybe_unused]] __forceinline float hsum_float_sse3(simde__m128 v)
 {
   auto shuf = simde_mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
   auto sums = simde_mm_add_ps(v, shuf);

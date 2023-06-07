@@ -3,7 +3,11 @@
 // This file includes some commonly used headers from glm and defines some useful functions
 // for glm
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+#define GLM_FORCE_NEON
+#else
 #define GLM_FORCE_AVX
+#endif
 // #define GLM_FORCE_INLINE
 #define GLM_FORCE_SIZE_T_LENGTH
 #define GLM_FORCE_EXPLICIT_CTOR

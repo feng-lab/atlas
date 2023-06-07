@@ -1,12 +1,17 @@
 #include "zimageavx.h"
 
-#include "zglobal.h"
+#include "zlog.h"
+#include <cpuinfo.h>
+#include <folly/CPortability.h>
 #ifdef _MSC_VER
 #include <cmath> // for simde
 #endif
 #include <simde/x86/avx512.h>
 
 namespace nim {
+
+FOLLY_PUSH_WARNING
+FOLLY_CLANG_DISABLE_WARNING("-Wunused-parameter")
 
 void Image2DFilterForOneBlock_AVX512(const double* padImg,
                                      size_t padImgWidth,
@@ -18,6 +23,7 @@ void Image2DFilterForOneBlock_AVX512(const double* padImg,
                                      size_t rangeStart,
                                      size_t rangeEnd)
 {
+#if CPUINFO_ARCH_X86_64
   for (size_t j = rangeStart; j < rangeEnd; ++j) {
     for (size_t i = 0; i < imgOutWidth; ++i) {
       double sum = 0.0;
@@ -46,6 +52,9 @@ void Image2DFilterForOneBlock_AVX512(const double* padImg,
       imgOut[j * imgOutWidth + i] = sum + _mm512_reduce_add_pd(vsum);
     }
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void Image2DRowFilterForOneBlock_AVX512(const double* padImg,
@@ -57,6 +66,7 @@ void Image2DRowFilterForOneBlock_AVX512(const double* padImg,
                                         size_t rangeStart,
                                         size_t rangeEnd)
 {
+#if CPUINFO_ARCH_X86_64
   for (size_t j = rangeStart; j < rangeEnd; ++j) {
     for (size_t i = 0; i < imgOutWidth; ++i) {
       double sum = 0.0;
@@ -84,6 +94,9 @@ void Image2DRowFilterForOneBlock_AVX512(const double* padImg,
       imgOut[j * imgOutWidth + i] = sum + _mm512_reduce_add_pd(vsum);
     }
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void Image3DFilterForOneBlock_AVX512(const double* padImg,
@@ -99,6 +112,7 @@ void Image3DFilterForOneBlock_AVX512(const double* padImg,
                                      size_t rangeStart,
                                      size_t rangeEnd)
 {
+#if CPUINFO_ARCH_X86_64
   for (size_t k = rangeStart; k < rangeEnd; ++k) {
     for (size_t j = 0; j < imgOutHeight; ++j) {
       for (size_t i = 0; i < imgOutWidth; ++i) {
@@ -131,6 +145,9 @@ void Image3DFilterForOneBlock_AVX512(const double* padImg,
       }
     }
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
 
 void Image3DRowFilterForOneBlock_AVX512(const double* padImg,
@@ -144,6 +161,7 @@ void Image3DRowFilterForOneBlock_AVX512(const double* padImg,
                                         size_t rangeStart,
                                         size_t rangeEnd)
 {
+#if CPUINFO_ARCH_X86_64
   for (size_t k = rangeStart; k < rangeEnd; ++k) {
     for (size_t j = 0; j < imgOutHeight; ++j) {
       for (size_t i = 0; i < imgOutWidth; ++i) {
@@ -173,6 +191,11 @@ void Image3DRowFilterForOneBlock_AVX512(const double* padImg,
       }
     }
   }
+#else
+  LOG(FATAL) << "avx512 only supports x86_64";
+#endif
 }
+
+FOLLY_POP_WARNING
 
 } // namespace nim

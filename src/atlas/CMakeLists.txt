@@ -41,6 +41,7 @@ find_package(gRPC CONFIG REQUIRED
              PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 message(STATUS "Using gRPC ${gRPC_VERSION}")
 print_target_properties(gRPC::grpc++)
+print_target_properties(gRPC::grpc_cpp_plugin)
 
 include(gRPCGenerateCPP)
 
@@ -610,7 +611,11 @@ set(SOURCES
     zswccolorparameters.h
     zthreadsafelrucache.h
     zthreadsafescalablecache.h
-    zrunbenchmark.cpp zrunbenchmark.h zimgregioncache.cpp zimgregioncache.h zcheckbox.cpp zcheckbox.h zrunexport3danimation.cpp zrunexport3danimation.h zcancellation.h)
+    zrunbenchmark.cpp zrunbenchmark.h
+    zimgregioncache.cpp zimgregioncache.h
+    zcheckbox.cpp zcheckbox.h
+    zrunexport3danimation.cpp zrunexport3danimation.h
+    zcancellation.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -713,7 +718,11 @@ else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
   target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
-  target_compile_options(${APP_NAME} PUBLIC -mavx)
+  if (APPLE AND AARCH64)
+    target_compile_options(${APP_NAME} PUBLIC -mcpu=apple-m1)
+  else ()
+    target_compile_options(${APP_NAME} PUBLIC -mavx)
+  endif ()
   target_compile_options(${APP_NAME} PUBLIC -fno-common)
 
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")

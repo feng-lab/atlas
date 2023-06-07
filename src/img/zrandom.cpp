@@ -2,7 +2,20 @@
 
 #include <tbb/enumerable_thread_specific.h>
 
-#if defined(_WIN32) || defined(_WIN64)
+#if defined(__aarch64__) || defined(_M_ARM64)
+
+#include <time.h>
+static uint64_t rdtsc()
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+
+  // Convert the timespec to a single 64-bit value.
+  // Note that this will overflow in about 584 years since Unix Epoch.
+  return (uint64_t)ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+}
+
+#elif defined(_WIN32) || defined(_WIN64)
 
 #include <intrin.h>
 #define rdtsc __rdtsc

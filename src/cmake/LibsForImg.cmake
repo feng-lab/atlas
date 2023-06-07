@@ -1,3 +1,8 @@
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
+  message(STATUS "AARCH64 build")
+  set(AARCH64 1)
+endif ()
+
 if (BUILD_WITH_CONDA)
   if (WIN32)
     set(CONDA_LIB_DIR $ENV{PREFIX}/Library)
@@ -8,8 +13,6 @@ if (BUILD_WITH_CONDA)
   set(QT_HOST_PATH ${CONDA_LIB_DIR})
   # tbb
   set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/tbb)
-  # ipp
-  set(IPP_DIR ${CONDA_LIB_DIR}/lib/cmake/ipp)
 else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
@@ -17,96 +20,109 @@ else ()
     # tbb
     set(TBB_DIR ${INTEL_PATH}/tbb/latest/lib/cmake/tbb)
   endif ()
-  # ipp
-  set(IPP_DIR ${INTEL_PATH}/ipp/latest/lib/cmake/ipp)
 endif ()
 set(QT_HOST_PATH_CMAKE_DIR ${QT_HOST_PATH}/lib/cmake)
 
 find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)
 
-if (BUILD_WITH_CONDA)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include)
-  find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
-               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-  find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread mkl_sequential_dll
-               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-  find_library(MKL_CORE NAMES mkl_core mkl_core_dll
-               PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
-  set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
-else ()
-  message(STATUS "INTEL_PATH: ${INTEL_PATH}")
-  if (WIN32)
-    set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
-  else (WIN32)
-    set(MKL_PATH ${INTEL_PATH}/mkl/latest)
-  endif (WIN32)
-  set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
-  if (WIN32)
-    # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
-    set(MKL_LIBRARIES ${MKL_LIBRARIES}
-        ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-        ${MKL_PATH}/lib/intel64/mkl_sequential.lib
-        ${MKL_PATH}/lib/intel64/mkl_core.lib)
-  elseif (APPLE)
-    set(MKL_LIBRARIES ${MKL_LIBRARIES}
-        ${MKL_PATH}/lib/libmkl_intel_lp64.a
-        ${MKL_PATH}/lib/libmkl_tbb_thread.a
-        ${MKL_PATH}/lib/libmkl_core.a)
-  else ()
-    set(MKL_LIBRARIES ${MKL_LIBRARIES}
-        ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
-        ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
-        ${MKL_PATH}/lib/intel64/libmkl_core.a)
-  endif ()
-  message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
-  message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
+if (NOT AARCH64)
+  if (BUILD_WITH_CONDA)
+    # mkl
+    set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include)
+    find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
+                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
+    find_library(MKL_TBB_THREAD NAMES mkl_tbb_thread mkl_sequential_dll
+                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
+    find_library(MKL_CORE NAMES mkl_core mkl_core_dll
+                 PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
+    set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
 
-  # ipp
-  set(IPP_SHARED FALSE)
-  set(IPP_TL_VARIANT TBB)
-  find_package(IPP REQUIRED)
-  message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
-  print_target_properties(IPP::ippi)
-  print_target_properties(IPP::ipps)
-  print_target_properties(IPP::ippvm)
-  print_target_properties(IPP::ippcore)
-  #  if (WIN32)
-  #    set(IPP_PATH "${INTEL_PATH}\\ipp")
-  #  else (WIN32)
-  #    set(IPP_PATH ${INTEL_PATH}/ipp)
-  #  endif (WIN32)
-  #  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
-  #  if (WIN32)
-  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-  #        ${IPP_PATH}/lib/intel64/ippimt.lib
-  #        ${IPP_PATH}/lib/intel64/ippcoremt.lib
-  #        ${IPP_PATH}/lib/intel64/ippvmmt.lib
-  #        ${IPP_PATH}/lib/intel64/ippsmt.lib
-  #        ${IPP_PATH}/lib/intel64/ippcvmt.lib
-  #        ${IPP_PATH}/lib/intel64/ippccmt.lib)
-  #  elseif (APPLE)
-  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-  #        ${IPP_PATH}/lib/libippi.a
-  #        ${IPP_PATH}/lib/libippcore.a
-  #        ${IPP_PATH}/lib/libippvm.a
-  #        #${IPP_PATH}/lib/libipps.a
-  #        ${IPP_PATH}/lib/libippcv.a
-  #        ${IPP_PATH}/lib/libippcc.a
-  #        ${INTEL_PATH}/lib/libirc.a
-  #        ${INTEL_PATH}/lib/libsvml.a
-  #        ${INTEL_PATH}/lib/libimf.a)
-  #  else ()
-  #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-  #        ${IPP_PATH}/lib/intel64/libippi.a
-  #        ${IPP_PATH}/lib/intel64/libippcore.a
-  #        ${IPP_PATH}/lib/intel64/libippvm.a
-  #        ${IPP_PATH}/lib/intel64/libipps.a
-  #        ${IPP_PATH}/lib/intel64/libippcv.a
-  #        ${IPP_PATH}/lib/intel64/libippcc.a)
-  #  endif ()
-  #message(STATUS "IPP_INCLUDE_DIRS: ${IPP_INCLUDE_DIRS}")
-  #message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
+    # ipp
+    # set(IPP_DIR ${CONDA_LIB_DIR}/lib/cmake/ipp)
+  else ()
+    if (NOT INTEL_PATH)
+      if (WIN32)
+        set(INTEL_PATH "C:\\Program Files (x86)\\Intel\\oneAPI")
+      else (WIN32)
+        set(INTEL_PATH /opt/intel/oneapi)
+      endif (WIN32)
+    endif ()
+    message(STATUS "INTEL_PATH: ${INTEL_PATH}")
+    # mkl
+    if (WIN32)
+      set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
+    else (WIN32)
+      set(MKL_PATH ${INTEL_PATH}/mkl/latest)
+    endif (WIN32)
+    set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${MKL_PATH}/include)
+    if (WIN32)
+      # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
+      set(MKL_LIBRARIES ${MKL_LIBRARIES}
+          ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
+          ${MKL_PATH}/lib/intel64/mkl_sequential.lib
+          ${MKL_PATH}/lib/intel64/mkl_core.lib)
+    elseif (APPLE)
+      set(MKL_LIBRARIES ${MKL_LIBRARIES}
+          ${MKL_PATH}/lib/libmkl_intel_lp64.a
+          ${MKL_PATH}/lib/libmkl_tbb_thread.a
+          ${MKL_PATH}/lib/libmkl_core.a)
+    else ()
+      set(MKL_LIBRARIES ${MKL_LIBRARIES}
+          ${MKL_PATH}/lib/intel64/libmkl_intel_lp64.a
+          ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
+          ${MKL_PATH}/lib/intel64/libmkl_core.a)
+    endif ()
+    message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
+    message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
+
+    # ipp
+    set(IPP_DIR ${INTEL_PATH}/ipp/latest/lib/cmake/ipp)
+    set(IPP_SHARED FALSE)
+    set(IPP_TL_VARIANT TBB)
+    find_package(IPP REQUIRED)
+    message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
+    print_target_properties(IPP::ippi)
+    print_target_properties(IPP::ipps)
+    print_target_properties(IPP::ippvm)
+    print_target_properties(IPP::ippcore)
+    #  if (WIN32)
+    #    set(IPP_PATH "${INTEL_PATH}\\ipp")
+    #  else (WIN32)
+    #    set(IPP_PATH ${INTEL_PATH}/ipp)
+    #  endif (WIN32)
+    #  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
+    #  if (WIN32)
+    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+    #        ${IPP_PATH}/lib/intel64/ippimt.lib
+    #        ${IPP_PATH}/lib/intel64/ippcoremt.lib
+    #        ${IPP_PATH}/lib/intel64/ippvmmt.lib
+    #        ${IPP_PATH}/lib/intel64/ippsmt.lib
+    #        ${IPP_PATH}/lib/intel64/ippcvmt.lib
+    #        ${IPP_PATH}/lib/intel64/ippccmt.lib)
+    #  elseif (APPLE)
+    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+    #        ${IPP_PATH}/lib/libippi.a
+    #        ${IPP_PATH}/lib/libippcore.a
+    #        ${IPP_PATH}/lib/libippvm.a
+    #        #${IPP_PATH}/lib/libipps.a
+    #        ${IPP_PATH}/lib/libippcv.a
+    #        ${IPP_PATH}/lib/libippcc.a
+    #        ${INTEL_PATH}/lib/libirc.a
+    #        ${INTEL_PATH}/lib/libsvml.a
+    #        ${INTEL_PATH}/lib/libimf.a)
+    #  else ()
+    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
+    #        ${IPP_PATH}/lib/intel64/libippi.a
+    #        ${IPP_PATH}/lib/intel64/libippcore.a
+    #        ${IPP_PATH}/lib/intel64/libippvm.a
+    #        ${IPP_PATH}/lib/intel64/libipps.a
+    #        ${IPP_PATH}/lib/intel64/libippcv.a
+    #        ${IPP_PATH}/lib/intel64/libippcc.a)
+    #  endif ()
+    #message(STATUS "IPP_INCLUDE_DIRS: ${IPP_INCLUDE_DIRS}")
+    #message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
+  endif ()
 endif ()
 
 find_package(cpuinfo REQUIRED)

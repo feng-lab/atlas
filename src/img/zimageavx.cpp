@@ -8,7 +8,7 @@
 
 namespace {
 
-__forceinline double hsum_double_avx(__m256d v)
+__forceinline double hsum_double_avx(simde__m256d v)
 {
   auto vlow = simde_mm256_castpd256_pd128(v);
   auto vhigh = simde_mm256_extractf128_pd(v, 1); // high 128
@@ -18,7 +18,7 @@ __forceinline double hsum_double_avx(__m256d v)
   return simde_mm_cvtsd_f64(simde_mm_add_sd(vlow, high64)); // reduce to scalar
 }
 
-__forceinline float hsum_float_sse3(__m128 v)
+__forceinline float hsum_float_sse3(simde__m128 v)
 {
   auto shuf = simde_mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
   auto sums = simde_mm_add_ps(v, shuf);
@@ -27,7 +27,7 @@ __forceinline float hsum_float_sse3(__m128 v)
   return simde_mm_cvtss_f32(sums);
 }
 
-[[maybe_unused]] __forceinline float hsum256_float_avx(__m256 v)
+[[maybe_unused]] __forceinline float hsum256_float_avx(simde__m256 v)
 {
   auto vlow = simde_mm256_castps256_ps128(v);
   auto vhigh = simde_mm256_extractf128_ps(v, 1); // high 128

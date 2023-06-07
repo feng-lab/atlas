@@ -51,12 +51,33 @@ def build_atlas_package(is_debug_version: bool = False):
                             symlinks=True)
             subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), app_name],
                            cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
-
-            subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
-                            os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
         else:
             sys.stderr.write('Error: atlas is not built yet.\n')
             sys.exit(1)
+
+        binary_dir = common_dirs.atlas_binary_dir(arm64=True)
+        print('arm64 binaryDIR:', binary_dir)
+        arm64_app_name = 'Atlas_arm64.app'
+
+        shutil.rmtree(os.path.join(common_dirs.deploy_target_dir(), arm64_app_name), ignore_errors=True)
+
+        if os.path.exists(os.path.join(binary_dir, app_name)):
+            shutil.copytree(os.path.join(binary_dir, app_name),
+                            os.path.join(common_dirs.deploy_target_dir(), arm64_app_name),
+                            symlinks=True)
+            subprocess.run([os.path.join(common_dirs.qt_bin_dir(), 'macdeployqt'), arm64_app_name],
+                           cwd=common_dirs.deploy_target_dir(), shell=False, check=True)
+        else:
+            sys.stderr.write('Error: arm64 atlas is not built yet.\n')
+            sys.exit(1)
+
+        filename = os.path.join(common_dirs.deploy_target_dir(), arm64_app_name, 'Contents', 'MacOS', 'Atlas')
+        target_filename = os.path.join(common_dirs.deploy_target_dir(), app_name, 'Contents', 'MacOS', 'Atlas')
+        print(f'merge {filename} to {target_filename}')
+        subprocess.run(['lipo', '-create', filename, target_filename, '-output', target_filename],
+                       shell=False, check=True)
+        subprocess.run(['codesign', '--force', '--deep', '--sign', '-',
+                        os.path.join(common_dirs.deploy_target_dir(), app_name)], shell=False, check=True)
     elif common_dirs.is_linux():
         app_name = "Atlas"
 

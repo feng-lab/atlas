@@ -10,6 +10,18 @@ import subprocess
 import errno
 
 
+def is_windows() -> bool:
+    return sys.platform.startswith('win')
+
+
+def is_mac() -> bool:
+    return sys.platform.startswith('darwin')
+
+
+def is_linux() -> bool:
+    return sys.platform.startswith('linux')
+
+
 def use_clang_cl() -> bool:
     return is_windows() and False
 
@@ -109,11 +121,13 @@ def atlas_test_data_dir() -> str:
     return res
 
 
-def atlas_build_dir() -> str:
+def atlas_build_dir(arm64: bool = False) -> str:
     if use_ninja():
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release-ninja')
     else:
         res = os.path.join(atlas_repository_dir(), 'cmake-build-release')
+    if arm64:
+        res += '-arm64'
     if not os.path.exists(res):
         os.mkdir(res)
     assert os.path.exists(res)
@@ -131,10 +145,10 @@ def python_package_build_dir() -> str:
     return res
 
 
-def atlas_binary_dir() -> str:
-    res = os.path.join(atlas_build_dir(), 'src', 'atlas')
+def atlas_binary_dir(arm64: bool = False) -> str:
+    res = os.path.join(atlas_build_dir(arm64=arm64), 'src', 'atlas')
     if not use_ninja() and sys.platform.startswith('win32'):
-        res = os.path.join(atlas_build_dir(), 'src', 'atlas', 'Release')
+        res = os.path.join(atlas_build_dir(arm64=arm64), 'src', 'atlas', 'Release')
     assert os.path.exists(res)
     return res
 
@@ -298,18 +312,6 @@ def freeimage_redist_dir() -> str:
     res = os.path.join(ext_build_dir(), 'freeimage')
     assert os.path.exists(res)
     return res
-
-
-def is_windows() -> bool:
-    return sys.platform.startswith('win')
-
-
-def is_mac() -> bool:
-    return sys.platform.startswith('darwin')
-
-
-def is_linux() -> bool:
-    return sys.platform.startswith('linux')
 
 
 def find_src_package_with_glob(files: str):
