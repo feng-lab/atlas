@@ -891,7 +891,8 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
         # if is_linux() and not use_clang_in_linux():
         #     os.replace(bak_file, orig_file)
-        os.replace(bak_file, orig_file)
+        if is_mac():
+            os.replace(bak_file, orig_file)
 
 
 def build_bzip2(src_dir: str, install_dir: str):
