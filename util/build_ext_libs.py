@@ -1478,12 +1478,11 @@ def build_suitesparse(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=["""set ( BLA_VENDOR Intel10_64lp )
 set ( BLA_SIZEOF_INTEGER 4 )
-# find_package ( BLAS )
-include(libs)""",
+find_package ( BLAS )""",
                                           ],
                               to_texts=["""set ( BLA_VENDOR Intel10_64lp )
 set ( BLA_SIZEOF_INTEGER 4 )
-## find_package ( BLAS )
+# find_package ( BLAS )
 include(libs)""",
                                         ])
 
