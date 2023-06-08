@@ -1683,7 +1683,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                          r'set(LAPACK_FOUND ON CACHE BOOL "")',
                                          r'add_library (METIS::METIS IMPORTED INTERFACE)',
                                          r'set(SuiteSparse_CHOLMOD_USES_METIS 1)',
-                                         r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
+                                         'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
                                          r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
                                          ]
                                )
