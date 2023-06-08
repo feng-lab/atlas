@@ -1643,6 +1643,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                            r'find_package(BLAS QUIET)',
                                            r'find_package(LAPACK QUIET)',
                                            r'find_package (METIS)',
+                                           r'check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)',
                                            ],
                                to_texts=[r'if (FALSE)',
                                          r' ',
@@ -1650,6 +1651,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                          r'set(BLAS_FOUND ON CACHE BOOL "")',
                                          r'set(LAPACK_FOUND ON CACHE BOOL "")',
                                          r'add_library (METIS::METIS IMPORTED INTERFACE)',
+                                         r'set(SuiteSparse_CHOLMOD_USES_METIS 1)',
                                          ]
                                )
         orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
@@ -1680,7 +1682,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
                             '-DSUITESPARSE:BOOL=ON',
-                            '-DACCELERATESPARSE:BOOL=ON',
+                            '-DACCELERATESPARSE:BOOL=' + ('ON' if is_mac() else 'OFF'),
                             '-DEIGENMETIS:BOOL=OFF',
                             '-DBUILD_EXAMPLES:BOOL=OFF',
                             '-DBUILD_BENCHMARKS:BOOL=OFF',
