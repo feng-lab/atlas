@@ -1237,11 +1237,11 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                            r'list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
                                            r'find_package(Glog MODULE)',
                                            r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
-                                           r'find_package(LibDwarf)' + '' if is_mac() else '_NONONO',
-                                           r'find_package(Libiberty)' + '' if is_mac() else '_NONONO',
-                                           r'find_package(LibAIO)' + '' if is_mac() else '_NONONO',
-                                           r'find_package(LibUring)' + '' if is_mac() else '_NONONO',
-                                           r'find_package(LibUnwind)' + '' if is_mac() else '_NONONO',
+                                           r'find_package(LibDwarf)' + ('' if is_mac() else '_NONONO'),
+                                           r'find_package(Libiberty)' + ('' if is_mac() else '_NONONO'),
+                                           r'find_package(LibAIO)' + ('' if is_mac() else '_NONONO'),
+                                           r'find_package(LibUring)' + ('' if is_mac() else '_NONONO'),
+                                           r'find_package(LibUnwind)' + ('' if is_mac() else '_NONONO'),
                                            r'set(FOLLY_USE_SYMBOLIZER ON)',
                                            ],
                                to_texts=[r'',
@@ -1287,15 +1287,33 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                        r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
                                    ])
 
+        cmakecmd_options = ['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                            '-DPYTHON_EXTENSIONS:BOOL=OFF',
+                            '-DBUILD_TESTS:BOOL=OFF',
+                            '-DBOOST_LINK_STATIC=ON',
+                            '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
+                            '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + ('ON' if use_asan else 'OFF'),
+                            src_dir]
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, cpp_extention=True, universal=True)
-        cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                         '-DPYTHON_EXTENSIONS:BOOL=OFF',
-                         '-DBUILD_TESTS:BOOL=OFF',
-                         '-DBOOST_LINK_STATIC=ON',
-                         '-DGFLAGS_USE_TARGET_NAMESPACE:BOOL=ON',
-                         '-DFOLLY_LIBRARY_SANITIZE_ADDRESS:BOOL=' + 'ON' if use_asan else 'OFF',
-                         src_dir])
+        cmakecmd.extend(cmakecmd_options)
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        # if is_mac():
+        #     build_dir = create_build_dir(src_dir)
+        #     arm64_install_dir = create_arm64_install_dir(src_dir)
+        #     try:
+        #         cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, cpp_extention=True, arm64_only=True)
+        #         cmakecmd_options.extend(['-DFOLLY_HAVE_UNALIGNED_ACCESS_EXITCODE=0',
+        #                                  '-DFOLLY_HAVE_LINUX_VDSO_EXITCODE=1',
+        #                                  '-DFOLLY_HAVE_WCHAR_SUPPORT_EXITCODE=0',
+        #                                  '-DHAVE_VSNPRINTF_ERRORS_EXITCODE=1',
+        #                                  ])
+        #         cmakecmd.extend(cmakecmd_options)
+        #         build_and_install_cmakecmd(cmakecmd, build_dir)
+        #         create_universal_binaries(arm64_install_dir, install_dir)
+        #     finally:
+        #         shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         if is_mac():
@@ -1493,7 +1511,7 @@ include(libs)""",
                                to_texts=[
                                    r'target_link_libraries ( spqr_cuda ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
                                    r'target_link_libraries ( spqr_cuda_static ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
-                                   ])
+                               ])
 
         shutil.copy2(os.path.join(ext_dir(), 'suitesparse-cmake', 'libs.cmake'),
                      os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules'))
@@ -1518,7 +1536,8 @@ include(libs)""",
                     build_dir = create_build_dir(module_src_dir)
                     arm64_install_dir = create_arm64_install_dir(module_src_dir)
                     try:
-                        cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+                        cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True,
+                                                             no_hidden_visibility=True)
                         cmakecmd.extend(cmakecmd_options)
                         cmakecmd.extend([module_src_dir])
                         build_and_install_cmakecmd(cmakecmd, build_dir)
