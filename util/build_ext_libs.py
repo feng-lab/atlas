@@ -150,6 +150,23 @@ def glob_remove(files: str):
         print(f'{file} removed')
 
 
+def remove_installed_dynamic_library(install_dir: str, libnames: list):
+    for libname in libnames:
+        if is_linux():
+            filename = os.path.join(install_dir, 'lib', f'lib{libname}.so')
+            print(f'deleting {filename}')
+            os.unlink(filename)
+        elif is_windows():
+            filename = os.path.join(install_dir, 'lib', f'{libname}.lib')
+            print(f'deleting {filename}')
+            os.unlink(filename)
+            filename = os.path.join(install_dir, 'bin', f'{libname}.dll')
+            print(f'deleting {filename}')
+            os.unlink(filename)
+        else:
+            glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.*dylib'))
+
+
 def get_vcvars_environment(remove_conda_from_path: bool = True,
                            remove_scoop_from_path: bool = True):
     """
@@ -1552,35 +1569,9 @@ include(libs)""",
         os.replace(bak_file2, orig_file2)
         os.unlink(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
 
-    if is_linux():
-        os.unlink(os.path.join(install_dir, 'lib', 'libamd.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libcamd.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libccolamd.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libcholmod_cuda.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libcholmod.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libcolamd.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libspqr_cuda.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libspqr.so'))
-        os.unlink(os.path.join(install_dir, 'lib', 'libsuitesparseconfig.so'))
-    elif is_windows():
-        os.unlink(os.path.join(install_dir, 'lib', 'amd.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'camd.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'ccolamd.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'cholmod_cuda.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'cholmod.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'colamd.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'spqr_cuda.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'spqr.lib'))
-        os.unlink(os.path.join(install_dir, 'lib', 'suitesparseconfig.lib'))
-        os.unlink(os.path.join(install_dir, 'bin', 'amd.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'camd.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'ccolamd.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'cholmod_cuda.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'cholmod.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'colamd.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'spqr_cuda.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'spqr.dll'))
-        os.unlink(os.path.join(install_dir, 'bin', 'suitesparseconfig.dll'))
+    remove_installed_dynamic_library(install_dir,
+                                     ['amd', 'camd', 'ccolamd', 'cholmod_cuda', 'cholmod', 'colamd', 'spqr_cuda',
+                                      'spqr', 'suitesparseconfig'])
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
