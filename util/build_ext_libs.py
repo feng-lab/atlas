@@ -2035,7 +2035,17 @@ def build_freeimage(src_dir: str, install_dir: str):
     bak_file_3 = None
     orig_file_4 = None
     bak_file_4 = None
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'fipMakefile.srcs')
+        from_texts = [r'Source/LibTIFF4/tif_dir.c ']
+        to_texts = [r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c ']
+        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+
+        if os.path.exists(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION')):
+            os.rename(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION'),
+                      os.path.join(src_dir, 'Source', 'LibTIFF4', '__VERSION'))
+
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['MSBuild', 'FreeImage.2017.sln', '/target:FreeImagePlus', '/property:Platform=x64',
@@ -2106,6 +2116,7 @@ def build_freeimage(src_dir: str, install_dir: str):
             subprocess.run(['make', '-f', 'Makefile_fip', 'clean'],
                            cwd=src_dir, shell=False, check=True)
     finally:
+        os.replace(bak_file, orig_file)
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
