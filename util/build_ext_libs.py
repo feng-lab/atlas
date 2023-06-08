@@ -2328,6 +2328,7 @@ def build_vtk(src_dir: str, install_dir: str):
             os.replace(bak_file6, orig_file6)
         os.rename(os.path.join(src_dir, 'CMake', '__FindTBB.cmake'),
                   os.path.join(src_dir, 'CMake', 'FindTBB.cmake'))
+        os.replace(bak_file7, orig_file7)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
