@@ -124,3 +124,7 @@
 [submodule "src/3rdparty/oneTBB"]
 	path = src/3rdparty/oneTBB
 	url = https://github.com/oneapi-src/oneTBB.git
+[submodule "src/3rdparty/SuiteSparse"]
+	path = src/3rdparty/SuiteSparse
+	url = https://github.com/DrTimothyAldenDavis/SuiteSparse.git
+	branch = stable

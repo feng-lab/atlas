@@ -436,15 +436,24 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     if os.path.exists(bak_file):
         os.remove(bak_file)
     os.rename(orig_file, bak_file)
+    # with open(bak_file, mode='r', encoding='utf-8') as f:
+    #     from_lines = f.readlines()
+    # with open(orig_file, mode='w', encoding='utf-8') as f:
+    #     to_lines = []
+    #     for line in from_lines:
+    #         for from_text, to_text in zip(from_texts, to_texts):
+    #             line = line.replace(from_text, to_text)
+    #         f.write(line)
+    #         to_lines.append(line)
+    txt = Path(bak_file).read_text()
+    with open(orig_file, mode='w', encoding='utf-8') as f:
+        for from_text, to_text in zip(from_texts, to_texts):
+            txt = txt.replace(from_text, to_text)
+        f.write(txt)
     with open(bak_file, mode='r', encoding='utf-8') as f:
         from_lines = f.readlines()
-    with open(orig_file, mode='w', encoding='utf-8') as f:
-        to_lines = []
-        for line in from_lines:
-            for from_text, to_text in zip(from_texts, to_texts):
-                line = line.replace(from_text, to_text)
-            f.write(line)
-            to_lines.append(line)
+    with open(orig_file, mode='r', encoding='utf-8') as f:
+        to_lines = f.readlines()
     print(''.join(list(difflib.unified_diff(from_lines, to_lines, fromfile=orig_file, tofile='<new>'))))
     if not keep_bak_file:
         os.remove(bak_file)
@@ -1011,24 +1020,24 @@ def build_snappy(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
-            cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                             '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
-                             '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
-                             '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
-                             '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
-                             src_dir])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
 
-            create_universal_binaries(arm64_install_dir, install_dir)
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+                cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                                 '-DSNAPPY_BUILD_TESTS:BOOL=OFF',
+                                 '-DSNAPPY_BUILD_BENCHMARKS:BOOL=OFF',
+                                 '-DSNAPPY_REQUIRE_AVX:BOOL=OFF',
+                                 '-DSNAPPY_REQUIRE_AVX2:BOOL=OFF',
+                                 src_dir])
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
-        if is_mac():
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
 def build_xz(src_dir: str, install_dir: str):
@@ -1063,23 +1072,23 @@ def build_xz(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
-            cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
-                             '-DCREATE_XZ_SYMLINKS:BOOL=OFF',
-                             '-DCREATE_LZMA_SYMLINKS:BOOL=OFF',
-                             src_dir])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
 
-            create_universal_binaries(arm64_install_dir, install_dir)
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
+                cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
+                                 '-DCREATE_XZ_SYMLINKS:BOOL=OFF',
+                                 '-DCREATE_LZMA_SYMLINKS:BOOL=OFF',
+                                 src_dir])
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
-        if is_mac():
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
 
 def build_zstd(src_dir: str, install_dir: str):
@@ -1330,15 +1339,14 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
                              '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '\\nasm.exe',
                              '-DWITH_CRT_DLL:BOOL=ON',
                              src_dir])
+        elif is_linux():
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm',
+                             src_dir])
         else:
-            if is_linux():
-                cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                                 '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=nasm',
-                                 src_dir])
-            else:
-                cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
-                                 '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
-                                 src_dir])
+            cmakecmd.extend(['-DENABLE_SHARED:BOOL=OFF',
+                             '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
+                             src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
@@ -1353,7 +1361,6 @@ def build_libjpeg(src_dir: str, install_dir: str, nasm_dir: str):
                              '-DCMAKE_ASM_NASM_COMPILER:FILEPATH=' + nasm_dir + '/nasm',
                              src_dir])
             build_and_install_cmakecmd(cmakecmd, build_dir)
-
             create_universal_binaries(arm64_install_dir=arm64_install_dir, final_install_dir=install_dir)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
@@ -1462,159 +1469,110 @@ def build_suitesparse(src_dir: str, install_dir: str):
                         '-DNSTATIC:BOOL=OFF',
                         ]
 
-    build_dir = create_build_dir(src_dir)
+    module_src_dir = os.path.join(src_dir, 'SuiteSparse_config')
+    build_dir = create_build_dir(module_src_dir)
+    orig_file = bak_file = None
+    orig_file1 = bak_file1 = None
     try:
+        orig_file = os.path.join(module_src_dir, 'cmake_modules', 'SuiteSparseBLAS.cmake')
+        bak_file = patch_file(orig_file,
+                              from_texts=["""set ( BLA_VENDOR Intel10_64lp )
+set ( BLA_SIZEOF_INTEGER 4 )
+# find_package ( BLAS )
+include(libs)""",
+                                          ],
+                              to_texts=["""set ( BLA_VENDOR Intel10_64lp )
+set ( BLA_SIZEOF_INTEGER 4 )
+## find_package ( BLAS )
+include(libs)""",
+                                        ])
+
+        orig_file1 = os.path.join(module_src_dir, 'cmake_modules', 'SuiteSparseLAPACK.cmake')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'find_package ( LAPACK REQUIRED )',
+                                           ],
+                               to_texts=[r'# find_package ( LAPACK REQUIRED )',
+                                         ])
+
+        shutil.copy2(os.path.join(ext_dir(), 'suitesparse-cmake', 'libs.cmake'),
+                     os.path.join(module_src_dir, 'cmake_modules'))
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
         cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'SuiteSparse_config')])
+        cmakecmd.extend([module_src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_mac():
+            build_dir = create_build_dir(module_src_dir)
+            arm64_install_dir = create_arm64_install_dir(module_src_dir)
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+                cmakecmd.extend(cmakecmd_options)
+                cmakecmd.extend([module_src_dir])
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
+        os.unlink(os.path.join(module_src_dir, 'cmake_modules', 'libs.cmake'))
 
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
+    for module in ['COLAMD', 'AMD', 'CCOLAMD', 'CAMD', 'CHOLMOD']:
+        module_src_dir = os.path.join(src_dir, module)
+        build_dir = create_build_dir(module_src_dir)
         try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+            cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
             cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'SuiteSparse_config')])
+            cmakecmd.extend([module_src_dir])
             build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+
+            if is_mac():
+                build_dir = create_build_dir(module_src_dir)
+                arm64_install_dir = create_arm64_install_dir(module_src_dir)
+                try:
+                    cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+                    cmakecmd.extend(cmakecmd_options)
+                    cmakecmd.extend([module_src_dir])
+                    build_and_install_cmakecmd(cmakecmd, build_dir)
+                    create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+                finally:
+                    shutil.rmtree(arm64_install_dir, ignore_errors=False)
         finally:
             shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
-    build_dir = create_build_dir(src_dir)
+    module_src_dir = os.path.join(src_dir, 'SPQR')
+    build_dir = create_build_dir(module_src_dir)
     try:
+        orig_file = os.path.join(module_src_dir, 'SPQRGPU', 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                               from_texts=[r'target_link_libraries ( spqr_cuda ${CHOLMOD_LIBRARIES} )',
+                                           r'target_link_libraries ( spqr_cuda_static ${CHOLMOD_LIBRARIES} )',
+                                           ],
+                               to_texts=[r'target_link_libraries ( spqr_cuda ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
+                                         r'target_link_libraries ( spqr_cuda_static ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
+                                         ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
         cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'COLAMD')])
+        cmakecmd.extend([module_src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        if is_mac():
+            build_dir = create_build_dir(module_src_dir)
+            arm64_install_dir = create_arm64_install_dir(module_src_dir)
+            try:
+                cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
+                cmakecmd.extend(cmakecmd_options)
+                cmakecmd.extend([module_src_dir])
+                build_and_install_cmakecmd(cmakecmd, build_dir)
+                create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+            finally:
+                shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'COLAMD')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-    build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'AMD')])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'AMD')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-    build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'CCOLAMD')])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'CCOLAMD')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-    build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'CAMD')])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'CAMD')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-    build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'CHOLMOD')])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'CHOLMOD')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-    build_dir = create_build_dir(src_dir)
-    try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        cmakecmd.extend(cmakecmd_options)
-        cmakecmd.extend([os.path.join(src_dir, 'SPQR')])
-        build_and_install_cmakecmd(cmakecmd, build_dir)
-    finally:
-        shutil.rmtree(build_dir, ignore_errors=False)
-
-    if is_mac():
-        arm64_install_dir = create_arm64_install_dir(src_dir)
-        build_dir = create_build_dir(src_dir)
-        try:
-            cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True, no_hidden_visibility=True)
-            cmakecmd.extend(cmakecmd_options)
-            cmakecmd.extend([os.path.join(src_dir, 'SPQR')])
-            build_and_install_cmakecmd(cmakecmd, build_dir)
-            create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
-        finally:
-            shutil.rmtree(build_dir, ignore_errors=False)
-            shutil.rmtree(arm64_install_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
     if is_linux():
         os.unlink(os.path.join(install_dir, 'lib', 'libamd.so'))
@@ -1731,7 +1689,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=env)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
 
@@ -1804,7 +1761,6 @@ def build_libpng(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
 
@@ -2549,7 +2505,6 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
             try:
@@ -2643,7 +2598,6 @@ def build_rocksdb(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
         if is_mac():
-            shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
             try:
@@ -2981,12 +2935,13 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             build_folly(src_dir, ext_build_dir(), use_asan=use_asan)
 
         if lib_name == 'suitesparse':
-            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'SuiteSparse*'))
-            src_dir = get_package_top_level_folder(package_name, ext_dir())
-            if not os.path.exists(src_dir):
-                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'SuiteSparse*'))
-                unpack_file_to_folder(package_name, ext_dir())
-                assert os.path.exists(src_dir)
+            # package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'SuiteSparse*'))
+            # src_dir = get_package_top_level_folder(package_name, ext_dir())
+            # if not os.path.exists(src_dir):
+            #     remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'SuiteSparse*'))
+            #     unpack_file_to_folder(package_name, ext_dir())
+            #     assert os.path.exists(src_dir)
+            src_dir = os.path.join(ext_dir(), 'SuiteSparse')
             build_suitesparse(src_dir, ext_build_dir())
 
         if lib_name == 'ceres-solver':
