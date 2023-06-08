@@ -1674,6 +1674,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                            r'find_package(LAPACK QUIET)',
                                            r'find_package (METIS)',
                                            r'check_symbol_exists (cholmod_metis cholmod.h SuiteSparse_CHOLMOD_USES_METIS)',
+                                           r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")',
                                            ],
                                to_texts=[r'if (FALSE)',
                                          r' ',
@@ -1682,6 +1683,8 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                          r'set(LAPACK_FOUND ON CACHE BOOL "")',
                                          r'add_library (METIS::METIS IMPORTED INTERFACE)',
                                          r'set(SuiteSparse_CHOLMOD_USES_METIS 1)',
+                                         r'set(CMAKE_FIND_LIBRARY_PREFIXES "lib" "" "${CMAKE_FIND_LIBRARY_PREFIXES}")\n'
+                                         r'set(CMAKE_FIND_LIBRARY_SUFFIXES "_static.lib" "${CMAKE_FIND_LIBRARY_SUFFIXES}")',
                                          ]
                                )
         orig_file2 = os.path.join(src_dir, 'cmake', 'FindGlog.cmake')
@@ -2263,7 +2266,7 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file4 = orig_file4 = None
     bak_file5 = orig_file5 = None
     bak_file6 = orig_file6 = None
-    bak_file7 = orig_file7 = None
+    # bak_file7 = orig_file7 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -2339,12 +2342,12 @@ def build_vtk(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
 
-        orig_file7 = os.path.join(install_dir, 'lib', 'cmake', 'vtk-9.2', 'VTK-targets.cmake')
-        bak_file7 = patch_file(orig_file7,
-                               from_texts=[r';TBB::tbb',
-                                           ],
-                               to_texts=[r'',
-                                         ])
+        # orig_file7 = os.path.join(install_dir, 'lib', 'cmake', 'vtk-9.2', 'VTK-targets.cmake')
+        # bak_file7 = patch_file(orig_file7,
+        #                        from_texts=[r';TBB::tbb',
+        #                                    ],
+        #                        to_texts=[r'',
+        #                                  ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
