@@ -1616,6 +1616,36 @@ def build_suitesparse(src_dir: str, install_dir: str):
             shutil.rmtree(build_dir, ignore_errors=False)
             shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
+    if is_linux():
+        os.unlink(os.path.join(install_dir, 'lib', 'libamd.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libcamd.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libccolamd.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libcholmod_cuda.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libcholmod.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libcolamd.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libspqr_cuda.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libspqr.so'))
+        os.unlink(os.path.join(install_dir, 'lib', 'libsuitesparseconfig.so'))
+    elif is_windows():
+        os.unlink(os.path.join(install_dir, 'lib', 'amd.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'camd.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'ccolamd.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'cholmod_cuda.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'cholmod.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'colamd.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'spqr_cuda.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'spqr.lib'))
+        os.unlink(os.path.join(install_dir, 'lib', 'suitesparseconfig.lib'))
+        os.unlink(os.path.join(install_dir, 'bin', 'amd.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'camd.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'ccolamd.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'cholmod_cuda.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'cholmod.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'colamd.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'spqr_cuda.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'spqr.dll'))
+        os.unlink(os.path.join(install_dir, 'bin', 'suitesparseconfig.dll'))
+
 
 def build_ceres_solver(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
@@ -2283,15 +2313,6 @@ def build_vtk(src_dir: str, install_dir: str):
                                    from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
                                    to_texts=['bool __dummyIsParallelScope<1>()', ])
 
-        os.rename(os.path.join(src_dir, 'CMake', 'FindTBB.cmake'),
-                  os.path.join(src_dir, 'CMake', '__FindTBB.cmake'))
-        orig_file7 = os.path.join(src_dir, 'CMake', 'vtkInstallCMakePackage.cmake')
-        bak_file7 = patch_file(orig_file7,
-                               from_texts=[r'FindTBB.cmake',
-                                           ],
-                               to_texts=[r'__FindTBB.cmake',
-                                         ])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -2317,6 +2338,13 @@ def build_vtk(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
+
+        orig_file7 = os.path.join(install_dir, 'lib', 'cmake', 'vtk-9.2', 'VTK-targets.cmake')
+        bak_file7 = patch_file(orig_file7,
+                               from_texts=[r';TBB::tbb',
+                                           ],
+                               to_texts=[r'',
+                                         ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
@@ -2326,9 +2354,6 @@ def build_vtk(src_dir: str, install_dir: str):
         if is_windows():
             os.replace(bak_file5, orig_file5)
             os.replace(bak_file6, orig_file6)
-        os.rename(os.path.join(src_dir, 'CMake', '__FindTBB.cmake'),
-                  os.path.join(src_dir, 'CMake', 'FindTBB.cmake'))
-        os.replace(bak_file7, orig_file7)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
