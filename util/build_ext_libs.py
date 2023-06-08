@@ -2282,6 +2282,9 @@ def build_vtk(src_dir: str, install_dir: str):
                                    from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
                                    to_texts=['bool __dummyIsParallelScope<1>()', ])
 
+        os.rename(os.path.join(src_dir, 'CMake', 'FindTBB.cmake'),
+                  os.path.join(src_dir, 'CMake', '__FindTBB.cmake'))
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -2316,6 +2319,8 @@ def build_vtk(src_dir: str, install_dir: str):
         if is_windows():
             os.replace(bak_file5, orig_file5)
             os.replace(bak_file6, orig_file6)
+        os.rename(os.path.join(src_dir, 'CMake', '__FindTBB.cmake'),
+                  os.path.join(src_dir, 'CMake', 'FindTBB.cmake'))
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
