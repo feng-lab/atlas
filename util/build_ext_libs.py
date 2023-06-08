@@ -2233,6 +2233,7 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file4 = orig_file4 = None
     bak_file5 = orig_file5 = None
     bak_file6 = orig_file6 = None
+    bak_file7 = orig_file7 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -2284,6 +2285,12 @@ def build_vtk(src_dir: str, install_dir: str):
 
         os.rename(os.path.join(src_dir, 'CMake', 'FindTBB.cmake'),
                   os.path.join(src_dir, 'CMake', '__FindTBB.cmake'))
+        orig_file7 = os.path.join(src_dir, 'CMake', 'vtkInstallCMakePackage.cmake')
+        bak_file7 = patch_file(orig_file7,
+                               from_texts=[r'FindTBB.cmake',
+                                           ],
+                               to_texts=[r'__FindTBB.cmake',
+                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
