@@ -462,12 +462,12 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     #             line = line.replace(from_text, to_text)
     #         f.write(line)
     #         to_lines.append(line)
-    txt = Path(bak_file).read_text()
+    txt = Path(bak_file).read_text(errors='ignore')
     with open(orig_file, mode='w', encoding='utf-8') as f:
         for from_text, to_text in zip(from_texts, to_texts):
             txt = txt.replace(from_text, to_text)
         f.write(txt)
-    with open(bak_file, mode='r', encoding='utf-8') as f:
+    with open(bak_file, mode='r', encoding='utf-8', errors='ignore') as f:
         from_lines = f.readlines()
     with open(orig_file, mode='r', encoding='utf-8') as f:
         to_lines = f.readlines()
@@ -675,9 +675,59 @@ def build_gflags(src_dir: str, install_dir: str):
 def build_glog(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
+    bak_file1 = orig_file1 = None
     try:
         # subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
         #                cwd=src_dir, shell=False, check=True)
+        orig_file = os.path.join(src_dir, 'src', 'glog', 'logging.h.in')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
+                    const char* base_filename, int line,
+                    const LogMessageTime& logmsgtime, const char* message,
+                    size_t message_len);""",
+                                          ],
+                              to_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
+                    const char* base_filename, int line,
+                    const LogMessageTime& logmsgtime, const char* message,
+                    size_t message_len);
+  virtual void send(LogSeverity severity, const char* full_filename,
+                    const char* base_filename, int line,
+                    const LogMessageTime& logmsgtime, const char* message,
+                    size_t message_len, [[maybe_unused]] size_t prefix_len) {
+    send(severity, full_filename, base_filename, line,
+         logmsgtime, message, message_len);
+  }""",
+                                        ])
+
+        orig_file1 = os.path.join(src_dir, 'src', 'logging.cc')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
+                         const char* base_filename, int line,
+                         const LogMessageTime& logmsgtime, const char* message,
+                         size_t message_len);""",
+                                           r"""LogDestination::LogToSinks(LogSeverity severity,
+                                       const char* full_filename,
+                                       const char* base_filename, int line,
+                                       const LogMessageTime& logmsgtime,
+                                       const char* message,
+                                       size_t message_len) {""",
+                                           r'line, logmsgtime, message, message_len);',
+                                           r'data_->num_prefix_chars_ - 1) );',
+                                           ],
+                               to_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
+                         const char* base_filename, int line,
+                         const LogMessageTime& logmsgtime, const char* message,
+                         size_t message_len, size_t prefix_len);""",
+                                         r"""LogDestination::LogToSinks(LogSeverity severity,
+                                       const char* full_filename,
+                                       const char* base_filename, int line,
+                                       const LogMessageTime& logmsgtime,
+                                       const char* message,
+                                       size_t message_len, size_t prefix_len) {""",
+                                         r'line, logmsgtime, message, message_len, prefix_len);',
+                                         r'data_->num_prefix_chars_ - 1), data_->num_prefix_chars_ );',
+                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DBUILD_TESTING:BOOL=OFF',
@@ -697,6 +747,8 @@ def build_glog(src_dir: str, install_dir: str):
                              ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
 
 
 def build_benchmark(src_dir: str, install_dir: str):
@@ -1820,9 +1872,82 @@ def build_libwebp(src_dir: str, install_dir: str):
 
 
 def build_jxrlib(src_dir: str, install_dir: str):
-    orig_file = None
-    bak_file = None
+    orig_file = bak_file = None
+    orig_file1 = bak_file1 = None
+    orig_file2 = bak_file2 = None
     try:
+        orig_file = os.path.join(src_dir, 'Makefile')
+        from_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                      r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O',
+                      r'@python -c ']
+        if is_linux():
+            to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
+                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx',
+                        r'cp $< $@ # @python -c ']
+        else:
+            to_texts = [r'CFLAGS=-arch x86_64 -arch arm64 -I. -Icommon/include -I$(DIR_SYS) '
+                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx -mcpu=apple-m1 '
+                        r'-mmacosx-version-min={0}'.format(macos_min_version()),
+                        r'cp $< $@ # @python -c ']
+        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+
+        orig_file1 = os.path.join(src_dir, 'image', 'sys', 'strcodec.c')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'ERR CloseWS_File(struct WMPStream** ppWS)'],
+                               to_texts=[r"""ERR CreateWS_FileTemp(struct WMPStream** ppWS, char* szFilename, const char* szMode)
+{
+#ifdef WIN32
+    ERR err = WMP_errFileIO;
+#else
+    ERR err = WMP_errSuccess;
+    struct WMPStream* pWS = NULL;
+
+    Call(WMPAlloc((void** )ppWS, sizeof(**ppWS)));
+    pWS = *ppWS;
+
+    pWS->Close = CloseWS_File;
+    pWS->EOS = EOSWS_File;
+
+    pWS->Read = ReadWS_File;
+    pWS->Write = WriteWS_File;
+    //pWS->GetLine = GetLineWS_File;
+
+    pWS->SetPos = SetPosWS_File;
+    pWS->GetPos = GetPosWS_File;
+
+    int fd = mkstemp(szFilename);
+    FailIf(-1 == fd, WMP_errFileIO);
+    pWS->state.file.pFile = fdopen(fd, szMode);
+    FailIf(NULL == pWS->state.file.pFile, WMP_errFileIO);
+#endif
+
+Cleanup:
+    return err;
+}
+
+ERR CloseWS_File(struct WMPStream** ppWS)"""])
+
+        orig_file2 = os.path.join(src_dir, 'image', 'encode', 'strenc.c')
+        bak_file2 = patch_file(orig_file2,
+                               from_texts=[r"""#else //DPK needs to support ANSI 
+                pSC->ppTempFile[i] = (char *)malloc(FILENAME_MAX * sizeof(char));
+                if(pSC->ppTempFile[i] == NULL) return ICERR_ERROR;
+
+                if ((pFilename = tmpnam(NULL)) == NULL)
+                    return ICERR_ERROR;                
+                strcpy(pSC->ppTempFile[i], pFilename);
+#endif
+                if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;"""],
+                               to_texts=[r"""                if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;
+
+#else //DPK needs to support ANSI 
+                pSC->ppTempFile[i] = (char *)malloc(FILENAME_MAX * sizeof(char));
+                if(pSC->ppTempFile[i] == NULL) return ICERR_ERROR;
+                pFilename = NULL;
+                snprintf(pSC->ppTempFile[i], L_tmpnam, "%s/tmp.XXXXXXXXXX", P_tmpdir);
+                if(CreateWS_FileTemp(pSC->ppWStream + i, pSC->ppTempFile[i], "w+b") != ICERR_OK) return ICERR_ERROR;
+#endif"""])
+
         if is_windows():
             env = get_vcvars_environment()
             subprocess.run(['devenv', 'JXR_vc14.sln', '/Upgrade'],
@@ -1854,25 +1979,12 @@ def build_jxrlib(src_dir: str, install_dir: str):
             glob_copy(os.path.join(src_dir, 'image', 'vc14projects', 'Release', 'JXREncodeLib', 'x64', '*.lib'),
                       os.path.join(install_dir, 'lib'))
         else:
-            orig_file = os.path.join(src_dir, 'Makefile')
-            from_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                          r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O']
-            if is_linux():
-                to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx']
-            else:
-                to_texts = [r'CFLAGS=-arch x86_64 -arch arm64 -I. -Icommon/include -I$(DIR_SYS) '
-                            r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx -mcpu=apple-m1 '
-                            r'-mmacosx-version-min={0}'.format(macos_min_version())]
-
-            bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
-
             subprocess.run(['make', '-j' + str(os.cpu_count()), 'install', 'DIR_INSTALL=' + install_dir],
                            cwd=src_dir, shell=False, check=True)
     finally:
-        if not is_windows():
-            shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
-            os.replace(bak_file, orig_file)
+        # if not is_windows():
+        #     shutil.rmtree(os.path.join(src_dir, 'build'), ignore_errors=True)
+        #     os.replace(bak_file, orig_file)
         cleanup_git_submodule(src_dir)
 
 

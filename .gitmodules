@@ -28,8 +28,8 @@
 	branch = master
 [submodule "src/3rdparty/glog"]
 	path = src/3rdparty/glog
-	url = https://github.com/feng-lab/glog.git
-	branch = feng
+	url = https://github.com/google/glog.git
+	branch = master
 [submodule "src/3rdparty/benchmark"]
 	path = src/3rdparty/benchmark
 	url = https://github.com/google/benchmark.git
@@ -40,8 +40,8 @@
 	branch = master
 [submodule "src/3rdparty/jxrlib"]
 	path = src/3rdparty/jxrlib
-	url = https://github.com/feng-lab/jxrlib.git
-	branch = feng
+	url = https://github.com/4creators/jxrlib.git
+	branch = master
 [submodule "src/3rdparty/assimp"]
 	path = src/3rdparty/assimp
 	url = https://github.com/assimp/assimp.git
