@@ -153,9 +153,7 @@ def glob_remove(files: str):
 def remove_installed_dynamic_library(install_dir: str, libnames: list):
     for libname in libnames:
         if is_linux():
-            filename = os.path.join(install_dir, 'lib', f'lib{libname}.so')
-            print(f'deleting {filename}')
-            os.unlink(filename)
+            glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.so*'))
         elif is_windows():
             filename = os.path.join(install_dir, 'lib', f'{libname}.lib')
             print(f'deleting {filename}')
@@ -2201,14 +2199,14 @@ def build_freeimage(src_dir: str, install_dir: str):
 def build_itk(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    # orig_file = bak_file = None
+    orig_file = bak_file = None
     # orig_file_1 = bak_file_1 = None
     # orig_file4 = bak_file4 = None
     try:
-        # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'Expat', 'src', 'expat', 'CMakeLists.txt')
-        # bak_file = patch_file(orig_file,
-        #                       from_texts=[r'${ITK3P_EXPAT_SOURCE_DIR}/expat_config.h'],
-        #                       to_texts=[r'${ITK3P_EXPAT_BINARY_DIR}/expat_config.h'])
+        orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'NIFTI', 'src', 'nifti', 'niftilib', 'nifti1_io.c')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'#include <limits.h>'],
+                              to_texts=['#include <limits.h>\n#include <stdint.h>'])
 
         # orig_file = os.path.join(src_dir, 'Modules', 'ThirdParty', 'MetaIO', 'src', 'MetaIO', 'src', 'CMakeLists.txt')
         # bak_file = patch_file(orig_file, from_texts=[r'install(FILES ${headers}'],
@@ -2288,7 +2286,7 @@ def build_itk(src_dir: str, install_dir: str):
         #              os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        # os.replace(bak_file, orig_file)
+        os.replace(bak_file, orig_file)
         # # os.replace(bak_file4, orig_file4)
         # if is_windows():
         #     os.replace(bak_file_1, orig_file_1)
