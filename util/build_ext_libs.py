@@ -2416,6 +2416,12 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                 bak_file2 = patch_file(orig_file2,
                                        from_texts=[r'set(_packages_path "${_path}/Lib/site-packages")'],
                                        to_texts=[r'set(_packages_path "Lib/site-packages")'])
+
+            if is_mac():
+                os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
+                          os.path.join(ext_build_dir(), 'include', '__tbb'))
+                os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
+                          os.path.join(ext_build_dir(), 'include', '__oneapi'))
         else:
             orig_file = os.path.join(src_dir, 'cmake', 'OpenCVFindMKL.cmake')
             bak_file = patch_file(orig_file,
@@ -2583,7 +2589,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
             print()
             build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        if is_mac():
+        if is_mac() and not conda_build:
             build_dir = create_build_dir(src_dir)
             arm64_install_dir = create_arm64_install_dir(src_dir)
             try:
@@ -2625,6 +2631,11 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
         os.replace(bak_file, orig_file)
         if conda_build and is_windows():
             os.replace(bak_file2, orig_file2)
+        if conda_build and is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
+                      os.path.join(ext_build_dir(), 'include', 'tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
+                      os.path.join(ext_build_dir(), 'include', 'oneapi'))
         if not conda_build:
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
@@ -2728,6 +2739,12 @@ def build_conda_zimg(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     try:
+        if is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', 'tbb'),
+                      os.path.join(ext_build_dir(), 'include', '__tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', 'oneapi'),
+                      os.path.join(ext_build_dir(), 'include', '__oneapi'))
+
         cmakecmd = get_cmake_cmd_common_part(install_dir)
 
         if is_windows():
@@ -2745,6 +2762,11 @@ def build_conda_zimg(src_dir: str, install_dir: str):
     finally:
         print('done')
         shutil.rmtree(build_dir, ignore_errors=False)
+        if is_mac():
+            os.rename(os.path.join(ext_build_dir(), 'include', '__tbb'),
+                      os.path.join(ext_build_dir(), 'include', 'tbb'))
+            os.rename(os.path.join(ext_build_dir(), 'include', '__oneapi'),
+                      os.path.join(ext_build_dir(), 'include', 'oneapi'))
 
 
 def build_ospray(src_dir: str, install_dir: str):
