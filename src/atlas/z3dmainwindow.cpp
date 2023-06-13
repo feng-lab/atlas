@@ -55,9 +55,11 @@ Z3DMainWindow::Z3DMainWindow(ZDoc& doc, ZMainWindow& win2d, bool stereoView, QWi
 
 Z3DMainWindow::~Z3DMainWindow()
 {
-  m_engine->cancelLongRendering();
-  m_renderingThread.quit();
-  m_renderingThread.wait();
+  if (!m_renderingThread.isFinished()) {
+    m_engine->cancelLongRendering();
+    m_renderingThread.quit();
+    m_renderingThread.wait();
+  }
 }
 
 void Z3DMainWindow::openEditWidget(size_t id)
@@ -82,6 +84,9 @@ void Z3DMainWindow::closeEvent(QCloseEvent* event)
 {
   if (maybeSave()) {
     writeSettings();
+    m_engine->cancelLongRendering();
+    m_renderingThread.quit();
+    m_renderingThread.wait();
     event->accept();
   } else {
     event->ignore();
