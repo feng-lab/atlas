@@ -1424,8 +1424,8 @@ void exportSceneForGlance()
   QStringList cellnames;
 
   Z3DRenderingEngine* view3d = mainWin->get3DWindow()->engine();
-  for (auto ojbview : view3d->objViews()) {
-    if (auto meshView = dynamic_cast<Z3DMeshView*>(ojbview)) {
+  for (auto& ojbview : view3d->objViews()) {
+    if (auto meshView = dynamic_cast<Z3DMeshView*>(ojbview.get())) {
       auto doc = const_cast<ZMeshDoc*>(qobject_cast<const ZMeshDoc*>(&meshView->doc()));
       CHECK(doc);
       for (auto& kv : meshView->idToFilter()) {
@@ -1440,7 +1440,7 @@ void exportSceneForGlance()
         mesh.generateNormals();
         mesh.save(name);
       }
-    } else if (auto swcView = dynamic_cast<Z3DSwcView*>(ojbview)) {
+    } else if (auto swcView = dynamic_cast<Z3DSwcView*>(ojbview.get())) {
       auto doc = const_cast<ZSwcDoc*>(qobject_cast<const ZSwcDoc*>(&swcView->doc()));
       CHECK(doc);
       for (auto& kv : swcView->idToFilter()) {
@@ -1464,7 +1464,7 @@ void exportSceneForGlance()
         QString cellname = doc->objName(id);
         cellnames.push_back(cellname);
       }
-    } else if (auto punctaView = dynamic_cast<Z3DPunctaView*>(ojbview)) {
+    } else if (auto punctaView = dynamic_cast<Z3DPunctaView*>(ojbview.get())) {
       auto doc = const_cast<ZPunctaDoc*>(qobject_cast<const ZPunctaDoc*>(&punctaView->doc()));
       CHECK(doc);
       for (auto& kv : punctaView->idToFilter()) {

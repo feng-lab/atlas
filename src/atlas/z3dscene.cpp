@@ -10,7 +10,7 @@
 namespace nim {
 
 Z3DScene::Z3DScene(int width, int height, bool stereo, Z3DCanvas& canvas)
-  : QGraphicsScene(0, 0, width, height, &canvas)
+  : QGraphicsScene(0, 0, width, height)
   , m_isStereoScene(stereo)
   , m_canvas(canvas)
 {}

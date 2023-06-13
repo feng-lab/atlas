@@ -253,12 +253,12 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   setViewport(QWidget::createWindowContainer(m_glWindow, nullptr, f));
 #else
   m_glWidget = new ZOpenGLWidget(this, f);
-  m_3dScene = new Z3DScene(width, height, m_glWidget->format().stereo(), *this);
+  m_3dScene = std::make_unique<Z3DScene>(width, height, m_glWidget->format().stereo(), *this);
   setViewport(m_glWidget);
 #endif
 
   setViewportUpdateMode(FullViewportUpdate);
-  setScene(m_3dScene);
+  setScene(m_3dScene.get());
 
   setWindowTitle(title);
   setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing | QPainter::SmoothPixmapTransform);
@@ -288,8 +288,14 @@ Z3DCanvas::Z3DCanvas(const QString& title, int width, int height, QWidget* paren
   connect(m_glWindow, &ZOpenGLWindow::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
 #else
   connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, this, &Z3DCanvas::openGLContextInitialized);
-  connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene, &Z3DScene::initPainter);
+  connect(m_glWidget, &ZOpenGLWidget::openGLContextInitialized, m_3dScene.get(), &Z3DScene::initPainter);
 #endif
+}
+
+Z3DCanvas::~Z3DCanvas()
+{
+  LOG(INFO) << "in canvas destructor";
+  getGLFocus();
 }
 
 QSurfaceFormat Z3DCanvas::format() const

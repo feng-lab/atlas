@@ -4,6 +4,11 @@
 
 namespace nim {
 
+ZOpenGLWidget::~ZOpenGLWidget()
+{
+  LOG(INFO) << "in OpenGLWidget destructor";
+}
+
 void ZOpenGLWidget::initializeGL()
 {
   Q_EMIT openGLContextInitialized();

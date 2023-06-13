@@ -12,8 +12,9 @@ class ZOpenGLWidget : public QOpenGLWidget
 public:
   using QOpenGLWidget::QOpenGLWidget;
 
-  // QOpenGLWidget interface
+  ~ZOpenGLWidget() override;
 
+  // QOpenGLWidget interface
 protected:
   void initializeGL() override;
 

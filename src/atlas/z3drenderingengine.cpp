@@ -294,7 +294,7 @@ void Z3DRenderingEngine::read(size_t id, const json::object& json)
 
 void Z3DRenderingEngine::write(size_t id, json::object& json) const
 {
-  for (auto objView : m_3dObjViews) {
+  for (auto& objView : m_3dObjViews) {
     if (objView->hasObj(id)) {
       json["ViewObjType"] = json::value_from(objView->doc().typeName());
       json["ViewVersion"] = 1.0;
@@ -533,7 +533,7 @@ ZBBox<glm::dvec3> Z3DRenderingEngine::boundBoxOfObjs(const std::vector<size_t>& 
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
-    for (auto objView : m_3dObjViews) {
+    for (auto& objView : m_3dObjViews) {
       if (objView->hasObj(id)) {
         res.expand(objView->boundBoxOfObj(id));
       }
@@ -546,7 +546,7 @@ ZBBox<glm::dvec3> Z3DRenderingEngine::boundBoxOfObjsAfterClipping(const std::vec
 {
   ZBBox<glm::dvec3> res;
   for (auto id : ids) {
-    for (auto objView : m_3dObjViews) {
+    for (auto& objView : m_3dObjViews) {
       if (objView->hasObj(id)) {
         res.expand(objView->boundBoxOfObjAfterClipping(id));
       }
@@ -602,27 +602,27 @@ void Z3DRenderingEngine::init()
     if (auto imgDoc = qobject_cast<ZImgDoc*>(objDoc)) {
       auto imgView = new Z3DImgView(*imgDoc, *this);
       connect(imgView, &Z3DImgView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(imgView);
+      m_3dObjViews.emplace_back(imgView);
     } else if (auto punctaDoc = qobject_cast<ZPunctaDoc*>(objDoc)) {
       auto punctaView = new Z3DPunctaView(*punctaDoc, *this);
       connect(punctaView, &Z3DPunctaView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(punctaView);
+      m_3dObjViews.emplace_back(punctaView);
     } else if (auto swcDoc = qobject_cast<ZSwcDoc*>(objDoc)) {
       auto swcView = new Z3DSwcView(*swcDoc, *this);
       connect(swcView, &Z3DSwcView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(swcView);
+      m_3dObjViews.emplace_back(swcView);
     } else if (auto meshDoc = qobject_cast<ZMeshDoc*>(objDoc)) {
       auto meshView = new Z3DMeshView(*meshDoc, *this);
       connect(meshView, &Z3DMeshView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(meshView);
+      m_3dObjViews.emplace_back(meshView);
     } else if (auto aniDoc = qobject_cast<Z3DAnimationDoc*>(objDoc)) {
       auto aniView = new Z3DAnimationView(*aniDoc, *this);
       connect(aniView, &Z3DAnimationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(aniView);
+      m_3dObjViews.emplace_back(aniView);
     } else if (auto raDoc = qobject_cast<ZRegionAnnotationDoc*>(objDoc)) {
       auto aniView = new Z3DRegionAnnotationView(*raDoc, *this);
       connect(aniView, &Z3DRegionAnnotationView::objViewReady, this, &Z3DRenderingEngine::objViewReady);
-      m_3dObjViews.push_back(aniView);
+      m_3dObjViews.emplace_back(aniView);
     }
   }
 

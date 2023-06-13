@@ -167,6 +167,8 @@ public:
             QWidget* parent = nullptr,
             Qt::WindowFlags f = Qt::WindowFlags());
 
+  ~Z3DCanvas() override;
+
   [[nodiscard]] QSurfaceFormat format() const;
 
   QOpenGLContext* context() const;
@@ -257,7 +259,7 @@ private:
 
   ZOpenGLWidget* m_glWidget = nullptr;
   ZOpenGLWindow* m_glWindow = nullptr;
-  Z3DScene* m_3dScene = nullptr;
+  std::unique_ptr<Z3DScene> m_3dScene;
 
   QShortcut* m_rotateXShortCut = nullptr;
   QShortcut* m_rotateYShortCut = nullptr;

@@ -104,7 +104,7 @@ public:
                                   const QString* imageOuputFolder = nullptr,
                                   bool skipVideoCompression = false);
 
-  std::vector<Z3DObjView*> objViews()
+  const std::vector<std::unique_ptr<Z3DObjView>>& objViews() const
   {
     return m_3dObjViews;
   }
@@ -304,7 +304,7 @@ private:
   std::unique_ptr<Z3DContext> m_context;
   ZDoc& m_doc;
 
-  std::vector<Z3DObjView*> m_3dObjViews;
+  std::vector<std::unique_ptr<Z3DObjView>> m_3dObjViews;
 
   QPointer<Z3DCanvas> m_canvas;
   std::unique_ptr<Z3DGlobalParameters> m_globalParas;
