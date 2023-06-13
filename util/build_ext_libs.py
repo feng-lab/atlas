@@ -1618,6 +1618,8 @@ include(libs)""",
     remove_installed_dynamic_library(install_dir,
                                      ['amd', 'camd', 'ccolamd', 'cholmod_cuda', 'cholmod', 'colamd', 'spqr_cuda',
                                       'spqr', 'suitesparseconfig'])
+    if is_windows():
+        cleanup_git_submodule(src_dir)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
