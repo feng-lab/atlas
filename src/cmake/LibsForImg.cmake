@@ -34,9 +34,11 @@ set(QT_HOST_PATH_CMAKE_DIR ${QT_HOST_PATH}/lib/cmake)
 find_package(TBB REQUIRED tbb)
 print_target_properties(TBB::tbb)
 
-if (NOT AARCH64)
+if (AARCH64)
+  set(MKL_INCLUDE_DIRS)
+  set(MKL_LIBRARIES)
+else (AARCH64)
   if (BUILD_WITH_CONDA)
-    # mkl
     set(MKL_INCLUDE_DIRS ${MKL_INCLUDE_DIRS} ${CONDA_LIB_DIR}/include)
     find_library(MKL_INTEL_LP64 NAMES mkl_intel_lp64 mkl_intel_lp64_dll
                  PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
@@ -45,11 +47,7 @@ if (NOT AARCH64)
     find_library(MKL_CORE NAMES mkl_core mkl_core_dll
                  PATHS ${CONDA_LIB_DIR}/lib NO_DEFAULT_PATH)
     set(MKL_LIBRARIES ${MKL_INTEL_LP64} ${MKL_TBB_THREAD} ${MKL_CORE})
-
-    # ipp
-    # set(IPP_DIR ${CONDA_LIB_DIR}/lib/cmake/ipp)
-  else ()
-    # mkl
+  else (BUILD_WITH_CONDA)
     if (WIN32)
       set(MKL_PATH "${INTEL_PATH}\\mkl\\latest")
     else (WIN32)
@@ -73,57 +71,10 @@ if (NOT AARCH64)
           ${MKL_PATH}/lib/intel64/libmkl_tbb_thread.a
           ${MKL_PATH}/lib/intel64/libmkl_core.a)
     endif ()
-    message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
-    message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
-
-    # ipp
-    set(IPP_DIR ${INTEL_PATH}/ipp/latest/lib/cmake/ipp)
-    set(IPP_SHARED FALSE)
-    set(IPP_TL_VARIANT TBB)
-    find_package(IPP REQUIRED)
-    message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
-    print_target_properties(IPP::ippi)
-    print_target_properties(IPP::ipps)
-    print_target_properties(IPP::ippvm)
-    print_target_properties(IPP::ippcore)
-    #  if (WIN32)
-    #    set(IPP_PATH "${INTEL_PATH}\\ipp")
-    #  else (WIN32)
-    #    set(IPP_PATH ${INTEL_PATH}/ipp)
-    #  endif (WIN32)
-    #  set(IPP_INCLUDE_DIRS ${IPP_INCLUDE_DIRS} ${IPP_PATH}/include)
-    #  if (WIN32)
-    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-    #        ${IPP_PATH}/lib/intel64/ippimt.lib
-    #        ${IPP_PATH}/lib/intel64/ippcoremt.lib
-    #        ${IPP_PATH}/lib/intel64/ippvmmt.lib
-    #        ${IPP_PATH}/lib/intel64/ippsmt.lib
-    #        ${IPP_PATH}/lib/intel64/ippcvmt.lib
-    #        ${IPP_PATH}/lib/intel64/ippccmt.lib)
-    #  elseif (APPLE)
-    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-    #        ${IPP_PATH}/lib/libippi.a
-    #        ${IPP_PATH}/lib/libippcore.a
-    #        ${IPP_PATH}/lib/libippvm.a
-    #        #${IPP_PATH}/lib/libipps.a
-    #        ${IPP_PATH}/lib/libippcv.a
-    #        ${IPP_PATH}/lib/libippcc.a
-    #        ${INTEL_PATH}/lib/libirc.a
-    #        ${INTEL_PATH}/lib/libsvml.a
-    #        ${INTEL_PATH}/lib/libimf.a)
-    #  else ()
-    #    set(IPP_LIBRARIES ${IPP_LIBRARIES}
-    #        ${IPP_PATH}/lib/intel64/libippi.a
-    #        ${IPP_PATH}/lib/intel64/libippcore.a
-    #        ${IPP_PATH}/lib/intel64/libippvm.a
-    #        ${IPP_PATH}/lib/intel64/libipps.a
-    #        ${IPP_PATH}/lib/intel64/libippcv.a
-    #        ${IPP_PATH}/lib/intel64/libippcc.a)
-    #  endif ()
-    #message(STATUS "IPP_INCLUDE_DIRS: ${IPP_INCLUDE_DIRS}")
-    #message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
-  endif ()
-endif ()
+  endif (BUILD_WITH_CONDA)
+endif (AARCH64)
+message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
+message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
 
 find_package(cpuinfo REQUIRED)
 print_target_properties(cpuinfo::cpuinfo)

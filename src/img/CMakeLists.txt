@@ -270,18 +270,28 @@ else ()
 endif ()
 add_library(${LIBRARY_NAME} STATIC ${TIFF_SOURCES} ${SCIFIO_SOURCES} ${IMG_SOURCES})
 
+set(IPP_LIBRARIES)
 if (NOT AARCH64)
   # mkl
   target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_MKL)
   target_include_directories(${LIBRARY_NAME} SYSTEM PRIVATE ${MKL_INCLUDE_DIRS})
   # ipp
-  if (BUILD_WITH_CONDA)
-    set(IPP_LIBRARIES "")
-  else ()
+  if (NOT BUILD_WITH_CONDA)
+    # ipp
+    set(IPP_DIR ${INTEL_PATH}/ipp/latest/lib/cmake/ipp)
+    set(IPP_SHARED FALSE)
+    set(IPP_TL_VARIANT TBB)
+    find_package(IPP REQUIRED)
+    print_target_properties(IPP::ippi)
+    print_target_properties(IPP::ipps)
+    print_target_properties(IPP::ippvm)
+    print_target_properties(IPP::ippcore)
+
     target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_IPP)
     set(IPP_LIBRARIES IPP::ippi)
   endif ()
 endif ()
+message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
 
 if (WIN32)
   target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
@@ -426,16 +436,14 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
                       ${VTK_LIBRARIES} assimp::assimp TBB::tbb
                       glog::glog llfio::sl ${_QT_LIBS_})
 
-if (NOT AARCH64)
-  if (UNIX AND NOT APPLE)
-    target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
-  else ()
-    target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES} ${IPP_LIBRARIES})
-  endif ()
+if (UNIX AND NOT APPLE)
+  target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)
+else ()
+  target_link_libraries(${LIBRARY_NAME} PUBLIC ${MKL_LIBRARIES} ${IPP_LIBRARIES})
 endif ()
 
-#if (APPLE AND AARCH64)
-#  target_link_options(${LIBRARY_NAME} PUBLIC -framework Accelerate)
-#endif ()
+if (APPLE)
+  target_link_libraries(${LIBRARY_NAME} PUBLIC "-framework Accelerate")
+endif ()
 
-  # target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
+# target_include_directories(${LIBRARY_NAME} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)

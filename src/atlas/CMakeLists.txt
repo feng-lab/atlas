@@ -8,23 +8,23 @@ cmake_policy(SET CMP0074 NEW)
 
 # main stuff
 
-# OpenSSL installation directory can be configured by setting OPENSSL_ROOT_DIR
-# We expect to locate OpenSSL using the built-in cmake module as the openssl
-# project itself does not provide installation support in its CMakeLists.txt
-# See https://cmake.org/cmake/help/v3.6/module/FindOpenSSL.html
-set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
-find_package(OpenSSL REQUIRED)
-if(TARGET OpenSSL::SSL)
-  print_target_properties(OpenSSL::SSL)
-  print_target_properties(OpenSSL::Crypto)
-  set(_Atlas_SSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
-else()
-  # set(_Atlas_SSL_LIBRARIES ${OPENSSL_LIBRARIES})
-  message(FATAL_ERROR "OpenSSL targets not found")
-endif()
-set(_Atlas_SSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
-message(STATUS "_Atlas_SSL_INCLUDE_DIR: ${_Atlas_SSL_INCLUDE_DIR}")
-message(STATUS "_Atlas_SSL_LIBRARIES: ${_Atlas_SSL_LIBRARIES}")
+## OpenSSL installation directory can be configured by setting OPENSSL_ROOT_DIR
+## We expect to locate OpenSSL using the built-in cmake module as the openssl
+## project itself does not provide installation support in its CMakeLists.txt
+## See https://cmake.org/cmake/help/v3.6/module/FindOpenSSL.html
+#set(OPENSSL_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build)
+#find_package(OpenSSL REQUIRED)
+#if (TARGET OpenSSL::SSL)
+#  print_target_properties(OpenSSL::SSL)
+#  print_target_properties(OpenSSL::Crypto)
+#  set(_Atlas_SSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
+#else ()
+#  # set(_Atlas_SSL_LIBRARIES ${OPENSSL_LIBRARIES})
+#  message(FATAL_ERROR "OpenSSL targets not found")
+#endif ()
+#set(_Atlas_SSL_INCLUDE_DIR ${OPENSSL_INCLUDE_DIR})
+#message(STATUS "_Atlas_SSL_INCLUDE_DIR: ${_Atlas_SSL_INCLUDE_DIR}")
+#message(STATUS "_Atlas_SSL_LIBRARIES: ${_Atlas_SSL_LIBRARIES}")
 
 # Find Protobuf installation
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
@@ -99,9 +99,9 @@ print_target_properties(RocksDB::rocksdb)
 print_target_properties(img NO_LOCATION)
 
 if (UNIX AND NOT APPLE)
-find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
-print_target_properties(OpenGL::OpenGL)
-print_target_properties(OpenGL::EGL)
+  find_package(OpenGL REQUIRED COMPONENTS OpenGL EGL)
+  print_target_properties(OpenGL::OpenGL)
+  print_target_properties(OpenGL::EGL)
 endif ()
 
 # get_cmake_property(_variableNames VARIABLES)
@@ -654,9 +654,9 @@ if (WIN32)
     target_compile_options(${APP_NAME} PUBLIC /wd28020)
     target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
     target_compile_options(${APP_NAME} PUBLIC /GL) # Enables whole program optimization.
-  else()
+  else ()
     target_compile_options(${APP_NAME} PUBLIC /MD)
-  endif()
+  endif ()
   # standard conformance
   target_compile_options(${APP_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline /Zc:preprocessor /Zc:lambda)
   target_compile_options(${APP_NAME} PUBLIC /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
@@ -671,7 +671,7 @@ if (WIN32)
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.
     target_link_options(${APP_NAME} PUBLIC /LTCG:STATUS /DEBUG:NONE /FORCE:MULTIPLE /VERBOSE:LIB /NODEFAULTLIB:msvcrtd.lib)
-  endif()
+  endif ()
 
   # for some files
   add_custom_command(TARGET ${APP_NAME}
@@ -734,7 +734,7 @@ else (WIN32)
     target_compile_options(${APP_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
     if (APPLE)
       target_compile_options(${APP_NAME} PUBLIC -stdlib=libc++)
-      target_link_options(${APP_NAME} PUBLIC -stdlib=libc++ -framework OpenGL)
+      target_link_options(${APP_NAME} PUBLIC -stdlib=libc++)
     else ()
       target_compile_options(${APP_NAME} PUBLIC -fsized-deallocation)
     endif ()

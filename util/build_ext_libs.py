@@ -356,8 +356,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
 
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
-               '' if not arm64_only else '-DCMAKE_SYSTEM_NAME=Darwin',
-               '' if not arm64_only else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
+               '-DCMAKE_SYSTEM_NAME=Darwin',
+               '' if universal else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
@@ -451,15 +451,7 @@ def patch_file(orig_file: str, from_texts: list, to_texts: list, keep_bak_file: 
     if os.path.exists(bak_file):
         os.remove(bak_file)
     os.rename(orig_file, bak_file)
-    # with open(bak_file, mode='r', encoding='utf-8') as f:
-    #     from_lines = f.readlines()
-    # with open(orig_file, mode='w', encoding='utf-8') as f:
-    #     to_lines = []
-    #     for line in from_lines:
-    #         for from_text, to_text in zip(from_texts, to_texts):
-    #             line = line.replace(from_text, to_text)
-    #         f.write(line)
-    #         to_lines.append(line)
+
     txt = Path(bak_file).read_text(errors='ignore')
     with open(orig_file, mode='w', encoding='utf-8') as f:
         for from_text, to_text in zip(from_texts, to_texts):
@@ -540,10 +532,11 @@ def build_boost(src_dir: str, install_dir: str):
                 subprocess.run(['./b2',
                                 '--disable-icu',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
-                                f'cxxflags={cbf["CXXFLAGS"]}',
-                                f'linkflags={cbf["LDFLAGS"]}',
-                                f'cflags={cbf["CFLAGS"]}',
-                                f'asmflags={cbf["ASMFLAGS"]}',
+                                'target-os=darwin', 'architecture=x86', 'abi=sysv',
+                                f'cxxflags={cbf["CXXFLAGS"]} -arch x86_64',
+                                f'linkflags={cbf["LDFLAGS"]} -arch x86_64',
+                                f'cflags={cbf["CFLAGS"]} -arch x86_64',
+                                f'asmflags={cbf["ASMFLAGS"]} -arch x86_64',
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -1209,6 +1202,9 @@ def build_libsodium(src_dir: str, install_dir: str):
                                  '#ifdef SODIUM_STATIC'])
         else:
             env = get_env_for_config_make()
+            if is_mac():
+                env['CFLAGS'] += ' -arch x86_64'
+                env['CXXFLAGS'] += ' -arch x86_64'
             subprocess.run(['./configure',
                             '--enable-shared=no',
                             '--enable-static=yes',
