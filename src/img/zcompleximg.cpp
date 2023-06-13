@@ -1,9 +1,7 @@
 #include "zcompleximg.h"
 
 #include "zlog.h"
-#ifdef ZIMG_USE_MKL
 #include "zmkl.h"
-#endif
 #include <algorithm>
 #include <functional>
 

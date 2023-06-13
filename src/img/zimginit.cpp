@@ -3,9 +3,7 @@
 #include "zimginterface.h"
 #include "zlogcache.h"
 #include "zh5zjpegxr.h"
-#ifdef ZIMG_USE_MKL
 #include "zmkl.h"
-#endif
 #ifdef ZIMG_USE_FFTW
 #include <fftw3.h>
 #endif
