@@ -1,8 +1,7 @@
 #include "zfft.h"
 
 #ifdef ZIMG_USE_MKL
-// #include <mkl.h>
-#include <mkl_dfti.h>
+#include "zmkl.h"
 #endif
 #ifdef ZIMG_USE_FFTW
 #include <fftw3.h>
