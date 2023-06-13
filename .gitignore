@@ -194,3 +194,5 @@ neurolabi/lib/Mingw/64/
 /neurolabi/cpp/lib/build/
 /neurolabi/python/CMakeParser.pyc
 /neurolabi/python/QMakeParser.pyc
+
+/.vscode
