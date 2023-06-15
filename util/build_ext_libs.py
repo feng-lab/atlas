@@ -1854,9 +1854,6 @@ def build_libwebp(src_dir: str, install_dir: str):
 
 
 def build_jxrlib(src_dir: str, install_dir: str):
-    orig_file = bak_file = None
-    orig_file1 = bak_file1 = None
-    orig_file2 = bak_file2 = None
     try:
         orig_file = os.path.join(src_dir, 'Makefile')
         from_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
@@ -1864,19 +1861,21 @@ def build_jxrlib(src_dir: str, install_dir: str):
                       r'@python -c ']
         if is_linux():
             to_texts = [r'CFLAGS=-I. -Icommon/include -I$(DIR_SYS) '
-                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx',
+                        r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -fPIC -mavx '
+                        r'-Wno-error=implicit-function-declaration ',
                         r'cp $< $@ # @python -c ']
         else:
             to_texts = [r'CFLAGS=-arch x86_64 -arch arm64 -I. -Icommon/include -I$(DIR_SYS) '
                         r'$(ENDIANFLAG) -D__ANSI__ -DDISABLE_PERF_MEASUREMENT -w $(PICFLAG) -O3 -mavx -mcpu=apple-m1 '
+                        r'-Wno-error=implicit-function-declaration '
                         r'-mmacosx-version-min={0}'.format(macos_min_version()),
                         r'cp $< $@ # @python -c ']
-        bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+        patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
 
-        orig_file1 = os.path.join(src_dir, 'image', 'sys', 'strcodec.c')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'ERR CloseWS_File(struct WMPStream** ppWS)'],
-                               to_texts=[r"""ERR CreateWS_FileTemp(struct WMPStream** ppWS, char* szFilename, const char* szMode)
+        orig_file = os.path.join(src_dir, 'image', 'sys', 'strcodec.c')
+        patch_file(orig_file,
+                   from_texts=[r'ERR CloseWS_File(struct WMPStream** ppWS)'],
+                   to_texts=[r"""ERR CreateWS_FileTemp(struct WMPStream** ppWS, char* szFilename, const char* szMode)
 {
 #ifdef WIN32
     ERR err = WMP_errFileIO;
@@ -1909,9 +1908,9 @@ Cleanup:
 
 ERR CloseWS_File(struct WMPStream** ppWS)"""])
 
-        orig_file2 = os.path.join(src_dir, 'image', 'encode', 'strenc.c')
-        bak_file2 = patch_file(orig_file2,
-                               from_texts=[r"""#else //DPK needs to support ANSI 
+        orig_file = os.path.join(src_dir, 'image', 'encode', 'strenc.c')
+        patch_file(orig_file,
+                   from_texts=[r"""#else //DPK needs to support ANSI 
                 pSC->ppTempFile[i] = (char *)malloc(FILENAME_MAX * sizeof(char));
                 if(pSC->ppTempFile[i] == NULL) return ICERR_ERROR;
 
@@ -1920,7 +1919,7 @@ ERR CloseWS_File(struct WMPStream** ppWS)"""])
                 strcpy(pSC->ppTempFile[i], pFilename);
 #endif
                 if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;"""],
-                               to_texts=[r"""                if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;
+                   to_texts=[r"""                if(CreateWS_File(pSC->ppWStream + i, pFilename, "w+b") != ICERR_OK) return ICERR_ERROR;
 
 #else //DPK needs to support ANSI 
                 pSC->ppTempFile[i] = (char *)malloc(FILENAME_MAX * sizeof(char));
