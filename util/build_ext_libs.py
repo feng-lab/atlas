@@ -950,7 +950,6 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                          '-DgRPC_MSVC_STATIC_RUNTIME:BOOL=OFF' if is_windows() else '',
                          '-DgRPC_ZLIB_PROVIDER:STRING=package',
                          '-DgRPC_PROTOBUF_PROVIDER=package',
-                         '-DgRPC_PROTOBUF_PACKAGE_TYPE:STRING=CONFIG',
                          '-DgRPC_CARES_PROVIDER=module',
                          '-DgRPC_SSL_PROVIDER=package',
                          f'-DOPENSSL_ROOT_DIR:PATH={install_dir}',
@@ -2716,9 +2715,18 @@ def build_rocksdb(src_dir: str, install_dir: str):
 def build_llfio(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    bak_file = orig_file = None
     try:
-        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        orig_file = os.path.join(src_dir, 'include', 'llfio', 'v2.0', 'detail', 'impl', 'map_handle.ipp')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'auto *p = *it;',
+                              ],
+                              to_texts=[
+                                  r'auto *p = &(*it);',
+                              ])
 
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DLLFIO_FORCE_NETWORKING_OFF:BOOL=ON',
                          '-DLLFIO_USE_EXPERIMENTAL_SG14_STATUS_CODE:BOOL=OFF',
                          '-DLLFIO_FORCE_COROUTINES_OFF:BOOL=ON',
@@ -2735,6 +2743,7 @@ def build_llfio(src_dir: str, install_dir: str):
                             dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
+        os.replace(bak_file, orig_file)
         print()
 
 

@@ -34,11 +34,11 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/
-    aqt install-qt --outputdir ~/Qt mac desktop 6.5.0 clang_64 --external 7z
+    aqt install-qt --outputdir ~/Qt mac desktop 6.5.1 clang_64 --external 7z
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/tools_ifw/
+    aqt install-tool --outputdir ~/Qt mac desktop tools_ifw qt.tools.ifw.46
     # list modules
     aqt list-tool mac desktop
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/tools_ifw/
-    aqt install-tool --outputdir ~/Qt mac desktop tools_ifw qt.tools.ifw.45
     ```
 * install intel oneapi basekit
 * fix intel oneapi basekit ipp cmake error: add 'set(IPP_ARCH)' to file `oneapi/ipp/latest/lib/cmake/ipp/ipp-config.cmake`
@@ -54,11 +54,11 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
-    aqt install-qt --outputdir ~/Qt windows desktop 6.5.0 win64_msvc2019_64 --external 7z
+    aqt install-qt --outputdir ~/Qt windows desktop 6.5.1 win64_msvc2019_64 --external 7z
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_ifw/
+    aqt install-tool --outputdir ~/Qt windows desktop tools_ifw qt.tools.ifw.46
     # list modules
     aqt list-tool windows desktop
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_ifw/
-    aqt install-tool --outputdir ~/Qt windows desktop tools_ifw qt.tools.ifw.45
     ```
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
@@ -80,11 +80,11 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/
-    aqt install-qt --outputdir ~/Qt linux desktop 6.5.0 clang_64 --external 7z
+    aqt install-qt --outputdir ~/Qt linux desktop 6.5.1 clang_64 --external 7z
+    # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/tools_ifw/
+    aqt install-tool --outputdir ~/Qt linux desktop tools_ifw qt.tools.ifw.46
     # list modules
     aqt list-tool linux desktop
-    # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/tools_ifw/
-    aqt install-tool --outputdir ~/Qt linux desktop tools_ifw qt.tools.ifw.45
     ```
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome with apt
 * install intel oneapi basekit with apt
