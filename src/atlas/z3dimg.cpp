@@ -593,7 +593,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-#if 0
+#if 1
           LOG(ERROR) << "Error: block id shader should not collect mapped empty block, "
                         "will reset the cache system and try again.";
           LOG(ERROR) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
