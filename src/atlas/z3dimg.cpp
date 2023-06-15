@@ -593,15 +593,20 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
       if (pageTableEntryPtr->w != 0) { // image block already mapped or is empty block
         if (pageTableEntryPtr->w == m_emptyFlag) {
-          // LOG(ERROR)
-          //   << "Error: block id shader should not collect mapped empty block, will reset the cache system and try
-          //   again.";
-          // resetCacheSystem(c);
-          // return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+#if 0
+          LOG(ERROR) << "Error: block id shader should not collect mapped empty block, "
+                        "will reset the cache system and try again.";
+          LOG(ERROR) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
+                     << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
+                     << pageTableEntryCoord; // block id shader should not collect mapped empty block
+          resetCacheSystem(c);
+          return updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken);
+#else
           CHECK(false) << *pageDirectoryEntryPtr << " " << *pageTableEntryPtr << " " << pageTableEntryKey << " "
                        << emptyBlockCount << " " << pageDirectoryEntryKey << " " << pageDirectoryEntryCoord << " "
                        << pageTableEntryCoord; // block id shader should not collect mapped empty block
           ++emptyBlockCount;
+#endif
         } else {
           m_channelImageCacheManagers[c]->touch(pageTableEntryKey);
           ++alreadyMapped;

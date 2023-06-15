@@ -16,9 +16,8 @@ requirements:
 
   host:
     - qt
-    - mkl-devel =2021.4.0
-    - tbb-devel # [py>=39 or not osx]
-    - tbb-devel =2020.2 # [osx and py==38]
+    - mkl-devel
+    - tbb-devel
     - python x.x
     - numpy
 
@@ -27,8 +26,7 @@ requirements:
     - numpy >=1.20
     - qt
     - mkl
-    - tbb # [py>=39 or not osx]
-    - tbb =2020.2 # [osx and py==38]
+    - tbb
 
 test:
 

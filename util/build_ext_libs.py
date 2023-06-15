@@ -356,8 +356,9 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
 
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
-               '-DCMAKE_SYSTEM_NAME=Darwin',
-               '' if universal else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
+               '' if not arm64_only else '-DCMAKE_SYSTEM_NAME=Darwin',
+               # '' if universal else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
+               '' if not arm64_only else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
@@ -369,7 +370,7 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                '-DCMAKE_CXX_EXTENSIONS=OFF',
                '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + macos_min_version(),
                '-DCMAKE_OSX_SYSROOT=' + osx_sysroot,
-               '-DCMAKE_OSX_ARCHITECTURES=' + arch,
+               '' if (not arm64_only and not universal) else f'-DCMAKE_OSX_ARCHITECTURES={arch}',
                f'-DCMAKE_C_FLAGS:STRING={cbf["CFLAGS"]}',
                f'-DCMAKE_CXX_FLAGS:STRING={cbf["CXXFLAGS"]}'
                ]
@@ -532,11 +533,15 @@ def build_boost(src_dir: str, install_dir: str):
                 subprocess.run(['./b2',
                                 '--disable-icu',
                                 'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
-                                'target-os=darwin', 'architecture=x86', 'abi=sysv',
-                                f'cxxflags={cbf["CXXFLAGS"]} -arch x86_64',
-                                f'linkflags={cbf["LDFLAGS"]} -arch x86_64',
-                                f'cflags={cbf["CFLAGS"]} -arch x86_64',
-                                f'asmflags={cbf["ASMFLAGS"]} -arch x86_64',
+                                f'cxxflags={cbf["CXXFLAGS"]}',
+                                f'linkflags={cbf["LDFLAGS"]}',
+                                f'cflags={cbf["CFLAGS"]}',
+                                f'asmflags={cbf["ASMFLAGS"]}',
+                                # 'target-os=darwin', 'architecture=x86', 'abi=sysv',
+                                # f'cxxflags={cbf["CXXFLAGS"]} -arch x86_64',
+                                # f'linkflags={cbf["LDFLAGS"]} -arch x86_64',
+                                # f'cflags={cbf["CFLAGS"]} -arch x86_64',
+                                # f'asmflags={cbf["ASMFLAGS"]} -arch x86_64',
                                 'install',
                                 ],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -1202,9 +1207,9 @@ def build_libsodium(src_dir: str, install_dir: str):
                                  '#ifdef SODIUM_STATIC'])
         else:
             env = get_env_for_config_make()
-            if is_mac():
-                env['CFLAGS'] += ' -arch x86_64'
-                env['CXXFLAGS'] += ' -arch x86_64'
+            # if is_mac():
+            #     env['CFLAGS'] += ' -arch x86_64'
+            #     env['CXXFLAGS'] += ' -arch x86_64'
             subprocess.run(['./configure',
                             '--enable-shared=no',
                             '--enable-static=yes',
