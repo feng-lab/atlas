@@ -110,7 +110,7 @@
 	branch = develop
 [submodule "src/3rdparty/pocketfft"]
 	path = src/3rdparty/pocketfft
-	url = https://github.com/mreineck/pocketfft
+	url = https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git
 	branch = cpp
 [submodule "src/3rdparty/rocksdb"]
 	path = src/3rdparty/rocksdb

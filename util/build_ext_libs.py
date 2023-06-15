@@ -1526,24 +1526,6 @@ def build_eigen(src_dir: str, install_dir: str):
 
 def build_pocketfft(src_dir: str, install_dir: str):
     shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
-    if is_windows():
-        orig_file_1 = os.path.join(install_dir, 'include', 'pocketfft_hdronly.h')
-        msvc_workaround = r"""#if __cplusplus >= 201703L && defined(_MSC_VER)
-inline void *aligned_alloc(size_t align, size_t size)
-  {
-  // aligned_alloc() requires that the requested size is a multiple of "align"
-  void *ptr = _aligned_malloc((size+align-1)&(~(align-1)), align);
-  if (!ptr) throw std::bad_alloc();
-  return ptr;
-  }
-inline void aligned_dealloc(void *ptr)
-    { _aligned_free(ptr); }
-#elif __cplusplus >= 201703L"""
-        bak_file_1 = patch_file(orig_file_1,
-                                from_texts=[r'#if (__cplusplus >= 201703L) && (!defined(__MINGW32__))',
-                                            ],
-                                to_texts=[msvc_workaround,
-                                          ])
 
 
 def build_suitesparse(src_dir: str, install_dir: str):
