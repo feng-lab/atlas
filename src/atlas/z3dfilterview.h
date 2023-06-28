@@ -141,7 +141,7 @@ protected:
           } else {
             m_doc.doc().clearAndSelectObj(idFilter.first);
           }
-          updateBoundBox();
+          // updateBoundBox();
           return;
         }
       }
@@ -154,7 +154,7 @@ protected:
       for (const auto& idFilter : m_idToFilter) {
         if (idFilter.second.get() == filter) {
           m_doc.doc().deselectObj(idFilter.first);
-          updateBoundBox();
+          // updateBoundBox();
           return;
         }
       }
@@ -168,7 +168,7 @@ protected:
         if (idFilter.second.get() == filter) {
           if (m_doc.doc().isObjVisible(idFilter.first) != v) {
             m_doc.doc().setObjVisible(idFilter.first, v); // slow
-            updateBoundBox();
+            // updateBoundBox();
           }
           return;
         }
