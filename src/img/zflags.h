@@ -59,7 +59,7 @@ template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
 constexpr bool is_flag_set(TEnum value, TEnum flag) noexcept
 {
   using underlyingT = typename std::underlying_type<TEnum>::type;
-  return (static_cast<underlyingT>(value) & static_cast<underlyingT>(flag)) != 0;
+  return (static_cast<underlyingT>(value) & static_cast<underlyingT>(flag)) == static_cast<underlyingT>(flag);
 }
 
 template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>

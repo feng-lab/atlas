@@ -316,6 +316,7 @@ void Z3DCanvas::setRenderingEngine(Z3DRenderingEngine* engine)
 {
   m_engine = engine;
   m_3dScene->setRenderingEngine(engine);
+  sceneParaUpdated();
 }
 
 void Z3DCanvas::toggleFullScreen()
@@ -331,7 +332,7 @@ void Z3DCanvas::toggleFullScreen()
 
 void Z3DCanvas::sceneParaUpdated()
 {
-  // LOG(INFO) << "sceneParaUpdated";
+  VLOG(1) << "sceneParaUpdated";
   if (m_engine) {
     QCoreApplication::postEvent(m_engine, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }

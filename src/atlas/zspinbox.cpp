@@ -34,6 +34,12 @@ void ZSpinBox::setValueBlockSignals(int v)
   setValue(v);
 }
 
+void ZSpinBox::setRangeBlockSignals(int min, int max)
+{
+  const QSignalBlocker blocker(this);
+  setRange(min, max);
+}
+
 void ZSpinBox::focusInEvent(QFocusEvent* e)
 {
   QSpinBox::focusInEvent(e);

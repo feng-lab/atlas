@@ -2142,7 +2142,7 @@ QWidget* ZIntSpanParameter::actualCreateWidget(QWidget* parent)
             &ZIntSpanParameter::upperValueWillChange,
             spanSlider,
             &ZSpanSliderWithSpinBox::setUpperValueBlockSignals);
-    connect(this, &ZIntSpanParameter::rangeChanged, spanSlider, &ZSpanSliderWithSpinBox::setDataRange);
+    connect(this, &ZIntSpanParameter::rangeChanged, spanSlider, &ZSpanSliderWithSpinBox::setDataRangeBlockSignals);
     return spanSlider;
   }
 }
@@ -2276,7 +2276,10 @@ QWidget* ZFloatSpanParameter::actualCreateWidget(QWidget* parent)
             &ZFloatSpanParameter::upperValueWillChange,
             spanSlider,
             &ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals);
-    connect(this, &ZFloatSpanParameter::rangeChanged, spanSlider, &ZDoubleSpanSliderWithSpinBox::setDataRange);
+    connect(this,
+            &ZFloatSpanParameter::rangeChanged,
+            spanSlider,
+            &ZDoubleSpanSliderWithSpinBox::setDataRangeBlockSignals);
     return spanSlider;
   }
 }
@@ -2414,7 +2417,10 @@ QWidget* ZDoubleSpanParameter::actualCreateWidget(QWidget* parent)
             &ZDoubleSpanParameter::upperValueWillChange,
             spanSlider,
             &ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals);
-    connect(this, &ZDoubleSpanParameter::rangeChanged, spanSlider, &ZDoubleSpanSliderWithSpinBox::setDataRange);
+    connect(this,
+            &ZDoubleSpanParameter::rangeChanged,
+            spanSlider,
+            &ZDoubleSpanSliderWithSpinBox::setDataRangeBlockSignals);
     return spanSlider;
   }
 }

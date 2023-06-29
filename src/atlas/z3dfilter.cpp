@@ -29,11 +29,12 @@ ZParameter* Z3DFilter::parameter(const QString& name) const
 
 void Z3DFilter::invalidate(State inv)
 {
-  set_flag(m_state, inv);
-
-  if (inv == State::Valid) {
+  CHECK(inv != State::Valid);
+  if (is_flag_set(m_state, inv)) {
     return;
   }
+
+  set_flag(m_state, inv);
 
   if (!m_invalidationVisited) {
     m_invalidationVisited = true;

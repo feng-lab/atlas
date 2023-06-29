@@ -18,6 +18,12 @@ void ZSpanSlider::setUpperValueBlockSignals(int upper)
   setUpperValue(upper);
 }
 
+void ZSpanSlider::setRangeBlockSignals(int min, int max)
+{
+  const QSignalBlocker blocker(this);
+  setRange(min, max);
+}
+
 ZSpanSliderWithSpinBox::ZSpanSliderWithSpinBox(int lowerValue,
                                                int upperValue,
                                                int min,
@@ -42,13 +48,13 @@ void ZSpanSliderWithSpinBox::setUpperValueBlockSignals(int upper)
   m_upperSpinBox->setValueBlockSignals(upper);
 }
 
-void ZSpanSliderWithSpinBox::setDataRange(int min, int max)
+void ZSpanSliderWithSpinBox::setDataRangeBlockSignals(int min, int max)
 {
-  m_slider->setRange(min, max);
-  m_lowerSpinBox->setRange(m_slider->minimum(), m_slider->upperValue());
-  m_lowerSpinBox->setValueBlockSignals(m_slider->lowerValue());
-  m_upperSpinBox->setRange(m_slider->lowerValue(), m_slider->maximum());
-  m_upperSpinBox->setValueBlockSignals(m_slider->upperValue());
+  m_slider->setRangeBlockSignals(min, max);
+  m_lowerSpinBox->setRangeBlockSignals(m_slider->minimum(), m_slider->upperValue());
+  // m_lowerSpinBox->setValueBlockSignals(m_slider->lowerValue());
+  m_upperSpinBox->setRangeBlockSignals(m_slider->lowerValue(), m_slider->maximum());
+  // m_upperSpinBox->setValueBlockSignals(m_slider->upperValue());
 }
 
 void ZSpanSliderWithSpinBox::lowerValueChangedFromSlider(int l)
@@ -153,7 +159,7 @@ void ZDoubleSpanSliderWithSpinBox::setUpperValueBlockSignals(double upper)
   m_upperSpinBox->setValueBlockSignals(upper);
 }
 
-void ZDoubleSpanSliderWithSpinBox::setDataRange(double min, double max)
+void ZDoubleSpanSliderWithSpinBox::setDataRangeBlockSignals(double min, double max)
 {
   m_min = min;
   m_max = max;

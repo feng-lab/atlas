@@ -13,7 +13,10 @@ public:
   using QxtSpanSlider::QxtSpanSlider;
 
   void setLowerValueBlockSignals(int lower);
+
   void setUpperValueBlockSignals(int upper);
+
+  void setRangeBlockSignals(int min, int max);
 };
 
 class ZSpanSliderWithSpinBox : public QWidget
@@ -33,7 +36,7 @@ public:
 
   void setUpperValueBlockSignals(int upper);
 
-  void setDataRange(int min, int max);
+  void setDataRangeBlockSignals(int min, int max);
 
 Q_SIGNALS:
   void lowerValueChanged(int lower);
@@ -52,9 +55,9 @@ private:
   void valueChangedFromUpperSpinBox(int u);
 
 private:
-  ZSpanSlider* m_slider;
-  ZSpinBox* m_lowerSpinBox;
-  ZSpinBox* m_upperSpinBox;
+  ZSpanSlider* m_slider = nullptr;
+  ZSpinBox* m_lowerSpinBox = nullptr;
+  ZSpinBox* m_upperSpinBox = nullptr;
 };
 
 class ZDoubleSpanSliderWithSpinBox : public QWidget
@@ -75,7 +78,7 @@ public:
 
   void setUpperValueBlockSignals(double upper);
 
-  void setDataRange(double min, double max);
+  void setDataRangeBlockSignals(double min, double max);
 
 Q_SIGNALS:
   void lowerValueChanged(double lower);
@@ -94,9 +97,9 @@ private:
   void createWidget();
 
 private:
-  ZSpanSlider* m_slider;
-  ZDoubleSpinBox* m_lowerSpinBox;
-  ZDoubleSpinBox* m_upperSpinBox;
+  ZSpanSlider* m_slider = nullptr;
+  ZDoubleSpinBox* m_lowerSpinBox = nullptr;
+  ZDoubleSpinBox* m_upperSpinBox = nullptr;
   double m_lowerValue;
   double m_upperValue;
   double m_min;
