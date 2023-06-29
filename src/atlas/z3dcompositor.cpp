@@ -166,13 +166,13 @@ void Z3DCompositor::setRenderingRegion(double left, double right, double bottom,
 
 void Z3DCompositor::setOutputSize(const glm::uvec2& size)
 {
-  m_outRenderTarget1.resize(size);
-  m_leftEyeOutRenderTarget1.resize(size);
-  m_rightEyeOutRenderTarget1.resize(size);
+  if (size == m_monoCurrentTarget->size()) {
+    return;
+  }
 
-  m_outRenderTarget2.resize(size);
-  m_leftEyeOutRenderTarget2.resize(size);
-  m_rightEyeOutRenderTarget2.resize(size);
+  m_monoCurrentTarget->resize(size);
+  m_leftCurrentTarget->resize(size);
+  m_rightCurrentTarget->resize(size);
 
   if (size != m_inport.expectedSize() || size != m_leftEyeInport.expectedSize() ||
       size != m_rightEyeInport.expectedSize()) {
@@ -732,13 +732,21 @@ double Z3DCompositor::process(Z3DEye eye)
   {
     const std::lock_guard<std::mutex> lock(m_rendererBase.globalParas().targetSwitchMutex);
     if (!m_monoReadyTarget) {
-      m_monoReadyTarget = &m_outRenderTarget2;
-      m_leftReadyTarget = &m_leftEyeOutRenderTarget2;
-      m_rightReadyTarget = &m_rightEyeOutRenderTarget2;
+      m_monoReadyTarget = &m_outRenderTarget2 != m_monoCurrentTarget ? &m_outRenderTarget2 : &m_outRenderTarget1;
+      m_leftReadyTarget =
+        &m_leftEyeOutRenderTarget2 != m_leftCurrentTarget ? &m_leftEyeOutRenderTarget2 : &m_leftEyeOutRenderTarget1;
+      m_rightReadyTarget =
+        &m_rightEyeOutRenderTarget2 != m_rightCurrentTarget ? &m_rightEyeOutRenderTarget2 : &m_rightEyeOutRenderTarget1;
     }
     std::swap(m_monoReadyTarget, m_monoCurrentTarget);
     std::swap(m_leftReadyTarget, m_leftCurrentTarget);
     std::swap(m_rightReadyTarget, m_rightCurrentTarget);
+
+    if (m_monoCurrentTarget->size() != m_monoReadyTarget->size()) {
+      m_monoCurrentTarget->resize(m_monoReadyTarget->size());
+      m_leftCurrentTarget->resize(m_leftReadyTarget->size());
+      m_rightCurrentTarget->resize(m_rightReadyTarget->size());
+    }
 
     m_rendererBase.globalParas().hasNewRendering = true;
   }

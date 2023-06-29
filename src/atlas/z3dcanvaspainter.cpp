@@ -19,11 +19,11 @@ void Z3DCanvasPainter::paint(bool stereo)
   if (!m_engine || !m_engine->monoReadyTarget()) {
     return;
   }
+  const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
   // render to screen
   glViewport(0, 0, m_canvas.physicalSize().x, m_canvas.physicalSize().y);
   m_rendererBase.setViewport(m_canvas.physicalSize());
   if (stereo) {
-    const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
     glDrawBuffer(GL_BACK_LEFT);
     m_textureCopyRenderer.setColorTexture(m_engine->leftReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->leftReadyTarget()->depthTexture());
@@ -36,7 +36,6 @@ void Z3DCanvasPainter::paint(bool stereo)
 
     m_engine->clearNewRenderingFlag();
   } else {
-    const std::lock_guard<std::mutex> lock(m_engine->targetSwitchMutex());
     auto startTarget = m_engine->monoReadyTarget();
     m_textureCopyRenderer.setColorTexture(m_engine->monoReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->monoReadyTarget()->depthTexture());
