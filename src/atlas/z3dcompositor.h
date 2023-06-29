@@ -64,6 +64,8 @@ Q_SIGNALS:
 protected:
   double process(Z3DEye eye) override;
 
+  void updateSize() override;
+
 private:
   // little helper function
   void renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,

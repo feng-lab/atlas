@@ -549,7 +549,6 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
                                         : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                 : m_opaqueRightEyeOutport;
-  currentOutport.resize(m_outport.size());
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -616,11 +615,7 @@ void Z3DImgFilter::setFastRenderingMode(bool v, bool stereo)
   }
   m_imgRaycasterRenderer.setFastRendering(v);
   m_imgSliceRenderer.setFastRendering(v);
-  if (stereo) {
-    invalidate(State::StereoResultInvalid);
-  } else {
-    invalidate(State::MonoViewResultInvalid);
-  }
+  set_flag(m_state, stereo ? State::StereoResultInvalid : State::MonoViewResultInvalid);
 }
 
 void Z3DImgFilter::enterSubregionView(float x, float y, float z)

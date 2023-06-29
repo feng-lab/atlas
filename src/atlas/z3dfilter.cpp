@@ -260,9 +260,11 @@ void Z3DFilter::updateSize()
   // 1. update outport size
   glm::uvec2 maxOutportSize(0, 0);
   for (auto port : m_outputPorts) {
+    // LOG(INFO) << className() << " " << port->expectedSize() << " " << port->size() << " " << port->name();
     glm::uvec2 outportSize = port->expectedSize();
     if (outportSize.x > 0 && outportSize != port->size()) {
       port->resize(outportSize);
+      // LOG(INFO) << className() << " " << outportSize;
     }
 
     maxOutportSize = glm::max(maxOutportSize, port->size());

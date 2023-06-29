@@ -208,7 +208,9 @@ void Z3DCompositor::setFastRenderingMode(bool v, bool /*stereo*/)
     return;
   }
   m_fastRendering = v;
-  // m_state = State::AllResultInvalid;
+  if (m_vPPort.isConnected()) {
+    m_state = State::AllResultInvalid;
+  }
 }
 
 double Z3DCompositor::process(Z3DEye eye)
@@ -744,6 +746,15 @@ double Z3DCompositor::process(Z3DEye eye)
   Q_EMIT renderingFinished();
 
   return 1.0;
+}
+
+void Z3DCompositor::updateSize()
+{
+  for (auto port : m_inputPorts) {
+    port->setExpectedSize(outputSize());
+  }
+
+  invalidate(State::AllResultInvalid);
 }
 
 void Z3DCompositor::renderGeometries(const std::vector<Z3DBoundedFilter*>& opaqueFilters,
