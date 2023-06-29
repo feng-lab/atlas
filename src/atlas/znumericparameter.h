@@ -723,13 +723,14 @@ public:
       auto oldUpperValue = upperValue();
       bool keepLowerToMin = m_min == oldLowerValue;
       bool keepUpperToMax = m_max == oldUpperValue;
+      // VLOG(1) << m_min << " " << m_max << " " << oldLowerValue << " " << oldUpperValue << " " << keepLowerToMin << " " << keepUpperToMax;
       m_min = min;
       m_max = max;
       changeRange();
       typename T::value_type newLower = keepLowerToMin ? m_min : std::max(m_min, oldLowerValue);
       typename T::value_type newUpper = keepUpperToMax ? m_max : std::min(m_max, oldUpperValue);
       this->set(T(newLower, newUpper));
-      // LOG(INFO) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
+      // VLOG(1) << lowerValue() << " " << upperValue() << " " << m_min << " " << m_max;
     }
   }
 

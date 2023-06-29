@@ -72,17 +72,17 @@ public:
 
   inline const ZFloatSpanParameter& globalXCutPara() const
   {
-    return m_globalParas.xCut;
+    return m_globalParas.globalXCut;
   }
 
   inline const ZFloatSpanParameter& globalYCutPara() const
   {
-    return m_globalParas.yCut;
+    return m_globalParas.globalYCut;
   }
 
   inline const ZFloatSpanParameter& globalZCutPara() const
   {
-    return m_globalParas.zCut;
+    return m_globalParas.globalZCut;
   }
 
   inline Z3DGlobalParameters& globalParas()

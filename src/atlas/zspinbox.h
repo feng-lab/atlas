@@ -47,6 +47,8 @@ public:
 
   void setValueBlockSignals(double v);
 
+  void setRangeBlockSignals(double min, double max);
+
 protected:
   void focusInEvent(QFocusEvent* e) override;
 

@@ -128,9 +128,9 @@ public:
   // must add to network
   Z3DTrackballInteractionHandler interactionHandler;
 
-  ZFloatSpanParameter xCut;
-  ZFloatSpanParameter yCut;
-  ZFloatSpanParameter zCut;
+  ZFloatSpanParameter globalXCut;
+  ZFloatSpanParameter globalYCut;
+  ZFloatSpanParameter globalZCut;
 
   ZFloatParameter devicePixelRatio;
 

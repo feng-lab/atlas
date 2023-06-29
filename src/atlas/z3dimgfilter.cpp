@@ -617,9 +617,9 @@ void Z3DImgFilter::setFastRenderingMode(bool v, bool stereo)
   m_imgRaycasterRenderer.setFastRendering(v);
   m_imgSliceRenderer.setFastRendering(v);
   if (stereo) {
-    set_flag(m_state, State::StereoResultInvalid);
+    invalidate(State::StereoResultInvalid);
   } else {
-    set_flag(m_state, State::MonoViewResultInvalid);
+    invalidate(State::MonoViewResultInvalid);
   }
 }
 
@@ -1121,29 +1121,29 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     std::vector<glm::vec3> planeOrigins;
     planeNormals.push_back(globalCamera().viewVector());
     planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * (globalCamera().nearDist() + 0.01f));
-    if (m_rendererBase.globalParas().xCut.lowerValue() != m_rendererBase.globalParas().xCut.minimum()) {
+    if (m_rendererBase.globalParas().globalXCut.lowerValue() != m_rendererBase.globalParas().globalXCut.minimum()) {
       planeNormals.emplace_back(1., 0., 0.);
-      planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.lowerValue(), 0, 0);
+      planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.lowerValue(), 0, 0);
     }
-    if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
+    if (m_rendererBase.globalParas().globalXCut.upperValue() != m_rendererBase.globalParas().globalXCut.maximum()) {
       planeNormals.emplace_back(-1., 0., 0.);
-      planeOrigins.emplace_back(m_rendererBase.globalParas().xCut.upperValue(), 0, 0);
+      planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.upperValue(), 0, 0);
     }
-    if (m_rendererBase.globalParas().yCut.lowerValue() != m_rendererBase.globalParas().yCut.minimum()) {
+    if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
       planeNormals.emplace_back(0., 1., 0.);
-      planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.lowerValue(), 0);
+      planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.lowerValue(), 0);
     }
-    if (m_rendererBase.globalParas().yCut.upperValue() != m_rendererBase.globalParas().yCut.maximum()) {
+    if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
       planeNormals.emplace_back(0., -1., 0.);
-      planeOrigins.emplace_back(0, m_rendererBase.globalParas().yCut.upperValue(), 0);
+      planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.upperValue(), 0);
     }
-    if (m_rendererBase.globalParas().zCut.lowerValue() != m_rendererBase.globalParas().zCut.minimum()) {
+    if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
       planeNormals.emplace_back(0., 0., 1.);
-      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.lowerValue());
+      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().zCut.upperValue() != m_rendererBase.globalParas().zCut.maximum()) {
+    if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
       planeNormals.emplace_back(0., 0., -1.);
-      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().zCut.upperValue());
+      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.upperValue());
     }
     // LOG(INFO) << planeNormals.size();
     ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
@@ -1158,17 +1158,17 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     if (m_rendererBase.globalParas().xCut.upperValue() != m_rendererBase.globalParas().xCut.maximum()) {
       planes.emplace_back(1., 0., 0., m_rendererBase.globalParas().xCut.upperValue());
     }
-    if (m_rendererBase.globalParas().yCut.lowerValue() != m_rendererBase.globalParas().yCut.minimum()) {
-      planes.emplace_back(0., -1., 0., -m_rendererBase.globalParas().yCut.lowerValue());
+    if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
+      planes.emplace_back(0., -1., 0., -m_rendererBase.globalParas().globalYCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().yCut.upperValue() != m_rendererBase.globalParas().yCut.maximum()) {
-      planes.emplace_back(0., 1., 0., m_rendererBase.globalParas().yCut.upperValue());
+    if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
+      planes.emplace_back(0., 1., 0., m_rendererBase.globalParas().globalYCut.upperValue());
     }
-    if (m_rendererBase.globalParas().zCut.lowerValue() != m_rendererBase.globalParas().zCut.minimum()) {
-      planes.emplace_back(0., 0., -1., -m_rendererBase.globalParas().zCut.lowerValue());
+    if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
+      planes.emplace_back(0., 0., -1., -m_rendererBase.globalParas().globalZCut.lowerValue());
     }
-    if (m_rendererBase.globalParas().zCut.upperValue() != m_rendererBase.globalParas().zCut.maximum()) {
-      planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().zCut.upperValue());
+    if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
+      planes.emplace_back(0., 0., 1., m_rendererBase.globalParas().globalZCut.upperValue());
     }
     LOG(INFO) << planes.size();
     auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);

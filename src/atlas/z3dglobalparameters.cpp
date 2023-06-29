@@ -20,9 +20,9 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   , camera("Camera", Z3DCamera())
   , pickingManager()
   , interactionHandler("Interaction Handler", &camera)
-  , xCut("X Cut", glm::vec2(0, 0), 0, 0)
-  , yCut("Y Cut", glm::vec2(0, 0), 0, 0)
-  , zCut("Z Cut", glm::vec2(0, 0), 0, 0)
+  , globalXCut("Global X Cut", glm::vec2(0, 0), 0, 0)
+  , globalYCut("Global Y Cut", glm::vec2(0, 0), 0, 0)
+  , globalZCut("Global Z Cut", glm::vec2(0, 0), 0, 0)
   , devicePixelRatio("Device Pixel Ratio", 1.f, 1.f, 16.f)
 {
   geometriesMultisampleMode.addOptions("None", "2x2");
@@ -50,12 +50,12 @@ Z3DGlobalParameters::Z3DGlobalParameters()
   m_cameraParameterIndex = m_parameters.size();
   addParameter(camera);
 
-  xCut.setSingleStep(1);
-  yCut.setSingleStep(1);
-  zCut.setSingleStep(1);
-  addParameter(xCut);
-  addParameter(yCut);
-  addParameter(zCut);
+  globalXCut.setSingleStep(1);
+  globalYCut.setSingleStep(1);
+  globalZCut.setSingleStep(1);
+  addParameter(globalXCut);
+  addParameter(globalYCut);
+  addParameter(globalZCut);
 
   // lights
   QString lightname = "Key Light";

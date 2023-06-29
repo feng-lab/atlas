@@ -157,14 +157,12 @@ void ZDoubleSpanSliderWithSpinBox::setDataRange(double min, double max)
 {
   m_min = min;
   m_max = max;
-  m_sliderMaxValue = 1e6; // roundTo<int>((m_max - m_min) / m_step);
-  m_slider->setRange(0, m_sliderMaxValue);
   double l = m_slider->lowerValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
   double u = m_slider->upperValue() / static_cast<double>(m_sliderMaxValue) * (m_max - m_min) + m_min;
-  m_lowerSpinBox->setRange(m_min, u);
-  m_lowerSpinBox->setValueBlockSignals(l);
-  m_upperSpinBox->setRange(l, m_max);
-  m_upperSpinBox->setValueBlockSignals(u);
+  m_lowerSpinBox->setRangeBlockSignals(m_min, u);
+  // m_lowerSpinBox->setValueBlockSignals(l);
+  m_upperSpinBox->setRangeBlockSignals(l, m_max);
+  // m_upperSpinBox->setValueBlockSignals(u);
 }
 
 void ZDoubleSpanSliderWithSpinBox::lowerValueChangedFromSlider(int l)

@@ -268,23 +268,23 @@ void Z3DRendererBase::setClipPlanes(std::vector<glm::vec4>* clipPlanes)
       m_clipPlanes.push_back(itCoordTrans * clipPlane);
     }
   }
-  if (m_globalParas.xCut.lowerValue() != m_globalParas.xCut.minimum()) {
-    m_clipPlanes.emplace_back(1., 0., 0., -m_globalParas.xCut.lowerValue());
+  if (m_globalParas.globalXCut.lowerValue() != m_globalParas.globalXCut.minimum()) {
+    m_clipPlanes.emplace_back(1., 0., 0., -m_globalParas.globalXCut.lowerValue());
   }
-  if (m_globalParas.xCut.upperValue() != m_globalParas.xCut.maximum()) {
-    m_clipPlanes.emplace_back(-1., 0., 0., m_globalParas.xCut.upperValue());
+  if (m_globalParas.globalXCut.upperValue() != m_globalParas.globalXCut.maximum()) {
+    m_clipPlanes.emplace_back(-1., 0., 0., m_globalParas.globalXCut.upperValue());
   }
-  if (m_globalParas.yCut.lowerValue() != m_globalParas.yCut.minimum()) {
-    m_clipPlanes.emplace_back(0., 1., 0., -m_globalParas.yCut.lowerValue());
+  if (m_globalParas.globalYCut.lowerValue() != m_globalParas.globalYCut.minimum()) {
+    m_clipPlanes.emplace_back(0., 1., 0., -m_globalParas.globalYCut.lowerValue());
   }
-  if (m_globalParas.yCut.upperValue() != m_globalParas.yCut.maximum()) {
-    m_clipPlanes.emplace_back(0., -1., 0., m_globalParas.yCut.upperValue());
+  if (m_globalParas.globalYCut.upperValue() != m_globalParas.globalYCut.maximum()) {
+    m_clipPlanes.emplace_back(0., -1., 0., m_globalParas.globalYCut.upperValue());
   }
-  if (m_globalParas.zCut.lowerValue() != m_globalParas.zCut.minimum()) {
-    m_clipPlanes.emplace_back(0., 0., 1., -m_globalParas.zCut.lowerValue());
+  if (m_globalParas.globalZCut.lowerValue() != m_globalParas.globalZCut.minimum()) {
+    m_clipPlanes.emplace_back(0., 0., 1., -m_globalParas.globalZCut.lowerValue());
   }
-  if (m_globalParas.zCut.upperValue() != m_globalParas.zCut.maximum()) {
-    m_clipPlanes.emplace_back(0., 0., -1., m_globalParas.zCut.upperValue());
+  if (m_globalParas.globalZCut.upperValue() != m_globalParas.globalZCut.maximum()) {
+    m_clipPlanes.emplace_back(0., 0., -1., m_globalParas.globalZCut.upperValue());
   }
   size_t nNewClipPlanes = m_clipPlanes.size();
   if (nNewClipPlanes != nOldClipPlanes) { // need to recompile shader to define or undefine HAS_CLIP_PLANE

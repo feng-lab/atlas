@@ -16,13 +16,13 @@ public:
   // ZImgFormat interface
 
 public:
-  QString shortName() const override;
+  [[nodiscard]] QString shortName() const override;
 
-  QString fullName() const override;
+  [[nodiscard]] QString fullName() const override;
 
-  QStringList extensions() const override;
+  [[nodiscard]] QStringList extensions() const override;
 
-  FileFormat format() const override
+  [[nodiscard]] FileFormat format() const override
   {
     return FileFormat::ITKImage;
   }
@@ -42,16 +42,16 @@ public:
 
   void writeImg(const QString& filename, const ZImg& img, const ZImgWriteParameters& paras) override;
 
-  bool supportRead() const override;
+  [[nodiscard]] bool supportRead() const override;
 
-  bool supportWrite() const override;
+  [[nodiscard]] bool supportWrite() const override;
 
 protected:
-  void parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
+  static void parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bool isNd2);
 
-  void parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
+  static void parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
 
-  bool hasSCIFIOSupport() const;
+  static bool hasSCIFIOSupport() ;
 };
 
 } // namespace nim

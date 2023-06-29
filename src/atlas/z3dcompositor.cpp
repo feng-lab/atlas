@@ -203,11 +203,12 @@ void Z3DCompositor::invalidate(State inv)
 
 void Z3DCompositor::setFastRenderingMode(bool v, bool /*stereo*/)
 {
+  // LOG(INFO) << m_fastRendering << " " << to_underlying(m_state);
   if (m_fastRendering == v) {
     return;
   }
   m_fastRendering = v;
-  m_state = State::AllResultInvalid;
+  // m_state = State::AllResultInvalid;
 }
 
 double Z3DCompositor::process(Z3DEye eye)

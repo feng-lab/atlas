@@ -74,6 +74,12 @@ void ZDoubleSpinBox::setValueBlockSignals(double v)
   setValue(v);
 }
 
+void ZDoubleSpinBox::setRangeBlockSignals(double min, double max)
+{
+  const QSignalBlocker blocker(this);
+  setRange(min, max);
+}
+
 void ZDoubleSpinBox::focusInEvent(QFocusEvent* e)
 {
   QDoubleSpinBox::focusInEvent(e);

@@ -267,14 +267,14 @@ void Z3DRenderingEngine::updateBoundBox()
 
   LOG(INFO) << json::value_from(m_boundBox);
   // update global cut
-  m_globalParas->xCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.x) - 1,
-                                           std::ceil(m_boundBox.maxCorner.x) + 1);
+  m_globalParas->globalXCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.x) - 1,
+                                                 std::ceil(m_boundBox.maxCorner.x) + 1);
 
-  m_globalParas->yCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.y) - 1,
-                                           std::ceil(m_boundBox.maxCorner.y) + 1);
+  m_globalParas->globalYCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.y) - 1,
+                                                 std::ceil(m_boundBox.maxCorner.y) + 1);
 
-  m_globalParas->zCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.z) - 1,
-                                           std::ceil(m_boundBox.maxCorner.z) + 1);
+  m_globalParas->globalZCut.setRangeKeepIfMinMax(std::floor(m_boundBox.minCorner.z) - 1,
+                                                 std::ceil(m_boundBox.maxCorner.z) + 1);
 }
 
 void Z3DRenderingEngine::read(size_t id, const json::object& json)
@@ -828,7 +828,7 @@ void Z3DRenderingEngine::rotateZM()
 
 bool Z3DRenderingEngine::event(QEvent* e)
 {
-  // LOG(INFO) << e->type();
+  // VLOG(1) << e->type();
   if (m_eventTypes.contains(e->type())) {
     if (e->type() == QEvent::UpdateRequest) {
       renderFast();

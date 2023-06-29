@@ -197,12 +197,12 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         }
       } else {
         imageIO->Read(img.channelData(0));
-      }
-      if (imgInfo.numChannels > 1 && imgInfo.numTimes == 1 &&
-          !isNd2) { // if numTimes > 1 or isNd2 then dimension order is already fixed
-        ZImg tpImg(imgInfo);
-        CXYZtoXYZC(img, tpImg);
-        img.swap(tpImg);
+        if (imgInfo.numChannels > 1 && !isNd2) {
+          // if numTimes > 1 or isNd2 then dimension order is already fixed
+          ZImg tpImg(imgInfo);
+          CXYZtoXYZC(img, tpImg);
+          img.swap(tpImg);
+        }
       }
 
       if (isNrrd && !region.containsWholeImg(imgInfo)) {
@@ -241,12 +241,12 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         }
       } else {
         imageIO->Read(tmpImg.channelData(0));
-      }
-      if (clipInfo.numChannels > 1 && clipInfo.numTimes == 1 &&
-          !isNd2) { // if numTimes > 1 or isNd2 then dimension order is already fixed
-        ZImg tpImg(clipInfo);
-        CXYZtoXYZC(tmpImg, tpImg);
-        tmpImg.swap(tpImg);
+        if (clipInfo.numChannels > 1 && !isNd2) {
+          // if numTimes > 1 or isNd2 then dimension order is already fixed
+          ZImg tpImg(clipInfo);
+          CXYZtoXYZC(tmpImg, tpImg);
+          tmpImg.swap(tpImg);
+        }
       }
 
       if (clipChannel) {
@@ -468,7 +468,7 @@ void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, nim::ZImgMetad
   }
 }
 
-bool ZImgITKImage::hasSCIFIOSupport() const
+bool ZImgITKImage::hasSCIFIOSupport()
 {
   return !ZImgGlobal::instance().jarsDIR.isEmpty();
 }
