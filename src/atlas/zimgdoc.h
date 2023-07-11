@@ -94,7 +94,12 @@ protected:
   //
   size_t loadImg(const QString& fileName, FileFormat format, QString& errorMsg);
 
-  size_t loadImg(const QString& fileName, size_t scene, FileFormat format, QString& errorMsg);
+  size_t loadImg(const QString& fileName,
+                 size_t scene,
+                 FileFormat format,
+                 QString& errorMsg,
+                 ZImgInfo& info,
+                 std::vector<std::shared_ptr<ZImgSubBlock>>& sceneSubBlocks);
 
   size_t loadImg(const QStringList& files, Dimension catDim, bool catScenes, FileFormat format, QString& errorMsg);
 
@@ -103,7 +108,9 @@ protected:
                  bool catScenes,
                  size_t scene,
                  FileFormat format,
-                 QString& errorMsg);
+                 QString& errorMsg,
+                 ZImgInfo& info,
+                 std::vector<std::shared_ptr<ZImgSubBlock>>& sceneSubBlocks);
 
   size_t loadImg(const ZImgSource& imgSource, QString& errorMsg);
 

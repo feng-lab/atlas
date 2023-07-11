@@ -66,14 +66,20 @@ ZImgInfo ZImgPackSubBlock::readInfo() const
   return m_img->info();
 }
 
-ZImgPack::ZImgPack(ZImgSource imgSource)
+ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo,
+                   std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks)
   : QObject()
   , m_imgSource(std::move(imgSource))
   , m_hasUnsavedChange(false)
   , m_diskCached(true)
 {
   std::vector<std::shared_ptr<ZImgSubBlock>> sceneSubBlock;
-  m_imgInfo = ZImg::readImgInfo(m_imgSource, &sceneSubBlock);
+  if (pInfo && pSceneSubBlocks) {
+    m_imgInfo.swap(*pInfo);
+    sceneSubBlock.swap(*pSceneSubBlocks);
+  } else {
+    m_imgInfo = ZImg::readImgInfo(m_imgSource, &sceneSubBlock);
+  }
   m_imgMetaData = ZImg::readImgMetadata(m_imgSource);
 
   m_minMaxState = MinMaxState::Invalid;
@@ -89,20 +95,21 @@ ZImgPack::ZImgPack(ZImgSource imgSource)
   // bool needScale = Z3DGpuInfo::instance().needScaleDataForTexture(m_imgInfo.width, m_imgInfo.height,
   // m_imgInfo.depth);
   if (m_imgSource.totalFileSize <= m_fastReadSizeThreshold) {
-    LOG(INFO) << "read all";
+    VLOG(1) << "read all";
     m_diskCached = false;
     m_img = ZImg(m_imgSource);
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
   } else if (hasPyramidal) {
-    // LOG(INFO) << fmt::format("has pyramidal: {}, need scale: {}", hasPyramidal, needScale);
+    VLOG(1) << fmt::format("has pyramidal: {}", hasPyramidal);
     buildFastReadIndex(sceneSubBlock);
   } else {
-    LOG(INFO) << "building pyramidal";
+    VLOG(1) << "building pyramidal";
     buildPyramidal();
   }
 
   updateDerivedData();
+  VLOG(1) << "imgpack done";
 }
 
 const QString& ZImgPack::sizeInfo() const
@@ -282,6 +289,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
       std::vector<RTreeValueType> queryResult;
       tiit->second->query(bgi::intersects(queryBox), std::back_inserter(queryResult));
       if (!queryResult.empty()) {
+        VLOG(1) << "read start " << queryResult.size();
         imgs.resize(queryResult.size());
         locs.resize(queryResult.size());
         scales.resize(queryResult.size(), readRatio[0]);
@@ -293,6 +301,7 @@ void ZImgPack::retrieveCoveredImgs(std::vector<std::shared_ptr<ZImg>>& imgs,
           }
         });
         finish = true;
+        VLOG(1) << "read end";
       } else {
         // move to previous readRatio
         finish = true;
@@ -1042,11 +1051,13 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
 
   createTileIndexStructure();
 
+#if 0
   // ZBenchTimer bt;
   // bt.start();
 
   // get estimation of minmax
   auto ratio = *m_pyramidalRatios.rbegin();
+  VLOG(1) << ratio[0] << " " << ratio[1] << " " <<  ratio[2];
 
   double minV;
   double maxV;
@@ -1071,6 +1082,7 @@ void ZImgPack::buildFastReadIndex(const std::vector<std::shared_ptr<ZImgSubBlock
 
   // bt.stop();
   // LOG(INFO) << bt;
+#endif
 }
 
 void ZImgPack::createTileIndexStructure()
@@ -1210,7 +1222,7 @@ void ZImgPack::updateDerivedData()
     m_maximumProjectedAlongZImg.clear();
   }
 
-  CHECK(m_minMaxState != MinMaxState::Invalid);
+  // CHECK(m_minMaxState != MinMaxState::Invalid);
   if (m_minMaxState == MinMaxState::Complete) {
     if (m_imgInfo.validBitCount != 12 && m_imgInfo.voxelByteNumber() == 2 &&
         m_imgInfo.voxelFormat == VoxelFormat::Unsigned && m_maxIntensity < 4096) {

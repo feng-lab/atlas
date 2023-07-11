@@ -54,7 +54,9 @@ public:
     Complete
   };
 
-  explicit ZImgPack(ZImgSource imgSource);
+  explicit ZImgPack(ZImgSource imgSource,
+                    ZImgInfo* pInfo = nullptr,
+                    std::vector<std::shared_ptr<ZImgSubBlock>>* pSceneSubBlocks = nullptr);
 
   ~ZImgPack() override = default;
 

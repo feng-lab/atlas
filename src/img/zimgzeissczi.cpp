@@ -636,7 +636,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
                             std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>>* subBlocks)
 {
 #ifdef DUMP_CZI_INFO
-  dump(filename);
+  LOG(INFO) << dump(filename);
 #endif
   clearInternalState();
 
@@ -658,6 +658,7 @@ void ZImgZeissCZI::readInfo(const QString& filename,
   detectInfos(infos, inputFileStream, fh);
 
   if (m_someTilesAreNot2D) {
+    VLOG(1) << "has 3d tiles";
     createDefaultSubBlocks(filename, infos, subBlocks);
   } else {
     if (subBlocks) {
@@ -804,12 +805,10 @@ void ZImgZeissCZI::readInfo(const QString& filename,
     }
   }
 
-#if 0
-  for (size_t i = 0; i < infos.size(); ++i) {
-    LOG(INFO) << infos[i].toQString();
+  for (const auto& info : infos) {
+    VLOG(1) << info.toQString();
   }
-  LOG(INFO) << "";
-#endif
+  VLOG(1) << "";
 }
 
 void ZImgZeissCZI::readMetadata(const QString& filename, ZImgMetadata& meta, size_t /*scene*/)
@@ -944,7 +943,7 @@ void ZImgZeissCZI::readImg(const QString& filename,
     // it is possible that even totalWritten >= img.voxelNumber() we still haven't read enough like in mixedTile plus 3D
     // tile situation if that happens we need to write a lot more code
     if (totalWritten < img.voxelNumber()) {
-      LOG(WARNING) << "not internal tiles";
+      VLOG(1) << "not internal tiles";
       if (totalWritten > 0) {
         LOG(WARNING) << "mixedTile?";
       }
@@ -1406,7 +1405,7 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
     m_metadataXmlString.remove(QChar::Null);
 
     readCZIInfo(m_metadataXmlString);
-    // LOG(INFO) << m_metadataXmlString;
+    VLOG(1) << m_metadataXmlString;
   } else {
     LOG(WARNING) << "no metadata in czi file";
   }
@@ -1768,7 +1767,8 @@ void ZImgZeissCZI::detectInfos(std::vector<ZImgInfo>& infos, std::ifstream& inpu
       LOG(INFO) << "";
     }
     for (const auto& tile : m_sceneTiles.back()) {
-      LOG(INFO) << tile.ratio << " " << tile.start << " " << tile.size << " " << tile.storedSize;
+      LOG(INFO) << tile.ratio << " " << tile.start.toString() << " " << tile.size.toString() << " "
+                << tile.storedSize.toString();
     }
 #endif
   }

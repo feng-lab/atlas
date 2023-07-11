@@ -115,7 +115,9 @@ void initImgLib(const char* argv0,
   ZImgGlobal::instance().resourcesDIR = resourcesDIR;
   LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
 
-  ZCpuInfo::instance().logCpuInfo();
+  if (isApp) {
+    ZCpuInfo::instance().logCpuInfo();
+  }
 
 #ifdef ZIMG_USE_MKL
   // todo: check this for amd cpu
@@ -240,8 +242,10 @@ void initImgLib(const char* argv0,
   LOG(INFO) << "IPP: " << ippVer->Name << " " << ippVer->Version;
 #endif
 
-  itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
-  mt.Print(std::cout);
+  if (isApp) {
+    itk::MultiThreaderBase::Pointer mt = itk::MultiThreaderBase::New();
+    mt.Print(std::cout);
+  }
 
   if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {
     LOG(FATAL) << "CPU not supported. This program requires CPU with AVX support.";
