@@ -2696,16 +2696,16 @@ def build_rocksdb(src_dir: str, install_dir: str):
 def build_llfio(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
+    # bak_file = orig_file = None
     try:
-        orig_file = os.path.join(src_dir, 'include', 'llfio', 'v2.0', 'detail', 'impl', 'map_handle.ipp')
-        bak_file = patch_file(orig_file,
-                              from_texts=[
-                                  r'auto *p = *it;',
-                              ],
-                              to_texts=[
-                                  r'auto *p = &(*it);',
-                              ])
+        # orig_file = os.path.join(src_dir, 'include', 'llfio', 'v2.0', 'detail', 'impl', 'map_handle.ipp')
+        # bak_file = patch_file(orig_file,
+        #                       from_texts=[
+        #                           r'auto *p = *it;',
+        #                       ],
+        #                       to_texts=[
+        #                           r'auto *p = &(*it);',
+        #                       ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DLLFIO_FORCE_NETWORKING_OFF:BOOL=ON',
@@ -2724,7 +2724,7 @@ def build_llfio(src_dir: str, install_dir: str):
                             dirs_exist_ok=True)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False, onerror=handleRemoveReadonly)
-        os.replace(bak_file, orig_file)
+        # os.replace(bak_file, orig_file)
         print()
 
 

@@ -107,24 +107,32 @@ void initImgLib(const char* argv0,
       }
 
       ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
-      LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+      if (isApp) {
+        LOG(INFO) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
+      }
       ZImgGlobal::instance().jreDIR = jreD.absolutePath();
-      LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
+      if (isApp) {
+        LOG(INFO) << "jreDIR: " << ZImgGlobal::instance().jreDIR;
+      }
     }
   }
   ZImgGlobal::instance().resourcesDIR = resourcesDIR;
-  LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
+  if (isApp) {
+    LOG(INFO) << "resourcesDIR: " << ZImgGlobal::instance().resourcesDIR;
+  }
 
   if (isApp) {
     ZCpuInfo::instance().logCpuInfo();
   }
 
 #ifdef ZIMG_USE_MKL
-  // todo: check this for amd cpu
-  MKLVersion mklVer;
-  MKL_Get_Version(&mklVer);
-  LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " " << mklVer.MajorVersion << "."
-            << mklVer.MinorVersion << "." << mklVer.UpdateVersion << ".b" << mklVer.Build;
+  if (isApp) {
+    // todo: check this for amd cpu
+    MKLVersion mklVer;
+    MKL_Get_Version(&mklVer);
+    LOG(INFO) << "MKL: " << mklVer.Platform << mklVer.Processor << " " << mklVer.MajorVersion << "."
+              << mklVer.MinorVersion << "." << mklVer.UpdateVersion << ".b" << mklVer.Build;
+  }
 #endif
 
 #ifdef ZIMG_USE_FFTW

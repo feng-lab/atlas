@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <functional>
 
+DECLARE_bool(zimg_use_mkl_for_fft_if_available);
+
 namespace nim {
 
 ZComplexImg::ZComplexImg(size_t width, size_t height, size_t depth)
@@ -43,12 +45,14 @@ bool ZComplexImg::isSameSize(const ZComplexImg& rhs) const
 ZComplexImg& ZComplexImg::conj()
 {
 #ifdef ZIMG_USE_MKL
-  vzConj(m_data.size(), m_data.data(), m_data.data());
-#else
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    vzConj(m_data.size(), m_data.data(), m_data.data());
+    return *this;
+  }
+#endif
   for (auto& v : m_data) {
     v = std::conj(v);
   }
-#endif
   return *this;
 }
 
@@ -73,10 +77,12 @@ ZComplexImg& ZComplexImg::operator+=(const ZComplexImg& rhs)
                        .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
-  vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-#else
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::plus<>());
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    vzAdd(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+    return *this;
+  }
 #endif
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::plus<>());
   return *this;
 }
 
@@ -109,10 +115,12 @@ ZComplexImg& ZComplexImg::operator-=(const ZComplexImg& rhs)
                        .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
-  vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-#else
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::minus<>());
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    vzSub(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+    return *this;
+  }
 #endif
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::minus<>());
   return *this;
 }
 
@@ -152,10 +160,12 @@ ZComplexImg& ZComplexImg::operator*=(const ZComplexImg& rhs)
                        .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
-  vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-#else
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::multiplies<>());
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    vzMul(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+    return *this;
+  }
 #endif
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::multiplies<>());
   return *this;
 }
 
@@ -188,10 +198,12 @@ ZComplexImg& ZComplexImg::operator/=(const ZComplexImg& rhs)
                        .arg(toQString(), rhs.toQString()));
   }
 #ifdef ZIMG_USE_MKL
-  vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
-#else
-  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::divides<>());
+  if (FLAGS_zimg_use_mkl_for_fft_if_available) {
+    vzDiv(m_data.size(), m_data.data(), rhs.m_data.data(), m_data.data());
+    return *this;
+  }
 #endif
+  std::transform(m_data.begin(), m_data.end(), rhs.m_data.begin(), m_data.begin(), std::divides<>());
   return *this;
 }
 
