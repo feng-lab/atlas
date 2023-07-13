@@ -1110,6 +1110,7 @@ def build_xz(src_dir: str, install_dir: str):
 
     bak_file = orig_file = None
     bak_file1 = orig_file1 = None
+    bak_file2 = orig_file2 = None
     try:
         orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
         bak_file = patch_file(orig_file,
@@ -1127,6 +1128,14 @@ def build_xz(src_dir: str, install_dir: str):
                                            ],
                                to_texts=[r'#target_compile_definitions(liblzma PRIVATE HAVE_SYMBOL_VERSIONS_LINUX)',
                                          ])
+
+        if is_windows():
+            orig_file2 = os.path.join(src_dir, 'src', 'liblzma', 'common', 'stream_encoder_mt.c')
+            bak_file2 = patch_file(orig_file2,
+                                   from_texts=[r'mythread_condtime wait_abs = {};',
+                                               ],
+                                   to_texts=[r'mythread_condtime wait_abs;',
+                                             ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1153,6 +1162,8 @@ def build_xz(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
+        if is_windows():
+            os.replace(bak_file2, orig_file2)
 
 
 def build_zstd(src_dir: str, install_dir: str):
@@ -1554,12 +1565,10 @@ include(libs)""",
 
         orig_file2 = os.path.join(src_dir, 'SPQR', 'SPQRGPU', 'CMakeLists.txt')
         bak_file2 = patch_file(orig_file2,
-                               from_texts=[r'target_link_libraries ( spqr_cuda ${CHOLMOD_LIBRARIES} )',
-                                           r'target_link_libraries ( spqr_cuda_static ${CHOLMOD_LIBRARIES} )',
+                               from_texts=[r'${CHOLMOD_LIBRARIES} )',
                                            ],
                                to_texts=[
-                                   r'target_link_libraries ( spqr_cuda ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
-                                   r'target_link_libraries ( spqr_cuda_static ${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES})',
+                                   r'${CHOLMOD_LIBRARIES} ${SUITESPARSE_CONFIG_LIBRARIES} )',
                                ])
 
         shutil.copy2(os.path.join(ext_dir(), 'suitesparse-cmake', 'libs.cmake'),
