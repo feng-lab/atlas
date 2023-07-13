@@ -16,14 +16,14 @@ requirements:
 
   host:
     - qt
-    - mkl-devel
+    - mkl-devel >=2023.1
     - tbb-devel
     - python x.x
-    - numpy
+    - numpy >=1.25
 
   run:
     - python
-    - numpy >=1.20
+    - numpy >=1.25
     - qt
     - mkl
     - tbb

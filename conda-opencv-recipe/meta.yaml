@@ -13,13 +13,13 @@ requirements:
 
   host:
     - python x.x
-    - numpy
-    - mkl
+    - numpy >=1.25
+    - mkl >=2023.1
     - tbb
 
   run:
     - python x.x
-    - numpy >=1.20
+    - numpy >=1.25
     - mkl
     - tbb
     - libstdcxx-ng # [linux]
