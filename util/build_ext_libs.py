@@ -1844,6 +1844,13 @@ def build_libwebp(src_dir: str, install_dir: str):
             shutil.rmtree(build_dir, ignore_errors=False)
             shutil.rmtree(arm64_install_dir, ignore_errors=False)
 
+    orig_file = os.path.join(install_dir, 'share', 'WebP', 'cmake', 'WebPConfig.cmake')
+    patch_file(orig_file,
+               from_texts=[r'check_required_components(WebP)',
+                           ],
+               to_texts=[r'#check_required_components(WebP)',
+                         ])
+
 
 def build_jxrlib(src_dir: str, install_dir: str):
     try:
@@ -3251,7 +3258,7 @@ def parse_inputs(argv: list):
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'rocksdb']
+    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
