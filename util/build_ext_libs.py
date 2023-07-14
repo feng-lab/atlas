@@ -1259,24 +1259,12 @@ def build_libsodium(src_dir: str, install_dir: str):
 def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     build_dir = create_build_dir(src_dir)
 
-    orig_file = bak_file = None
     orig_file1 = bak_file1 = None
     orig_file5 = bak_file5 = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file6 = bak_file6 = None
-    orig_file7 = bak_file7 = None
     try:
-        if is_mac():
-            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'-std=${CXX_STD}'],
-                                  to_texts=[r''])
-        if is_linux() and use_clang_in_linux():
-            orig_file = os.path.join(src_dir, 'CMake', 'FollyCompilerUnix.cmake')
-            bak_file = patch_file(orig_file,
-                                  from_texts=[r'-std=${CXX_STD}'],
-                                  to_texts=[r''])
         if is_mac() and macos_min_version().startswith('10.'):
             # preadv and pwritev are only available after macOS 11.0
             orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
@@ -1394,10 +1382,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         #         shutil.rmtree(arm64_install_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        if is_mac():
-            os.replace(bak_file, orig_file)
-        if is_linux() and use_clang_in_linux():
-            os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
         if is_mac() and macos_min_version().startswith('10.'):
             os.replace(bak_file5, orig_file5)
@@ -1405,7 +1389,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         os.replace(bak_file3, orig_file3)
         if is_windows():
             os.replace(bak_file6, orig_file6)
-        # os.replace(bak_file7, orig_file7)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
