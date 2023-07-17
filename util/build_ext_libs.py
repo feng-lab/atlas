@@ -1669,6 +1669,7 @@ def build_ceres_solver(src_dir: str, install_dir: str):
         cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
                             '-DSUITESPARSE:BOOL=ON',
                             '-DACCELERATESPARSE:BOOL=' + ('ON' if is_mac() else 'OFF'),
+                            '-DUSE_CUDA:BOOL=OFF',
                             '-DEIGENMETIS:BOOL=OFF',
                             '-DBUILD_EXAMPLES:BOOL=OFF',
                             '-DBUILD_BENCHMARKS:BOOL=OFF',
