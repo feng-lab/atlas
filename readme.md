@@ -135,7 +135,6 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 ```bash
 conda-build purge-all
 conda-build zimg-recipe
-conda-build conda-opencv-recipe
-conda remove zimg conda-opencv -y
-conda install zimg conda-opencv -c fenglab -y
+conda remove zimg -y
+conda install zimg -c fenglab -y
 ```
