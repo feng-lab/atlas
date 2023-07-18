@@ -127,8 +127,8 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
   for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
-      mapIFDToImgLocation(ifdIdx, z, c, t, l);
-      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
+      if (mapIFDToImgLocation(ifdIdx, z, c, t, l) && (region.zInRegion(z)) && (region.cInRegion(c) || c == -1) &&
+          (region.tInRegion(t)) && (scene == size_t(l))) {
         tiff.readImgFromIFD(i, buf2DImg);
         // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
@@ -227,16 +227,23 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
       ZImgInfo tmpInfo;
       tiff.readInfoFromIFD(ifd, tmpInfo);
 
-      widths.insert(tmpInfo.width);
-      heights.insert(tmpInfo.height);
-      numChannels.insert(tmpInfo.numChannels);
-      bytesPerVoxels.insert(tmpInfo.bytesPerVoxel);
-      voxelFormats.insert(tmpInfo.voxelFormat);
-      alphaChannel.insert(tmpInfo.lastChannelIsAlphaChannel);
-      validBitCounts.insert(tmpInfo.validBitCount);
-      if (widths.size() != 1 || heights.size() != 1 || numChannels.size() != 1 || bytesPerVoxels.size() != 1 ||
-          voxelFormats.size() != 1 || alphaChannel.size() != 1 || validBitCounts.size() != 1) {
-        throw ZIOException("Different image dimensions or formats is not supported.");
+      if (widths.empty()) {
+        widths.insert(tmpInfo.width);
+        heights.insert(tmpInfo.height);
+        numChannels.insert(tmpInfo.numChannels);
+        bytesPerVoxels.insert(tmpInfo.bytesPerVoxel);
+        voxelFormats.insert(tmpInfo.voxelFormat);
+        alphaChannel.insert(tmpInfo.lastChannelIsAlphaChannel);
+        validBitCounts.insert(tmpInfo.validBitCount);
+      } else {
+        if (!contains(widths, tmpInfo.width) || !contains(heights, tmpInfo.height) ||
+            !contains(numChannels, tmpInfo.numChannels) || !contains(bytesPerVoxels, tmpInfo.bytesPerVoxel) ||
+            !contains(voxelFormats, tmpInfo.voxelFormat) ||
+            !contains(alphaChannel, tmpInfo.lastChannelIsAlphaChannel) ||
+            !contains(validBitCounts, tmpInfo.validBitCount)) {
+          LOG(WARNING) << "Different image dimensions or formats is not supported, might be Thumbnail but not marked properly";
+          break;
+        }
       }
 
       m_imgInfo[0].depth++;
@@ -479,9 +486,9 @@ bool ZImgTiff::IFDToLoc(size_t ifdIdx,
     c = -1;
   }
 
-  // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " <<
-  // dimensionOrder << " " << imgInfo.toQString() << " "
-  //          << startZ << " " << startC << " " << startT << " " << startL;
+  //  LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l << " " << startIFDIndex << " " <<
+  //  dimensionOrder
+  //            << " " << imgInfo.toQString() << " " << startZ << " " << startC << " " << startT << " " << startL;
   return true;
 }
 
