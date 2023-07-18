@@ -101,9 +101,9 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
   }
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'")
-                         .arg(m_imgInfo[scene].toQString())
-                         .arg(region.toQString()));
+    throw ZIOException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
+                                   m_imgInfo[scene].toString(),
+                                   region.toString()));
   }
 
   ZImgInfo imgInfo2D(m_imgInfo[scene]);
@@ -127,8 +127,10 @@ void ZImgTiff::readImg(const QString& filename, ZImg& img, const ZImgRegion& reg
 
   for (size_t i = 0; i < ifds.size(); ++i) {
     if (ifds[i].isNormalImage()) {
-      if (mapIFDToImgLocation(ifdIdx, z, c, t, l) && (region.zInRegion(z)) && (region.cInRegion(c) || c == -1) &&
-          (region.tInRegion(t)) && (scene == size_t(l))) {
+      if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
+        break;
+      }
+      if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
         tiff.readImgFromIFD(i, buf2DImg);
         // LOG(INFO) << ifdIdx << " " << z << " " << c << " " << t << " " << l;
         cpyImg(buf2DImg, region, imgTmp, z - region.start.z, c, t - region.start.t);
@@ -212,13 +214,6 @@ void ZImgTiff::clearInternalState()
 void ZImgTiff::detectImgInfo(ZTiff& tiff)
 {
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
-  std::set<size_t> widths;
-  std::set<size_t> heights;
-  std::set<size_t> numChannels;
-  std::set<size_t> bytesPerVoxels;
-  std::set<VoxelFormat> voxelFormats;
-  std::set<bool> alphaChannel;
-  std::set<size_t> validBitCounts;
   m_imgInfo.resize(1);
   m_imgInfo[0].depth = 0;
   m_imgInfo[0].numTimes = 1;
@@ -227,21 +222,22 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
       ZImgInfo tmpInfo;
       tiff.readInfoFromIFD(ifd, tmpInfo);
 
-      if (widths.empty()) {
-        widths.insert(tmpInfo.width);
-        heights.insert(tmpInfo.height);
-        numChannels.insert(tmpInfo.numChannels);
-        bytesPerVoxels.insert(tmpInfo.bytesPerVoxel);
-        voxelFormats.insert(tmpInfo.voxelFormat);
-        alphaChannel.insert(tmpInfo.lastChannelIsAlphaChannel);
-        validBitCounts.insert(tmpInfo.validBitCount);
+      if (m_imgInfo[0].depth == 0) {
+        m_imgInfo[0].width = tmpInfo.width;
+        m_imgInfo[0].height = tmpInfo.height;
+        m_imgInfo[0].numChannels = tmpInfo.numChannels;
+        m_imgInfo[0].bytesPerVoxel = tmpInfo.bytesPerVoxel;
+        m_imgInfo[0].voxelFormat = tmpInfo.voxelFormat;
+        m_imgInfo[0].lastChannelIsAlphaChannel = tmpInfo.lastChannelIsAlphaChannel;
+        m_imgInfo[0].validBitCount = tmpInfo.validBitCount;
       } else {
-        if (!contains(widths, tmpInfo.width) || !contains(heights, tmpInfo.height) ||
-            !contains(numChannels, tmpInfo.numChannels) || !contains(bytesPerVoxels, tmpInfo.bytesPerVoxel) ||
-            !contains(voxelFormats, tmpInfo.voxelFormat) ||
-            !contains(alphaChannel, tmpInfo.lastChannelIsAlphaChannel) ||
-            !contains(validBitCounts, tmpInfo.validBitCount)) {
-          LOG(WARNING) << "Different image dimensions or formats is not supported, might be Thumbnail but not marked properly";
+        if (m_imgInfo[0].width != tmpInfo.width || m_imgInfo[0].height != tmpInfo.height ||
+            m_imgInfo[0].numChannels != tmpInfo.numChannels || m_imgInfo[0].bytesPerVoxel != tmpInfo.bytesPerVoxel ||
+            m_imgInfo[0].voxelFormat != tmpInfo.voxelFormat ||
+            m_imgInfo[0].lastChannelIsAlphaChannel != tmpInfo.lastChannelIsAlphaChannel ||
+            m_imgInfo[0].validBitCount != tmpInfo.validBitCount) {
+          LOG(WARNING)
+            << "Different image dimensions or formats is not supported, might be Thumbnail but not marked properly";
           break;
         }
       }
@@ -250,14 +246,6 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
     }
   }
   if (m_imgInfo[0].depth > 0) {
-    m_imgInfo[0].width = *widths.begin();
-    m_imgInfo[0].height = *heights.begin();
-    m_imgInfo[0].numChannels = *numChannels.begin();
-    m_imgInfo[0].bytesPerVoxel = *bytesPerVoxels.begin();
-    m_imgInfo[0].voxelFormat = *voxelFormats.begin();
-    m_imgInfo[0].lastChannelIsAlphaChannel = *alphaChannel.begin();
-    m_imgInfo[0].validBitCount = *validBitCounts.begin();
-
     if (m_imageDescription.startsWith("ImageJ=") && m_imageDescription.contains("images=")) {
       m_isImageJTiff = true;
       size_t images = 0;
@@ -326,7 +314,9 @@ void ZImgTiff::readMetadataInternal(ZImgMetadata& meta, size_t scene, ZTiff& tif
   }
   for (const auto& ifd : ifds) {
     if (ifd.isNormalImage()) {
-      mapIFDToImgLocation(ifdIdx, z, c, t, l);
+      if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
+        break;
+      }
       if (size_t(l) != scene) {
         continue;
       }
@@ -348,9 +338,9 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
   const std::vector<ZTiffIFD>& ifds = tiff.ifds();
 
   if (region.isEmpty() || !region.isValid(m_imgInfo[scene])) {
-    throw ZIOException(QString("Invalid image region. Image info: '%1', region: '%2'")
-                         .arg(m_imgInfo[scene].toQString())
-                         .arg(region.toQString()));
+    throw ZIOException(fmt::format("Invalid image region. Image info: '{}', region: '{}'",
+                                   m_imgInfo[scene].toString(),
+                                   region.toString()));
   }
 
   // thumbnail follows image or in subifd
@@ -361,7 +351,9 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
   size_t ifdIdx = 0;
   for (const auto& ifd : ifds) {
     if (ifd.isNormalImage()) {
-      mapIFDToImgLocation(ifdIdx, z, c, t, l);
+      if (!mapIFDToImgLocation(ifdIdx, z, c, t, l)) {
+        break;
+      }
       if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
         const std::vector<ZTiffIFD>& subifds = ifd.subIFDs();
         for (const auto& subifd : subifds) {
@@ -373,7 +365,9 @@ void ZImgTiff::readThumbnailInternal(ZImgThumbernail& thumbnail, const ZImgRegio
       }
       ifdIdx++;
     } else if (ifd.isReducedResolutionImage() && ifdIdx > 0) {
-      mapIFDToImgLocation(ifdIdx - 1, z, c, t, l);
+      if (!mapIFDToImgLocation(ifdIdx - 1, z, c, t, l)) {
+        break;
+      }
       if ((region.zInRegion(z)) && (region.cInRegion(c) || c == -1) && (region.tInRegion(t)) && (scene == size_t(l))) {
         ZImg thumb = tiff.readThumbnailFromIFD(ifd);
         if (!thumb.isEmpty()) {
