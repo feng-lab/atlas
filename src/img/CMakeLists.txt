@@ -3,11 +3,6 @@ project(img)
 
 # main stuff
 
-# get_cmake_property(_variableNames VARIABLES)
-# foreach (_variableName ${_variableNames})
-#   message(STATUS "${_variableName}=${${_variableName}}")
-# endforeach ()
-
 # tiff srcs
 set(TIFFDIR ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/libtiff/libtiff)
 set(TIFF_SOURCES

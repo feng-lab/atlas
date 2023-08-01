@@ -1,0 +1,57 @@
+#!/bin/bash
+function initdir
+{
+  dirname=$1
+  echo "Checking $dirname"
+  x=`mkdir -p $dirname 2>&1 || true`
+  username=$USER
+  if [[ "$x" == *"Permission denied"* ]]
+  then
+    sudo ./sudo_initdir $dirname $username
+  fi
+}
+
+function installprog
+{
+  prog=$1
+  bindir=$2
+  sourcedir=/groups/flyem/data/shared/bin
+
+  run_script=$bindir/$prog
+  if [ -f $sourcedir/$prog ]
+  then
+    ln -s $sourcedir/$prog $run_script
+    echo "$run_script installed"
+  else
+    echo "$run_script skipped"
+  fi
+}
+
+set -e 
+
+
+if [ `uname` = 'Darwin' ]; then
+  scriptDir=$(cd $(dirname "$0") && pwd -P)
+  export PATH=/usr/bin:/usr/local/bin:/bin:/sbin
+else
+  scriptDir=$(dirname `readlink -f "$0"`)
+  export PATH=/usr/bin:/usr/local/bin:/bin
+fi
+
+if test $# -eq 0
+then
+  install_dir=/opt
+else
+  install_dir=$1
+fi
+
+echo "Installing NeuTu under $install_dir"
+initdir $install_dir
+bindir=$install_dir/bin
+initdir $bindir
+
+prog_array=("neutu" "neu3" "debug_neutu" "debug_neu3")
+for prog in ${prog_array[@]} 
+do
+  installprog $prog $bindir
+done

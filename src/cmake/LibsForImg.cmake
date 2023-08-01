@@ -76,7 +76,7 @@ endif (AARCH64)
 message(STATUS "MKL_INCLUDE_DIRS: ${MKL_INCLUDE_DIRS}")
 message(STATUS "MKL_LIBRARIES: ${MKL_LIBRARIES}")
 
-find_package(cpuinfo REQUIRED)
+find_package(cpuinfo REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(cpuinfo::cpuinfo)
 
 set(JPEGTURBO_INCLUDE_DIRS ${JPEGTURBO_INCLUDE_DIRS}

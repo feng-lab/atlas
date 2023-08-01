@@ -1,0 +1,110 @@
+#include "flyembodyfilterdialog.h"
+
+#include "ui_flyembodyfilterdialog.h"
+#include "zstring.h"
+#include "zdialogfactory.h"
+
+FlyEmBodyFilterDialog::FlyEmBodyFilterDialog(QWidget *parent) :
+  QDialog(parent),
+  ui(new Ui::FlyEmBodyFilterDialog)
+{
+  ui->setupUi(this);
+  connect(ui->maxBodySizeCheckBox, SIGNAL(toggled(bool)),
+          ui->maxSizeSpinBox, SLOT(setEnabled(bool)));
+  connect(ui->minBodySizeCheckBox, SIGNAL(toggled(bool)),
+          ui->minSizeSpinBox, SLOT(setEnabled(bool)));
+  connect(ui->bodyFilePushButton, SIGNAL(clicked()),
+          this, SLOT(setBodyListFile()));
+
+  ui->bodySizeWidget->hide();
+}
+
+FlyEmBodyFilterDialog::~FlyEmBodyFilterDialog()
+{
+  delete ui;
+}
+
+void FlyEmBodyFilterDialog::setBodyListFile(const QString path)
+{
+  ui->bodyFileLineEdit->setText(path);
+}
+
+void FlyEmBodyFilterDialog::setBodyListFile()
+{
+  QString fileName = ZDialogFactory::GetOpenFileName("Load Body List", "", this);
+  if (!fileName.isEmpty()) {
+    setBodyListFile(fileName);
+  }
+}
+
+size_t FlyEmBodyFilterDialog::getMinBodySize() const
+{
+  if (ui->minSizeSpinBox->value() < 0 ||
+      !ui->minBodySizeCheckBox->isChecked()) {
+    return 0;
+  }
+
+  return ui->minSizeSpinBox->value();
+}
+
+size_t FlyEmBodyFilterDialog::getMaxBodySize() const
+{
+  if (ui->maxSizeSpinBox->value() < 0) {
+    return 0;
+  }
+
+  return ui->maxSizeSpinBox->value();
+}
+
+bool FlyEmBodyFilterDialog::hasUpperBodySize() const
+{
+  if (ui->maxSizeSpinBox->value() < 0) {
+    return false;
+  }
+
+  return ui->maxBodySizeCheckBox->isChecked();
+}
+
+std::vector<uint64_t> FlyEmBodyFilterDialog::getExcludedBodies() const
+{
+  ZString str =  ui->excludedBodyLineEdit->text().toStdString();
+  return str.toUint64Array();
+}
+
+std::set<uint64_t> FlyEmBodyFilterDialog::getExcludedBodySet() const
+{
+  std::vector<uint64_t> bodyArray = getExcludedBodies();
+  std::set<uint64_t> bodySet;
+  bodySet.insert(bodyArray.begin(), bodyArray.end());
+
+  return bodySet;
+}
+
+QString FlyEmBodyFilterDialog::getBodyListFile() const
+{
+  return ui->bodyFileLineEdit->text();
+}
+
+ZDvidFilter FlyEmBodyFilterDialog::getDvidFilter() const
+{
+  ZDvidFilter filter;
+  filter.setMinBodySize(getMinBodySize());
+  filter.setMaxBodySize(getMaxBodySize());
+  filter.setUpperBodySizeEnabled(hasUpperBodySize());
+  filter.exclude(getExcludedBodies());
+  filter.setNamedBodyOnly(namedBodyOnly());
+  filter.setBodyListFile(getBodyListFile().toStdString());
+  filter.setTracedOnly(tracedOnly());
+
+  return filter;
+}
+
+bool FlyEmBodyFilterDialog::namedBodyOnly() const
+{
+  return ui->namedBodyCheckBox->isChecked();
+}
+
+bool FlyEmBodyFilterDialog::tracedOnly() const
+{
+  return ui->tracedCheckBox->isChecked();
+}

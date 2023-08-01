@@ -79,9 +79,13 @@ endif ()
 message(STATUS "ATLAS_DEBUG_VERSION: ${ATLAS_DEBUG_VERSION}")
 
 include(PrintCMakeTargetInfo)
-include(LibsForImg)
+
 
 # subprojects
+add_subdirectory(src/neurolabi/c)
+
+include(LibsForImg)
+add_subdirectory(src/neurolabi/gui)
 add_subdirectory(src/img)
 # add_subdirectory(src/matlab)
 add_subdirectory(src/atlas)

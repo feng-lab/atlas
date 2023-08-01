@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+if [ $# -ge 1 ]
+then
+  install_dir=$1
+else
+  install_dir=/opt
+fi
+
+if [ `uname` = 'Darwin' ]; then
+  scriptDir=$(cd $(dirname "$0") && pwd -P)
+else
+  scriptDir=$(dirname `readlink -f "$0"`)
+fi
+
+echo $PATH
+
+downloadDir=$install_dir/Download
+cd $downloadDir
+condaDir=$install_dir/Download/miniconda
+if [ ! -d $condaDir ]
+then
+  if [ `uname` = 'Darwin' ]
+  then
+    curl -O https://repo.continuum.io/miniconda/Miniconda-latest-MacOSX-x86_64.sh
+    bash Miniconda-latest-MacOSX-x86_64.sh -b -p $condaDir
+  else
+    wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+    bash Miniconda-latest-Linux-x86_64.sh -b -p $condaDir
+  fi
+fi
+
+CONDA_ROOT=`$condaDir/bin/conda info --root`
+envDir=$condaDir/envs/dvidenv
+if [ ! -d $envDir ]
+then
+  source ${CONDA_ROOT}/bin/activate root
+  { echo y; } | $condaDir/bin/conda create -n dvidenv -c flyem libdvid-cpp
+fi
+
+source $scriptDir/flyem_utilities.sh
+update_gcc $condaDir
+
+#install lowtis
+if [ `uname` != 'Darwin' ]
+then
+  flyem_build_lowtis $install_dir $scriptDir
+fi
+

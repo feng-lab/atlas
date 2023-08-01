@@ -2816,6 +2816,21 @@ def build_skia(src_dir: str, install_dir: str):
         print('done')
 
 
+def build_jansson(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DJANSSON_STATIC_CRT:BOOL=OFF',
+                         '-DJANSSON_EXAMPLES:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_libs(libs: OrderedDict, use_asan: bool):
     # print('extDIR:', ext_dir())
     # print('srcPackageDIR:', src_package_dir())
@@ -3246,6 +3261,25 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             src_dir = os.path.join(atlas_src_dir(), 'python')
             build_conda_zimg(src_dir, ext_conda_build_dir())
 
+        if lib_name == 'jansson':
+            package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'jansson*'))
+            src_dir = get_package_top_level_folder(package_name, ext_dir())
+            if not os.path.exists(src_dir):
+                remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'jansson*'))
+                unpack_file_to_folder(package_name, ext_dir())
+                assert os.path.exists(src_dir)
+            build_jansson(src_dir, ext_build_dir())
+
+        if lib_name == 'pcre':
+            if is_windows():
+                package_name = find_src_package_with_glob(os.path.join(src_package_dir(), 'jansson*'))
+                src_dir = get_package_top_level_folder(package_name, ext_dir())
+                if not os.path.exists(src_dir):
+                    remove_old_src_folder_with_glob(os.path.join(ext_dir(), 'jansson*'))
+                    unpack_file_to_folder(package_name, ext_dir())
+                    assert os.path.exists(src_dir)
+                build_jansson(src_dir, ext_build_dir())
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb', 'eigen',
@@ -3254,7 +3288,7 @@ def parse_inputs(argv: list):
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
                 'opencv', 'botan', 'ospray', 'java', 'ants', 'skia',
-                'neuTube', 'rocksdb', 'llfio', 'conda-zimg', 'conda-opencv'
+                'neuTube', 'rocksdb', 'llfio', 'conda-zimg', 'conda-opencv', 'jansson', 'pcre'
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
