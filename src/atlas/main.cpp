@@ -69,6 +69,7 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationName("Atlas");
   try {
     if (argc > 1 && strcmp(argv[1], "--command") == 0) {
+      ZApplication app(argc, argv);
       return ZRunNeuTuCommand().run(argc, argv);
     }
 

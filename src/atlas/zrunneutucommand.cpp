@@ -31,6 +31,9 @@
 #include "zstack.hxx"
 #include "zstring.h"
 
+#include "command/zcommandmodule.h"
+#include "command/zneurontracecommand.h"
+
 namespace nim {
 
 ZRunNeuTuCommand::ZRunNeuTuCommand()
@@ -54,6 +57,39 @@ void ZRunNeuTuCommand::init()
   m_forceUpdate = false;
   m_namedOnly = false;
   m_intvSpecified = false;
+}
+
+void ZRunNeuTuCommand::registerModule()
+{
+  registerModule<ZNeuronTraceCommand>("trace_neuron");
+}
+
+template<typename T>
+void ZRunNeuTuCommand::registerModule(const std::string& name)
+{
+  registerModule(name, new T);
+}
+
+void ZRunNeuTuCommand::registerModule(const std::string& name, ZCommandModule* module)
+{
+  if (!name.empty() && module != NULL) {
+    if (m_commandMap.count(name) > 0) {
+      LOG(WARNING) << "Cannot overwrite a registered module: " << name;
+    } else {
+      module->setForceUpdate(m_forceUpdate);
+      m_commandMap[name] = module;
+    }
+  }
+}
+
+ZCommandModule* ZRunNeuTuCommand::getModule(const std::string& name)
+{
+  ZCommandModule* module = NULL;
+  if (m_commandMap.count(name) > 0) {
+    module = m_commandMap[name];
+  }
+
+  return module;
 }
 
 ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
@@ -203,6 +239,46 @@ int ZRunNeuTuCommand::runTraceNeuron()
   }
 
   return stat;
+}
+
+int ZRunNeuTuCommand::runGeneral()
+{
+  if (!m_generalConfig.empty()) {
+#ifdef _DEBUG_
+    std::cout << "Config: " << m_generalConfig << std::endl;
+#endif
+
+    ZJsonObject config;
+    if (ZFileType::FileType(m_generalConfig) == ZFileType::EFileType::JSON) {
+      config.load(m_generalConfig);
+      config.setEntry("_source", m_generalConfig);
+    } else {
+      if (!config.decode(m_generalConfig, true)) {
+        std::cerr << "Invalid config json: " << m_generalConfig << std::endl;
+      }
+    }
+
+    config.setEntry("_input", m_inputJson);
+
+    std::string commandName = ZJsonParser::stringValue(config["command"]);
+    std::cout << "Running command " << commandName << "..." << std::endl;
+    ZCommandModule* module = getModule(commandName);
+    if (module != NULL) {
+      try {
+        return module->run(m_input, m_output, config);
+      }
+      catch (std::exception& e) {
+        std::cerr << "COMMAND FAILED: " << e.what() << std::endl;
+        return 1;
+      }
+    } else {
+      std::cerr << "Invalid command module: " << commandName << std::endl;
+
+      return 1;
+    }
+  }
+
+  return 1;
 }
 
 double ZRunNeuTuCommand::compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher) const
@@ -417,7 +493,8 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
   Process_Arguments(argc, argv, const_cast<char**>(Spec), 1);
 
   m_configDir = ZSystemInfo::resourcesDir().absoluteFilePath("json").toStdString();
-  // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR), "json");
+  // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR),
+  // "json");
   std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
 
   if (Is_Arg_Matched(const_cast<char*>("--config"))) {
@@ -561,6 +638,8 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     }
   }
 
+  registerModule();
+
   switch (command) {
     case SKELETONIZE:
       return runSkeletonize();
@@ -568,6 +647,9 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
       return runCompareSwc();
     case TRACE_NEURON:
       return runTraceNeuron();
+    case GENERAL_COMMAND:
+      return runGeneral();
+      break;
     default:
       LOG(INFO) << "Unknown command";
       return 1;

@@ -2,7 +2,6 @@
 
 #include <iostream>
 
-#include "neutubeconfig.h"
 #include "zstack.hxx"
 #include "zneurontracer.h"
 #include "zneurontracerconfig.h"
@@ -12,6 +11,9 @@
 #include "zjsonobjectparser.h"
 #include "zfiletype.h"
 #include "filesystem/utilities.h"
+
+#include <QDir>
+#include <QCoreApplication>
 
 ZNeuronTraceCommand::ZNeuronTraceCommand()
 {
@@ -64,8 +66,12 @@ void ZNeuronTraceCommand::loadTraceConfig(const ZJsonObject &config)
     ZJsonObjectParser parser;
     std::string path = parser.GetValue(config, "path", "");
     if (path.empty() || path == "default") {
-      path = NeutubeConfig::getInstance().getPath(
-            NeutubeConfig::EConfigItem::CONFIG_DIR) + "/json/trace_config.json";
+#ifdef Q_OS_MACOS
+      QDir rdir(QCoreApplication::applicationDirPath() + u"/../Resources");
+#else
+      QDir rdir(QCoreApplication::applicationDirPath() + u"/Resources");
+#endif
+      path = QDir(rdir.absoluteFilePath("json")).absoluteFilePath("trace_config.json").toStdString();
     }
     actualConfig.load(path);
   }

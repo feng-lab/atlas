@@ -117,6 +117,9 @@ set(NEUTU_SOURCES
     zstackutil.cpp zstackutil.h
     zstackptr.cpp zstackptr.h
     geometry/zgeo3dtransform.cpp geometry/zgeo3dtransform.h
+    command/zcommandmodule.cpp command/zcommandmodule.h
+    command/zneurontracecommand.h command/zneurontracecommand.cpp
+    zstackreader.cpp zstackreader.h
     )
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")

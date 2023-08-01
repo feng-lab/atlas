@@ -9,6 +9,7 @@
 class ZSwcTree;
 class ZSwcTreeMatcher;
 class ZStack;
+class ZCommandModule;
 
 namespace nim {
 
@@ -40,11 +41,21 @@ public:
 private:
   void init();
 
+  void registerModule();
+
+  void registerModule(const std::string &name, ZCommandModule *module);
+
+  template<typename T>
+  void registerModule(const std::string &name);
+
+  ZCommandModule* getModule(const std::string &name);
+
   static ECommand getCommand(const char *cmd);
 
   int runSkeletonize();
   int runCompareSwc();
   int runTraceNeuron();
+  int runGeneral();
 
   void loadConfig(const std::string& filePath);
   void expandConfig(const std::string& configFilePath, const std::string& key);
@@ -87,6 +98,8 @@ private:
   bool m_forceUpdate;
   bool m_namedOnly;
   std::vector<uint64_t> m_bodyIdArray;
+
+  std::map<std::string, ZCommandModule*> m_commandMap;
 };
 
 } // namespace nim

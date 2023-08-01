@@ -11,25 +11,18 @@
 #include "dvid/zdvidreader.h"
 #endif
 
-#if defined(_QT_GUI_USED_)
-
-#  ifdef _QT5_
-#include <QUrlQuery>
-#  endif
-
 #include <QUrl>
 #include <QFileInfo>
 #include <QDir>
-
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
+#include <QUrlQuery>
 #endif
 
-ZStackReader::ZStackReader()
-{
-}
+ZStackReader::ZStackReader() {}
 
-ZStack* ZStackReader::ReadDvid(const QUrl &url)
+ZStack* ZStackReader::ReadDvid(const QUrl& url)
 {
-  ZStack *stack = nullptr;
+  ZStack* stack = nullptr;
 
 #if defined(_ENABLE_LIBDVIDCPP_)
   QString urlPath = url.path();
@@ -40,7 +33,6 @@ ZStack* ZStackReader::ReadDvid(const QUrl &url)
   if (parts.size() == 2 && !range.isEmpty()) {
     ZDvidTarget target;
     target.set(url.host().toStdString(), parts[0].toStdString(), url.port(-1));
-
 
     target.setGrayScaleName(parts[1].toStdString());
     target.setSegmentationName("*");
@@ -56,11 +48,11 @@ ZStack* ZStackReader::ReadDvid(const QUrl &url)
   return stack;
 }
 
-ZStack* ZStackReader::ReadSeries(const QUrl &url)
+ZStack* ZStackReader::ReadSeries(const QUrl& url)
 {
-  ZStack *stack = nullptr;
+  ZStack* stack = nullptr;
 
-#if defined(_QT5_)
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
   QUrlQuery query(url);
   QString prefix = query.queryItemValue("prefix");
   QString suffix = query.queryItemValue("suffix");
@@ -69,24 +61,23 @@ ZStack* ZStackReader::ReadSeries(const QUrl &url)
   QString suffix = url.queryItemValue("suffix");
 #endif
   QDir dir(url.path());
-  QFileInfoList fileList =
-      dir.entryInfoList(QStringList() << prefix + "*" + suffix);
+  QFileInfoList fileList = dir.entryInfoList(QStringList() << prefix + "*" + suffix);
 
   if (!fileList.isEmpty()) {
     QString filePath = fileList[0].absoluteFilePath();
     int nchannel = ZStack::getChannelNumber(filePath.toStdString());
-    Stack *slice = Read_Sc_Stack(filePath.toLocal8Bit(), 0);
+    Stack* slice = Read_Sc_Stack(filePath.toLocal8Bit().constData(), 0);
     int kind = C_Stack::kind(slice);
     int width = C_Stack::width(slice);
     int height = C_Stack::height(slice);
     int depth = fileList.size();
-    Mc_Stack *stackData = C_Stack::make(kind, width, height, depth, nchannel);
+    Mc_Stack* stackData = C_Stack::make(kind, width, height, depth, nchannel);
     C_Stack::kill(slice);
     slice = NULL;
 
     for (int i = 0; i < nchannel; i++) {
       for (int j = 0; j < fileList.size(); j++) {
-        slice = Read_Sc_Stack(fileList[j].absoluteFilePath().toLocal8Bit(), i);
+        slice = Read_Sc_Stack(fileList[j].absoluteFilePath().toLocal8Bit().constData(), i);
         C_Stack::copyPlaneValue(stackData, slice->array, i, j);
         C_Stack::kill(slice);
         slice = NULL;
@@ -102,10 +93,10 @@ ZStack* ZStackReader::ReadSeries(const QUrl &url)
   return stack;
 }
 
-ZIntCuboid ZStackReader::GetRange(const QUrl &url)
+ZIntCuboid ZStackReader::GetRange(const QUrl& url)
 {
   ZIntCuboid box;
-#ifdef _QT5_
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
   QUrlQuery query(url.query());
   QString x0Str = query.queryItemValue("x0");
   int x0 = x0Str.toInt();
@@ -180,43 +171,40 @@ ZIntCuboid ZStackReader::GetRange(const QUrl &url)
   return box;
 }
 
-ZStack* ZStackReader::ReadJson(const ZJsonObject &obj)
+ZStack* ZStackReader::ReadJson(const ZJsonObject& obj)
 {
   ZJsonObjectParser parser;
 
-  //Json {"source": <path>, "offset": [x0, y0, z0]}
+  // Json {"source": <path>, "offset": [x0, y0, z0]}
   std::string source = parser.GetValue(obj, "source", "");
-  ZStack *stack = Read(source);
+  ZStack* stack = Read(source);
   if (stack) {
-    std::vector<int64_t> offset =
-        parser.GetValue(obj, "offset", std::vector<int64_t>());
+    std::vector<int64_t> offset = parser.GetValue(obj, "offset", std::vector<int64_t>());
     if (offset.size() == 3) {
-      stack->setOffset(
-            stack->getOffset() + ZIntPoint(offset[0], offset[1], offset[2]));
+      stack->setOffset(stack->getOffset() + ZIntPoint(offset[0], offset[1], offset[2]));
     }
   }
 
   return stack;
 }
 
-ZStack* ZStackReader::Read(const std::string &path)
+ZStack* ZStackReader::Read(const std::string& path)
 {
-  ZStack *stack = NULL;
+  ZStack* stack = NULL;
 
-#if defined(_QT_GUI_USED_)
   QUrl url(path.c_str());
   if (url.scheme() == "dvid") {
-    //Initial design of dvid scheme:
-    //  dvid://<host>:<port>/<uuid>/<dataname>?<query>
-    //    query: x0, y0, z0, x1, y1, z1, width, height, depth
-    //           (width, height, depth) overwrite (x1, y1, z1)
+    // Initial design of dvid scheme:
+    //   dvid://<host>:<port>/<uuid>/<dataname>?<query>
+    //     query: x0, y0, z0, x1, y1, z1, width, height, depth
+    //            (width, height, depth) overwrite (x1, y1, z1)
 #if defined(_ENABLE_LIBDVIDCPP_)
     stack = ReadDvid(url);
 #endif
   } else if (url.scheme() == "file") {
-    //File scheme
-    //  file://<path>?<query>
-    //    query: prefix=<prefix>&suffix=<suffix>&numwidth=<suffix>
+    // File scheme
+    //   file://<path>?<query>
+    //     query: prefix=<prefix>&suffix=<suffix>&numwidth=<suffix>
     stack = ReadSeries(url);
   } else {
     ZStackFile stackFile;
@@ -228,7 +216,7 @@ ZStack* ZStackReader::Read(const std::string &path)
         json.load(path);
         std::vector<ZStack*> stackArray;
         for (size_t i = 0; i < json.size(); ++i) {
-          ZStack *substack = ReadJson(ZJsonObject(json.value(i)));
+          ZStack* substack = ReadJson(ZJsonObject(json.value(i)));
           if (substack) {
             stackArray.push_back(substack);
           }
@@ -237,8 +225,6 @@ ZStack* ZStackReader::Read(const std::string &path)
       }
     }
   }
-#endif
-
 
   return stack;
 }
