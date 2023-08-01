@@ -3,11 +3,6 @@
 
 #ifndef _QT_GUI_USED_
 
-class ZQObject {
-  ZQObject(ZQObject *parent = 0x0) {}
-};
-#define QObject ZObject
-
 class ZQImage {};
 #define QImage ZQImage
 
@@ -31,29 +26,14 @@ public:
 class ZQPaintDevice{};
 #define QPaintDevice ZQPaintDevice
 
-class ZQString{};
-#define QString ZQString
-
-class ZQStringList{};
-#define QStringList ZQStringList
-
-class ZQList{};
-#define QList ZQList
-
-class ZQColor{};
-#define QColor ZQColor
-
 class ZQRectF{};
 #define QRectF ZQRectF
 
 class ZQRect{};
 #define QRect ZQRect
 
-typedef double Zqreal;
-#define qreal Zqreal
 #else
 #include <QObject>
-#include <QColor>
 #include <QPainter>
 #include <QImage>
 #include <QPoint>
@@ -67,5 +47,7 @@ typedef double Zqreal;
 #include <QPen>
 #include "qt/gui/utilities.h"
 #endif
+
+#include <QColor>
 
 #endif // ZQTHEADER_H

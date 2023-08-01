@@ -35,6 +35,7 @@ public:
   ZObject3d(Object_3d *obj = NULL);
   ZObject3d(const std::vector<size_t> &indexArray, int width, int height,
             int dx, int dy, int dz);
+  ZObject3d& operator=(const ZObject3d&) = default;
   virtual ~ZObject3d() override;
 
   static ZStackObject::EType GetType() {

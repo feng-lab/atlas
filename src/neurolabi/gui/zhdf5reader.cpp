@@ -1,6 +1,7 @@
 #include "zhdf5reader.h"
 
 #include <string>
+#include "tz_cdefs.h"
 
 using namespace std;
 
@@ -72,6 +73,8 @@ std::vector<int> ZHdf5Reader::readIntArray(const string &dataPath)
   //H5Tclose(nativeType);
   H5Dclose(dset);
   H5Sclose(space);
+#else
+  UNUSED_PARAMETER(dataPath)
 #endif
 
   return array;
@@ -154,6 +157,8 @@ mylib::Array* ZHdf5Reader::readArray(const std::string &dataPath)
   //H5Tclose(nativeType);
   H5Dclose(dset);
   H5Sclose(space);
+#else
+  UNUSED_PARAMETER(dataPath)
 #endif
 
   return array;
@@ -251,6 +256,8 @@ std::vector<std::string> ZHdf5Reader::getAllDatasetName(
   if (m_file != NULL_FILE) {
     H5Giterate(m_file, group.c_str(), NULL, getDataSetName, &nameArray);
   }
+#else
+  UNUSED_PARAMETER(group)
 #endif
 
   return nameArray;

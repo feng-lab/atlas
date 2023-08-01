@@ -616,7 +616,7 @@ set(SOURCES
     zimgregioncache.cpp zimgregioncache.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
-    zcancellation.h)
+    zcancellation.h zrunneutucommand.cpp zrunneutucommand.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -702,6 +702,10 @@ if (WIN32)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ontology
                      $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
+  add_custom_command(TARGET ${APP_NAME}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
+                     $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
 else (WIN32)
   target_compile_options(${APP_NAME} PUBLIC -frtti)
   target_compile_options(${APP_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
@@ -784,6 +788,10 @@ else (WIN32)
                        $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/ontology)
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
+                       $<TARGET_FILE_DIR:${APP_NAME}>/../Resources/json)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
                        COMMAND codesign --force --deep --sign - $<TARGET_BUNDLE_DIR:${APP_NAME}>)
   else ()
     add_custom_command(TARGET ${APP_NAME}
@@ -817,6 +825,10 @@ else (WIN32)
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/Resources/ontology
                        $<TARGET_FILE_DIR:${APP_NAME}>/Resources/ontology)
+    add_custom_command(TARGET ${APP_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
+                       $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
   endif ()
 endif (WIN32)
 

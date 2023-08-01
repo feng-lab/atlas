@@ -2,7 +2,8 @@
 #include <iostream>
 #include <climits>
 #include <stdexcept>
-#include <neulib/core/stringbuilder.h>
+// #include <neulib/core/stringbuilder.h>
+#include <QString>
 
 #include "zerror.h"
 #include "zpoint.h"
@@ -265,11 +266,11 @@ std::string ZIntPoint::toString(const std::string &templ) const
     return toString();
   }
 
-  return neulib::StringBuilder(templ).
+  return QString::fromStdString(templ).
       replace("$X", "$x").replace("$Y", "$y").replace("$Z", "$z").
-      replace("$x", std::to_string(getX())).
-      replace("$y", std::to_string(getY())).
-      replace("$z", std::to_string(getZ()));
+      replace("$x", QString::number(getX())).
+      replace("$y", QString::number(getY())).
+      replace("$z", QString::number(getZ())).toStdString();
 }
 
 ZIntPoint ZIntPoint::operator - () const

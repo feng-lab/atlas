@@ -11,6 +11,7 @@
 
 #include "zrunbenchmark.h"
 #include "zrunexport3danimation.h"
+#include "zrunneutucommand.h"
 #include "zwindowsheader.h"
 
 #include <QSurfaceFormat>
@@ -67,10 +68,14 @@ int main(int argc, char* argv[])
 #endif
   QCoreApplication::setApplicationName("Atlas");
   try {
+    if (argc > 1 && strcmp(argv[1], "--command") == 0) {
+      return ZRunNeuTuCommand().run(argc, argv);
+    }
+
     if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
       FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
     }
-    std::string usage("Atlas is a brain map platform.  Usage:\n");
+    std::string usage("Atlas is a brain mapping platform.  Usage:\n");
     usage += std::string(argv[0]) + "";
     gflags::SetUsageMessage(usage);
     gflags::SetVersionString(GIT_VERSION);

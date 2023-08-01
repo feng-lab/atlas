@@ -19,6 +19,7 @@ public:
   ZString ( const char * s, size_t n );
   ZString ( const char * s );
   ZString ( size_t n, char c );
+  ZString(const ZString& s) = default;
 #if defined(_QT_GUI_USED_)
   ZString(const QString &str);
 #endif

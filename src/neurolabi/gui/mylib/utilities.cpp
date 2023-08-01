@@ -208,7 +208,7 @@ static char  *Program;        //  name of program
 static char **Master_Spec;    //  specification copy (persistent)
 
 static int    ArgC;           //  global references to argc, argv of command-line
-static char **ArgV;      
+static char **ArgV;
 
 #define INT_TYPE    0         //  value types
 #define DOUBLE_TYPE 1
@@ -693,7 +693,7 @@ static Node *rep()
   p = fact();
   while (1)
     { char *tp = Scan;
-      while (isspace(*Scan)) 
+      while (isspace(*Scan))
         Scan += 1;
       if (Scan[0] == '.' && Scan[1] == '.' && Scan[2] == '.')
         { if (p->loops)
@@ -1286,7 +1286,7 @@ static void check_automaton_units(State *s)
     if (u != NULL && (s->flags & LOOP_FINISH) == 0)
       classify_edge(s,u,MORE1_FLAG);
   }
-} 
+}
 
 /* Finally, in a reverse topo. order scan we determine the ends of every unit by finding
    those states that are in any one of automaton states 2, 4, 5, 6, or 7 (0x7a), and see
@@ -1374,7 +1374,7 @@ static void compute_unit_finishes(State *s)
     { s->minlen = s->succ[0]->minlen;
       s->maxlen = s->succ[0]->maxlen;
       if (s->succ[1] != NULL && (s->flags & LOOP_FINISH) == 0)
-        { if (s->succ[1]->minlen < s->minlen) 
+        { if (s->succ[1]->minlen < s->minlen)
             s->minlen = s->succ[1]->minlen;
           if (s->succ[1]->maxlen > s->maxlen)
             s->maxlen = s->succ[1]->maxlen;
@@ -1522,7 +1522,7 @@ static int    Unit_Span;   //  Current span (# of WHITE's) in current unit
 
 //  For the option currently on Stack, find the option with the largest index that is
 //    a synonym (matches ignoring internals of {} pairs)
- 
+
 static int equivalent_option()
 { int    k;
 
@@ -1531,7 +1531,7 @@ static int equivalent_option()
       { Atom **unit = Unit_Table[k].unit;
         int    ulen = Unit_Table[k].len;
         int    i, j, vi, vj;
-  
+
         vi = vj = 0;
         for (i = 0; i < ulen; i++)
           if (unit[i]->label == TYPE)
@@ -1558,10 +1558,10 @@ static int equivalent_option()
                 i += 1;
               vi += 1;
             }
-          else // unit[i]->label == TEXT|LIST|DASH 
+          else // unit[i]->label == TEXT|LIST|DASH
             { char *name = unit[i]->name;
               int   nlen = unit[i]->nlen;
-  
+
               for (j = 0; j < nlen; j++)
                 { if (vi >= Stop) goto nomatch;
                   if (AtStk[vi]->label < TEXT || AtStk[vi]->label > DASH) goto nomatch;
@@ -1570,18 +1570,18 @@ static int equivalent_option()
                   if (vj >= AtStk[vi]->nlen)
                     { vi += 1; vj = 0; }
                 }
-            } 
+            }
         if (vi == Stop)
           return (k);
       nomatch:
         continue;
-      } 
+      }
   return (-1);
 }
 
 //  For the unit currently on Stack, find the unit with the largest index that is
 //    equal to it (if any).
- 
+
 static int equal_unit()
 { int    k;
 
@@ -1591,7 +1591,7 @@ static int equal_unit()
         int    ulen = Unit_Table[k].len;
         int    i, j, vi, vj;
         int    defmat;
-  
+
         defmat = 1;
         vi = vj = 0;
         for (i = 0; i < ulen; i++)
@@ -1638,10 +1638,10 @@ static int equal_unit()
                   goto nomatch;
                 vi += 1;
               }
-            else // unit[i]->label == TEXT|LIST|DASH 
+            else // unit[i]->label == TEXT|LIST|DASH
               { char *name = unit[i]->name;
                 int   nlen = unit[i]->nlen;
-    
+
                 for (j = 0; j < nlen; j++)
                   { if (vi >= Stop) goto nomatch;
                     if (AtStk[vi]->label < TEXT || AtStk[vi]->label > DASH) goto nomatch;
@@ -1654,18 +1654,18 @@ static int equal_unit()
                           vi += 1;
                       }
                   }
-              } 
+              }
           }
         while (vi < Stop && (AtStk[vi]->label == SYN_L || AtStk[vi]->label == SYN_R))
           vi += 1;
         if (vi == Stop)
           { if (!defmat)
               dual_error(DF_ERROR,AtStk[0],unit[0]);
-            return (k); 
+            return (k);
           }
       nomatch:
         continue;
-      } 
+      }
   return (-1);
 }
 
@@ -1867,7 +1867,7 @@ static void check_dups_back(State *s, Unit *d)   // traverse backwards looking f
 
 static void check_for_duplicates()
 { int i, k;
- 
+
   for (i = 0; i < Num_of_Units; i++)    // for each unit with a non-trivial equal list
     if (Unit_Table[i].equal > i)        // mark all the class & see if one proceeds another
       { Unit_Table[i].used = 1;
@@ -1948,18 +1948,18 @@ static inline Candidate *add_match(Unit *def, int argp)
 // Compare *flag* unit def against all arguments on the command line
 
 static void match_flags(Unit *def)
-{ int set[128]; 
+{ int set[128];
   int first;
   int i, j, k;
-                
+
   for (i = 0; i < 128; i++)
-    set[i] = 0;     
- 
+    set[i] = 0;
+
   first = 1;
   for (i = 0; i < def->len; i++)
     { char *name = def->unit[i]->name;
       int   nlen = def->unit[i]->nlen;
- 
+
       if (def->unit[i]->label == SYN_R || def->unit[i]->label == SYN_L)
         continue;
       for (j = (first ? 1 : 0); j < nlen; j++)
@@ -1968,8 +1968,8 @@ static void match_flags(Unit *def)
           Flag_Space[v>>5] |= (1 << (v&0x1f));
         }
       first = 0;
-    }               
-                      
+    }
+
   for (i = 1; i < ArgC; i++)
     if (ArgV[i][0] == OPTION_CHAR)
       { for (j = 1; ArgV[i][j] != '\0'; j++)
@@ -1990,7 +1990,7 @@ static void match_flags(Unit *def)
             printf(" matches %s\n",ArgV[i]);
 #endif
           }
-      }   
+      }
 }
 
 // Return non-zero if val[0..len-1] matches an integer constant.  Also push the value
@@ -2111,7 +2111,7 @@ static int match_text(char *name, char *text, int len)
 //   at by argv (the rest of the command line following it in order).
 
 static int match_option_suffix(Unit *def, int i, char *arg, char **argv)
-{ if (i >= def->len) 
+{ if (i >= def->len)
     { if (*arg == '\0')
         return (1);
       else
@@ -2165,7 +2165,7 @@ static int match_option_suffix(Unit *def, int i, char *arg, char **argv)
           int   slen  = state->slen;
           int   off;
 
-          off = 0; 
+          off = 0;
           for (off = 1; off <= ((int) strlen(arg)) - slen; off++)
             { if (match_text(sname,arg+off,nlen))
                 { switch (def->unit[i]->def_val.type)
@@ -2292,7 +2292,7 @@ static void is_match_possible(Automaton *mach, Node *root, int no_escapes)
 
   { int i, k, nreq, oreq;
     int rmin, rmax;
-    
+
     rmin = mach->start->minlen;
     rmax = mach->start->maxlen;
     if (root->loops && ArgC > rmax)
@@ -2457,7 +2457,7 @@ static void traverse_edge(State *s)
               for (i = 0; i < Ftop; i++)
                 F_Path[i] = Fstack[i];
               Flen = Ftop;
-            } 
+            }
           else if (nos == Num_Numbers)
             { for (i = 1; i < ArgC; i++)
                 if (A_Match[i].matched == PART_MATCH)
@@ -2467,7 +2467,7 @@ static void traverse_edge(State *s)
                 else
                   { if (Match_Vector[i].inst != A_Match[i].inst)
                       break;
-                  } 
+                  }
               if (i < ArgC)
                 { Num_Matches += 1;
 
@@ -2555,7 +2555,7 @@ static void match_instance(Unit *ins, Candidate *mat)
           mval = Match_Vector[o].matched;
           for (k = 0; k < 4; k++)
             mset[k] = Match_Vector[o].matflag[k];
-        
+
           Match_Vector[o].inst    = ins;
           Match_Vector[o].matched = PART_MATCH;
           for (k = 0; k < 4; k++)
@@ -2723,7 +2723,7 @@ static void store_match(int argc, char *argv[])
           nvals += ins->nvals;
         atot += (int) (strlen(argv[i])+1);
       }
-  
+
     Vtop = vbase = (Value *) mylib::Guarded_Malloc(sizeof(Value)*((size_t) nvals),"Process_Arguments");
     Ttop = tbase = (char  *) mylib::Guarded_Malloc(((size_t) atot),"Process_Arguments");
     Fill_Values = 1;
@@ -2766,7 +2766,7 @@ static void store_match(int argc, char *argv[])
   //  Set the repeat count for every unit in a loop
 
   for (i = 0; i < Num_of_Units; i++)
-    { if (Unit_Table[i].beg->loop != NULL) 
+    { if (Unit_Table[i].beg->loop != NULL)
         Unit_Table[i].maxi = Unit_Table[i].beg->loop->mark;
       else
         Unit_Table[i].maxi = 0;
@@ -2828,7 +2828,7 @@ void mylib::Process_Arguments(int argc, char *argv[], char *spec[], int no_escap
 
   { int   lines;
     char *n;
- 
+
     n = argv[0] + (int) (strlen(argv[0]) - 1);
     while (n > argv[0] && *n != '/')
       n -= 1;
@@ -2953,7 +2953,7 @@ static int search_table(char *query)
     { if (Unit_Table[k].kind == OPTION || Unit_Table[k].kind == OFLAG)
         { Atom **unit = Unit_Table[k].unit;
           int    ulen = Unit_Table[k].len;
-          int    i, j, vj;
+          int    i, vj;
   
           vj = 0;
           for (i = 0; i < ulen; i++)
@@ -2967,10 +2967,10 @@ static int search_table(char *query)
                   vj += 1;
                 }
               else if (unit[i]->label != SYN_L &&
-                       unit[i]->label != SYN_R   ) // unit[i]->label == TEXT|LIST|DASH 
+                       unit[i]->label != SYN_R   ) // unit[i]->label == TEXT|LIST|DASH
                 { char *name = unit[i]->name;
                   int   nlen = unit[i]->nlen;
-      
+
                   for (j = 0; j < nlen; j++)
                     { if (query[vj] == '\0') break;
                       if (name[j] == ESCAPE_CHAR)
@@ -2978,20 +2978,20 @@ static int search_table(char *query)
                       if (name[j] != query[vj]) goto nomatch;
                       vj += 1;
                     }
-                } 
+                }
             }
           if (query[vj] != '\0') goto nomatch;
-  
+
           if (Unit_Table[k].kind == OFLAG)
             fg_hit = 1;
-  
+
           full = (i >= ulen);
-        } 
+        }
       else if (Unit_Table[k].kind == REQUIRED)
         { char *name = Unit_Table[k].unit[0]->name;
     	  int   nlen = Unit_Table[k].unit[0]->nlen;
           int   qlen = (int) strlen(query);
-    
+
           if (nlen < qlen || strncmp(name,query,((size_t) qlen)))
             goto nomatch;
           full = (nlen == qlen);
@@ -3034,7 +3034,7 @@ static int search_table(char *query)
             else
               goto nomatch;
           }
-     
+
       if (full)                      //  add hit to list
         { Unit_Table[k].prefix = 0;
           c_hit += 1;
@@ -3052,7 +3052,7 @@ static int search_table(char *query)
     nomatch:
       continue;
     }
-  
+
   //  if a flag provides the hit, count it (but its obviously not on the list)
 
   if (!fg_hit && strlen(query) == 2 && query[0] == OPTION_CHAR)
@@ -3099,7 +3099,7 @@ static Match *find_iteration(int k, int it)
   Match *m;
 
   j = k;
-  do 
+  do
     { for (m = Unit_Table[j].alist; m != NULL; m = m->next)
         if (m->iter == it+1)
           return (m);
@@ -3116,7 +3116,7 @@ static Match *find_value(int k)
   Match *m;
 
   j = k;
-  do 
+  do
     { m = Unit_Table[j].alist;
       if (m != NULL)
         return (m);
@@ -3204,7 +3204,7 @@ static Value *get_value(char *name, int n, int k, int j, int type)
   ival.type = INT_TYPE;
   if (n < 0 || Unit_Table[n].kind == OFLAG)
     { if (n >= 0 && find_value(n) != NULL)
-        ival.value.intval = 1; 
+        ival.value.intval = 1;
       else
         { k = name[1];
           ival.value.intval = ((Flag_Vector[k>>5] & (1 << (k & 0x1f))) != 0);
@@ -3233,7 +3233,7 @@ static Value *get_value(char *name, int n, int k, int j, int type)
         v = mat->value + (j-1);
     }
   else
-    { mat = find_value(n); 
+    { mat = find_value(n);
       if (j == 0)
         { ival.value.intval = (mat != NULL);
           v = &ival;

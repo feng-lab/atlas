@@ -731,11 +731,11 @@ double C_Stack::mode(const Stack *stack)
   return comm;
 }
 
-Stack* C_Stack::translate(Stack *stack, int kind, int in_place)
+Stack* C_Stack::translate(Stack *stack, int kind, int in_place_)
 {
   STACK_MUTEX_GUARD
 
-  return Translate_Stack(stack, kind, in_place);
+  return Translate_Stack(stack, kind, in_place_);
 }
 
 Stack* C_Stack::make(int kind, int width, int height, int depth)
@@ -892,7 +892,7 @@ void C_Stack::view(const Stack *src, Image_Array *dst)
 
 bool C_Stack::hasSameValue(Mc_Stack *stack, size_t index1, size_t index2,
                            size_t channelOffset)
-{ 
+{
   size_t byteNumber = kind(stack);
 
   bool isEqual = true;

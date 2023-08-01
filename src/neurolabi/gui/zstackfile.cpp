@@ -295,8 +295,8 @@ void ZStackFile::loadJsonObject(json_t *obj, const std::string &source)
       if (m_type == FILE_LIST) {
         size_t arraySize = ZJsonParser::ArraySize(stackValue);
         for (size_t i = 0; i < arraySize; i++) {
-          json_t *obj = ZJsonParser::ArrayValue(stackValue, i);
-          ZString url = ZJsonParser::stringValue(obj);
+          json_t * obj2 = ZJsonParser::ArrayValue(stackValue, i);
+          ZString url = ZJsonParser::stringValue(obj2);
           m_urlList.push_back(
                 url.absolutePath(ZString(source).dirPath()).c_str());
         }

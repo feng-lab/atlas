@@ -49,14 +49,14 @@ ZFileType::EFileType ZFileType::FileType(const std::string &filePath)
   } else if (str.endsWith(".txt", ZString::CASE_INSENSITIVE)) {
     FILE *fp = fopen(str.c_str(), "r");
     if (fp != NULL) {
-      ZString str;
+      ZString str2;
       int patternCount = 0;
-      while (str.readLine(fp)) {
-        if (str.startsWith("session:")) {
+      while (str2.readLine(fp)) {
+        if (str2.startsWith("session:")) {
           patternCount++;
         }
         if (patternCount == 1) {
-          if (str.startsWith("bookmarks")) {
+          if (str2.startsWith("bookmarks")) {
             patternCount++;
           }
         }

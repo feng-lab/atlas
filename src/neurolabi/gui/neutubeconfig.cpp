@@ -544,7 +544,7 @@ std::string NeutubeConfig::getPath(EConfigItem item) const
       return
           QDir(getPath(EConfigItem::WORKING_DIR).c_str()).filePath("autosave").toStdString();
 #else
-      return ZString::fullPath(getPath(WORKING_DIR), "autosave");
+      return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "autosave");
 #endif
   case EConfigItem::SKELETONIZATION_CONFIG:
     return getConfigDir() + ZString::FileSeparator + "json" +
@@ -590,31 +590,31 @@ std::string NeutubeConfig::getPath(EConfigItem item) const
     return QDir(getPath(EConfigItem::LOG_DIR).c_str()).filePath(fileName).toStdString();
   }
 #else
-    return ZString::fullPath(getPath(WORKING_DIR), "log.txt");
+    return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "log.txt");
 #endif
   case EConfigItem::LOG_APPOUT:
 #ifdef _QT_GUI_USED_
     return QDir(getPath(EConfigItem::WORKING_DIR).c_str()).filePath("log_appout.txt").toStdString();
 #else
-    return ZString::fullPath(getPath(WORKING_DIR), "log_appout.txt");
+    return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "log_appout.txt");
 #endif
   case EConfigItem::LOG_TRACE:
 #ifdef _QT_GUI_USED_
     return QDir(getPath(EConfigItem::LOG_DIR).c_str()).filePath("log_trace.txt").toStdString();
 #else
-    return ZString::fullPath(getPath(WORKING_DIR), "log_trace.txt");
+    return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "log_trace.txt");
 #endif
   case EConfigItem::LOG_WARN:
 #ifdef _QT_GUI_USED_
     return QDir(getPath(EConfigItem::WORKING_DIR).c_str()).filePath("log_warn.txt").toStdString();
 #else
-    return ZString::fullPath(getPath(WORKING_DIR), "log_warn.txt");
+    return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "log_warn.txt");
 #endif
   case EConfigItem::LOG_ERROR:
 #ifdef _QT_GUI_USED_
     return QDir(getPath(EConfigItem::WORKING_DIR).c_str()).filePath("log_error.txt").toStdString();
 #else
-    return ZString::fullPath(getPath(WORKING_DIR), "log_error.txt");
+    return ZString::fullPath(getPath(EConfigItem::WORKING_DIR), "log_error.txt");
 #endif
   case EConfigItem::NEUPRINT_AUTH:
     return ZString::fullPath(NeutubeConfig::getInstance().getPath(
@@ -623,7 +623,8 @@ std::string NeutubeConfig::getPath(EConfigItem item) const
     return ZString::fullPath(NeutubeConfig::getInstance().getPath(
           NeutubeConfig::EConfigItem::WORKING_DIR), "flyem_services_auth.json");
   case EConfigItem::CONFIG_DIR:
-    return ZString::fullPath(getApplicatinDir(), _CONFIG_FOLDER_);
+    // return ZString::fullPath(getApplicatinDir(), _CONFIG_FOLDER_);
+    return ZString::fullPath(getApplicatinDir(), "config");
   default:
     break;
   }

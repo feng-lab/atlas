@@ -228,8 +228,8 @@ std::map<uint64_t, ZObject3dScan *> *ZObject3dScan::extractAllObject(
 
   for (std::map<uint64_t, ZObject3dScan*>::iterator iter = bodySet->begin();
        iter != bodySet->end(); ++iter) {
-    ZObject3dScan *obj = iter->second;
-    obj->blockEvent(false);
+    ZObject3dScan *obj2 = iter->second;
+    obj2->blockEvent(false);
   }
 
   return bodySet;

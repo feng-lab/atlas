@@ -19,7 +19,7 @@ uint64_t neutu::FileSize(const std::string &path)
 
 std::string neutu::FileExtension(const std::string &path)
 {
-  std::string ext = boost::filesystem::extension(path);
+  std::string ext = boost::filesystem::path(path).extension().string();
   if (!ext.empty()) {
     if (ext[0] == '.') {
       ext = ext.substr(1);

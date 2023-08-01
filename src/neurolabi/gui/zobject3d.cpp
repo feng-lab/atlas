@@ -179,6 +179,7 @@ bool ZObject3d::load(const char *filePath)
 
 bool ZObject3d::display(QPainter *painter, const DisplayConfig &config) const
 {
+#ifdef _QT_GUI_USED_
   ZSlice3dPainter s3Painter;
   s3Painter.setModelViewTransform(config.getWorldViewTransform());
   s3Painter.setViewCanvasTransform(config.getViewCanvasTransform());
@@ -212,13 +213,16 @@ bool ZObject3d::display(QPainter *painter, const DisplayConfig &config) const
   s3Painter.drawPoints(painter, points);
 
   return s3Painter.getPaintedHint();
+#else
+  return false;
+#endif
 }
 
 #if 0
 void ZObject3d::display(
     ZPainter &painter, int slice, zstackobject::EDisplayStyle option,
     neutu::EAxis sliceAxis) const
-{  
+{
   UNUSED_PARAMETER(option);
 
   if (sliceAxis == neutu::EAxis::ARB) {
@@ -668,9 +672,9 @@ void ZObject3d::drawStack(const std::vector<Stack*> &stackArray,
       int x = obj->voxels[i][0] / rx - origin[0];
       int y = obj->voxels[i][1] / ry - origin[1];
       int z = obj->voxels[i][2] / rz - origin[2];
-      ssize_t offset = Stack_Util_Offset(x, y, z, width, height, depth);
-      if (offset >= 0) {
-        cstack->array[offset] = color[c];
+      ssize_t offset2 = Stack_Util_Offset(x, y, z, width, height, depth);
+      if (offset2 >= 0) {
+        cstack->array[offset2] = color[c];
       }
     }
   }

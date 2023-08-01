@@ -24,6 +24,8 @@ public:
   ZJsonObject(const ZJsonObject &obj);
   ZJsonObject(const ZJsonValue &obj);
 
+  ZJsonObject& operator=(const ZJsonObject& other) = default;
+
   virtual ~ZJsonObject();
 
   json_t* operator[] (const char *key);

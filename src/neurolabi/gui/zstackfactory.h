@@ -123,49 +123,49 @@ ZStack* ZStackFactory::composite(InputIterator begin, InputIterator end)
 
   std::vector<Stack*> stackArray(stackNumber);
   int **offset;
-  int i;
-  MALLOC_2D_ARRAY(offset, stackNumber, 3, int, i);
+  int i1;
+  MALLOC_2D_ARRAY(offset, stackNumber, 3, int, i1);
 
   int corner[3];
 
   bool isPilable = true;
-  i = 0;
+  i1 = 0;
   for (InputIterator iter = begin; iter != end; ++iter) {
     ZStack *stack = *iter;
-    stackArray[i] = stack->c_stack();
-    offset[i][0] = stack->getOffset().getX();
-    offset[i][1] = stack->getOffset().getY();
-    offset[i][2] = stack->getOffset().getZ();
-    if (i > 0) {
-      if (offset[i][0] != offset[i-1][0]) {
+    stackArray[i1] = stack->c_stack();
+    offset[i1][0] = stack->getOffset().getX();
+    offset[i1][1] = stack->getOffset().getY();
+    offset[i1][2] = stack->getOffset().getZ();
+    if (i1 > 0) {
+      if (offset[i1][0] != offset[i1 -1][0]) {
         isPilable = false;
       }
-      if (offset[i][1] != offset[i-1][1]) {
+      if (offset[i1][1] != offset[i1 -1][1]) {
         isPilable = false;
       }
-      if (offset[i][2] != offset[i-1][2] + C_Stack::depth(stackArray[i-1])) {
+      if (offset[i1][2] != offset[i1 -1][2] + C_Stack::depth(stackArray[i1 -1])) {
         isPilable = false;
       }
 
-      if (C_Stack::width(stackArray[i]) != C_Stack::width(stackArray[i-1])) {
+      if (C_Stack::width(stackArray[i1]) != C_Stack::width(stackArray[i1 -1])) {
         isPilable = false;
       }
-      if (C_Stack::height(stackArray[i]) != C_Stack::height(stackArray[i-1])) {
+      if (C_Stack::height(stackArray[i1]) != C_Stack::height(stackArray[i1 -1])) {
         isPilable = false;
       }
     }
 
-    ++i;
+    ++i1;
   }
 
-  for (int i = 0; i < 3; ++i) {
-    corner[i] = offset[0][i];
+  for (int i2 = 0; i2 < 3; ++i2) {
+    corner[i2] = offset[0][i2];
   }
 
-  for (int i = 1; i < stackNumber; ++i) {
+  for (int i2 = 1; i2 < stackNumber; ++i2) {
     for (int j = 0; j < 3; ++j) {
-      if (corner[j] > offset[i][j]) {
-        corner[j] = offset[i][j];
+      if (corner[j] > offset[i2][j]) {
+        corner[j] = offset[i2][j];
       }
     }
   }

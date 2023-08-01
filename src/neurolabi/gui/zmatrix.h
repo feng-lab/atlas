@@ -16,6 +16,7 @@ class ZMatrix
 public:
   ZMatrix();
   ZMatrix(int rowNumber, int columnNumber);
+  ZMatrix(const ZMatrix&) = default;
   virtual ~ZMatrix();
 
   /*!

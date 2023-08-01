@@ -39,7 +39,7 @@ ZStack::ZStack()
 
 ZStack::ZStack(int kind, int width, int height, int depth,
                int nchannel, bool isVirtual)
-{  
+{
   init();
 
   Mc_Stack *stack = NULL;
@@ -436,7 +436,7 @@ void ZStack::deprecate(EComponent component)
   deprecateDependent(component);
 
   switch (component) {
-  case MC_STACK:  
+  case MC_STACK:
     if (m_stack != NULL && m_dealloc != NULL) {
       m_dealloc(m_stack);
     }
@@ -718,10 +718,10 @@ int ZStack::getChannelNumber(const string &filepath)
       reader = Open_Tiff_Reader((char*) filepath.c_str(), NULL, 1);
     }
 
-    Tiff_Type type = TIFF_BYTE;
+    Tiff_Type type0 = TIFF_BYTE;
     int count = 0;
     Tiff_IFD *ifd = Read_Tiff_IFD(reader);
-    uint32_t *val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_NEW_SUB_FILE_TYPE,&type,&count);
+    uint32_t *val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_NEW_SUB_FILE_TYPE,&type0,&count);
     if (val != NULL) {
       while (*val == 1) {
         Free_Tiff_IFD(ifd);
@@ -732,7 +732,7 @@ int ZStack::getChannelNumber(const string &filepath)
           return 0;
         }
         ifd = Read_Tiff_IFD(reader);
-        val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_NEW_SUB_FILE_TYPE,&type,&count);
+        val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_NEW_SUB_FILE_TYPE,&type0,&count);
         if (val == NULL) {
           Free_Tiff_IFD(ifd);
           Free_Tiff_Reader(reader);
@@ -740,7 +740,7 @@ int ZStack::getChannelNumber(const string &filepath)
         }
       }
     } else {  // try TIFF_IMAGE_WIDTH
-      val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_IMAGE_WIDTH,&type,&count);
+      val = (uint32_t*)Get_Tiff_Tag(ifd,TIFF_IMAGE_WIDTH,&type0,&count);
       if (val == NULL) {
         Free_Tiff_IFD(ifd);
         Free_Tiff_Reader(reader);

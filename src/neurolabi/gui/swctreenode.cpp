@@ -1823,7 +1823,7 @@ Swc_Tree_Node* SwcTreeNode::findClosestNode(
   return const_cast<Swc_Tree_Node*>(target);
 }
 
-void SwcTreeNode::dump(const Swc_Tree_Node *tn, ostream &stream)
+void SwcTreeNode::dump(const Swc_Tree_Node *tn, ostream &stream4)
 {
   if (tn != NULL) {
     if (parent(tn) != NULL) {
@@ -1832,7 +1832,7 @@ void SwcTreeNode::dump(const Swc_Tree_Node *tn, ostream &stream)
       }
     }
 
-    stream << id(tn) << " " << type(tn) << " " << x(tn) << " " << y(tn) << " "
+    stream4 << id(tn) << " " << type(tn) << " " << x(tn) << " " << y(tn) << " "
            << z(tn) << " " << radius(tn) << " " << parentId(tn) << std::endl;
   }
 }

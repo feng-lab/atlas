@@ -258,10 +258,10 @@ void ZStackObject::setColor(int red, int green, int blue, int alpha)
 //  m_color.setBlue(blue);
 //  m_color.setAlpha(alpha);
 //#else
-//  UNUSED_PARAMETER(red);
-//  UNUSED_PARAMETER(green);
-//  UNUSED_PARAMETER(blue);
-//  UNUSED_PARAMETER(alpha);
+  UNUSED_PARAMETER(red);
+  UNUSED_PARAMETER(green);
+  UNUSED_PARAMETER(blue);
+  UNUSED_PARAMETER(alpha);
 //#endif
 }
 
@@ -269,7 +269,7 @@ void ZStackObject::setColor(const QColor &n) {
 #if defined(_QT_GUI_USED_)
   m_color = n;
 #else
-  UNUSED_PARAMETER(&n);
+  UNUSED_PARAMETER(n);
 #endif
 }
 
@@ -572,6 +572,7 @@ void ZStackObject::setPrevZ(int z) const
 bool ZStackObject::display(
     QPainter *painter, const DisplayConfig &config) const
 {
+#if defined(_QT_GUI_USED_)
   if (isVisible(config)) {
     neutu::ApplyOnce ao([&]() {painter->save();}, [&]() {painter->restore();});
     painter->setRenderHint(QPainter::Antialiasing, m_usingCosmeticPen);
@@ -581,7 +582,10 @@ bool ZStackObject::display(
     });
     return display_inner(painter, config);
   }
-
+#else
+  UNUSED_PARAMETER(painter);
+  UNUSED_PARAMETER(config);
+#endif
   return false;
 }
 

@@ -2364,6 +2364,7 @@ bool ZObject3dScan::getDefaultCosmetic(EDisplayStyle style) const
 
 bool ZObject3dScan::display(QPainter *painter, const DisplayConfig &config) const
 {
+#if defined(_QT_GUI_USED_)
   if (getSliceAxis() == config.getSliceAxis()) {
     ZSlice2dPainter s2Painter;
 //    s3Painter.setModelViewTransform(config.getWorldViewTransform());
@@ -2487,6 +2488,7 @@ bool ZObject3dScan::display(QPainter *painter, const DisplayConfig &config) cons
     return s2Painter.getPaintedHint();
   }
 
+#endif
   return false;
 }
 
@@ -2766,16 +2768,16 @@ ZObject3dScan ZObject3dScan::interpolateSlice(int z) const
         slice2.translate(c1.getX() - c2.getX(), c1.getY() - c2.getY(), 0);
 
         {
-          int stripeNumber = slice1.getStripeNumber();
-          for (int i = 0; i < stripeNumber; ++i) {
+          int stripeNumber2 = slice1.getStripeNumber();
+          for (int i = 0; i < stripeNumber2; ++i) {
             ZObject3dStripe &stripe = slice1.getStripe(i);
             stripe.setZ(0);
           }
         }
 
         {
-          int stripeNumber = slice2.getStripeNumber();
-          for (int i = 0; i < stripeNumber; ++i) {
+          int stripeNumber2 = slice2.getStripeNumber();
+          for (int i = 0; i < stripeNumber2; ++i) {
             ZObject3dStripe &stripe = slice2.getStripe(i);
             stripe.setZ(0);
           }
@@ -3493,9 +3495,9 @@ ZObject3dScan ZObject3dScan::getPlaneSurface(int z) const
       downStripe.setY(stripe.getY());
       newStripe = stripe - (upStripe - (upStripe - downStripe));
 
-      for (size_t i = 0; i < stripe.getSize(); ++i) {
-        newStripe.addSegment(stripe.getSegmentStart(i), stripe.getSegmentStart(i));
-        newStripe.addSegment(stripe.getSegmentEnd(i), stripe.getSegmentEnd(i));
+      for (size_t i2 = 0; i2 < stripe.getSize(); ++i2) {
+        newStripe.addSegment(stripe.getSegmentStart(i2), stripe.getSegmentStart(i2));
+        newStripe.addSegment(stripe.getSegmentEnd(i2), stripe.getSegmentEnd(i2));
       }
     } else {
       newStripe = stripe;
@@ -4936,7 +4938,7 @@ bool ZObject3dScan::load(const int *data, size_t length)
 }
 
 std::vector<int> ZObject3dScan::toIntArray() const
-{ 
+{
   std::vector<int> array;
   if (!isEmpty()) {
     //Count total size

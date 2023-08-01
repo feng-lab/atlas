@@ -208,7 +208,7 @@ void ZSwcBranch::updateAccumDistance()
 
   Swc_Tree_Node *iter = m_begin;
   iter->weight = 0.0;
-  for (Swc_Tree_Node *iter = m_begin->next; iter != NULL; iter = iter->next) {
+  for (iter = m_begin->next; iter != NULL; iter = iter->next) {
     iter->weight = iter->parent->weight + Swc_Tree_Node_Dist(iter, iter->parent);
   }
 }

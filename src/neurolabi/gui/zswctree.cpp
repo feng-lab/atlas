@@ -969,6 +969,9 @@ bool ZSwcTree::display_inner(QPainter *painter, const DisplayConfig &config) con
 
     return true;
   }
+#else
+  UNUSED_PARAMETER(painter)
+  UNUSED_PARAMETER(config)
 #endif
 
   return false;
@@ -1106,13 +1109,13 @@ int ZSwcTree::updateIterator(int option, Swc_Tree_Node *start,
 
               //Linke an ancenster's sibling that is not blocked
               while ((parent_tn != m_tree->begin) && (parent_tn != NULL)) {
-                Swc_Tree_Node *sibling = parent_tn->next_sibling;
-                while (sibling != NULL) {
-                  if (blocker.count(sibling) == 0) {
-                    tn->next = sibling;
+                Swc_Tree_Node * sibling2 = parent_tn->next_sibling;
+                while (sibling2 != NULL) {
+                  if (blocker.count(sibling2) == 0) {
+                    tn->next = sibling2;
                     break;
                   }
-                  sibling = sibling->next_sibling;
+                  sibling2 = sibling2->next_sibling;
                 }
 
                 if (tn->next == NULL) {
@@ -1167,25 +1170,24 @@ int ZSwcTree::updateIterator(int option, Swc_Tree_Node *start,
       {
         updateIterator(SWC_TREE_ITERATOR_DEPTH_FIRST, start, blocker, _FALSE_);
         Swc_Tree_Node *current_node = NULL;
-        Swc_Tree_Node *tn = NULL;
+        Swc_Tree_Node * tn2 = NULL;
         Swc_Tree_Node *firstLeaf = NULL;
         count = 0;
-        for (tn = const_cast<Swc_Tree_Node*>(begin());
-             tn != NULL; tn = const_cast<Swc_Tree_Node*>(next())) {
-          if (Swc_Tree_Node_Is_Leaf(tn)) {
+        for (tn2 = const_cast<Swc_Tree_Node*>(begin()); tn2 != NULL; tn2 = const_cast<Swc_Tree_Node*>(next())) {
+          if (Swc_Tree_Node_Is_Leaf(tn2)) {
             count++;
             if (current_node == NULL) {
-              current_node = tn;
-              firstLeaf = tn;
+              current_node = tn2;
+              firstLeaf = tn2;
               if (indexing == _TRUE_) {
                 current_node->index = 0;
               }
             } else {
-              current_node->next = tn;
+              current_node->next = tn2;
               if (indexing == _TRUE_) {
-                tn->index = current_node->index + 1;
+                tn2->index = current_node->index + 1;
               }
-              current_node = tn;
+              current_node = tn2;
               current_node->next = NULL;
             }
           }
@@ -1299,7 +1301,7 @@ int ZSwcTree::saveAsLocsegChains(const char *prefix, int startNum)
   //Swc_Tree_Iterator_Start(tree, SWC_TREE_ITERATOR_DEPTH_FIRST, _FALSE_);
   tree->updateIterator(SWC_TREE_ITERATOR_DEPTH_FIRST, _FALSE_);
 
-  for (Swc_Tree_Node *tn = tree->begin(); tn != tree->end(); tn = tree->next()) {
+  for (tn = tree->begin(); tn != tree->end(); tn = tree->next()) {
     tn->node.label = 0;
   }
 
@@ -1574,6 +1576,10 @@ Swc_Tree_Node* ZSwcTree::hitTest(double x, double y, double z, double margin)
 
   return const_cast<Swc_Tree_Node*>(hit);
 #else
+  UNUSED_PARAMETER(x)
+  UNUSED_PARAMETER(y)
+  UNUSED_PARAMETER(z)
+  UNUSED_PARAMETER(margin)
   return NULL;
 #endif
 }
@@ -3018,10 +3024,10 @@ void ZSwcTree::markSoma(double radiusThre, int somaType, int otherType)
   }
   // tree by tree process
   for (size_t i=0; i<treeRoots.size(); ++i) {
-    Swc_Tree_Node *root = treeRoots[i];
+    Swc_Tree_Node * root2 = treeRoots[i];
     double maxRadius = -std::numeric_limits<double>::max();
     Swc_Tree_Node *maxRadiusNode = NULL;
-    updateIterator(SWC_TREE_ITERATOR_BREADTH_FIRST, root, _FALSE_);
+    updateIterator(SWC_TREE_ITERATOR_BREADTH_FIRST, root2, _FALSE_);
     for (Swc_Tree_Node *tn = begin(); tn != NULL; tn = next()) {
       if (SwcTreeNode::radius(tn) > maxRadius) {
         maxRadius = SwcTreeNode::radius(tn);
@@ -3169,7 +3175,7 @@ vector<ZSwcPath> ZSwcTree::getBranchArray()
       default:
         break;
       }
-    }  
+    }
   }
 
   if (!path.empty()) {
@@ -3642,16 +3648,16 @@ double ZSwcTree::computeBackTraceLength()
 void ZSwcTree::labelSubtree(Swc_Tree_Node *tn, int label)
 {
   updateIterator(SWC_TREE_ITERATOR_DEPTH_FIRST, tn, 0);
-  for (Swc_Tree_Node *tn = begin(); tn != NULL; tn = next()) {
-    SwcTreeNode::setLabel(tn, label);
+  for (Swc_Tree_Node * tn2 = begin(); tn2 != NULL; tn2 = next()) {
+    SwcTreeNode::setLabel(tn2, label);
   }
 }
 
 void ZSwcTree::addLabelSubtree(Swc_Tree_Node *tn, int label)
 {
   updateIterator(SWC_TREE_ITERATOR_DEPTH_FIRST, tn, 0);
-  for (Swc_Tree_Node *tn = begin(); tn != NULL; tn = next()) {
-    SwcTreeNode::addLabel(tn, label);
+  for (Swc_Tree_Node * tn2 = begin(); tn2 != NULL; tn2 = next()) {
+    SwcTreeNode::addLabel(tn2, label);
   }
 }
 
@@ -4367,7 +4373,7 @@ bool ZSwcTree::TerminalIterator::hasNext() const
 }
 
 Swc_Tree_Node* ZSwcTree::TerminalIterator::next()
-{ 
+{
   if (hasNext()) {
     m_currentNode = m_nodeArray[m_currentIndex++];
 

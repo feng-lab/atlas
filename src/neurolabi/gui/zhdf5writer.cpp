@@ -30,6 +30,8 @@ bool ZHdf5Writer::open(const std::string &filePath)
     m_file = H5Fcreate(filePath.c_str(), H5F_ACC_EXCL, H5P_DEFAULT,
                        H5P_DEFAULT);
   }
+#else
+  UNUSED_PARAMETER(filePath)
 #endif
 
   return (m_file != NULL_FILE);
@@ -41,6 +43,9 @@ bool ZHdf5Writer::open(const std::string &filePath, unsigned flags)
 
 #if defined(_ENABLE_HDF5_)
   m_file = H5Fopen(filePath.c_str(), flags, H5P_DEFAULT);
+#else
+  UNUSED_PARAMETER(filePath)
+  UNUSED_PARAMETER(flags)
 #endif
 
   return (m_file != NULL_FILE);

@@ -204,9 +204,9 @@ void ZJsonParser::print(const char *key, json_t *object, int indent)
   {
     cout << "{" << endl;
     json_t *value;
-    const char *key;
-    json_object_foreach(object, key, value) {
-      print(key, value, indent + 2);
+    const char *key2;
+    json_object_foreach(object, key2, value) {
+      print(key2, value, indent + 2);
     }
     for (int i = 0; i < indent; ++i) {
       cout << " ";

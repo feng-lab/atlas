@@ -16,6 +16,7 @@ public:
   explicit ZJsonArray(json_t *data, ESetDataOption option);
   explicit ZJsonArray(const json_t *data, ESetDataOption option);
   explicit ZJsonArray(const ZJsonValue &v);
+  ZJsonArray(const ZJsonArray& other) = default;
   virtual ~ZJsonArray();
 
 public:
