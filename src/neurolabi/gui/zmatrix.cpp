@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <string>
 #include <stdexcept>
+#include <cstring>
 
 #if defined(_QT_GUI_USED_)
 #include <QDebug>
