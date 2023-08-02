@@ -9,28 +9,28 @@ class ZQImage {};
 class ZQPainter{};
 #define QPainter ZQPainter
 
-class ZQPoint {
-public:
-  ZQPoint() {}
-  ZQPoint(int, int) {}
-};
-#define QPoint ZQPoint
-
-class ZQPointF {
-public:
-  ZQPointF() {}
-  ZQPointF(double, double) {}
-};
-#define QPointF ZQPointF
+//class ZQPoint {
+//public:
+//  ZQPoint() {}
+//  ZQPoint(int, int) {}
+//};
+//#define QPoint ZQPoint
+//
+//class ZQPointF {
+//public:
+//  ZQPointF() {}
+//  ZQPointF(double, double) {}
+//};
+//#define QPointF ZQPointF
 
 class ZQPaintDevice{};
 #define QPaintDevice ZQPaintDevice
 
-class ZQRectF{};
-#define QRectF ZQRectF
-
-class ZQRect{};
-#define QRect ZQRect
+//class ZQRectF{};
+//#define QRectF ZQRectF
+//
+//class ZQRect{};
+//#define QRect ZQRect
 
 #else
 #include <QObject>

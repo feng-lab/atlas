@@ -45,6 +45,8 @@
 #include "swc/zswcresampler.h"
 #include "swc/zswcconnector.h"
 
+#include "zlog.h"
+
 
 ZNeuronTraceSeeder::ZNeuronTraceSeeder()
 {
@@ -1190,6 +1192,9 @@ std::vector<Locseg_Chain*> ZNeuronTracer::recover(const Stack *stack)
 
       ZNeuronTraceSeeder seeder;
       prepareTraceScoreThreshold(TRACING_SEED);
+      if (seedPointArray == NULL) {
+        return chainArray;
+      }
       m_baseMask = seeder.sortSeed(seedPointArray, stack, m_traceWorkspace);
 
       /* <seedPointArray> freed */
@@ -1833,6 +1838,9 @@ ZSwcTree* ZNeuronTracer::trace(Stack *stack, bool doResampleAfterTracing)
   log("Sorting seeds ...");
   ZNeuronTraceSeeder seeder;
   prepareTraceScoreThreshold(TRACING_SEED);
+  if (seedPointArray == NULL) {
+    return tree;
+  }
   m_baseMask = seeder.sortSeed(seedPointArray, stack, m_traceWorkspace);
 
   m_diag.save(m_baseMask, "base_mask");

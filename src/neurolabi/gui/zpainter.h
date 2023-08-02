@@ -216,7 +216,9 @@ private:
 #endif
 
   int m_z = 0;
+#ifdef _QT_GUI_USED_
   QRectF m_canvasRange;
+#endif
   bool m_isPainted = false;
 
   ZStTransform m_transform; //world coordinates to canvas coordinates
