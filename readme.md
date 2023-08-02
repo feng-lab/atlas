@@ -62,7 +62,7 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     ```
 * install vulkan sdk: https://vulkan.lunarg.com/home/welcome
 * install golang: https://golang.org, add to path
-* install perl: https://www.activestate.com/products/perl/downloads/, add to path
+* install perl: https://strawberryperl.com/, add to path
 
 ### Linux:
 * install some required packages

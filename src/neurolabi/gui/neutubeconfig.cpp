@@ -233,10 +233,12 @@ std::string NeutubeConfig::getUserName() const
 //  return m_userName;
 }
 
+#ifndef _MSC_VER
 std::string NeutubeConfig::GetUserName()
 {
   return getInstance().getUserName();
 }
+#endif
 
 neutu::UserInfo NeutubeConfig::getUserInfo() const
 {

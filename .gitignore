@@ -48,6 +48,7 @@ test_build.sh
 /src/3rdparty/libwebp*
 /src/3rdparty/ospray*
 /src/3rdparty/jansson*
+/src/3rdparty/pcre*
 
 !/src/neurolabi/lib/Mingw/*.zip
 

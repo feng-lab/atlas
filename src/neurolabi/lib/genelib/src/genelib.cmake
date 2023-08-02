@@ -1,6 +1,6 @@
 if (MSVC)
-  SET (AWK ${CMAKE_CURRENT_LIST_DIR}/../../msvc/awk.exe)
-  message(${AWK})
+  SET (AWK ${CMAKE_CURRENT_LIST_DIR}/../../../../../util/awk.exe)
+  message(STATUS ${AWK})
 else (MSVC)
 FIND_PROGRAM (AWK NAMES awk gawk PATH /usr/bin /bin /local/bin /usr/local/bin)
 MARK_AS_ADVANCED(FORCE AWK)

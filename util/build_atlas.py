@@ -76,6 +76,7 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
                                          intel_sw_dir(),
                                          r'C:\Program Files (x86)\Windows Kits',
                                          os.path.join(atlas_repository_dir(), 'test'),
+                                         r'C:\Strawberry\perl\bin',
                                          ])
         env['PATH'] = f'{env["PATH"]};{tbb_redist_dir()};{qt_bin_dir()};{freeimage_redist_dir()}'
         print(env['PATH'])

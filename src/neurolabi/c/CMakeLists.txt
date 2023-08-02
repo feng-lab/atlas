@@ -97,14 +97,14 @@ check_include_files(regex.h HAVE_REGEX_H)
 check_include_files(dirent.h HAVE_DIRENT_H)
 
 # use pcreposix if can not find regex.h
-if (NOT HAVE_REGEX_H)
+if (WIN32)
   set(PCRE2_USE_STATIC_LIBS ON)
-  find_package(PCRE REQUIRED
-               COMPONENTS 8BIT
+  find_package(PCRE2 REQUIRED
+               COMPONENTS POSIX 8BIT
                PATHS ${CMAKE_CURRENT_LIST_DIR}/../../3rdparty/build NO_DEFAULT_PATH)
-  print_target_properties(PCRE2::8BIT)
-  set(EXT_LIBS ${EXT_LIBS} PCRE2::8BIT)
-endif (NOT HAVE_REGEX_H)
+  print_target_properties(PCRE2::POSIX)
+  set(EXT_LIBS ${EXT_LIBS} PCRE2::POSIX)
+endif (WIN32)
 
 check_function_exists(bzero HAVE_BZERO)
 check_function_exists(floor HAVE_FLOOR)
@@ -218,7 +218,7 @@ if (WIN32)
                              _HAS_DEPRECATED_RESULT_OF
                              PCRE2_STATIC LIBXML_STATIC)
   target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${LIBRARY_NAME} PUBLIC /W4)
+  target_compile_options(${LIBRARY_NAME} PUBLIC /W4 /TP)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Waddress -Wdeprecated)

@@ -45,6 +45,10 @@
 #include "swc/zswcresampler.h"
 #include "swc/zswcconnector.h"
 
+#ifdef _MSC_VER
+#include <direct.h>
+#endif
+
 
 ZNeuronTraceSeeder::ZNeuronTraceSeeder()
 {
