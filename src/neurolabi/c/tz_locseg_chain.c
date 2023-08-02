@@ -65,9 +65,9 @@ Locseg_Chain* Copy_Locseg_Chain(Locseg_Chain *chain)
 #else
   Locseg_Chain *chain_copy = New_Locseg_Chain(chain);
 #endif
-  
+
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
-  
+
   Locseg_Node *node = NULL;
 
   while ((node = Locseg_Chain_Next(chain)) != NULL) {
@@ -107,7 +107,7 @@ double Locseg_Chain_Geolen(Locseg_Chain *chain)
   if (chain == NULL) {
     return 0.0;
   }
-  
+
   if (chain->list == NULL) {
     return 0.0;
   }
@@ -115,9 +115,9 @@ double Locseg_Chain_Geolen(Locseg_Chain *chain)
   /* alloc <ka> */
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
   double prev_pos[3], pos[3];
-  
+
   double dist = 0.0;
-  Local_Neuroseg *locseg = NULL;  
+  Local_Neuroseg *locseg = NULL;
   Locseg_Chain_Iterator_Start(ka->chain, DL_HEAD);
 
   int knot_index = 0;
@@ -132,7 +132,7 @@ double Locseg_Chain_Geolen(Locseg_Chain *chain)
        if (knot->id == index) {
 	 /* Set pos to the current knot */
 	 Local_Neuroseg_Axis_Coord_N(locseg, knot->offset, pos);
-	 /* if it is not the first knot */ 
+	 /* if it is not the first knot */
 	 if (knot_index > 1) {
 	   /* Accumulate distance */
 	   dist += Geo3d_Dist(pos[0], pos[1], pos[2], prev_pos[0],
@@ -148,7 +148,7 @@ double Locseg_Chain_Geolen(Locseg_Chain *chain)
 	 knot_index++;
        } else {
 	 break;
-       } 
+       }
      }
      index++;
   }
@@ -168,9 +168,9 @@ double Locseg_Chain_Geolen_Z(Locseg_Chain *chain, double z_scale)
 
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
   double prev_pos[3], pos[3];
-  
+
   double dist = 0.0;
-  Local_Neuroseg *locseg = NULL;  
+  Local_Neuroseg *locseg = NULL;
   Locseg_Chain_Iterator_Start(ka->chain, DL_HEAD);
 
   int knot_index = 0;
@@ -187,7 +187,7 @@ double Locseg_Chain_Geolen_Z(Locseg_Chain *chain, double z_scale)
 	 Local_Neuroseg_Axis_Coord_N(locseg, knot->offset, pos);
 	 pos[2] /= z_scale;
 
-	 /* if it is not the first knot */ 
+	 /* if it is not the first knot */
 	 if (knot_index > 1) {
 	   /* Accumulate distance */
 	   dist += Geo3d_Dist(pos[0], pos[1], pos[2], prev_pos[0],
@@ -203,7 +203,7 @@ double Locseg_Chain_Geolen_Z(Locseg_Chain *chain, double z_scale)
 	 knot_index++;
        } else {
 	 break;
-       } 
+       }
      }
      index++;
   }
@@ -211,8 +211,8 @@ double Locseg_Chain_Geolen_Z(Locseg_Chain *chain, double z_scale)
   return dist;
 }
 
-Trace_Workspace* 
-Locseg_Chain_Default_Trace_Workspace(Trace_Workspace *tw, 
+Trace_Workspace*
+Locseg_Chain_Default_Trace_Workspace(Trace_Workspace *tw,
 				     const Stack *stack)
 {
   if (tw == NULL) {
@@ -250,8 +250,8 @@ Locseg_Chain_Default_Trace_Workspace(Trace_Workspace *tw,
   return tw;
 }
 
-Locseg_Chain* Locseg_Chain_Trace_Init(const Stack *stack, double z_scale, 
-				      Local_Neuroseg *locseg, 
+Locseg_Chain* Locseg_Chain_Trace_Init(const Stack *stack, double z_scale,
+				      Local_Neuroseg *locseg,
 				      void *ws)
 {
   Locseg_Fit_Workspace *fws = (Locseg_Fit_Workspace*) ws;
@@ -269,10 +269,10 @@ Locseg_Chain* Locseg_Chain_Trace_Init(const Stack *stack, double z_scale,
 
   Trace_Record *tr = New_Trace_Record();
   tr->mask = ZERO_BIT_MASK;
-  
+
   Locseg_Node *p = Make_Locseg_Node(locseg, tr);
   Locseg_Chain *chain = Make_Locseg_Chain(p);
-  
+
   return chain;
 }
 
@@ -305,19 +305,19 @@ int Locseg_Chain_Trace_Test(void *argv[])
     }
 
     if (tw->resolution[0] > 0.0) {
-      segr1 = 
-        sqrt(Neuroseg_Rx_P(&(locseg->seg), tw->resolution, NEUROSEG_BOTTOM) * 
+      segr1 =
+        sqrt(Neuroseg_Rx_P(&(locseg->seg), tw->resolution, NEUROSEG_BOTTOM) *
             Neuroseg_Ry_P(&(locseg->seg), tw->resolution, NEUROSEG_BOTTOM));
-      segr2 = 
-        sqrt(Neuroseg_Rx_P(&(locseg->seg), tw->resolution, NEUROSEG_TOP) * 
+      segr2 =
+        sqrt(Neuroseg_Rx_P(&(locseg->seg), tw->resolution, NEUROSEG_TOP) *
             Neuroseg_Ry_P(&(locseg->seg), tw->resolution, NEUROSEG_TOP));
     } else {
-      segr1 = 
-        sqrt(Neuroseg_Rx(&(locseg->seg), NEUROSEG_BOTTOM) * 
+      segr1 =
+        sqrt(Neuroseg_Rx(&(locseg->seg), NEUROSEG_BOTTOM) *
             Neuroseg_Ry(&(locseg->seg), NEUROSEG_BOTTOM));
-      segr2 = 
-        sqrt(Neuroseg_Rx(&(locseg->seg), NEUROSEG_TOP) * 
-            Neuroseg_Ry(&(locseg->seg), NEUROSEG_TOP));      
+      segr2 =
+        sqrt(Neuroseg_Rx(&(locseg->seg), NEUROSEG_TOP) *
+            Neuroseg_Ry(&(locseg->seg), NEUROSEG_TOP));
     }
     //NEUROSEG_RC(&(locseg->seg)) * sqrt(locseg->seg.scale);
     //dmin2(locseg->seg.r1, locseg->seg.r2) * sqrt(locseg->seg.scale);
@@ -337,9 +337,9 @@ int Locseg_Chain_Trace_Test(void *argv[])
       Stack_Fit_Score fs;
       fs.n = 1;
       fs.options[0] = tw->tscore_option;
-      double sup_score = Local_Neuroseg_Score(locseg, tw->sup_stack, z_scale, 
+      double sup_score = Local_Neuroseg_Score(locseg, tw->sup_stack, z_scale,
           &fs);
-      if (Local_Neuroseg_Good_Score(locseg, sup_score, tw->min_score) 
+      if (Local_Neuroseg_Good_Score(locseg, sup_score, tw->min_score)
           == _FALSE_) {
         printf("low sup score: %g\n", sup_score);
         return TRACE_LOW_SCORE;
@@ -371,7 +371,7 @@ int Locseg_Chain_Trace_Test(void *argv[])
       printf("irregular tube 1\n");
       return TRACE_INVALID_SHAPE;
     } else if (NEUROSEG_RA(&(locseg->seg)) > 2.5) {
-      if (NEUROSEG_RB(&(locseg->seg)) / 
+      if (NEUROSEG_RB(&(locseg->seg)) /
           NEUROSEG_RA(&(locseg->seg)) > 3.0) {
         printf("irregular tube 2\n");
         return TRACE_INVALID_SHAPE;
@@ -380,7 +380,7 @@ int Locseg_Chain_Trace_Test(void *argv[])
   }
 
   if ((chain != NULL) && (pos[0] >= 0.0)) {
-    if ((Locseg_Chain_Hit_Test(chain, DL_BACKWARD, 
+    if ((Locseg_Chain_Hit_Test(chain, DL_BACKWARD,
             pos[0], pos[1], pos[2]) > 0) ||
         (Locseg_Chain_Form_Loop(chain, locseg, trace_direction) == _TRUE_)) {
       printf("Loop formed\n");
@@ -399,7 +399,7 @@ int Locseg_Chain_Trace_Test(void *argv[])
     }
 
     double intensity1 = Local_Neuroseg_Average_Signal(locseg, stack, z_scale);
-    double intensity2 = Local_Neuroseg_Average_Signal(prev_locseg, stack, 
+    double intensity2 = Local_Neuroseg_Average_Signal(prev_locseg, stack,
         z_scale);
     if (intensity1 / intensity2 < 0.5) {
       return TRACE_SIGNAL_CHANGE;
@@ -436,36 +436,36 @@ int Locseg_Chain_Trace_Test(void *argv[])
     }
 #endif
 
-    int hit_label = Trace_Workspace_Mask_Value(tw, ipos); 
+    int hit_label = Trace_Workspace_Mask_Value(tw, ipos);
     if(hit_label > 0) {
       tr->hit_region = hit_label;
       printf("hit marked region\n");
       return TRACE_HIT_MARK;
-    }    
+    }
 
 #if 0
     if (tw->trace_mask != NULL) {
       int hit_label = 0;
       if (ipos[0] >= 0) {
         hit_label = Get_Stack_Pixel(tw->trace_mask, (int) round(ipos[0]),
-            (int) round(ipos[1]), 
+            (int) round(ipos[1]),
             (int) round(ipos[2]), 0);
       }
 
-      /*      
+      /*
               if (hit_label == 0) {
               double center[3];
               Local_Neuroseg_Center(locseg, center);
               hit_label = Get_Stack_Pixel(tw->trace_mask, (int) round(center[0]),
-              (int) round(center[1]), 
+              (int) round(center[1]),
               (int) round(center[2] * z_scale), 0);
               }
-              */     
+              */
       if(hit_label > 0) {
         tr->hit_region = hit_label;
         printf("hit marked region\n");
         return TRACE_HIT_MARK;
-      }    
+      }
     }
 #endif
   }
@@ -489,7 +489,7 @@ int Locseg_Chain_Trace_Test(void *argv[])
 #define LOCSEG_CHAIN_END_FIT(locseg, list_end)				\
   if (list_end == DL_HEAD) {						\
     Flip_Local_Neuroseg(locseg);					\
-  }  
+  }
 
 
 #define LOCSEG_CHAIN_FIT(locseg)					\
@@ -746,12 +746,12 @@ int Locseg_Chain_Trace_Test(void *argv[])
       current_locseg = NULL;						\
       tw->trace_status[end_index] = cur_end_status;			\
     }									\
-  }						   
+  }
 
-void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain, 
+void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
 		 Trace_Workspace *tw)
 {
-  if ((stack == NULL) || (chain == NULL) || (chain->list == NULL) || 
+  if ((stack == NULL) || (chain == NULL) || (chain->list == NULL) ||
       (tw == NULL)) {
     TZ_WARN(ERROR_POINTER_NULL);
     return;
@@ -775,7 +775,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   /* Initialize variable set for normal fitting */
 #if 0
   int var_index[LOCAL_NEUROSEG_NPARAM];
-  int nvar = 
+  int nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 				     //NEUROSEG_VAR_MASK_HEIGHT |
 				     NEUROSEG_VAR_MASK_ORIENTATION |
@@ -791,32 +791,32 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
 						NEUROSEG_VAR_MASK_HEIGHT, //|
 						//NEUROSEG_VAR_MASK_ORIENTATION |
 						//NEUROSEG_VAR_MASK_SCALE,
-						NEUROSEG_VAR_MASK_NONE, 
+						NEUROSEG_VAR_MASK_NONE,
 						var_index_h);
   */
 
-  fit_ws_h->nvar = 
-    Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_HEIGHT, 
-				     NEUROSEG_VAR_MASK_NONE, 
+  fit_ws_h->nvar =
+    Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_HEIGHT,
+				     NEUROSEG_VAR_MASK_NONE,
 				     fit_ws_h->var_index);
 
   /*
   int var_index_o[LOCAL_NEUROSEG_PLANE_NPARAM];
   int nvar_o = Local_Neuroseg_Var_Mask_To_Index(
 						NEUROSEG_VAR_MASK_ORIENTATION,
-						NEUROSEG_VAR_MASK_NONE, 
+						NEUROSEG_VAR_MASK_NONE,
 						var_index_o);
   */
   /*
 #ifdef _CONE_SEG_
   int *var_link = NULL;
-#else             
+#else
   int var_link[LOCAL_NEUROSEG_NPARAM];
   int k;
   for (k = 0; k < LOCAL_NEUROSEG_NPARAM; k++) {
     var_link[k] = 0;
   }
-  Variable_Set_Add_Link(var_link, 0, 1);  
+  Variable_Set_Add_Link(var_link, 0, 1);
 #endif
   */
   //Local_Neuroseg *locseg = chain->list->data->locseg;
@@ -829,7 +829,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   tr.fs.n = 2;
   tr.fs.options[0] = 0;
   tr.fs.options[1] = tw->tscore_option;
-  
+
   fit_ws->sws->fs.options[fit_ws->sws->fs.n++] = tw->tscore_option;
   if (fit_ws->sws != fit_ws_h->sws) {
     fit_ws_h->sws->fs.options[fit_ws_h->sws->fs.n++] = tw->tscore_option;
@@ -853,7 +853,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
 
   /* Score threshold for height fit. When the fitting score is lower than the
    * threshold, the segment will adjust its height. */
-  double fit_height_threshold = tw->dyvar[2]; 
+  double fit_height_threshold = tw->dyvar[2];
 
   Locseg_Node *current_ends[2]; /* two ends: 0 head 1 tail*/
   current_ends[0] = Locseg_Chain_Head(chain);
@@ -862,7 +862,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   Local_Neuroseg *forward_locseg = NULL;
   Local_Neuroseg *backward_locseg = NULL;
 
-  if ((tw->trace_status[1] == TRACE_NORMAL) || 
+  if ((tw->trace_status[1] == TRACE_NORMAL) ||
       (tw->trace_status[1] == TRACE_REFIT)) { /* tail, go forward */
     forward_locseg = current_ends[1]->locseg;
   }
@@ -887,7 +887,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
       trace_direction = DL_FORWARD;
       tw->trace_status[1] = tw->test_func(argv);
     }
-    
+
     if (tw->trace_status[0] == TRACE_NORMAL) {
       print_trace_message("Fit the backward seed segment.\n");
       Flip_Local_Neuroseg(backward_locseg);
@@ -903,14 +903,14 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
 
   argv[1] = chain;
   Neuroseg_Fit_Score ort_fs;
-  ort_fs.n = 1;		
+  ort_fs.n = 1;
   ort_fs.options[0] = STACK_FIT_CORRCOEF;
 
   double default_step = tw->trace_step;
   double step[2];
   step[0] = default_step;
   step[1] = default_step;
-  
+
   int hit_count[2];
   hit_count[0] = 0;
   hit_count[1] = 0;
@@ -921,7 +921,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   int chain_length = Locseg_Chain_Length(chain);
   if (chain_length > 1) {
     double pos[3];
-    if ((tw->trace_status[0] == TRACE_NORMAL) || 
+    if ((tw->trace_status[0] == TRACE_NORMAL) ||
         (tw->trace_status[0] == TRACE_REFIT)) {
       Local_Neuroseg_Bottom(backward_locseg, pos);
       if (Trace_Workspace_Point_In_Bound_Z(tw, pos, z_scale)
@@ -932,7 +932,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
       }
     }
 
-    if ((tw->trace_status[1] == TRACE_NORMAL) || 
+    if ((tw->trace_status[1] == TRACE_NORMAL) ||
         (tw->trace_status[1] == TRACE_REFIT)) {
       Local_Neuroseg_Top(forward_locseg, pos);
       if (Trace_Workspace_Point_In_Bound_Z(tw, pos, z_scale)
@@ -942,7 +942,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
         tw->trace_status[1] = TRACE_HIT_MARK;
       }
     }
-    
+
     /*
     argv[0] = backward_locseg;
     int status = tw->test_func(argv);
@@ -970,7 +970,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
 #define TRACING_FORWARD_POSSIBLE \
   ((tw->trace_status[1] == TRACE_NORMAL) || (tw->trace_status[1] == TRACE_REFIT))
 
-  while ((i < tw->length) && 
+  while ((i < tw->length) &&
       (TRACING_BACKWARD_POSSIBLE || TRACING_FORWARD_POSSIBLE)) {
     //printf("segment %d\n", i);
 
@@ -1000,7 +1000,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   if (tw->tune_end == _TRUE_) {
     if (Locseg_Chain_Length(chain) >= 2) {
       Local_Neuroseg *locseg = NULL;
-      if ((tw->trace_status[0] != TRACE_HIT_MARK) && 
+      if ((tw->trace_status[0] != TRACE_HIT_MARK) &&
           (tw->trace_status[0] != TRACE_NOT_ASSIGNED)) {
         locseg = Locseg_Chain_Head_Seg(chain);
         Flip_Local_Neuroseg(locseg);
@@ -1009,7 +1009,7 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
         Flip_Local_Neuroseg(locseg);
       }
 
-      if ((tw->trace_status[1] != TRACE_HIT_MARK) && 
+      if ((tw->trace_status[1] != TRACE_HIT_MARK) &&
           (tw->trace_status[1] != TRACE_NOT_ASSIGNED)) {
         locseg = Locseg_Chain_Tail_Seg(chain);
         //Local_Neuroseg_Height_Search_P(locseg, stack, z_scale);
@@ -1032,10 +1032,10 @@ void Trace_Locseg(const Stack *stack, double z_scale, Locseg_Chain *chain,
   }
 }
 
-void Locseg_Chain_Trace_Np(const Stack *stack, double z_scale, 
+void Locseg_Chain_Trace_Np(const Stack *stack, double z_scale,
 			   Locseg_Chain *chain, Trace_Workspace *tw)
 {
-  Local_Neuroseg *locseg = NULL; 
+  Local_Neuroseg *locseg = NULL;
   double hr = 0.0;
   switch (tw->trace_direction) {
   case DL_FORWARD:
@@ -1057,11 +1057,11 @@ void Locseg_Chain_Trace_Np(const Stack *stack, double z_scale,
     TZ_ERROR(ERROR_DATA_VALUE);
   }
 
-  Local_Neuroseg_Plane *locnp = 
+  Local_Neuroseg_Plane *locnp =
     Local_Neuroseg_To_Plane(locseg, locseg->seg.h * hr, NULL);
 
 
-  Locnp_Chain *locnp_chain = 
+  Locnp_Chain *locnp_chain =
     Locnp_Chain_Trace_Init(stack, z_scale, locnp, NULL);
 
   Trace_Locnp(stack, 1.0, locnp_chain, tw);
@@ -1070,7 +1070,7 @@ void Locseg_Chain_Trace_Np(const Stack *stack, double z_scale,
   if (tw->trace_direction == DL_BACKWARD) {
     end = DL_HEAD;
   }
-   
+
   Print_Locnp_Chain(locnp_chain);
   if (end == DL_HEAD) {
     if (tw->trace_status[0] == TRACE_HIT_MARK) {
@@ -1088,7 +1088,7 @@ void Locseg_Chain_Trace_Np(const Stack *stack, double z_scale,
 }
 
 /*
-static double 
+static double
 locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
 			      Local_Neuroseg *head,
 			      Local_Neuroseg *tail)
@@ -1101,7 +1101,7 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
   double target[3];
   double dist;
   double min_dist;
-  
+
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
   Local_Neuroseg *locseg2 = New_Local_Neuroseg();
 
@@ -1110,9 +1110,9 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
   Local_Neuroseg_Scale_Z(locseg2, z_scale);
 
   Local_Neuroseg_Center(locseg2, target);
-  min_dist = dmin2(Geo3d_Dist(source1[0], source1[1], source1[2], 
+  min_dist = dmin2(Geo3d_Dist(source1[0], source1[1], source1[2],
 			      target[0], target[1], target[2]),
-		   Geo3d_Dist(source2[0], source2[1], source2[2], 
+		   Geo3d_Dist(source2[0], source2[1], source2[2],
 			      target[0], target[1], target[2]));
 
   Local_Neuroseg *locseg = NULL;
@@ -1121,9 +1121,9 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
     Local_Neuroseg_Scale_Z(locseg2, z_scale);
 
     Local_Neuroseg_Center(locseg2, target);
-    dist = dmin2(Geo3d_Dist(source1[0], source1[1], source1[2], 
+    dist = dmin2(Geo3d_Dist(source1[0], source1[1], source1[2],
 			    target[0], target[1], target[2]),
-		 Geo3d_Dist(source2[0], source2[1], source2[2], 
+		 Geo3d_Dist(source2[0], source2[1], source2[2],
 			    target[0], target[1], target[2]));
 
     if (dist < min_dist) {
@@ -1137,7 +1137,7 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
 }
 */
 
-static double 
+static double
 locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
 			      Local_Neuroseg *testseg)
 {
@@ -1147,7 +1147,7 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
   double target[3];
   double dist;
   double min_dist;
-  
+
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
   Local_Neuroseg *locseg2 = New_Local_Neuroseg();
 
@@ -1156,7 +1156,7 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
   Local_Neuroseg_Scale_Z(locseg2, z_scale);
 
   Local_Neuroseg_Center(locseg2, target);
-  min_dist = Geo3d_Dist(source[0], source[1], source[2], 
+  min_dist = Geo3d_Dist(source[0], source[1], source[2],
 			target[0], target[1], target[2]);
 
   Local_Neuroseg *locseg = NULL;
@@ -1165,7 +1165,7 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
     Local_Neuroseg_Scale_Z(locseg2, z_scale);
 
     Local_Neuroseg_Center(locseg2, target);
-    dist = Geo3d_Dist(source[0], source[1], source[2], 
+    dist = Geo3d_Dist(source[0], source[1], source[2],
 		      target[0], target[1], target[2]);
 
     if (dist < min_dist) {
@@ -1179,8 +1179,8 @@ locseg_chain_dist_upper_bound(Locseg_Chain *chain, double z_scale,
 }
 
 _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
-				  const Stack *stack, double z_scale, 
-				  Neurocomp_Conn *conn, 
+				  const Stack *stack, double z_scale,
+				  Neurocomp_Conn *conn,
 				  Connection_Test_Workspace *ctw)
 {
   TZ_ASSERT(ctw != NULL, "Null workspace");
@@ -1196,7 +1196,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
   darraycpy(res, ctw->resolution, 0, 3);
 
   double xz_ratio = 1.0;
-  
+
   if (res[0] != res[2]) {
     xz_ratio = res[0] / res[2];
   }
@@ -1221,7 +1221,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 
   Local_Neuroseg_Scale_Z(head, xz_ratio);
   Local_Neuroseg_Scale_Z(tail, xz_ratio);
-  
+
   /* get upper bound */
   int index = 0;
 
@@ -1237,7 +1237,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
   if (ctw->hook_spot == 1) {
     mindist = locseg_chain_dist_upper_bound(chain2, xz_ratio, tail);
   }
-  
+
   if (ctw->hook_spot == -1) {
     mindist = dmin2(locseg_chain_dist_upper_bound(chain2, xz_ratio, head),
 		    locseg_chain_dist_upper_bound(chain2, xz_ratio, tail));
@@ -1256,17 +1256,17 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
   /* Calculate the distance from the hook end(s) to the loop chain surface. */
   while ((locseg = Locseg_Chain_Next_Seg(chain2)) != NULL) {
     Local_Neuroseg_Copy(locseg2, locseg);
-    Local_Neuroseg_Scale_Z(locseg2, xz_ratio);    
+    Local_Neuroseg_Scale_Z(locseg2, xz_ratio);
     Local_Neuroseg_Ball_Bound(locseg2, &(range1));
 
     /* if the head is required to be tested */
     if ((ctw->hook_spot == 0) || (ctw->hook_spot == -1)){
       Local_Neuroseg_Ball_Bound(head, &(range2));
-      /* Ignore it if the minimal possible distance is not less than 
+      /* Ignore it if the minimal possible distance is not less than
        * the current minial distnace */
-      if (Geo3d_Dist(range1.center[0], range1.center[1], range1.center[2], 
+      if (Geo3d_Dist(range1.center[0], range1.center[1], range1.center[2],
 		     range2.center[0], range2.center[1], range2.center[2])
-	  - range1.r - range2.r < mindist) {	
+	  - range1.r - range2.r < mindist) {
 	double dist = Local_Neuroseg_Dist2(head, locseg2, tmp_pos);
 	_BOOL_ update = _FALSE_;
 	if (dist < mindist) {
@@ -1275,7 +1275,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	  update = _TRUE_;
 	} else if (dist == mindist) {
 	  double pdist = Local_Neuroseg_Planar_Dist_L(head, locseg2);
-	  if (conn->pdist > pdist) {	    
+	  if (conn->pdist > pdist) {
 	    conn->pdist = pdist;
 	    update = _TRUE_;
 	  }
@@ -1296,9 +1296,9 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
     /* if the tail is required to be tested */
     if ((ctw->hook_spot == 1) || (ctw->hook_spot == -1)){
       Local_Neuroseg_Ball_Bound(tail, &(range2));
-      /* Ignore it if the minimal possible distance is not less than 
-       * the current minial distnace */      
-      if (Geo3d_Dist(range1.center[0], range1.center[1], range1.center[2], 
+      /* Ignore it if the minimal possible distance is not less than
+       * the current minial distnace */
+      if (Geo3d_Dist(range1.center[0], range1.center[1], range1.center[2],
 		     range2.center[0], range2.center[1], range2.center[2])
 	  - range1.r - range2.r < mindist) {
 	double dist = Local_Neuroseg_Dist2(tail, locseg2, tmp_pos);
@@ -1337,9 +1337,9 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
   conn->pos[2] *= xz_ratio;
 
   /* free <head> */
-  Delete_Local_Neuroseg(head);  
+  Delete_Local_Neuroseg(head);
   /* free <tail> */
-  Delete_Local_Neuroseg(tail);  
+  Delete_Local_Neuroseg(tail);
 
   /*
   double dist_thre = 20.0;
@@ -1380,7 +1380,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
     Geo3d_Orientation_Normal(locseg1->seg.theta, locseg1->seg.psi,
 			     conn->ort, conn->ort + 1, conn->ort + 2);
 
-    /*    
+    /*
     if ((conn->sdist > 5.0) && (conn->pos != NULL)) {
       double test_vec[3];
       if (conn->info[0] == 0) {
@@ -1390,30 +1390,30 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
       } else {
 	test_vec[0] = conn->pos[0] - test_pos[0];
 	test_vec[1] = conn->pos[1] - test_pos[1];
-	test_vec[2] = conn->pos[2] - test_pos[2];	
+	test_vec[2] = conn->pos[2] - test_pos[2];
       }
       if (Geo3d_Dot_Product(test_vec[0], test_vec[1], test_vec[2],
 			    conn->ort[0], conn->ort[1], conn->ort[2]) < 0.0) {
 	conn->mode = NEUROCOMP_CONN_NONE;
 	conn->cost = 10.0;
-	return _FALSE_;	
+	return _FALSE_;
       }
     }
         */
 
     //locseg2 = Locseg_Chain_Peek_Seg_At(chain2, conn->info[1]);
-    
+
     //int n;
     //double *feat = Locseg_Conn_Feature(locseg1, locseg2, NULL, res, NULL, &n);
 
     /*
-    conn->cost = 
+    conn->cost =
       1.0 / (1.0 + exp(0.546599 * feat[0] + -1.45673 * feat[7] +
 		       6.48994 * fabs((feat[4] - feat[5])/(feat[4] + feat[5])) +
-		       0.433958 * fabs(feat[6])));     
+		       0.433958 * fabs(feat[6])));
     */
     /*
-    conn->cost = 
+    conn->cost =
       1.0 / (1.0 + exp(0.592935 * feat[0] + -1.27852 * feat[7] +
 		       0.766847 * fabs(feat[6])));
     */
@@ -1450,7 +1450,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	  hit_index = 0;
 	  for (k = 0; k < path->length; k++) {
 	    if (hit_index < 3) {
-	      Stack_Util_Coord(path->array[k], stack->width, 
+	      Stack_Util_Coord(path->array[k], stack->width,
 			       stack->height, coord, coord + 1,
 			       coord + 2);
 	      if (conn->info[0] == 0) {
@@ -1461,17 +1461,17 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 						  coord[0], coord[1], coord[2]);
 	      }
 	    }
-	    
+
 	    _BOOL_ count = _TRUE_;
 	    if (ctw->mask != NULL) {
 	      if (Stack_Array_Value(ctw->mask, path->array[k]) < 0.5) {
 		count = _FALSE_;
 	      }
 	    }
-	    
+
 	    if (count) {
-	      if ((Stack_Array_Value(stack, path->array[k]) < 
-		   sgw->argv[3] - sgw->argv[4]) || 
+	      if ((Stack_Array_Value(stack, path->array[k]) <
+		   sgw->argv[3] - sgw->argv[4]) ||
 		  (Stack_Array_Value(stack, path->array[k]) == 0)){
 		dark_count++;
 	      } else {
@@ -1479,17 +1479,17 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	      }
 	    }
 	  }
-	  
+
 	  /* ~w~ */
-	  if (((dark_count >= 2) && (dark_count >= bright_count)) || 
-	      (dark_count >= 5) || (hit_index >= 3) /*|| 
+	  if (((dark_count >= 2) && (dark_count >= bright_count)) ||
+	      (dark_count >= 5) || (hit_index >= 3) /*||
 	      (path_dist > dist_thre * 3.0)*/) {
 	    conn->mode = NEUROCOMP_CONN_NONE;
 	  } else {
 	    if (dark_count + bright_count >= 2) {
 	      int prev_pos[3];
 	      int pos[3];
-	      Stack_Util_Coord(path->array[path->length-2], stack->width, 
+	      Stack_Util_Coord(path->array[path->length-2], stack->width,
 			       stack->height, prev_pos, prev_pos + 1,
 			       prev_pos + 2);
 	      int count = 0;
@@ -1498,7 +1498,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	      conn->ort[1] = 0.0;
 	      conn->ort[2] = 0.0;
 	      for (i = path->length - 3; i >= 0; i--) {
-		Stack_Util_Coord(path->array[i], stack->width, 
+		Stack_Util_Coord(path->array[i], stack->width,
 				 stack->height, pos, pos + 1, pos + 2);
 		conn->ort[0] += prev_pos[0] - pos[0];
 		conn->ort[1] += prev_pos[1] - pos[1];
@@ -1517,14 +1517,14 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	  }
 	}
 
-	if (sgw->resolution != NULL) {
+	//if (sgw->resolution != NULL) {
 	  gdist /= sgw->resolution[0];
-	}
+	//}
       } else {
 	conn->mode = NEUROCOMP_CONN_NONE;
 	gdist = 0.0;
       }
-      
+
       Kill_Stack_Graph_Workspace(sgw);
 
       /*
@@ -1541,7 +1541,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
       printf("%g, %g, %g\n", conn->pos[0], conn->pos[1], conn->pos[2]);
       printf("%g, %g, %g\n", conn->ort[0], conn->ort[1], conn->ort[2]);
 #endif
-      
+
       if (path != NULL) {
 	Kill_Int_Arraylist(path);
       }
@@ -1554,7 +1554,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
     //conn->cost = 1.0 / (1.0 + exp(-feat[7]));
 
     /*
-    conn->cost = 
+    conn->cost =
       1.0 / (1.0 + exp(0.546474 * feat[0] -1.45891 * feat[7] +
 		       6.50761 * fabs((feat[4] - feat[5])/(feat[4] + feat[5])) +
 		       0.433692 * fabs(feat[6])));
@@ -1590,14 +1590,14 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
     */
 
     //conn->cost = feat[7];
-    
+
     /*
-    conn->cost = exp(-(0.6053 * feat[0] -1.3751 * feat[7] + 
+    conn->cost = exp(-(0.6053 * feat[0] -1.3751 * feat[7] +
 		       0.8384 * fabs(feat[6])));
     */
 
     /*
-    conn->cost = exp(-(1.1812 * feat[0] - 2.5651 * feat[7] + 
+    conn->cost = exp(-(1.1812 * feat[0] - 2.5651 * feat[7] +
 		       0.6728 * fabs(feat[6])));
     */
 
@@ -1618,7 +1618,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
   } else {
     if (ctw->interpolate == _TRUE_) {
       if (conn->mode == NEUROCOMP_CONN_HL) {
-	int index = Locseg_Chain_Interpolate_L(chain2, conn->pos, conn->ort, 
+	int index = Locseg_Chain_Interpolate_L(chain2, conn->pos, conn->ort,
 					       conn->pos);
 	if (index >= 0) {
 	  conn->info[1] = index;
@@ -1628,7 +1628,7 @@ _BOOL_ Locseg_Chain_Connection_Test(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	    conn->info[1] = 0;
 	  } else if (conn->info[1] == Locseg_Chain_Length(chain2) - 1) {
 	    conn->mode = NEUROCOMP_CONN_LINK;
-	    conn->info[1] = 1;	  
+	    conn->info[1] = 1;
 	  }
 	}
       }
@@ -1688,7 +1688,7 @@ int Locseg_Chain_Hit_Test_Seg(Locseg_Chain *chain, const Local_Neuroseg *locseg)
   for (chain_locseg = Locseg_Chain_Next_Seg(chain); chain_locseg != NULL;
        chain_locseg = Locseg_Chain_Next_Seg(chain)) {
     i++;
-    
+
     double center1[3];
     double center2[3];
     Local_Neuroseg_Center(chain_locseg, center1);
@@ -1697,29 +1697,29 @@ int Locseg_Chain_Hit_Test_Seg(Locseg_Chain *chain, const Local_Neuroseg *locseg)
     double cdist_sqr = Geo3d_Dist_Sqr(center1[0], center1[1], center1[2],
 				      center2[0], center2[1], center2[2]);
 
-    double max_dist = 
-      dmax3(chain_locseg->seg.h / 2.0, chain_locseg->seg.r1, 
+    double max_dist =
+      dmax3(chain_locseg->seg.h / 2.0, chain_locseg->seg.r1,
 	    NEUROSEG_R2(&(chain_locseg->seg))) +
-	    dmax3(locseg->seg.h / 2.0, locseg->seg.r1, 
+	    dmax3(locseg->seg.h / 2.0, locseg->seg.r1,
 		  NEUROSEG_R2(&(locseg->seg)));
     if (cdist_sqr > max_dist * max_dist) { /* too far away */
       continue;
     }
-       
+
     for (z = 0.0; z <= locseg->seg.h; z += 2.0) {
       Neuroseg_Axis_Offset(&(locseg->seg), z, pos);
       pos[0] += bottom[0];
       pos[1] += bottom[1];
       pos[2] += bottom[2];
-      
+
       if (Local_Neuroseg_Hit_Test(chain_locseg, pos[0], pos[1], pos[2])
 	  == _TRUE_) {
 	/* test if the next segment is closer */
-	if (Locseg_Chain_Peek_Next(chain) != NULL) { 
+	if (Locseg_Chain_Peek_Next(chain) != NULL) {
 	  double center3[3];
-	  Local_Neuroseg_Center(Locseg_Chain_Peek_Next(chain)->locseg, 
+	  Local_Neuroseg_Center(Locseg_Chain_Peek_Next(chain)->locseg,
 				center3);
-	  double cdist_sqr_next = 
+	  double cdist_sqr_next =
 	    Geo3d_Dist_Sqr(center3[0], center3[1], center3[2],
 			   center2[0], center2[1], center2[2]);
 	  if (cdist_sqr_next < cdist_sqr) {
@@ -1740,7 +1740,7 @@ int Locseg_Chain_Hit_Test_Seg(Locseg_Chain *chain, const Local_Neuroseg *locseg)
 
 void Locseg_Chain_Append_Locnp(Locseg_Chain *chain1, Locnp_Chain *chain2,
 			       Dlist_End_e end)
-{ 
+{
   Locnp_Chain_Iterator_Start(chain2, (Dlist_End_e)(-end));
   Local_Neuroseg_Plane *locnp = NULL;
   _BOOL_ add = _FALSE_;
@@ -1790,7 +1790,7 @@ void Locseg_Chain_Append_Locnp(Locseg_Chain *chain1, Locnp_Chain *chain2,
   }
 }
 
-void Locseg_Chain_Draw_Stack(Locseg_Chain *chain, Stack *stack, 
+void Locseg_Chain_Draw_Stack(Locseg_Chain *chain, Stack *stack,
 			     const Stack_Draw_Workspace *ws)
 {
   Locseg_Chain_Label(chain, stack, ws->z_scale);
@@ -1818,7 +1818,7 @@ void Locseg_Chain_Label(Locseg_Chain *chain, Stack *stack, double z_scale)
       color = 0;
     }
   }
-  
+
   chain->iterator = old_iter;
 }
 
@@ -1841,7 +1841,7 @@ void Locseg_Chain_Label_E(Stack *stack, Locseg_Chain *chain, double z_scale,
 	color = 1;
       } else {
 	color = 0;
-      }	 
+      }
     }
     i++;
   }
@@ -1852,7 +1852,7 @@ void Locseg_Chain_Label_E(Stack *stack, Locseg_Chain *chain, double z_scale,
 }
 
 void Locseg_Chain_Label_G(Locseg_Chain *chain, Stack *stack, double z_scale,
-			  int begin, int end, double ratio, double diff, 
+			  int begin, int end, double ratio, double diff,
 			  int flag, int value)
 {
   Local_Neuroseg *tmp_seg = New_Local_Neuroseg();
@@ -2036,9 +2036,9 @@ int Locseg_Chain_Remove_Overlap_Ends(Locseg_Chain *chain)
   double bottom[3];
   Local_Neuroseg_Top(head, top);
   Local_Neuroseg_Bottom(head, bottom);
- 
+
   if ((Local_Neuroseg_Hit_Test(runner_up, top[0], top[1], top[2]) == _TRUE_) &&
-      (Local_Neuroseg_Hit_Test(runner_up, bottom[0], bottom[1], bottom[2]) 
+      (Local_Neuroseg_Hit_Test(runner_up, bottom[0], bottom[1], bottom[2])
        == _TRUE_)) {
     Locseg_Chain_Remove_End(chain, DL_HEAD);
     nremove++;
@@ -2054,16 +2054,16 @@ int Locseg_Chain_Remove_Overlap_Ends(Locseg_Chain *chain)
 
   Local_Neuroseg_Top(tail, top);
   Local_Neuroseg_Bottom(tail, bottom);
- 
+
   runner_up = Locseg_Chain_Prev_Seg(chain);
 
   if ((Local_Neuroseg_Hit_Test(runner_up, top[0], top[1], top[2]) == _TRUE_) &&
-      (Local_Neuroseg_Hit_Test(runner_up, bottom[0], bottom[1], bottom[2]) 
+      (Local_Neuroseg_Hit_Test(runner_up, bottom[0], bottom[1], bottom[2])
        == _TRUE_)) {
     Locseg_Chain_Remove_End(chain, DL_TAIL);
     nremove++;
   }
-  
+
   return nremove;
 }
 
@@ -2077,7 +2077,7 @@ void Locseg_Chain_Remove_Turn_Ends(Locseg_Chain *chain, double max_angle)
 
   Local_Neuroseg *head = Locseg_Chain_Next_Seg(chain);
   Local_Neuroseg *runner_up = Locseg_Chain_Next_Seg(chain);
-  
+
   double angle = Neuroseg_Angle_Between(&(head->seg), &(runner_up->seg));
   if (angle > TZ_PI) {
     angle = TZ_2PI - angle;
@@ -2095,7 +2095,7 @@ void Locseg_Chain_Remove_Turn_Ends(Locseg_Chain *chain, double max_angle)
 
   Local_Neuroseg *tail = Locseg_Chain_Prev_Seg(chain);
   runner_up = Locseg_Chain_Prev_Seg(chain);
-  
+
   angle = Neuroseg_Angle_Between(&(tail->seg), &(runner_up->seg));
   if (angle > TZ_PI) {
     angle = TZ_2PI - angle;
@@ -2110,7 +2110,7 @@ void Locseg_Chain_Remove_Turn_Ends(Locseg_Chain *chain, double max_angle)
 /*
 void Set_Locseg_Trace_Record(Local_Neuroseg *locseg, const Trace_Record *tr)
 {
-  if (locseg->info != NULL) { 	
+  if (locseg->info != NULL) {
     free(locseg->info);
   }
   locseg->info = Copy_Trace_Record(tr);
@@ -2118,7 +2118,7 @@ void Set_Locseg_Trace_Record(Local_Neuroseg *locseg, const Trace_Record *tr)
 */
 
 
-int Locseg_Chain_Knot_Number(Locseg_Chain *chain) 
+int Locseg_Chain_Knot_Number(Locseg_Chain *chain)
 {
   /* alloc <ka> */
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
@@ -2131,7 +2131,7 @@ int Locseg_Chain_Knot_Number(Locseg_Chain *chain)
 
 #define LOCSEG_CHAIN_TO_KNOT_ARRAY_EPS 1e-3
 
-Locseg_Chain_Knot_Array* 
+Locseg_Chain_Knot_Array*
 Locseg_Chain_To_Knot_Array(Locseg_Chain *chain, Locseg_Chain_Knot_Array *ka)
 {
   int length = Locseg_Chain_Length(chain);
@@ -2162,7 +2162,7 @@ Locseg_Chain_To_Knot_Array(Locseg_Chain *chain, Locseg_Chain_Knot_Array *ka)
   Locseg_Node *prev_node = NULL;
   Locseg_Node *last_node = NULL;
   double prev_pos[3], pos[3];
-  
+
   while ((node = Locseg_Chain_Next(chain)) != NULL) {
     double offset = -1.0;
     if (Trace_Record_Direction(node->tr) != DL_BOTHDIR) { /* not a seed */
@@ -2197,16 +2197,16 @@ Locseg_Chain_To_Knot_Array(Locseg_Chain *chain, Locseg_Chain_Knot_Array *ka)
       Local_Neuroseg_Axis_Coord_N(node->locseg, offset, pos);
       double dist = 10.0;
       if (last_node != NULL) {
-	Local_Neuroseg_Axis_Coord_N(last_node->locseg, 
+	Local_Neuroseg_Axis_Coord_N(last_node->locseg,
 				    Locseg_Chain_Knot_Array_Last(ka)->offset,
 				    prev_pos);
 	dist = Geo3d_Dist(prev_pos[0], prev_pos[1], prev_pos[2],
 			  pos[0], pos[1], pos[2]);
       }
-      
+
       if (dist > LOCSEG_CHAIN_TO_KNOT_ARRAY_EPS) {
-	Locseg_Chain_Knot_Array_Append_U(ka, 
-					 Make_Locseg_Chain_Knot(index, 
+	Locseg_Chain_Knot_Array_Append_U(ka,
+					 Make_Locseg_Chain_Knot(index,
 								offset));
 	last_node = node;
       }
@@ -2231,12 +2231,12 @@ Locseg_Chain_To_Knot_Array(Locseg_Chain *chain, Locseg_Chain_Knot_Array *ka)
     }
   }
     */
-    
+
     prev_node = node;
     index++;
   }
 
-  Locseg_Chain_Knot_Array_Append_U(ka, 
+  Locseg_Chain_Knot_Array_Append_U(ka,
 				   Make_Locseg_Chain_Knot(length - 1, 1.0));
 
   return ka;
@@ -2244,11 +2244,11 @@ Locseg_Chain_To_Knot_Array(Locseg_Chain *chain, Locseg_Chain_Knot_Array *ka)
 
 Geo3d_Circle* Locseg_Chain_To_Geo3d_Circle_Array_Z(Locseg_Chain *chain,
 						   double z_scale,
-						   Geo3d_Circle *circle, 
+						   Geo3d_Circle *circle,
 						   int *n)
 {
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
-  
+
   circle = Locseg_Chain_Knot_Array_To_Circle_Z(ka, z_scale, circle);
   *n = Locseg_Chain_Knot_Array_Length(ka);
 
@@ -2266,16 +2266,16 @@ Geo3d_Circle* Locseg_Chain_To_Geo3d_Circle_Array(Locseg_Chain *chain,
 Locne_Chain* Locseg_Chain_To_Locne_Chain(Locseg_Chain *chain)
 {
   Local_Neuroseg *locseg = NULL;
-  
+
   Locseg_Node_Dlist *old_iter = Locseg_Chain_Iterator_Start(chain, DL_HEAD);
 
   locseg = Locseg_Chain_Next_Seg(chain);
 
-  Local_Neuroseg_Ellipse *locne =  
+  Local_Neuroseg_Ellipse *locne =
     Local_Neuroseg_To_Ellipse_T(locseg, 0.0, NULL);
 
   Trace_Record *tr = New_Trace_Record();
-  
+
   int index[2];
   index[0] = 0;
   tr->index = index[0];
@@ -2286,7 +2286,7 @@ Locne_Chain* Locseg_Chain_To_Locne_Chain(Locseg_Chain *chain)
 
   Locne_Chain *locne_chain = New_Locne_Chain();
   Locne_Chain_Add(locne_chain, locne, tr, DL_TAIL);
-  
+
   Local_Neuroseg *next_seg = Locseg_Chain_Next_Seg(chain);
   index[1] = 1;
 
@@ -2315,7 +2315,7 @@ Locne_Chain* Locseg_Chain_To_Locne_Chain(Locseg_Chain *chain)
     }
 
     /* to avoid going back */
-    if ((index[0] > cur_index) || 
+    if ((index[0] > cur_index) ||
 	((index[0] == cur_index) && (t1 > cur_t + 0.01))) {
       locne = Local_Neuroseg_To_Ellipse_T(locseg, t1, NULL);
 
@@ -2342,19 +2342,19 @@ Locne_Chain* Locseg_Chain_To_Locne_Chain(Locseg_Chain *chain)
       cur_index = index[1];
       cur_t = t2;
     }
-    
+
     index[0] = index[1];
     locseg = next_seg;
     next_seg = Locseg_Chain_Next_Seg(chain);
     index[1]++;
   }
-  
+
   tr->index = index[0];
   tr->fs.scores[0] = 1.0;
 #ifdef _DEBUG_2
     printf("%d, %g\n", index[0], 1.0);
 #endif
-  locne = Local_Neuroseg_To_Ellipse_T(locseg, 1.0, NULL);  
+  locne = Local_Neuroseg_To_Ellipse_T(locseg, 1.0, NULL);
   Locne_Chain_Add(locne_chain, locne, tr, DL_TAIL);
 
   chain->iterator = old_iter;
@@ -2362,7 +2362,7 @@ Locne_Chain* Locseg_Chain_To_Locne_Chain(Locseg_Chain *chain)
   return locne_chain;
 }
 
-Geo3d_Ellipse* 
+Geo3d_Ellipse*
 Locseg_Chain_To_Ellipse_Array_Z(Locseg_Chain *chain, double z_scale,
 				Geo3d_Ellipse *locne, int *n)
 {
@@ -2380,7 +2380,7 @@ Locseg_Chain_To_Ellipse_Array_Z(Locseg_Chain *chain, double z_scale,
   if (*n == 0) {
     return NULL;
   }
-  
+
   *n += 2;
 
   if (locne == NULL) {
@@ -2389,31 +2389,31 @@ Locseg_Chain_To_Ellipse_Array_Z(Locseg_Chain *chain, double z_scale,
 
   Local_Neuroseg_Ellipse *locne_head = locne;
   Local_Neuroseg *locseg = NULL;
-  
+
   Local_Neuroseg locseg2;
 
   Locseg_Node_Dlist *old_iter = Locseg_Chain_Iterator_Start(chain, DL_HEAD);
 
   locseg = Locseg_Chain_Peek_Seg(chain);
-  Local_Neuroseg_Copy(&locseg2, locseg);  
+  Local_Neuroseg_Copy(&locseg2, locseg);
   Local_Neuroseg_Scale_Z(&locseg2, z_scale);
 
   Local_Neuroseg_To_Ellipse(&locseg2, locne, NEUROSEG_BOTTOM);
   locne++;
-  
+
   do {
     locseg = Locseg_Chain_Next_Seg(chain);
-    Local_Neuroseg_Copy(&locseg2, locseg);  
+    Local_Neuroseg_Copy(&locseg2, locseg);
     Local_Neuroseg_Scale_Z(&locseg2, z_scale);
 
     Local_Neuroseg_To_Ellipse(&locseg2, locne, NEUROSEG_CENTER);
     locne++;
   } while (Locseg_Chain_Peek(chain) != NULL);
-  
-  Local_Neuroseg_Copy(&locseg2, locseg);  
+
+  Local_Neuroseg_Copy(&locseg2, locseg);
   Local_Neuroseg_Scale_Z(&locseg2, z_scale);
   Local_Neuroseg_To_Ellipse(&locseg2, locne, NEUROSEG_TOP);
-  
+
   chain->iterator = old_iter;
 
   return locne_head;
@@ -2425,7 +2425,7 @@ void Locseg_Chain_Vrml_Fprint_Z(FILE *fp, Locseg_Chain *chain, double z_scale,
 {
   int ncircle;
 
-  Geo3d_Ellipse *circle =  
+  Geo3d_Ellipse *circle =
     Locseg_Chain_To_Ellipse_Array_Z(chain, z_scale, NULL, &ncircle);
   int nsample = 20;
   coordinate_3d_t *pts = Geo3d_Ellipse_Array_Sampling(circle, ncircle,
@@ -2442,10 +2442,10 @@ void Locseg_Chain_Vrml_Fprint_Z(FILE *fp, Locseg_Chain *chain, double z_scale,
     Vrml_Material_Fprint(fp, material, indent + 4);
   }
   Vrml_Node_End_Fprint(fp, "Appearance", indent + 2);
-  Vrml_Pm_Rectangle_Fprint(fp, (const coordinate_3d_t *) pts, nsample, 
+  Vrml_Pm_Rectangle_Fprint(fp, (const coordinate_3d_t *) pts, nsample,
 			   ncircle, indent + 2);
   Vrml_Node_End_Fprint(fp, "Shape", indent);
-  
+
   free(circle);
   free(pts);
 }
@@ -2469,7 +2469,7 @@ Graph* Locseg_Chain_Graph(Locseg_Chain *chain, int n, Int_Arraylist *hit_spots)
   Graph *graph = Make_Graph(n, n, _FALSE_);
 
   int i, j;
-  
+
   int hit = 0;
 
   PROGRESS_BEGIN("Build neuron chain graph");
@@ -2488,7 +2488,7 @@ Graph* Locseg_Chain_Graph(Locseg_Chain *chain, int n, Int_Arraylist *hit_spots)
 	    Int_Arraylist_Add(hit_spots, -hit);
 	  }
 	  //continue;
-	} else {	 
+	} else {
 	  hit = Locseg_Chain_Hit_Test_Seg(&(chain[j]), tail_seg);
 	  if ((hit > 1) && (hit < Locseg_Chain_Length(&(chain[j])))) {
 	    Graph_Add_Edge(graph, i, j);
@@ -2517,9 +2517,9 @@ int Locseg_Chain_End_Points(Locseg_Chain *chain, int n, coordinate_3d_t pts[])
   if (n > 0) {
     Locseg_Chain_Iterator_Start(chain, DL_HEAD);
     Local_Neuroseg *head = Locseg_Chain_Next_Seg(chain);
-    
+
     Local_Neuroseg_Bottom(head, pts[0]);
-          
+
     for (i = 1; i < n; i++) {
       Local_Neuroseg_Center(head, pts[i]);
       head = Locseg_Chain_Next_Seg(chain);
@@ -2532,11 +2532,11 @@ int Locseg_Chain_End_Points(Locseg_Chain *chain, int n, coordinate_3d_t pts[])
     Local_Neuroseg *tail = Locseg_Chain_Prev_Seg(chain);
 
     n = -n;
-    
+
     Local_Neuroseg_Top(tail, pts[0]);
-    
+
     for (i = 1; i < n; i++) {
-      Local_Neuroseg_Center(tail, pts[i]);      
+      Local_Neuroseg_Center(tail, pts[i]);
       tail = Locseg_Chain_Prev_Seg(chain);
       if (tail == NULL) {
 	break;
@@ -2560,10 +2560,10 @@ int Locseg_Chain_End_Points_Z(Locseg_Chain *chain, int n, coordinate_3d_t pts[],
   if (n > 0) {
     Locseg_Chain_Iterator_Start(chain, DL_HEAD);
     Local_Neuroseg *head = Locseg_Chain_Next_Seg(chain);
-    
+
     Local_Neuroseg_Bottom(head, pts[0]);
     pts[0][2] /= z_scale;
-          
+
     for (i = 1; i < n; i++) {
       Local_Neuroseg_Center(head, pts[i]);
       pts[i][2] /= z_scale;
@@ -2577,12 +2577,12 @@ int Locseg_Chain_End_Points_Z(Locseg_Chain *chain, int n, coordinate_3d_t pts[],
     Local_Neuroseg *tail = Locseg_Chain_Prev_Seg(chain);
 
     n = -n;
-    
+
     Local_Neuroseg_Top(tail, pts[0]);
     pts[0][2] /= z_scale;
-    
+
     for (i = 1; i < n; i++) {
-      Local_Neuroseg_Center(tail, pts[i]);      
+      Local_Neuroseg_Center(tail, pts[i]);
       pts[i][2] /= z_scale;
       tail = Locseg_Chain_Prev_Seg(chain);
       if (tail == NULL) {
@@ -2597,7 +2597,7 @@ int Locseg_Chain_End_Points_Z(Locseg_Chain *chain, int n, coordinate_3d_t pts[],
 }
 
 void Locseg_Chain_Hit_Stack(Locseg_Chain *chain, Stack *region, int hit[])
-{  
+{
   coordinate_3d_t pos[5];
   int i;
   int x, y, z;
@@ -2625,7 +2625,7 @@ void Locseg_Chain_Hit_Stack(Locseg_Chain *chain, Stack *region, int hit[])
     }
   }
 
-  n = Locseg_Chain_End_Points(chain, -nsample, pos); 
+  n = Locseg_Chain_End_Points(chain, -nsample, pos);
 
   for (i = 0; i < n; i++) {
     x = (int) (pos[i][0] + 0.5);
@@ -2649,7 +2649,7 @@ void Locseg_Chain_Hit_Stack(Locseg_Chain *chain, Stack *region, int hit[])
 #endif
 }
 
-Neuron_Structure* Locseg_Chain_Neurostruct(Locseg_Chain *chain, int n, 
+Neuron_Structure* Locseg_Chain_Neurostruct(Locseg_Chain *chain, int n,
 					   const Stack *stack, double z_scale,
 					   void *ws)
 {
@@ -2666,9 +2666,9 @@ Neuron_Structure* Locseg_Chain_Neurostruct(Locseg_Chain *chain, int n,
 	Neurocomp_Conn conn;
 	conn.mode = NEUROCOMP_CONN_HL;
 
-	if (Locseg_Chain_Connection_Test(chain + i, chain + j, stack, 
+	if (Locseg_Chain_Connection_Test(chain + i, chain + j, stack,
     z_scale, &conn, (Connection_Test_Workspace*)ws) == _TRUE_) {
-	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(chain + j), 
+	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(chain + j),
 					&conn);
 	  Neuron_Structure_Add_Conn(ns, i, j, &conn);
 	}
@@ -2701,11 +2701,11 @@ void Locseg_Chain_Reach_Conn(Locseg_Chain *hook, Locseg_Chain *loop,
   }
 
   double line_start[3], line_end[3];
-  Local_Neuroseg_Bottom(Locseg_Chain_Peek_Seg_At(loop, 
+  Local_Neuroseg_Bottom(Locseg_Chain_Peek_Seg_At(loop,
 						 conn->info[1]), line_start);
-  Local_Neuroseg_Top(Locseg_Chain_Peek_Seg_At(loop, 
+  Local_Neuroseg_Top(Locseg_Chain_Peek_Seg_At(loop,
 					      conn->info[1]), line_end);
- 
+
   double lambda;
   Geo3d_Point_Lineseg_Dist(pt, line_start, line_end, &lambda);
 
@@ -2724,13 +2724,13 @@ void Locseg_Chain_Reach_Conn(Locseg_Chain *hook, Locseg_Chain *loop,
 }
 
 int Locseg_Chain_Swc_Fprint_Z(FILE *fp, Locseg_Chain *chain, int type,
-			      int start_id, int parent_id, 
+			      int start_id, int parent_id,
 			      Dlist_Direction_e direction, double z_scale)
 {
   int n;
   Geo3d_Circle *circles = Locseg_Chain_To_Geo3d_Circle_Array_Z(chain, z_scale,
 							       NULL, &n);
-  int i;                                                                            
+  int i;
   int start;
   int end;
   int step;
@@ -2768,14 +2768,14 @@ int Locseg_Chain_Swc_Fprint_Z(FILE *fp, Locseg_Chain *chain, int type,
 }
 
 int Locseg_Chain_Swc_Fprint_T(FILE *fp, Locseg_Chain *chain, int type,
-			      int start_id, int parent_id, 
-			      Dlist_Direction_e direction, double z_scale, 
+			      int start_id, int parent_id,
+			      Dlist_Direction_e direction, double z_scale,
 			      const double *offset)
 {
   int n;
   Geo3d_Circle *circles = Locseg_Chain_To_Geo3d_Circle_Array_Z(chain, z_scale,
 							       NULL, &n);
-  int i;                                                                            
+  int i;
   int start;
   int end;
   int step;
@@ -2830,7 +2830,7 @@ int Locseg_Chain_Swc_Fprint(FILE *fp, Locseg_Chain *chain, int type,
 {
   int n;
   Geo3d_Circle *circles = Locseg_Chain_To_Geo3d_Circle_Array(chain, NULL, &n);
-  int i;                                                                            
+  int i;
   int start;
   int end;
   int step;
@@ -2876,19 +2876,19 @@ Neuron_Component* Dir_Locseg_Chain_Nc(const char *dir_name, const char *pattern,
   }
 
   Neuron_Component *chain_array =
-    (Neuron_Component*) Guarded_Malloc(sizeof(Neuron_Component) * (*n), 
+    (Neuron_Component*) Guarded_Malloc(sizeof(Neuron_Component) * (*n),
 				       "Dir_Neurochain");
-  
+
   DIR *dir = opendir(dir_name);
   struct dirent *ent = readdir(dir);
   int index = 0;
 
   /* allocate a string for storing full path. 100 is just an initial guess */
-  char *full_path = (char *) Guarded_Malloc(strlen(dir_name) + 100, 
+  char *full_path = (char *) Guarded_Malloc(strlen(dir_name) + 100,
 					    "Dir_Neurochain");
-  strcpy(full_path, dir_name);  
+  strcpy(full_path, dir_name);
   strcat(full_path, "/");
-	
+
   regex_t preg;
   regcomp(&preg, pattern, REG_BASIC);
 
@@ -2896,7 +2896,7 @@ Neuron_Component* Dir_Locseg_Chain_Nc(const char *dir_name, const char *pattern,
     if (regexec(&preg, ent->d_name, 0, NULL, REG_BASIC) ==0) {
       int path_length = strlen(dir_name) + strlen(ent->d_name) + 1;
       if (path_length > strlen(full_path)) {
-	full_path = (char *) Guarded_Realloc(full_path, path_length + 1, 
+	full_path = (char *) Guarded_Realloc(full_path, path_length + 1,
 					     "Dir_Neurochain");
       }
       strcpy(full_path + strlen(dir_name) + 1, ent->d_name);
@@ -2924,8 +2924,8 @@ Neuron_Component* Dir_Locseg_Chain_Nc(const char *dir_name, const char *pattern,
   return chain_array;
 }
 
-Neuron_Structure* 
-Locseg_Chain_Comp_Neurostruct(Neuron_Component *comp, int n, 
+Neuron_Structure*
+Locseg_Chain_Comp_Neurostruct(Neuron_Component *comp, int n,
 			      const Stack *stack, double z_scale,
 			      void *ws)
 {
@@ -3000,7 +3000,7 @@ Locseg_Chain_Comp_Neurostruct(Neuron_Component *comp, int n,
       Kill_Graph_Workspace(gw);
   }
 
-  return ns;  
+  return ns;
 }
 
 Neuron_Structure *
@@ -3017,7 +3017,7 @@ Locseg_Chain_Comp_Neurostruct_W(Neuron_Structure *ns, const Stack *stack,
   }
 
   PROGRESS_BEGIN("Build neuron chain graph");
-  
+
   int n = NEURON_STRUCTURE_COMPONENT_NUMBER(ns);
 
   for (i = 0; i < n; i++) {
@@ -3036,7 +3036,7 @@ Locseg_Chain_Comp_Neurostruct_W(Neuron_Structure *ns, const Stack *stack,
 	}
 #endif
 
-	if (Locseg_Chain_Connection_Test(chain_i, chain_j, stack, 
+	if (Locseg_Chain_Connection_Test(chain_i, chain_j, stack,
 					 z_scale, &conn, ws) == _TRUE_) {
 	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(chain_j), &conn);
 	  _BOOL_ conn_existed = _FALSE_;
@@ -3064,7 +3064,7 @@ Locseg_Chain_Comp_Neurostruct_W(Neuron_Structure *ns, const Stack *stack,
 	      }
 	    }
 	  }
-	  
+
 	  if (conn_existed == _FALSE_) {
 	    Neuron_Structure_Add_Conn(ns, i, j, &conn);
 	    Graph_Expand_Edge_Table(i, j, ns->graph->nedge - 1, gw);
@@ -3079,11 +3079,11 @@ Locseg_Chain_Comp_Neurostruct_W(Neuron_Structure *ns, const Stack *stack,
 
   Kill_Graph_Workspace(gw);
 
-  return ns;    
+  return ns;
 }
 
-Neuron_Component* 
-Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type, 
+Neuron_Component*
+Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
 				 Neuron_Component *nc, int *n)
 {
   int i;
@@ -3091,7 +3091,7 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
   case NEUROCOMP_TYPE_LOCSEG_CHAIN:
     *n = 1;
     if (nc == NULL) {
-      nc = (Neuron_Component*) 
+      nc = (Neuron_Component*)
 	Guarded_Malloc(sizeof(Neuron_Component) * (*n),
 		       "Locseg_Chain_To_Neuron_Component");
     }
@@ -3100,7 +3100,7 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
   case NEUROCOMP_TYPE_LOCAL_NEUROSEG:
     *n = Locseg_Chain_Length(chain);
     if (nc == NULL) {
-      nc = (Neuron_Component*) 
+      nc = (Neuron_Component*)
 	Guarded_Malloc(sizeof(Neuron_Component) * (*n),
 		       "Locseg_Chain_To_Neuron_Component");
     }
@@ -3120,22 +3120,22 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
     if (*n == 0) {
       return NULL;
     }
-  
+
     *n += 2;
 
     if (nc == NULL) {
-      nc = (Neuron_Component*) 
+      nc = (Neuron_Component*)
 	Guarded_Malloc(sizeof(Neuron_Component) * (*n),
 		       "Locseg_Chain_To_Neuron_Component");
     }
 
     Local_Neuroseg *locseg = NULL;
     i = 0;
-    
+
     Locseg_Chain_Iterator_Start(chain, DL_HEAD);
     locseg = Locseg_Chain_Peek_Seg(chain);
-    Geo3d_Circle *circle = 
-      Local_Neuroseg_To_Circle(locseg, NEUROSEG_BOTTOM, NEUROSEG_CIRCLE_RX, 
+    Geo3d_Circle *circle =
+      Local_Neuroseg_To_Circle(locseg, NEUROSEG_BOTTOM, NEUROSEG_CIRCLE_RX,
 			       NULL);
     Set_Neuron_Component(nc + i, type, circle);
 
@@ -3147,8 +3147,8 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
 				 NULL);
       Set_Neuron_Component(nc + i, type, circle);
     } while (Locseg_Chain_Peek(chain) != NULL);
-    
-    circle = 
+
+    circle =
       Local_Neuroseg_To_Circle(locseg, NEUROSEG_TOP, NEUROSEG_CIRCLE_RX, NULL);
     i++;
     Set_Neuron_Component(nc + i, type, circle);
@@ -3160,11 +3160,11 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
       Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
       *n = Locseg_Chain_Knot_Array_Length(ka);
       if (nc == NULL) {
-	nc = (Neuron_Component*) 
+	nc = (Neuron_Component*)
 	  Guarded_Malloc(sizeof(Neuron_Component) * (*n),
 			 "Locseg_Chain_To_Neuron_Component");
       }
-      Geo3d_Circle *circle = 
+      Geo3d_Circle *circle =
 	Locseg_Chain_Knot_Array_To_Circle_Z(ka, 1.0, NULL);
       for (i = 0; i < *n; i++) {
 	Set_Neuron_Component(nc + i, type, Copy_Geo3d_Circle(circle + i));
@@ -3181,8 +3181,8 @@ Locseg_Chain_To_Neuron_Component(Locseg_Chain *chain, int type,
   return nc;
 }
 
-Neuron_Component* 
-Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type, 
+Neuron_Component*
+Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
 				   Neuron_Component *nc, int *n,
 				   double xy_scale, double z_scale)
 {
@@ -3200,7 +3200,7 @@ Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
         *n = Locseg_Chain_Knot_Array_Length(ka);
 
         if (nc == NULL) {
-          nc = (Neuron_Component*) 
+          nc = (Neuron_Component*)
             Guarded_Malloc(sizeof(Neuron_Component) * (*n),
                 "Locseg_Chain_To_Neuron_Component_S");
         }
@@ -3221,8 +3221,8 @@ Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
           Locseg_Chain_Knot *knot = Locseg_Chain_Knot_Array_At(ka, knot_index);
           while (knot != NULL) {
             if (knot->id == index) {
-              Geo3d_Circle *circle = 
-                Local_Neuroseg_To_Circle_T(&locseg2, knot->offset, 
+              Geo3d_Circle *circle =
+                Local_Neuroseg_To_Circle_T(&locseg2, knot->offset,
                     NEUROSEG_CIRCLE_RX, NULL);
               Set_Neuron_Component(nc + circle_index, type, circle);
               //circle_index += 3;
@@ -3249,10 +3249,10 @@ Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->center[1] / 3.0;
            circle->center[2] = NEUROCOMP_GEO3D_CIRCLE(nc + i)->center[2] / 1.5 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->center[2] / 3.0;
-           circle->orientation[0] = 
+           circle->orientation[0] =
            NEUROCOMP_GEO3D_CIRCLE(nc + i)->orientation[0] / 1.5 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->orientation[0] / 3.0;
-           circle->orientation[1] = 
+           circle->orientation[1] =
            NEUROCOMP_GEO3D_CIRCLE(nc + i)->orientation[1] / 1.5 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->orientation[1] / 3.0;
            Set_Neuron_Component(nc + i + 1, type, circle);
@@ -3266,10 +3266,10 @@ Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->center[1] / 1.5;
            circle->center[2] = NEUROCOMP_GEO3D_CIRCLE(nc + i)->center[2] / 3.0 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->center[2] / 1.5;
-           circle->orientation[0] = 
+           circle->orientation[0] =
            NEUROCOMP_GEO3D_CIRCLE(nc + i)->orientation[0] / 3.0 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->orientation[0] / 1.5;
-           circle->orientation[1] = 
+           circle->orientation[1] =
            NEUROCOMP_GEO3D_CIRCLE(nc + i)->orientation[1] / 3.0 +
            NEUROCOMP_GEO3D_CIRCLE(nc + i + 3)->orientation[1] / 1.5;
            Set_Neuron_Component(nc + i + 2, type, circle);
@@ -3294,17 +3294,17 @@ Locseg_Chain_To_Neuron_Component_S(Locseg_Chain *chain, int type,
   return nc;
 }
 
-Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale, 
-			      Local_Neuroseg *locseg, double *scores, 
+Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
+			      Local_Neuroseg *locseg, double *scores,
 			      int nseed, Trace_Workspace *tw, int *nchain)
 {
   /*
-  Locseg_Chain **chain = (Locseg_Chain**) 
+  Locseg_Chain **chain = (Locseg_Chain**)
     Guarded_Malloc(sizeof(Locseg_Chain*) * nseed, "Trace_Locseg_S");
   */
 
   Unipointer_List *chain_list = NULL; /* a list to record chains */
-  Unipointer_List *chain_head = NULL; /* a positioning pointer */ 
+  Unipointer_List *chain_head = NULL; /* a positioning pointer */
   *nchain = 0;
 
   Locseg_Score_Workspace sws;
@@ -3322,7 +3322,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
   //Stack_Fit_Score fs;
   sws.fs.n = 1;
   sws.fs.options[0] = STACK_FIT_CORRCOEF;
-  
+
   int i;
 
   _BOOL_ null_score = (scores == NULL);
@@ -3362,7 +3362,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
   /* create the tracing mask if necessary */
   if (tw->trace_mask_updating == _TRUE_) {
     if (tw->trace_mask == NULL) {
-      tw->trace_mask = 
+      tw->trace_mask =
 	Make_Stack(GREY16, signal->width, signal->height, signal->depth);
       Zero_Stack(tw->trace_mask);
     }
@@ -3386,8 +3386,8 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
     Local_Neuroseg_Center(locseg + index, center);
 
     if (tw->trace_mask != NULL) {
-      if ((center[0] >= 232) && (center[0] <= 248) && 
-          (center[1] >= 226) && (center[1] <=244) && 
+      if ((center[0] >= 232) && (center[0] <= 248) &&
+          (center[1] >= 226) && (center[1] <=244) &&
           (center[2] >=80) && (center[2] <= 95)) {
         printf("debug here\n");
         char tmpfile[100];
@@ -3419,7 +3419,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
     /* test if the location has been traced */
     /*
        if (tw->trace_mask != NULL) {
-       if (Local_Neuroseg_Hit_Mask(locseg + index, 
+       if (Local_Neuroseg_Hit_Mask(locseg + index,
        tw->trace_mask, z_scale) > 0) {
        printf("traced \n");
        continue;
@@ -3440,7 +3440,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
         tw->trace_status[0] = TRACE_HIT_MARK;
       }
 
-      Local_Neuroseg_Axis_Position(locseg + index, pt, 
+      Local_Neuroseg_Axis_Position(locseg + index, pt,
           locseg[index].seg.h * 2.0 / 3.0);
       tmpx = iround(pt[0]);
       tmpy = iround(pt[1]);
@@ -3451,7 +3451,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
       }
     }
 
-    if ((tw->trace_status[0] != TRACE_NORMAL) && 
+    if ((tw->trace_status[0] != TRACE_NORMAL) &&
         (tw->trace_status[1] != TRACE_NORMAL)) {
       printf("traced \n");
       continue;
@@ -3462,7 +3462,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
     /* The seed passes quals, let's start tracing */
     printf("Start: \n");
 
-    if ((tw->trace_status[0] == TRACE_NORMAL) || 
+    if ((tw->trace_status[0] == TRACE_NORMAL) ||
         (tw->trace_status[1] == TRACE_NORMAL)) {
       /* Initialize a chain */
       Trace_Record *tr = New_Trace_Record();
@@ -3479,7 +3479,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
         Trace_Record_Set_Direction(tr, DL_FORWARD);
       }
 #endif
-      Locseg_Node *p = 
+      Locseg_Node *p =
         Make_Locseg_Node(Copy_Local_Neuroseg(locseg + index), tr);
       Locseg_Chain *locseg_chain = Make_Locseg_Chain(p);
 
@@ -3525,16 +3525,16 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
 
       /* record chains that are long enough */
       if ((Locseg_Chain_Geolen(locseg_chain) >= tw->min_chain_length) ||
-          ((tw->trace_status[0] == TRACE_HIT_MARK) || 
+          ((tw->trace_status[0] == TRACE_HIT_MARK) ||
            (tw->trace_status[1] == TRACE_HIT_MARK))) {
         int new_chain_number = 1;
         if (tw->break_refit == _TRUE_) {
           /*
-             chain[index] = Locseg_Chain_Refit_Break(locseg_chain, chain[index], 
+             chain[index] = Locseg_Chain_Refit_Break(locseg_chain, chain[index],
              &new_chain_number);
              */
-          Locseg_Chain *subchain = Locseg_Chain_Refit_Break(locseg_chain, 
-              NULL, 
+          Locseg_Chain *subchain = Locseg_Chain_Refit_Break(locseg_chain,
+              NULL,
               &new_chain_number);
           Delete_Locseg_Chain(locseg_chain);
           locseg_chain = NULL;
@@ -3566,7 +3566,7 @@ Locseg_Chain** Trace_Locseg_S(const Stack *signal, double z_scale,
 
   printf("Time passed: %lld\n", toc());
 
-  Locseg_Chain **chain = (Locseg_Chain**) 
+  Locseg_Chain **chain = (Locseg_Chain**)
     Guarded_Malloc(sizeof(Locseg_Chain*) * (*nchain), "Trace_Locseg_S");
 
   for (i = 0; i < *nchain; i++) {
@@ -3589,13 +3589,13 @@ double* Locseg_Chain_Intensity_Profile(Locseg_Chain *chain, const Stack *stack,
   }
 
   Locseg_Node_Dlist *old_iter = Locseg_Chain_Iterator_Start(chain, DL_HEAD);
-  
+
   Local_Neuroseg *locseg = NULL;
   int i = 0;
   while ((locseg = Locseg_Chain_Next_Seg(chain)) != NULL) {
-    value[i++] = Local_Neuroseg_Average_Signal(locseg, stack, z_scale); 
+    value[i++] = Local_Neuroseg_Average_Signal(locseg, stack, z_scale);
   }
-  
+
   chain->iterator = old_iter;
 
   return value;
@@ -3615,16 +3615,16 @@ int Locseg_Chain_Refit_Number(Locseg_Chain *chain)
   return n;
 }
 
-Locseg_Chain* Locseg_Chain_Refit_Break(Locseg_Chain *chain, 
+Locseg_Chain* Locseg_Chain_Refit_Break(Locseg_Chain *chain,
 				       Locseg_Chain *chain_array, int *n)
 {
   *n = Locseg_Chain_Refit_Number(chain) + 1;
   if (chain_array == NULL) {
-    chain_array = (Locseg_Chain*) 
-      Guarded_Malloc(sizeof(Locseg_Chain) * ((*n) + 1), 
+    chain_array = (Locseg_Chain*)
+      Guarded_Malloc(sizeof(Locseg_Chain) * ((*n) + 1),
 		     "Locseg_Chain_Refit_Break");
   }
-  
+
   int i;
   for (i = 0; i <= *n; i++) {
     chain_array[i].list = NULL;
@@ -3647,7 +3647,7 @@ Locseg_Chain* Locseg_Chain_Refit_Break(Locseg_Chain *chain,
       }
 
       /* if the current start is not NULL and is not used by previous chain */
-      if ((chain->iterator != NULL) && 
+      if ((chain->iterator != NULL) &&
 	  (chain->iterator != chain_array[index].list)) {
 	index++;
 	chain_array[index].list = chain->iterator;
@@ -3655,7 +3655,7 @@ Locseg_Chain* Locseg_Chain_Refit_Break(Locseg_Chain *chain,
 	chain_array[index].list->prev = NULL;
       }
     }
-    
+
     if (go_next == _TRUE_) {
       Locseg_Chain_Next(chain);
     } else {
@@ -3699,9 +3699,9 @@ double Locseg_Chain_Connection_Test_P(Locseg_Chain *chain1,
   double offset = NEUROSEG_DEFAULT_H * 1.5;
   Local_Neuroseg_Stretch(head, scale, offset, -1);
   Local_Neuroseg_Stretch(tail, scale, offset, 1);
-  
+
   Locseg_Chain_Iterator_Start(chain2, DL_HEAD);
-  
+
   double mindist = Infinity;
 
   Local_Neuroseg *locseg;
@@ -3711,17 +3711,17 @@ double Locseg_Chain_Connection_Test_P(Locseg_Chain *chain1,
 
   while ((locseg = Locseg_Chain_Next_Seg(chain2)) != NULL) {
     Local_Neuroseg *locseg2 = locseg;
-    
+
     if (index == 0) { /* head */
       locseg2 = Copy_Local_Neuroseg(locseg);
       Local_Neuroseg_Stretch(locseg2, scale, offset, -1);
     }
-    
+
     if (Locseg_Chain_Peek(chain2) == NULL) { /*tail*/
       if (locseg == locseg2) {
 	locseg2 = Copy_Local_Neuroseg(locseg);
       }
-      Local_Neuroseg_Stretch(locseg2, scale, offset, 1);      
+      Local_Neuroseg_Stretch(locseg2, scale, offset, 1);
     }
 
     double dist = Local_Neuroseg_Planar_Dist(head, locseg2);
@@ -3745,17 +3745,17 @@ double Locseg_Chain_Connection_Test_P(Locseg_Chain *chain1,
     index++;
   }
 
-  Delete_Local_Neuroseg(head);  
-  Delete_Local_Neuroseg(tail);  
+  Delete_Local_Neuroseg(head);
+  Delete_Local_Neuroseg(tail);
 
   conn->cost = mindist;
 
   return mindist;
 }
 
-Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack, 
+Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack,
 				  double z_scale, const Stack *mask,
-				  int option, double *record, 
+				  int option, double *record,
 				  int *trial)
 {
   Stack_Fit_Score fs;
@@ -3774,9 +3774,9 @@ Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack,
     record[0] = fs.scores[2];
   }
   int var_index[LOCAL_NEUROSEG_PLANE_NPARAM];
-  int nvar = 
+  int nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_ORIENTATION |
-				     NEUROSEG_VAR_MASK_R1 | 
+				     NEUROSEG_VAR_MASK_R1 |
 				     NEUROSEG_VAR_MASK_SCALE,
 				     NEUROSEG_VAR_MASK_NONE, var_index);
 
@@ -3791,11 +3791,11 @@ Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack,
     if (mask == NULL) {
       Fit_Local_Neuroseg_P(locseg2, stack, var_index, nvar, NULL, z_scale, &fs);
     } else {
-      Fit_Local_Neuroseg_Pm(locseg2, stack, var_index, nvar, NULL, z_scale, 
+      Fit_Local_Neuroseg_Pm(locseg2, stack, var_index, nvar, NULL, z_scale,
 			    mask, &fs);
     }
-    
-    if ((Neuroseg_Angle_Between(&(locseg->seg), &(locseg2->seg)) 
+
+    if ((Neuroseg_Angle_Between(&(locseg->seg), &(locseg2->seg))
 	 > TZ_PI / 2.0) || (fs.scores[0] / score0 < 0.5)){
       i--;
       break;
@@ -3806,11 +3806,11 @@ Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack,
       record[i] = fs.scores[2];
     }
 
-    
+
     if (fs.scores[1] < 0.80) {
       break;
     }
-    
+
   }
 
   if (trial != NULL) {
@@ -3822,20 +3822,20 @@ Locseg_Chain* Local_Neuroseg_Push(Local_Neuroseg *locseg, const Stack *stack,
 
 /*
  * Features:
- *  1. anisotropic planar distance 
- *  2. isotropic planar distance 
- *  3. anisotropic euclidean distance 
- *  4. isotropic euclidean distance 
- *  5. thickness 1 
- *  6. thickness 2 
- *  7. angle 
- *  8. anisotropic surface distance 
- *  9. isotropic surface distance 
+ *  1. anisotropic planar distance
+ *  2. isotropic planar distance
+ *  3. anisotropic euclidean distance
+ *  4. isotropic euclidean distance
+ *  5. thickness 1
+ *  6. thickness 2
+ *  7. angle
+ *  8. anisotropic surface distance
+ *  9. isotropic surface distance
  *  10. geodesic distance
  *  11. maxmin distance
  */
 double* Locseg_Chain_Conn_Feature(Locseg_Chain *chain1, Locseg_Chain *chain2,
-				  const Stack *stack, const double *res, 
+				  const Stack *stack, const double *res,
 				  double *feat, int *n)
 {
   Connection_Test_Workspace *ctw = New_Connection_Test_Workspace();
@@ -3856,11 +3856,11 @@ double* Locseg_Chain_Conn_Feature(Locseg_Chain *chain1, Locseg_Chain *chain2,
   } else {
     locseg1 = Locseg_Chain_Tail_Seg(chain1);
   }
-   
+
   Local_Neuroseg *locseg2 = Locseg_Chain_Peek_Seg_At(chain2, nc_conn.info[1]);
 
   Locseg_Conn_Feature(locseg1, locseg2, stack, res, feat, n);
-  
+
   /* Calculate geodesic dist and maxmin dist. More efficient impementation
    * required.*/
   Stack_Graph_Workspace *sgw = New_Stack_Graph_Workspace();
@@ -3881,7 +3881,7 @@ double* Locseg_Chain_Conn_Feature(Locseg_Chain *chain1, Locseg_Chain *chain2,
     feat[(*n)++] = NaN;
   }
   Kill_Stack_Graph_Workspace(sgw);
-  
+
   sgw = New_Stack_Graph_Workspace();
   sgw->conn = 26;
   sgw->wf = Stack_Voxel_Weight_S;
@@ -3906,30 +3906,30 @@ double* Locseg_Chain_Conn_Feature(Locseg_Chain *chain1, Locseg_Chain *chain2,
 }
 
 #if 0
-double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain, 
+double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain,
 				  const Local_Neuroseg *locseg1,
-				  const Stack *stack, const double *res, 
+				  const Stack *stack, const double *res,
 				  double *feat, int *n)
 {
   double z_scale = res[0] / res[2];
 
   Local_Neuroseg *zlocseg1 = Copy_Local_Neuroseg(locseg1);
-  Local_Neuroseg_Scale_Z(zlocseg1, z_scale);  
+  Local_Neuroseg_Scale_Z(zlocseg1, z_scale);
 
   /* Find the segment in <chain> that is closest to <locseg1> */
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
-  
+
   Local_Neuroseg *locseg2 = Locseg_Chain_Next_Seg(chain);
   Local_Neuroseg *zlocseg2 = Locseg_Chain_Next_Seg(chain);
 
   zlocseg2 = Copy_Local_Neuroseg(locseg2);
   Local_Neuroseg_Scale_Z(zlocseg2, z_scale);
-  
+
   double zbottom1[3], ztop1[3];
   Local_Neuroseg_Bottom(zlocseg1, zbottom1);
   Local_Neuroseg_Top(zlocseg1, ztop1);
-  
-  double mindist = 
+
+  double mindist =
     Local_Neuroseg_Lineseg_Dist(zlocseg2, zbottom1, ztop1, 1.0);
 
   Delete_Local_Neuroseg(zlocseg2);
@@ -3945,7 +3945,7 @@ double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain,
       locseg2 = tmpseg;
       mindist = dist;
     }
-      
+
     Delete_Local_Neuroseg(zlocseg2);
   }
 
@@ -3955,7 +3955,7 @@ double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain,
   if (feat == NULL) {
     feat = darray_malloc(*n);
   }
-  
+
   double bottom1[3], top1[3];
   double bottom2[3], top2[3];
 
@@ -3963,22 +3963,22 @@ double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain,
   Local_Neuroseg_Top(locseg1, top1);
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-  
+
   zlocseg2 = Copy_Local_Neuroseg(locseg2);
- 
+
   Local_Neuroseg_Scale_Z(zlocseg2, z_scale);
 
   double zbottom2[3], ztop2[3];
   Local_Neuroseg_Bottom(zlocseg2, zbottom2);
   Local_Neuroseg_Top(zlocseg2, ztop2);
-  
+
   /* anisotropic planar distance */
   feat[0] = Geo3d_Line_Line_Dist(zbottom1, ztop1, zbottom2, ztop2);
   feat[0] *= res[0];
 
   /* isotropic planar distance */
   feat[1] = Geo3d_Line_Line_Dist(bottom1, top1, bottom2, top2);
-  
+
   double intersect1, intersect2;
   int cond;
 
@@ -4001,7 +4001,7 @@ double *Locseg_Chain_Conn_Feature(Locseg_Chain *chain,
   feat[6] = Neuroseg_Angle_Between(&(locseg1->seg), &(locseg2->seg));
 
   /* anisotropic surface distance */
-  feat[7] = Local_Neuroseg_Lineseg_Dist(zlocseg2, zbottom1, ztop1, 1.0) 
+  feat[7] = Local_Neuroseg_Lineseg_Dist(zlocseg2, zbottom1, ztop1, 1.0)
     * res[0];
 
 /* isotropic surface distance */
@@ -4104,7 +4104,7 @@ int Locseg_Chain_File_Trace_Record_Size(const char *file)
   Trace_Record tr;
 
   Local_Neuroseg_Fread(&locseg, fp);
-  
+
   while (Trace_Record_Fread(&tr, fp) == NULL) {
     if (Local_Neuroseg_Fread(&locseg, fp) == NULL) {
       return sizeof(Trace_Record);
@@ -4113,7 +4113,7 @@ int Locseg_Chain_File_Trace_Record_Size(const char *file)
 
   double best_score = -1.0;
   int best_size = sizeof(Trace_Record);
-  
+
   Local_Neuroseg locseg2;
 
   fseek(fp, -best_size, SEEK_CUR);
@@ -4123,7 +4123,7 @@ int Locseg_Chain_File_Trace_Record_Size(const char *file)
   for (i = 1; i <= largest_size; i++) {
     fseek(fp, i, SEEK_CUR);
     if (Local_Neuroseg_Fread(&locseg2, fp) != NULL) {
-      double score = 
+      double score =
 	Geo3d_Dist_Sqr(locseg.pos[0], locseg.pos[1], locseg.pos[2],
 		       locseg2.pos[0], locseg2.pos[1], locseg.pos[2]);
       if (best_score < 0) {
@@ -4192,9 +4192,9 @@ void Locseg_Chain_Tune_End(Locseg_Chain *chain, Stack *stack, double z_scale,
   Locseg_Fit_Workspace_Set_Var(fws,
 			       NEUROSEG_VAR_MASK_ORIENTATION,
 			       NEUROSEG_VAR_MASK_NONE);
-  
+
   Local_Neuroseg* (*step_func) (Locseg_Chain*);
-  
+
   if (end == DL_HEAD) {
     step_func = Locseg_Chain_Next_Seg;
   } else {
@@ -4202,7 +4202,7 @@ void Locseg_Chain_Tune_End(Locseg_Chain *chain, Stack *stack, double z_scale,
   }
 
   Locseg_Chain_Iterator_Start(chain, end);
-  do {      
+  do {
     locseg = step_func(chain);
 
     if (locseg == NULL) {
@@ -4210,21 +4210,21 @@ void Locseg_Chain_Tune_End(Locseg_Chain *chain, Stack *stack, double z_scale,
     }
 
     prev_locseg = Locseg_Chain_Peek_Seg(chain);
-    
+
     end_removed = _FALSE_;
     if (end == DL_HEAD) {
       Flip_Local_Neuroseg(locseg);
     }
-     
+
 #ifdef _DEBUG_
     printf("before: ");
     Print_Local_Neuroseg(locseg);
 #endif
 
     Local_Neuroseg_Break_Gap(locseg, stack, z_scale);
-    
+
     Print_Local_Neuroseg(locseg);
-    
+
     if (mask != NULL) {
       /* if the center hit marked region */
       if (Local_Neuroseg_Center_Sample(locseg, mask, z_scale) > 0.8) {
@@ -4259,7 +4259,7 @@ void Locseg_Chain_Tune_End(Locseg_Chain *chain, Stack *stack, double z_scale,
 	  break;
 	}
       }
-      
+
 #ifdef _DEBUG_
       Print_Local_Neuroseg(locseg);
 #endif
@@ -4295,7 +4295,7 @@ void Locseg_Chain_Tune_End(Locseg_Chain *chain, Stack *stack, double z_scale,
       }
     }
   } while (end_removed == _TRUE_);
-    
+
   if (locseg == NULL) {
     Locseg_Chain_Iterator_Start(chain, end);
     locseg = step_func(chain);
@@ -4352,7 +4352,7 @@ static double kappa3(double *p1, double *p2, double *p3)
   return sqrt(1 - Coordinate_3d_Cos3(p1, p2, p3));
 }
 
-int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg, 
+int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg,
 			     Trace_Record *tr)
 {
   int n = Locseg_Chain_Length(chain);
@@ -4365,7 +4365,7 @@ int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg,
 
   /* alloc <kappa> */
   double *kappa = darray_malloc(n + 2);
-  
+
   int i, j;
 
   kappa[0] = 0;
@@ -4388,7 +4388,7 @@ int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg,
     locseg_buffer[1] = locseg_buffer[2];
   }
 
-  
+
   double min_cost = 5.0;
   int index = -1;
   double *p[4];
@@ -4457,7 +4457,7 @@ int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg,
     locseg_buffer[0] = Locseg_Chain_Peek_Seg(chain);
     ort[2][0] = locseg_buffer[0]->seg.theta;
     ort[2][1] = locseg_buffer[0]->seg.psi;
-    flow = Xz_Orientation_Dot(ort[0], ort[1]) + 
+    flow = Xz_Orientation_Dot(ort[0], ort[1]) +
       Xz_Orientation_Dot(ort[1], ort[2]);
   }
 
@@ -4471,7 +4471,7 @@ int Locseg_Chain_Connect_Seg(Locseg_Chain *chain, Local_Neuroseg *locseg,
 }
 
 /* See th M document for more details. */
-void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2, 
+void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
 			Dlist_End_e end1, Dlist_End_e end2)
 {
   if (Locseg_Chain_Is_Empty(chain2)) {
@@ -4483,8 +4483,8 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
     Locseg_Chain_Flip(chain2);
   }
 
-  /* Switch the chains if necessary. This is to make sure that the tail of 
-   * input_chain[0] (master chain) is merged to the head of 
+  /* Switch the chains if necessary. This is to make sure that the tail of
+   * input_chain[0] (master chain) is merged to the head of
    * input_chain[1] (slave chain) */
   Locseg_Chain *input_chain[2];
 
@@ -4504,9 +4504,9 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
     Local_Neuroseg_Top(node->locseg, top);
     Local_Neuroseg_Bottom(node->locseg, bottom);
     changed = _FALSE_;
-    if ((Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD, 
+    if ((Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD,
 			       top[0], top[1], top[2]) > 0) &&
-	(Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD, 
+	(Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD,
 			       bottom[0], bottom[1], bottom[2]) > 0)) {
       /* Remove the head of slave chain if it is within the master chain. */
       Locseg_Chain_Remove_End(input_chain[1], DL_HEAD);
@@ -4517,13 +4517,13 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
       node = Locseg_Chain_Peek_At(input_chain[1], 1);
       if (node != NULL) {
 	Local_Neuroseg_Bottom(node->locseg, bottom);
-	if (Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD, 
+	if (Locseg_Chain_Hit_Test(input_chain[0], DL_BACKWARD,
 				  bottom[0], bottom[1], bottom[2]) > 0) {
 	  Locseg_Chain_Remove_End(input_chain[1], DL_HEAD);
 	  changed = _TRUE_;
 	}
       }
-    }    
+    }
   }
 
   double top[3], bottom[3];
@@ -4533,9 +4533,9 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
     Local_Neuroseg_Top(node->locseg, top);
     Local_Neuroseg_Bottom(node->locseg, bottom);
     changed = _FALSE_;
-    if ((Locseg_Chain_Hit_Test(input_chain[1], DL_FORWARD, 
+    if ((Locseg_Chain_Hit_Test(input_chain[1], DL_FORWARD,
 			       top[0], top[1], top[2]) > 0) &&
-	(Locseg_Chain_Hit_Test(input_chain[1], DL_FORWARD, 
+	(Locseg_Chain_Hit_Test(input_chain[1], DL_FORWARD,
 			       bottom[0], bottom[1], bottom[2]) > 0)) {
 	Locseg_Chain_Remove_End(input_chain[0], DL_TAIL);
 	changed = _TRUE_;
@@ -4545,13 +4545,13 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
       node = Locseg_Chain_Prev(input_chain[0]);
       if (node != NULL) {
 	Local_Neuroseg_Bottom(node->locseg, top);
-	if (Locseg_Chain_Hit_Test(input_chain[1], DL_BACKWARD, 
+	if (Locseg_Chain_Hit_Test(input_chain[1], DL_BACKWARD,
 				  top[0], top[1], top[2]) > 0) {
 	  Locseg_Chain_Remove_End(input_chain[0], DL_TAIL);
 	  changed = _TRUE_;
 	}
       }
-    }    
+    }
   }
 
   if ((Locseg_Chain_Length(input_chain[0]) > 0) &&
@@ -4559,7 +4559,7 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
     node = Locseg_Chain_Tail(input_chain[0]);
     double pos[3];
     if (Locseg_Node_Fix_Pos(node, pos)) {
-      if (Locseg_Chain_Hit_Test(input_chain[1], DL_BACKWARD, 
+      if (Locseg_Chain_Hit_Test(input_chain[1], DL_BACKWARD,
 				pos[0], pos[1], pos[2]) > 0) {
 	Locseg_Node_Set_Direction(node, DL_BOTHDIR);
       }
@@ -4567,7 +4567,7 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
 
     node = Locseg_Chain_Head(input_chain[1]);
     if (Locseg_Node_Fix_Pos(node, pos)) {
-      if (Locseg_Chain_Hit_Test(input_chain[0], DL_FORWARD, 
+      if (Locseg_Chain_Hit_Test(input_chain[0], DL_FORWARD,
 				pos[0], pos[1], pos[2]) > 0) {
 	Locseg_Node_Set_Direction(node, DL_BOTHDIR);
       }
@@ -4579,8 +4579,8 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	Local_Neuroseg_Bottom(node->locseg, bottom);
 	Local_Neuroseg_Top(node->locseg, top);
 	Local_Neuroseg *head = Locseg_Chain_Head_Seg(input_chain[1]);
-	if (Local_Neuroseg_Point_Dist(head, 
-				      bottom[0], bottom[1], bottom[2], 1.0) < 
+	if (Local_Neuroseg_Point_Dist(head,
+				      bottom[0], bottom[1], bottom[2], 1.0) <
 	    Local_Neuroseg_Point_Dist(head, top[0], top[1], top[2], 1.0)) {
 	  Flip_Local_Neuroseg(node->locseg);
 	}
@@ -4593,8 +4593,8 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
 	Local_Neuroseg_Bottom(node->locseg, bottom);
 	Local_Neuroseg_Top(node->locseg, top);
 	Local_Neuroseg *tail = Locseg_Chain_Tail_Seg(input_chain[0]);
-	if (Local_Neuroseg_Point_Dist(tail, 
-				      bottom[0], bottom[1], bottom[2], 1.0) > 
+	if (Local_Neuroseg_Point_Dist(tail,
+				      bottom[0], bottom[1], bottom[2], 1.0) >
 	    Local_Neuroseg_Point_Dist(tail, top[0], top[1], top[2], 1.0)) {
 	  Flip_Local_Neuroseg(node->locseg);
 	}
@@ -4605,7 +4605,7 @@ void Locseg_Chain_Merge(Locseg_Chain *chain1, Locseg_Chain *chain2,
   if (Locseg_Chain_Is_Empty(input_chain[1]) == _FALSE_) {
     Locseg_Chain_Cat(input_chain[0], input_chain[1]);
   }
-  
+
   if (end1 == DL_HEAD) {
     chain1->list = chain2->list;
   }
@@ -4655,7 +4655,7 @@ void Locseg_Chain_Conn_Fix(Locseg_Chain *chain1, Locseg_Chain *chain2,
       while ((locseg = Locseg_Chain_Head_Seg(chain2)) != NULL) {
 	double center[3];
 	Local_Neuroseg_Center(locseg, center);
-	if (Locseg_Chain_Hit_Test(chain1, test_direction, 
+	if (Locseg_Chain_Hit_Test(chain1, test_direction,
 				  center[0], center[1], center[2]) > 0) {
 	  Locseg_Chain_Remove_End(chain2, DL_HEAD);
 	} else {
@@ -4667,14 +4667,14 @@ void Locseg_Chain_Conn_Fix(Locseg_Chain *chain1, Locseg_Chain *chain2,
       while ((locseg = Locseg_Chain_Tail_Seg(chain2)) != NULL) {
 	double center[3];
 	Local_Neuroseg_Center(locseg, center);
-	if (Locseg_Chain_Hit_Test(chain1, test_direction, 
+	if (Locseg_Chain_Hit_Test(chain1, test_direction,
 				  center[0], center[1], center[2]) > 0) {
 	  Locseg_Chain_Remove_End(chain2, DL_TAIL);
 	} else {
 	  break;
 	}
-      }      
-    }   
+      }
+    }
   }
 }
 
@@ -4710,26 +4710,26 @@ void Locseg_Chain_Remove_Redundant(Locseg_Chain *chain)
       Locseg_Chain_Next_Seg(chain);
       locseg = Locseg_Chain_Peek_Seg(chain);
     }
-  }  
+  }
 }
 */
 
-Locseg_Chain* Locseg_Chain_Bridge(const Local_Neuroseg *locseg1, 
+Locseg_Chain* Locseg_Chain_Bridge(const Local_Neuroseg *locseg1,
 				  const Local_Neuroseg *locseg2)
 {
   double center1[3], center2[3];
   Local_Neuroseg_Center(locseg1, center1);
   Local_Neuroseg_Center(locseg2, center2);
-  
+
   double vec[3];
-  
+
   Geo3d_Coordinate_Offset(center1[0], center1[1], center1[2],
 			  center2[0], center2[1], center2[2],
 			  vec, vec + 1, vec + 2);
-  
+
   Local_Neuroseg *start_locseg = Copy_Local_Neuroseg(locseg1);
   Local_Neuroseg *end_locseg = Copy_Local_Neuroseg(locseg2);
-  
+
   coordinate_3d_t vec1, vec2;
   Geo3d_Orientation_Normal(locseg1->seg.theta, locseg1->seg.psi,
 			   vec1, vec1 + 1, vec1 + 2);
@@ -4749,8 +4749,8 @@ Locseg_Chain* Locseg_Chain_Bridge(const Local_Neuroseg *locseg1,
     Geo3d_Orientation_Normal(end_locseg->seg.theta, end_locseg->seg.psi,
 			     vec2, vec2 + 1, vec2 + 2);
   }
-  
-  
+
+
   Locseg_Chain *chain = New_Locseg_Chain();
 
   Local_Neuroseg *locseg = New_Local_Neuroseg();
@@ -4786,7 +4786,7 @@ Locseg_Chain* Locseg_Chain_Bridge(const Local_Neuroseg *locseg1,
     dort[i] = (vec2[i] - vec1[i]) / (nseg + 1);
   }
   */
-  ds = (end_locseg->seg.scale - start_locseg->seg.scale) / (nseg + 1);  
+  ds = (end_locseg->seg.scale - start_locseg->seg.scale) / (nseg + 1);
 
   Set_Neuroseg_Position(locseg, center1, NEUROSEG_BOTTOM);
   Coordinate_3d_Unitize(vec);
@@ -4827,8 +4827,8 @@ Locseg_Chain* Locseg_Chain_Bridge(const Local_Neuroseg *locseg1,
   return chain;
 }
 
-Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source, 
-				     Locseg_Chain *target, 
+Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source,
+				     Locseg_Chain *target,
 				     const Stack *signal, double z_scale,
 				     Stack_Graph_Workspace *sgw,
 				     Locseg_Fit_Workspace *fw)
@@ -4858,11 +4858,11 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source,
 
   _BOOL_ first = _TRUE_;
   Locseg_Fit_Workspace tmp_fw;
-  const double dist2_thre = 
+  const double dist2_thre =
     (NEUROSEG_DEFAULT_H - 1.0) * (NEUROSEG_DEFAULT_H - 1.0);
 
   for (i = 1; i < path->length - 1; i++) {
-    Stack_Util_Coord(path->array[i], signal->width, signal->height, 
+    Stack_Util_Coord(path->array[i], signal->width, signal->height,
 		     coord, coord + 1, coord + 2);
     pos[0] = coord[0];
     pos[1] = coord[1];
@@ -4875,14 +4875,14 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source,
     } else {
       Geo3d_Coord_Orientation(vec[0], vec[1], vec[2], &theta, &psi);
       Local_Neuroseg *new_seg = New_Local_Neuroseg();
-      Set_Local_Neuroseg(new_seg, source->seg.r1, 0.0, NEUROSEG_DEFAULT_H, 
+      Set_Local_Neuroseg(new_seg, source->seg.r1, 0.0, NEUROSEG_DEFAULT_H,
 			 theta, psi,
 			 0.0, 0.0, source->seg.scale, 0.0, 0.0, 0.0);
       Set_Neuroseg_Position(new_seg, start_pos, NEUROSEG_BOTTOM);
       if (fw != NULL) {
 	if (first) {
           Locseg_Fit_Workspace_Copy(&tmp_fw, fw);
-	  tmp_fw.nvar = 
+	  tmp_fw.nvar =
 	    Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 					     NEUROSEG_VAR_MASK_SCALE,
 					     NEUROPOS_VAR_MASK_NONE,
@@ -4902,8 +4902,8 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source,
     }
   }
 
-  Stack_Util_Coord(path->array[path->length - 2], 
-		   signal->width, signal->height, 
+  Stack_Util_Coord(path->array[path->length - 2],
+		   signal->width, signal->height,
 		   coord, coord + 1, coord + 2);
   pos[0] = coord[0];
   pos[1] = coord[1];
@@ -4913,23 +4913,23 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp(const Local_Neuroseg *source,
   if (Coordinate_3d_Distance(pos, start_pos) >= 2.0) {
     int seg_index;
     Locseg_Chain_Point_Dist(target, pos, &seg_index, NULL);
-    
+
     Local_Neuroseg *last_seg = Locseg_Chain_Tail_Seg(bridge);
-    
+
     Local_Neuroseg *locseg = Locseg_Chain_Peek_Seg_At(target, seg_index);
     if (last_seg == NULL) {
       last_seg = locseg;
     }
-    
+
     //Local_Neuroseg_Center(locseg, pos);
     Local_Neuroseg *new_seg = New_Local_Neuroseg();
-    Set_Local_Neuroseg(new_seg, last_seg->seg.r1, 0.0, NEUROSEG_DEFAULT_H, 
+    Set_Local_Neuroseg(new_seg, last_seg->seg.r1, 0.0, NEUROSEG_DEFAULT_H,
 		       0.0, 0.0, 0.0, 0.0, last_seg->seg.scale, 0.0, 0.0, 0.0);
     Set_Neuroseg_Position(new_seg, start_pos, NEUROSEG_BOTTOM);
     //Locseg_Chain_Point_Dist_K(target, pos, start_pos);
     //Local_Neuroseg_Change_Top(new_seg, start_pos);
     Local_Neuroseg_Change_Top(new_seg, pos);
-    
+
     Trace_Record *tr = New_Trace_Record();
     Trace_Record_Set_Direction(tr, DL_FORWARD);
     Trace_Record_Set_Fix_Point(tr, 0.0);
@@ -4951,7 +4951,7 @@ void Locseg_Chain_End_Pos(Locseg_Chain *chain, Dlist_End_e end, double *pos)
   }
 }
 
-double Locseg_Chain_Point_Dist(Locseg_Chain *chain, const double *pos, 
+double Locseg_Chain_Point_Dist(Locseg_Chain *chain, const double *pos,
 			       int *seg_index, double *skel_pos)
 {
   double dist, min_dist;
@@ -4959,11 +4959,11 @@ double Locseg_Chain_Point_Dist(Locseg_Chain *chain, const double *pos,
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
 
   /* alloc <ellipse> */
-  Geo3d_Ellipse *ellipse = 
+  Geo3d_Ellipse *ellipse =
     Locseg_Chain_Knot_Array_To_Ellipse_Z(ka, 1.0, NULL);
 
   Geo3d_Ellipse cur_ellipse = ellipse[0];
-  
+
   int i;
   int n = Locseg_Chain_Knot_Array_Length(ka);
   min_dist = Geo3d_Ellipse_Point_Distance(&cur_ellipse, pos);
@@ -4973,13 +4973,13 @@ double Locseg_Chain_Point_Dist(Locseg_Chain *chain, const double *pos,
 
   int min_index = 0;
   for (i = 0; i < n - 1; i++) {
-    double interval = Coordinate_3d_Distance(ellipse[i].center, 
+    double interval = Coordinate_3d_Distance(ellipse[i].center,
 					     ellipse[i+1].center);
     if (interval > 1.5) {
       double dl = 1.0 / interval;
       double lambda = dl;
       for (lambda = dl; lambda < 1.0; lambda += dl) {
-	Geo3d_Ellipse_Interpolate(ellipse + i, ellipse + i + 1, lambda, 
+	Geo3d_Ellipse_Interpolate(ellipse + i, ellipse + i + 1, lambda,
 				  &cur_ellipse);
 	dist = Geo3d_Ellipse_Point_Distance(&cur_ellipse, pos);
 	if (dist < min_dist) {
@@ -5018,19 +5018,19 @@ double Locseg_Chain_Point_Dist(Locseg_Chain *chain, const double *pos,
     *seg_index = min_index;
   }
 
-  return min_dist;  
+  return min_dist;
 }
 
-double Locseg_Chain_Point_Dist_K(Locseg_Chain *chain, const double *pos, 
+double Locseg_Chain_Point_Dist_K(Locseg_Chain *chain, const double *pos,
 				 double *knot_pos)
 {
   double dist, min_dist;
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
-  Geo3d_Ellipse *ellipse = 
+  Geo3d_Ellipse *ellipse =
     Locseg_Chain_Knot_Array_To_Ellipse_Z(ka, 1.0, NULL);
 
   Geo3d_Ellipse cur_ellipse = ellipse[0];
-  
+
   int i;
   int n = Locseg_Chain_Knot_Array_Length(ka);
   min_dist = Geo3d_Ellipse_Point_Distance(&cur_ellipse, pos);
@@ -5042,9 +5042,9 @@ double Locseg_Chain_Point_Dist_K(Locseg_Chain *chain, const double *pos,
       min_index = i;
     }
   }
-  
+
   Kill_Locseg_Chain_Knot_Array(ka);
-  
+
   if (knot_pos != NULL) {
     knot_pos[0] = ellipse[min_index].center[0];
     knot_pos[1] = ellipse[min_index].center[1];
@@ -5053,10 +5053,10 @@ double Locseg_Chain_Point_Dist_K(Locseg_Chain *chain, const double *pos,
 
   free(ellipse);
 
-  return min_dist;  
+  return min_dist;
 }
 
-double Locseg_Chain_Dist(Locseg_Chain *chain1, Locseg_Chain *chain2, 
+double Locseg_Chain_Dist(Locseg_Chain *chain1, Locseg_Chain *chain2,
 			 Dlist_End_e end)
 {
   double pos[3];
@@ -5095,7 +5095,7 @@ double Locseg_Chain_Min_Seg_Signal(Locseg_Chain *chain, const Stack *signal,
 }
 
 void Locseg_Chain_Bright_End(Locseg_Chain *chain, Dlist_End_e end,
-			     const Stack *signal, double z_scale, 
+			     const Stack *signal, double z_scale,
 			     double *pos)
 {
   Local_Neuroseg *locseg = NULL;
@@ -5128,7 +5128,7 @@ void Locseg_Chain_Bright_End(Locseg_Chain *chain, Dlist_End_e end,
     if (last_offset < 0.0) {
       PRINT_EXCEPTION("Abnormal value", "Negative offset");
       last_offset = 0.0;
-    }   
+    }
     Local_Neuroseg_Axis_Position(locseg, pos, start_offset);
     if (z_scale != 1.0) {
       pos[2] /= z_scale;
@@ -5152,7 +5152,7 @@ void Locseg_Chain_Bright_End(Locseg_Chain *chain, Dlist_End_e end,
 	}
       }
       offset += step;
-    }    
+    }
   }
 }
 
@@ -5162,7 +5162,7 @@ static void validate_value(int *v, double r)
     *v = 0;
   } else if(*v >= r) {
     *v = r - 1;
-  }  
+  }
 }
 
 static void validate_position(int *pos, int width, int height, int depth)
@@ -5176,7 +5176,7 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
 					     Locseg_Chain *target,
 					     int start_index,
 					     int end_index,
-					     const Stack *signal, 
+					     const Stack *signal,
 					     double z_scale,
 					     Stack_Graph_Workspace *sgw)
 {
@@ -5212,21 +5212,21 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
   Locseg_Label_Workspace *ws = New_Locseg_Label_Workspace();
   if (sgw->sp_option != 1) {
     if (sgw->group_mask == NULL) {
-      sgw->group_mask = Make_Stack(GREY, signal->width, signal->height, 
+      sgw->group_mask = Make_Stack(GREY, signal->width, signal->height,
 	  signal->depth);
     }
     Zero_Stack(sgw->group_mask);
     ws->flag = 0;
     ws->value = 1;
-    Locseg_Chain_Label_W(target, sgw->group_mask, 1.0, start_index, 
+    Locseg_Chain_Label_W(target, sgw->group_mask, 1.0, start_index,
 	end_index, ws);
-    Stack_Graph_Workspace_Set_Range(sgw, start_pos[0], ws->range[0], 
-	start_pos[1], ws->range[1], 
+    Stack_Graph_Workspace_Set_Range(sgw, start_pos[0], ws->range[0],
+	start_pos[1], ws->range[1],
 	start_pos[2], ws->range[2]);
-    Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4], 
-	ws->range[5]); 
+    Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4],
+	ws->range[5]);
   } else {
-    Stack_Graph_Workspace_Set_Range(sgw, start_pos[0], end_pos[0], 
+    Stack_Graph_Workspace_Set_Range(sgw, start_pos[0], end_pos[0],
 	start_pos[1], end_pos[1], start_pos[2], end_pos[2]);
   }
 
@@ -5239,7 +5239,7 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
 
   /* alloc <offset_path> */
   Int_Arraylist *offset_path = NULL;
-  if (fabs((end_pos[2] - start_pos[2]) * (end_pos[1] - start_pos[1]) * 
+  if (fabs((end_pos[2] - start_pos[2]) * (end_pos[1] - start_pos[1]) *
         (end_pos[0] - start_pos[0]) * 1.0) < 100000.0) {
     offset_path = Stack_Route(signal, start_pos, end_pos, sgw);
   } else {
@@ -5253,9 +5253,9 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
     tmpsgw->wf = Stack_Voxel_Weight_S;
     Stack_Sp_Grow_Infer_Parameter(tmpsgw, signal);
 
-    Set_Stack_Pixel(mask, iround(start_pos[0]), iround(start_pos[1]), 
+    Set_Stack_Pixel(mask, iround(start_pos[0]), iround(start_pos[1]),
         iround(start_pos[2]), 0, 2);
-    Set_Stack_Pixel(mask, iround(end_pos[0]), iround(end_pos[1]), 
+    Set_Stack_Pixel(mask, iround(end_pos[0]), iround(end_pos[1]),
         iround(end_pos[2]), 0, 1);
     offset_path = Stack_Sp_Grow(signal, NULL, 0, NULL, 0, tmpsgw);
 
@@ -5263,7 +5263,7 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
     Kill_Stack(mask);
     /*
     Locseg_Chain_Label_G(source, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 2);
-    Locseg_Chain_Label_G(target, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 1);	    
+    Locseg_Chain_Label_G(target, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 1);
     */
   }
 
@@ -5274,7 +5274,7 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
     return NULL;
   }
 
-  Int_Arraylist *path = Make_Int_Arraylist(0, 1);  
+  Int_Arraylist *path = Make_Int_Arraylist(0, 1);
 
   int i;
   int nvoxel = Stack_Voxel_Number(signal);
@@ -5297,11 +5297,11 @@ Int_Arraylist *Locseg_Chain_Shortest_Path_Pt(double *pos,
   }
 #endif
 
-  return path;  
+  return path;
 }
 
 static void locseg_chain_point_range(Locseg_Chain *target, int index,
-				     double *pos, double dist, 
+				     double *pos, double dist,
 				     int *start, int *end)
 {
   Locseg_Chain_Iterator_Locate(target, index);
@@ -5309,7 +5309,7 @@ static void locseg_chain_point_range(Locseg_Chain *target, int index,
   double current[3], extend[3];
   Coordinate_3d_Copy(current, pos);
   Local_Neuroseg_Bottom(locseg, extend);
-  
+
   *start = index;
   double d = Coordinate_3d_Distance(current, extend);
   while (d < dist) {
@@ -5328,7 +5328,7 @@ static void locseg_chain_point_range(Locseg_Chain *target, int index,
   locseg = Locseg_Chain_Next_Seg(target);
   Coordinate_3d_Copy(current, pos);
   Local_Neuroseg_Top(locseg, extend);
-  
+
   *end = index;
   d = Coordinate_3d_Distance(current, extend);
   while (d < dist) {
@@ -5342,7 +5342,7 @@ static void locseg_chain_point_range(Locseg_Chain *target, int index,
       break;
     }
   }
-  
+
 }
 
 void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
@@ -5359,14 +5359,14 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
   Locseg_Chain_Point_Dist(target, pos, &seg_index, skel_pos);
 
   int start, end;
-  locseg_chain_point_range(target, seg_index, skel_pos, 
-			   NEUROSEG_DEFAULT_H * 2.5, 
+  locseg_chain_point_range(target, seg_index, skel_pos,
+			   NEUROSEG_DEFAULT_H * 2.5,
 			   &start, &end);
 
   //int start, end;
   //start = seg_index - 1;
   //end = seg_index + 2;
-  
+
   if (start < 0) {
     start = 0;
   }
@@ -5380,7 +5380,7 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
 
   if (sgw->sp_option != 1) {
     if (sgw->group_mask == NULL) {
-      sgw->group_mask = Make_Stack(GREY, signal->width, signal->height, 
+      sgw->group_mask = Make_Stack(GREY, signal->width, signal->height,
 	  signal->depth);
     }
     Zero_Stack(sgw->group_mask);
@@ -5389,11 +5389,11 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
     Locseg_Chain_Label_W(target, sgw->group_mask, 1.0, start, end, ws);
   }
 
-  Stack_Graph_Workspace_Set_Range(sgw, (int) pos[0], ws->range[0], 
-				  (int) pos[1], ws->range[1], 
+  Stack_Graph_Workspace_Set_Range(sgw, (int) pos[0], ws->range[0],
+				  (int) pos[1], ws->range[1],
 				  (int) pos[2], ws->range[2]);
-  Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4], 
-				     ws->range[5]);   
+  Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4],
+				     ws->range[5]);
   sgw->wf = Stack_Voxel_Weight_S;
 
   if (tz_isnan(sgw->argv[3]) || tz_isnan(sgw->argv[4])) {
@@ -5403,19 +5403,19 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
     }
 
     switch (option) {
-    case 0: 
+    case 0:
       {
-	Stack *substack = Crop_Stack(signal, sgw->range[0], sgw->range[2], 
-				     sgw->range[4], 
-				     sgw->range[1] - sgw->range[0] + 1, 
+	Stack *substack = Crop_Stack(signal, sgw->range[0], sgw->range[2],
+				     sgw->range[4],
+				     sgw->range[1] - sgw->range[0] + 1,
 				     sgw->range[3] - sgw->range[2] + 1,
 				     sgw->range[5] - sgw->range[4] + 1, NULL);
 	int *hist = NULL;
 	if (sgw->signal_mask != NULL) {
-	  Stack *submask = 
-	    Crop_Stack(sgw->signal_mask, 
-		       sgw->range[0], sgw->range[2], sgw->range[4], 
-		       sgw->range[1] - sgw->range[0] + 1, 
+	  Stack *submask =
+	    Crop_Stack(sgw->signal_mask,
+		       sgw->range[0], sgw->range[2], sgw->range[4],
+		       sgw->range[1] - sgw->range[0] + 1,
 		       sgw->range[3] - sgw->range[2] + 1,
 		       sgw->range[5] - sgw->range[4] + 1, NULL);
 	  hist = Stack_Hist_M(substack, submask);
@@ -5425,7 +5425,7 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
 	}
 
 	double c1, c2;
-	int thre = Hist_Rcthre_R(hist, Int_Histogram_Min(hist), 
+	int thre = Hist_Rcthre_R(hist, Int_Histogram_Min(hist),
 				 Int_Histogram_Max(hist), &c1, &c2);
 	free(hist);
 	sgw->argv[3] = thre;
@@ -5446,11 +5446,11 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
 	double inner =Local_Neuroseg_Score(source, signal, z_scale, &fs);
 	fs.options[0] = STACK_FIT_OUTER_SIGNAL;
 	double outer =Local_Neuroseg_Score(source, signal, z_scale, &fs);
-      
+
 	if (tz_isnan(sgw->argv[3])) {
 	  sgw->argv[3] = inner * 0.1 + outer * 0.9;
 	}
-      
+
 	if (tz_isnan(sgw->argv[4])) {
 	  sgw->argv[4] = (inner - outer) / 4.6 * 1.8;
 	}
@@ -5468,34 +5468,34 @@ void Locseg_Chain_Update_Stack_Graph_Workspace(const Local_Neuroseg *source,
 
 Int_Arraylist *Locseg_Chain_Shortest_Path_Seg(const Local_Neuroseg *source,
 					      Locseg_Chain *target,
-					      const Stack *signal, 
+					      const Stack *signal,
 					      double z_scale,
 					      Stack_Graph_Workspace *sgw)
 {
   double pos[3];
   Local_Neuroseg_Center(source, pos);
-  
+
   int seg_index;
   double skel_pos[3];
   double dist = Locseg_Chain_Point_Dist(target, pos, &seg_index, skel_pos);
   if (dist > 200.0) {
     return NULL;
   }
-  
+
   int start_index = 0;
   int end_index = 0;
-  locseg_chain_point_range(target, seg_index, skel_pos, 
-			   NEUROSEG_DEFAULT_H * 2.5, 
+  locseg_chain_point_range(target, seg_index, skel_pos,
+			   NEUROSEG_DEFAULT_H * 2.5,
 			   &start_index, &end_index);
 
-  Int_Arraylist *path = 
-    Locseg_Chain_Shortest_Path_Pt(pos, target, start_index, end_index, 
+  Int_Arraylist *path =
+    Locseg_Chain_Shortest_Path_Pt(pos, target, start_index, end_index,
 				  signal, z_scale, sgw);
 
   return path;
 }
 
-Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source, 
+Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
 					  Locseg_Chain *target,
 					  const Stack *signal, double z_scale,
 					  Stack_Graph_Workspace *sgw)
@@ -5512,13 +5512,13 @@ Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
 
   double tmp_pos[3];
   int tmp_seg_index;
-  
+
   Locseg_Chain_Bright_End(source, DL_TAIL, signal, 1.0, tmp_pos);
   if (z_scale != 1.0) {
     tmp_pos[2] /= z_scale;
   }
   double tmp_skel_pos[3];
-  double tmp_dist = Locseg_Chain_Point_Dist(target, tmp_pos, &tmp_seg_index, 
+  double tmp_dist = Locseg_Chain_Point_Dist(target, tmp_pos, &tmp_seg_index,
 					    tmp_skel_pos);
 
   Local_Neuroseg *source_seg = Locseg_Chain_Head_Seg(source);
@@ -5533,13 +5533,13 @@ Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
     skel_pos[0] = tmp_skel_pos[0];
     skel_pos[1] = tmp_skel_pos[1];
     skel_pos[2] = tmp_skel_pos[2];
-    
+
     source_seg = Locseg_Chain_Tail_Seg(source);
   }
 
-  if (!IS_IN_CLOSE_RANGE3(pos[0], pos[1], pos[2], 
-			  0, Stack_Width(signal) - 1, 
-			  0, Stack_Height(signal) - 1, 
+  if (!IS_IN_CLOSE_RANGE3(pos[0], pos[1], pos[2],
+			  0, Stack_Width(signal) - 1,
+			  0, Stack_Height(signal) - 1,
 			  0, Stack_Depth(signal) - 1)) {
     return NULL;
   }
@@ -5549,7 +5549,7 @@ Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
     return NULL;
   }
   */
-  
+
 #ifdef _DEBUG_
   if (sgw->signal_mask != NULL) {
     if (sgw->signal_mask->kind != GREY) {
@@ -5568,14 +5568,14 @@ Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
 	STACK_FIT_MEAN_SIGNAL);
     if (tmpc < c2) {
      c2 = tmpc;
-    } 
+    }
     double c1 = Locseg_Chain_Min_Seg_Score(source, signal, z_scale,
 	STACK_FIT_OUTER_SIGNAL);
     tmpc = Locseg_Chain_Min_Seg_Score(target, signal, z_scale,
 	STACK_FIT_OUTER_SIGNAL);
     if (tmpc < c1) {
      c1 = tmpc;
-    } 
+    }
     sgw->argv[3] = (c1 + c2) / 2.0;
     if (tz_isnan(sgw->argv[4])) {
       sgw->argv[4] = c2 - c1;
@@ -5588,8 +5588,8 @@ Int_Arraylist *Locseg_Chain_Shortest_Path(Locseg_Chain *source,
 
   int start_index = 0;
   int end_index = 0;
-  locseg_chain_point_range(target, seg_index, skel_pos, 
-			   NEUROSEG_DEFAULT_H * 2.5, 
+  locseg_chain_point_range(target, seg_index, skel_pos,
+			   NEUROSEG_DEFAULT_H * 2.5,
 			   &start_index, &end_index);
 
   return Locseg_Chain_Shortest_Path_Pt(pos, target, start_index,
@@ -5601,15 +5601,15 @@ Int_Arraylist* Locseg_Chain_Skel_Shortest_Path_Pt(double *pos,
 						  Locseg_Chain *target,
 						  int start_index,
 						  int end_index,
-						  const Stack *signal, 
+						  const Stack *signal,
 						  double z_scale,
 						  Stack_Graph_Workspace *sgw)
 {
   /* alloc <ws> */
   Locseg_Label_Workspace *ws = New_Locseg_Label_Workspace();
-  
+
   if (sgw->group_mask == NULL) {
-    sgw->group_mask = Make_Stack(GREY, signal->width, signal->height, 
+    sgw->group_mask = Make_Stack(GREY, signal->width, signal->height,
 				 signal->depth);
   }
   Zero_Stack(sgw->group_mask);
@@ -5617,7 +5617,7 @@ Int_Arraylist* Locseg_Chain_Skel_Shortest_Path_Pt(double *pos,
   int start, end;
   start = start_index;
   end = end_index;
-  
+
   if (start < 0) {
     start = 0;
   }
@@ -5631,19 +5631,19 @@ Int_Arraylist* Locseg_Chain_Skel_Shortest_Path_Pt(double *pos,
   ws->option = 10;
   Locseg_Chain_Label_W(target, sgw->group_mask, 1.0, start, end, ws);
 
-  Stack_Graph_Workspace_Set_Range(sgw, (int) pos[0], ws->range[0], 
-				  (int) pos[1], ws->range[1], 
+  Stack_Graph_Workspace_Set_Range(sgw, (int) pos[0], ws->range[0],
+				  (int) pos[1], ws->range[1],
 				  (int) pos[2], ws->range[2]);
-  Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4], 
-				     ws->range[5]); 
-  
+  Stack_Graph_Workspace_Update_Range(sgw, ws->range[3], ws->range[4],
+				     ws->range[5]);
+
   int start_pos[3];
   int end_pos[3];
-  
+
   start_pos[0] = (int) pos[0];
   start_pos[1] = (int) pos[1];
   start_pos[2] = (int) pos[2];
-  
+
   int seg_index = (start_index + end_index) / 2;
   Local_Neuroseg *locseg = Locseg_Chain_Peek_Seg_At(target, seg_index);
   //Print_Local_Neuroseg(locseg);
@@ -5658,10 +5658,10 @@ Int_Arraylist* Locseg_Chain_Skel_Shortest_Path_Pt(double *pos,
   end_pos[2] = iround(pos[2]);
 
   /* alloc <offset_path> */
-  Int_Arraylist *offset_path = 
+  Int_Arraylist *offset_path =
     Stack_Route(signal, start_pos, end_pos, sgw);
 
-  Int_Arraylist *path = Make_Int_Arraylist(0, 1);  
+  Int_Arraylist *path = Make_Int_Arraylist(0, 1);
 
   int i;
   int nvoxel = Stack_Voxel_Number(signal);
@@ -5679,41 +5679,41 @@ Int_Arraylist* Locseg_Chain_Skel_Shortest_Path_Pt(double *pos,
   /* free <ws> */
   Kill_Locseg_Label_Workspace(ws);
 
-  return path;  
+  return path;
 }
 
 Int_Arraylist*
 Locseg_Chain_Skel_Shortest_Path_Seg(const Local_Neuroseg *source,
 				    Locseg_Chain *target,
-				    const Stack *signal, 
+				    const Stack *signal,
 				    double z_scale,
 				    Stack_Graph_Workspace *sgw)
 {
   double pos[3];
   Local_Neuroseg_Center(source, pos);
-  
+
   int seg_index;
   double dist = Locseg_Chain_Point_Dist(target, pos, &seg_index, NULL);
   if (dist > 200.0) {
     return NULL;
   }
 
-  Int_Arraylist *path = 
-    Locseg_Chain_Skel_Shortest_Path_Pt(pos, target, seg_index - 1, 
+  Int_Arraylist *path =
+    Locseg_Chain_Skel_Shortest_Path_Pt(pos, target, seg_index - 1,
 				       seg_index + 2, signal, z_scale, sgw);
-  
-  return path;  
+
+  return path;
 }
 
-Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source, 
+Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source,
 					       Locseg_Chain *target,
-					       const Stack *signal, 
+					       const Stack *signal,
 					       double z_scale,
 					       Stack_Graph_Workspace *sgw)
 {
   double pos[3];
   Locseg_Chain_Bright_End(source, DL_HEAD, signal, 1.0, pos);
-  
+
   if (z_scale != 1.0) {
     pos[2] /= z_scale;
   }
@@ -5723,7 +5723,7 @@ Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source,
 
   double tmp_pos[3];
   int tmp_seg_index;
-  
+
   Locseg_Chain_Bright_End(source, DL_TAIL, signal, 1.0, tmp_pos);
   if (z_scale != 1.0) {
     tmp_pos[2] /= z_scale;
@@ -5742,9 +5742,9 @@ Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source,
     //source_seg = Locseg_Chain_Tail_Seg(source);
   }
 
-  if (!IS_IN_CLOSE_RANGE3(pos[0], pos[1], pos[2], 
-			  0, Stack_Width(signal) - 1, 
-			  0, Stack_Height(signal) - 1, 
+  if (!IS_IN_CLOSE_RANGE3(pos[0], pos[1], pos[2],
+			  0, Stack_Width(signal) - 1,
+			  0, Stack_Height(signal) - 1,
 			  0, Stack_Depth(signal) - 1)) {
     return NULL;
   }
@@ -5752,7 +5752,7 @@ Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source,
   if (dist > 200.0) {
     return NULL;
   }
-  
+
   Locseg_Chain_Update_Stack_Graph_Workspace(source_seg, target, signal,
   					    1.0, sgw);
   if (tz_isnan(sgw->argv[3])) {
@@ -5765,7 +5765,7 @@ Int_Arraylist *Locseg_Chain_Skel_Shortest_Path(Locseg_Chain *source,
 }
 
 
-int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt, 
+int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
 			       const double *ort, double *new_pos)
 {
   Locseg_Chain_Knot_Array *ka = Locseg_Chain_To_Knot_Array(chain, NULL);
@@ -5822,10 +5822,10 @@ int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
     Locseg_Chain_Knot_Pos(ka, 1, end_pos);
 
     int cond;
-    min_dist = Geo3d_Lineseg_Lineseg_Dist(start_pos, end_pos, 
-					  start, end, &lambda1, &lambda2, 
+    min_dist = Geo3d_Lineseg_Lineseg_Dist(start_pos, end_pos,
+					  start, end, &lambda1, &lambda2,
 					  &cond);
-    
+
     lambda = lambda1;
 
     for (i = 2; i < n; i++) {
@@ -5833,7 +5833,7 @@ int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
       start_pos[1] = end_pos[1];
       start_pos[2] = end_pos[2];
       Locseg_Chain_Knot_Pos(ka, i, end_pos);
-      dist = Geo3d_Lineseg_Lineseg_Dist(start_pos, end_pos, 
+      dist = Geo3d_Lineseg_Lineseg_Dist(start_pos, end_pos,
 					start, end, &lambda1, &lambda2, &cond);
 
       if (dist < min_dist) {
@@ -5841,7 +5841,7 @@ int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
 	min_index = i - 1;
 	lambda = lambda1;
       }
-    }  
+    }
   }
 
   if ((lambda > 0.0) && (lambda < 1.0)) {
@@ -5864,22 +5864,22 @@ int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
 	}
       }
     }
-  }  
+  }
 
   if ((lambda > 0.0) && (lambda < 1.0)) {
     Geo3d_Lineseg_Break(start_pos, end_pos, lambda, insertion);
     Locseg_Chain_Knot *knot = Locseg_Chain_Knot_Array_At(ka, min_index);
-    Locseg_Chain_Knot *next_knot = 
+    Locseg_Chain_Knot *next_knot =
       Locseg_Chain_Knot_Array_At(ka, min_index + 1);
 
     Local_Neuroseg *locseg = NULL;
     if (next_knot->id == knot->id) { /* break in the same locseg*/
-      TZ_ASSERT((knot->offset == 0.0) || (next_knot->offset == 1.0), 
+      TZ_ASSERT((knot->offset == 0.0) || (next_knot->offset == 1.0),
 		"Invalid knots");
       Local_Neuroseg *prev_locseg = Locseg_Chain_Peek_Seg_At(chain, knot->id);
       double h = prev_locseg->seg.h;
       if (h > 1.0) {
-	double alpha = 
+	double alpha =
 	  knot->offset * (1.0 - lambda) + next_knot->offset * lambda;
 	locseg = Copy_Local_Neuroseg(prev_locseg);
 	Local_Neuroseg_Chop(prev_locseg, alpha);
@@ -5890,23 +5890,23 @@ int Locseg_Chain_Interpolate_L(Locseg_Chain *chain, const double *pt,
 	  node->tr = New_Trace_Record();
 	}
 	Trace_Record *tr = New_Trace_Record();
-	if (knot->offset == 0.0) {	  
+	if (knot->offset == 0.0) {
 	  Trace_Record_Set_Fix_Point(node->tr, 1.0);
-	  Trace_Record_Set_Fix_Point(tr, next_knot->offset * (1.0 - alpha) / 
+	  Trace_Record_Set_Fix_Point(tr, next_knot->offset * (1.0 - alpha) /
 				     (1.0 - alpha * next_knot->offset));
 	} else if (next_knot->offset == 1.0) {
-	  Trace_Record_Set_Fix_Point(node->tr, knot->offset / 
-				     (knot->offset + 
+	  Trace_Record_Set_Fix_Point(node->tr, knot->offset /
+				     (knot->offset +
 				      alpha * (1.0 - knot->offset)));
 	  Trace_Record_Set_Fix_Point(tr, 0.0);
 	} else {
 	  TZ_ERROR(ERROR_DATA_VALUE);
 	}
-	  
+
 	Locseg_Chain_Insert(chain, locseg, tr, knot->id + 1);
 	index = knot->id + 1;
       }
-    } else { /* break in different segments */      
+    } else { /* break in different segments */
       Locseg_Node *node1 = Locseg_Chain_Peek_At(chain, knot->id);
       Locseg_Node *node2 = Locseg_Chain_Peek_At(chain, next_knot->id);
 
@@ -5962,7 +5962,7 @@ void Locseg_Chain_Translate(Locseg_Chain *chain, const double *offset)
 _BOOL_ Locseg_Chain_Break_Node(Locseg_Chain *chain, int index, double t)
 {
   Locseg_Node *node = Locseg_Chain_Peek_At(chain, index);
-  
+
   if ((node->locseg->seg.h <= 1.5) || (t <= 0.0) || (t >= 1.0)) {
     return _FALSE_;
   }
@@ -5991,7 +5991,7 @@ _BOOL_ Locseg_Chain_Break_Node(Locseg_Chain *chain, int index, double t)
       }
     }
   }
-  
+
   Locseg_Chain_Insert(chain, locseg, tr, index);
 
   return _TRUE_;
@@ -6001,7 +6001,7 @@ int Locseg_Chain_Remove_Seed(Locseg_Chain *chain)
 {
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
   Locseg_Node *node = NULL;
-  
+
   int removed = 0;
 
   while ((node = Locseg_Chain_Next(chain)) != NULL) {
@@ -6020,7 +6020,7 @@ void Locseg_Chain_Adjust_Seed(Locseg_Chain *chain)
 {
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
   Locseg_Node *node = NULL;
-  
+
   Locseg_Node *prev_node = NULL;
 
   while ((node = Locseg_Chain_Next(chain)) != NULL) {
@@ -6038,11 +6038,11 @@ void Locseg_Chain_Adjust_Seed(Locseg_Chain *chain)
       }
     }
     prev_node = node;
-  }  
+  }
 }
 
 _BOOL_ Locseg_Chain_Form_Loop(Locseg_Chain *chain, Local_Neuroseg *locseg,
-			    Dlist_Direction_e direction) 
+			    Dlist_Direction_e direction)
 {
   double center[3];
   Local_Neuroseg_Center(locseg, center);
@@ -6050,14 +6050,14 @@ _BOOL_ Locseg_Chain_Form_Loop(Locseg_Chain *chain, Local_Neuroseg *locseg,
     Locseg_Chain_Iterator_Start(chain, DL_TAIL);
     Locseg_Node *node = Locseg_Chain_Prev(chain);
     while ((node = Locseg_Chain_Prev(chain)) != NULL) {
-      if (Local_Neuroseg_Hit_Test(node->locseg, 
+      if (Local_Neuroseg_Hit_Test(node->locseg,
 				  center[0], center[1], center[2]) > 0) {
 	double bottom[3];
 	Local_Neuroseg_Bottom(locseg, bottom);
-	if (Local_Neuroseg_Hit_Test(node->locseg, 
+	if (Local_Neuroseg_Hit_Test(node->locseg,
 				    bottom[0], bottom[1], bottom[2]) == 0) {
 	  return _TRUE_;
-	} else if (Neuroseg_Angle_Between(&(locseg->seg), 
+	} else if (Neuroseg_Angle_Between(&(locseg->seg),
 					  &(node->locseg->seg))
 		   > TZ_PI_2) {
 	  return _TRUE_;
@@ -6068,14 +6068,14 @@ _BOOL_ Locseg_Chain_Form_Loop(Locseg_Chain *chain, Local_Neuroseg *locseg,
     Locseg_Chain_Iterator_Start(chain, DL_HEAD);
     Locseg_Node *node = Locseg_Chain_Next(chain);
     while ((node = Locseg_Chain_Next(chain)) != NULL) {
-      if (Local_Neuroseg_Hit_Test(node->locseg, 
+      if (Local_Neuroseg_Hit_Test(node->locseg,
 				  center[0], center[1], center[2]) > 0) {
 	double top[3];
 	Local_Neuroseg_Top(locseg, top);
-	if (Local_Neuroseg_Hit_Test(node->locseg, 
+	if (Local_Neuroseg_Hit_Test(node->locseg,
 				    top[0], top[1], top[2]) == 0) {
 	  return _TRUE_;
-	} else if (Neuroseg_Angle_Between(&(locseg->seg), 
+	} else if (Neuroseg_Angle_Between(&(locseg->seg),
 					  &(node->locseg->seg))
 		   > TZ_PI_2) {
 	  return _TRUE_;
@@ -6101,7 +6101,7 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
   double theta, psi;
   _BOOL_ first = _TRUE_;
   Locseg_Fit_Workspace tmp_fw;
-  const double dist2_thre = 
+  const double dist2_thre =
     (NEUROSEG_DEFAULT_H - 1.0) * (NEUROSEG_DEFAULT_H - 1.0);
 
   double dist2 = 0.0;
@@ -6117,7 +6117,7 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
   Locseg_Chain *bridge = New_Locseg_Chain();
   int i;
   for (i = 0; i < n; i++) {
-    Stack_Util_Coord(skel[i], signal->width, signal->height, 
+    Stack_Util_Coord(skel[i], signal->width, signal->height,
 		     coord, coord + 1, coord + 2);
     Set_Coordinate_3d(pos, coord[0], coord[1], coord[2]);
     dist2 = Geo3d_Dist_Sqr(start_pos[0], start_pos[1], start_pos[2],
@@ -6132,14 +6132,14 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
 	printf("stop here: 0 vec.\n");
       }
 #endif
-      
+
       vec[0] += pos[0] - start_pos[0];
       vec[1] += pos[1] - start_pos[1];
       vec[2] += pos[2] - start_pos[2];
 
       Geo3d_Coord_Orientation(vec[0], vec[1], vec[2], &theta, &psi);
       Local_Neuroseg *new_seg = New_Local_Neuroseg();
-      Set_Local_Neuroseg(new_seg, sr, 0.0, sqrt(dist2) + 1.0, 
+      Set_Local_Neuroseg(new_seg, sr, 0.0, sqrt(dist2) + 1.0,
 			 theta, psi, 0.0, 0.0, ss, 0.0, 0.0, 0.0);
       dist2 = 0.0;
       Set_Neuroseg_Position(new_seg, start_pos, NEUROSEG_BOTTOM);
@@ -6148,7 +6148,7 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
 	if (fw != NULL) {
 	  if (first) {
 	    Locseg_Fit_Workspace_Copy(&tmp_fw, fw);
-	    tmp_fw.nvar = 
+	    tmp_fw.nvar =
 	      Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 					       NEUROSEG_VAR_MASK_SCALE,
 					       NEUROPOS_VAR_MASK_NONE,
@@ -6172,7 +6172,7 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
       Trace_Record_Set_Direction(tr, DL_FORWARD);
       Trace_Record_Set_Fix_Point(tr, 0.0);
       Locseg_Chain_Add(bridge, new_seg, tr, DL_TAIL);
-      
+
       /* step forward */
       Local_Neuroseg_Center(new_seg, start_pos);
       Set_Coordinate_3d(vec, 0.0, 0.0, 0.0);
@@ -6180,13 +6180,13 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
   }
 
   /* last segment */
-  Stack_Util_Coord(skel[n-1], signal->width, signal->height, 
+  Stack_Util_Coord(skel[n-1], signal->width, signal->height,
 		   coord, coord + 1, coord + 2);
   Set_Coordinate_3d(pos, coord[0], coord[1], coord[2]);
-  
+
   Local_Neuroseg *last_seg = Locseg_Chain_Tail_Seg(bridge);
   Local_Neuroseg *new_seg = New_Local_Neuroseg();
-  Set_Local_Neuroseg(new_seg, sr, 0.0, 1.0, 
+  Set_Local_Neuroseg(new_seg, sr, 0.0, 1.0,
 		     0.0, 0.0, 0.0, 0.0, ss, 0.0, 0.0, 0.0);
   if (last_seg != NULL) {
     new_seg->seg.r1 = last_seg->seg.r1;
@@ -6195,12 +6195,12 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
 
   Set_Neuroseg_Position(new_seg, start_pos, NEUROSEG_BOTTOM);
   Local_Neuroseg_Change_Top(new_seg, pos);
- 
+
   if ((sr > 0) && (new_seg->seg.h >= 5.0)) {
     if (fw != NULL) {
       if (first) {
 	Locseg_Fit_Workspace_Copy(&tmp_fw, fw);
-	tmp_fw.nvar = 
+	tmp_fw.nvar =
 	  Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 					   NEUROSEG_VAR_MASK_SCALE,
 					   NEUROPOS_VAR_MASK_NONE,
@@ -6212,13 +6212,13 @@ Locseg_Chain* Locseg_Chain_From_Skel(int *skel, int n, double sr, double ss,
   } else {
     new_seg->seg.r1 = 0.0;
   }
-   
+
   Trace_Record *tr = New_Trace_Record();
   Trace_Record_Set_Direction(tr, DL_FORWARD);
   Trace_Record_Set_Fix_Point(tr, 0.0);
   Locseg_Chain_Add(bridge, new_seg, tr, DL_TAIL);
 
-  return bridge;  
+  return bridge;
 }
 
 Locseg_Chain* Locseg_Chain_From_Ball_Array(Geo3d_Ball *skel, int n,
@@ -6254,14 +6254,14 @@ Locseg_Chain* Locseg_Chain_From_Ball_Array(Geo3d_Ball *skel, int n,
     tmpvec[1] = skel[i+1].center[1] - skel[i].center[1];
     tmpvec[2] = skel[i+1].center[2] - skel[i].center[2];
     h = Coordinate_3d_Norm(tmpvec);
-    Set_Local_Neuroseg(new_seg, skel[i].r, 0.0, h, 
+    Set_Local_Neuroseg(new_seg, skel[i].r, 0.0, h,
 		       theta, psi, 0.0, 0.0, ss, 0.0, 0.0, 0.0);
     Set_Neuroseg_Position(new_seg, skel[i].center, NEUROSEG_BOTTOM);
 
     if ((fw != NULL) && (signal != NULL)) {
       if (first) {
 	Locseg_Fit_Workspace_Copy(&tmp_fw, fw);
-	tmp_fw.nvar = 
+	tmp_fw.nvar =
 	  Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 					   NEUROSEG_VAR_MASK_SCALE,
 					   NEUROPOS_VAR_MASK_NONE,
@@ -6284,19 +6284,19 @@ Locseg_Chain* Locseg_Chain_From_Ball_Array(Geo3d_Ball *skel, int n,
     Trace_Record_Set_Direction(tr, DL_FORWARD);
     Trace_Record_Set_Fix_Point(tr, 0.0);
     Locseg_Chain_Add(bridge, new_seg, tr, DL_TAIL);
-    
+
     /* step forward */
     Set_Coordinate_3d(vec, 0.0, 0.0, 0.0);
   }
 
-  return bridge;  
+  return bridge;
 }
 
 Locseg_Chain* Locseg_Chain_From_Sp_Grow(Stack *stack, double z_scale,
 					Sp_Grow_Workspace *sgw)
 {
   Int_Arraylist *path = Stack_Sp_Grow(stack, NULL, 0, NULL, 0, sgw);
-  
+
   Locseg_Fit_Workspace *fw = New_Locseg_Fit_Workspace();
   Locseg_Chain *chain = Locseg_Chain_From_Skel(path->array, path->length,
 					       3.0, 1.0, stack, z_scale,
@@ -6304,11 +6304,11 @@ Locseg_Chain* Locseg_Chain_From_Sp_Grow(Stack *stack, double z_scale,
 
   Kill_Locseg_Fit_Workspace(fw);
   Kill_Int_Arraylist(path);
-  
+
   return chain;
 }
 
-Locseg_Chain* Locseg_Chain_Bridge_Sp_G(Locseg_Chain *source, 
+Locseg_Chain* Locseg_Chain_Bridge_Sp_G(Locseg_Chain *source,
 				       Locseg_Chain *target,
 				       Stack *stack, double z_scale,
 				       Sp_Grow_Workspace *sgw)
@@ -6319,9 +6319,9 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp_G(Locseg_Chain *source,
   mask.height = stack->height;
   mask.depth = stack->depth;
   mask.array = sgw->mask;
-  
+
   Locseg_Chain_Label_G(source, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 2);
-  Locseg_Chain_Label_G(target, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 1);				   
+  Locseg_Chain_Label_G(target, &mask, 1.0, 0, -1, 1.0, 0.0, 0, 1);
   Int_Arraylist *path = Stack_Sp_Grow(stack, NULL, 0, NULL, 0, sgw);
 
   int x, y, z;
@@ -6332,7 +6332,7 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp_G(Locseg_Chain *source,
   Local_Neuroseg *locseg = Locseg_Chain_Peek_Seg_Nearby(source, pos);
   double sr = locseg->seg.r1;
   double ss = locseg->seg.scale;
-  
+
   Locseg_Fit_Workspace *fw = New_Locseg_Fit_Workspace();
   Locseg_Chain *chain = Locseg_Chain_From_Skel(path->array, path->length,
 					       sr, ss, stack, z_scale,
@@ -6340,11 +6340,11 @@ Locseg_Chain* Locseg_Chain_Bridge_Sp_G(Locseg_Chain *source,
 
   Kill_Locseg_Fit_Workspace(fw);
   Kill_Int_Arraylist(path);
-  
+
   return chain;
 }
 
-Local_Neuroseg *Locseg_Chain_Peek_Seg_Nearby(Locseg_Chain *chain, 
+Local_Neuroseg *Locseg_Chain_Peek_Seg_Nearby(Locseg_Chain *chain,
 					     const double *pos)
 {
   int seg_index;
@@ -6364,15 +6364,15 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
   mask.height = stack->height;
   mask.depth = stack->depth;
   mask.array = sgw->mask;
-  
+
   /* alloc <id_stack> */
-  Stack *id_stack = Make_Stack(GREY16, stack->width, stack->height, 
+  Stack *id_stack = Make_Stack(GREY16, stack->width, stack->height,
 			       stack->depth);
   Zero_Stack(id_stack);
 
   int i;
   for (i = 0; i < n; i++) {
-    Locseg_Chain_Label_G(chain_array[i], id_stack, 
+    Locseg_Chain_Label_G(chain_array[i], id_stack,
 			 1.0, 0, -1, 1.0, 0.0, 0, i + 1);
   }
 
@@ -6385,16 +6385,16 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
   int ntarget = n - 1;
   /* alloc ns */
   Neuron_Structure *ns = Make_Neuron_Structure(n + n - 1);
-  
+
   Neuron_Component nc;
   int tmpn;
   for (i = 0; i < n; i++) {
-    Locseg_Chain_To_Neuron_Component(chain_array[i], 
-				     NEUROCOMP_TYPE_LOCSEG_CHAIN, 
+    Locseg_Chain_To_Neuron_Component(chain_array[i],
+				     NEUROCOMP_TYPE_LOCSEG_CHAIN,
 				     &nc, &tmpn);
     Neuron_Structure_Set_Component(ns, i, &nc);
   }
-    
+
   /* alloc <fw> */
   Locseg_Fit_Workspace *fw = New_Locseg_Fit_Workspace();
 
@@ -6425,7 +6425,7 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 	    fg_count++;
 	  }
 	}
-	
+
 #ifdef _DEBUG_
 	printf("%g\n", (double) fg_count / path->length);
 #endif
@@ -6434,12 +6434,12 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 	  bridge = _FALSE_;
 	}
       }
-  
+
       int source_id = Stack_Array_Value(id_stack, path->array[0]) - 1;
-      int target_id = 
+      int target_id =
 	Stack_Array_Value(id_stack, path->array[path->length-1]) - 1;
 
-#ifdef _DEBUG_  
+#ifdef _DEBUG_
       if (source_id == target_id) {
 	printf("stop here\n");
       }
@@ -6447,40 +6447,40 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 
       if (bridge) {
 	int x, y, z;
-	Stack_Util_Coord(path->array[0], stack->width, stack->height, 
+	Stack_Util_Coord(path->array[0], stack->width, stack->height,
 			 &x, &y, &z);
 	double source_pos[3];
 	Set_Coordinate_3d(source_pos, x, y, z);
 	int source_seg_index;
-	source_chain = 
+	source_chain =
 	  NEUROCOMP_LOCSEG_CHAIN(Neuron_Structure_Get_Component(ns, source_id));
 	Locseg_Chain_Point_Dist(source_chain, source_pos,
 				&source_seg_index, NULL);
-	
-	Stack_Util_Coord(path->array[path->length-1], 
+
+	Stack_Util_Coord(path->array[path->length-1],
 			 stack->width, stack->height, &x, &y, &z);
 	double target_pos[3];
 	Set_Coordinate_3d(target_pos, x, y, z);
 	int target_seg_index;
-	Locseg_Chain_Point_Dist(chain_array[target_id], target_pos, 
+	Locseg_Chain_Point_Dist(chain_array[target_id], target_pos,
 				&target_seg_index, NULL);
-	
-	Local_Neuroseg *locseg = 
+
+	Local_Neuroseg *locseg =
 	  Locseg_Chain_Peek_Seg_Nearby(source_chain, target_pos);
 	double sr = locseg->seg.r1;
 	double ss = locseg->seg.scale;
-	
+
 	Locseg_Chain *new_chain = NULL;
-	
+
 	new_chain = Locseg_Chain_From_Skel(path->array, path->length,
 					   sr, ss, stack, z_scale, fw);
-	
+
 	if (new_chain != NULL) {
-	  Locseg_Chain_To_Neuron_Component(new_chain, 
-					   NEUROCOMP_TYPE_LOCSEG_CHAIN, 
-					   &nc, &tmpn);  
+	  Locseg_Chain_To_Neuron_Component(new_chain,
+					   NEUROCOMP_TYPE_LOCSEG_CHAIN,
+					   &nc, &tmpn);
 	  Neuron_Structure_Set_Component(ns, last_id, &nc);
-	  
+
 	  conn.info[0] = 0;
 	  conn.info[1] = source_seg_index;
 	  conn.cost = sgw->value;
@@ -6488,7 +6488,7 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 	  conn.mode = NEUROCOMP_CONN_HL;
 	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(source_chain), &conn);
 	  Neuron_Structure_Add_Conn(ns, last_id, source_id, &conn);
-	  
+
 	  conn.info[0] = 1;
 	  conn.info[1] = target_seg_index;
 	  conn.mode = NEUROCOMP_CONN_HL;
@@ -6496,8 +6496,8 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 	  Set_Coordinate_3d(conn.pos, target_pos[0], target_pos[1], target_pos[2]);
 	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(source_chain), &conn);
 	  Neuron_Structure_Add_Conn(ns, last_id, target_id, &conn);
-	
-	  Locseg_Chain_Label_G(new_chain, id_stack, 1.0, 0, -1, 1.0, 0.0, -1, 
+
+	  Locseg_Chain_Label_G(new_chain, id_stack, 1.0, 0, -1, 1.0, 0.0, -1,
 			       last_id + 1);
 	  Locseg_Chain_Label_G(new_chain, &mask, 1.0, 0, -1, 1.0, 0.0, -1, 2);
 	}
@@ -6505,15 +6505,15 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 
       Locseg_Chain_Label_G(chain_array[target_id], id_stack, 1.0, 0, -1, 1.0,
 			   0.0, -1, target_id + 1);
-      Locseg_Chain_Label_G(chain_array[target_id], &mask, 
-			   1.0, 0, -1, 1.0, 0.0, 1, 2);  
+      Locseg_Chain_Label_G(chain_array[target_id], &mask,
+			   1.0, 0, -1, 1.0, 0.0, 1, 2);
     }
 
     Kill_Int_Arraylist(path);
-  
+
     ntarget--;
     last_id++;
-    
+
     printf("%d\n", ntarget);
   }
 
@@ -6526,7 +6526,7 @@ Locseg_Chain_Sp_Grow_Reconstruct(Locseg_Chain **chain_array,
 void Locseg_Chain_Regularize(Locseg_Chain *chain)
 {
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
-  
+
   Local_Neuroseg *locseg = Locseg_Chain_Peek_Seg(chain);
   while (locseg != NULL) {
     if (locseg->seg.r1 * locseg->seg.scale <= 0.0) {
@@ -6553,7 +6553,7 @@ Locseg_Chain** Locseg_Chain_Import_List(const char *file_path, int *n)
 
   *n = 0;
   fseek(fp, 0, SEEK_SET);
-  
+
   char *chain_file = NULL;
   while ((chain_file = Read_Line(fp, sw)) != NULL) {
     if (fhasext(chain_file, "tb")) {
@@ -6587,7 +6587,7 @@ Locseg_Chain* Locseg_Chain_Break_At(Locseg_Chain *chain, int index)
   return new_chain;
 }
 
-static int locseg_chain_maximum_turn(Locseg_Chain *chain, 
+static int locseg_chain_maximum_turn(Locseg_Chain *chain,
 				     int index1, int index2)
 {
   Locseg_Chain_Iterator_Locate(chain, index1 + 1);
@@ -6597,7 +6597,7 @@ static int locseg_chain_maximum_turn(Locseg_Chain *chain,
   while (count < index2) {
     Local_Neuroseg *locseg1 = Locseg_Chain_Next_Seg(chain);
     Local_Neuroseg *locseg2 = Locseg_Chain_Peek_Seg(chain);
-    
+
     double angle = Neuroseg_Angle_Between(&(locseg1->seg), &(locseg2->seg));
     if (angle > maxangle) {
       maxangle = angle;
@@ -6605,7 +6605,7 @@ static int locseg_chain_maximum_turn(Locseg_Chain *chain,
     }
     count++;
   }
-  
+
   return maxindex;
 }
 
@@ -6615,7 +6615,7 @@ static void locseg_chain_switch_list(Locseg_Chain *chain1, Locseg_Chain *chain2)
   SWAP2(chain1->list, chain2->list, tmplist);
 }
 
-Locseg_Chain* Locseg_Chain_Break_Between(Locseg_Chain *chain, 
+Locseg_Chain* Locseg_Chain_Break_Between(Locseg_Chain *chain,
 					 int index1, int index2)
 {
   Locseg_Chain *new_chain = NULL;;
@@ -6672,7 +6672,7 @@ double Locseg_Chain_Hit_Ratio(Locseg_Chain *source, Locseg_Chain *target)
   int n = 0;
   int total = 0;
   Locseg_Chain_Iterator_Start(source, DL_HEAD);
-  
+
   Local_Neuroseg *locseg = Locseg_Chain_Next_Seg(source);
   if (locseg == NULL) {
     return 0.0;
@@ -6689,7 +6689,7 @@ double Locseg_Chain_Hit_Ratio(Locseg_Chain *source, Locseg_Chain *target)
   }
 
   total += 2;
-  
+
   Local_Neuroseg *locseg2 = locseg;
   while ((locseg = Locseg_Chain_Next_Seg(source)) != NULL) {
     Local_Neuroseg_Center(locseg, pos);
@@ -6703,7 +6703,7 @@ double Locseg_Chain_Hit_Ratio(Locseg_Chain *source, Locseg_Chain *target)
   Local_Neuroseg_Top(locseg2, pos);
   if (Locseg_Chain_Hit_Test(target, DL_FORWARD, pos[0], pos[1], pos[2])) {
     n++;
-  }  
+  }
   total++;
 
   return (double) n / total;
@@ -6720,7 +6720,7 @@ double Locseg_Chain_Hit_Ratio_Swc(Locseg_Chain *source, Swc_Tree *target)
   int n = 0;
   int total = 0;
   Locseg_Chain_Iterator_Start(source, DL_HEAD);
-  
+
   Local_Neuroseg *locseg = Locseg_Chain_Next_Seg(source);
   if (locseg == NULL) {
     return 0.0;
@@ -6737,7 +6737,7 @@ double Locseg_Chain_Hit_Ratio_Swc(Locseg_Chain *source, Swc_Tree *target)
   }
 
   total += 2;
-  
+
   Local_Neuroseg *locseg2 = locseg;
   while ((locseg = Locseg_Chain_Next_Seg(source)) != NULL) {
     Local_Neuroseg_Center(locseg, pos);
@@ -6750,16 +6750,16 @@ double Locseg_Chain_Hit_Ratio_Swc(Locseg_Chain *source, Swc_Tree *target)
   }
 
   Local_Neuroseg_Top(locseg2, pos);
-  if (Swc_Tree_Hit_Test(target, SWC_TREE_ITERATOR_NO_UPDATE, 
+  if (Swc_Tree_Hit_Test(target, SWC_TREE_ITERATOR_NO_UPDATE,
 			pos[0], pos[1], pos[2])) {
     n++;
-  }  
+  }
   total++;
 
   return (double) n / total;
 }
 
-void Locseg_Chain_Extend(Locseg_Chain *chain, Dlist_End_e end, 
+void Locseg_Chain_Extend(Locseg_Chain *chain, Dlist_End_e end,
     const double *pos)
 {
   TZ_ASSERT((end == DL_TAIL) || (end == DL_HEAD), "Invalid end.");
@@ -6779,7 +6779,7 @@ void Locseg_Chain_Extend(Locseg_Chain *chain, Dlist_End_e end,
     Local_Neuroseg_Top(lastseg, tmptop);
 
     /* flip the segment if the bottom is closer */
-    if (Coordinate_3d_Distance(pos, tmpbot) < 
+    if (Coordinate_3d_Distance(pos, tmpbot) <
         Coordinate_3d_Distance(pos, tmptop)) {
       end = DL_HEAD;
     } else {
@@ -6836,7 +6836,7 @@ void Locseg_Chain_Array_Screen_Z(Locseg_Chain **chain, int n, double thre)
   }
 }
 
-static Neuron_Structure* locseg_chain_neurostruct(Locseg_Chain **chain, int n, 
+static Neuron_Structure* locseg_chain_neurostruct(Locseg_Chain **chain, int n,
     Connection_Test_Workspace *ws)
 {
   Neuron_Structure *ns = Make_Neuron_Structure(n);
@@ -6848,16 +6848,16 @@ static Neuron_Structure* locseg_chain_neurostruct(Locseg_Chain **chain, int n,
 	  (Locseg_Chain_Is_Empty(chain[j]) == _FALSE_)) {
 	Neurocomp_Conn conn;
 	conn.mode = NEUROCOMP_CONN_HL;
-	if (Locseg_Chain_Connection_Test(chain[i], chain[j], NULL, 
+	if (Locseg_Chain_Connection_Test(chain[i], chain[j], NULL,
 	      1.0, &conn, ws) == _TRUE_) {
 	  Neurocomp_Conn conn2;
-	  if (Locseg_Chain_Connection_Test(chain[i], chain[j], NULL, 
+	  if (Locseg_Chain_Connection_Test(chain[i], chain[j], NULL,
 		1.0, &conn2, ws) == _TRUE_) {
 	    if (conn.cost > conn2.cost) {
 	      conn = conn2;
 	    }
 	  }
-	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(chain[j]), 
+	  Neurocomp_Conn_Translate_Mode(Locseg_Chain_Length(chain[j]),
 	      &conn);
 	  Neuron_Structure_Add_Conn(ns, i, j, &conn);
 	}
@@ -6883,15 +6883,15 @@ static double turning_angle(coordinate_3d_t *pts)
     vec3[i] = pts[3][i] - pts[2][i];
   }
 
-  return Geo3d_Angle2(vec1[0], vec1[1], vec1[2], vec2[0], vec2[1], vec2[2]) + 
+  return Geo3d_Angle2(vec1[0], vec1[1], vec1[2], vec2[0], vec2[1], vec2[2]) +
     Geo3d_Angle2(vec2[0], vec2[1], vec2[2], vec3[0], vec3[1], vec3[2]);
 }
 
-double Locseg_Chain_Turning_Angle(Locseg_Chain *chain1, 
+double Locseg_Chain_Turning_Angle(Locseg_Chain *chain1,
     Locseg_Chain *chain2, int end1, int end2, double *res)
 {
   coordinate_3d_t pts[4];
-  
+
   if (end1 == 0) {
     Local_Neuroseg *locseg = Locseg_Chain_Head_Seg(chain1);
     Local_Neuroseg_Center(locseg, pts[1]);
@@ -6997,7 +6997,7 @@ static int construct_merge_list(_BOOL_ **conn, int nvertex, int *merge_list)
   }
 
   return length;
-} 
+}
 
 #define CONN_ID_TO_CHAIN_ID(cid) ((cid) / 2)
 
@@ -7013,7 +7013,7 @@ static int construct_merge_list(_BOOL_ **conn, int nvertex, int *merge_list)
   id2 = (CONN_ID_TO_CHAIN_ID(idx%nvertex))); \
 }
 
-void Locseg_Chain_Array_Force_Merge(Locseg_Chain **chain, int n, 
+void Locseg_Chain_Array_Force_Merge(Locseg_Chain **chain, int n,
     const Connection_Test_Workspace *ws)
 {
   Connection_Test_Workspace tmpws = *ws;
@@ -7035,11 +7035,11 @@ void Locseg_Chain_Array_Force_Merge(Locseg_Chain **chain, int n,
       res[1] = tmpws.resolution[1];
       res[2] = tmpws.resolution[2];
       double w =Locseg_Chain_Turning_Angle(chain[id1], chain[id2], end1, end2,
-	  res); 
+	  res);
       if ((w < TZ_PI / 3.0) || ((w < TZ_PI_2) && (ns->conn[i].sdist < 5.0))) {
 	w =Locseg_Chain_Turning_Angle(chain[id1], chain[id2], end1, end2, NULL);
-	Graph_Add_Weighted_Edge(graph, link_node(id1, end1), 
-	    link_node(id2, end2), w); 
+	Graph_Add_Weighted_Edge(graph, link_node(id1, end1),
+	    link_node(id2, end2), w);
       }
     }
   }
@@ -7086,7 +7086,7 @@ void Locseg_Chain_Array_Force_Merge(Locseg_Chain **chain, int n,
   Kill_Neuron_Structure(ns);
 }
 
-static double locseg_chain_point_dist_c(Locseg_Chain *chain, double *pos, 
+static double locseg_chain_point_dist_c(Locseg_Chain *chain, double *pos,
     int *seg_index)
 {
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
@@ -7113,7 +7113,7 @@ _BOOL_ locseg_chain_index_is_internal(int chain_length, int seg_index)
   return (seg_index > 1) && (seg_index < chain_length - 2);
 }
 
-Locseg_Chain** Locseg_Chain_Array_Break_Jump(Locseg_Chain **chain, int n, 
+Locseg_Chain** Locseg_Chain_Array_Break_Jump(Locseg_Chain **chain, int n,
     double dist_thre, int *n2)
 {
   *n2 = 0;
@@ -7136,10 +7136,10 @@ Locseg_Chain** Locseg_Chain_Array_Break_Jump(Locseg_Chain **chain, int n,
           if (Locseg_Chain_Length(chain[j]) > 5) {
             int seg_index1, seg_index2;
             Locseg_Chain_End_Pos(chain[j], DL_HEAD, tip);
-            double dist1 = 
+            double dist1 =
               locseg_chain_point_dist_c(chain[i], tip, &seg_index1);
             Locseg_Chain_End_Pos(chain[j], DL_TAIL, tip);
-            double dist2 = 
+            double dist2 =
               locseg_chain_point_dist_c(chain[i], tip, &seg_index2);
             if (dist1 > dist2) {
               dist1 = dist2;
@@ -7172,7 +7172,7 @@ Locseg_Chain** Locseg_Chain_Array_Break_Jump(Locseg_Chain **chain, int n,
 	  index1--;
 	  index2++;
 	}
-        chain2[(*n2)] = 
+        chain2[(*n2)] =
           Locseg_Chain_Break_Between(chain2[(*n2)-1], index1, index2);
         (*n2)++;
       }

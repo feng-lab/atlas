@@ -83,6 +83,7 @@ endif (USE_LIBPNG)
 
 find_package(jansson REQUIRED PATHS ${CMAKE_CURRENT_LIST_DIR}/../../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(jansson::jansson)
+set(EXT_LIBS ${EXT_LIBS} jansson::jansson)
 set(HAVE_LIBJANSSON TRUE)
 
 check_include_files(stddef.h HAVE_STDDEF_H)
@@ -97,9 +98,12 @@ check_include_files(dirent.h HAVE_DIRENT_H)
 
 # use pcreposix if can not find regex.h
 if (NOT HAVE_REGEX_H)
-  find_package(PCRE REQUIRED)
-  include_directories(${PCRE_INCLUDE_DIRS})
-  set(EXT_LIBS ${EXT_LIBS} ${PCRE_LIBRARIES})
+  set(PCRE2_USE_STATIC_LIBS ON)
+  find_package(PCRE REQUIRED
+               COMPONENTS 8BIT
+               PATHS ${CMAKE_CURRENT_LIST_DIR}/../../3rdparty/build NO_DEFAULT_PATH)
+  print_target_properties(PCRE2::8BIT)
+  set(EXT_LIBS ${EXT_LIBS} PCRE2::8BIT)
 endif (NOT HAVE_REGEX_H)
 
 check_function_exists(bzero HAVE_BZERO)
@@ -225,7 +229,7 @@ endif (WIN32)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${GENELIB_DIR})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(${LIBRARY_NAME} PUBLIC jansson::jansson)
+target_link_libraries(${LIBRARY_NAME} PUBLIC ${EXT_LIBS})
 
 ## install library
 #install(TARGETS ${LIBRARY_NAME} ARCHIVE DESTINATION ${PROJECT_SOURCE_DIR}/lib)

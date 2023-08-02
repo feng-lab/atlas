@@ -193,6 +193,8 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
 
+    set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
+
     if (APPLE)
       target_compile_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
       target_link_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)

@@ -132,7 +132,7 @@ private:
 
 class ZStack_Projection {
 public:
-  ZStack_Projection(Stack *parent = NULL) : m_parent(parent),
+  ZStack_Projection(Stack */*parent*/ = NULL) : // m_parent(parent),
   m_proj(NULL) { }
   ~ZStack_Projection() {if (m_proj != NULL) { Kill_Image(m_proj); }}
 
@@ -141,7 +141,7 @@ public:
   inline void* data() { return (void*)m_proj->array; }
 
 private:
-  Stack *m_parent;
+  // Stack *m_parent;
   //int m_stamp;
   Image *m_proj;
 };
