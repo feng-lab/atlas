@@ -105,6 +105,12 @@ enum class EWindowConfig {
   WINDOW_2D, WINDOW_3D
 };
 
+#ifdef _MSC_VER
+#undef INFORMATION
+#undef WARNING
+#undef ERROR 
+#undef DEBUG
+#endif
 enum class EMessageType {
   INFORMATION, WARNING, ERROR, DEBUG
 };

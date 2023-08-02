@@ -1,4 +1,5 @@
 find_package (Perl 5.10.0 REQUIRED)
+message (STATUS ${PERL_EXECUTABLE})
 
 function (parse_template_file OUTPUT_NAME INPUT_NAME ARGS outputlist)
   set (OUTPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/${OUTPUT_NAME})
@@ -8,7 +9,7 @@ function (parse_template_file OUTPUT_NAME INPUT_NAME ARGS outputlist)
   if (WIN32)
     add_custom_command(
       OUTPUT ${OUTPUT_FILE}
-      COMMAND if exist {${OUTPUT_FILE}} {icacls ${OUTPUT_FILE} /grant everyone:F /Q}
+      # COMMAND if exist {${OUTPUT_FILE}} {icacls ${OUTPUT_FILE} /grant everyone:F /Q}
       COMMAND ${PERL_EXECUTABLE} ../shell/parsetmpl.pl ${INPUT_FILE} ${OUTPUT_FILE} ${ARGS}
       DEPENDS ${INPUT_FILE}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
