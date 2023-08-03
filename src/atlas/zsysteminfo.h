@@ -29,6 +29,10 @@ public:
 
   static QString applicationInstallDirPath();
 
+  static QString jsonDirPath();
+
+  static QDir jsonDir();
+
   // return empty if can not find enough space
   static QString imgCachePath(size_t requiredSpaceInBytes);
 

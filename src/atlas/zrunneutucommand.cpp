@@ -1,14 +1,5 @@
 #include "zrunneutucommand.h"
 
-#include <ostream>
-#include <set>
-
-#include <QFileInfoList>
-#include <QDir>
-#include <QApplication>
-#include <QUrl>
-#include <QUrlQuery>
-
 #include "zlog.h"
 #include "zsysteminfo.h"
 
@@ -17,8 +8,10 @@
 #include "zobject3dscan.h"
 #include "zjsonparser.h"
 #include "zjsonobject.h"
+#include "zjsonobjectparser.h"
 #include "zfiletype.h"
 #include "zstackskeletonizer.h"
+#include "zstackreader.h"
 #include "zrandomgenerator.h"
 #include "zneurontracer.h"
 #include "zneurontracerconfig.h"
@@ -31,66 +24,14 @@
 #include "zstack.hxx"
 #include "zstring.h"
 
-#include "command/zcommandmodule.h"
-#include "command/zneurontracecommand.h"
+#include <QFileInfoList>
+#include <QDir>
+#include <QUrl>
+#include <QUrlQuery>
+#include <ostream>
+#include <set>
 
 namespace nim {
-
-ZRunNeuTuCommand::ZRunNeuTuCommand()
-{
-  init();
-}
-
-void ZRunNeuTuCommand::init()
-{
-  m_ravelerHeight = 2599;
-  m_zStart = 1499;
-
-  m_isVerbose = false;
-  for (int i = 0; i < 3; ++i) {
-    m_intv[i] = 0;
-    m_blockOffset[i] = 0;
-  }
-  m_level = 0;
-  m_scale = 1.0;
-  m_fullOverlapScreen = false;
-  m_forceUpdate = false;
-  m_namedOnly = false;
-  m_intvSpecified = false;
-}
-
-void ZRunNeuTuCommand::registerModule()
-{
-  registerModule<ZNeuronTraceCommand>("trace_neuron");
-}
-
-template<typename T>
-void ZRunNeuTuCommand::registerModule(const std::string& name)
-{
-  registerModule(name, new T);
-}
-
-void ZRunNeuTuCommand::registerModule(const std::string& name, ZCommandModule* module)
-{
-  if (!name.empty() && module != NULL) {
-    if (m_commandMap.count(name) > 0) {
-      LOG(WARNING) << "Cannot overwrite a registered module: " << name;
-    } else {
-      module->setForceUpdate(m_forceUpdate);
-      m_commandMap[name] = module;
-    }
-  }
-}
-
-ZCommandModule* ZRunNeuTuCommand::getModule(const std::string& name)
-{
-  ZCommandModule* module = NULL;
-  if (m_commandMap.count(name) > 0) {
-    module = m_commandMap[name];
-  }
-
-  return module;
-}
 
 ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
 {
@@ -119,7 +60,7 @@ void ZRunNeuTuCommand::loadTraceConfig()
 ZJsonObject ZRunNeuTuCommand::loadInputJson()
 {
   if (m_input.empty()) {
-    return ZJsonObject();
+    return {};
   }
 
   ZJsonObject obj;
@@ -262,10 +203,9 @@ int ZRunNeuTuCommand::runGeneral()
 
     std::string commandName = ZJsonParser::stringValue(config["command"]);
     std::cout << "Running command " << commandName << "..." << std::endl;
-    ZCommandModule* module = getModule(commandName);
-    if (module != NULL) {
+    if (commandName == "trace_neuron") {
       try {
-        return module->run(m_input, m_output, config);
+        return runTraceCommand(m_input, m_output, config);
       }
       catch (std::exception& e) {
         std::cerr << "COMMAND FAILED: " << e.what() << std::endl;
@@ -281,7 +221,7 @@ int ZRunNeuTuCommand::runGeneral()
   return 1;
 }
 
-double ZRunNeuTuCommand::compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher) const
+double ZRunNeuTuCommand::compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher)
 {
   double score = 0.0;
 
@@ -328,7 +268,7 @@ int ZRunNeuTuCommand::runCompareSwc()
   std::vector<ZSwcTree*> treeArray(m_input.size(), NULL);
   for (size_t i = 0; i < m_input.size(); ++i) {
     std::cout << "  " << m_input[i] << std::endl;
-    ZSwcTree* tree = new ZSwcTree;
+    auto tree = new ZSwcTree;
     tree->load(m_input[i]);
     if (m_scale != 1.0) {
       tree->rescale(m_scale, m_scale, m_scale);
@@ -338,16 +278,16 @@ int ZRunNeuTuCommand::runCompareSwc()
   }
 
   ZSwcTreeMatcher matcher;
-  ZSwcLayerTrunkAnalyzer* trunkAnalyzer = new ZSwcLayerTrunkAnalyzer;
+  auto trunkAnalyzer = new ZSwcLayerTrunkAnalyzer;
   trunkAnalyzer->setStep(200.0);
-  ZSwcLayerShollFeatureAnalyzer* helperAnalyzer = new ZSwcLayerShollFeatureAnalyzer;
+  auto helperAnalyzer = new ZSwcLayerShollFeatureAnalyzer;
   helperAnalyzer->setLayerScale(4000.0);
   helperAnalyzer->setLayerMargin(100.0);
 
-  ZSwcNodeBufferFeatureAnalyzer* analyzer = new ZSwcNodeBufferFeatureAnalyzer;
+  auto analyzer = new ZSwcNodeBufferFeatureAnalyzer;
   analyzer->setHelper(helperAnalyzer);
 
-  ZSwcFeatureAnalyzer* featureAnalyzer = dynamic_cast<ZSwcFeatureAnalyzer*>(analyzer);
+  auto featureAnalyzer = dynamic_cast<ZSwcFeatureAnalyzer*>(analyzer);
 
   matcher.setTrunkAnalyzer(trunkAnalyzer);
   matcher.setFeatureAnalyzer(featureAnalyzer);
@@ -378,7 +318,7 @@ int ZRunNeuTuCommand::runCompareSwc()
 
 int ZRunNeuTuCommand::runSkeletonize()
 {
-  int stat = 0;
+  int stat;
 
   if (m_input.empty()) {
     std::cout << "Please specify input." << std::endl;
@@ -465,24 +405,18 @@ int ZRunNeuTuCommand::skeletonizeFile()
 int ZRunNeuTuCommand::run(int argc, char* argv[])
 {
   static const char* Spec[] = {"--command",
-                               "[--unit_test]",
                                "[<input:string> ...]",
                                "[-o <string>]",
                                "[--config <string>]",
                                "[--intv <int> <int> <int>]",
-                               "[--skeletonize] [--force] [--bodyid <string>] [--named_only]",
+                               "[--skeletonize]",
                                "[--general <string>]",
                                "[--compare_swc] [--scale <double>]",
                                "[--trace] [--level <int>]",
                                "[--separate <string>]",
-                               "[--foutput <string>]",
                                "[--compute_seed]",
-                               //    "[--position <int> <int> <int>]",
-                               //    "[--size <int> <int> <int>]",
-                               "[--dvid <string>]",
-                               "[--test]",
                                "[--verbose]",
-                               0};
+                               nullptr};
 
 #ifdef _DEBUG_2
   for (int i = 0; i < argc; ++i) {
@@ -492,7 +426,7 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
 
   Process_Arguments(argc, argv, const_cast<char**>(Spec), 1);
 
-  m_configDir = ZSystemInfo::resourcesDir().absoluteFilePath("json").toStdString();
+  m_configDir = ZSystemInfo::jsonDirPath().toStdString();
   // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR),
   // "json");
   std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
@@ -508,43 +442,8 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     command = getCommand(ZJsonParser::stringValue(m_configJson["command"]).c_str());
     m_input.push_back(ZJsonParser::stringValue(m_configJson["input"]));
     m_output = ZJsonParser::stringValue(m_configJson["output"]);
-    if (m_configJson.hasKey("synapse")) {
-      m_synapseFile = ZJsonParser::stringValue(m_configJson["synapse"]);
-    }
-
-    if (m_configJson.hasKey("raveler_height")) {
-      m_ravelerHeight = ZJsonParser::integerValue(m_configJson["raveler_height"]);
-    }
-
-    if (m_configJson.hasKey("z_start")) {
-      m_zStart = ZJsonParser::integerValue(m_configJson["z_start"]);
-    }
-
-    if (m_configJson.hasKey("block_offset")) {
-      for (int i = 0; i < 3; ++i) {
-        m_blockOffset[i] = ZJsonParser::numberValue(m_configJson["block_offset"], i);
-      }
-    }
-
-    m_blockFile = ZJsonParser::stringValue(m_configJson["block_file"]);
-    m_referenceBlockFile = ZJsonParser::stringValue(m_configJson["block_reference"]);
   }
 
-  m_forceUpdate = false;
-  if (Is_Arg_Matched(const_cast<char*>("--force"))) {
-    m_forceUpdate = true;
-  }
-
-  m_namedOnly = false;
-  if (Is_Arg_Matched(const_cast<char*>("--named_only"))) {
-    m_namedOnly = true;
-  }
-
-  if (Is_Arg_Matched(const_cast<char*>("--foutput"))) {
-    m_outputFlag = Get_String_Arg(const_cast<char*>("--foutput"));
-  }
-
-  m_scale = 1.0;
   if (Is_Arg_Matched(const_cast<char*>("--scale"))) {
     m_scale = Get_Double_Arg(const_cast<char*>("--scale"));
   }
@@ -582,33 +481,6 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     m_intvSpecified = true;
   }
 
-  //  if (Is_Arg_Matched(const_cast<char*>("--position"))) {
-  //    m_position.resize(3, 0);
-  //    for (int i = 0; i < 3; ++i) {
-  //      m_position[i] = Get_Int_Arg(const_cast<char*>("--position"), i + 1);
-  //    }
-  //  }
-
-  //  if (Is_Arg_Matched(const_cast<char*>("--size"))) {
-  //    for (int i = 0; i < 3; ++i) {
-  //      m_size[i] = Get_Int_Arg(const_cast<char*>("--size"), i + 1);
-  //    }
-  //  }
-
-  //  if (Is_Arg_Matched(const_cast<char*>("--bodyid"))) {
-  //    ZString bodyIdStr(Get_String_Arg(const_cast<char*>("--bodyid")));
-  //
-  //    if (bodyIdStr.endsWith("txt", ZString::CASE_INSENSITIVE)) {
-  //      importBodies(bodyIdStr);
-  //    } else {
-  //      m_bodyIdArray = bodyIdStr.toUint64Array();
-  //      if (m_bodyIdArray.empty()) {
-  //        _error("No valid body ID specified. Abort!");
-  //        return 1;
-  //      }
-  //    }
-  //  }
-
   if (command == UNKNOWN_COMMAND) {
     if (Is_Arg_Matched(const_cast<char*>("--skeletonize"))) {
       command = SKELETONIZE;
@@ -616,14 +488,12 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     } else if (Is_Arg_Matched(const_cast<char*>("--separate"))) {
       command = SEPARATE_IMAGE;
       //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-      m_input.push_back(Get_String_Arg(const_cast<char*>("--separate")));
+      m_input.emplace_back(Get_String_Arg(const_cast<char*>("--separate")));
       m_output = Get_String_Arg(const_cast<char*>("-o"));
     } else if (Is_Arg_Matched(const_cast<char*>("--trace"))) {
       //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
       m_output = Get_String_Arg(const_cast<char*>("-o"));
       command = TRACE_NEURON;
-    } else if (Is_Arg_Matched(const_cast<char*>("--test"))) {
-      command = TEST_SELF;
     } else if (Is_Arg_Matched(const_cast<char*>("--compare_swc"))) {
       command = COMPARE_SWC;
     } else if (Is_Arg_Matched(const_cast<char*>("--compute_seed"))) {
@@ -638,7 +508,7 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
     }
   }
 
-  registerModule();
+  // registerModule();
 
   switch (command) {
     case SKELETONIZE:
@@ -649,13 +519,10 @@ int ZRunNeuTuCommand::run(int argc, char* argv[])
       return runTraceNeuron();
     case GENERAL_COMMAND:
       return runGeneral();
-      break;
     default:
       LOG(INFO) << "Unknown command";
       return 1;
   }
-
-  return 0;
 }
 
 void ZRunNeuTuCommand::loadConfig(const std::string& filePath)
@@ -702,7 +569,7 @@ void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath, const std
       if (fexist(includeFilePath.c_str())) {
         ZJsonObject subJson(m_configJson.value(objKey.c_str()));
         ZJsonObject includeJson;
-        includeJson.load(includeFilePath.c_str());
+        includeJson.load(includeFilePath);
 
         const char* key;
         json_t* value;
@@ -719,6 +586,122 @@ void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath, const std
       }
     }
   }
+}
+
+int ZRunNeuTuCommand::runTraceCommand(const std::vector<std::string>& input,
+                                       const std::string& output,
+                                       const ZJsonObject& config)
+{
+  ZJsonObject inputJson(config.value("_input"));
+
+  ZJsonObjectParser parser(inputJson);
+  std::string additionalInput = parser.getValue("signal", "");
+
+  std::vector<std::string> updatedInput = input;
+  if (!additionalInput.empty() && updatedInput.empty()) {
+    updatedInput.push_back(additionalInput);
+  }
+
+  if (updatedInput.empty() || output.empty()) {
+    return 1;
+  }
+
+  loadTraceConfig(config);
+
+  if (ZJsonObjectParser::GetValue(config, "action", "") == "inspect") {
+    ZNeuronTracerConfig::getInstance().print();
+    return 0;
+  }
+
+  ZSwcTree* tree = traceFile(updatedInput[0], inputJson);
+
+  if (tree) {
+    std::cout << "Saving " + output + "..." << std::endl;
+    tree->save(output);
+  } else {
+    std::cout << "WARNING: No result generated." << std::endl;
+  }
+
+  return 0;
+}
+
+void ZRunNeuTuCommand::loadTraceConfig(const ZJsonObject& config)
+{
+  ZJsonObject actualConfig = config;
+
+  if (config.hasKey("path")) {
+    std::string path = ZJsonObjectParser::GetValue(config, "path", "");
+    if (path.empty() || path == "default") {
+      path = ZSystemInfo::jsonDir().absoluteFilePath("trace_config.json").toStdString();
+    }
+    actualConfig.load(path);
+  }
+
+  if (!ZNeuronTracerConfig::getInstance().loadJsonObject(actualConfig)) {
+    LOG(WARNING) << "Configuration Failed: Failed to load the config.";
+  }
+
+  m_diagnosis = ZJsonObjectParser::GetValue(config, "diagnosis", false);
+  //  ZNeuronTracerConfig::getInstance().setCrossoverTest(false);
+}
+
+ZSwcTree* ZRunNeuTuCommand::traceFile(const std::string& filePath, const ZJsonObject& inputConfig) const
+{
+  //  ZStack signal;
+  //  signal.load(filePath);
+
+  ZStack* signal = ZStackReader::Read(filePath);
+
+  ZSwcTree* tree = nullptr;
+
+  if (signal) {
+    ZNeuronTracer tracer;
+    tracer.setIntensityField(signal);
+    tracer.setTraceLevel(m_level);
+    tracer.setDiagnosis(m_diagnosis);
+
+    ZJsonObjectParser parser(inputConfig);
+    std::string maskPath = parser.getValue("mask", "");
+    ZStack* mask = nullptr;
+    if (!maskPath.empty()) {
+      std::cout << "Using a predefined mask: " << maskPath << std::endl;
+      if (!neutu::FileExists(maskPath)) {
+        LOG(ERROR) << "Missing file: Cannot find the mask file " + maskPath + ".";
+        return nullptr;
+      }
+      if (ZFileType::FileType(maskPath) != ZFileType::EFileType::TIFF) {
+        LOG(ERROR) << "File error: Failed to recognize the mask file " + maskPath + " as a TIFF";
+        return nullptr;
+      }
+
+      mask = ZStackReader::Read(maskPath);
+      if (mask == nullptr) {
+        LOG(WARNING) << "File error: Failed to read mask file " + maskPath + ".";
+      } else {
+        int threshold = parser.getValue("maskThreshold", 0);
+        if (threshold < 0) {
+          //        Stack *newMask = tracer.makeMask(mask);
+          tracer._makeMask = [&](Stack* /*stack*/) {
+            return tracer.makeMask(mask->c_stack());
+          };
+        } else {
+          mask->binarize(threshold);
+          tracer._makeMask = [=](Stack* /*stack*/) {
+            return C_Stack::clone(mask->c_stack());
+          };
+        }
+      }
+    }
+
+    tree = tracer.trace(signal);
+
+    delete mask;
+    delete signal;
+
+    return tree;
+  }
+
+  return tree;
 }
 
 } // namespace nim

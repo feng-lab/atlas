@@ -1,35 +1,26 @@
 #pragma once
 
+#include "zjsonobject.h"
 #include <string>
 #include <vector>
-#include <set>
-
-#include "zjsonobject.h"
 
 class ZSwcTree;
 class ZSwcTreeMatcher;
 class ZStack;
-class ZCommandModule;
 
 namespace nim {
 
 class ZRunNeuTuCommand
 {
 public:
-  ZRunNeuTuCommand();
-
   enum ECommand
   {
     OBJECT_MARKER,
     BOUNDARY_ORPHAN,
-    OBJECT_OVERLAP,
-    SYNAPSE_OBJECT,
-    CLASS_LIST,
     FLYEM_NEURON_FEATURE,
     SKELETONIZE,
     SEPARATE_IMAGE,
     TRACE_NEURON,
-    TEST_SELF,
     COMPARE_SWC,
     COMPUTE_SEED,
     GENERAL_COMMAND,
@@ -39,18 +30,7 @@ public:
   int run(int argc, char* argv[]);
 
 private:
-  void init();
-
-  void registerModule();
-
-  void registerModule(const std::string &name, ZCommandModule *module);
-
-  template<typename T>
-  void registerModule(const std::string &name);
-
-  ZCommandModule* getModule(const std::string &name);
-
-  static ECommand getCommand(const char *cmd);
+  static ECommand getCommand(const char* cmd);
 
   int runSkeletonize();
   int runCompareSwc();
@@ -61,7 +41,7 @@ private:
   void expandConfig(const std::string& configFilePath, const std::string& key);
   std::string extractIncludePath(const std::string& configFilePath, const std::string& key);
 
-  double compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher) const;
+  static double compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher);
 
 private:
   void loadTraceConfig();
@@ -72,34 +52,25 @@ private:
 
   ZJsonObject loadInputJson();
 
+  int runTraceCommand(const std::vector<std::string>& input, const std::string& output, const ZJsonObject& config);
+  void loadTraceConfig(const ZJsonObject& config);
+  [[nodiscard]] ZSwcTree* traceFile(const std::string& filePath, const ZJsonObject& inputConfig) const;
+
 private:
   std::vector<std::string> m_input;
   std::string m_output;
-  std::string m_blockFile;
-  std::string m_referenceBlockFile;
-  std::string m_synapseFile;
   ZJsonObject m_configJson;
   std::string m_configDir;
-  std::string m_outputFlag;
   std::string m_generalConfig;
   ZJsonObject m_inputJson;
-  //  std::string m_initialSwcPath;
-  int m_ravelerHeight;
-  int m_zStart;
-  int m_intv[3];
-  bool m_intvSpecified;
-  int m_blockOffset[3];
+  int m_intv[3] = {0, 0, 0};
+  bool m_intvSpecified = false;
   std::vector<int> m_position;
   std::vector<int> m_size;
-  int m_level;
-  double m_scale;
-  bool m_fullOverlapScreen;
-  bool m_isVerbose;
-  bool m_forceUpdate;
-  bool m_namedOnly;
-  std::vector<uint64_t> m_bodyIdArray;
-
-  std::map<std::string, ZCommandModule*> m_commandMap;
+  int m_level = 0;
+  double m_scale = 1.0;
+  bool m_isVerbose = false;
+  bool m_diagnosis = false;
 };
 
 } // namespace nim

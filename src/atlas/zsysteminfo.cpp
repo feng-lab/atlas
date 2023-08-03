@@ -110,6 +110,16 @@ QString ZSystemInfo::applicationInstallDirPath()
 #endif
 }
 
+QString ZSystemInfo::jsonDirPath()
+{
+  return resourcesDir().absoluteFilePath("json");
+}
+
+QDir ZSystemInfo::jsonDir()
+{
+  return QDir(jsonDirPath());
+}
+
 QString ZSystemInfo::imgCachePath(size_t requiredSpaceInBytes)
 {
   QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);

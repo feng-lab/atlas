@@ -76,7 +76,7 @@ int main(int argc, char* argv[])
                  ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
                  ZSystemInfo::jarsDirPath(),
                  "",
-                 false,
+                 true,
                  false);
       [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
         shutdownImgLib();
