@@ -87,15 +87,6 @@ int main(int argc, char* argv[])
       return ZRunNeuTuCommand().run(argc, argv);
     }
 
-    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
-      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
-    }
-    std::string usage("Atlas is a brain mapping platform.  Usage:\n");
-    usage += std::string(argv[0]) + "";
-    gflags::SetUsageMessage(usage);
-    gflags::SetVersionString(GIT_VERSION);
-    gflags::ParseCommandLineFlags(&argc, &argv, false);
-
     QSurfaceFormat format;
 #if defined(__APPLE__) && defined(ATLAS_USE_CORE_PROFILE)
     format.setVersion(3, 3);
@@ -121,6 +112,15 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
 
     ZApplication app(argc, argv);
+
+    if (QString setting_filename = "user_settings_flagfile.txt"; ZSystemInfo::configDir().exists(setting_filename)) {
+      FLAGS_flagfile = QFile::encodeName(ZSystemInfo::configDir().absoluteFilePath(setting_filename)).constData();
+    }
+    std::string usage("Atlas is a brain mapping platform.  Usage:\n");
+    usage += std::string(argv[0]) + "";
+    gflags::SetUsageMessage(usage);
+    gflags::SetVersionString(GIT_VERSION);
+    gflags::ParseCommandLineFlags(&argc, &argv, false);
 
     // init the logging mechanism
     QDir logDir = ZSystemInfo::logDir();
