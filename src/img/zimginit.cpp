@@ -55,6 +55,8 @@ void initImgLib(const char* argv0,
 {
   initLogging(argv0, logFilename);
 
+  ZImgGlobal::instance().isApp = isApp;
+
   if (isApp) {
     if (isGUIMode) {
       addLogSink(&ZLogCache::instance());
@@ -86,7 +88,8 @@ void initImgLib(const char* argv0,
         VLOG(1) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;
         VLOG(1) << "no jreDIR and environment variable JAVA_HOME, will try to use java in system path";
       } else {
-        VLOG(1) << "try java from JAVA_HOME: " << javahome << ", note: might crash if the java version is not compatible";
+        VLOG(1) << "try java from JAVA_HOME: " << javahome
+                << ", note: might crash if the java version is not compatible";
         jreD = QDir(javahome);
       }
     } else {
@@ -256,7 +259,7 @@ void initImgLib(const char* argv0,
   }
 
   if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {
-    LOG(FATAL) << "CPU not supported. This program requires CPU with AVX support.";
+    throw ZException("CPU not supported. This program requires CPU with AVX support.");
   }
 
   jpegxr_register_h5filter();
@@ -273,9 +276,9 @@ void initImgLib(const char* argv0,
   folly::enable_hazptr_thread_pool_executor();
 }
 
-void shutdownImgLib(bool isApp)
+void shutdownImgLib()
 {
-  if (isApp) {
+  if (ZImgGlobal::instance().isApp) {
     LOG(INFO) << "--- App Log End ---";
   }
 

@@ -70,6 +70,20 @@ int main(int argc, char* argv[])
   try {
     if (argc > 1 && strcmp(argv[1], "--command") == 0) {
       ZApplication app(argc, argv);
+
+      initImgLib(argv[0],
+                 ZSystemInfo::resourcesDirPath(),
+                 ZCpuInfo::instance().isX86_64 ? ZSystemInfo::jreDirPath() : ZSystemInfo::jreArmDirPath(),
+                 ZSystemInfo::jarsDirPath(),
+                 "",
+                 false,
+                 false);
+      [[maybe_unused]] auto guardimglib = folly::makeGuard([]() {
+        shutdownImgLib();
+      });
+
+      LOG(INFO) << "Version: " << GIT_VERSION;
+
       return ZRunNeuTuCommand().run(argc, argv);
     }
 
@@ -107,14 +121,6 @@ int main(int argc, char* argv[])
     QCoreApplication::setAttribute(Qt::AA_CompressHighFrequencyEvents, true);
 
     ZApplication app(argc, argv);
-
-    if (ZCpuInfo::instance().isX86_64 && !ZCpuInfo::instance().bAVX) {
-      QMessageBox::critical(nullptr,
-                            QCoreApplication::applicationName(),
-                            "CPU not supported.\nThis program requires CPU with AVX support. Click OK to exit.");
-      LOG(ERROR) << "CPU not supported";
-      return 1;
-    }
 
     // init the logging mechanism
     QDir logDir = ZSystemInfo::logDir();
@@ -183,6 +189,7 @@ int main(int argc, char* argv[])
     return app.exec();
   }
   catch (const ZException& e) {
+    QMessageBox::critical(nullptr, QCoreApplication::applicationName(), e.what());
     LOG(FATAL) << "exit with " << typeid(e).name() << ": " << e.what();
   }
   catch (const std::exception& e) {

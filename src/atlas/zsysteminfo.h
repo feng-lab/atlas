@@ -62,7 +62,7 @@ public:
     setLastOpenedObjPath("Image", path);
   }
 
-  static void removeOldLogs(int numberToKeep = 20);
+  static void removeOldLogs(int numberToKeep = 100);
 
 protected:
   static void updateRecentFiles();

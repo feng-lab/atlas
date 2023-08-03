@@ -12,6 +12,6 @@ void initImgLib(const char* argv0,
                 bool isApp = true,
                 bool isGUIMode = true);
 
-void shutdownImgLib(bool isApp = true);
+void shutdownImgLib();
 
 } // namespace nim
