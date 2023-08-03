@@ -1,12 +1,11 @@
 #pragma once
 
-#include "zjsonobject.h"
 #include <string>
 #include <vector>
 
 class ZSwcTree;
 class ZSwcTreeMatcher;
-class ZStack;
+class ZJsonObject;
 
 namespace nim {
 
@@ -32,37 +31,36 @@ public:
 private:
   static ECommand getCommand(const char* cmd);
 
-  int runSkeletonize();
+  int runSkeletonize(ZJsonObject& configJson);
   int runCompareSwc();
-  int runTraceNeuron();
-  int runGeneral();
+  int runTraceNeuron(const ZJsonObject& configJson);
+  int runGeneral(const ZJsonObject& inputJson);
 
-  void loadConfig(const std::string& filePath);
-  void expandConfig(const std::string& configFilePath, const std::string& key);
-  std::string extractIncludePath(const std::string& configFilePath, const std::string& key);
+  static void loadConfig(const std::string& filePath, ZJsonObject& configJson);
+  static void expandConfig(const std::string& configFilePath, const std::string& key, ZJsonObject& configJson);
+  static std::string
+  extractIncludePath(const std::string& configFilePath, const std::string& key, ZJsonObject& configJson);
 
   static double compareSwc(ZSwcTree* tree1, ZSwcTree* tree2, ZSwcTreeMatcher& matcher);
 
 private:
-  void loadTraceConfig();
+  void loadTraceConfig(const ZJsonObject& configJson);
 
-  int skeletonizeFile();
+  int skeletonizeFile(ZJsonObject& configJson);
 
   ZSwcTree* traceFile();
 
   ZJsonObject loadInputJson();
 
   int runTraceCommand(const std::vector<std::string>& input, const std::string& output, const ZJsonObject& config);
-  void loadTraceConfig(const ZJsonObject& config);
+  void loadTraceConfigForTraceCommand(const ZJsonObject& config);
   [[nodiscard]] ZSwcTree* traceFile(const std::string& filePath, const ZJsonObject& inputConfig) const;
 
 private:
   std::vector<std::string> m_input;
   std::string m_output;
-  ZJsonObject m_configJson;
   std::string m_configDir;
   std::string m_generalConfig;
-  ZJsonObject m_inputJson;
   int m_intv[3] = {0, 0, 0};
   bool m_intvSpecified = false;
   std::vector<int> m_position;

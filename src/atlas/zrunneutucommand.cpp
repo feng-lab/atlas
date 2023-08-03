@@ -26,12 +26,132 @@
 
 #include <QFileInfoList>
 #include <QDir>
-#include <QUrl>
-#include <QUrlQuery>
-#include <ostream>
-#include <set>
 
 namespace nim {
+
+int ZRunNeuTuCommand::run(int argc, char* argv[])
+{
+  static const char* Spec[] = {"--command",
+                               "[<input:string> ...]",
+                               "[-o <string>]",
+                               "[--config <string>]",
+                               "[--intv <int> <int> <int>]",
+                               "[--skeletonize]",
+                               "[--general <string>]",
+                               "[--compare_swc] [--scale <double>]",
+                               "[--trace] [--level <int>]",
+                               "[--separate <string>]",
+                               "[--compute_seed]",
+                               "[--verbose]",
+                               nullptr};
+
+#ifdef _DEBUG_2
+  for (int i = 0; i < argc; ++i) {
+    std::cout << argv[i] << std::endl;
+  }
+#endif
+
+  Process_Arguments(argc, argv, const_cast<char**>(Spec), 1);
+
+  m_configDir = ZSystemInfo::jsonDirPath().toStdString();
+  // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR),
+  // "json");
+  std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
+
+  if (Is_Arg_Matched(const_cast<char*>("--config"))) {
+    configPath = Get_String_Arg(const_cast<char*>("--config"));
+  }
+
+  ZJsonObject configJson;
+  loadConfig(configPath, configJson);
+
+  ECommand command = UNKNOWN_COMMAND;
+  if (!configJson.isEmpty()) {
+    command = getCommand(ZJsonParser::stringValue(configJson["command"]).c_str());
+    m_input.push_back(ZJsonParser::stringValue(configJson["input"]));
+    m_output = ZJsonParser::stringValue(configJson["output"]);
+  }
+
+  if (Is_Arg_Matched(const_cast<char*>("--scale"))) {
+    m_scale = Get_Double_Arg(const_cast<char*>("--scale"));
+  }
+
+  if (Is_Arg_Matched(const_cast<char*>("--level"))) {
+    m_level = Get_Int_Arg(const_cast<char*>("--level"));
+  }
+
+  //  ZArgumentProcessor::processArguments(argc, argv, Spec);
+
+  m_input.clear();
+  int inputNumber = Get_Repeat_Count(const_cast<char*>("input"));
+  //  if (ZArgumentProcessor::isArgMatched("input")) {
+  //    int inputNumber = ZArgumentProcessor::getRepeatCount("input");
+  m_input.resize(inputNumber);
+  for (int i = 0; i < inputNumber; ++i) {
+    m_input[i] = Get_String_Arg(const_cast<char*>("input"), i);
+    //      m_input[i] = ZArgumentProcessor::getStringArg("input", i);
+  }
+
+  auto inputJson = loadInputJson();
+
+  if (Is_Arg_Matched(const_cast<char*>("-o"))) {
+    m_output = Get_String_Arg(const_cast<char*>("-o"));
+  }
+
+  if (Is_Arg_Matched(const_cast<char*>("--verbose"))) {
+    m_isVerbose = true;
+  }
+
+  if (Is_Arg_Matched(const_cast<char*>("--intv"))) {
+    for (int i = 0; i < 3; ++i) {
+      m_intv[i] = Get_Int_Arg(const_cast<char*>("--intv"), i + 1);
+    }
+    m_intvSpecified = true;
+  }
+
+  if (command == UNKNOWN_COMMAND) {
+    if (Is_Arg_Matched(const_cast<char*>("--skeletonize"))) {
+      command = SKELETONIZE;
+      //    m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
+    } else if (Is_Arg_Matched(const_cast<char*>("--separate"))) {
+      command = SEPARATE_IMAGE;
+      //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
+      m_input.emplace_back(Get_String_Arg(const_cast<char*>("--separate")));
+      m_output = Get_String_Arg(const_cast<char*>("-o"));
+    } else if (Is_Arg_Matched(const_cast<char*>("--trace"))) {
+      //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
+      m_output = Get_String_Arg(const_cast<char*>("-o"));
+      command = TRACE_NEURON;
+    } else if (Is_Arg_Matched(const_cast<char*>("--compare_swc"))) {
+      command = COMPARE_SWC;
+    } else if (Is_Arg_Matched(const_cast<char*>("--compute_seed"))) {
+      command = COMPUTE_SEED;
+    } else if (Is_Arg_Matched(const_cast<char*>("--general"))) {
+      command = GENERAL_COMMAND;
+      m_generalConfig = Get_String_Arg(const_cast<char*>("--general"));
+#ifdef _DEBUG_2
+      std::cout << "Config:" << std::endl;
+      std::cout << m_generalConfig << std::endl;
+#endif
+    }
+  }
+
+  // registerModule();
+
+  switch (command) {
+    case SKELETONIZE:
+      return runSkeletonize(configJson);
+    case COMPARE_SWC:
+      return runCompareSwc();
+    case TRACE_NEURON:
+      return runTraceNeuron(configJson);
+    case GENERAL_COMMAND:
+      return runGeneral(inputJson);
+    default:
+      LOG(INFO) << "Unknown command";
+      return 1;
+  }
+}
 
 ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
 {
@@ -50,9 +170,9 @@ ZRunNeuTuCommand::ECommand ZRunNeuTuCommand::getCommand(const char* cmd)
   return UNKNOWN_COMMAND;
 }
 
-void ZRunNeuTuCommand::loadTraceConfig()
+void ZRunNeuTuCommand::loadTraceConfig(const ZJsonObject& configJson)
 {
-  if (!ZNeuronTracerConfig::getInstance().loadJsonObject(m_configJson)) {
+  if (!ZNeuronTracerConfig::getInstance().loadJsonObject(configJson)) {
     ZNeuronTracerConfig::getInstance().load(m_configDir + "/trace_config.json");
   }
 }
@@ -149,7 +269,7 @@ ZSwcTree* ZRunNeuTuCommand::traceFile()
   return tree;
 }
 
-int ZRunNeuTuCommand::runTraceNeuron()
+int ZRunNeuTuCommand::runTraceNeuron(const ZJsonObject& configJson)
 {
   if (m_input.empty()) {
     std::cout << "No input specified. Abort." << std::endl;
@@ -168,7 +288,7 @@ int ZRunNeuTuCommand::runTraceNeuron()
 
   int stat = 1;
 
-  loadTraceConfig();
+  loadTraceConfig(configJson);
 
   ZSwcTree* tree = traceFile();
 
@@ -182,7 +302,7 @@ int ZRunNeuTuCommand::runTraceNeuron()
   return stat;
 }
 
-int ZRunNeuTuCommand::runGeneral()
+int ZRunNeuTuCommand::runGeneral(const ZJsonObject& inputJson)
 {
   if (!m_generalConfig.empty()) {
 #ifdef _DEBUG_
@@ -199,7 +319,7 @@ int ZRunNeuTuCommand::runGeneral()
       }
     }
 
-    config.setEntry("_input", m_inputJson);
+    config.setEntry("_input", inputJson);
 
     std::string commandName = ZJsonParser::stringValue(config["command"]);
     std::cout << "Running command " << commandName << "..." << std::endl;
@@ -316,7 +436,7 @@ int ZRunNeuTuCommand::runCompareSwc()
   return 1;
 }
 
-int ZRunNeuTuCommand::runSkeletonize()
+int ZRunNeuTuCommand::runSkeletonize(ZJsonObject& configJson)
 {
   int stat;
 
@@ -329,7 +449,7 @@ int ZRunNeuTuCommand::runSkeletonize()
     tic();
   }
 
-  stat = skeletonizeFile();
+  stat = skeletonizeFile(configJson);
 
   if (m_isVerbose) {
     ptoc();
@@ -338,7 +458,7 @@ int ZRunNeuTuCommand::runSkeletonize()
   return stat;
 }
 
-int ZRunNeuTuCommand::skeletonizeFile()
+int ZRunNeuTuCommand::skeletonizeFile(ZJsonObject& configJson)
 {
   if (!fexist(m_input[0].c_str())) {
     LOG(ERROR) << "Skeletonization Failed: The input file " << m_input[0] << " seems not exist.";
@@ -349,8 +469,8 @@ int ZRunNeuTuCommand::skeletonizeFile()
 
   ZSwcTree* tree = NULL;
 
-  if (m_configJson.hasKey("skeletonize")) {
-    skeletonizer.configure(ZJsonObject(m_configJson["skeletonize"], ZJsonValue::SET_INCREASE_REF_COUNT));
+  if (configJson.hasKey("skeletonize")) {
+    skeletonizer.configure(ZJsonObject(configJson["skeletonize"], ZJsonValue::SET_INCREASE_REF_COUNT));
   }
 
   if (m_intvSpecified) {
@@ -402,136 +522,13 @@ int ZRunNeuTuCommand::skeletonizeFile()
   return 0;
 }
 
-int ZRunNeuTuCommand::run(int argc, char* argv[])
-{
-  static const char* Spec[] = {"--command",
-                               "[<input:string> ...]",
-                               "[-o <string>]",
-                               "[--config <string>]",
-                               "[--intv <int> <int> <int>]",
-                               "[--skeletonize]",
-                               "[--general <string>]",
-                               "[--compare_swc] [--scale <double>]",
-                               "[--trace] [--level <int>]",
-                               "[--separate <string>]",
-                               "[--compute_seed]",
-                               "[--verbose]",
-                               nullptr};
-
-#ifdef _DEBUG_2
-  for (int i = 0; i < argc; ++i) {
-    std::cout << argv[i] << std::endl;
-  }
-#endif
-
-  Process_Arguments(argc, argv, const_cast<char**>(Spec), 1);
-
-  m_configDir = ZSystemInfo::jsonDirPath().toStdString();
-  // m_configDir = neutu::JoinPath(NeutubeConfig::getInstance().getPath(NeutubeConfig::EConfigItem::CONFIG_DIR),
-  // "json");
-  std::string configPath = neutu::JoinPath(m_configDir, "command_config.json");
-
-  if (Is_Arg_Matched(const_cast<char*>("--config"))) {
-    configPath = Get_String_Arg(const_cast<char*>("--config"));
-  }
-
-  loadConfig(configPath);
-
-  ECommand command = UNKNOWN_COMMAND;
-  if (!m_configJson.isEmpty()) {
-    command = getCommand(ZJsonParser::stringValue(m_configJson["command"]).c_str());
-    m_input.push_back(ZJsonParser::stringValue(m_configJson["input"]));
-    m_output = ZJsonParser::stringValue(m_configJson["output"]);
-  }
-
-  if (Is_Arg_Matched(const_cast<char*>("--scale"))) {
-    m_scale = Get_Double_Arg(const_cast<char*>("--scale"));
-  }
-
-  if (Is_Arg_Matched(const_cast<char*>("--level"))) {
-    m_level = Get_Int_Arg(const_cast<char*>("--level"));
-  }
-
-  //  ZArgumentProcessor::processArguments(argc, argv, Spec);
-
-  m_input.clear();
-  int inputNumber = Get_Repeat_Count(const_cast<char*>("input"));
-  //  if (ZArgumentProcessor::isArgMatched("input")) {
-  //    int inputNumber = ZArgumentProcessor::getRepeatCount("input");
-  m_input.resize(inputNumber);
-  for (int i = 0; i < inputNumber; ++i) {
-    m_input[i] = Get_String_Arg(const_cast<char*>("input"), i);
-    //      m_input[i] = ZArgumentProcessor::getStringArg("input", i);
-  }
-
-  m_inputJson = loadInputJson();
-
-  if (Is_Arg_Matched(const_cast<char*>("-o"))) {
-    m_output = Get_String_Arg(const_cast<char*>("-o"));
-  }
-
-  if (Is_Arg_Matched(const_cast<char*>("--verbose"))) {
-    m_isVerbose = true;
-  }
-
-  if (Is_Arg_Matched(const_cast<char*>("--intv"))) {
-    for (int i = 0; i < 3; ++i) {
-      m_intv[i] = Get_Int_Arg(const_cast<char*>("--intv"), i + 1);
-    }
-    m_intvSpecified = true;
-  }
-
-  if (command == UNKNOWN_COMMAND) {
-    if (Is_Arg_Matched(const_cast<char*>("--skeletonize"))) {
-      command = SKELETONIZE;
-      //    m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-    } else if (Is_Arg_Matched(const_cast<char*>("--separate"))) {
-      command = SEPARATE_IMAGE;
-      //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-      m_input.emplace_back(Get_String_Arg(const_cast<char*>("--separate")));
-      m_output = Get_String_Arg(const_cast<char*>("-o"));
-    } else if (Is_Arg_Matched(const_cast<char*>("--trace"))) {
-      //      m_input.push_back(ZArgumentProcessor::getStringArg("input", 0));
-      m_output = Get_String_Arg(const_cast<char*>("-o"));
-      command = TRACE_NEURON;
-    } else if (Is_Arg_Matched(const_cast<char*>("--compare_swc"))) {
-      command = COMPARE_SWC;
-    } else if (Is_Arg_Matched(const_cast<char*>("--compute_seed"))) {
-      command = COMPUTE_SEED;
-    } else if (Is_Arg_Matched(const_cast<char*>("--general"))) {
-      command = GENERAL_COMMAND;
-      m_generalConfig = Get_String_Arg(const_cast<char*>("--general"));
-#ifdef _DEBUG_2
-      std::cout << "Config:" << std::endl;
-      std::cout << m_generalConfig << std::endl;
-#endif
-    }
-  }
-
-  // registerModule();
-
-  switch (command) {
-    case SKELETONIZE:
-      return runSkeletonize();
-    case COMPARE_SWC:
-      return runCompareSwc();
-    case TRACE_NEURON:
-      return runTraceNeuron();
-    case GENERAL_COMMAND:
-      return runGeneral();
-    default:
-      LOG(INFO) << "Unknown command";
-      return 1;
-  }
-}
-
-void ZRunNeuTuCommand::loadConfig(const std::string& filePath)
+void ZRunNeuTuCommand::loadConfig(const std::string& filePath, ZJsonObject& configJson)
 {
   //  ZJsonObject m_configJson;
-  m_configJson.load(filePath);
+  configJson.load(filePath);
 
-  expandConfig(filePath, "skeletonize");
-  expandConfig(filePath, "trace");
+  expandConfig(filePath, "skeletonize", configJson);
+  expandConfig(filePath, "trace", configJson);
 
 #ifdef _DEBUG_
   std::cout << "==========Command configuration========" << std::endl;
@@ -540,13 +537,14 @@ void ZRunNeuTuCommand::loadConfig(const std::string& filePath)
 #endif
 }
 
-std::string ZRunNeuTuCommand::extractIncludePath(const std::string& configFilePath, const std::string& key)
+std::string
+ZRunNeuTuCommand::extractIncludePath(const std::string& configFilePath, const std::string& key, ZJsonObject& configJson)
 {
   QDir configDir = QDir(ZString::dirPath(configFilePath).c_str());
 
   QString filePath;
 
-  ZJsonObject subJson(m_configJson.value(key.c_str()));
+  ZJsonObject subJson(configJson.value(key.c_str()));
 
   if (subJson.hasKey("include")) {
     QFileInfo fileInfo(ZJsonParser::stringValue(subJson["include"]).c_str());
@@ -560,14 +558,16 @@ std::string ZRunNeuTuCommand::extractIncludePath(const std::string& configFilePa
   return filePath.toStdString();
 }
 
-void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath, const std::string& objKey)
+void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath,
+                                    const std::string& objKey,
+                                    ZJsonObject& configJson)
 {
-  if (m_configJson.hasKey(objKey.c_str())) {
-    std::string includeFilePath = extractIncludePath(configFilePath, objKey);
+  if (configJson.hasKey(objKey.c_str())) {
+    std::string includeFilePath = extractIncludePath(configFilePath, objKey, configJson);
 
     if (!includeFilePath.empty()) {
       if (fexist(includeFilePath.c_str())) {
-        ZJsonObject subJson(m_configJson.value(objKey.c_str()));
+        ZJsonObject subJson(configJson.value(objKey.c_str()));
         ZJsonObject includeJson;
         includeJson.load(includeFilePath);
 
@@ -589,8 +589,8 @@ void ZRunNeuTuCommand::expandConfig(const std::string& configFilePath, const std
 }
 
 int ZRunNeuTuCommand::runTraceCommand(const std::vector<std::string>& input,
-                                       const std::string& output,
-                                       const ZJsonObject& config)
+                                      const std::string& output,
+                                      const ZJsonObject& config)
 {
   ZJsonObject inputJson(config.value("_input"));
 
@@ -606,7 +606,7 @@ int ZRunNeuTuCommand::runTraceCommand(const std::vector<std::string>& input,
     return 1;
   }
 
-  loadTraceConfig(config);
+  loadTraceConfigForTraceCommand(config);
 
   if (ZJsonObjectParser::GetValue(config, "action", "") == "inspect") {
     ZNeuronTracerConfig::getInstance().print();
@@ -625,7 +625,7 @@ int ZRunNeuTuCommand::runTraceCommand(const std::vector<std::string>& input,
   return 0;
 }
 
-void ZRunNeuTuCommand::loadTraceConfig(const ZJsonObject& config)
+void ZRunNeuTuCommand::loadTraceConfigForTraceCommand(const ZJsonObject& config)
 {
   ZJsonObject actualConfig = config;
 
