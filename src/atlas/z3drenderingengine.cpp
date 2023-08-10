@@ -881,10 +881,11 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   VLOG(1) << "renderFast";
   m_isRendering = true;
   getGLFocus();
-  Q_EMIT progressChanged(20);
-  m_networkEvaluator->process(stereo, true);
-  Q_EMIT progressChanged(100);
-  QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+  m_progress = m_networkEvaluator->process(stereo, true);
+  Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
+  if (m_progress < 1.) {
+    QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+  }
 
   m_isRendering = false;
 }
@@ -898,11 +899,9 @@ void Z3DRenderingEngine::render(bool stereo)
   getGLFocus();
   try {
     m_globalParas->cancellationSource = std::make_unique<folly::CancellationSource>();
-    double progress = 0.1;
-    Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
-    while (progress < 1.0) {
-      progress = m_networkEvaluator->process(stereo, false, m_globalParas->cancellationSource->getToken());
-      Q_EMIT progressChanged(std::clamp<int>(progress * 100., 0, 100));
+    while (m_progress < 1.0) {
+      m_progress = m_networkEvaluator->process(stereo, true, m_globalParas->cancellationSource->getToken());
+      Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
   catch (ZException& e) {

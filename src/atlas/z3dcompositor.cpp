@@ -192,25 +192,18 @@ glm::uvec2 Z3DCompositor::outputSize() const
 void Z3DCompositor::invalidate(State inv)
 {
   CHECK(inv != State::Valid);
-  if (is_flag_set(m_state, inv)) {
-    return;
-  }
+//  if (is_flag_set(m_state, inv)) {
+//    return;
+//  }
   // LOG(INFO) << to_underlying(m_state) << " " << to_underlying(inv);
   set_flag(m_state, inv);
 
   Q_EMIT sceneParaUpdated();
 }
 
-void Z3DCompositor::setFastRenderingMode(bool v, bool /*stereo*/)
+void Z3DCompositor::setProgressiveRenderingMode(bool v)
 {
-  // LOG(INFO) << m_fastRendering << " " << to_underlying(m_state);
-  if (m_fastRendering == v) {
-    return;
-  }
-  m_fastRendering = v;
-  if (m_vPPort.isConnected()) {
-    m_state = State::AllResultInvalid;
-  }
+  m_progressiveRendering = v;
 }
 
 double Z3DCompositor::process(Z3DEye eye)
@@ -750,7 +743,7 @@ double Z3DCompositor::process(Z3DEye eye)
 
     m_rendererBase.globalParas().hasNewRendering = true;
   }
-  VLOG(1) << fmt::format("{} finished", m_fastRendering ? "fast rendering" : "rendering");
+  VLOG(1) << fmt::format("{} finished", m_progressiveRendering ? "progressive rendering" : "rendering");
   Q_EMIT renderingFinished();
 
   return 1.0;

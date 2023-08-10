@@ -176,15 +176,15 @@ private:
   void viewScaleChanged(double s);
 
 private:
-  ZImgPack* m_imgPack;
+  ZImgPack* m_imgPack = nullptr;
 
   std::vector<QGraphicsPixmapItem*> m_imgItems;
   std::unique_ptr<ZGraphicsItemGroup> m_item;
   std::unique_ptr<ZImgScaleBarGraphicsItem> m_scaleBarItem;
 
-  bool m_sliceValid;
-  bool m_hasVisibleChannel;
-  bool m_isVisible;
+  bool m_sliceValid = false;
+  bool m_hasVisibleChannel = true;
+  bool m_isVisible = false;
 
   std::vector<std::unique_ptr<ZBoolParameter>> m_channelVisibleParas;
   std::vector<std::unique_ptr<ZDoubleSpanParameter>> m_doubleChannelRangeParas;
@@ -197,12 +197,12 @@ private:
   ZVec3Parameter m_scaleBarColor;
 
   std::unique_ptr<ZImgPackDisplay> m_display;
-  bool m_displayValid;
+  bool m_displayValid = false;
 
-  bool m_lastMIP;
-  int m_lastSlice;
-  int m_lastTime;
-  double m_lastScale;
+  bool m_lastMIP = false;
+  int m_lastSlice = -1;
+  int m_lastTime = -1;
+  double m_lastScale = 0;
   QRectF m_lastViewport;
 
   std::shared_ptr<ZWidgetsGroup> m_widgetsGroup;

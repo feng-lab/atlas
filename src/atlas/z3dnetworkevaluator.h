@@ -43,7 +43,7 @@ public:
   // according the network topology and the invalidation levels of the filters.
   // stereo means run two passes for left and right eye
   double process(bool stereo = false,
-                 bool fastRendering = false,
+                 bool progressiveRendering = false,
                  const folly::CancellationToken& cancellationToken = folly::CancellationToken());
 
   // call when network topology changed

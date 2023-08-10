@@ -29,7 +29,8 @@ Z3DNetworkEvaluator::Z3DNetworkEvaluator(Z3DCompositor& compositor, QObject* par
   updateNetwork();
 }
 
-double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, const folly::CancellationToken& cancellationToken)
+double
+Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly::CancellationToken& cancellationToken)
 {
   //  if (m_locked) {
   //    LOG(INFO) << "locked. Scheduling.";
@@ -69,7 +70,7 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, const folly
   for (auto currentFilter : m_renderingOrder) {
     maybeCancel(cancellationToken);
 
-    currentFilter->setFastRenderingMode(fastRendering, stereo);
+    currentFilter->setProgressiveRenderingMode(progressiveRendering);
 
     Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
 
@@ -83,16 +84,16 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, const folly
 
       {
         double progress = currentFilter->process(eye);
-        currentFilter->setValid(eye);
-        //        if (progress == 1.0) {
-        //          if (currentFilter == &m_compositor) {
-        //            if (totalProgress == currentProgress) {
-        //              currentFilter->setValid(eye);
-        //            }
-        //          } else {
-        //            currentFilter->setValid(eye);
-        //          }
-        //        }
+        // currentFilter->setValid(eye);
+        if (progress == 1.0) {
+          if (currentFilter == &m_compositor) {
+            if (totalProgress == currentProgress) {
+              currentFilter->setValid(eye);
+            }
+          } else {
+            currentFilter->setValid(eye);
+          }
+        }
         currentProgress += progress;
         totalProgress += 1.0;
         CHECK_GL_ERROR
@@ -114,16 +115,16 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, const folly
 
       {
         double progress = currentFilter->process(Z3DEye::Right);
-        currentFilter->setValid(Z3DEye::Right);
-        //        if (progress == 1.0) {
-        //          if (currentFilter == &m_compositor) {
-        //            if (totalProgress == currentProgress) {
-        //              currentFilter->setValid(Z3DEye::Right);
-        //            }
-        //          } else {
-        //            currentFilter->setValid(Z3DEye::Right);
-        //          }
-        //        }
+        // currentFilter->setValid(Z3DEye::Right);
+        if (progress == 1.0) {
+          if (currentFilter == &m_compositor) {
+            if (totalProgress == currentProgress) {
+              currentFilter->setValid(Z3DEye::Right);
+            }
+          } else {
+            currentFilter->setValid(Z3DEye::Right);
+          }
+        }
         currentProgress += progress;
         totalProgress += 1.0;
         CHECK_GL_ERROR
@@ -151,6 +152,9 @@ double Z3DNetworkEvaluator::process(bool stereo, bool fastRendering, const folly
   //    m_compositor.invalidate(Z3DFilter::State::AllResultInvalid);
   //  }
 
+  if (!progressiveRendering) {
+    CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
+  }
   return totalProgress > 0 ? currentProgress / totalProgress : 1.0;
 }
 

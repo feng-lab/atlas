@@ -59,11 +59,13 @@ public:
   // otherwise don't use the returned value
   glm::vec3 get3DPosition(int x, int y, int width, int height, bool& success);
 
-  void setFastRenderingMode(bool v, bool stereo) override;
+  void setProgressiveRenderingMode(bool v) override;
 
   void enterSubregionView(float x, float y, float z);
 
   void exitSubregionView();
+
+  void invalidate(State inv) override;
 
 Q_SIGNALS:
   void showImgContextMenu(QPoint globalPos, float x, float y, float z, bool enter, bool exit);
@@ -75,7 +77,7 @@ protected:
 
   void adjustWidget();
 
-  // void fullResolutionRenderingToggled();
+  void fullResolutionRenderingToggled();
 
   void leftMouseButtonPressed(QMouseEvent* e, int w, int h);
 
@@ -98,11 +100,11 @@ protected:
 
   [[nodiscard]] bool hasSlices() const;
 
-  void renderSlices(Z3DEye eye);
+  double renderSlices(Z3DEye eye);
 
   [[nodiscard]] bool hasImage() const;
 
-  void renderImage(Z3DEye eye);
+  double renderImage(Z3DEye eye);
 
   [[nodiscard]] bool onlyBoundBox() const;
 
@@ -166,6 +168,12 @@ private:
   Z3DRenderTarget m_blockIDsRenderTarget;
   Z3DRenderTarget m_imageRenderTarget1;
   Z3DRenderTarget m_imageRenderTarget2;
+  Z3DRenderTarget m_imageRenderTarget1Left;
+  Z3DRenderTarget m_imageRenderTarget2Left;
+  Z3DRenderTarget m_imageRenderTarget1Right;
+  Z3DRenderTarget m_imageRenderTarget2Right;
+  Z3DRenderTarget* m_imageRenderTarget1s[3] = {nullptr, nullptr, nullptr};
+  Z3DRenderTarget* m_imageRenderTarget2s[3] = {nullptr, nullptr, nullptr};
 
   Z3DRenderOutputPort m_outport;
   Z3DRenderOutputPort m_leftEyeOutport;
@@ -210,6 +218,8 @@ private:
   glm::ivec2 m_startCoord{};
 
   bool m_channelRangeChanged = false;
+
+  bool m_progressiveRendering = false;
 };
 
 } // namespace nim

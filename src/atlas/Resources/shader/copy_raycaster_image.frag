@@ -20,7 +20,12 @@ void main()
   if (fragColor.a == 0.0)
     discard;
 
+  vec2 rayLengthAndDepth = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).xy;
+
+  if (rayLengthAndDepth.x < 1.0)
+    discard;
+
   FragData0 = fragColor;
 
-  gl_FragDepth = texelFetch(depth_texture, ivec2(gl_FragCoord.xy), 0).y;
+  gl_FragDepth = rayLengthAndDepth.y;
 }

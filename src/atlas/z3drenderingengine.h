@@ -321,6 +321,8 @@ private:
   bool m_isRendering = false;
 
   QMutex m_mutex;
+
+  double m_progress = 0;
 };
 
 } // namespace nim

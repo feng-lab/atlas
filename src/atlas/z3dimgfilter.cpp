@@ -98,6 +98,10 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   , m_blockIDsRenderTarget(glm::uvec2(32, 32))
   , m_imageRenderTarget1(glm::uvec2(32, 32))
   , m_imageRenderTarget2(glm::uvec2(32, 32))
+  , m_imageRenderTarget1Left(glm::uvec2(32, 32))
+  , m_imageRenderTarget2Left(glm::uvec2(32, 32))
+  , m_imageRenderTarget1Right(glm::uvec2(32, 32))
+  , m_imageRenderTarget2Right(glm::uvec2(32, 32))
   , m_outport("Image", this)
   , m_leftEyeOutport("LeftEyeImage", this)
   , m_rightEyeOutport("RightEyeImage", this)
@@ -174,40 +178,48 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_blockIDsRenderTarget.attachTextureToFBO(&m_missBlocksTexture7, GL_COLOR_ATTACHMENT7, false);
   m_blockIDsRenderTarget.isFBOComplete();
 
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
-                              glm::uvec3(32, 32, 1),
-                              GL_RGBA,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-  g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
-                              glm::uvec3(32, 32, 1),
-                              GL_RG,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-  m_imageRenderTarget1.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
-  m_imageRenderTarget1.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
-  m_imageRenderTarget1.isFBOComplete();
-  g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
-                              glm::uvec3(32, 32, 1),
-                              GL_RGBA,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-  g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
-                              glm::uvec3(32, 32, 1),
-                              GL_RG,
-                              GL_FLOAT,
-                              nullptr,
-                              GLint(GL_NEAREST),
-                              GLint(GL_NEAREST));
-  m_imageRenderTarget2.attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
-  m_imageRenderTarget2.attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
-  m_imageRenderTarget2.isFBOComplete();
+  m_imageRenderTarget1s[0] = &m_imageRenderTarget1Left;
+  m_imageRenderTarget1s[1] = &m_imageRenderTarget1;
+  m_imageRenderTarget1s[2] = &m_imageRenderTarget1Right;
+  m_imageRenderTarget2s[0] = &m_imageRenderTarget2Left;
+  m_imageRenderTarget2s[1] = &m_imageRenderTarget2;
+  m_imageRenderTarget2s[2] = &m_imageRenderTarget2Right;
+  for (int i = 0; i < 3; ++i) {
+    g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
+                                glm::uvec3(32, 32, 1),
+                                GL_RGBA,
+                                GL_FLOAT,
+                                nullptr,
+                                GLint(GL_NEAREST),
+                                GLint(GL_NEAREST));
+    g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
+                                glm::uvec3(32, 32, 1),
+                                GL_RG,
+                                GL_FLOAT,
+                                nullptr,
+                                GLint(GL_NEAREST),
+                                GLint(GL_NEAREST));
+    m_imageRenderTarget1s[i]->attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
+    m_imageRenderTarget1s[i]->attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
+    m_imageRenderTarget1s[i]->isFBOComplete();
+    g_TexId[0] = new Z3DTexture(GLint(GL_RGBA16),
+                                glm::uvec3(32, 32, 1),
+                                GL_RGBA,
+                                GL_FLOAT,
+                                nullptr,
+                                GLint(GL_NEAREST),
+                                GLint(GL_NEAREST));
+    g_TexId[1] = new Z3DTexture(GLint(GL_RG32F),
+                                glm::uvec3(32, 32, 1),
+                                GL_RG,
+                                GL_FLOAT,
+                                nullptr,
+                                GLint(GL_NEAREST),
+                                GLint(GL_NEAREST));
+    m_imageRenderTarget2s[i]->attachTextureToFBO(g_TexId[0], GL_COLOR_ATTACHMENT0, true);
+    m_imageRenderTarget2s[i]->attachTextureToFBO(g_TexId[1], GL_COLOR_ATTACHMENT1, true);
+    m_imageRenderTarget2s[i]->isFBOComplete();
+  }
 
   // ports
   addPort(m_outport);
@@ -273,7 +285,7 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   m_imgSliceRenderer.setLayerTarget(m_layerTarget);
   m_imgRaycasterRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
   m_imgSliceRenderer.setBlockIDsRenderTarget(m_blockIDsRenderTarget);
-  m_imgRaycasterRenderer.setImageRenderTargetWithRayDepthLayer(m_imageRenderTarget1, m_imageRenderTarget2);
+  m_imgRaycasterRenderer.setImageRenderTargetWithRayDepthLayer(m_imageRenderTarget1s, m_imageRenderTarget2s);
   //  for (size_t i=0; i<m_maxNumOfFullResolutionVolumeSlice; ++i) {
   //    m_image2DRenderers.emplace_back(std::make_unique<Z3DImage2DRenderer>(m_rendererBase));
   //    m_image2DRenderers[i]->setLayerTarget(&m_layerTarget);
@@ -286,12 +298,12 @@ Z3DImgFilter::Z3DImgFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addParameter(m_imgRaycasterRenderer.localMIPThresholdPara());
   addParameter(m_imgRaycasterRenderer.samplingRatePara());
 
-  //  m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
-  //  m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
-  //  connect(&m_fullResolutionRendering,
-  //          &ZBoolParameter::valueChanged,
-  //          this,
-  //          &Z3DImgFilter::fullResolutionRenderingToggled);
+  m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  connect(&m_fullResolutionRendering,
+          &ZBoolParameter::valueChanged,
+          this,
+          &Z3DImgFilter::fullResolutionRenderingToggled);
 
   connect(&m_rendererBase.globalXCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
   connect(&m_rendererBase.globalYCutPara(), &ZFloatSpanParameter::valueChanged, this, &Z3DImgFilter::invalidateResult);
@@ -583,39 +595,9 @@ glm::vec3 Z3DImgFilter::get3DPosition(int x, int y, int width, int height, bool&
   }
 }
 
-void Z3DImgFilter::setFastRenderingMode(bool v, bool stereo)
+void Z3DImgFilter::setProgressiveRenderingMode(bool v)
 {
-  if (v == m_imgRaycasterRenderer.isFastRendering() && v == m_imgSliceRenderer.isFastRendering()) {
-    return;
-  }
-  // always fast rendering
-  if (m_3dImg && !m_3dImg->isVolumeDownsampled()) {
-    m_imgRaycasterRenderer.setFastRendering(true);
-    m_imgSliceRenderer.setFastRendering(true);
-    return;
-  }
-  // always fast rendering
-  if (!m_fullResolutionRendering.get()) {
-    m_imgRaycasterRenderer.setFastRendering(true);
-    m_imgSliceRenderer.setFastRendering(true);
-    return;
-  }
-  // has valid full-res rendering, do nothing
-  if (stereo) {
-    bool stereoValid =
-      !is_flag_set(m_state, State::LeftEyeResultInvalid) && !is_flag_set(m_state, State::RightEyeResultInvalid);
-    if (!m_imgRaycasterRenderer.isFastRendering() && !m_imgSliceRenderer.isFastRendering() && stereoValid) {
-      return;
-    }
-  } else {
-    if (!m_imgRaycasterRenderer.isFastRendering() && !m_imgSliceRenderer.isFastRendering() &&
-        !is_flag_set(m_state, State::MonoViewResultInvalid)) {
-      return;
-    }
-  }
-  m_imgRaycasterRenderer.setFastRendering(v);
-  m_imgSliceRenderer.setFastRendering(v);
-  set_flag(m_state, stereo ? State::StereoResultInvalid : State::MonoViewResultInvalid);
+  m_progressiveRendering = v;
 }
 
 void Z3DImgFilter::enterSubregionView(float x, float y, float z)
@@ -638,6 +620,13 @@ void Z3DImgFilter::exitSubregionView()
   m_yCut.set(m_yCut.range());
   m_zCut.set(m_zCut.range());
   m_rendererBase.globalParas().cameraFocusesOn(axisAlignedBoundBox());
+}
+
+void Z3DImgFilter::invalidate(State inv)
+{
+  Z3DBoundedFilter::invalidate(inv);
+  m_imgRaycasterRenderer.resetProgress();
+  m_imgSliceRenderer.resetProgress();
 }
 
 void Z3DImgFilter::updateSize()
@@ -670,12 +659,12 @@ void Z3DImgFilter::adjustWidget()
   m_obliqueSlice2DistanceToOrigin.setVisible(m_showObliqueSlice2.get());
 }
 
-// void Z3DImgFilter::fullResolutionRenderingToggled()
-//{
-//   m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
-//   m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
-//   m_smoothInteraction.setVisible(m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get());
-// }
+void Z3DImgFilter::fullResolutionRenderingToggled()
+{
+  m_imgRaycasterRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  m_imgSliceRenderer.setFastRendering(!m_fullResolutionRendering.get());
+  // m_smoothInteraction.setVisible(m_3dImg && m_3dImg->isVolumeDownsampled() && m_fullResolutionRendering.get());
+}
 
 void Z3DImgFilter::leftMouseButtonPressed(QMouseEvent* /*e*/, int /*w*/, int /*h*/)
 {
@@ -786,19 +775,29 @@ double Z3DImgFilter::process(Z3DEye eye)
     glDisable(GL_DEPTH_TEST);
   });
 
+  double currentProgress = 0.0;
+  double totalProgress = 0.0;
+
   if (hasImage()) {
-    renderImage(eye);
+    double progress = renderImage(eye);
+    currentProgress += progress;
+    totalProgress += 1.0;
   } else if (onlyBoundBox()) {
     renderOnlyBoundBox(eye);
   }
 
   if (hasSlices()) {
-    renderSlices(eye);
+    double progress = renderSlices(eye);
+    currentProgress += progress;
+    totalProgress += 1.0;
   }
 
   CHECK_GL_ERROR
 
-  return 1.0;
+  if (!m_progressiveRendering) {
+    CHECK(currentProgress == totalProgress) << currentProgress << " " << totalProgress;
+  }
+  return totalProgress > 0 ? currentProgress / totalProgress : 1.0;
 }
 
 bool Z3DImgFilter::hasSlices() const
@@ -807,217 +806,117 @@ bool Z3DImgFilter::hasSlices() const
          m_showZSlice2.get() || m_showObliqueSlice.get() || m_showObliqueSlice2.get();
 }
 
-void Z3DImgFilter::renderSlices(Z3DEye eye)
+double Z3DImgFilter::renderSlices(Z3DEye eye)
 {
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
                                         : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
                                                                 : m_opaqueRightEyeOutport;
-  currentOutport.resize(m_outport.size());
 
-  m_layerTarget.resize(currentOutport.size());
+  if (!(m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye))) {
+    currentOutport.resize(m_outport.size());
+    m_layerTarget.resize(currentOutport.size());
+
+    glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
+    glm::vec3 coordLuf = m_3dImg->physicalLUF();
+    glm::vec3 coordRdb = m_3dImg->physicalRDB();
+
+    m_imgSliceRenderer.clearSlices();
+
+    ZMesh cube = ZMesh::createCube(coordLuf, coordRdb, glm::vec3(0, 0, 0), glm::vec3(1, 1, 1));
+    if (m_showObliqueSlice.get()) {
+      glm::vec3 normal = m_obliqueSliceNormal.get();
+      if (glm::length(normal) == 0) {
+        normal = glm::vec3(1, 1, 0);
+      } else {
+        normal = glm::normalize(normal);
+      }
+      ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
+      if (!slice.empty()) {
+        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+    }
+    if (m_showZSlice.get()) {
+      float zTexCoord = (m_zSlicePosition.get() + .5f) / volDim.z;
+      float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+    if (m_showYSlice.get()) {
+      float yTexCoord = (m_ySlicePosition.get() + .5f) / volDim.y;
+      float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+    if (m_showXSlice.get()) {
+      float xTexCoord = (m_xSlicePosition.get() + .5f) / volDim.x;
+      float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+
+    if (m_showObliqueSlice2.get()) {
+      glm::vec3 normal = m_obliqueSlice2Normal.get();
+      if (glm::length(normal) == 0) {
+        normal = glm::vec3(1, 1, 0);
+      } else {
+        normal = glm::normalize(normal);
+      }
+      ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
+      if (!slice.empty()) {
+        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+        m_imgSliceRenderer.addSlice(slice);
+      }
+    }
+    if (m_showZSlice2.get()) {
+      float zTexCoord = (m_zSlice2Position.get() + .5f) / volDim.z;
+      float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+    if (m_showYSlice2.get()) {
+      float yTexCoord = (m_ySlice2Position.get() + .5f) / volDim.y;
+      float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+    if (m_showXSlice2.get()) {
+      float xTexCoord = (m_xSlice2Position.get() + .5f) / volDim.x;
+      float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
+
+      ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
+      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgSliceRenderer.addSlice(slice);
+    }
+  }
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
   m_rendererBase.setViewport(currentOutport.size());
 
-  glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
-  glm::vec3 coordLuf = m_3dImg->physicalLUF();
-  glm::vec3 coordRdb = m_3dImg->physicalRDB();
-
-  //  if (m_useFRVolumeSlice.get() && m_3dImg->isVolumeDownsampled()) {
-  //    std::vector<Z3DPrimitiveRenderer*> renderers;
-
-  //    size_t sliceRendererIdx = 0;
-  //    if (m_showZSlice.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeZSliceVolume(m_zSlicePosition.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float zTexCoord = m_zSlicePosition.get() / static_cast<float>(volDim.z-1);
-  //        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(zCoord, 2, coordLuf.xy(), coordRdb.xy());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    sliceRendererIdx = 1;
-  //    if (m_showYSlice.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeYSliceVolume(m_ySlicePosition.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float yTexCoord = m_ySlicePosition.get() / static_cast<float>(volDim.y-1);
-  //        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(yCoord, 1, coordLuf.xz(), coordRdb.xz());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    sliceRendererIdx = 2;
-  //    if (m_showXSlice.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeXSliceVolume(m_xSlicePosition.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float xTexCoord = m_xSlicePosition.get() / static_cast<float>(volDim.x-1);
-  //        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(xCoord, 0, coordLuf.yz(), coordRdb.yz());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    sliceRendererIdx = 3;
-  //    if (m_showZSlice2.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeZSliceVolume(m_zSlice2Position.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float zTexCoord = m_zSlice2Position.get() / static_cast<float>(volDim.z-1);
-  //        float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(zCoord, 2, coordLuf.xy(), coordRdb.xy());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    sliceRendererIdx = 4;
-  //    if (m_showYSlice2.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeYSliceVolume(m_ySlice2Position.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float yTexCoord = m_ySlice2Position.get() / static_cast<float>(volDim.y-1);
-  //        float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(yCoord, 1, coordLuf.xz(), coordRdb.xz());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    sliceRendererIdx = 5;
-  //    if (m_showXSlice2.get()) {
-  //      if (!m_FRVolumeSlicesValidState[sliceRendererIdx]) {
-  //        m_image2DRenderers[sliceRendererIdx]->clearSlices();
-
-  //        m_FRVolumeSlices[sliceRendererIdx] = m_3dImg->makeXSliceVolume(m_xSlice2Position.get());
-  //        m_image2DRenderers[sliceRendererIdx]->setChannels(m_FRVolumeSlices[sliceRendererIdx], m_sliceColormaps);
-
-  //        float xTexCoord = m_xSlice2Position.get() / static_cast<float>(volDim.x-1);
-  //        float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
-  //        ZMesh slice = ZMesh::createCubeSliceWith2DTexture(xCoord, 0, coordLuf.yz(), coordRdb.yz());
-  //        slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-  //        m_image2DRenderers[sliceRendererIdx]->addSlice(slice);
-  //        m_FRVolumeSlicesValidState[sliceRendererIdx] = true;
-  //      }
-  //      renderers.push_back(m_image2DRenderers[sliceRendererIdx].get());
-  //    }
-  //    m_rendererBase.render(eye, renderers);
-
-  //  } else {
-
-  m_imgSliceRenderer.clearSlices();
-
-  ZMesh cube = ZMesh::createCube(coordLuf, coordRdb, glm::vec3(0, 0, 0), glm::vec3(1, 1, 1));
-  if (m_showObliqueSlice.get()) {
-    glm::vec3 normal = m_obliqueSliceNormal.get();
-    if (glm::length(normal) == 0) {
-      normal = glm::vec3(1, 1, 0);
-    } else {
-      normal = glm::normalize(normal);
-    }
-    ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSliceDistanceToOrigin.get() * normal);
-    if (!slice.empty()) {
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addSlice(slice);
-    }
+  double progress = 1.0;
+  if (!m_progressiveRendering) {
+    m_rendererBase.render(eye, m_imgSliceRenderer);
+  } else {
+    progress = m_imgSliceRenderer.renderProgressively(eye);
   }
-  if (m_showZSlice.get()) {
-    float zTexCoord = (m_zSlicePosition.get() + .5f) / volDim.z;
-    float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-  if (m_showYSlice.get()) {
-    float yTexCoord = (m_ySlicePosition.get() + .5f) / volDim.y;
-    float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-  if (m_showXSlice.get()) {
-    float xTexCoord = (m_xSlicePosition.get() + .5f) / volDim.x;
-    float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-
-  if (m_showObliqueSlice2.get()) {
-    glm::vec3 normal = m_obliqueSlice2Normal.get();
-    if (glm::length(normal) == 0) {
-      normal = glm::vec3(1, 1, 0);
-    } else {
-      normal = glm::normalize(normal);
-    }
-    ZMesh slice = ZMesh::planeClosedSurfaceIntersection(cube, normal, m_obliqueSlice2DistanceToOrigin.get() * normal);
-    if (!slice.empty()) {
-      slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-      m_imgSliceRenderer.addSlice(slice);
-    }
-  }
-  if (m_showZSlice2.get()) {
-    float zTexCoord = (m_zSlice2Position.get() + .5f) / volDim.z;
-    float zCoord = glm::mix(coordLuf.z, coordRdb.z, zTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(zCoord, zTexCoord, 2, coordLuf.xy(), coordRdb.xy());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-  if (m_showYSlice2.get()) {
-    float yTexCoord = (m_ySlice2Position.get() + .5f) / volDim.y;
-    float yCoord = glm::mix(coordLuf.y, coordRdb.y, yTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(yCoord, yTexCoord, 1, coordLuf.xz(), coordRdb.xz());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-  if (m_showXSlice2.get()) {
-    float xTexCoord = (m_xSlice2Position.get() + .5f) / volDim.x;
-    float xCoord = glm::mix(coordLuf.x, coordRdb.x, xTexCoord);
-
-    ZMesh slice = ZMesh::createCubeSlice(xCoord, xTexCoord, 0, coordLuf.yz(), coordRdb.yz());
-    slice.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgSliceRenderer.addSlice(slice);
-  }
-  m_rendererBase.render(eye, m_imgSliceRenderer);
-  //}
 
   currentOutport.releaseTarget();
 
   // glFinish();
   // currentOutport.colorTexture()->saveAsColorImage("/Users/feng/Downloads/abc.tif");
+
+  return progress;
 }
 
 bool Z3DImgFilter::hasImage() const
@@ -1028,120 +927,121 @@ bool Z3DImgFilter::hasImage() const
          m_zCut.lowerValue() < m_zCut.maximum();
 }
 
-void Z3DImgFilter::renderImage(Z3DEye eye)
+double Z3DImgFilter::renderImage(Z3DEye eye)
 {
-  glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
-  glm::vec3 coordLuf = m_3dImg->physicalLUF();
-  glm::vec3 coordRdb = m_3dImg->physicalRDB();
-
-  float xTexCoordStart = m_xCut.lowerValue() / volDim.x;
-  float xTexCoordEnd = m_xCut.upperValue() / volDim.x;
-  float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
-  float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
-  float yTexCoordStart = m_yCut.lowerValue() / volDim.y;
-  float yTexCoordEnd = m_yCut.upperValue() / volDim.y;
-  float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
-  float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
-  float zTexCoordStart = m_zCut.lowerValue() / volDim.z;
-  float zTexCoordEnd = m_zCut.upperValue() / volDim.z;
-  float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
-  float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
-
   Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
                                         : (eye == Z3DEye::Left) ? m_leftEyeOutport
                                                                 : m_rightEyeOutport;
 
-  m_layerTarget.resize(currentOutport.size());
-  m_blockIDsRenderTarget.resize(currentOutport.size());
-  m_imageRenderTarget1.resize(currentOutport.size());
-  m_imageRenderTarget2.resize(currentOutport.size());
+  if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
+    m_layerTarget.resize(currentOutport.size());
+    m_blockIDsRenderTarget.resize(currentOutport.size());
+    m_imageRenderTarget1s[to_underlying(eye)]->resize(currentOutport.size());
+    m_imageRenderTarget2s[to_underlying(eye)]->resize(currentOutport.size());
 
-  if (m_3dImg->is2DData()) { // for 2d image
-    ZMesh m_2DImageQuad = ZMesh::createImageSlice(0,
-                                                  glm::vec2(xCoordStart, yCoordStart),
-                                                  glm::vec2(xCoordEnd, yCoordEnd),
-                                                  glm::vec2(xTexCoordStart, yTexCoordStart),
-                                                  glm::vec2(xTexCoordEnd, yTexCoordEnd));
-    m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgRaycasterRenderer.clearQuads();
-    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
-  } else if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
-    ZMesh m_2DImageQuad = ZMesh::createCubeSlice(zCoordStart,
-                                                 zTexCoordStart,
-                                                 2,
-                                                 glm::vec2(xCoordStart, yCoordStart),
-                                                 glm::vec2(xCoordEnd, yCoordEnd),
-                                                 glm::vec2(xTexCoordStart, yTexCoordStart),
-                                                 glm::vec2(xTexCoordEnd, yTexCoordEnd));
-    m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgRaycasterRenderer.clearQuads();
-    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
-  } else if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
-    ZMesh m_2DImageQuad = ZMesh::createCubeSlice(yCoordStart,
-                                                 yTexCoordStart,
-                                                 1,
-                                                 glm::vec2(xCoordStart, zCoordStart),
-                                                 glm::vec2(xCoordEnd, zCoordEnd),
-                                                 glm::vec2(xTexCoordStart, zTexCoordStart),
-                                                 glm::vec2(xTexCoordEnd, zTexCoordEnd));
-    m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgRaycasterRenderer.clearQuads();
-    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
-  } else if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
-    ZMesh m_2DImageQuad = ZMesh::createCubeSlice(xCoordStart,
-                                                 xTexCoordStart,
-                                                 0,
-                                                 glm::vec2(yCoordStart, zCoordStart),
-                                                 glm::vec2(yCoordEnd, zCoordEnd),
-                                                 glm::vec2(yTexCoordStart, zTexCoordStart),
-                                                 glm::vec2(yTexCoordEnd, zTexCoordEnd));
-    m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    m_imgRaycasterRenderer.clearQuads();
-    m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
-  } else { // 3d volume Raycasting
-    ZMesh cube = ZMesh::createCube(glm::vec3(xCoordStart, yCoordStart, zCoordStart),
-                                   glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
-                                   glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
-                                   glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
-    cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
-    bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
+    glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
+    glm::vec3 coordLuf = m_3dImg->physicalLUF();
+    glm::vec3 coordRdb = m_3dImg->physicalRDB();
 
-    // enable culling
-    glEnable(GL_CULL_FACE);
+    float xTexCoordStart = m_xCut.lowerValue() / volDim.x;
+    float xTexCoordEnd = m_xCut.upperValue() / volDim.x;
+    float xCoordStart = glm::mix(coordLuf.x, coordRdb.x, xTexCoordStart);
+    float xCoordEnd = glm::mix(coordLuf.x, coordRdb.x, xTexCoordEnd);
+    float yTexCoordStart = m_yCut.lowerValue() / volDim.y;
+    float yTexCoordEnd = m_yCut.upperValue() / volDim.y;
+    float yCoordStart = glm::mix(coordLuf.y, coordRdb.y, yTexCoordStart);
+    float yCoordEnd = glm::mix(coordLuf.y, coordRdb.y, yTexCoordEnd);
+    float zTexCoordStart = m_zCut.lowerValue() / volDim.z;
+    float zTexCoordEnd = m_zCut.upperValue() / volDim.z;
+    float zCoordStart = glm::mix(coordLuf.z, coordRdb.z, zTexCoordStart);
+    float zCoordEnd = glm::mix(coordLuf.z, coordRdb.z, zTexCoordEnd);
 
-    m_rendererBase.setViewport(currentOutport.size());
-    CHECK_GL_ERROR
+    if (m_3dImg->is2DData()) { // for 2d image
+      ZMesh m_2DImageQuad = ZMesh::createImageSlice(0,
+                                                    glm::vec2(xCoordStart, yCoordStart),
+                                                    glm::vec2(xCoordEnd, yCoordEnd),
+                                                    glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                    glm::vec2(xTexCoordEnd, yTexCoordEnd));
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgRaycasterRenderer.clearQuads();
+      m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+    } else if (m_zCut.lowerValue() == m_zCut.upperValue()) { // slice of 3d image
+      ZMesh m_2DImageQuad = ZMesh::createCubeSlice(zCoordStart,
+                                                   zTexCoordStart,
+                                                   2,
+                                                   glm::vec2(xCoordStart, yCoordStart),
+                                                   glm::vec2(xCoordEnd, yCoordEnd),
+                                                   glm::vec2(xTexCoordStart, yTexCoordStart),
+                                                   glm::vec2(xTexCoordEnd, yTexCoordEnd));
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgRaycasterRenderer.clearQuads();
+      m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+    } else if (m_yCut.lowerValue() == m_yCut.upperValue()) { // slice of 3d image
+      ZMesh m_2DImageQuad = ZMesh::createCubeSlice(yCoordStart,
+                                                   yTexCoordStart,
+                                                   1,
+                                                   glm::vec2(xCoordStart, zCoordStart),
+                                                   glm::vec2(xCoordEnd, zCoordEnd),
+                                                   glm::vec2(xTexCoordStart, zTexCoordStart),
+                                                   glm::vec2(xTexCoordEnd, zTexCoordEnd));
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgRaycasterRenderer.clearQuads();
+      m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+    } else if (m_xCut.lowerValue() == m_xCut.upperValue()) { // slice of 3d image
+      ZMesh m_2DImageQuad = ZMesh::createCubeSlice(xCoordStart,
+                                                   xTexCoordStart,
+                                                   0,
+                                                   glm::vec2(yCoordStart, zCoordStart),
+                                                   glm::vec2(yCoordEnd, zCoordEnd),
+                                                   glm::vec2(yTexCoordStart, zTexCoordStart),
+                                                   glm::vec2(yTexCoordEnd, zTexCoordEnd));
+      m_2DImageQuad.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      m_imgRaycasterRenderer.clearQuads();
+      m_imgRaycasterRenderer.addQuad(m_2DImageQuad);
+    } else { // 3d volume Raycasting
+      ZMesh cube = ZMesh::createCube(glm::vec3(xCoordStart, yCoordStart, zCoordStart),
+                                     glm::vec3(xCoordEnd, yCoordEnd, zCoordEnd),
+                                     glm::vec3(xTexCoordStart, yTexCoordStart, zTexCoordStart),
+                                     glm::vec3(xTexCoordEnd, yTexCoordEnd, zTexCoordEnd));
+      cube.transformVerticesByMatrix(m_rendererBase.coordTransform());
+      bool flipped = glm::determinant(glm::mat3(m_rendererBase.coordTransform())) < 0.0;
 
-    std::vector<glm::vec3> planeNormals;
-    std::vector<glm::vec3> planeOrigins;
-    planeNormals.push_back(globalCamera().viewVector());
-    planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * (globalCamera().nearDist() + 0.01f));
-    if (m_rendererBase.globalParas().globalXCut.lowerValue() != m_rendererBase.globalParas().globalXCut.minimum()) {
-      planeNormals.emplace_back(1., 0., 0.);
-      planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.lowerValue(), 0, 0);
-    }
-    if (m_rendererBase.globalParas().globalXCut.upperValue() != m_rendererBase.globalParas().globalXCut.maximum()) {
-      planeNormals.emplace_back(-1., 0., 0.);
-      planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.upperValue(), 0, 0);
-    }
-    if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
-      planeNormals.emplace_back(0., 1., 0.);
-      planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.lowerValue(), 0);
-    }
-    if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
-      planeNormals.emplace_back(0., -1., 0.);
-      planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.upperValue(), 0);
-    }
-    if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
-      planeNormals.emplace_back(0., 0., 1.);
-      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.lowerValue());
-    }
-    if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
-      planeNormals.emplace_back(0., 0., -1.);
-      planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.upperValue());
-    }
-    // LOG(INFO) << planeNormals.size();
-    ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
+      // enable culling
+      glEnable(GL_CULL_FACE);
+
+      m_rendererBase.setViewport(currentOutport.size());
+      CHECK_GL_ERROR
+
+      std::vector<glm::vec3> planeNormals;
+      std::vector<glm::vec3> planeOrigins;
+      planeNormals.push_back(globalCamera().viewVector());
+      planeOrigins.push_back(globalCamera().eye() + globalCamera().viewVector() * (globalCamera().nearDist() + 0.01f));
+      if (m_rendererBase.globalParas().globalXCut.lowerValue() != m_rendererBase.globalParas().globalXCut.minimum()) {
+        planeNormals.emplace_back(1., 0., 0.);
+        planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.lowerValue(), 0, 0);
+      }
+      if (m_rendererBase.globalParas().globalXCut.upperValue() != m_rendererBase.globalParas().globalXCut.maximum()) {
+        planeNormals.emplace_back(-1., 0., 0.);
+        planeOrigins.emplace_back(m_rendererBase.globalParas().globalXCut.upperValue(), 0, 0);
+      }
+      if (m_rendererBase.globalParas().globalYCut.lowerValue() != m_rendererBase.globalParas().globalYCut.minimum()) {
+        planeNormals.emplace_back(0., 1., 0.);
+        planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.lowerValue(), 0);
+      }
+      if (m_rendererBase.globalParas().globalYCut.upperValue() != m_rendererBase.globalParas().globalYCut.maximum()) {
+        planeNormals.emplace_back(0., -1., 0.);
+        planeOrigins.emplace_back(0, m_rendererBase.globalParas().globalYCut.upperValue(), 0);
+      }
+      if (m_rendererBase.globalParas().globalZCut.lowerValue() != m_rendererBase.globalParas().globalZCut.minimum()) {
+        planeNormals.emplace_back(0., 0., 1.);
+        planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.lowerValue());
+      }
+      if (m_rendererBase.globalParas().globalZCut.upperValue() != m_rendererBase.globalParas().globalZCut.maximum()) {
+        planeNormals.emplace_back(0., 0., -1.);
+        planeOrigins.emplace_back(0, 0, m_rendererBase.globalParas().globalZCut.upperValue());
+      }
+      // LOG(INFO) << planeNormals.size();
+      ZMesh clipped = ZMesh::clipClosedSurface(cube, planeNormals, planeOrigins);
 #if 0
     float nearPlaneDistToOrigin =
       glm::dot(globalCamera().eye(), -globalCamera().viewVector()) - globalCamera().nearDist() - 0.01f;
@@ -1169,40 +1069,41 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     auto clipped = ZMeshUtils::clipClosedSurface(cube, planes);
 #endif
 
-    // render back texture
-    const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
-    m_entryExitTarget.resize(currentOutport.size());
+      // render back texture
+      const GLenum g_drawBuffers[] = {GL_COLOR_ATTACHMENT0};
+      m_entryExitTarget.resize(currentOutport.size());
 
-    m_entryExitTarget.attachSlice(1);
-    m_entryExitTarget.bind();
-    glDrawBuffers(1, g_drawBuffers);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glCullFace(flipped ? GL_BACK : GL_FRONT);
+      m_entryExitTarget.attachSlice(1);
+      m_entryExitTarget.bind();
+      glDrawBuffers(1, g_drawBuffers);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glCullFace(flipped ? GL_BACK : GL_FRONT);
 
-    m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-    m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-    m_entryExitTarget.release();
-    CHECK_GL_ERROR
+      m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
+      m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
+      m_entryExitTarget.release();
+      CHECK_GL_ERROR
 
-    // render front texture
-    m_entryExitTarget.attachSlice(0);
-    m_entryExitTarget.bind();
-    glDrawBuffers(1, g_drawBuffers);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glCullFace(flipped ? GL_FRONT : GL_BACK);
+      // render front texture
+      m_entryExitTarget.attachSlice(0);
+      m_entryExitTarget.bind();
+      glDrawBuffers(1, g_drawBuffers);
+      glClear(GL_COLOR_BUFFER_BIT);
+      glCullFace(flipped ? GL_FRONT : GL_BACK);
 
-    m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
-    m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
-    m_entryExitTarget.release();
-    CHECK_GL_ERROR
+      m_textureAndEyeCoordinateRenderer.setTriangleList(&clipped);
+      m_rendererBase.render(eye, m_textureAndEyeCoordinateRenderer);
+      m_entryExitTarget.release();
+      CHECK_GL_ERROR
 
-    // restore OpenGL state
-    glCullFace(GL_BACK);
-    glDisable(GL_CULL_FACE);
+      // restore OpenGL state
+      glCullFace(GL_BACK);
+      glDisable(GL_CULL_FACE);
 
-    // m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
+      // m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage("/Users/feng/Downloads/test1rayeye.tif");
 
-    m_imgRaycasterRenderer.setEntryExitInfo(m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0));
+      m_imgRaycasterRenderer.setEntryExitInfo(m_entryExitTarget.attachment(GL_COLOR_ATTACHMENT0));
+    }
   }
 
   glEnable(GL_BLEND);
@@ -1219,10 +1120,17 @@ void Z3DImgFilter::renderImage(Z3DEye eye)
     glDisable(GL_BLEND);
   });
 
-  m_rendererBase.render(eye, m_imgRaycasterRenderer);
+  double progress = 1.0;
+  if (!m_progressiveRendering) {
+    m_rendererBase.render(eye, m_imgRaycasterRenderer);
+  } else {
+    progress = m_imgRaycasterRenderer.renderProgressively(eye);
+  }
 
   renderBoundBox(eye);
   CHECK_GL_ERROR
+
+  return progress;
 }
 
 bool Z3DImgFilter::onlyBoundBox() const

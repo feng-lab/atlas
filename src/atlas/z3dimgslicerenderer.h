@@ -4,6 +4,7 @@
 #include "z3dshaderprogram.h"
 #include "zcolormap.h"
 #include "zmesh.h"
+#include "zglobal.h"
 
 namespace nim {
 
@@ -40,10 +41,10 @@ public:
     m_blockIDsRenderTarget = &target;
   }
 
-//  [[nodiscard]] bool lastRenderingIsFastRendering() const
-//  {
-//    return m_lastRenderingIsFastRendering;
-//  }
+  //  [[nodiscard]] bool lastRenderingIsFastRendering() const
+  //  {
+  //    return m_lastRenderingIsFastRendering;
+  //  }
 
   // a slice in 3D volume contains plane triangles and 3d texture coordinates
   // clear
@@ -57,6 +58,20 @@ public:
 
   void compile() override;
 
+  double renderProgressively(Z3DEye eye);
+
+  void resetProgress()
+  {
+    m_progress[0] = 0;
+    m_progress[1] = 0;
+    m_progress[2] = 0;
+  }
+
+  bool renderingStarted(Z3DEye eye)
+  {
+    return m_progress[to_underlying(eye)] > 0;
+  }
+
 protected:
   void bindVolumes(Z3DShaderProgram& shader) const;
 
@@ -65,6 +80,11 @@ protected:
   QString generateHeader();
 
   void render(Z3DEye eye) override;
+
+private:
+  double renderSlice(Z3DEye eye, bool progressive = false);
+
+  void renderSliceFast(Z3DEye eye);
 
 protected:
   // Z3DShaderProgram m_volumeSliceShader;
@@ -87,6 +107,8 @@ private:
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = true;
   // bool m_lastRenderingIsFastRendering = false;
+
+  double m_progress[3] = {0, 0, 0};
 };
 
 } // namespace nim

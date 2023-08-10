@@ -54,7 +54,7 @@ public:
 
   void invalidate(State inv) override;
 
-  void setFastRenderingMode(bool v, bool stereo) override;
+  void setProgressiveRenderingMode(bool v) override;
 
 Q_SIGNALS:
   void sceneParaUpdated();
@@ -219,7 +219,7 @@ private:
 
   glm::vec4 m_region;
 
-  bool m_fastRendering = true;
+  bool m_progressiveRendering = false;
 };
 
 } // namespace nim

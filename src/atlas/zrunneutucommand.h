@@ -18,7 +18,6 @@ public:
     BOUNDARY_ORPHAN,
     FLYEM_NEURON_FEATURE,
     SKELETONIZE,
-    SEPARATE_IMAGE,
     TRACE_NEURON,
     COMPARE_SWC,
     COMPUTE_SEED,
@@ -36,7 +35,7 @@ private:
   int runTraceNeuron(const ZJsonObject& configJson);
   int runGeneral(const ZJsonObject& inputJson);
 
-  static void loadConfig(const std::string& filePath, ZJsonObject& configJson);
+  static ZJsonObject loadConfig(const std::string& filePath);
   static void expandConfig(const std::string& configFilePath, const std::string& key, ZJsonObject& configJson);
   static std::string
   extractIncludePath(const std::string& configFilePath, const std::string& key, ZJsonObject& configJson);

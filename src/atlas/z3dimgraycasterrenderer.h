@@ -29,10 +29,10 @@ public:
     m_blockIDsRenderTarget = &target;
   }
 
-  void setImageRenderTargetWithRayDepthLayer(Z3DRenderTarget& target1, Z3DRenderTarget& target2)
+  void setImageRenderTargetWithRayDepthLayer(Z3DRenderTarget* target1[3], Z3DRenderTarget* target2[3])
   {
-    m_lastImageRenderTarget = &target1;
-    m_currentImageRenderTarget = &target2;
+    m_lastImageRenderTargets = target1;
+    m_currentImageRenderTargets = target2;
   }
 
   // quad or entry_exit texture should be set before rendering
@@ -118,6 +118,23 @@ public:
 
   void updateDisplayRanges();
 
+  double renderProgressively(Z3DEye eye);
+
+  void resetProgress()
+  {
+    m_channelIdx[0] = -1;
+    m_channelIdx[1] = -1;
+    m_channelIdx[2] = -1;
+    m_round[0] = 0;
+    m_round[1] = 0;
+    m_round[2] = 0;
+  }
+
+  bool renderingStarted(Z3DEye eye)
+  {
+    return m_channelIdx[to_underlying(eye)] > -1;
+  }
+
 protected:
   void adjustWidgets();
 
@@ -138,11 +155,19 @@ private:
 
   void render2DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
-  void render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+  double render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive = false);
 
   void render2DSliceOf3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
-  void render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+  double render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive = false);
+
+  // return ture if is last round
+  bool render3DImageForOneRound(Z3DEye eye,
+                                size_t c,
+                                uint32_t round,
+                                float ze_to_zw_a,
+                                float ze_to_zw_b,
+                                float ze_to_screen_pixel_voxel_size);
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
 
@@ -164,8 +189,8 @@ protected:
 
   Z3DRenderTarget* m_layerTarget = nullptr;
   Z3DRenderTarget* m_blockIDsRenderTarget = nullptr;
-  Z3DRenderTarget* m_lastImageRenderTarget = nullptr;
-  Z3DRenderTarget* m_currentImageRenderTarget = nullptr;
+  Z3DRenderTarget** m_lastImageRenderTargets = nullptr;
+  Z3DRenderTarget** m_currentImageRenderTargets = nullptr;
 
   ZFloatParameter m_samplingRate; // Sampling rate of the raycasting, specified relative to the size of one voxel
   ZFloatParameter m_isoValue; // The used isovalue, when isosurface raycasting is enabled
@@ -192,6 +217,9 @@ private:
   std::vector<uint32_t> m_blockIDs;
   bool m_fastRendering = true;
   // bool m_lastRenderingIsFastRendering = false;
+
+  int m_channelIdx[3] = {-1, -1, -1};
+  int m_round[3] = {0, 0, 0};
 };
 
 } // namespace nim

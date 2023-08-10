@@ -79,19 +79,11 @@ void ZImgScaleBarGraphicsItem::updatePos()
 
 ZImgFilter::ZImgFilter(ZView& view)
   : ZObjFilter(view)
-  , m_imgPack(nullptr)
-  , m_hasVisibleChannel(true)
-  , m_isVisible(false)
   , m_opacity(QString("Opacity"), 1.0, 0.0, 1.0)
   , m_showScaleBar("Show Scale Bar", false)
   , m_scaleBarLengthInUm("Scale Bar Length", 10., 0.0001, 1e9)
   , m_scaleBarHeight("Scale Bar Height", 5, 1, 500)
   , m_scaleBarColor("Scale Bar Color", glm::vec3(1., 1., 1.))
-  , m_displayValid(false)
-  , m_lastSlice(-1)
-  , m_lastTime(-1)
-  , m_lastScale(0)
-  , m_lastViewport()
 {
   connect(&m_visible, &ZBoolParameter::valueChanged, this, &ZImgFilter::visibleChanged);
   connect(&m_opacity, &ZDoubleParameter::valueChanged, this, &ZImgFilter::opacityChanged);
@@ -435,7 +427,7 @@ void ZImgFilter::channelVisibleChanged()
   }
   m_isVisible = m_hasVisibleChannel && m_visible.get() && m_sliceValid;
 
-  if (ZBoolParameter* para = qobject_cast<ZBoolParameter*>(sender())) {
+  if (auto para = qobject_cast<ZBoolParameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelVisibleParas.size(); ++c) {
@@ -485,7 +477,7 @@ void ZImgFilter::channelRangeChanged()
 
 void ZImgFilter::channelColorChanged()
 {
-  if (ZVec3Parameter* para = qobject_cast<ZVec3Parameter*>(sender())) {
+  if (auto para = qobject_cast<ZVec3Parameter*>(sender())) {
     // find which channel send the signal
     size_t c = 0;
     for (; c < m_channelColorParas.size(); ++c) {
