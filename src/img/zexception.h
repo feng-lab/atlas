@@ -78,4 +78,9 @@ public:
   }
 };
 
+class ZCancellationException : public ZException
+{
+  using ZException::ZException;
+};
+
 } // namespace nim

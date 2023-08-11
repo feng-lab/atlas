@@ -879,6 +879,7 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   }
 
   VLOG(1) << "renderFast";
+  Q_EMIT progressChanged(10);
   m_isRendering = true;
   getGLFocus();
   m_progress = m_networkEvaluator->process(stereo, true);
@@ -906,10 +907,13 @@ void Z3DRenderingEngine::render(bool stereo)
       Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
     }
   }
-  catch (ZException& e) {
+  catch (ZCancellationException& e) {
     LOG(INFO) << e.what();
     LOG(INFO) << "schedule a update later";
     QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
+  }
+  catch (ZException& e) {
+    LOG(INFO) << e.what();
   }
   Q_EMIT progressChanged(100);
   m_globalParas->cancellationSource.reset();
