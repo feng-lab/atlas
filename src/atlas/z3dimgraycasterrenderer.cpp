@@ -324,7 +324,7 @@ double Z3DImgRaycasterRenderer::renderProgressively(nim::Z3DEye eye)
     return progress;
   }
   catch (const ZException&) {
-    resetProgress();
+    resetProgress(eye);
     throw;
   }
 }

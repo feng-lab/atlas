@@ -120,16 +120,6 @@ public:
 
   double renderProgressively(Z3DEye eye);
 
-  void resetProgress()
-  {
-    m_channelIdx[0] = -1;
-    m_channelIdx[1] = -1;
-    m_channelIdx[2] = -1;
-    m_round[0] = 0;
-    m_round[1] = 0;
-    m_round[2] = 0;
-  }
-
   bool renderingStarted(Z3DEye eye)
   {
     return m_channelIdx[to_underlying(eye)] > -1;
@@ -170,6 +160,12 @@ private:
                                 float ze_to_screen_pixel_voxel_size);
 
   void render3DImageFast(Z3DEye eye, const std::vector<size_t>& visibleIdxs);
+
+  void resetProgress(Z3DEye eye)
+  {
+    m_channelIdx[to_underlying(eye)] = -1;
+    m_round[to_underlying(eye)] = 0;
+  }
 
 protected:
   //  Z3DShaderProgram m_raycasterShader;

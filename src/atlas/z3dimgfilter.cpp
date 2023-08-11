@@ -625,8 +625,6 @@ void Z3DImgFilter::exitSubregionView()
 void Z3DImgFilter::invalidate(State inv)
 {
   Z3DBoundedFilter::invalidate(inv);
-  m_imgRaycasterRenderer.resetProgress();
-  m_imgSliceRenderer.resetProgress();
 }
 
 void Z3DImgFilter::updateSize()

@@ -60,13 +60,6 @@ public:
 
   double renderProgressively(Z3DEye eye);
 
-  void resetProgress()
-  {
-    m_progress[0] = 0;
-    m_progress[1] = 0;
-    m_progress[2] = 0;
-  }
-
   bool renderingStarted(Z3DEye eye)
   {
     return m_progress[to_underlying(eye)] > 0;
@@ -85,6 +78,11 @@ private:
   double renderSlice(Z3DEye eye, bool progressive = false);
 
   void renderSliceFast(Z3DEye eye);
+
+  void resetProgress(Z3DEye eye)
+  {
+    m_progress[to_underlying(eye)] = 0;
+  }
 
 protected:
   // Z3DShaderProgram m_volumeSliceShader;

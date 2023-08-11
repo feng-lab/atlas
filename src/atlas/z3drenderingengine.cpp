@@ -885,6 +885,8 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
   if (m_progress < 1.) {
     QCoreApplication::postEvent(this, new QEvent(QEvent::LayoutRequest), Qt::LowEventPriority - 1);
+  } else {
+    Q_EMIT progressChanged(100);
   }
 
   m_isRendering = false;
@@ -906,6 +908,8 @@ void Z3DRenderingEngine::render(bool stereo)
   }
   catch (ZException& e) {
     LOG(INFO) << e.what();
+    LOG(INFO) << "schedule a update later";
+    QCoreApplication::postEvent(this, new QEvent(QEvent::UpdateRequest), Qt::LowEventPriority);
   }
   Q_EMIT progressChanged(100);
   m_globalParas->cancellationSource.reset();
