@@ -2931,29 +2931,88 @@ def build_proxygen(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
+    bak_file1 = orig_file1 = None
+    bak_file2 = orig_file2 = None
+    bak_file3 = orig_file3 = None
+    bak_file4 = orig_file4 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
                               from_texts=[
                                   r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                                  r'find_program(PROXYGEN_PYTHON python3)',
+                                  r'-Wextra',
                               ],
                               to_texts=[
                                   'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
+                                  r'find_program(PROXYGEN_PYTHON python)',
+                                  r'' if is_windows() else r'-Wextra',
                               ])
+
+        if is_windows():
+            orig_file1 = os.path.join(src_dir, 'cmake', 'FindZstd.cmake')
+            bak_file1 = patch_file(orig_file1,
+                                  from_texts=[
+                                      r"""find_library(ZSTD_LIBRARIES
+  NAMES zstd""",
+                                      r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
+                                  ],
+                                  to_texts=[
+                                      r"""find_library(ZSTD_LIBRARIES
+  NAMES zstd zstd_static""",
+                                      r'if(TRUE)',
+                                  ])
+
+            orig_file2 = os.path.join(src_dir, 'proxygen', 'external', 'CMakeLists.txt')
+            bak_file2 = patch_file(orig_file2,
+                                   from_texts=[
+                                       r'"-Wno-implicit-fallthrough"',
+                                   ],
+                                   to_texts=[
+                                       r'',
+                                   ])
+
+            orig_file3 = os.path.join(src_dir, 'proxygen', 'lib', 'services', 'RequestWorkerThread.cpp')
+            bak_file3 = patch_file(orig_file3,
+                                   from_texts=[
+                                       r'sigset_t ss;',
+                                       r'PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);',
+                                   ],
+                                   to_texts=[
+                                       "#ifndef _MSC_VER\nsigset_t ss;",
+                                       "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
+                                   ])
+
+            orig_file4 = os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt')
+            bak_file4 = patch_file(orig_file4,
+                                   from_texts=[
+                                       r"""${PROXYGEN_FBCODE_ROOT}
+        ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
+                                   ],
+                                   to_texts=[
+                                       "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
+                                   ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
-            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()}',
+            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()};{os.path.dirname(sys.executable)}',
+                             f'-DBUILD_SAMPLES:BOOL=OFF',
                              ])
         cmakecmd.extend(['-DBUILD_QUIC:BOOL=ON',
                          ])
 
         cmakecmd.extend([src_dir])
+
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        if is_windows():
+            os.replace(bak_file1, orig_file1)
+            os.replace(bak_file2, orig_file2)
+            os.replace(bak_file3, orig_file3)
+            os.replace(bak_file4, orig_file4)
         print()
 
 
