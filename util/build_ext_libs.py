@@ -515,6 +515,8 @@ def build_boost(src_dir: str, install_dir: str):
                             '--with-regex',
                             '--with-thread',
                             '--with-system',
+                            '--with-date_time',
+                            '--with-iostreams',
                             'address-model=64',
                             'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                             'install',
@@ -526,7 +528,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True)
                 env = get_env_for_config_make()
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
                                 '--without-icu',
                                 '--prefix=' + install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -549,7 +551,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True, arm64_only=True)
                 env = get_env_for_config_make(arm64_only=True)
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
                                 '--without-icu',
                                 '--prefix=' + arm64_install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -572,7 +574,7 @@ def build_boost(src_dir: str, install_dir: str):
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
                             '--with-toolset=clang' if use_clang_in_linux() else '',
-                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
+                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
                             '--without-icu',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True, env=env)
@@ -893,8 +895,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
     sub_install_dir = ext_build_dir()
     sub_build_dir = create_build_dir(src_dir)
     try:
-        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, cpp_standard=(20 if is_windows() else cpp_standard()),
-                                             universal=True)
+        cmakecmd = get_cmake_cmd_common_part(sub_install_dir, universal=True)
         cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
                          '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE', ])
 
@@ -1046,6 +1047,7 @@ def build_lz4(src_dir: str, install_dir: str):
                          '-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DBUILD_STATIC_LIBS:BOOL=ON',
                          '-DLZ4_BUILD_LEGACY_LZ4C:BOOL=OFF',
+                         '-DLZ4_BUILD_CLI:BOOL=OFF',
                          os.path.join(src_dir, 'build', 'cmake')])
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
@@ -2845,6 +2847,116 @@ def build_pcre(src_dir: str, install_dir: str):
         shutil.rmtree(build_dir, ignore_errors=False)
 
 
+def build_fizz(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    bak_file = orig_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
+                              ],
+                              to_texts=[
+                                  'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
+                                  'add_library(gflags::gflags ALIAS gflags)',
+                              ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DFIZZ_BUILD_AEGIS:BOOL=OFF',
+                         '-DBUILD_TESTS:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        print()
+
+
+def build_mvfst(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    bak_file = orig_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                              ],
+                              to_texts=[
+                                  'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
+                                  'add_library(gflags::gflags ALIAS gflags)',
+                              ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        print()
+
+
+def build_wangle(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    bak_file = orig_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'find_package(LibEvent MODULE REQUIRED)',
+                              ],
+                              to_texts=[
+                                  'add_library(gflags::gflags ALIAS gflags)\n'
+                                  'find_package(LibEvent MODULE REQUIRED)',
+                              ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        cmakecmd.extend(['-DBUILD_TESTS:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        print()
+
+
+def build_proxygen(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    bak_file = orig_file = None
+    try:
+        orig_file = os.path.join(src_dir, 'CMakeLists.txt')
+        bak_file = patch_file(orig_file,
+                              from_texts=[
+                                  r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                              ],
+                              to_texts=[
+                                  'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
+                                  'add_library(gflags::gflags ALIAS gflags)',
+                              ])
+
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+        if is_windows():
+            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()}',
+                             ])
+        cmakecmd.extend(['-DBUILD_QUIC:BOOL=ON',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
+        print()
+
+
 def build_libs(libs: OrderedDict, use_asan: bool):
     # print('extDIR:', ext_dir())
     # print('srcPackageDIR:', src_package_dir())
@@ -3294,6 +3406,22 @@ def build_libs(libs: OrderedDict, use_asan: bool):
                     assert os.path.exists(src_dir)
                 build_pcre(src_dir, ext_build_dir())
 
+        if lib_name == 'fizz':
+            src_dir = os.path.join(ext_dir(), 'fizz', 'fizz')
+            build_fizz(src_dir, ext_build_dir())
+
+        if lib_name == 'mvfst':
+            src_dir = os.path.join(ext_dir(), 'mvfst')
+            build_mvfst(src_dir, ext_build_dir())
+
+        if lib_name == 'wangle':
+            src_dir = os.path.join(ext_dir(), 'wangle', 'wangle')
+            build_wangle(src_dir, ext_build_dir())
+
+        if lib_name == 'proxygen':
+            src_dir = os.path.join(ext_dir(), 'proxygen')
+            build_proxygen(src_dir, ext_build_dir())
+
 
 def parse_inputs(argv: list):
     lib_list = ['cmake', 'ninja', 'curl', 'make-cmake-pathlist', 'qt', 'zlib', 'ffmpeg', 'boost', 'tbb', 'eigen',
@@ -3302,7 +3430,9 @@ def parse_inputs(argv: list):
                 'libsodium', 'folly', 'suitesparse', 'ceres-solver', 'glbinding', 'libjpeg', 'libpng', 'openjpeg',
                 'libwebp', 'jxrlib', 'geometrictools', 'assimp', 'hdf5', 'freeimage', 'itk', 'vtk',
                 'opencv', 'botan', 'ospray', 'java', 'ants', 'skia',
-                'neuTube', 'rocksdb', 'llfio', 'conda-zimg', 'conda-opencv', 'jansson', 'pcre'
+                'neuTube', 'rocksdb', 'llfio', 'jansson', 'pcre',
+                'fizz', 'mvfst', 'wangle', 'proxygen',
+                'conda-zimg', 'conda-opencv',
                 ]
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
@@ -3312,7 +3442,7 @@ def parse_inputs(argv: list):
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
                             'libjpeg': ['opencv', 'itk', 'vtk'],
-                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly'],
+                            'zlib': ['libpng', 'assimp', 'hdf5', 'itk', 'vtk', 'opencv', 'grpc', 'folly', 'proxygen'],
                             'gflags': ['glog'],
                             'glog': ['ceres-solver', 'folly', 'opencv'],
                             'benchmark': ['grpc'],
@@ -3332,8 +3462,11 @@ def parse_inputs(argv: list):
                             'snappy': ['folly', 'rocksdb'],
                             'bzip2': ['folly'],
                             'libsodium': ['folly'],
-                            'folly': ['rocksdb'],
+                            'folly': ['rocksdb', 'proxygen', 'wangle', 'fizz', 'mvfst'],
                             'qt': ['make-cmake-pathlist'],
+                            'wangle': ['proxygen'],
+                            'mvfst': ['proxygen'],
+                            'fizz': ['mvfst'],
                             }
 
     print('current interpreter: ' + sys.executable)

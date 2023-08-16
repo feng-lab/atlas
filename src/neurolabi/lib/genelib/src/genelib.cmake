@@ -1,19 +1,12 @@
-if (MSVC)
-  SET (AWK ${CMAKE_CURRENT_LIST_DIR}/../../../../../util/awk.exe)
-  message(STATUS ${AWK})
-else (MSVC)
-FIND_PROGRAM (AWK NAMES awk gawk PATH /usr/bin /bin /local/bin /usr/local/bin)
-MARK_AS_ADVANCED(FORCE AWK)
-if (NOT AWK)
-  message(FATAL_ERROR "Can not find awk, CMake will exit.")
-  return()
-endif (NOT AWK)
-SET (AWK_FOUND TRUE)
-endif (MSVC)
+if (WIN32)
+  set(CMAKE_PROGRAM_PATH ${CMAKE_CURRENT_LIST_DIR}/../../../../../util)
+endif (WIN32)
+find_program(AWK NAMES awk gawk REQUIRED)
+message(STATUS ${AWK})
 
-# Syntax: 
+# Syntax:
 #   add_p_file(<outputlist> <p file>)
-# Adds a build rule for the specified p file. The absolute paths of the generated 
+# Adds a build rule for the specified p file. The absolute paths of the generated
 # files are added to the <outputlist> list.
 function(add_p_file outputlist filename)
   # Only process *.p files
@@ -45,7 +38,7 @@ set(GENELIB_SRCS_TMP
   contour_lib.p
   fct_root.p
   image_lib.p
-  utilities.p  
+  utilities.p
   draw_lib.p
   hash.p
   level_set.p

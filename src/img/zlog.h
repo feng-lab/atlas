@@ -321,11 +321,21 @@ inline std::ostream& operator<<(std::ostream& s, QKeyCombination combination)
 
 } // namespace nim
 
+template<>
+struct fmt::formatter<QString> : fmt::formatter<const char*>
+{
+  auto format(const QString& s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.toUtf8().constData(), ctx);
+  }
+};
+
 #if (QT_VERSION < QT_VERSION_CHECK(5, 14, 0))
 namespace std {
 
-template <>
-struct hash<QString> {
+template<>
+struct hash<QString>
+{
   size_t operator()(const QString& s) const noexcept
   {
     return qHash(s, qHash(std::hash<int>{}(0)));

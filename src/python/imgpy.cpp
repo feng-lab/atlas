@@ -403,21 +403,9 @@ PYBIND11_MODULE(_imgpy, m)
       "Returns a string representation of the color.");
   py::implicitly_convertible<py::tuple, col4>();
 
-  static py::exception<ZException> base_ex(m, "ZException");
-  static py::exception<ZIOException> io_ex(m, "ZIOException", base_ex.ptr());
-  py::register_exception_translator([](std::exception_ptr p) {
-    try {
-      if (p) {
-        std::rethrow_exception(p);
-      }
-    }
-    catch (const ZIOException& e) {
-      io_ex(e.what());
-    }
-    catch (const ZException& e) {
-      base_ex(e.what());
-    }
-  });
+  py::register_exception<ZCancellationException>(m, "ZCancellationException");
+  py::register_exception<ZIOException>(m, "ZIOException");
+  py::register_exception<ZException>(m, "ZException");
 
   py::class_<ZImgWriteParameters>(m,
                                   "ZImgWriteParameters",

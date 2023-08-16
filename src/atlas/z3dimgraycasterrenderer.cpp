@@ -656,6 +656,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     }
     return 0.5;
   }
+
   double progress = 1;
 
   auto cancellationToken = m_rendererBase.globalParas().cancellationSource
@@ -728,17 +729,22 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       ++m_round[to_underlying(eye)];
     }
     int totalRound = visibleIdxs.size() * FLAGS_atlas_volume_rendering_maximum_round;
-    int currentRound = m_channelIdx[to_underlying(eye)] * FLAGS_atlas_volume_rendering_maximum_round + m_round[to_underlying(eye)];
-    progress = currentRound >= totalRound ? 1 : static_cast<double>(currentRound) / totalRound * 0.5 + 0.5;
+    int currentRound =
+      m_channelIdx[to_underlying(eye)] * FLAGS_atlas_volume_rendering_maximum_round + m_round[to_underlying(eye)];
+    progress = currentRound >= totalRound ? 1 : (static_cast<double>(currentRound) / totalRound * 0.5 + 0.5);
     if (progress == 1) {
       m_channelIdx[to_underlying(eye)] = -1;
       m_round[to_underlying(eye)] = 0;
     }
   } else {
-    size_t idx = 0;
-    for (auto c : visibleIdxs) {
+    for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
       for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
-        bool lastRound = render3DImageForOneRound(eye, c, round, ze_to_zw_a, ze_to_zw_b, ze_to_screen_pixel_voxel_size);
+        bool lastRound = render3DImageForOneRound(eye,
+                                                  visibleIdxs[channelIdx],
+                                                  round,
+                                                  ze_to_zw_a,
+                                                  ze_to_zw_b,
+                                                  ze_to_screen_pixel_voxel_size);
 #if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
           auto filen =
@@ -769,7 +775,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         renderScreenQuad(m_VAO, m_copyTextureShader);
         m_copyTextureShader.release();
       } else {
-        m_layerTarget->attachSlice(idx++);
+        m_layerTarget->attachSlice(channelIdx);
         m_layerTarget->bind();
         m_layerTarget->clear();
 

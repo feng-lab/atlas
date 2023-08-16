@@ -40,6 +40,12 @@ def atlas_repository_dir() -> str:
     return res
 
 
+def atlas_util_dir() -> str:
+    res = os.path.join(atlas_repository_dir(), 'util')
+    assert os.path.exists(res)
+    return res
+
+
 def atlas_src_dir() -> str:
     res = os.path.join(atlas_repository_dir(), 'src')
     assert os.path.exists(res)

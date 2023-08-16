@@ -4,7 +4,6 @@
 #include "z3dshaderprogram.h"
 #include "zcolormap.h"
 #include "zmesh.h"
-#include "zglobal.h"
 
 namespace nim {
 

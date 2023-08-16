@@ -19,8 +19,8 @@ public:
     : m_what(what)
   {}
 
-  explicit inline ZException(std::string what)
-    : m_what(std::move(what))
+  explicit inline ZException(std::string_view what)
+    : m_what(what)
   {}
 
   explicit inline ZException(const QString& what)
@@ -59,8 +59,8 @@ public:
     }
   }
 
-  explicit inline ZIOException(std::string what)
-    : ZException(std::move(what))
+  explicit inline ZIOException(std::string_view what)
+    : ZException(what)
   {
     if (errno != 0) {
       m_what = m_what + " <errno: " + std::strerror(errno) + ">";

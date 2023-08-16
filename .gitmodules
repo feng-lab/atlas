@@ -57,11 +57,11 @@
 [submodule "src/3rdparty/opencv"]
 	path = src/3rdparty/opencv
 	url = https://github.com/opencv/opencv.git
-	branch = master
+	branch = 4.x
 [submodule "src/3rdparty/opencv_contrib"]
 	path = src/3rdparty/opencv_contrib
 	url = https://github.com/opencv/opencv_contrib.git
-	branch = master
+	branch = 4.x
 [submodule "src/3rdparty/grpc"]
 	path = src/3rdparty/grpc
 	url = https://github.com/grpc/grpc.git
@@ -128,3 +128,15 @@
 	path = src/3rdparty/SuiteSparse
 	url = https://github.com/DrTimothyAldenDavis/SuiteSparse.git
 	branch = stable
+[submodule "src/3rdparty/fizz"]
+	path = src/3rdparty/fizz
+	url = https://github.com/facebookincubator/fizz.git
+[submodule "src/3rdparty/mvfst"]
+	path = src/3rdparty/mvfst
+	url = https://github.com/facebook/mvfst.git
+[submodule "src/3rdparty/wangle"]
+	path = src/3rdparty/wangle
+	url = https://github.com/facebook/wangle.git
+[submodule "src/3rdparty/proxygen"]
+	path = src/3rdparty/proxygen
+	url = https://github.com/facebook/proxygen.git
