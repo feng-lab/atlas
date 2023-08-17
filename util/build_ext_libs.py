@@ -500,6 +500,7 @@ def build_zlib(src_dir: str, install_dir: str):
 
 def build_boost(src_dir: str, install_dir: str):
     try:
+        shutil.rmtree(os.path.join(src_dir, 'bin.v2'), ignore_errors=True)
         if is_windows():
             cbf = get_common_build_flags(with_optimization=True)
             env = get_vcvars_environment()
@@ -515,8 +516,6 @@ def build_boost(src_dir: str, install_dir: str):
                             '--with-regex',
                             '--with-thread',
                             '--with-system',
-                            '--with-date_time',
-                            '--with-iostreams',
                             'address-model=64',
                             'variant=release', 'link=static', 'threading=multi', 'runtime-link=shared',
                             'install',
@@ -528,7 +527,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True)
                 env = get_env_for_config_make()
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                                 '--without-icu',
                                 '--prefix=' + install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -551,7 +550,7 @@ def build_boost(src_dir: str, install_dir: str):
                 cbf = get_common_build_flags(with_optimization=True, arm64_only=True)
                 env = get_env_for_config_make(arm64_only=True)
                 subprocess.run(['./bootstrap.sh',
-                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
+                                '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                                 '--without-icu',
                                 '--prefix=' + arm64_install_dir],
                                cwd=src_dir, shell=False, check=True, env=env)
@@ -574,7 +573,7 @@ def build_boost(src_dir: str, install_dir: str):
             env = get_env_for_config_make()
             subprocess.run(['./bootstrap.sh',
                             '--with-toolset=clang' if use_clang_in_linux() else '',
-                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system,date_time,iostreams',
+                            '--with-libraries=headers,context,filesystem,program_options,regex,thread,system',
                             '--without-icu',
                             '--prefix=' + install_dir],
                            cwd=src_dir, shell=False, check=True, env=env)
@@ -2884,10 +2883,14 @@ def build_mvfst(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=[
                                   r'list(APPEND GFLAG_DEPENDENCIES gflags)',
+                                  r'iostreams',
+                                  r'date_time',
                               ],
                               to_texts=[
                                   'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
+                                  r'',
+                                  r'',
                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
@@ -2942,13 +2945,31 @@ def build_proxygen(src_dir: str, install_dir: str):
                                   r'list(APPEND GFLAG_DEPENDENCIES gflags)',
                                   r'find_program(PROXYGEN_PYTHON python3)',
                                   r'-Wextra',
+                                  r'iostreams',
                               ],
                               to_texts=[
                                   'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
                                   r'find_program(PROXYGEN_PYTHON python)',
                                   r'' if is_windows() else r'-Wextra',
+                                  r'',
                               ])
+
+        orig_file4 = os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt')
+        bak_file4 = patch_file(orig_file4,
+                               from_texts=[
+                                   r"""${PROXYGEN_FBCODE_ROOT}
+    ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
+                                   r'Boost::boost',
+                                   r'Boost::iostreams',
+                                   r'-lz',
+                               ],
+                               to_texts=[
+                                   "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
+                                   r'',
+                                   r'',
+                                   r'',
+                               ])
 
         if is_windows():
             orig_file1 = os.path.join(src_dir, 'cmake', 'FindZstd.cmake')
@@ -2984,16 +3005,6 @@ def build_proxygen(src_dir: str, install_dir: str):
                                        "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
                                    ])
 
-            orig_file4 = os.path.join(src_dir, 'proxygen', 'lib', 'CMakeLists.txt')
-            bak_file4 = patch_file(orig_file4,
-                                   from_texts=[
-                                       r"""${PROXYGEN_FBCODE_ROOT}
-        ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
-                                   ],
-                                   to_texts=[
-                                       "${PROXYGEN_FBCODE_ROOT}\n${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http\n${PROXYGEN_GPERF}",
-                                   ])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
             cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()};{os.path.dirname(sys.executable)}',
@@ -3008,11 +3019,11 @@ def build_proxygen(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file4, orig_file4)
         if is_windows():
             os.replace(bak_file1, orig_file1)
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
-            os.replace(bak_file4, orig_file4)
         print()
 
 
