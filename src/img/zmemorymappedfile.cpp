@@ -11,6 +11,8 @@ DEFINE_string(
   "maximum_prefetching,win_disable_unlink_emulation,win_disable_sparse_file_creation,disable_parallelism,"
   "win_create_case_sensitive_directory,multiplexable,byte_lock_insanity,anonymous_inode");
 
+#ifdef ZIMG_USE_LLFIO
+
 namespace nim {
 
 ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
@@ -60,3 +62,5 @@ ZMemoryMappedFile::ZMemoryMappedFile(const QString& filename)
 }
 
 } // namespace nim
+
+#endif

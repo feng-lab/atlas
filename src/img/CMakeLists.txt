@@ -288,6 +288,10 @@ if (NOT AARCH64)
 endif ()
 message(STATUS "IPP_LIBRARIES: ${IPP_LIBRARIES}")
 
+if (llfio_FOUND)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC ZIMG_USE_LLFIO)
+endif ()
+
 if (WIN32)
   target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
 endif ()
@@ -429,7 +433,11 @@ target_link_libraries(${LIBRARY_NAME} PUBLIC ${ITK_LIBRARIES} ${JPEGTURBO_LIBRAR
                       GeometricTools glm::glm
                       WebP::webp zstd::libzstd_static liblzma::liblzma ZLIB::ZLIB
                       ${VTK_LIBRARIES} assimp::assimp TBB::tbb
-                      glog::glog llfio::sl ${_QT_LIBS_})
+                      glog::glog ${_QT_LIBS_})
+
+if (llfio_FOUND)
+  target_link_libraries(${LIBRARY_NAME} PUBLIC llfio::sl)
+endif ()
 
 if (UNIX AND NOT APPLE)
   target_link_libraries(${LIBRARY_NAME} PUBLIC -Wl,--start-group ${MKL_LIBRARIES} ${IPP_LIBRARIES} -Wl,--end-group)

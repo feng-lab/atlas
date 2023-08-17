@@ -8,16 +8,19 @@ ZMemoryMappedFileCache& ZMemoryMappedFileCache::instance()
   return cache;
 }
 
-ZMemoryMappedFile* ZMemoryMappedFileCache::getMemoryMappedFile(const QString& filename) const
+ZMemoryMappedFile* ZMemoryMappedFileCache::getMemoryMappedFile([[maybe_unused]] const QString& filename) const
 {
+#ifdef ZIMG_USE_LLFIO
   if (auto it = m_mmfs.find(filename); it != m_mmfs.end()) {
     return it->second.get();
   }
+#endif
   return nullptr;
 }
 
-ZMemoryMappedFile* ZMemoryMappedFileCache::getOrCreateMemoryMappedFile(const QString& filename)
+ZMemoryMappedFile* ZMemoryMappedFileCache::getOrCreateMemoryMappedFile([[maybe_unused]] const QString& filename)
 {
+#ifdef ZIMG_USE_LLFIO
   if (auto it = m_mmfs.find(filename); it != m_mmfs.end()) {
     return it->second.get();
   } else {
@@ -28,6 +31,7 @@ ZMemoryMappedFile* ZMemoryMappedFileCache::getOrCreateMemoryMappedFile(const QSt
       m_mmfs.insert({filename, std::unique_ptr<ZMemoryMappedFile>()});
     }
   }
+#endif
   return nullptr;
 }
 

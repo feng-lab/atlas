@@ -104,10 +104,6 @@
 [submodule "src/3rdparty/ceres-solver"]
 	path = src/3rdparty/ceres-solver
 	url = https://github.com/ceres-solver/ceres-solver.git
-[submodule "src/3rdparty/llfio"]
-	path = src/3rdparty/llfio
-	url = https://github.com/ned14/llfio.git
-	branch = develop
 [submodule "src/3rdparty/pocketfft"]
 	path = src/3rdparty/pocketfft
 	url = https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git

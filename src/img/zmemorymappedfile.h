@@ -1,9 +1,13 @@
 #pragma once
 
 #include "zlog.h"
+#ifdef ZIMG_USE_LLFIO
 #include <llfio.hpp>
+#endif
 
 namespace nim {
+
+#ifdef ZIMG_USE_LLFIO
 
 namespace {
 namespace llfio = LLFIO_V2_NAMESPACE;
@@ -38,5 +42,11 @@ private:
   llfio::mapped_file_handle m_mappedFileHandle;
   bool m_mappedFileHandleIsValid = false;
 };
+
+#else
+
+class ZMemoryMappedFile {};
+
+#endif
 
 } // namespace nim

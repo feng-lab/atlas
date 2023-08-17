@@ -1,4 +1,4 @@
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64.*|AARCH64.*|arm64.*|ARM64.*)")
   message(STATUS "AARCH64 build")
   set(AARCH64 1)
 endif ()
@@ -216,7 +216,7 @@ find_package(Boost 1.82.0 REQUIRED
              COMPONENTS
              headers context filesystem program_options regex system thread
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH
-             )
+)
 print_target_properties(Boost::headers)
 
 find_package(Snappy REQUIRED
@@ -267,6 +267,10 @@ print_target_properties(VTK::FiltersGeometry)
 print_target_properties(VTK::FiltersSources)
 print_target_properties(VTK::IOXML)
 
-find_package(llfio REQUIRED
+find_package(llfio
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
-print_target_properties(llfio::sl)
+if (llfio_FOUND)
+  print_target_properties(llfio::sl)
+else ()
+  message(STATUS "no llfio")
+endif ()
