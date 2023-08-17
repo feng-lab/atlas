@@ -3521,7 +3521,7 @@ def parse_inputs(argv: list):
     libs = OrderedDict([(lib, False) for lib in lib_list])
 
     # not used now
-    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv']
+    lib_skip_list = ['botan', 'ospray', 'ants', 'skia', 'rocksdb', 'conda-opencv', 'llfio']
 
     libs_reverse_depends = {'eigen': ['opencv', 'ceres-solver', 'itk', 'vtk'],
                             'libpng': ['opencv', 'itk', 'vtk'],
