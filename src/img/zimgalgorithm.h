@@ -121,18 +121,18 @@ public:
 protected:
   virtual ~ZImgAlgorithmBase() = default;
 
-  inline void setCancelFlag(bool* /*unused*/) {}
+  inline void setCancelFlag(bool*) {}
 
-  inline void setProgressReportInterval(double /*unused*/) {}
+  inline void setProgressReportInterval(double) {}
 
-  inline void setTotalSubOperationWeight(double /*unused*/) {}
+  inline void setTotalSubOperationWeight(double) {}
 
-  inline void reportProgress(double /*unused*/) {}
+  inline void reportProgress(double) {}
 
   // will change the progress interval of internal operation
-  inline void registerSubOperation(void* /*unused*/, double /*unused*/) {}
+  inline void registerSubOperation(void*, double) {}
 
-  inline void registerSubOperation(itk::ProcessObject* /*unused*/, double /*unused*/) {}
+  inline void registerSubOperation(itk::ProcessObject*, double) {}
 
   inline void clearRegisteredSubOperations() {}
 

@@ -127,7 +127,7 @@ public:
   {}
 
   template<class Graph>
-  void examine_vertex(Vertex u, Graph& /*unused*/)
+  void examine_vertex(Vertex u, Graph&)
   {
     for (Vertex gv : m_goals) {
       if (gv == u) {

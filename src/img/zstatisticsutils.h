@@ -251,7 +251,7 @@ public:
     m_sum += std::accumulate(range.begin(), range.end(), ResultType(0));
   }
 
-  SumRangeReduce_Impl(SumRangeReduce_Impl& /*unused*/, tbb::split /*unused*/)
+  SumRangeReduce_Impl(SumRangeReduce_Impl&, tbb::split)
     : m_sum(0)
   {}
 
@@ -310,7 +310,7 @@ public:
       std::inner_product(m_diffbegin + range.begin(), m_diffbegin + range.end(), m_diffbegin + range.begin(), 0.0);
   }
 
-  StandardDeviationReduce_Impl(StandardDeviationReduce_Impl& x, tbb::split /*unused*/)
+  StandardDeviationReduce_Impl(StandardDeviationReduce_Impl& x, tbb::split)
     : m_begin(x.m_begin)
     , m_diffbegin(x.m_diffbegin)
     , m_meanV(x.m_meanV)

@@ -116,11 +116,7 @@ void Z3DCanvas::initializeGL()
   Q_EMIT openGLContextInitialized();
 }
 
-void Z3DCanvas::resizeGL(int w, int h)
-{
-  Q_UNUSED(w)
-  Q_UNUSED(h)
-}
+void Z3DCanvas::resizeGL(int, int) {}
 
 void Z3DCanvas::paintGL()
 {

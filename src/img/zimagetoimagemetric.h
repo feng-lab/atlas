@@ -130,7 +130,7 @@ struct EvaluateMetricForOneBlock
     }
   }
 
-  EvaluateMetricForOneBlock(EvaluateMetricForOneBlock& x, tbb::split /*unused*/)
+  EvaluateMetricForOneBlock(EvaluateMetricForOneBlock& x, tbb::split)
     : m_img1(x.m_img1)
     , m_img2(x.m_img2)
     , m_size(x.m_size)

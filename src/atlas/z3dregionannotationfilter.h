@@ -25,12 +25,12 @@ public:
 
   void renderTransparent(Z3DEye eye) override;
 
-  [[nodiscard]] bool hasOpaque(Z3DEye /*unused*/) const override
+  [[nodiscard]] bool hasOpaque(Z3DEye) const override
   {
     return true;
   }
 
-  [[nodiscard]] bool hasTransparent(Z3DEye /*unused*/) const override
+  [[nodiscard]] bool hasTransparent(Z3DEye) const override
   {
     return true;
   }

@@ -27,7 +27,7 @@ QWidget* ZStringParameter::actualCreateWidget(QWidget* parent)
   return le;
 }
 
-void ZStringParameter::afterChange(QString& /*unused*/)
+void ZStringParameter::afterChange(QString&)
 {
   Q_EMIT stringChanged(m_value);
 }

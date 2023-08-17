@@ -160,7 +160,7 @@ void ZBoolParameter::beforeChange(bool& value)
   Q_EMIT valueWillChange(value);
 }
 
-void ZBoolParameter::afterChange(bool& /*unused*/)
+void ZBoolParameter::afterChange(bool&)
 {
   Q_EMIT boolChanged(m_value);
 }

@@ -20,14 +20,14 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye) const override
   {
     return false;
   }
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye) const override
   {
     return true;
   }

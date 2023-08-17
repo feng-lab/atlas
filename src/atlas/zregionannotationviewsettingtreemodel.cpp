@@ -279,9 +279,9 @@ void ZRegionAnnotationViewSettingTreeModel::clicked(const QModelIndex& index)
   //  }
 }
 
-void ZRegionAnnotationViewSettingTreeModel::doubleClicked(const QModelIndex& /*unused*/) {}
+void ZRegionAnnotationViewSettingTreeModel::doubleClicked(const QModelIndex&) {}
 
-void ZRegionAnnotationViewSettingTreeModel::activated(const QModelIndex& /*idxIn*/)
+void ZRegionAnnotationViewSettingTreeModel::activated(const QModelIndex&)
 {
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {

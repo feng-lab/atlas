@@ -1975,7 +1975,7 @@ Compression ZTiffWriter::defaultCompression(const ZImg* img)
   return Compression::NONE;
 }
 
-bool ZTiffWriter::checkCompression(const ZImg* /*unused*/, Compression comp)
+bool ZTiffWriter::checkCompression(const ZImg*, Compression comp)
 {
   if (comp == Compression::NONE) {
     return true;

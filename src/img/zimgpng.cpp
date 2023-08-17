@@ -17,17 +17,17 @@ struct PngPack
   png_infop endPtr = nullptr;
 };
 
-void pngReadErrorFunction(png_structp /*unused*/, const char* message)
+void pngReadErrorFunction(png_structp, const char* message)
 {
   throw nim::ZIOException(QString("Libpng error: %1").arg(message));
 }
 
-void pngReadWarningFunction(png_structp /*unused*/, const char* message)
+void pngReadWarningFunction(png_structp, const char* message)
 {
   LOG(WARNING) << "Libpng warning: " << message;
 }
 
-int skipIDATChunk(png_structp /*unused*/, png_unknown_chunkp chunk)
+int skipIDATChunk(png_structp, png_unknown_chunkp chunk)
 {
   // LOG(INFO) << reinterpret_cast<const char*>(chunk->name);
   if (chunk->name[0] == 'I' && chunk->name[1] == 'D' && chunk->name[2] == 'A' && chunk->name[3] == 'T') {

@@ -75,7 +75,7 @@ Z3DAnimationFilter::Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject
   m_lineRenderer.setLineWidth(m_lineWidth.get());
 }
 
-double Z3DAnimationFilter::process(Z3DEye /*unused*/)
+double Z3DAnimationFilter::process(Z3DEye)
 {
   if (m_dataIsInvalid) {
     prepareData();

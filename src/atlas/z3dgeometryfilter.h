@@ -14,7 +14,7 @@ class Z3DGeometryFilter : public Z3DBoundedFilter
 public:
   explicit Z3DGeometryFilter(Z3DGlobalParameters& globalPara, QObject* parent = nullptr);
 
-  virtual void renderPicking(Z3DEye /*unused*/) {}
+  virtual void renderPicking(Z3DEye) {}
 
   [[nodiscard]] bool isStayOnTop() const
   {

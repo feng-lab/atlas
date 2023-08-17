@@ -184,7 +184,7 @@ void Z3DBackgroundRenderer::render(Z3DEye eye)
   m_backgroundShaderGrp.release();
 }
 
-void Z3DBackgroundRenderer::renderPicking(Z3DEye /*unused*/)
+void Z3DBackgroundRenderer::renderPicking(Z3DEye)
 {
   // do nothing
 }

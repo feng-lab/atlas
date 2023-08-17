@@ -862,7 +862,7 @@ QString ZMainWindow::strippedName(const QString& fullFileName)
   return QFileInfo(fullFileName).fileName();
 }
 
-ZMainWindow* ZMainWindow::findMainWindow(const QString& /*unused*/)
+ZMainWindow* ZMainWindow::findMainWindow(const QString&)
 {
   return nullptr;
 }

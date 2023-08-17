@@ -23,9 +23,9 @@ class Z3DFilterWrapper
 public:
   virtual ~Z3DFilterWrapper() = default;
 
-  virtual void beforeFilterProcess(const Z3DFilter* /*unused*/) {}
+  virtual void beforeFilterProcess(const Z3DFilter*) {}
 
-  virtual void afterFilterProcess(const Z3DFilter* /*unused*/) {}
+  virtual void afterFilterProcess(const Z3DFilter*) {}
 
   virtual void beforeNetworkProcess() {}
 
@@ -114,7 +114,7 @@ class Z3DProfileFilterWrapper : public Z3DFilterWrapper
   ZBenchTimer m_benchTimer;
 
 public:
-  void beforeFilterProcess(const Z3DFilter* /*unused*/) override;
+  void beforeFilterProcess(const Z3DFilter*) override;
 
   void afterFilterProcess(const Z3DFilter* p) override;
 

@@ -53,14 +53,14 @@ public:
     return m_interactionMode;
   }
 
-  bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye) const override
   {
     return m_rendererBase.opacity() == 1.f && !m_renderingPrimitive.isSelected("Line");
   }
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye) const override
   {
     return m_rendererBase.opacity() < 1.f || m_renderingPrimitive.isSelected("Line");
   }
@@ -87,7 +87,7 @@ protected:
 
   void contextMenuEvent(QContextMenuEvent* e, int w, int h);
 
-  double process(Z3DEye /*unused*/) override;
+  double process(Z3DEye) override;
 
   void registerPickingObjects() override;
 

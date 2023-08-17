@@ -38,7 +38,7 @@ struct MarkAsIfOtherEqualsOtherWiseZero
   {}
 
   template<typename TVoxel, typename TVoxelOther>
-  TVoxel operator()(TVoxel /*unused*/, TVoxelOther otherVoxel) const
+  TVoxel operator()(TVoxel, TVoxelOther otherVoxel) const
   {
     return (static_cast<int64_t>(otherVoxel) == equal) ? as : 0;
   }

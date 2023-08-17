@@ -350,7 +350,7 @@ void Z3DCheckOpenGLStateFilterWrapper::warn(const Z3DFilter* p, const char* mess
   }
 }
 
-void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter* /*unused*/)
+void Z3DProfileFilterWrapper::beforeFilterProcess(const Z3DFilter*)
 {
   m_benchTimer.start();
 }

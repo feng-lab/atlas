@@ -126,13 +126,13 @@ Q_SIGNALS:
 
 protected:
   // some templated subclass might need this
-  virtual void reservedIntSlot1(int /*unused*/) {}
+  virtual void reservedIntSlot1(int) {}
 
-  virtual void reservedIntSlot2(int /*unused*/) {}
+  virtual void reservedIntSlot2(int) {}
 
-  virtual void reservedStringSlot1(const QString& /*unused*/) {}
+  virtual void reservedStringSlot1(const QString&) {}
 
-  virtual void reservedStringSlot2(const QString& /*unused*/) {}
+  virtual void reservedStringSlot2(const QString&) {}
 
   virtual void reservedSlot1() {}
 

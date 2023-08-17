@@ -236,9 +236,9 @@ void ZRegionAnnotationTreeModel::clicked(const QModelIndex& /*idxIn*/)
   //  }
 }
 
-void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex& /*unused*/) {}
+void ZRegionAnnotationTreeModel::doubleClicked(const QModelIndex&) {}
 
-void ZRegionAnnotationTreeModel::activated(const QModelIndex& /*idxIn*/)
+void ZRegionAnnotationTreeModel::activated(const QModelIndex&)
 {
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {

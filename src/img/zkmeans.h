@@ -391,7 +391,7 @@ public:
     }
   }
 
-  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split /*unused*/)
+  _ZKmeansReduce(_ZKmeansReduce& x, tbb::split)
     : m_kmeans(x.m_kmeans)
   {}
 

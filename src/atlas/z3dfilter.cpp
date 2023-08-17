@@ -132,7 +132,7 @@ bool Z3DFilter::isValid(Z3DEye eye) const
   }
 }
 
-bool Z3DFilter::isReady(Z3DEye /*unused*/) const
+bool Z3DFilter::isReady(Z3DEye) const
 {
   bool isReady = std::all_of(m_inputPorts.begin(), m_inputPorts.end(), [](auto port) { return port->isReady(); });
   if (isReady) {

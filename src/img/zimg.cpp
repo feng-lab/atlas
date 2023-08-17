@@ -1515,7 +1515,10 @@ ZImg ZImg::resized(size_t desWidth,
   return res;
 }
 
-ZImg ZImg::resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant) const
+ZImg ZImg::resizedIPP([[maybe_unused]] size_t desWidth,
+                      [[maybe_unused]] size_t desHeight,
+                      [[maybe_unused]] size_t desDepth,
+                      [[maybe_unused]] Interpolant interpolant) const
 {
 #ifdef ZIMG_USE_IPP
   CHECK(desWidth > 0 && desHeight > 0 && desDepth > 0);
@@ -1649,10 +1652,6 @@ ZImg ZImg::resizedIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interp
   return res;
 #else
   LOG(FATAL) << "ipp not supported";
-  Q_UNUSED(desWidth)
-  Q_UNUSED(desHeight)
-  Q_UNUSED(desDepth)
-  Q_UNUSED(interpolant)
 #endif
 }
 

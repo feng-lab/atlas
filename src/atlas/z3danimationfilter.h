@@ -25,7 +25,7 @@ class Z3DAnimationFilter : public Z3DGeometryFilter
 public:
   explicit Z3DAnimationFilter(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  double process(Z3DEye /*unused*/) override;
+  double process(Z3DEye) override;
 
   void setData(Z3DAnimation* animation);
 
@@ -33,14 +33,14 @@ public:
 
   std::shared_ptr<ZWidgetsGroup> widgetsGroup();
 
-  bool hasOpaque(Z3DEye /*unused*/) const override
+  bool hasOpaque(Z3DEye) const override
   {
     return false;
   }
 
   void renderOpaque(Z3DEye eye) override;
 
-  bool hasTransparent(Z3DEye /*unused*/) const override
+  bool hasTransparent(Z3DEye) const override
   {
     return true;
   }

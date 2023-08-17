@@ -93,7 +93,7 @@ Z3DSwcFilter::Z3DSwcFilter(Z3DGlobalParameters& globalParas, QObject* parent)
   addEventListener(m_contextMenuEvent);
 }
 
-double Z3DSwcFilter::process(Z3DEye /*unused*/)
+double Z3DSwcFilter::process(Z3DEye)
 {
   if (m_dataIsInvalid) {
     prepareData();

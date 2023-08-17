@@ -25,7 +25,7 @@ public:
     }
   }
 
-  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split /*unused*/)
+  _ZVBGMMReduce(_ZVBGMMReduce& x, tbb::split)
     : m_vbgmm(x.m_vbgmm)
   {}
 

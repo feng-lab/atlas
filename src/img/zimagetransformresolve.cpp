@@ -63,7 +63,7 @@ public:
   }
 
   template<typename Graph>
-  void tree_edge(Edge e, const Graph& /*unused*/) const
+  void tree_edge(Edge e, const Graph&) const
   {
     m_dfsSortedEdges.push_back(e);
   }

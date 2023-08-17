@@ -99,9 +99,8 @@ public:
 
   [[nodiscard]] virtual QString objInfo(size_t id) const = 0;
 
-  [[nodiscard]] virtual QString objDetailedInfo(size_t id) const
+  [[nodiscard]] virtual QString objDetailedInfo(size_t) const
   {
-    Q_UNUSED(id)
     static QString str;
     return str;
   }
@@ -113,9 +112,8 @@ public:
     return const_cast<QUndoStack*>(const_cast<const ZObjDoc*>(this)->objUndoStack(id));
   }
 
-  [[nodiscard]] virtual const QUndoStack* objUndoStack(size_t id) const
+  [[nodiscard]] virtual const QUndoStack* objUndoStack([[maybe_unused]] size_t id) const
   {
-    Q_UNUSED(id)
     return nullptr;
   }
 

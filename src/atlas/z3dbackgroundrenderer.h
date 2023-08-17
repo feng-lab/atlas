@@ -45,7 +45,7 @@ protected:
 
   void render(Z3DEye eye) override;
 
-  void renderPicking(Z3DEye /*unused*/) override;
+  void renderPicking(Z3DEye) override;
 
 protected:
   Z3DShaderGroup m_backgroundShaderGrp;

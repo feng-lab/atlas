@@ -107,7 +107,7 @@ protected:
 
   virtual void render(Z3DEye) = 0;
 
-  virtual void renderPicking(Z3DEye /*unused*/) {}
+  virtual void renderPicking(Z3DEye) {}
 
 protected:
   Z3DRendererBase& m_rendererBase;

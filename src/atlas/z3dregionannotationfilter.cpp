@@ -214,7 +214,7 @@ void Z3DRegionAnnotationFilter::allMeshChanged()
   }
 }
 
-void Z3DRegionAnnotationFilter::renderPicking(Z3DEye /*unused*/) {}
+void Z3DRegionAnnotationFilter::renderPicking(Z3DEye) {}
 
 void Z3DRegionAnnotationFilter::registerPickingObjects() {}
 

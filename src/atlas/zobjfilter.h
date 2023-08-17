@@ -42,30 +42,18 @@ public:
 
   virtual void copyKeyPressed() {}
 
-  virtual void pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFlip)
-  {
-    Q_UNUSED(slice)
-    Q_UNUSED(point)
-    Q_UNUSED(hFlip)
-    Q_UNUSED(vFlip)
-  }
+  virtual void pasteKeyPressed([[maybe_unused]] int slice,
+                               [[maybe_unused]] QPointF point,
+                               [[maybe_unused]] bool hFlip,
+                               [[maybe_unused]] bool vFlip)
+  {}
 
-  virtual void mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
-  {
-    Q_UNUSED(scenePos)
-    Q_UNUSED(modifiers)
-  }
+  virtual void mousePressed([[maybe_unused]] const QPointF& scenePos, [[maybe_unused]] Qt::KeyboardModifiers modifiers)
+  {}
 
-  virtual void mouseMoved(const QPointF& scenePos, Qt::KeyboardModifiers modifiers)
-  {
-    Q_UNUSED(scenePos)
-    Q_UNUSED(modifiers)
-  }
+  virtual void mouseMoved([[maybe_unused]] const QPointF& scenePos, [[maybe_unused]] Qt::KeyboardModifiers modifiers) {}
 
-  virtual void mouseReleased(const QPointF& scenePos)
-  {
-    Q_UNUSED(scenePos)
-  }
+  virtual void mouseReleased([[maybe_unused]] const QPointF& scenePos) {}
 
   virtual void rotateClockwise(double, double) {}
 

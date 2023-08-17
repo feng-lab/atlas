@@ -474,7 +474,7 @@ void ZObjModel::clicked(const QModelIndex& idxIn)
   }
 }
 
-void ZObjModel::doubleClicked(const QModelIndex& /*unused*/) {}
+void ZObjModel::doubleClicked(const QModelIndex&) {}
 
 void ZObjModel::activated(const QModelIndex& idxIn)
 {

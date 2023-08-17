@@ -551,7 +551,7 @@ bool Z3DImgFilter::isReady(Z3DEye eye) const
   return Z3DBoundedFilter::isReady(eye) && m_visible.get() && m_3dImg;
 }
 
-bool Z3DImgFilter::hasOpaque(Z3DEye /*unused*/) const
+bool Z3DImgFilter::hasOpaque(Z3DEye) const
 {
   return hasSlices();
 }

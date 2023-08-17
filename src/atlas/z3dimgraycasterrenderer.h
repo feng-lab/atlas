@@ -136,7 +136,7 @@ protected:
 
   void render(Z3DEye eye) override;
 
-  void renderPicking(Z3DEye /*unused*/) override;
+  void renderPicking(Z3DEye) override;
 
 private:
   // this function is used to get proper default

@@ -58,7 +58,7 @@ void ZShareItemSelectionModel::srcSelectionChanged(const QItemSelection& selecte
   QItemSelectionModel::select(mapSelectionFromSrc(deselected), QItemSelectionModel::Deselect);
 }
 
-void ZShareItemSelectionModel::srcCurrentChanged(const QModelIndex& srcCurrent, const QModelIndex& /*unused*/)
+void ZShareItemSelectionModel::srcCurrentChanged(const QModelIndex& srcCurrent, const QModelIndex&)
 {
   const QModelIndex current = mapIndexFromSrc(srcCurrent);
   if (!current.isValid() || current == currentIndex()) {
@@ -67,7 +67,7 @@ void ZShareItemSelectionModel::srcCurrentChanged(const QModelIndex& srcCurrent, 
   setCurrentIndex(current, QItemSelectionModel::NoUpdate);
 }
 
-void ZShareItemSelectionModel::thisCurrentChanged(const QModelIndex& current, const QModelIndex& /*unused*/)
+void ZShareItemSelectionModel::thisCurrentChanged(const QModelIndex& current, const QModelIndex&)
 {
   const QModelIndex srcCurrent = mapIndexToSrc(current);
   if (!srcCurrent.isValid() || srcCurrent == m_srcSelectionModel->currentIndex()) {

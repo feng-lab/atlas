@@ -384,7 +384,7 @@ void Z3DImgRaycasterRenderer::render(Z3DEye eye)
   }
 }
 
-void Z3DImgRaycasterRenderer::renderPicking(Z3DEye /*unused*/) {}
+void Z3DImgRaycasterRenderer::renderPicking(Z3DEye) {}
 
 void Z3DImgRaycasterRenderer::resetTransferFunctions()
 {

@@ -137,9 +137,9 @@ void ZPunctaTableModel::clicked(const QModelIndex& /*idxIn*/)
   //  }
 }
 
-void ZPunctaTableModel::doubleClicked(const QModelIndex& /*unused*/) {}
+void ZPunctaTableModel::doubleClicked(const QModelIndex&) {}
 
-void ZPunctaTableModel::activated(const QModelIndex& /*idxIn*/)
+void ZPunctaTableModel::activated(const QModelIndex&)
 {
   //  size_t id = indexToId(idxIn);
   //  if (id > 0) {
