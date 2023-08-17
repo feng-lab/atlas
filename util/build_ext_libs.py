@@ -2950,7 +2950,7 @@ def build_proxygen(src_dir: str, install_dir: str):
                               to_texts=[
                                   'list(APPEND GFLAG_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
-                                  r'find_program(PROXYGEN_PYTHON python)',
+                                  r'find_program(PROXYGEN_PYTHON python)' if is_windows() else r'find_program(PROXYGEN_PYTHON python3)',
                                   r'' if is_windows() else r'-Wextra',
                                   r'',
                               ])
@@ -3009,6 +3009,9 @@ def build_proxygen(src_dir: str, install_dir: str):
         if is_windows():
             cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()};{os.path.dirname(sys.executable)}',
                              f'-DBUILD_SAMPLES:BOOL=OFF',
+                             ])
+        else:
+            cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={os.path.dirname(sys.executable)}',
                              ])
         cmakecmd.extend(['-DBUILD_QUIC:BOOL=ON',
                          ])
