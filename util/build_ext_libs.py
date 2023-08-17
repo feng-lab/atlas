@@ -2878,6 +2878,7 @@ def build_mvfst(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     bak_file = orig_file = None
+    bak_file1 = orig_file1 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -2893,6 +2894,15 @@ def build_mvfst(src_dir: str, install_dir: str):
                                   r'',
                               ])
 
+        orig_file1 = os.path.join(src_dir, 'cmake', 'mvfst-config.cmake.in')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[
+                                   r'find_dependency(Boost COMPONENTS iostreams system thread filesystem regex context)',
+                               ],
+                               to_texts=[
+                                   r'find_dependency(Boost COMPONENTS system thread filesystem regex context)',
+                               ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend([src_dir])
@@ -2900,6 +2910,7 @@ def build_mvfst(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
         print()
 
 
@@ -2974,16 +2985,16 @@ def build_proxygen(src_dir: str, install_dir: str):
         if is_windows():
             orig_file1 = os.path.join(src_dir, 'cmake', 'FindZstd.cmake')
             bak_file1 = patch_file(orig_file1,
-                                  from_texts=[
-                                      r"""find_library(ZSTD_LIBRARIES
-  NAMES zstd""",
-                                      r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
-                                  ],
-                                  to_texts=[
-                                      r"""find_library(ZSTD_LIBRARIES
-  NAMES zstd zstd_static""",
-                                      r'if(TRUE)',
-                                  ])
+                                   from_texts=[
+                                       r"""find_library(ZSTD_LIBRARIES
+   NAMES zstd""",
+                                       r'if("${ZSTD_LIBRARIES}" MATCHES ".*.a$")',
+                                   ],
+                                   to_texts=[
+                                       r"""find_library(ZSTD_LIBRARIES
+   NAMES zstd zstd_static""",
+                                       r'if(TRUE)',
+                                   ])
 
             orig_file2 = os.path.join(src_dir, 'proxygen', 'external', 'CMakeLists.txt')
             bak_file2 = patch_file(orig_file2,
