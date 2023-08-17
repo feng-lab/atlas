@@ -21,8 +21,8 @@
 __BEGIN_DECLS
 
 /*
- * Definition of a 3D object. <conn> is the connectivity of the stack 
- * neighborhood system (see tz_stack_neighborhood.h for more information). If 
+ * Definition of a 3D object. <conn> is the connectivity of the stack
+ * neighborhood system (see tz_stack_neighborhood.h for more information). If
  * <conn> is 0, there is no constraint for voxel connection.
  */
 #ifdef _MSC_VER
@@ -45,7 +45,7 @@ typedef Object_3d* Object_3d_P;
 size_t Object_3d_Asize(size_t size);
 
 Object_3d* New_Object_3d();
-void Default_Object_3d();
+void Default_Object_3d(Object_3d *object);
 
 Object_3d *Make_Object_3d(size_t size, int conn);
 void Set_Object_3d_Asize(Object_3d *obj, size_t asize);
@@ -63,10 +63,10 @@ Object_3d* Load_Object_3d(char *file_path);
 void Print_Object_3d(Object_3d *obj);
 void Print_Object_3d_Info(Object_3d *obj);
 
-void Object_3d_Set_Voxel(Object_3d *obj, size_t index, int x, int y, int z);  
+void Object_3d_Set_Voxel(Object_3d *obj, size_t index, int x, int y, int z);
 
 /*
- * Object_3d_Range() retrieves the bounding box of <obj>. 
+ * Object_3d_Range() retrieves the bounding box of <obj>.
  * (<corners[0]>, <corners[1]>, <corners[2]>) is the left-top corner and
  * (<corners[3]>, <corners[4]>, <corners[5]>) is the right-bottom corner.
  */
@@ -108,12 +108,12 @@ typedef enum {
  * normal of the major plane (<pointer> is PLANE_NORMAL), which is useful for
  * flat objects.
  *
- * Object_3d_Orientation_Zscale() is the z-scale verion of 
+ * Object_3d_Orientation_Zscale() is the z-scale verion of
  * Object_3d_Orientation().
  */
-void Object_3d_Orientation(const Object_3d *obj, double *vec, 
+void Object_3d_Orientation(const Object_3d *obj, double *vec,
 			   Object_3d_Orientation_Pointer_e pointer);
-void Object_3d_Orientation_Zscale(const Object_3d *obj, double *vec, 
+void Object_3d_Orientation_Zscale(const Object_3d *obj, double *vec,
 				  Object_3d_Orientation_Pointer_e pointer,
 				  double z_scale);
 
@@ -147,7 +147,7 @@ void Object_3d_Sort_By_Index(Object_3d *obj);
 void Object_3d_Csv_Fprint(Object_3d *obj, FILE *fp);
 
 //Swc_Tree* Object_3d_To_Tube(const Object_3d *obj);
-    
+
 /* Routines for handling mylib Region objects */
 
 typedef int32_t mylib_Dimn_Type;
@@ -167,10 +167,10 @@ typedef struct {
   mylib_Size_Type area;
 } RasterCon;
 
-typedef struct { 
+typedef struct {
   mylib_Size_Type  rastlen;  // Length of the raster pair vector (always even)
   mylib_Indx_Type *raster;   // Pixels are [raster[i],raster[i+1]] for i in [0,rastlen) and i even
-} mylib_Region; 
+} mylib_Region;
 
 typedef char mylib_string[MAX_PATH_LENGTH];
 
@@ -217,17 +217,17 @@ void Region_Merge_M(mylib_Region *master, mylib_Region **slave,
 Object_3d* Region_To_Object_3d(const mylib_Region *region);
 
 /**@brief Convert a region to a binary stack
- * 
+ *
  * <out> must be GREY type if it is not NULL.
  */
 Stack* Region_To_Stack(mylib_Region *region, Stack *out);
 
 /**@brief Convert a region to a binary stack
- * 
+ *
  * <out> must be GREY type or GREY16 type.
  */
 void Region_Label_Stack(mylib_Region *region, uint16_t label, Stack *out);
-void Region_Draw_Stack(mylib_Region *region, Stack *canvas, 
+void Region_Draw_Stack(mylib_Region *region, Stack *canvas,
     uint8_t r, uint8_t g, uint8_t b);
 
 Rgb_Color Region_Average_Color(mylib_Region *region, const Mc_Stack *stack);

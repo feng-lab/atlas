@@ -564,7 +564,7 @@ void ZString::appendNumber(uint64_t num, int pad)
   if (pad >= 0 && pad <= kMaxPadSize) {
     char numStr[50];
 
-    sprintf(numStr, "%llu", num);
+    snprintf(numStr, 50, "%llu", num);
 
     int zeroNumber = pad - int(strlen(numStr));
     for (int i = 0; i < zeroNumber; i++) {

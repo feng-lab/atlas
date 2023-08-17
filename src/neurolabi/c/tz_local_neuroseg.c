@@ -49,13 +49,13 @@ INIT_EXCEPTION
 
 /* New_Local_Neuroseg(): New a local neuron segment.
  *
- * Return: a new local neuron segment. It should be freed by 
+ * Return: a new local neuron segment. It should be freed by
  *         Free_Local_Neuroseg().
  */
 Local_Neuroseg* New_Local_Neuroseg()
 {
-  Local_Neuroseg *locseg = 
-    (Local_Neuroseg *) Guarded_Malloc(sizeof(Local_Neuroseg), 
+  Local_Neuroseg *locseg =
+    (Local_Neuroseg *) Guarded_Malloc(sizeof(Local_Neuroseg),
 				     "New_Local_Neuroseg");
   Default_Local_Neuroseg(locseg);
 
@@ -88,7 +88,7 @@ void Default_Local_Neuroseg(Local_Neuroseg *locseg)
   if (locseg == NULL) {
     return;
   }
-  
+
   Reset_Neuroseg(&(locseg->seg));
   Reset_Neuropos(locseg->pos);
 
@@ -99,7 +99,7 @@ Local_Neuroseg* Copy_Local_Neuroseg(const Local_Neuroseg *locseg)
 {
   Local_Neuroseg *new_locseg = New_Local_Neuroseg();
   Local_Neuroseg_Copy(new_locseg, locseg);
-  
+
   return new_locseg;
 }
 
@@ -125,13 +125,13 @@ void Print_Local_Neuroseg(const Local_Neuroseg *locseg)
   Fprint_Local_Neuroseg(stdout, locseg);
 }
 
-Local_Neuroseg *Local_Neuroseg_Import_Xml(const char *file_path, 
+Local_Neuroseg *Local_Neuroseg_Import_Xml(const char *file_path,
 					  Local_Neuroseg *locseg)
 {
 #ifdef HAVE_LIBXML2
   xmlDocPtr doc;
   xmlNodePtr cur;
-    
+
   doc = xmlParseFile(file_path);
   if (doc == NULL) {
     fprintf(stderr, "XML parsing failed.\n");
@@ -179,7 +179,7 @@ Local_Neuroseg *Local_Neuroseg_Import_Xml(const char *file_path,
 
     cur = cur->next;
   }
-    
+
   xmlFreeDoc(doc);
 #else
   TZ_ERROR(ERROR_NA_FUNC);
@@ -228,7 +228,7 @@ Local_Neuroseg* Local_Neuroseg_Fread(Local_Neuroseg *locseg, FILE *fp)
 }
 
 
-void Write_Local_Neuroseg_Array(const char *file_path, 
+void Write_Local_Neuroseg_Array(const char *file_path,
 				const Local_Neuroseg *locseg, int length)
 {
   ASSERT(locseg != NULL, "Null pointer.");
@@ -236,7 +236,7 @@ void Write_Local_Neuroseg_Array(const char *file_path,
   ASSERT(length > 0, "Invalid length.");
 
   FILE *fp = fopen(file_path, "wb");
-  
+
   if (fp == NULL) {
     TZ_ERROR(ERROR_IO_OPEN);
   }
@@ -250,17 +250,17 @@ Local_Neuroseg* Read_Local_Neuroseg_Array(const char *file_path, int *length)
 {
   ASSERT_NOT_NULL(file_path);
   ASSERT_NOT_NULL(length);
-  
+
   FILE *fp = fopen(file_path, "rb");
-  
+
   if (fp == NULL) {
     TZ_ERROR(ERROR_IO_OPEN);
   }
-  
+
   fread(length, sizeof(int), 1, fp);
-  
+
   Local_Neuroseg *locseg = (Local_Neuroseg *)
-    Guarded_Malloc(sizeof(Local_Neuroseg) * 
+    Guarded_Malloc(sizeof(Local_Neuroseg) *
 		   *length, "Read_Local_Neuroseg_Array");
   fread(locseg, sizeof(Local_Neuroseg), *length, fp);
 
@@ -359,7 +359,7 @@ void  Set_Neuroseg_Position(Local_Neuroseg *locseg, const double pos[],
       THROW(ERROR_DATA_VALUE);
       break;
     }
-    
+
     Neuroseg_Axis_Offset(&(locseg->seg), axis_offset, apos);
     Neuropos_Translate(locseg->pos, apos[0], apos[1], apos[2]);
   }
@@ -390,7 +390,7 @@ void Local_Neuroseg_Normal(const Local_Neuroseg *locseg, double *ort)
  *
  * Return: _TRUE_ if it's hit. _FALSE_ if it's missed.
  */
-_BOOL_ Local_Neuroseg_Hit_Test(const Local_Neuroseg *locseg, 
+_BOOL_ Local_Neuroseg_Hit_Test(const Local_Neuroseg *locseg,
 			     double x, double y, double z)
 {
   double tmp_pos[3];
@@ -422,10 +422,10 @@ _BOOL_ Local_Neuroseg_Hit_Test2(const Local_Neuroseg *target,
   center1[1] -= center2[1];
   center1[2] -= center2[2];
 
-  double max_dist = 
+  double max_dist =
     dmax3(target->seg.h / 2.0, target->seg.r1, NEUROSEG_R2(&(target->seg))) +
     dmax3(locseg->seg.h / 2.0, locseg->seg.r1, NEUROSEG_R2(&(target->seg)));
-  if ((center1[0] * center1[0] + center1[1] * center1[1] + 
+  if ((center1[0] * center1[0] + center1[1] * center1[1] +
        center1[2] * center1[2]) > max_dist * max_dist) {
     return _FALSE_;
   }
@@ -445,7 +445,7 @@ _BOOL_ Local_Neuroseg_Hit_Test2(const Local_Neuroseg *target,
       return _TRUE_;
     }
   }
-  
+
   return _FALSE_;
 }
 
@@ -483,9 +483,9 @@ _BOOL_ Local_Neuroseg_Axis_Test(const Local_Neuroseg *locseg,
 int Local_Neuroseg_Axis_Test2(const Local_Neuroseg *locseg,
 			      const Local_Neuroseg *next_locseg)
 {
-  double pos[3]; 
+  double pos[3];
   Local_Neuroset_Top(locseg, pos);
-  
+
 }
 */
 
@@ -506,47 +506,47 @@ _BOOL_ Local_Neuroseg_Contain_Axis(const Local_Neuroseg *container,
   return _TRUE_;
 }
 
-void Local_Neuroseg_Stack_Position(const double position[3], int c[3], 
+void Local_Neuroseg_Stack_Position(const double position[3], int c[3],
 				   double offpos[3], double z_scale)
 {
   local_neuroseg_stack_position(position, c, offpos, z_scale);
 }
 
 Stack* Local_Neuroseg_Substack(const Local_Neuroseg *seg, const Stack *stack,
-			       Field_Range *range, double *offpos, 
-			       double z_scale) 
+			       Field_Range *range, double *offpos,
+			       double z_scale)
 {
   if ((stack == NULL) || (seg == NULL)){
     THROW(ERROR_POINTER_NULL);
   }
 
   double bottom_position[3];
-  
+
   Local_Neuroseg_Bottom(seg, bottom_position);
 
   int c[3];          /* position of the original point in filter range */
 
   local_neuroseg_stack_position(bottom_position, c, offpos, z_scale);
-   
+
   Neuroseg_Field_Range(&(seg->seg), range, z_scale);
-  
+
   if((range->size[0] == 0) || (range->size[0] == 0) || (range->size[0] == 0)) {
     printf("Empty range\n");
     TZ_WARN(ERROR_DATA_VALUE);
     return 0;
   }
 
-  Stack *substack = Crop_Stack(stack, range->first_corner[0] + c[0], 
-			       range->first_corner[1] + c[1], 
+  Stack *substack = Crop_Stack(stack, range->first_corner[0] + c[0],
+			       range->first_corner[1] + c[1],
 			       range->first_corner[2] + c[2],
 			       range->size[0], range->size[1], range->size[2],
 			       NULL);
 
-  return substack;  
+  return substack;
 }
 
 
-double Local_Neuroseg_Score_P(const Local_Neuroseg *locseg, const Stack *stack, 
+double Local_Neuroseg_Score_P(const Local_Neuroseg *locseg, const Stack *stack,
 			      double z_scale, Stack_Fit_Score *fs)
 {
   double score = 0.0;
@@ -559,12 +559,12 @@ double Local_Neuroseg_Score_P(const Local_Neuroseg *locseg, const Stack *stack,
 
     Kill_Geo3d_Scalar_Field(field);
   }
-  
-  return score;  
+
+  return score;
 }
 
-double Local_Neuroseg_Score_Pm(const Local_Neuroseg *locseg, 
-			       const Stack *stack, double z_scale, 
+double Local_Neuroseg_Score_Pm(const Local_Neuroseg *locseg,
+			       const Stack *stack, double z_scale,
 			       const Stack *mask, Stack_Fit_Score *fs)
 {
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_S(locseg,
@@ -575,12 +575,12 @@ double Local_Neuroseg_Score_Pm(const Local_Neuroseg *locseg,
 						  fs);
 
   Kill_Geo3d_Scalar_Field(field);
-  
-  return score; // / sqrt(sqrt(NEUROSEG_CRC(&(locseg->seg))));  
+
+  return score; // / sqrt(sqrt(NEUROSEG_CRC(&(locseg->seg))));
 }
 
-double Local_Neuroseg_Score_W(const Local_Neuroseg *locseg, const Stack *stack, 
-			      double z_scale, 
+double Local_Neuroseg_Score_W(const Local_Neuroseg *locseg, const Stack *stack,
+			      double z_scale,
 			      Locseg_Score_Workspace *ws)
 {
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_S(locseg,
@@ -594,12 +594,12 @@ double Local_Neuroseg_Score_W(const Local_Neuroseg *locseg, const Stack *stack,
   }
 
   Kill_Geo3d_Scalar_Field(field);
-  
-  return score;  
+
+  return score;
 }
 
 void Local_Neuroseg_Draw_Stack(Local_Neuroseg *seg, Stack *stack,
-			       const Stack_Draw_Workspace *ws) 
+			       const Stack_Draw_Workspace *ws)
 {
   int color  = 1;
   if (ws->color_mode == 1) {
@@ -625,7 +625,7 @@ void Local_Neuroseg_Label(const Local_Neuroseg *seg, Stack *stack, int color,
     PRINT_EXCEPTION("Null pointer", "Null local segment.");
     THROW(ERROR_POINTER_NULL);
   }
-  
+
   if((stack->kind != COLOR) && (color >= 0)) {
     THROW(ERROR_DATA_TYPE);
   }
@@ -655,24 +655,24 @@ void Local_Neuroseg_Label(const Local_Neuroseg *seg, Stack *stack, int color,
   print_field_range(&range);
 #endif
 
-  double *filter = Neurofilter(&(seg->seg), NULL, NULL, 
+  double *filter = Neurofilter(&(seg->seg), NULL, NULL,
 			       &range, offpos, z_scale);
 
   int i;
   int region_corner[3];
-  
+
   for (i = 0; i < 3; i++) {
     region_corner[i] = range.first_corner[i] + c[i];
   }
 
 #ifdef _DEBUG_2
-  printf("corner: %d, %d, %d\n", 
+  printf("corner: %d, %d, %d\n",
 	 region_corner[0], region_corner[1], region_corner[2]);
   printf("size: %d, %d, %d\n", range.size[0], range.size[1], range.size[2]);
 #endif
 
-  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0], 
-					   range.size[1], 
+  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0],
+					   range.size[1],
 					   range.size[2], GREY);
 
 #ifdef _DEBUG_2
@@ -682,7 +682,7 @@ void Local_Neuroseg_Label(const Local_Neuroseg *seg, Stack *stack, int color,
   int point[3];
   int offset = 0;
   //uint8 pixel[3];
-  
+
   int j, k;
   for (k = 0; k < filter_stack->depth; k++) {
     point[2] = region_corner[2] + k;
@@ -748,11 +748,11 @@ void Local_Neuroseg_Label(const Local_Neuroseg *seg, Stack *stack, int color,
 	offset++;
       }
     }
-  }     
-  
+  }
+
   free(filter);
-  Kill_Stack(filter_stack);  
-} 
+  Kill_Stack(filter_stack);
+}
 
 _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
 				    double z_scale, double value)
@@ -766,7 +766,7 @@ _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
     PRINT_EXCEPTION("Null pointer", "Null local segment.");
     THROW(ERROR_POINTER_NULL);
   }
-  
+
   if(stack->kind == COLOR) {
     THROW(ERROR_DATA_TYPE);
   }
@@ -786,12 +786,12 @@ _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
 
   Field_Range range;
   Neuroseg_Field_Range(&(seg->seg), &range, z_scale);
-  double *filter = Neurofilter(&(seg->seg), NULL, NULL, 
+  double *filter = Neurofilter(&(seg->seg), NULL, NULL,
 			       &range, offpos, z_scale);
 
   int i;
   int region_corner[3];
-  
+
   for (i = 0; i < 3; i++) {
     region_corner[i] = range.first_corner[i] + c[i];
   }
@@ -810,7 +810,7 @@ _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
 	    (point[1] >= 0) && (point[1] < stack->height) &&
 	    (point[2] >= 0) && (point[2] < stack->depth)) {
 	  if (filter[offset] > 0) {
-	    if (Get_Stack_Pixel(stack, point[0], point[1], point[2], 0) == 
+	    if (Get_Stack_Pixel(stack, point[0], point[1], point[2], 0) ==
 		value) {
 	      free(filter);
 	      return _TRUE_;
@@ -820,9 +820,9 @@ _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
 	offset++;
       }
     }
-  }     
-  
-  free(filter);  
+  }
+
+  free(filter);
   return _FALSE_;
 }
 
@@ -830,7 +830,7 @@ _BOOL_ Local_Neuroseg_Has_Stack_Value(const Local_Neuroseg *seg, Stack *stack,
  * flag >= 0: only overwrite pixels with value flag
  * flag == -1: no constraint
  */
-void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack, 
+void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack,
 			    int flag, int value, double z_scale)
 {
   if (stack == NULL) {
@@ -842,7 +842,7 @@ void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack,
     PRINT_EXCEPTION("Null pointer", "Null local segment.");
     THROW(ERROR_POINTER_NULL);
   }
-  
+
   if(stack->kind == COLOR) {
     THROW(ERROR_DATA_TYPE);
   }
@@ -862,25 +862,25 @@ void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack,
 
   Field_Range range;
   Neuroseg_Field_Range(&(seg->seg), &range, z_scale);
-  double *filter = Neurofilter(&(seg->seg), NULL, NULL, 
+  double *filter = Neurofilter(&(seg->seg), NULL, NULL,
 			       &range, offpos, z_scale);
 
   int i;
   int region_corner[3];
-  
+
   for (i = 0; i < 3; i++) {
     region_corner[i] = range.first_corner[i] + c[i];
   }
 
   /*
-  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0], 
-					   range.size[1], 
+  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0],
+					   range.size[1],
 					   range.size[2], GREY);
   */
   int point[3];
   int offset = 0;
   //uint8 pixel[3];
-  
+
   int j, k;
   _BOOL_ label;
 
@@ -901,7 +901,7 @@ void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack,
 		label = _FALSE_;
 	      }
 	    }
-	    
+
 	    if (label == _TRUE_) {
 	      Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, value);
 	    }
@@ -910,13 +910,13 @@ void Local_Neuroseg_Label_G(const Local_Neuroseg *seg, Stack *stack,
 	offset++;
       }
     }
-  }     
-  
-  free(filter);
-  //Kill_Stack(filter_stack);  
-} 
+  }
 
-void Local_Neuroseg_Label_C(const Local_Neuroseg *seg, Stack *stack, 
+  free(filter);
+  //Kill_Stack(filter_stack);
+}
+
+void Local_Neuroseg_Label_C(const Local_Neuroseg *seg, Stack *stack,
 			    double z_scale, const color_t color)
 {
   if (stack == NULL) {
@@ -928,7 +928,7 @@ void Local_Neuroseg_Label_C(const Local_Neuroseg *seg, Stack *stack,
     PRINT_EXCEPTION("Null pointer", "Null local segment.");
     THROW(ERROR_POINTER_NULL);
   }
-  
+
   /*
   if((stack->kind != COLOR)) {
     THROW(ERROR_DATA_TYPE);
@@ -948,23 +948,23 @@ void Local_Neuroseg_Label_C(const Local_Neuroseg *seg, Stack *stack,
   Field_Range range;
   Neuroseg_Field_Range(&(seg->seg), &range, z_scale);
 
-  double *filter = Neurofilter(&(seg->seg), NULL, NULL, 
+  double *filter = Neurofilter(&(seg->seg), NULL, NULL,
 			       &range, offpos, z_scale);
 
   int i;
   int region_corner[3];
-  
+
   for (i = 0; i < 3; i++) {
     region_corner[i] = range.first_corner[i] + c[i];
   }
 
-  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0], 
-					   range.size[1], 
+  Stack *filter_stack = Scale_Double_Stack(filter, range.size[0],
+					   range.size[1],
 					   range.size[2], GREY);
   int point[3];
   int offset = 0;
   //uint8 pixel[3];
-  
+
   int j, k;
   for (k = 0; k < filter_stack->depth; k++) {
     point[2] = region_corner[2] + k;
@@ -985,13 +985,13 @@ void Local_Neuroseg_Label_C(const Local_Neuroseg *seg, Stack *stack,
 	offset++;
       }
     }
-  }     
-  
+  }
+
   free(filter);
-  Kill_Stack(filter_stack);    
+  Kill_Stack(filter_stack);
 }
 
-void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack, 
+void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
 			    double z_scale, Locseg_Label_Workspace *ws)
 {
   double bottom_position[3];
@@ -1004,7 +1004,7 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
   local_neuroseg_stack_position(bottom_position, c, offpos, z_scale);
 
   Local_Neuroseg *label_locseg = Copy_Local_Neuroseg(seg);
-  
+
   //  if (ws->option == 1) {
   if (ws->option == 10) {
     label_locseg->seg.r1 = 0.75;
@@ -1023,16 +1023,16 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
   double *filter = NULL;
 
   if (ws->option > 10) {
-    filter = Neurofilter(&(label_locseg->seg), NULL, NULL, 
+    filter = Neurofilter(&(label_locseg->seg), NULL, NULL,
 			 &range, offpos, z_scale);
   } else {
-    filter = Neuroseg_Dist_Filter(&(label_locseg->seg), NULL, NULL, 
-				  &range, offpos, z_scale);    
+    filter = Neuroseg_Dist_Filter(&(label_locseg->seg), NULL, NULL,
+				  &range, offpos, z_scale);
   }
 
   int i;
   int region_corner[3];
-  
+
   for (i = 0; i < 3; i++) {
     region_corner[i] = range.first_corner[i] + c[i];
   }
@@ -1040,13 +1040,13 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
   int offset = 0;
   //uint8 pixel[3];
 
-  double *filter2 = NULL;  
+  double *filter2 = NULL;
   double thre = 0;
   if ((ws->option >= 2) && (ws->option <= 4)){
     thre = Local_Neuroseg_Average_Weak_Signal(seg, ws->signal, z_scale);
-    filter2 =  Neuroseg_Dist_Filter(&(seg->seg), NULL, NULL, 
+    filter2 =  Neuroseg_Dist_Filter(&(seg->seg), NULL, NULL,
 				    &range, offpos, z_scale);
-  }  
+  }
 
   for (i = 0; i < 3; i++) {
     if (ws->range[i] < 0) {
@@ -1123,40 +1123,40 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
 	      if (filter[offset] <= 1) {
 		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				ws->value);
-	      } 
+	      }
 	      break;
 	    case 2:
 	      if (filter2[offset] <= 1) {
-		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				ws->value);
-	      } else if (filter[offset] <= 1) {		
+	      } else if (filter[offset] <= 1) {
 		if (Get_Stack_Pixel(ws->signal, point[0], point[1], point[2], 0)
 		    < thre) {
-		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				  ws->value);
 		}
 	      }
 	      break;
 	    case 3:
 	      if (filter2[offset] <= 1) {
-		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				ws->value);
-	      } else if (filter[offset] <= 1) {		
+	      } else if (filter[offset] <= 1) {
 		if (Stack_Neighbor_Mean(ws->signal, 18,
 					point[0], point[1], point[2]) < thre) {
-		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				  ws->value);
 		}
 	      }
 	      break;
 	    case 4:
 	      if (filter2[offset] <= 1) {
-		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				ws->value);
-	      } else if (filter[offset] <= 1) {		
+	      } else if (filter[offset] <= 1) {
 		if (Stack_Neighbor_Min(ws->signal, 18,
 				       point[0], point[1], point[2]) < thre) {
-		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0, 
+		  Set_Stack_Pixel(stack, point[0], point[1], point[2], 0,
 				  ws->value);
 		}
 	      }
@@ -1167,7 +1167,7 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
 	offset++;
       }
     }
-  }     
+  }
 
   Delete_Local_Neuroseg(label_locseg);
   if (filter2 != NULL) {
@@ -1176,22 +1176,22 @@ void Local_Neuroseg_Label_W(const Local_Neuroseg *seg, Stack *stack,
   free(filter);
 }
 
-/* Local_Neuroseg_Var_Mask_To_Index(): Initialize variable indices from a bit 
+/* Local_Neuroseg_Var_Mask_To_Index(): Initialize variable indices from a bit
  *                                     mask.
  *
  * Args: neuroseg_mask - the variable bit mask of neuron segment;
  *       neuropos_mask - the position bit mask;
- *       index - an array to store the resulted variable indices. It must 
+ *       index - an array to store the resulted variable indices. It must
  *               be long enough.
  *
  * Return: the number of variables selected.
  */
-int Local_Neuroseg_Var_Mask_To_Index(Bitmask_t neuroseg_mask, 
+int Local_Neuroseg_Var_Mask_To_Index(Bitmask_t neuroseg_mask,
 				     Bitmask_t neuropos_mask, int *index)
 {
   int nvar1 = Neuroseg_Var_Mask_To_Index(neuroseg_mask, index);
   int nvar2 = Neuropos_Var_Mask_To_Index(neuropos_mask, index + nvar1);
-  
+
   int i;
   for (i = 0; i < nvar2; i++) {
     index[nvar1 + i] += NEUROSEG_NPARAM;
@@ -1200,13 +1200,13 @@ int Local_Neuroseg_Var_Mask_To_Index(Bitmask_t neuroseg_mask,
   return nvar1 + nvar2;
 }
 
-int Local_Neuroseg_Var_Mask_To_Index_R(Bitmask_t neuroseg_mask, 
+int Local_Neuroseg_Var_Mask_To_Index_R(Bitmask_t neuroseg_mask,
 				       Bitmask_t neuropos_mask, int *index)
 {
-  int nvar1 = Neuroseg_Var_Mask_To_Index(neuroseg_mask | 
+  int nvar1 = Neuroseg_Var_Mask_To_Index(neuroseg_mask |
 					 NEUROSEG_VAR_MASK_R1, index);
   int nvar2 = Neuropos_Var_Mask_To_Index(neuropos_mask, index + nvar1);
- 
+
 
   return nvar1 + nvar2;
 }
@@ -1217,11 +1217,11 @@ int Local_Neuroseg_Var_Mask_To_Index_R(Bitmask_t neuroseg_mask,
  *       var - the extracted variables. Each element of var is the address of
  *             a variable of the neuron segment. So if the value of an element
  *             is changed, <locseg> will be changed as well.
- *       
+ *
  * Return: the number of variables.
  */
 int Local_Neuroseg_Var(const Local_Neuroseg *locseg, double *var[])
-{  
+{
   int nvar = Neuroseg_Var(&(locseg->seg), var);
   Neuropos_Var(locseg->pos, var + nvar);
 
@@ -1243,7 +1243,7 @@ void Local_Neuroseg_Set_Var_W(Local_Neuroseg *seg, int var_index, double value,
   *(var[var_index]) = value * weight;
 }
 
-void Local_Neuroseg_Validate(double *var, const double *var_min, 
+void Local_Neuroseg_Validate(double *var, const double *var_min,
 			     const double *var_max, const void *param)
 {
   int i;
@@ -1260,7 +1260,7 @@ void Local_Neuroseg_Validate(double *var, const double *var_min,
   }
 }
 
-double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack, 
+double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack,
 			       const int *var_index, int nvar, int *var_link,
 			       double *var_min, double *var_max,
 			       double z_scale, const Stack *mask,
@@ -1271,7 +1271,7 @@ double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack,
   }
 
   double *weight = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
-  
+
   double *var = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
   //Local_Neuroseg_Param_Array_W(locseg, z_scale, weight, var);
   Local_Neuroseg_Param_Array(locseg, z_scale, var);
@@ -1293,13 +1293,13 @@ double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack,
     weight[i] = delta[var_index[i]];
   }
   double wl = darray_norm(weight, nvar);
-  
+
   for (i = 0; i < nvar; i++) {
     weight[i] /= wl;
   }
   perceptor.weight = weight;
 
-  
+
 
   /*
   for (i = 0; i < LOCAL_NEUROSEG_NPARAM; i++) {
@@ -1308,7 +1308,7 @@ double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack,
   }
   */
 
-  perceptor.s = 
+  perceptor.s =
     Make_Continuous_Function(Local_Neuroseg_Score_Gvm, Local_Neuroseg_Validate,
 			     var_min, var_max);
 
@@ -1331,7 +1331,7 @@ double Fit_Local_Neuroseg_Pr_M(Local_Neuroseg *locseg, const Stack *stack,
 }
 
 
-double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack, 
+double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack,
 			     const int *var_index, int nvar, int *var_link,
 			     double *var_min, double *var_max,
 			     double z_scale, Neuroseg_Fit_Score *fs)
@@ -1341,7 +1341,7 @@ double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack,
   }
 
   double *weight = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
-  
+
   double *var = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
   //Local_Neuroseg_Param_Array_W(locseg, z_scale, weight, var);
   Local_Neuroseg_Param_Array(locseg, z_scale, var);
@@ -1365,13 +1365,13 @@ double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack,
     weight[i] = delta[var_index[i]];
   }
   double wl = darray_norm(weight, nvar);
-  
+
   for (i = 0; i < nvar; i++) {
     weight[i] /= wl;
   }
   perceptor.weight = weight;
 
-  
+
 
   /*
   for (i = 0; i < LOCAL_NEUROSEG_NPARAM; i++) {
@@ -1380,7 +1380,7 @@ double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack,
   }
   */
 
-  perceptor.s = 
+  perceptor.s =
     Make_Continuous_Function(Local_Neuroseg_Score_R, Local_Neuroseg_Validate,
 			     var_min, var_max);
 
@@ -1397,30 +1397,30 @@ double Fit_Local_Neuroseg_Pr(Local_Neuroseg *locseg, const Stack *stack,
 
   locseg->seg.theta = Normalize_Radian(locseg->seg.theta);
   locseg->seg.psi = Normalize_Radian(locseg->seg.psi);
-  
+
   Kill_Locseg_Score_Workspace((Receptor_Score_Workspace*)perceptor.arg);
 
   return Local_Neuroseg_Score_P(locseg, stack, z_scale, fs);
 }
 
-double Fit_Local_Neuroseg_P(Local_Neuroseg *locseg, const Stack *stack, 
+double Fit_Local_Neuroseg_P(Local_Neuroseg *locseg, const Stack *stack,
 			    const int *var_index, int nvar, int *var_link,
 			    double z_scale, Neuroseg_Fit_Score *fs)
 {
   DECLARE_LOCAL_NEUROSEG_VAR_MIN(var_min);
   DECLARE_LOCAL_NEUROSEG_VAR_MAX(var_max);
-  return Fit_Local_Neuroseg_Pr(locseg, stack, var_index, nvar, var_link, 
+  return Fit_Local_Neuroseg_Pr(locseg, stack, var_index, nvar, var_link,
 			       var_min, var_max, z_scale, fs);
 }
 
-double Fit_Local_Neuroseg_Pm(Local_Neuroseg *locseg, const Stack *stack, 
+double Fit_Local_Neuroseg_Pm(Local_Neuroseg *locseg, const Stack *stack,
 			     const int *var_index, int nvar, int *var_link,
 			     double z_scale, const Stack *mask,
 			     Neuroseg_Fit_Score *fs)
 {
   DECLARE_LOCAL_NEUROSEG_VAR_MIN(var_min);
   DECLARE_LOCAL_NEUROSEG_VAR_MAX(var_max);
-  return Fit_Local_Neuroseg_Pr_M(locseg, stack, var_index, nvar, var_link, 
+  return Fit_Local_Neuroseg_Pr_M(locseg, stack, var_index, nvar, var_link,
 				 var_min, var_max, z_scale, mask, fs);
 }
 
@@ -1433,7 +1433,7 @@ double Fit_Local_Neuroseg_W(Local_Neuroseg *locseg, const Stack *stack,
     }
 
     double *weight = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
-  
+
     double *var = darray_malloc(LOCAL_NEUROSEG_NPARAM + 1);
 
     Local_Neuroseg_Param_Array(locseg, z_scale, var);
@@ -1445,7 +1445,7 @@ double Fit_Local_Neuroseg_W(Local_Neuroseg *locseg, const Stack *stack,
     perceptor.vs->var = var;
     perceptor.vs->link = ws->var_link;
     perceptor.min_gradient = 1e-3;
-    
+
     perceptor.arg = ws->sws;
 
     double *delta = (double *) Delta;
@@ -1456,13 +1456,13 @@ double Fit_Local_Neuroseg_W(Local_Neuroseg *locseg, const Stack *stack,
       weight[i] = delta[perceptor.vs->var_index[i]];
     }
     double wl = darray_norm(weight, perceptor.vs->nvar);
-  
+
     for (i = 0; i < perceptor.vs->nvar; i++) {
       weight[i] /= wl;
     }
     perceptor.weight = weight;
 
-    perceptor.s = 
+    perceptor.s =
       Make_Continuous_Function(Local_Neuroseg_Score_R, Local_Neuroseg_Validate,
 			       ws->var_min, ws->var_max);
 
@@ -1479,11 +1479,11 @@ double Fit_Local_Neuroseg_W(Local_Neuroseg *locseg, const Stack *stack,
 
     locseg->seg.theta = Normalize_Radian(locseg->seg.theta);
     locseg->seg.psi = Normalize_Radian(locseg->seg.psi);
-  
+
     return Local_Neuroseg_Score_W(locseg, stack, z_scale, ws->sws);
 }
 
-double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
 					 const Stack *stack, double z_scale,
 					 Neuroseg_Fit_Score *fs)
 {
@@ -1492,7 +1492,7 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
   double theta, psi;
   double score;
   double step;
-  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg(); 
+  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg();
 
 #ifdef _TEST_
   double test_scores[2000];
@@ -1507,7 +1507,7 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
   Stack *canvas = Translate_Stack((Stack *)stack, COLOR, 0);
   Local_Neuroseg_Label(locseg, canvas, 1, z_scale);
 #endif
-  
+
   best_score = Local_Neuroseg_Score_P(locseg, stack, z_scale, fs) * 2.0;
   best_theta = locseg->seg.theta;
   best_psi = locseg->seg.psi;
@@ -1523,7 +1523,7 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
 
 #if 0
   int var_index[LOCAL_NEUROSEG_NPARAM];
-  int nvar = 
+  int nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_ORIENTATION,
 				     NEUROSEG_VAR_MASK_NONE, var_index);
 #endif
@@ -1539,15 +1539,15 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
     } else {
       step = 1.0 / locseg->seg.h / sin(theta);
     }
-     
+
     for (psi = 0.0; psi < TZ_2PI; psi += step) {
       tmp_locseg->seg.theta = theta;
       tmp_locseg->seg.psi = psi;
       Set_Xz_Orientation(new_ort, theta, psi);
       Geo3d_Rotate_Orientation(locseg->seg.theta, locseg->seg.psi,
-			       &(tmp_locseg->seg.theta), 
-			       &(tmp_locseg->seg.psi));   
-      
+			       &(tmp_locseg->seg.theta),
+			       &(tmp_locseg->seg.psi));
+
       //score = Fit_Local_Neuroseg_P(tmp_locseg, stack, var_index, nvar,
       //			   z_scale, fs);
 
@@ -1565,7 +1565,7 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
 #endif
 
 #ifdef _TEST_2
-      Local_Neuroseg_Label(tmp_locseg, canvas, 0, z_scale);  
+      Local_Neuroseg_Label(tmp_locseg, canvas, 0, z_scale);
 #endif
 
       if (score > best_score) {
@@ -1584,10 +1584,10 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
 
   locseg->seg.theta = best_theta;
   locseg->seg.psi = best_psi;
-  
 
-#ifdef _TEST_2   
-  Local_Neuroseg_Label(locseg, canvas, 0, z_scale);  
+
+#ifdef _TEST_2
+  Local_Neuroseg_Label(locseg, canvas, 0, z_scale);
 #endif
 
 #ifdef _TEST_
@@ -1607,7 +1607,7 @@ double Local_Neuroseg_Orientation_Search(Local_Neuroseg *locseg,
   return best_score;
 }
 
-double Local_Neuroseg_Orientation_Search_C(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Orientation_Search_C(Local_Neuroseg *locseg,
 					   const Stack *stack, double z_scale,
 					   Neuroseg_Fit_Score *fs)
 {
@@ -1616,7 +1616,7 @@ double Local_Neuroseg_Orientation_Search_C(Local_Neuroseg *locseg,
   double theta, psi;
   double score;
   double step;
-  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg(); 
+  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg();
 
   double center[3];
   Local_Neuroseg_Center(locseg, center);
@@ -1639,9 +1639,9 @@ double Local_Neuroseg_Orientation_Search_C(Local_Neuroseg *locseg,
       tmp_locseg->seg.psi = psi;
 
       Geo3d_Rotate_Orientation(locseg->seg.theta, locseg->seg.psi,
-			       &(tmp_locseg->seg.theta), 
-			       &(tmp_locseg->seg.psi));   
-      
+			       &(tmp_locseg->seg.theta),
+			       &(tmp_locseg->seg.psi));
+
       Set_Neuroseg_Position(tmp_locseg, center, NEUROSEG_CENTER);
       Local_Neuroseg_Field_Sp(tmp_locseg, NULL, field);
 
@@ -1665,7 +1665,7 @@ double Local_Neuroseg_Orientation_Search_C(Local_Neuroseg *locseg,
   return best_score;
 }
 
-double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
 					   const Stack *stack, double z_scale,
 					   Neuroseg_Fit_Score *fs)
 {
@@ -1674,7 +1674,7 @@ double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
   double theta, psi;
   double score;
   double step;
-  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg(); 
+  Local_Neuroseg *tmp_locseg = New_Local_Neuroseg();
 
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_Sp(locseg, NULL, NULL);
 
@@ -1690,7 +1690,7 @@ double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
   Local_Neuroseg_Copy(tmp_locseg, locseg);
   /*
   tmp_locseg->seg.alpha = 0.0;
-  tmp_locseg->seg.r1 = (tmp_locseg->seg.r1 * tmp_locseg->seg.scale 
+  tmp_locseg->seg.r1 = (tmp_locseg->seg.r1 * tmp_locseg->seg.scale
 			+ tmp_locseg->seg.r2) / 2.0;
   tmp_locseg->seg.r2 = tmp_locseg->seg.r1;
   tmp_locseg->seg.scale = 1.0;
@@ -1705,9 +1705,9 @@ double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
       tmp_locseg->seg.psi = psi;
 
       Geo3d_Rotate_Orientation(locseg->seg.theta, locseg->seg.psi,
-			       &(tmp_locseg->seg.theta), 
-			       &(tmp_locseg->seg.psi));   
-      Set_Neuroseg_Position(tmp_locseg, bottom, NEUROSEG_BOTTOM); 
+			       &(tmp_locseg->seg.theta),
+			       &(tmp_locseg->seg.psi));
+      Set_Neuroseg_Position(tmp_locseg, bottom, NEUROSEG_BOTTOM);
       Local_Neuroseg_Field_Sp(tmp_locseg, NULL, field);
 
       score = Geo3d_Scalar_Field_Stack_Score(field, stack, z_scale, fs);// * (2.0 + cos(theta));
@@ -1722,7 +1722,7 @@ double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
 
   locseg->seg.theta = best_theta;
   locseg->seg.psi = best_psi;
-  Set_Neuroseg_Position(locseg, bottom, NEUROSEG_BOTTOM); 
+  Set_Neuroseg_Position(locseg, bottom, NEUROSEG_BOTTOM);
 
   Delete_Local_Neuroseg(tmp_locseg);
   Kill_Geo3d_Scalar_Field(field);
@@ -1732,26 +1732,26 @@ double Local_Neuroseg_Orientation_Search_B(Local_Neuroseg *locseg,
   return best_score;
 }
 
-void Local_Neuroseg_Orientation_Adjust(Local_Neuroseg *locseg, 
+void Local_Neuroseg_Orientation_Adjust(Local_Neuroseg *locseg,
 				       const Stack *stack, double z_scale)
 {
 /* alloc <Geo3d_Scalar_Field> */
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_S(locseg, NULL, NULL);
-  
-  Stack_Points_Sampling(stack, Coordinate_3d_Double_Array(field->points), 
+
+  Stack_Points_Sampling(stack, Coordinate_3d_Double_Array(field->points),
 			field->size, field->values);
 
   double vec[3], ext[3];
   Geo3d_Scalar_Field_Ort(field, vec, ext);
 
   double ort[3];
-  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi, 
+  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi,
 			   ort, ort + 1, ort + 2);
 
-  double angle = 
+  double angle =
     Geo3d_Dot_Product(vec[0], vec[1], vec[2], ort[0], ort[1], ort[2]);
 
-  Geo3d_Normal_Orientation(vec[0], vec[1], vec[2], &(locseg->seg.theta), 
+  Geo3d_Normal_Orientation(vec[0], vec[1], vec[2], &(locseg->seg.theta),
 			   &(locseg->seg.psi));
 
   if (angle < 0.0) {
@@ -1762,7 +1762,7 @@ void Local_Neuroseg_Orientation_Adjust(Local_Neuroseg *locseg,
   Kill_Geo3d_Scalar_Field(field);
 }
 
-double Local_Neuroseg_Position_Search(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Position_Search(Local_Neuroseg *locseg,
 				      const Stack *stack, double z_scale,
 				      double v[3], double range, double step,
 				      Neuroseg_Fit_Score *fs)
@@ -1795,7 +1795,7 @@ double Local_Neuroseg_Position_Search(Local_Neuroseg *locseg,
   return best_score;
 }
 
-double Local_Neuroseg_Radius_Search(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Radius_Search(Local_Neuroseg *locseg,
 				    const Stack *stack, double z_scale,
 				    double start, double end, double step,
 				    Neuroseg_Fit_Score *fs)
@@ -1806,7 +1806,7 @@ double Local_Neuroseg_Radius_Search(Local_Neuroseg *locseg,
   best_score = Local_Neuroseg_Score_P(locseg, stack, z_scale, fs);
   printf("%g\n", best_score);
   double best_r = locseg->seg.r1;
-  
+
   double r;
   for (r = start; r <= end; r += step) {
     locseg->seg.r1 = r;
@@ -1825,7 +1825,7 @@ double Local_Neuroseg_Radius_Search(Local_Neuroseg *locseg,
   return best_score;
 }
 
-double Local_Neuroseg_Scale_Search(Local_Neuroseg *locseg, 
+double Local_Neuroseg_Scale_Search(Local_Neuroseg *locseg,
 				   const Stack *stack, double z_scale,
 				   double start, double end, double step,
 				   Neuroseg_Fit_Score *fs)
@@ -1836,7 +1836,7 @@ double Local_Neuroseg_Scale_Search(Local_Neuroseg *locseg,
   best_score = Local_Neuroseg_Score_P(locseg, stack, z_scale, fs);
   printf("%g\n", best_score);
   double best_s = locseg->seg.scale;
-  
+
   double s;
   for (s = start; s <= end; s += step) {
     locseg->seg.scale = s;
@@ -1854,11 +1854,11 @@ double Local_Neuroseg_Scale_Search(Local_Neuroseg *locseg,
   return best_score;
 }
 
-double Local_Neuroseg_R_Scale_Search(Local_Neuroseg *locseg, 
+double Local_Neuroseg_R_Scale_Search(Local_Neuroseg *locseg,
 				     const Stack *stack, double z_scale,
-				     double r_start, double r_end, 
+				     double r_start, double r_end,
 				     double r_step,
-				     double s_start, double s_end, 
+				     double s_start, double s_end,
 				     double s_step,
 				     Neuroseg_Fit_Score *fs)
 {
@@ -1897,15 +1897,15 @@ double Local_Neuroseg_R_Scale_Search(Local_Neuroseg *locseg,
   return best_score;
 }
 
-void Local_Neuroseg_Position_Adjust(Local_Neuroseg *locseg, 
+void Local_Neuroseg_Position_Adjust(Local_Neuroseg *locseg,
 				    const Stack *stack, double z_scale)
 {
   /* alloc <field> */
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_S(locseg, NULL, NULL);
-    
-  Geo3d_Scalar_Field_Stack_Sampling(field, stack, z_scale, 
+
+  Geo3d_Scalar_Field_Stack_Sampling(field, stack, z_scale,
 				    field->values);
-  
+
   coordinate_3d_t center;
   Geo3d_Scalar_Field_Centroid(field, center);
 #ifdef _DEBUG_2
@@ -1913,12 +1913,12 @@ void Local_Neuroseg_Position_Adjust(Local_Neuroseg *locseg,
 #endif
 
   Set_Neuroseg_Position(locseg, center, NEUROSEG_CENTER);
-  
+
   /* free <field> */
   Kill_Geo3d_Scalar_Field(field);
 }
 
-int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg, 
+int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg,
 				   const Stack *stack, double z_scale)
 {
   double old_height = locseg->seg.h;
@@ -1942,13 +1942,13 @@ int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg,
   }
 
   Local_Neuroseg_Change_Height(locseg, index + 1);
-#if 1  
+#if 1
   length = index + 1;
 
   if (length > 1) {
-    Local_Neuroseg_Height_Profile(locseg, stack, z_scale, length, 
+    Local_Neuroseg_Height_Profile(locseg, stack, z_scale, length,
 				  STACK_FIT_MEAN_SIGNAL, NULL, profile);
-    
+
     double min = profile[0];
     double max = darray_max(profile + 1, length - 1, NULL);
 
@@ -1986,20 +1986,20 @@ int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg,
 #endif
 
   int length = round(locseg->seg.h);
-  
+
   int i;
 
   Local_Neuroseg_Plane *locnp = New_Local_Neuroseg_Plane();
 
   Local_Neuroseg_To_Plane(locseg, 0.0, locnp);
-  Geo3d_Scalar_Field *field = 
+  Geo3d_Scalar_Field *field =
     Local_Neuroseg_Plane_Field(locnp, 0.2 * locnp->np.r, NULL);
- 
+
   Stack_Fit_Score fs;
   fs.n = 1;
   fs.options[0] = 1;
 
-  double score = 
+  double score =
     Geo3d_Scalar_Field_Stack_Score(field, stack, z_scale, &fs);
   Kill_Geo3d_Scalar_Field(field);
 
@@ -2036,7 +2036,7 @@ int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg,
   }
 
   Delete_Local_Neuroseg_Plane(locnp);
-  
+
   Set_Neuroseg_Position(locseg, pos, NEUROSEG_BOTTOM);
 
 #ifdef _DEBUG_2
@@ -2049,7 +2049,7 @@ int Local_Neuroseg_Height_Search_P(Local_Neuroseg *locseg,
   return (old_height != locseg->seg.h);
 }
 
-int Local_Neuroseg_Height_Search_W(Local_Neuroseg *locseg, 
+int Local_Neuroseg_Height_Search_W(Local_Neuroseg *locseg,
 				   const Stack *stack, double z_scale,
 				   Locseg_Score_Workspace *sws)
 {
@@ -2102,16 +2102,16 @@ int Local_Neuroseg_Height_Search_E(Local_Neuroseg *locseg, int base,
   return 1;
 }
 
-_BOOL_ Local_Neuroseg_Good_Score(Local_Neuroseg *locseg, double score, 
+_BOOL_ Local_Neuroseg_Good_Score(Local_Neuroseg *locseg, double score,
 			       double min_score)
 {
-  double cal_score = min_score * 
+  double cal_score = min_score *
     (1.0 + 1.0 / (2.0 + exp(4.0 - NEUROSEG_CRC(&(locseg->seg)))));
 
   return score > cal_score;
 }
 
-Local_Neuroseg* Next_Local_Neuroseg(const Local_Neuroseg *locseg1, 
+Local_Neuroseg* Next_Local_Neuroseg(const Local_Neuroseg *locseg1,
 				    Local_Neuroseg *locseg2, double pos_step)
 {
   if (locseg2 == NULL) {
@@ -2119,9 +2119,9 @@ Local_Neuroseg* Next_Local_Neuroseg(const Local_Neuroseg *locseg1,
   }
 
   Next_Neuroseg(&(locseg1->seg), &(locseg2->seg), pos_step);
-  
+
   double bottom[3];
-  Local_Neuroseg_Axis_Position(locseg1, bottom, 
+  Local_Neuroseg_Axis_Position(locseg1, bottom,
 			       pos_step * (locseg1->seg.h - 1.0));
   Set_Neuroseg_Position(locseg2, bottom, NEUROSEG_BOTTOM);
 
@@ -2182,7 +2182,7 @@ void Local_Neuroseg_Fprint_Vrml(const Local_Neuroseg *locseg, FILE *stream)
   rotate_axis[0] = cos(locseg->seg.psi);
   rotate_axis[1] = sin(locseg->seg.psi);
   rotate_axis[2] = 0.0;
-  fprintf(stream, "rotation %.4f %.4f %.4f %.4f\n", 
+  fprintf(stream, "rotation %.4f %.4f %.4f %.4f\n",
 	  rotate_axis[0], rotate_axis[1], rotate_axis[2], locseg->seg.theta);
   */
 
@@ -2205,7 +2205,7 @@ void Local_Neuroseg_Fprint_Vrml(const Local_Neuroseg *locseg, FILE *stream)
   fprintf(stream, "}\n");
 }
 
-static void local_neuroseg_field_shift(const Local_Neuroseg *locseg, 
+static void local_neuroseg_field_shift(const Local_Neuroseg *locseg,
 				       double *offset)
 {
   double pos[2][3];
@@ -2229,12 +2229,12 @@ static void local_neuroseg_field_shift(const Local_Neuroseg *locseg,
   offset[1] = pos[1][1] - pos[0][1];
   offset[2] = pos[1][2] - pos[0][2];
 
-  //  printf("field shift: %g %g %g\n", offset[0], offset[1], offset[2]); 
+  //  printf("field shift: %g %g %g\n", offset[0], offset[1], offset[2]);
 }
 
 
 
-Geo3d_Scalar_Field* Local_Neuroseg_Field_S(const Local_Neuroseg *locseg, 
+Geo3d_Scalar_Field* Local_Neuroseg_Field_S(const Local_Neuroseg *locseg,
 					   Neuroseg_Field_f field_func,
 					   Geo3d_Scalar_Field *field)
 {
@@ -2248,7 +2248,7 @@ Geo3d_Scalar_Field* Local_Neuroseg_Field_S(const Local_Neuroseg *locseg,
   return field;
 }
 
-Geo3d_Scalar_Field* Local_Neuroseg_Field_Sp(const Local_Neuroseg *locseg, 
+Geo3d_Scalar_Field* Local_Neuroseg_Field_Sp(const Local_Neuroseg *locseg,
 					    Neuroseg_Field_f field_func,
 					    Geo3d_Scalar_Field *field)
 {
@@ -2279,20 +2279,16 @@ Geo3d_Ball* Local_Neuroseg_Ball_Bound(const Local_Neuroseg *locseg,
 				      Geo3d_Ball *ball)
 {
   if (ball == NULL) {
-#ifdef _MSC_VER
     ball = New_Geo3d_Ball();
-#else
-    ball = New_Geo3d_Ball(ball);
-#endif
   }
-  
+
   Local_Neuroseg_Center(locseg, ball->center);
   ball->r = Neuroseg_Ball_Range(&(locseg->seg)) / 2.0;
-  
+
   return ball;
 }
 
-void Local_Neuroseg_From_Geo3d_Circle(Local_Neuroseg *locseg, 
+void Local_Neuroseg_From_Geo3d_Circle(Local_Neuroseg *locseg,
 				      const Geo3d_Circle *circle)
 {
   locseg->seg.r1 = circle->radius;
@@ -2304,16 +2300,16 @@ void Local_Neuroseg_From_Geo3d_Circle(Local_Neuroseg *locseg,
   Set_Neuroseg_Position(locseg, circle->center, NEUROSEG_CENTER);
 }
 
-double* Local_Neuroseg_Height_Profile(const Local_Neuroseg *locseg, 
+double* Local_Neuroseg_Height_Profile(const Local_Neuroseg *locseg,
 				      const Stack *stack, double z_scale,
-				      int n, int option, 
+				      int n, int option,
 				      Neuroseg_Field_f field_func,
 				      double *profile)
 {
   if (profile == NULL) {
     profile = darray_malloc(n);
   }
-  
+
   double step = locseg->seg.h / n;
   int i;
   double z = 0.0;
@@ -2332,7 +2328,7 @@ double* Local_Neuroseg_Height_Profile(const Local_Neuroseg *locseg,
   return profile;
 }
 
-int Local_Neuroseg_Param_Array(const Local_Neuroseg *locseg, double z_scale, 
+int Local_Neuroseg_Param_Array(const Local_Neuroseg *locseg, double z_scale,
 			       double *param)
 {
   int i;
@@ -2343,11 +2339,11 @@ int Local_Neuroseg_Param_Array(const Local_Neuroseg *locseg, double z_scale,
   }
 
   param[LOCAL_NEUROSEG_NPARAM] = z_scale;
-  
+
   return LOCAL_NEUROSEG_NPARAM + 1;
 }
 
-int Local_Neuroseg_Param_Array_W(const Local_Neuroseg *seg, double z_scale, 
+int Local_Neuroseg_Param_Array_W(const Local_Neuroseg *seg, double z_scale,
 				 const double *weight, double *param)
 {
   int i;
@@ -2358,7 +2354,7 @@ int Local_Neuroseg_Param_Array_W(const Local_Neuroseg *seg, double z_scale,
   }
 
   param[LOCAL_NEUROSEG_NPARAM] = z_scale;
-  
+
   return LOCAL_NEUROSEG_NPARAM + 1;
 }
 
@@ -2410,23 +2406,23 @@ double Local_Neuroseg_Score_Gv(const double *var, const void *param)
 double Local_Neuroseg_Score_R(const double *var, const void *param)
 {
   void **param_array = (void**) param;
-  
+
   Stack *stack = (Stack *) param_array[0];
-  Locseg_Score_Workspace *ws = 
+  Locseg_Score_Workspace *ws =
     (Locseg_Score_Workspace *) param_array[1];
-  
+
   Local_Neuroseg seg;// = New_Local_Neuroseg();
   int i;
   for (i = 0; i < LOCAL_NEUROSEG_NPARAM; i++) {
     Local_Neuroseg_Set_Var(&seg, i, var[i]);
   }
-  
+
   double z_scale = var[LOCAL_NEUROSEG_NPARAM];
-  
+
   double score = Local_Neuroseg_Score_W(&seg, stack, z_scale, ws);
-  
+
   //Delete_Local_Neuroseg(seg);
-  
+
   return score;
 }
 
@@ -2480,7 +2476,7 @@ Local_Neuroseg* Local_Neuroseg_From_Plane(Local_Neuroseg *locseg,
   }
   double center[3];
   Local_Neuroseg_Plane_Center(locnp, center);
-  Set_Local_Neuroseg(locseg, locnp->np.r, locnp->np.r, 1.0, 
+  Set_Local_Neuroseg(locseg, locnp->np.r, locnp->np.r, 1.0,
 		     locnp->np.theta, locnp->np.psi,
 		     0.0, 0.0, 1.0, center[0], center[1], center[2]);
 
@@ -2489,7 +2485,7 @@ Local_Neuroseg* Local_Neuroseg_From_Plane(Local_Neuroseg *locseg,
 
 Geo3d_Circle* Local_Neuroseg_To_Circle(const Local_Neuroseg *locseg,
 				       Neuropos_Reference_e ref, int option,
-				       Geo3d_Circle *sc) 
+				       Geo3d_Circle *sc)
 {
   if (sc == NULL) {
     sc = New_Geo3d_Circle();
@@ -2513,13 +2509,13 @@ Geo3d_Circle* Local_Neuroseg_To_Circle(const Local_Neuroseg *locseg,
     break;
   }
 
-  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi); 
+  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi);
 
   return sc;
 }
 
-Geo3d_Circle* 
-Local_Neuroseg_To_Circle_Z(const Local_Neuroseg *locseg, 
+Geo3d_Circle*
+Local_Neuroseg_To_Circle_Z(const Local_Neuroseg *locseg,
 			   double z, int option, Geo3d_Circle *circle)
 {
   if (circle == NULL) {
@@ -2539,7 +2535,7 @@ Local_Neuroseg_To_Circle_Z(const Local_Neuroseg *locseg,
   if (r <= 0.0) {
     return NULL;
   } else {
-    circle->radius = NEUROSEG_RADIUS(&(locseg->seg), z) 
+    circle->radius = NEUROSEG_RADIUS(&(locseg->seg), z)
       * sqrt(locseg->seg.scale);
     Local_Neuroseg_Axis_Position(locseg, circle->center, z);
   }
@@ -2547,8 +2543,8 @@ Local_Neuroseg_To_Circle_Z(const Local_Neuroseg *locseg,
   return circle;
 }
 
-Geo3d_Circle* 
-Local_Neuroseg_To_Circle_T(const Local_Neuroseg *locseg, 
+Geo3d_Circle*
+Local_Neuroseg_To_Circle_T(const Local_Neuroseg *locseg,
 			   double t, int option, Geo3d_Circle *circle)
 {
   double z = (locseg->seg.h - 1.0) * t;
@@ -2556,8 +2552,8 @@ Local_Neuroseg_To_Circle_T(const Local_Neuroseg *locseg,
   return Local_Neuroseg_To_Circle_Z(locseg, z, option, circle);
 }
 
-Local_Neuroseg_Ellipse* 
-Local_Neuroseg_To_Ellipse_Z(const Local_Neuroseg *locseg, 
+Local_Neuroseg_Ellipse*
+Local_Neuroseg_To_Ellipse_Z(const Local_Neuroseg *locseg,
 			    double z, Local_Neuroseg_Ellipse *locnp)
 {
   if (locnp == NULL) {
@@ -2570,7 +2566,7 @@ Local_Neuroseg_To_Ellipse_Z(const Local_Neuroseg *locseg,
   if (r <= 0.0) {
     return NULL;
   } else {
-    Set_Neuroseg_Ellipse(&(locnp->np), r * locseg->seg.scale, r, 
+    Set_Neuroseg_Ellipse(&(locnp->np), r * locseg->seg.scale, r,
 			 locseg->seg.theta, locseg->seg.psi,
 			 locseg->seg.alpha, 0.0, 0.0);
     Local_Neuroseg_Axis_Position(locseg, locnp->pos, z);
@@ -2579,35 +2575,35 @@ Local_Neuroseg_To_Ellipse_Z(const Local_Neuroseg *locseg,
   return locnp;
 }
 
-Local_Neuroseg_Ellipse* 
-Local_Neuroseg_To_Ellipse_T(const Local_Neuroseg *locseg, 
+Local_Neuroseg_Ellipse*
+Local_Neuroseg_To_Ellipse_T(const Local_Neuroseg *locseg,
 			    double t, Local_Neuroseg_Ellipse *locnp)
 {
   double z = (locseg->seg.h - 1.0) * t;
-  
+
   return Local_Neuroseg_To_Ellipse_Z(locseg, z, locnp);
 }
 
-Local_Neuroseg_Ellipse* 
-Local_Neuroseg_Central_Ellipse(const Local_Neuroseg *locseg, 
+Local_Neuroseg_Ellipse*
+Local_Neuroseg_Central_Ellipse(const Local_Neuroseg *locseg,
 			       Local_Neuroseg_Ellipse *locnp)
 {
-  return Local_Neuroseg_To_Ellipse_Z(locseg, (locseg->seg.h - 1.0) / 2.0, 
+  return Local_Neuroseg_To_Ellipse_Z(locseg, (locseg->seg.h - 1.0) / 2.0,
 				     locnp);
 }
 
-coordinate_3d_t* 
+coordinate_3d_t*
 Local_Neuroseg_Halo_Points(const Local_Neuroseg *locseg,
 			   int nsample, coordinate_3d_t *pts)
 {
   if (pts == NULL) {
-    pts = (coordinate_3d_t *) 
+    pts = (coordinate_3d_t *)
       Guarded_Malloc(sizeof(coordinate_3d_t) * nsample,
 		     "Local_Neuroseg_Halo_Points");
   }
 
   Local_Neuroseg_Ellipse *locne = Local_Neuroseg_Central_Ellipse(locseg, NULL);
-        
+
   Local_Neuroseg_Ellipse_Points(locne, nsample, 0, pts);
 
   Delete_Local_Neuroseg_Ellipse(locne);
@@ -2619,16 +2615,16 @@ void Local_Neuroseg_Scale_Z(Local_Neuroseg *locseg, double z_scale)
 {
   locseg->pos[2] /= z_scale;
   coordinate_3d_t normal;
-  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi, 
+  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi,
 			   normal, normal + 1, normal + 2);
-  Neuroseg_Set_Model_Height(&(locseg->seg), 
-      Neuroseg_Model_Height(&(locseg->seg)) * 
+  Neuroseg_Set_Model_Height(&(locseg->seg),
+      Neuroseg_Model_Height(&(locseg->seg)) *
       sqrt(1.0 + (dsqr(1.0 / z_scale) - 1.0) * dsqr(normal[2])));
-		      
+
   //locseg->seg.h *= sqrt(1.0 + (dsqr(1.0 / z_scale) - 1.0) * dsqr(normal[2]));
   /* cross section stretch for z scale */
   ASSERT(locseg->seg.alpha == 0.0, "Alpha not allowed yet.");
-  double factor = sqrt(dsqr(cos(locseg->seg.theta)) + 
+  double factor = sqrt(dsqr(cos(locseg->seg.theta)) +
 		       dsqr(sin(locseg->seg.theta) / z_scale));
   /* make sure that the tube is not destorted by PSF */
   //if (locseg->seg.scale > factor) {
@@ -2639,7 +2635,7 @@ void Local_Neuroseg_Scale_Z(Local_Neuroseg *locseg, double z_scale)
 
   normal[2] /= z_scale;
   Coordinate_3d_Unitize(normal);
-  Geo3d_Normal_Orientation(normal[0], normal[1], normal[2], 
+  Geo3d_Normal_Orientation(normal[0], normal[1], normal[2],
 			   &(locseg->seg.theta), &(locseg->seg.psi));
 }
 
@@ -2649,25 +2645,25 @@ void Local_Neuroseg_Scale_XY(Local_Neuroseg *locseg, double xy_scale)
   locseg->pos[1] *= xy_scale;
 
   coordinate_3d_t normal;
-  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi, 
+  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi,
 			   normal, normal + 1, normal + 2);
 
-  double s = sqrt(dsqr(normal[0] * xy_scale) + 
+  double s = sqrt(dsqr(normal[0] * xy_scale) +
 		  dsqr(normal[1] * xy_scale) +
 		  dsqr(normal[2]));
 
-  Neuroseg_Set_Model_Height(&(locseg->seg), 
+  Neuroseg_Set_Model_Height(&(locseg->seg),
       s * Neuroseg_Model_Height(&(locseg->seg)));
 
   /*
-  locseg->seg.h *= sqrt(dsqr(normal[0] * xy_scale) + 
+  locseg->seg.h *= sqrt(dsqr(normal[0] * xy_scale) +
 			dsqr(normal[1] * xy_scale) +
 			dsqr(normal[2]));
   */
 
   /* cross section stretch for z scale */
   ASSERT(locseg->seg.alpha == 0.0, "Alpha not allowed yet.");
-  double factor = sqrt(dsqr(cos(locseg->seg.theta) * xy_scale) + 
+  double factor = sqrt(dsqr(cos(locseg->seg.theta) * xy_scale) +
 		       dsqr(sin(locseg->seg.theta)));
 
   locseg->seg.r1 = locseg->seg.r1 * factor;
@@ -2676,11 +2672,11 @@ void Local_Neuroseg_Scale_XY(Local_Neuroseg *locseg, double xy_scale)
   normal[0] *= xy_scale;
   normal[1] *= xy_scale;
   Coordinate_3d_Unitize(normal);
-  Geo3d_Normal_Orientation(normal[0], normal[1], normal[2], 
+  Geo3d_Normal_Orientation(normal[0], normal[1], normal[2],
 			   &(locseg->seg.theta), &(locseg->seg.psi));
 }
 
-void Local_Neuroseg_Scale(Local_Neuroseg *locseg, double xy_scale, 
+void Local_Neuroseg_Scale(Local_Neuroseg *locseg, double xy_scale,
 			  double z_scale)
 {
   if ((xy_scale != 1.0) || (z_scale != 1.0)) {
@@ -2689,23 +2685,23 @@ void Local_Neuroseg_Scale(Local_Neuroseg *locseg, double xy_scale,
     locseg->pos[2] *= z_scale;
 
     coordinate_3d_t normal;
-    Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi, 
+    Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi,
 			     normal, normal + 1, normal + 2);
-    
-    double s = sqrt(dsqr(normal[0] * xy_scale) + 
+
+    double s = sqrt(dsqr(normal[0] * xy_scale) +
 		    dsqr(normal[1] * xy_scale) +
 		    dsqr(normal[2] * z_scale));
-    
-    Neuroseg_Set_Model_Height(&(locseg->seg), 
+
+    Neuroseg_Set_Model_Height(&(locseg->seg),
 	s * Neuroseg_Model_Height(&(locseg->seg)));
 
     /*
-    locseg->seg.h *= sqrt(dsqr(normal[0] * xy_scale) + 
+    locseg->seg.h *= sqrt(dsqr(normal[0] * xy_scale) +
 			  dsqr(normal[1] * xy_scale) +
 			  dsqr(normal[2] * z_scale));
     */
     ASSERT(locseg->seg.alpha == 0.0, "Alpha not allowed yet.");
-    double factor = sqrt(dsqr(cos(locseg->seg.theta) * xy_scale) + 
+    double factor = sqrt(dsqr(cos(locseg->seg.theta) * xy_scale) +
 			 dsqr(sin(locseg->seg.theta) * z_scale));
 
     locseg->seg.r1 *= factor;
@@ -2715,8 +2711,8 @@ void Local_Neuroseg_Scale(Local_Neuroseg *locseg, double xy_scale,
     normal[1] *= xy_scale;
     normal[2] *= z_scale;
     Coordinate_3d_Unitize(normal);
-    Geo3d_Normal_Orientation(normal[0], normal[1], normal[2], 
-			     &(locseg->seg.theta), &(locseg->seg.psi));  
+    Geo3d_Normal_Orientation(normal[0], normal[1], normal[2],
+			     &(locseg->seg.theta), &(locseg->seg.psi));
   }
 }
 
@@ -2741,15 +2737,15 @@ void Local_Neuroseg_Change_Top(Local_Neuroseg *locseg, const double *new_top)
   }
   locseg->seg.h = h + 1.0;
   //ASSERT(locseg->seg.h >= 1.0, "invalid height");
-  
+
 
   Geo3d_Normal_Orientation(axis_vector[0], axis_vector[1], axis_vector[2],
 			   &(locseg->seg.theta), &(locseg->seg.psi));
 
-  Set_Neuroseg_Position(locseg, new_top, NEUROSEG_TOP);  
+  Set_Neuroseg_Position(locseg, new_top, NEUROSEG_TOP);
 }
 
-void Local_Neuroseg_Change_Bottom(Local_Neuroseg *locseg, 
+void Local_Neuroseg_Change_Bottom(Local_Neuroseg *locseg,
 				  const double *new_bottom)
 {
   double top[3];
@@ -2774,7 +2770,7 @@ void Local_Neuroseg_Change_Bottom(Local_Neuroseg *locseg,
   Geo3d_Normal_Orientation(axis_vector[0], axis_vector[1], axis_vector[2],
 			   &(locseg->seg.theta), &(locseg->seg.psi));
 
-  Set_Neuroseg_Position(locseg, new_bottom, NEUROSEG_BOTTOM);  
+  Set_Neuroseg_Position(locseg, new_bottom, NEUROSEG_BOTTOM);
 }
 
 void Local_Neuroseg_Set_Bottom_Top(Local_Neuroseg *locseg, const double *bottom,
@@ -2811,7 +2807,7 @@ void Local_Neuroseg_Break_Gap(Local_Neuroseg *locseg,
 			      const Stack *stack, double z_scale)
 {
   int n = 11;
-  
+
   double *profile = Local_Neuroseg_Height_Profile(locseg, stack, z_scale, n,
 						  STACK_FIT_MEAN_SIGNAL,
 						  NULL, NULL);
@@ -2856,7 +2852,7 @@ void Local_Neuroseg_Chop(Local_Neuroseg *locseg, double ratio)
   } else { /* top half */
     Local_Neuroseg_Top(locseg, pos);
     locseg->seg.h *= -ratio;
-    locseg->seg.r1 = NEUROSEG_RADIUS(&(locseg->seg), locseg->seg.h); 
+    locseg->seg.r1 = NEUROSEG_RADIUS(&(locseg->seg), locseg->seg.h);
     if (Neuropos_Reference != NEUROSEG_TOP) {
       Set_Neuroseg_Position(locseg, pos, NEUROSEG_TOP);
     }
@@ -2877,14 +2873,14 @@ void Local_Neuroseg_Chop(Local_Neuroseg *locseg, double ratio)
   } else { /* top half */
     Local_Neuroseg_Top(locseg, pos);
     locseg->seg.h = -(locseg->seg.h - 1.0) * ratio + 1.0;
-    locseg->seg.r1 = NEUROSEG_RADIUS(&(locseg->seg), locseg->seg.h - 1.0); 
+    locseg->seg.r1 = NEUROSEG_RADIUS(&(locseg->seg), locseg->seg.h - 1.0);
     if (Neuropos_Reference != NEUROSEG_TOP) {
       Set_Neuroseg_Position(locseg, pos, NEUROSEG_TOP);
     }
   }
 }
 
-double Local_Neuroseg_Average_Signal(const Local_Neuroseg *locseg, 
+double Local_Neuroseg_Average_Signal(const Local_Neuroseg *locseg,
 				     const Stack *stack, double z_scale)
 {
   Stack_Fit_Score fs;
@@ -2894,7 +2890,7 @@ double Local_Neuroseg_Average_Signal(const Local_Neuroseg *locseg,
   return fs.scores[0];
 }
 
-double Local_Neuroseg_Average_Weak_Signal(const Local_Neuroseg *locseg, 
+double Local_Neuroseg_Average_Weak_Signal(const Local_Neuroseg *locseg,
 					  const Stack *stack, double z_scale)
 {
   Stack_Fit_Score fs;
@@ -2907,7 +2903,7 @@ double Local_Neuroseg_Average_Weak_Signal(const Local_Neuroseg *locseg,
 /*
 void Local_Neuroseg_To_Geo3d_Circle(const Local_Neuroseg *locseg,
 				    Geo3d_Circle *sc,
-				    Neuropos_Reference_e ref) 
+				    Neuropos_Reference_e ref)
 {
   sc->radius = Neuroseg_Rx(&(locseg->seg), ref);
 
@@ -2929,16 +2925,16 @@ void Local_Neuroseg_To_Geo3d_Circle(const Local_Neuroseg *locseg,
     break;
   }
 
-  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi); 
+  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi);
 }
 
 void Local_Neuroseg_To_Geo3d_Circle_Z(const Local_Neuroseg *locseg,
 				      Geo3d_Circle *sc,
-				      double z) 
+				      double z)
 {
   sc->radius = NEUROSEG_RADIUS(&(locseg->seg), z) * locseg->seg.scale;
   Local_Neuroseg_Axis_Position(locseg, sc->center, z);
-  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi); 
+  Set_Xz_Orientation(sc->orientation, locseg->seg.theta, locseg->seg.psi);
 }
 void Local_Neuroseg_To_Geo3d_Circle_S(const Local_Neuroseg *locseg,
 				      Geo3d_Circle *sc,
@@ -2993,7 +2989,7 @@ int Local_Neuroseg_Stack_Feature(Local_Neuroseg *locseg, Stack *stack,
 {
   /* alloc <Geo3d_Scalar_Field> */
   Geo3d_Scalar_Field *field = Local_Neuroseg_Field_S(locseg, NULL, NULL);
-  
+
   int nfeat = 0;
 
   Stack_Fit_Score fs;
@@ -3011,12 +3007,12 @@ int Local_Neuroseg_Stack_Feature(Local_Neuroseg *locseg, Stack *stack,
   }
 
   double *signal = darray_malloc(field->size);
- 
+
   if (z_scale == 1.0) {
-    Stack_Points_Sampling(stack, Coordinate_3d_Double_Array(field->points), 
+    Stack_Points_Sampling(stack, Coordinate_3d_Double_Array(field->points),
 			  field->size, signal);
   } else {
-    Stack_Points_Sampling_Z(stack, z_scale, 
+    Stack_Points_Sampling_Z(stack, z_scale,
 			    Coordinate_3d_Double_Array(field->points),
 			    field->size, signal);
   }
@@ -3032,10 +3028,10 @@ int Local_Neuroseg_Stack_Feature(Local_Neuroseg *locseg, Stack *stack,
   free(signal);
 
   double ort[3];
-  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi, 
+  Geo3d_Orientation_Normal(locseg->seg.theta, locseg->seg.psi,
 			   ort, ort + 1, ort + 2);
 
-  feats[nfeat++] = 
+  feats[nfeat++] =
     fabs(Geo3d_Dot_Product(vec[0], vec[1], vec[2], ort[0], ort[1], ort[2]));
 
   feats[nfeat++] = fabs(ext[0]);
@@ -3047,7 +3043,7 @@ int Local_Neuroseg_Stack_Feature(Local_Neuroseg *locseg, Stack *stack,
   Local_Neuroseg_Height_Profile(locseg, stack, z_scale, nprofile, 1, NULL,
 				feats + nfeat);
   nfeat += nprofile;
-  
+
   /* free <Geo3d_Scalar_Field> */
   Kill_Geo3d_Scalar_Field(field);
 
@@ -3060,7 +3056,7 @@ int Local_Neuroseg_Stack_Feature(Local_Neuroseg *locseg, Stack *stack,
  *         2 - size search
  *         3 - no size search or position search
  */
-double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack, 
+double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack,
 			       double z_scale, int option)
 {
   Stack_Fit_Score fs;
@@ -3072,7 +3068,7 @@ double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack,
     Local_Neuroseg_Position_Adjust(locseg, stack, z_scale);
   }
 
-  Local_Neuroseg_Orientation_Search_C(locseg, stack, z_scale, &fs); 
+  Local_Neuroseg_Orientation_Search_C(locseg, stack, z_scale, &fs);
 
   if (option <= 1) {
     for (i = 0; i < 5; i++) {
@@ -3101,32 +3097,32 @@ double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack,
 #endif
   */
 
-  
+
   int nvar;
 
   /*
-  nvar = 
+  nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R | NEUROSEG_VAR_MASK_SCALE,
 				     NEUROPOS_VAR_MASK_NONE,
 				     var_index);
   Fit_Local_Neuroseg_P(locseg, stack, var_index, nvar, NULL, z_scale, NULL);
   */
   /*
-  nvar = 
+  nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_NONE,
 				     NEUROPOS_VAR_MASK_ALL,
 				     var_index);
   Fit_Local_Neuroseg_P(locseg, stack, var_index, nvar, NULL, z_scale, NULL);
   */
   /*
-  nvar = 
+  nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R1 |
 				     NEUROSEG_VAR_MASK_ORIENTATION,
 				     NEUROPOS_VAR_MASK_NONE,
 				     var_index);
   Fit_Local_Neuroseg_P(locseg, stack, var_index, nvar, var_link, z_scale, NULL);
   */
-  nvar = 
+  nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R |
 				     NEUROSEG_VAR_MASK_ORIENTATION |
 				     //			     NEUROSEG_VAR_MASK_ALPHA |
@@ -3134,10 +3130,10 @@ double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack,
 				     NEUROPOS_VAR_MASK_NONE,
 				     var_index);
   int *var_link = NULL;
-  double score = Fit_Local_Neuroseg_P(locseg, stack, var_index, nvar, var_link, 
+  double score = Fit_Local_Neuroseg_P(locseg, stack, var_index, nvar, var_link,
 				      z_scale, NULL);
   /*
-  nvar = 
+  nvar =
     Local_Neuroseg_Var_Mask_To_Index(NEUROSEG_VAR_MASK_R1,
 				     NEUROPOS_VAR_MASK_NONE,
 				     var_index);
@@ -3146,7 +3142,7 @@ double Local_Neuroseg_Optimize(Local_Neuroseg *locseg, const Stack *stack,
   return score;
 }
 
-double Local_Neuroseg_Optimize_W(Local_Neuroseg *locseg, const Stack *stack, 
+double Local_Neuroseg_Optimize_W(Local_Neuroseg *locseg, const Stack *stack,
 				 double z_scale, int option,
 				 Locseg_Fit_Workspace *ws)
 {
@@ -3159,7 +3155,7 @@ double Local_Neuroseg_Optimize_W(Local_Neuroseg *locseg, const Stack *stack,
     Local_Neuroseg_Position_Adjust(locseg, stack, z_scale);
   }
 
-  Local_Neuroseg_Orientation_Search_C(locseg, stack, z_scale, &fs); 
+  Local_Neuroseg_Orientation_Search_C(locseg, stack, z_scale, &fs);
 
   if (option <= 1) {
     for (i = 0; i < 3; i++) {
@@ -3191,7 +3187,7 @@ double Local_Neuroseg_Array_Maxr(Local_Neuroseg *locseg, int length)
   return maxr;
 }
 
-int Local_Neuroseg_Hit_Mask(const Local_Neuroseg *locseg, 
+int Local_Neuroseg_Hit_Mask(const Local_Neuroseg *locseg,
 			    const Stack *stack, double z_scale)
 {
   /*
@@ -3205,7 +3201,7 @@ int Local_Neuroseg_Hit_Mask(const Local_Neuroseg *locseg,
   }
 
   Local_Neuroseg_Halo_Points(locseg, 8, pts + 5);
-  
+
   for (i = 0; i < 13; i++) {
     int x = iround(pts[i][0]);
     int y = iround(pts[i][1]);
@@ -3219,16 +3215,16 @@ int Local_Neuroseg_Hit_Mask(const Local_Neuroseg *locseg,
 
   coordinate_3d_t pts[11];
   int i;
-  
+
   double astep = locseg->seg.h / 6.0;
   double z = locseg->seg.h / 3.0;
   for (i = 0; i < 3; i++) {
     Local_Neuroseg_Axis_Position(locseg, pts[i], z);
     z += astep;
   }
-  
+
   Local_Neuroseg_Halo_Points(locseg, 8, pts + 1);
-  
+
   for (i = 0; i < 11; i++) {
     int x = iround(pts[i][0]);
     int y = iround(pts[i][1]);
@@ -3242,32 +3238,32 @@ int Local_Neuroseg_Hit_Mask(const Local_Neuroseg *locseg,
   return 0;
 }
 
-double Local_Neuroseg_Center_Sample(const Local_Neuroseg *locseg, 
+double Local_Neuroseg_Center_Sample(const Local_Neuroseg *locseg,
 				    const Stack *stack, double z_scale)
 {
   double center[3];
   Local_Neuroseg_Center(locseg, center);
-  
+
   return Stack_Point_Sampling(stack, center[0], center[1], center[2] * z_scale);
 }
 
 /* under testing */
-double Local_Neuroseg_Top_Sample(const Local_Neuroseg *locseg, 
+double Local_Neuroseg_Top_Sample(const Local_Neuroseg *locseg,
 				 const Stack *stack, double z_scale)
 {
   double pos[3];
   Local_Neuroseg_Top(locseg, pos);
-  
-  double value = 
+
+  double value =
     Stack_Point_Sampling(stack, pos[0], pos[1], pos[2] * z_scale);
 
   double lambda;
   for (lambda = 0.6; lambda < 0.95; lambda += 0.1) {
     Local_Neuroseg_Axis_Position(locseg, pos, locseg->seg.h * lambda);
 
-    double value2 = 
+    double value2 =
       Stack_Point_Sampling(stack, pos[0], pos[1], pos[2] * z_scale);
-    
+
     if (value2 > value) {
       value = value2;
     }
@@ -3286,7 +3282,7 @@ double Local_Neuroseg_Planar_Dist(const Local_Neuroseg *locseg1,
   Local_Neuroseg_Top(locseg1, top1);
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-  
+
   double int1, int2;
   int cond;
   return Geo3d_Lineseg_Lineseg_Dist(bottom1, top1, bottom2, top2,
@@ -3303,11 +3299,11 @@ double Local_Neuroseg_Planar_Dist_L(const Local_Neuroseg *locseg1,
   Local_Neuroseg_Top(locseg1, top1);
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-  
+
   return Geo3d_Line_Line_Dist(bottom1, top1, bottom2, top2);
 }
 
-void Local_Neuroseg_Stretch(Local_Neuroseg *locseg, double scale, 
+void Local_Neuroseg_Stretch(Local_Neuroseg *locseg, double scale,
 			    double offset, int direction)
 {
   double pos[3];
@@ -3315,7 +3311,7 @@ void Local_Neuroseg_Stretch(Local_Neuroseg *locseg, double scale,
 
   switch(direction) {
   case -1: /* stretch backward */
-    Local_Neuroseg_Axis_Position(locseg, pos, 
+    Local_Neuroseg_Axis_Position(locseg, pos,
 	locseg->seg.h - 1.0 - new_height);
     Local_Neuroseg_Change_Bottom(locseg, pos);
     break;
@@ -3326,7 +3322,7 @@ void Local_Neuroseg_Stretch(Local_Neuroseg *locseg, double scale,
   case 0: /* stretch to both directions */
     Local_Neuroseg_Axis_Position(locseg, pos, new_height / 2.0);
     Local_Neuroseg_Change_Top(locseg, pos);
-    Local_Neuroseg_Axis_Position(locseg, pos, 
+    Local_Neuroseg_Axis_Position(locseg, pos,
 				 (locseg->seg.h - 1.0 - new_height) / 2.0);
     Local_Neuroseg_Change_Bottom(locseg, pos);
     break;
@@ -3388,17 +3384,17 @@ double Local_Neuroseg_Point_Dist(const Local_Neuroseg *locseg,
 
   double r = locseg->seg.r1;
 
-  double d2 = (tmp_pos[0] * tmp_pos[0]) / 
+  double d2 = (tmp_pos[0] * tmp_pos[0]) /
     (locseg->seg.scale * locseg->seg.scale) + tmp_pos[1] * tmp_pos[1];
   if (d2 <= r * r) {
     return fabs(tmp_pos[2]);
   } else {
     double rs = locseg->seg.r1 * locseg->seg.scale;
     /*
-    double step = 
+    double step =
       TZ_PI * res / (2.0 * locseg->seg.r1 * sqrt(locseg->seg.scale));
     double theta = 0.0;
-    
+
     double mindist = INFINITY;
     for (theta = 0.0; theta < TZ_2PI; theta += step) {
       double ex = rs * cos(theta);
@@ -3426,7 +3422,7 @@ double Local_Neuroseg_Point_Dist(const Local_Neuroseg *locseg,
 }
 
 double Local_Neuroseg_Lineseg_Dist(const Local_Neuroseg *locseg,
-				   const coordinate_3d_t start, 
+				   const coordinate_3d_t start,
 				   const coordinate_3d_t end, double res)
 {
   double step[3];
@@ -3452,7 +3448,7 @@ double Local_Neuroseg_Lineseg_Dist(const Local_Neuroseg *locseg,
       x += step[0];
       y += step[1];
       z += step[2];
-      
+
       double dist = Local_Neuroseg_Point_Dist(locseg, x, y, z, res);
       if (dist < mindist) {
 	mindist = dist;
@@ -3465,7 +3461,7 @@ double Local_Neuroseg_Lineseg_Dist(const Local_Neuroseg *locseg,
   return mindist;
 }
 
-double Local_Neuroseg_Dist2(const Local_Neuroseg *locseg1, 
+double Local_Neuroseg_Dist2(const Local_Neuroseg *locseg1,
 			    const Local_Neuroseg *locseg2, double *pos)
 {
   double bottom[3];
@@ -3477,7 +3473,7 @@ double Local_Neuroseg_Dist2(const Local_Neuroseg *locseg1,
 }
 
 double Local_Neuroseg_Lineseg_Dist_S(const Local_Neuroseg *locseg,
-				     const coordinate_3d_t start, 
+				     const coordinate_3d_t start,
 				     const coordinate_3d_t end,
 				     double *pos)
 {
@@ -3486,12 +3482,12 @@ double Local_Neuroseg_Lineseg_Dist_S(const Local_Neuroseg *locseg,
   double mindist = 0.0;
 
   double tmp_pos[3];
-  
+
   //Print_Local_Neuroseg(locseg);
   double res = 1.0;
 
   if (d < res) {
-    mindist = Local_Neuroseg_Point_Dist_S(locseg, 
+    mindist = Local_Neuroseg_Point_Dist_S(locseg,
 					  start[0], start[1], start[2],
 					  pos);
   } else {
@@ -3508,7 +3504,7 @@ double Local_Neuroseg_Lineseg_Dist_S(const Local_Neuroseg *locseg,
       x += step[0];
       y += step[1];
       z += step[2];
-      
+
       double dist = Local_Neuroseg_Point_Dist_S(locseg, x, y, z, tmp_pos);
       if (dist < mindist) {
 	mindist = dist;
@@ -3523,10 +3519,10 @@ double Local_Neuroseg_Lineseg_Dist_S(const Local_Neuroseg *locseg,
     //printf("%g %g %g\n", end[0], end[1], end[2]);
   }
 
-  return mindist;  
+  return mindist;
 }
 
-double Local_Neuroseg_Point_Dist_S(const Local_Neuroseg *locseg, 
+double Local_Neuroseg_Point_Dist_S(const Local_Neuroseg *locseg,
 				   double x, double y, double z,
 				   double *pt)
 {
@@ -3601,7 +3597,7 @@ double Local_Neuroseg_Point_Dist_S(const Local_Neuroseg *locseg,
 	rx = ry * locseg->seg.scale;
       }
       mindist = Ellipse_Point_Distance(tmp_pos[0], tmp_pos[1], rx, ry,
-				       &tmp_tx, &tmp_ty); 
+				       &tmp_tx, &tmp_ty);
       //mindist = d;
       //mindist = sqrt(tmp_pos[2] * tmp_pos[2] + d * d);
       tmp_tz = tmp_pos[2];
@@ -3640,7 +3636,7 @@ double Local_Neuroseg_Point_Dist_S(const Local_Neuroseg *locseg,
       pt[0] += locseg->pos[0];
       pt[1] += locseg->pos[1];
       pt[2] += locseg->pos[2];
-    }    
+    }
   } else {
     if (pt != NULL) {
       pt[0] = x;
@@ -3677,7 +3673,7 @@ double Local_Neuroseg_Point_Dist_S(const Local_Neuroseg *locseg,
 
 Stack* Local_Neuroseg_Stack(const Local_Neuroseg *locseg, const Stack *stack)
 {
-  int width = 
+  int width =
     iround(NEUROSEG_RB(&(locseg->seg)) * locseg->seg.scale * 2) * 2 + 1;
   int height = iround(NEUROSEG_RB(&(locseg->seg)) * 2) * 2 + 1;
   int depth = iround(locseg->seg.h);
@@ -3736,7 +3732,7 @@ Stack* Local_Neuroseg_Stack(const Local_Neuroseg *locseg, const Stack *stack)
 
 void Local_Neuroseg_Rotate(Local_Neuroseg *locseg, double theta, double psi)
 {
-  Geo3d_Rotate_Orientation(theta, psi, &(locseg->seg.theta), 
+  Geo3d_Rotate_Orientation(theta, psi, &(locseg->seg.theta),
 			   &(locseg->seg.psi));
 }
 
@@ -3747,41 +3743,41 @@ void Local_Neuroseg_Translate(Local_Neuroseg *locseg, const double *offset)
   locseg->pos[2] += offset[2];
 }
 
-double Local_Neuroseg_Intersect(const Local_Neuroseg *locseg1, 
+double Local_Neuroseg_Intersect(const Local_Neuroseg *locseg1,
 				const Local_Neuroseg *locseg2,
 				double *t1, double *t2)
 {
   double bottom1[3], top1[3];
   double bottom2[3], top2[3];
-  
+
   Local_Neuroseg_Bottom(locseg1, bottom1);
   Local_Neuroseg_Top(locseg1, top1);
 
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-  
+
   int cond;
   double dist = Geo3d_Lineseg_Lineseg_Dist(bottom1, top1, bottom2, top2,
 					   t1, t2, &cond);
-  
+
   return dist;
 }
 
 #define LOCAL_NEUROSEG_FIX_ON_EPS 1e-3
 
-Neuropos_Reference_e Local_Neuroseg_Fixon(const Local_Neuroseg *locseg1, 
-					   const Local_Neuroseg *locseg2, 
+Neuropos_Reference_e Local_Neuroseg_Fixon(const Local_Neuroseg *locseg1,
+					   const Local_Neuroseg *locseg2,
 					   double *t)
 {
   double bottom1[3], top1[3];
   double bottom2[3], top2[3];
-  
+
   Local_Neuroseg_Bottom(locseg1, bottom1);
   Local_Neuroseg_Top(locseg1, top1);
 
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-    
+
   double dist = Geo3d_Point_Lineseg_Dist(bottom1, bottom2, top2, t);
   Neuropos_Reference_e fix = NEUROSEG_BOTTOM;
   double mindist = dist;
@@ -3812,7 +3808,7 @@ int Local_Neuroseg_Tangent_Compare(const Local_Neuroseg *locseg1,
   Local_Neuroseg_Normal(locseg1, ort1);
   Local_Neuroseg_Normal(locseg2, ort2);
 
-  double ort_diff = Geo3d_Dist(ort1[0], ort1[1], ort1[2], 
+  double ort_diff = Geo3d_Dist(ort1[0], ort1[1], ort1[2],
 			       ort2[0], ort2[1], ort2[2]);
 
   if (Geo3d_Dist(pos1[0], pos1[1], pos1[2], pos2[0], pos2[1], pos2[2])
@@ -3858,9 +3854,9 @@ int Local_Neuroseg_Tangent_Compare(const Local_Neuroseg *locseg1,
   return -1;
 }
 
-double *Locseg_Conn_Feature(const Local_Neuroseg *locseg1, 
+double *Locseg_Conn_Feature(const Local_Neuroseg *locseg1,
 			    const Local_Neuroseg *locseg2,
-			    const Stack *stack, const double *res, 
+			    const Stack *stack, const double *res,
 			    double *feat, int *n)
 {
   TZ_ASSERT(locseg1 != NULL, "Null pointer.");
@@ -3870,7 +3866,7 @@ double *Locseg_Conn_Feature(const Local_Neuroseg *locseg1,
   if (feat == NULL) {
     feat = darray_malloc(*n);
   }
-  
+
   double bottom1[3], top1[3];
   double bottom2[3], top2[3];
 
@@ -3878,7 +3874,7 @@ double *Locseg_Conn_Feature(const Local_Neuroseg *locseg1,
   Local_Neuroseg_Top(locseg1, top1);
   Local_Neuroseg_Bottom(locseg2, bottom2);
   Local_Neuroseg_Top(locseg2, top2);
-  
+
   Local_Neuroseg *zlocseg1 = Copy_Local_Neuroseg(locseg1);
   Local_Neuroseg *zlocseg2 = Copy_Local_Neuroseg(locseg2);
 
@@ -3894,14 +3890,14 @@ double *Locseg_Conn_Feature(const Local_Neuroseg *locseg1,
   Local_Neuroseg_Top(zlocseg1, ztop1);
   Local_Neuroseg_Bottom(zlocseg2, zbottom2);
   Local_Neuroseg_Top(zlocseg2, ztop2);
-  
+
   /* anisotropic planar distance */
   feat[0] = Geo3d_Line_Line_Dist(zbottom1, ztop1, zbottom2, ztop2);
   //feat[0] *= res[0];
 
   /* isotropic planar distance */
   feat[1] = Geo3d_Line_Line_Dist(bottom1, top1, bottom2, top2);
-  
+
   double intersect1, intersect2;
   int cond;
 

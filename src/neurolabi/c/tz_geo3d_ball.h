@@ -47,16 +47,16 @@ void Geo3d_Ball_Draw_Stack(const Geo3d_Ball *ball, Stack *stack,
 		const Stack_Draw_Workspace *ws);
 
 #define GEO3D_BALL_FIELD_SIZE 515
-	
+
 Geo3d_Scalar_Field* Geo3d_Ball_Field(const Geo3d_Ball *ball,
     Geo3d_Scalar_Field *field);
 
-/**@brief Mean shift of a ball. 
+/**@brief Mean shift of a ball.
  */
-void Geo3d_Ball_Mean_Shift(Geo3d_Ball *ball, Stack *stack, double z_scale, 
+void Geo3d_Ball_Mean_Shift(Geo3d_Ball *ball, Stack *stack, double z_scale,
     double min_shift);
 
-void Geo3d_Ball_Label_Stack(const Geo3d_Ball *ball, Stack *stack, 
+void Geo3d_Ball_Label_Stack(const Geo3d_Ball *ball, Stack *stack,
     Geo3d_Ball_Label_Workspace *ws);
 
 __END_DECLS

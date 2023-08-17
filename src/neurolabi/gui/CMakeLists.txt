@@ -190,6 +190,7 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
+    target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-unused-but-set-variable)
 
     set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
 

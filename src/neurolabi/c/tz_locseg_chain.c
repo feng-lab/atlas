@@ -60,11 +60,7 @@ static void print_trace_message(const char *msg)
 
 Locseg_Chain* Copy_Locseg_Chain(Locseg_Chain *chain)
 {
-#ifdef _MSC_VER
   Locseg_Chain *chain_copy = New_Locseg_Chain();
-#else
-  Locseg_Chain *chain_copy = New_Locseg_Chain(chain);
-#endif
 
   Locseg_Chain_Iterator_Start(chain, DL_HEAD);
 

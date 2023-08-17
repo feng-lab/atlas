@@ -224,7 +224,7 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Waddress -Wdeprecated)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function
                          -Wno-unused-variable -Wno-sometimes-uninitialized -Wno-uninitialized -Wno-varargs
-                         -Wno-absolute-value)
+                         -Wno-absolute-value -Wno-unused-but-set-variable)
 endif (WIN32)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${GENELIB_DIR})

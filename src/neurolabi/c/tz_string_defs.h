@@ -12,7 +12,7 @@
 __BEGIN_DECLS
 
 #define MAX_LINE_DIM 1000 /* maximum length of a line can be */
-#define MAX_WORD_LENGTH 100 /* maximum length of a word can be. '\0' is 
+#define MAX_WORD_LENGTH 100 /* maximum length of a word can be. '\0' is
 			     * counted as a character in the word. */
 #define MAX_STRING_LENGTH 10000
 
@@ -34,7 +34,7 @@ void Default_String_Workspace(String_Workspace *sw);
 void Construct_String_Workspace(String_Workspace * sw, int size);
 void Clean_String_Workspace(String_Workspace * sw);
 
-String_Workspace* Make_String_Workspace();
+String_Workspace* Make_String_Workspace(int size);
 
 /* Functions defined in the macros */
 String_Workspace* New_String_Workspace();
