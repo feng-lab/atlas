@@ -2970,7 +2970,7 @@ def build_proxygen(src_dir: str, install_dir: str):
         bak_file4 = patch_file(orig_file4,
                                from_texts=[
                                    r"""${PROXYGEN_FBCODE_ROOT}
-    ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
+        ${PROXYGEN_GENERATED_ROOT}/proxygen/lib/http""",
                                    r'Boost::boost',
                                    r'Boost::iostreams',
                                    r'-lz',
