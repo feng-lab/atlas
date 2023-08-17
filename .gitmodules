@@ -136,3 +136,6 @@
 [submodule "src/3rdparty/proxygen"]
 	path = src/3rdparty/proxygen
 	url = https://github.com/facebook/proxygen.git
+[submodule "src/3rdparty/llfio"]
+	path = src/3rdparty/llfio
+	url = https://github.com/ned14/llfio.git
