@@ -378,10 +378,10 @@ else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress-of-temporary)
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
 
     set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
 

@@ -118,7 +118,7 @@ set(NEUTU_SOURCES
     zstackptr.cpp zstackptr.h
     geometry/zgeo3dtransform.cpp geometry/zgeo3dtransform.h
     zstackreader.cpp zstackreader.h
-    )
+)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 
@@ -186,13 +186,13 @@ else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Waddress-of-temporary)
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast -Wno-unused-parameter)
     target_compile_options(${LIBRARY_NAME} PUBLIC -mllvm -inline-threshold=600)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wshadow)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
-    target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-unknown-warning-option -Wno-unused-but-set-variable)
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-unused-but-set-variable
+                           -Wno-format -Wundefined-reinterpret-cast -Wno-unused-parameter)
 
-    set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS -Wno-shadow)
+    set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS "-Wno-shadow -Wno-misleading-indentation")
 
     if (APPLE)
       target_compile_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)
