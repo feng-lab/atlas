@@ -314,7 +314,7 @@ if (WIN32)
 
   target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${LIBRARY_NAME} PUBLIC /W4)
+  target_compile_options(${LIBRARY_NAME} PUBLIC /Wall)
   target_compile_options(${LIBRARY_NAME} PUBLIC /bigobj) # increases the number of sections that an object file can contain.
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
@@ -322,6 +322,13 @@ if (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd4828) # The file contains a character starting at offset 0x60 that is illegal in the current source character set (codepage 65001).
   target_compile_options(${LIBRARY_NAME} PUBLIC /wd5105) # macro expansion producing 'defined' has undefined behavior, from windows sdk
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd5219) # implicit conversion from 'type-1' to 'type-2', possible loss of data
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4242) # 'identifier' : conversion from 'type1' to 'type2', possible loss of data
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4464) # relative include path contains '..'
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd4266) # 'function': no override available for virtual member function from base 'type'; function is hidden
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd5039) # 'function': pointer or reference to potentially throwing function passed to extern C function under -EHc. Undefined behavior may occur if this function throws an exception.
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd5204) # A class with virtual functions has non-virtual trivial destructor.
+  target_compile_options(${LIBRARY_NAME} PUBLIC /wd5246) # 'member': the initialization of a subobject should be wrapped in braces
   target_compile_options(${LIBRARY_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
@@ -333,6 +340,8 @@ if (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd6239) #  (<non-zero constant> && <expression>) always evaluates to the result of <expression>. Did you intend to use the bitwise-and operator?
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd6336) # Arithmetic operator has precedence over question operator, use parentheses to clarify intent.
     target_compile_options(${LIBRARY_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception.  Consider using _malloca instead.
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6262) # Function uses constant_1 bytes of stack: exceeds /analyze:stacksize constant_2. Consider moving some data to heap
+    target_compile_options(${LIBRARY_NAME} PUBLIC /wd6385) # Invalid data: accessing buffer-name, the readable size is size1 bytes, but size2 bytes may be read: Lines: x, y
     target_compile_options(${LIBRARY_NAME} PUBLIC /MP) # Build with Multiple Processes
     target_compile_options(${LIBRARY_NAME} PUBLIC /GL) # Enables whole program optimization.
   else ()

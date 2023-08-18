@@ -105,8 +105,9 @@ SIZE_T EnumerateUsingD3D9( IDirect3D9* pD3D9 )
 
         DWORD dwAvailableVidMem;
         if( SUCCEEDED( GetVideoMemoryViaDirectDraw( hMonitor, &dwAvailableVidMem ) ) ) {
-            wprintf( L"\tGetVideoMemoryViaDirectDraw\n\t\tdwAvailableVidMem: %u MB (%u)\n",
-                        dwAvailableVidMem / 1024 / 1024, dwAvailableVidMem );
+            wprintf(L"\tGetVideoMemoryViaDirectDraw\n\t\tdwAvailableVidMem: %u MB (%u)\n",
+                    (UINT)dwAvailableVidMem / 1024 / 1024,
+                    (UINT)dwAvailableVidMem);
             res = std::max(res, (SIZE_T)dwAvailableVidMem / 1024 / 1024);
         } else
             wprintf( L"\tGetVideoMemoryViaDirectDraw\n\t\tn/a\n" );
@@ -114,8 +115,9 @@ SIZE_T EnumerateUsingD3D9( IDirect3D9* pD3D9 )
 #if _WIN32_WINNT >= 0x600
         DWORD dwDisplayMemory;
         if( SUCCEEDED( GetVideoMemoryViaDxDiag( hMonitor, &dwDisplayMemory ) ) ) {
-            wprintf( L"\tGetVideoMemoryViaDxDiag\n\t\tdwDisplayMemory: %u MB (%u)\n", dwDisplayMemory / 1024 /
-                        1024, dwDisplayMemory );
+            wprintf(L"\tGetVideoMemoryViaDxDiag\n\t\tdwDisplayMemory: %u MB (%u)\n",
+                    (UINT)dwDisplayMemory / 1024 / 1024,
+                    (UINT)dwDisplayMemory);
             res = std::max(res, (SIZE_T)dwDisplayMemory / 1024 / 1024);
         } else
             wprintf( L"\tGetVideoMemoryViaDxDiag\n\t\tn/a\n" );

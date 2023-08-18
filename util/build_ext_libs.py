@@ -1339,10 +1339,12 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         bak_file3 = patch_file(orig_file3,
                                from_texts=[r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib)',
                                            r'/std:${MSVC_LANGUAGE_VERSION}',
+                                           r'/EHs #',
                                            ],
                                to_texts=[
                                    r'list(APPEND FOLLY_LINK_LIBRARIES Iphlpapi.lib Ws2_32.lib Bcrypt.lib Crypt32.lib)',
                                    r'/DGLOG_NO_ABBREVIATED_SEVERITIES #/std:${MSVC_LANGUAGE_VERSION}',
+                                   r'/EHsc #',
                                ])
 
         if is_windows():
@@ -2088,11 +2090,17 @@ def build_freeimage(src_dir: str, install_dir: str):
     orig_file_4 = None
     bak_file_4 = None
     orig_file = bak_file = None
+    orig_file5 = bak_file5 = None
     try:
         orig_file = os.path.join(src_dir, 'fipMakefile.srcs')
         from_texts = [r'Source/LibTIFF4/tif_dir.c ']
         to_texts = [r'Source/LibTIFF4/tif_dir.c Source/LibTIFF4/tif_hash_set.c ']
         bak_file = patch_file(orig_file, from_texts=from_texts, to_texts=to_texts)
+
+        orig_file5 = os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'FreeImagePlus.h')
+        from_texts = [r'#define WIN32_LEAN_AND_MEAN']
+        to_texts = ['#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif']
+        bak_file5 = patch_file(orig_file5, from_texts=from_texts, to_texts=to_texts)
 
         if os.path.exists(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION')):
             os.rename(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION'),
@@ -2169,6 +2177,7 @@ def build_freeimage(src_dir: str, install_dir: str):
                            cwd=src_dir, shell=False, check=True)
     finally:
         os.replace(bak_file, orig_file)
+        os.replace(bak_file5, orig_file5)
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))

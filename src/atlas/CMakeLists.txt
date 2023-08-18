@@ -633,41 +633,11 @@ target_include_directories(${APP_NAME} PRIVATE ${QTCSVDIR} ${QTCSVDIR}/include)
 target_include_directories(${APP_NAME} PRIVATE ${LIBQXTDIR}/core ${LIBQXTDIR}/widgets)
 target_compile_definitions(${APP_NAME} PUBLIC ATLAS_USE_CORE_PROFILE)
 if (WIN32)
-  target_compile_definitions(${APP_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE WINVER=0x0601 _WIN32_WINNT=0x0601 _USE_MATH_DEFINES _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
-
-  target_compile_options(${APP_NAME} PUBLIC /GR) # Enable Run-Time Type Information
-  target_compile_options(${APP_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx
-  target_compile_options(${APP_NAME} PUBLIC /W4)
-  target_compile_options(${APP_NAME} PUBLIC /bigobj) # increases the number of sections that an object file can contain.
-  target_compile_options(${APP_NAME} PUBLIC /wd4267) # 'var' : conversion from 'size_t' to 'type', possible loss of data
-  target_compile_options(${APP_NAME} PUBLIC /wd4244) # 'argument' : conversion from 'type1' to 'type2', possible loss of data
-  target_compile_options(${APP_NAME} PUBLIC /wd4305) # 'identifier' : truncation from 'type1' to 'type2'
-  target_compile_options(${APP_NAME} PUBLIC /wd4819) # The file contains a character that cannot be represented in the current code page (number). Save the file in Unicode format to prevent data loss.
-  target_compile_options(${APP_NAME} PUBLIC /wd4828) # The file contains a character starting at offset 0x60 that is illegal in the current source character set (codepage 65001).
-  target_compile_options(${APP_NAME} PUBLIC /wd5105) # macro expansion producing 'defined' has undefined behavior, from windows sdk
-  target_compile_options(${APP_NAME} PUBLIC /utf-8)  # https://blogs.msdn.microsoft.com/vcblog/2016/02/22/new-options-for-managing-character-sets-in-the-microsoft-cc-compiler/
-  if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${APP_NAME} PUBLIC /analyze) # The C/C++ Code Analysis tool provides information to developers about possible defects in their C/C++ source code
-    # target_compile_options(${APP_NAME} PUBLIC /wd6255) # _alloca indicates failure by raising a stack overflow exception. Consider using _malloca instead.
-    target_compile_options(${APP_NAME} PUBLIC /wd6326) # Potential comparison of a constant with another constant.
-    # target_compile_options(${APP_NAME} PUBLIC /wd6330) # Incorrect type passed as parameter in call to function.
-    target_compile_options(${APP_NAME} PUBLIC /wd6386) # Buffer overrun while writing to 'data'.
-    target_compile_options(${APP_NAME} PUBLIC /wd28020)
-    target_compile_options(${APP_NAME} PUBLIC /MP) # Build with Multiple Processes
-    target_compile_options(${APP_NAME} PUBLIC /GL) # Enables whole program optimization.
-  else ()
-    target_compile_options(${APP_NAME} PUBLIC /MD)
-  endif ()
-  # standard conformance
-  target_compile_options(${APP_NAME} PUBLIC /permissive- /volatile:iso /Zc:inline /Zc:preprocessor /Zc:lambda)
-  target_compile_options(${APP_NAME} PUBLIC /Zc:externConstexpr /Zc:throwingNew /Zc:enumTypes /Zc:templateScope)
-  target_compile_options(${APP_NAME} PUBLIC /Zc:__cplusplus) # The /Zc:__cplusplus compiler option enables the __cplusplus preprocessor macro to report an updated value for recent C++ language standards support
-
-  #
-  target_compile_options(${APP_NAME} PUBLIC /arch:AVX)
-
   #set_source_files_properties(${SYS_SOURCES} PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
   #set_source_files_properties(z3dnetworkevaluator.cpp PROPERTIES COMPILE_FLAGS /Zc:preprocessor-)
+  set_source_files_properties(${LIBQXTDIR}/core/qxtcsvmodel.cpp PROPERTIES COMPILE_FLAGS /wd4458) # declaration of 'd_ptr' hides class member
+  set_source_files_properties(${GRPC_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
+  set_source_files_properties(${PROTO_SRCS} PROPERTIES COMPILE_FLAGS "/wd4946") # reinterpret_cast used between related classes: 'class1' and 'class2'
 
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     # to create an output file whether or not LINK finds more than one definition for a symbol.
@@ -707,30 +677,8 @@ if (WIN32)
                      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../neurolabi/json
                      $<TARGET_FILE_DIR:${APP_NAME}>/Resources/json)
 else (WIN32)
-  target_compile_options(${APP_NAME} PUBLIC -frtti)
-  target_compile_options(${APP_NAME} PUBLIC -fexceptions -fwrapv -fno-strict-aliasing)
-  target_compile_options(${APP_NAME} PUBLIC -Wall -Wextra)
-  target_compile_options(${APP_NAME} PUBLIC -Waddress -Wdeprecated)
-  if (APPLE AND AARCH64)
-    target_compile_options(${APP_NAME} PUBLIC -mcpu=apple-m1)
-  else ()
-    target_compile_options(${APP_NAME} PUBLIC -mavx)
-  endif ()
-  target_compile_options(${APP_NAME} PUBLIC -fno-common)
-
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${APP_NAME} PUBLIC -Wbool-conversion -Wconstant-conversion -Wenum-conversion)
-    target_compile_options(${APP_NAME} PUBLIC -Waddress-of-temporary)
-    target_compile_options(${APP_NAME} PUBLIC -mllvm -inline-threshold=600)
-    target_compile_options(${APP_NAME} PUBLIC -Wshadow)
-    target_compile_options(${APP_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
     target_compile_options(${APP_NAME} PRIVATE -Wundefined-reinterpret-cast)
-    if (APPLE)
-      target_compile_options(${APP_NAME} PUBLIC -stdlib=libc++)
-      target_link_options(${APP_NAME} PUBLIC -stdlib=libc++)
-    else ()
-      target_compile_options(${APP_NAME} PUBLIC -fsized-deallocation)
-    endif ()
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_link_options(${APP_NAME} PUBLIC -Wl,--allow-multiple-definition)
   endif ()

@@ -22,7 +22,9 @@
  * OF THIS SOFTWARE.
  */
 
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #define VC_EXTRALEAN
 
 #include "tiffiop.h"
