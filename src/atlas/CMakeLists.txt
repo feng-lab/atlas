@@ -196,427 +196,225 @@ set(RESOURCES
     )
 
 set(SOURCES
-    zimgdisplay.h
-    zsectionsregistrationdialog.h
-    zstitchimagedialog.h
-    zpunctadetectiondialog.h
-    zgenerateanalysistextfile.h
-    zanalysisworklistdialog.h
-    zanalysisworklistmodel.h
-    zstyleditemdelegate.h
-    zitemeditorfactory.h
-    zmainwindow.h
-    zimgdoc.h
-    zimgview.h
-    zspinboxwithscrollbar.h
-    zgraphicsview.h
-    zview.h
-    zdoc.h
-    zobjdoc.h
-    zobjview.h
-    zimgfilter.h
-    zobjmodel.h
-    zobjwidget.h
-    zshareitemselectionmodel.h
-    zitemselectionmodel.h
-    zviewsettingwidget.h
-    z3dmainwindow.h
-    z3drenderingengine.h
-    z3dobjview.h
-    z3dimgview.h
+    zimgdisplay.h zimgdisplay.cpp
+    zsectionsregistrationdialog.h zsectionsregistrationdialog.cpp
+    zstitchimagedialog.h zstitchimagedialog.cpp
+    zpunctadetectiondialog.h zpunctadetectiondialog.cpp
+    zgenerateanalysistextfile.h zgenerateanalysistextfile.cpp
+    zanalysisworklistdialog.h zanalysisworklistdialog.cpp
+    zanalysisworklistmodel.h zanalysisworklistmodel.cpp
+    zstyleditemdelegate.h zstyleditemdelegate.cpp
+    zitemeditorfactory.h zitemeditorfactory.cpp
+    zmainwindow.h zmainwindow.cpp
+    zimgdoc.h zimgdoc.cpp
+    zimgview.h zimgview.cpp
+    zspinboxwithscrollbar.h zspinboxwithscrollbar.cpp
+    zgraphicsview.h zgraphicsview.cpp
+    zview.h zview.cpp
+    zdoc.h zdoc.cpp
+    zobjdoc.h zobjdoc.cpp
+    zobjview.h zobjview.cpp
+    zimgfilter.h zimgfilter.cpp
+    zobjmodel.h zobjmodel.cpp
+    zobjwidget.h zobjwidget.cpp
+    zshareitemselectionmodel.h zshareitemselectionmodel.cpp
+    zitemselectionmodel.h zitemselectionmodel.cpp
+    zviewsettingwidget.h zviewsettingwidget.cpp
+    z3dmainwindow.h z3dmainwindow.cpp
+    z3drenderingengine.h z3drenderingengine.cpp
+    z3dobjview.h z3dobjview.cpp
+    z3dimgview.h z3dimgview.cpp
     zviewsettinginterface.h
-    zpunctadoc.h
-    z3dpunctaview.h
-    z3dpunctafilter.h
-    z3dmeshfilter.h
-    z3dswcfilter.h
-    zmeshdoc.h
-    zswcdoc.h
-    z3dswcview.h
-    z3dmeshview.h
-    zobjfilter.h
-    zanimation.h
-    zparameteranimation.h
-    zparameterkey.h
-    zcameraparameterkey.h
-    zcameraparameteranimation.h
-    z3danimation.h
-    z3danimationdoc.h
-    zsaveobjsdialog.h
-    zanimationwidget.h
-    zobjeditwidget.h
-    zparameterfactory.h
-    zfontparameter.h
-    zfontwidget.h
-    z2danimation.h
-    z2danimationdoc.h
-    ztimelinewidget.h
-    ztimelineobjview.h
-    ztimelineeventview.h
-    ztimelineobjscene.h
-    ztimelineeventscene.h
-    ztimelineaxisview.h
-    ztimelinekeyeditdialog.h
-    zdockwidget.h
-    z3danimationview.h
-    z3danimationfilter.h
-    z3dcompositor.h
-    z3dgeometryfilter.h
-    z3daxisfilter.h
-    z3dboundedfilter.h
-    z3dvolumeslicerenderer.h
-    z3dmeshrenderer.h
-    z3dtexturecopyrenderer.h
-    z3dtexturecoordinaterenderer.h
-    z3dtextureblendrenderer.h
-    z3dsphererenderer.h
-    z3dlinewithfixedwidthcolorrenderer.h
-    z3dlinerenderer.h
-    z3dimage2drenderer.h
-    z3dfontrenderer.h
-    z3dellipsoidrenderer.h
-    z3dconerenderer.h
-    z3dbackgroundrenderer.h
-    z3darrowrenderer.h
-    z3drendererbase.h
-    z3dprimitiverenderer.h
-    z3dcanvaspainter.h
-    z3dnetworkevaluator.h
-    z3dcanvas.h
-    z3dscene.h
-    z3dshadergroup.h
-    z3dport.h
-    z3drenderport.h
-    z3dglobalparameters.h
-    z3dshaderprogram.h
-    z3dvolume.h
-    z3dtransferfunction.h
-    z3dtransferfunctioneditor.h
-    z3dtransferfunctionwidgetwitheditorwindow.h
-    zclickablelabel.h
-    zcolormap.h
-    zcolormapeditor.h
-    zcolormapwidgetwitheditorwindow.h
-    z3dvertexarrayobject.h
-    z3dvertexbufferobject.h
-    z3dpickingmanager.h
+    zpunctadoc.h zpunctadoc.cpp
+    z3dpunctaview.h z3dpunctaview.cpp
+    z3dpunctafilter.h z3dpunctafilter.cpp
+    z3dmeshfilter.h z3dmeshfilter.cpp
+    z3dswcfilter.h z3dswcfilter.cpp
+    zmeshdoc.h zmeshdoc.cpp
+    zswcdoc.h zswcdoc.cpp
+    z3dswcview.h z3dswcview.cpp
+    z3dmeshview.h z3dmeshview.cpp
+    zobjfilter.h zobjfilter.cpp
+    zanimation.h zanimation.cpp
+    zparameteranimation.h zparameteranimation.cpp
+    zparameterkey.h zparameterkey.cpp
+    zcameraparameterkey.h zcameraparameterkey.cpp
+    zcameraparameteranimation.h zcameraparameteranimation.cpp
+    z3danimation.h z3danimation.cpp
+    z3danimationdoc.h z3danimationdoc.cpp
+    zsaveobjsdialog.h zsaveobjsdialog.cpp
+    zanimationwidget.h zanimationwidget.cpp
+    zobjeditwidget.h zobjeditwidget.cpp
+    zparameterfactory.h zparameterfactory.cpp
+    zfontparameter.h zfontparameter.cpp
+    zfontwidget.h zfontwidget.cpp
+    z2danimation.h z2danimation.cpp
+    z2danimationdoc.h z2danimationdoc.cpp
+    ztimelinewidget.h ztimelinewidget.cpp
+    ztimelineobjview.h ztimelineobjview.cpp
+    ztimelineeventview.h ztimelineeventview.cpp
+    ztimelineobjscene.h ztimelineobjscene.cpp
+    ztimelineeventscene.h ztimelineeventscene.cpp
+    ztimelineaxisview.h ztimelineaxisview.cpp
+    ztimelinekeyeditdialog.h ztimelinekeyeditdialog.cpp
+    zdockwidget.h zdockwidget.cpp
+    z3danimationview.h z3danimationview.cpp
+    z3danimationfilter.h z3danimationfilter.cpp
+    z3dcompositor.h z3dcompositor.cpp
+    z3dgeometryfilter.h z3dgeometryfilter.cpp
+    z3daxisfilter.h z3daxisfilter.cpp
+    z3dboundedfilter.h z3dboundedfilter.cpp
+    z3dvolumeslicerenderer.h z3dvolumeslicerenderer.cpp
+    z3dmeshrenderer.h z3dmeshrenderer.cpp
+    z3dtexturecopyrenderer.h z3dtexturecopyrenderer.cpp
+    z3dtexturecoordinaterenderer.h z3dtexturecoordinaterenderer.cpp
+    z3dtextureblendrenderer.h z3dtextureblendrenderer.cpp
+    z3dsphererenderer.h z3dsphererenderer.cpp
+    z3dlinewithfixedwidthcolorrenderer.h z3dlinewithfixedwidthcolorrenderer.cpp
+    z3dlinerenderer.h z3dlinerenderer.cpp
+    z3dimage2drenderer.h z3dimage2drenderer.cpp
+    z3dfontrenderer.h z3dfontrenderer.cpp
+    z3dellipsoidrenderer.h z3dellipsoidrenderer.cpp
+    z3dconerenderer.h z3dconerenderer.cpp
+    z3dbackgroundrenderer.h z3dbackgroundrenderer.cpp
+    z3darrowrenderer.h z3darrowrenderer.cpp
+    z3drendererbase.h z3drendererbase.cpp
+    z3dprimitiverenderer.h z3dprimitiverenderer.cpp
+    z3dcanvaspainter.h z3dcanvaspainter.cpp
+    z3dnetworkevaluator.h z3dnetworkevaluator.cpp
+    z3dcanvas.h z3dcanvas.cpp
+    z3dscene.h z3dscene.cpp
+    z3dshadergroup.h z3dshadergroup.cpp
+    z3dport.h z3dport.cpp
+    z3drenderport.h z3drenderport.cpp
+    z3dglobalparameters.h z3dglobalparameters.cpp
+    z3dshaderprogram.h z3dshaderprogram.cpp
+    z3dvolume.h z3dvolume.cpp
+    z3dtransferfunction.h z3dtransferfunction.cpp
+    z3dtransferfunctioneditor.h z3dtransferfunctioneditor.cpp
+    z3dtransferfunctionwidgetwitheditorwindow.h z3dtransferfunctionwidgetwitheditorwindow.cpp
+    zclickablelabel.h zclickablelabel.cpp
+    zcolormap.h zcolormap.cpp
+    zcolormapeditor.h zcolormapeditor.cpp
+    zcolormapwidgetwitheditorwindow.h zcolormapwidgetwitheditorwindow.cpp
+    z3dvertexarrayobject.h z3dvertexarrayobject.cpp
+    z3dvertexbufferobject.h z3dvertexbufferobject.cpp
+    z3dpickingmanager.h z3dpickingmanager.cpp
     z3dfilterview.h
-    zroi.h
-    zroidoc.h
     zfilterview.h
-    zroiview.h
-    zroifilter.h
     zboostgeometryadaptor.h
-    zquatparameter.h
-    z3dshadermanager.h
-    zanimationexportwidget.h
-    zvideoencoder.h
-    zswcfilter.h
-    zswcview.h
-    zpunctafilter.h
-    zpunctaview.h
-    znumericparameter.h
-    zoptionparameter.h
-    zparameter.h
-    zcombobox.h
-    zselectfilewidget.h
-    zloadimagesequencedialog.h
-    zspinbox.h
-    zspinboxwithslider.h
-    zwidgetsgroup.h
-    z3dcamera.h
-    z3dcameraparameter.h
-    z3drendertarget.h
-    z3dinteractionhandler.h
-    zeventlistenerparameter.h
     z3dcanvaseventlistener.h
-    z3dtexture.h
-    z3dtransformparameter.h
-    z3dgpuinfo.h
-    zstringparameter.h
-    z3dsdfont.h
-    zspanslider.h
-    zcustomcommand.h
-    ztakescreenshotwidget.h
-    z3dshader.h
-    z3dcontext.h
-    z3dgl.h
-    zimgpack.h
-    zimgpackdisplay.h
     zimgvoxelcolormap.h
-    zimgcache.h
-    zsysteminfo.h
-    zfileutils.h
-    zregionannotation.h
-    zregionannotationdoc.h
-    z3dregionannotationview.h
-    zregionannotationview.h
-    zregionannotationfilter.h
-    z3dregionannotationfilter.h
-    zregionannotationwidget.h
-    zregionannotationtreemodel.h
-    zregionannotationtreeview.h
-    zbuttoncolumndelegate.h
-    zchooseobjdialog.h
-    zgraphicsscene.h
-    z3dfilter.h
-    z3dtextureglowrenderer.h
-    z3dcameracontrolwidget.h
-    z3dtextureandeyecoordinaterenderer.h
-    z3dimgraycasterrenderer.h
-    z3dimg.h
-    z3dimgfilter.h
-    z3dblockcache.h
-    z3dimgslicerenderer.h
-    zregionontology.h
-    zobjdetailedinfowidget.h
-    zlogdialog.h
-    zlogmodelsink.h
+    zroi.h zroi.cpp
+    zroidoc.h zroidoc.cpp
+    zroiview.h zroiview.cpp
+    zroifilter.h zroifilter.cpp
+    zquatparameter.h zquatparameter.cpp
+    z3dshadermanager.h z3dshadermanager.cpp
+    zanimationexportwidget.h zanimationexportwidget.cpp
+    zvideoencoder.h zvideoencoder.cpp
+    zswcfilter.h zswcfilter.cpp
+    zswcview.h zswcview.cpp
+    zpunctafilter.h zpunctafilter.cpp
+    zpunctaview.h zpunctaview.cpp
+    znumericparameter.h znumericparameter.cpp
+    zoptionparameter.h zoptionparameter.cpp
+    zparameter.h zparameter.cpp
+    zcombobox.h zcombobox.cpp
+    zselectfilewidget.h zselectfilewidget.cpp
+    zloadimagesequencedialog.h zloadimagesequencedialog.cpp
+    zspinbox.h zspinbox.cpp
+    zspinboxwithslider.h zspinboxwithslider.cpp
+    zwidgetsgroup.h zwidgetsgroup.cpp
+    z3dcamera.h z3dcamera.cpp
+    z3dcameraparameter.h z3dcameraparameter.cpp
+    z3drendertarget.h z3drendertarget.cpp
+    z3dinteractionhandler.h z3dinteractionhandler.cpp
+    zeventlistenerparameter.h zeventlistenerparameter.cpp
+    z3dtexture.h z3dtexture.cpp
+    z3dtransformparameter.h z3dtransformparameter.cpp
+    z3dgpuinfo.h z3dgpuinfo.cpp
+    zstringparameter.h zstringparameter.cpp
+    z3dsdfont.h z3dsdfont.cpp
+    zspanslider.h zspanslider.cpp
+    zcustomcommand.h zcustomcommand.cpp
+    ztakescreenshotwidget.h ztakescreenshotwidget.cpp
+    z3dshader.h z3dshader.cpp
+    z3dcontext.h z3dcontext.cpp
+    z3dgl.h z3dgl.cpp
+    zimgpack.h zimgpack.cpp
+    zimgpackdisplay.h zimgpackdisplay.cpp
+    zimgcache.h zimgcache.cpp
+    zsysteminfo.h zsysteminfo.cpp
+    zfileutils.h zfileutils.cpp
+    zregionannotation.h zregionannotation.cpp
+    zregionannotationdoc.h zregionannotationdoc.cpp
+    z3dregionannotationview.h z3dregionannotationview.cpp
+    zregionannotationview.h zregionannotationview.cpp
+    zregionannotationfilter.h zregionannotationfilter.cpp
+    z3dregionannotationfilter.h z3dregionannotationfilter.cpp
+    zregionannotationwidget.h zregionannotationwidget.cpp
+    zregionannotationtreemodel.h zregionannotationtreemodel.cpp
+    zregionannotationtreeview.h zregionannotationtreeview.cpp
+    zbuttoncolumndelegate.h zbuttoncolumndelegate.cpp
+    zchooseobjdialog.h zchooseobjdialog.cpp
+    zgraphicsscene.h zgraphicsscene.cpp
+    z3dfilter.h z3dfilter.cpp
+    z3dtextureglowrenderer.h z3dtextureglowrenderer.cpp
+    z3dcameracontrolwidget.h z3dcameracontrolwidget.cpp
+    z3dtextureandeyecoordinaterenderer.h z3dtextureandeyecoordinaterenderer.cpp
+    z3dimgraycasterrenderer.h z3dimgraycasterrenderer.cpp
+    z3dimg.h z3dimg.cpp
+    z3dimgfilter.h z3dimgfilter.cpp
+    z3dimgslicerenderer.h z3dimgslicerenderer.cpp
+    zregionontology.h zregionontology.cpp
+    zobjdetailedinfowidget.h zobjdetailedinfowidget.cpp
+    zlogdialog.h zlogdialog.cpp
+    zlogmodelsink.h zlogmodelsink.cpp
     main.cpp
-    zimgdisplay.cpp
-    zsectionsregistrationdialog.cpp
-    zstitchimagedialog.cpp
-    zpunctadetectiondialog.cpp
-    zgenerateanalysistextfile.cpp
-    zanalysisworklistdialog.cpp
-    zanalysisworklistmodel.cpp
-    zstyleditemdelegate.cpp
-    zitemeditorfactory.cpp
-    zmainwindow.cpp
-    zimgdoc.cpp
-    zimgview.cpp
-    zspinboxwithscrollbar.cpp
-    zgraphicsview.cpp
-    zview.cpp
-    zdoc.cpp
-    zobjdoc.cpp
-    zobjview.cpp
-    zimgfilter.cpp
-    zobjmodel.cpp
-    zobjwidget.cpp
-    zshareitemselectionmodel.cpp
-    zitemselectionmodel.cpp
-    zviewsettingwidget.cpp
-    z3dmainwindow.cpp
-    z3drenderingengine.cpp
-    z3dobjview.cpp
-    z3dimgview.cpp
-    zpunctadoc.cpp
-    z3dpunctaview.cpp
-    z3dpunctafilter.cpp
-    z3dmeshfilter.cpp
-    z3dswcfilter.cpp
-    zmeshdoc.cpp
-    zswcdoc.cpp
-    z3dswcview.cpp
-    z3dmeshview.cpp
-    zobjfilter.cpp
-    zanimation.cpp
-    zparameteranimation.cpp
-    zparameterkey.cpp
-    zcameraparameterkey.cpp
-    zcameraparameteranimation.cpp
-    z3danimation.cpp
-    z3danimationdoc.cpp
-    zsaveobjsdialog.cpp
-    zanimationwidget.cpp
-    zobjeditwidget.cpp
-    zparameterfactory.cpp
-    zfontparameter.cpp
-    zfontwidget.cpp
-    z2danimation.cpp
-    z2danimationdoc.cpp
-    ztimelinewidget.cpp
-    ztimelineobjview.cpp
-    ztimelineeventview.cpp
-    ztimelineobjscene.cpp
-    ztimelineeventscene.cpp
-    ztimelineaxisview.cpp
-    ztimelinekeyeditdialog.cpp
-    zdockwidget.cpp
-    z3danimationview.cpp
-    z3danimationfilter.cpp
-    z3dcompositor.cpp
-    z3dgeometryfilter.cpp
-    z3daxisfilter.cpp
-    z3dboundedfilter.cpp
-    z3dvolumeslicerenderer.cpp
-    z3dmeshrenderer.cpp
-    z3dtexturecopyrenderer.cpp
-    z3dtexturecoordinaterenderer.cpp
-    z3dtextureblendrenderer.cpp
-    z3dsphererenderer.cpp
-    z3dprimitiverenderer.cpp
-    z3dlinewithfixedwidthcolorrenderer.cpp
-    z3dlinerenderer.cpp
-    z3dimage2drenderer.cpp
-    z3dfontrenderer.cpp
-    z3dellipsoidrenderer.cpp
-    z3dconerenderer.cpp
-    z3dbackgroundrenderer.cpp
-    z3darrowrenderer.cpp
-    z3drendererbase.cpp
-    z3dcanvaspainter.cpp
-    z3dnetworkevaluator.cpp
-    z3dcanvas.cpp
-    z3dscene.cpp
-    z3dshadergroup.cpp
-    z3dport.cpp
-    z3drenderport.cpp
-    z3dglobalparameters.cpp
-    z3dshaderprogram.cpp
-    z3dvolume.cpp
-    z3dtransferfunction.cpp
-    z3dtransferfunctioneditor.cpp
-    z3dtransferfunctionwidgetwitheditorwindow.cpp
-    zclickablelabel.cpp
-    zcolormap.cpp
-    zcolormapeditor.cpp
-    zcolormapwidgetwitheditorwindow.cpp
-    z3dvertexarrayobject.cpp
-    z3dvertexbufferobject.cpp
-    z3dpickingmanager.cpp
-    zroi.cpp
-    zroidoc.cpp
-    zroiview.cpp
-    zroifilter.cpp
-    zquatparameter.cpp
-    z3dshadermanager.cpp
-    zanimationexportwidget.cpp
-    zvideoencoder.cpp
-    zswcfilter.cpp
-    zswcview.cpp
-    zpunctafilter.cpp
-    zpunctaview.cpp
-    znumericparameter.cpp
-    zoptionparameter.cpp
-    zparameter.cpp
-    zcombobox.cpp
-    zselectfilewidget.cpp
-    zloadimagesequencedialog.cpp
-    zspinbox.cpp
-    zspinboxwithslider.cpp
-    zwidgetsgroup.cpp
-    z3dcamera.cpp
-    z3dcameraparameter.cpp
-    z3drendertarget.cpp
-    z3dinteractionhandler.cpp
-    zeventlistenerparameter.cpp
-    z3dtexture.cpp
-    z3dtransformparameter.cpp
-    z3dgpuinfo.cpp
-    zstringparameter.cpp
-    z3dsdfont.cpp
-    zspanslider.cpp
-    zcustomcommand.cpp
-    ztakescreenshotwidget.cpp
-    z3dshader.cpp
-    z3dcontext.cpp
-    z3dgl.cpp
-    zimgpack.cpp
-    zimgpackdisplay.cpp
-    zimgcache.cpp
-    zsysteminfo.cpp
-    zfileutils.cpp
-    zregionannotation.cpp
-    zregionannotationdoc.cpp
-    z3dregionannotationview.cpp
-    zregionannotationview.cpp
-    zregionannotationfilter.cpp
-    z3dregionannotationfilter.cpp
-    zregionannotationwidget.cpp
-    zregionannotationtreemodel.cpp
-    zregionannotationtreeview.cpp
-    zbuttoncolumndelegate.cpp
-    zchooseobjdialog.cpp
-    zgraphicsscene.cpp
-    z3dfilter.cpp
-    z3dtextureglowrenderer.cpp
-    z3dcameracontrolwidget.cpp
-    z3dtextureandeyecoordinaterenderer.cpp
-    z3dimgraycasterrenderer.cpp
-    z3dimg.cpp
-    z3dimgfilter.cpp
-    z3dimgslicerenderer.cpp
-    zregionontology.cpp
-    zobjdetailedinfowidget.cpp
-    zlogdialog.cpp
-    zlogmodelsink.cpp
-    zapplication.cpp
-    zapplication.h
-    zsvgdoc.cpp
-    zsvgdoc.h
-    zsvgfilter.cpp
-    zsvgfilter.h
-    zsvgview.cpp
-    zsvgview.h
+    z3dblockcache.h
+    zapplication.cpp zapplication.h
+    zsvgdoc.cpp zsvgdoc.h
+    zsvgfilter.cpp zsvgfilter.h
+    zsvgview.cpp zsvgview.h
     zgraphicsitemtype.h
-    zparametereditdialog.cpp
-    zparametereditdialog.h
-    z2dtransformparameter.cpp
-    z2dtransformparameter.h
-    zspinboxdelegate.cpp
-    zspinboxdelegate.h
-    z3dopenglwidget.cpp
-    z3dopenglwidget.h
-    zchromaticshiftcorrectiondialog.cpp
-    zchromaticshiftcorrectiondialog.h
-    zlogwidget.cpp
-    zlogwidget.h
-    zimgprocessdialog.cpp
-    zimgprocessdialog.h
-    zservicemanager.cpp
-    zservicemanager.h
-    zrpcservice.cpp
-    zrpcservice.h
-    ztheme.cpp
-    ztheme.h
+    zparametereditdialog.cpp zparametereditdialog.h
+    z2dtransformparameter.cpp z2dtransformparameter.h
+    zspinboxdelegate.cpp zspinboxdelegate.h
+    z3dopenglwidget.cpp z3dopenglwidget.h
+    zchromaticshiftcorrectiondialog.cpp zchromaticshiftcorrectiondialog.h
+    zlogwidget.cpp zlogwidget.h
+    zimgprocessdialog.cpp zimgprocessdialog.h
+    zservicemanager.cpp zservicemanager.h
+    zrpcservice.cpp zrpcservice.h
+    ztheme.cpp ztheme.h
     zserializationutils.h
-    zroiwidget.cpp
-    zroiwidget.h
-    zgraphicsitemgroup.cpp
-    zgraphicsitemgroup.h
-    zchooseregiondialog.cpp
-    zchooseregiondialog.h
-    zregionannotationviewsettingtreemodel.h
-    zregionannotationviewsettingtreeview.h
-    zregionannotationviewsettingcolumndelegate.h
-    zregionannotationviewsettingtreemodel.cpp
-    zregionannotationviewsettingtreeview.cpp
-    zregionannotationviewsettingcolumndelegate.cpp
-    zregionviewsettingwitheditorwindow.h
-    zregionviewsettingwitheditorwindow.cpp
-    zpunctawidget.cpp
-    zpunctawidget.h
-    zpunctatablemodel.h
-    zpunctatablemodel.cpp
-    zpunctatableview.cpp
-    zpunctatableview.h
-    zpunctapack.cpp
-    zpunctapack.h
-    zswcpack.cpp
-    zswcpack.h
-    zswcwidget.cpp
-    zswcwidget.h
-    zswctreeview.cpp
-    zswctreeview.h
-    zswctreemodel.cpp
-    zswctreemodel.h
-    zobjpack.cpp
-    zobjpack.h
-    zroipack.cpp
-    zroipack.h
-    zregionannotationpack.cpp
-    zregionannotationpack.h
-    zswccolorparameters.cpp
-    zswccolorparameters.h
-    zthreadsafelrucache.h
-    zthreadsafescalablecache.h
+    zroiwidget.cpp zroiwidget.h
+    zgraphicsitemgroup.cpp zgraphicsitemgroup.h
+    zchooseregiondialog.cpp zchooseregiondialog.h
+    zregionannotationviewsettingtreemodel.h zregionannotationviewsettingtreemodel.cpp
+    zregionannotationviewsettingtreeview.h zregionannotationviewsettingtreeview.cpp
+    zregionannotationviewsettingcolumndelegate.h zregionannotationviewsettingcolumndelegate.cpp
+    zregionviewsettingwitheditorwindow.h zregionviewsettingwitheditorwindow.cpp
+    zpunctawidget.cpp zpunctawidget.h
+    zpunctatablemodel.h zpunctatablemodel.cpp
+    zpunctatableview.cpp zpunctatableview.h
+    zpunctapack.cpp zpunctapack.h
+    zswcpack.cpp zswcpack.h
+    zswcwidget.cpp zswcwidget.h
+    zswctreeview.cpp zswctreeview.h
+    zswctreemodel.cpp zswctreemodel.h
+    zobjpack.cpp zobjpack.h
+    zroipack.cpp zroipack.h
+    zregionannotationpack.cpp zregionannotationpack.h
+    zswccolorparameters.cpp zswccolorparameters.h
+    zthreadsafelrucache.h zthreadsafescalablecache.h
     zrunbenchmark.cpp zrunbenchmark.h
     zimgregioncache.cpp zimgregioncache.h
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
-    zcancellation.h zrunneutucommand.cpp zrunneutucommand.h)
+    zcancellation.h
+    zrunneutucommand.cpp zrunneutucommand.h)
 
 # our target
 set(APP_NAME Atlas)
@@ -780,9 +578,12 @@ else (WIN32)
   endif ()
 endif (WIN32)
 
-target_link_libraries(${APP_NAME} PUBLIC glbinding::glbinding-aux glbinding::glbinding
-                      img neutu ${OpenCV_LIBS} Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
-                      Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test benchmark::benchmark
+target_link_libraries(${APP_NAME} PUBLIC img neutu
+                      glbinding::glbinding-aux glbinding::glbinding
+                      ${OpenCV_LIBS}
+                      Qt6::Core Qt6::Widgets Qt6::Network Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent
+                      Qt6::OpenGLWidgets Qt6::CorePrivate Qt6::Test
+                      benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf
                       # RocksDB::rocksdb
                       )

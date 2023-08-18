@@ -134,10 +134,11 @@ target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # target_compile_definitions(${LIBRARY_NAME} PUBLIC _QT_GUI_USED_)
 if (WIN32)
   target_compile_options(${LIBRARY_NAME} PRIVATE /wd4065 /wd4101 /wd4245 /wd4805 /wd4456 /wd5246 /wd5262 /wd5264)
-  target_compile_options(${LIBRARY_NAME} PRIVATE /wd6011 /wd28182 /wd6387 /wd6385 /wd6308 
+  target_compile_options(${LIBRARY_NAME} PRIVATE /wd6011 /wd28182 /wd6387 /wd6385 /wd6308
                           /wd6054 /wd6340 /wd6246 /wd6297)
   set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS "/wd4774")
 else (WIN32)
+  target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra) # has to come before the following -W options
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-unused-but-set-variable
                            -Wno-format -Wundefined-reinterpret-cast -Wno-unused-parameter)

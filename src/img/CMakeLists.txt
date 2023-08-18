@@ -64,184 +64,109 @@ source_group(scifio FILES ${SCIFIO_SOURCES})
 # main srcs
 set(IMG_SOURCES
     zbbox.h
-    zbenchtimer.h
+    zbenchtimer.h zbenchtimer.cpp
     zbitset.h
-    zcpuinfo.h
-    zeigenutils.h
+    zcpuinfo.h zcpuinfo.cpp
+    zeigenutils.h zeigenutils.cpp
     zglmutils.h
-    zexception.h
+    zexception.h zexception.cpp
     zglobal.h
-    zimage2dutils.h
+    zimage2dutils.h zimage2dutils.cpp
     zimage3dutils.h
-    zimageavx.h
-    zimagefilterkernel.h
-    zimagesse3.h
-    zimg.h
-    zimgformat.h
-    zimgfreeimage.h
-    zimginfo.h
-    zimginterface.h
-    zimgio.h
-    zimgitkimage.h
-    zimgjpeg.h
-    zimgjpegxr.h
+    zimageavx.h zimageavx.cpp
+    zimagefilterkernel.h zimagefilterkernel.cpp
+    zimagesse3.h zimagesse3.cpp
+    zimg.h zimg.cpp
+    zimgformat.h zimgformat.cpp
+    zimgfreeimage.h zimgfreeimage.cpp
+    zimginfo.h zimginfo.cpp
+    zimginterface.h zimginterface.cpp
+    zimgio.h zimgio.cpp
+    zimgitkimage.h zimgitkimage.cpp
+    zimgjpeg.h zimgjpeg.cpp
+    zimgjpegxr.h zimgjpegxr.cpp
     zimgmetadatabase.h
-    zimgmetaimage.h
-    zimgmetatag.h
-    zimgometiff.h
-    zimgpng.h
-    zimgregion.h
-    zimgsliceprovider.h
+    zimgmetaimage.h zimgmetaimage.cpp
+    zimgmetatag.h zimgmetatag.cpp
+    zimgometiff.h zimgometiff.cpp
+    zimgpng.h zimgpng.cpp
+    zimgregion.h zimgregion.cpp
+    zimgsliceprovider.h zimgsliceprovider.cpp
     # zimgstackinterface.h
-    zimgtiff.h
-    zimgv3draw.h
-    zimgzeissczi.h
-    zimgzeisslsm.h
-    zioutils.h
-    zrandom.h
+    zimgtiff.h zimgtiff.cpp
+    zimgv3draw.h zimgv3draw.cpp
+    zimgzeissczi.h zimgzeissczi.cpp
+    zimgzeisslsm.h zimgzeisslsm.cpp
+    zioutils.h zioutils.cpp
+    zrandom.h zrandom.cpp
     zsaturateoperation.h
     zstatisticsutils.h
-    zstringutils.h
-    ztiff.h
+    zstringutils.h zstringutils.cpp
+    ztiff.h ztiff.cpp
     zvoxelcoordinate.h
     zimgregioniterator.h
     zimgneighborhooditerator.h
     zimgneighborhoodwithcoorditerator.h
-    zneighborhood.h
+    zneighborhood.h zneighborhood.cpp
     zimgneighborhoodwithptriterator.h
-    zlog.h
+    zlog.h zlog.cpp
     zwindowsheader.h
-    zbenchtimer.cpp
-    zcpuinfo.cpp
-    zeigenutils.cpp
-    zimage2dutils.cpp
-    zimagefilterkernel.cpp
-    zimg.cpp
-    zimgformat.cpp
-    zimgfreeimage.cpp
-    zimginfo.cpp
-    zimginterface.cpp
-    zimgio.cpp
-    zimgitkimage.cpp
-    zimgjpeg.cpp
-    zimgmetaimage.cpp
-    zimgmetatag.cpp
-    zimgometiff.cpp
-    zimgpng.cpp
-    zimgregion.cpp
-    zimgsliceprovider.cpp
     # zimgstackinterface.cpp
-    zimgtiff.cpp
-    zimgv3draw.cpp
-    zimgzeissczi.cpp
-    zimgzeisslsm.cpp
-    zioutils.cpp
-    zrandom.cpp
-    zstringutils.cpp
-    ztiff.cpp
-    zneighborhood.cpp
-    zlog.cpp
-    zimagesse3.cpp
-    zimageavx.cpp
-    zimgjpegxr.cpp
-    zexception.cpp
     zflags.h
-    zimghdf5.cpp
-    zimghdf5.h
-    zimginfoio.cpp
-    zimginfoio.h
+    zimghdf5.cpp zimghdf5.h
+    zimginfoio.cpp zimginfoio.h
     zimgblockprovider.h
-    zimgleica.cpp
-    zimgleica.h
+    zimgleica.cpp zimgleica.h
     zgmm.h
     zkmeans.h
     zvbgmm.h
-    zpuncta.cpp
-    zpuncta.h
-    zpunctaio.cpp
-    zpunctaio.h
-    zpunctum.cpp
-    zpunctum.h
-    zswc.h
-    zswc.cpp
+    zpuncta.cpp zpuncta.h
+    zpunctaio.cpp zpunctaio.h
+    zpunctum.cpp zpunctum.h
+    zswc.h zswc.cpp
     ztree.hpp
-    zvoxelregion.h
-    zvoxelregion.cpp
-    zimgtile.h
-    zimgtile.cpp
+    zvoxelregion.h zvoxelregion.cpp
+    zimgtile.h zimgtile.cpp
     zimgitkinterface.h
-    zcompleximg.h
-    zcompleximg.cpp
-    zfft.h
-    zfft.cpp
-    zaffine2d.h
-    zaffine3d.h
-    zaffine2d.cpp
-    zaffine3d.cpp
-    zimageinterpolation.h
-    zimageinterpolation.cpp
-    zimagetoimagemetric.h
-    zimagetoimagemetric.cpp
-    zimagetransform.h
-    zimagetransform.cpp
-    zimagematrix2dtransform.h
-    zimagematrix2dtransform.cpp
-    zimagematrix3dtransform.h
-    zimagematrix3dtransform.cpp
-    zimagecompositetransform.h
-    zimagecompositetransform.cpp
-    zimagetransformresolve.h
-    zimagetransformresolve.cpp
-    zimgmerge.h
-    zimgncc.h
-    zimgmerge.cpp
-    zimgncc.cpp
-    zimgalgorithm.h
-    zimgconnectedcomponents.h
-    zimgregionalextrema.h
-    zimgautothreshold.h
-    zimgalgorithm.cpp
-    zimgconnectedcomponents.cpp
-    zimgregionalextrema.cpp
-    zimgautothreshold.cpp
-    zimgsigneddistancemap.h
-    zimgsigneddistancemap.cpp
-    zimggraph.h
-    zimgnccmatch.h
-    zimggraph.cpp
-    zimgnccmatch.cpp
-    zimgfillhole.h
-    zimgfillhole.cpp
-    zimgregistration.h
-    zimgregistration.cpp
-    zregistrationoptimizer.h
-    zregistrationcostfunction.h
-    zregistrationoptimizer.cpp
-    zregistrationcostfunction.cpp
-    zregistrationnumericdiffcostfunction.h
-    zregistrationnumericdiffcostfunction.cpp
-    zimgprocess.h
-    zimgprocess.cpp
-    zassignpuncta.h
-    zassignpuncta.cpp
-    zchromaticshiftcorrection.cpp
-    zchromaticshiftcorrection.h
-    zpunctadetection.h
-    zpunctadetection.cpp
-    zsectionsregistration.h
-    zsectionsregistration.cpp
-    zstitchimage.cpp
-    zstitchimage.h
-    zimginit.h
-    zimginit.cpp
-    zjson.h
-    zjson.cpp
-    zroiutils.cpp
-    zroiutils.h
-    zlogcache.cpp
-    zlogcache.h
-    zminimumspanningtree.cpp
-    zminimumspanningtree.h zsubrange.h zmkl.h zsaturateoperation.cpp
+    zcompleximg.h zcompleximg.cpp
+    zfft.h zfft.cpp
+    zaffine2d.h zaffine2d.cpp
+    zaffine3d.h zaffine3d.cpp
+    zimageinterpolation.h zimageinterpolation.cpp
+    zimagetoimagemetric.h zimagetoimagemetric.cpp
+    zimagetransform.h zimagetransform.cpp
+    zimagematrix2dtransform.h zimagematrix2dtransform.cpp
+    zimagematrix3dtransform.h zimagematrix3dtransform.cpp
+    zimagecompositetransform.h zimagecompositetransform.cpp
+    zimagetransformresolve.h zimagetransformresolve.cpp
+    zimgmerge.h zimgmerge.cpp
+    zimgncc.h zimgncc.cpp
+    zimgalgorithm.h zimgalgorithm.cpp
+    zimgconnectedcomponents.h zimgconnectedcomponents.cpp
+    zimgregionalextrema.h zimgregionalextrema.cpp
+    zimgautothreshold.h zimgautothreshold.cpp
+    zimgsigneddistancemap.h zimgsigneddistancemap.cpp
+    zimggraph.h zimggraph.cpp
+    zimgnccmatch.h zimgnccmatch.cpp
+    zimgfillhole.h zimgfillhole.cpp
+    zimgregistration.h zimgregistration.cpp
+    zregistrationoptimizer.h zregistrationoptimizer.cpp
+    zregistrationcostfunction.h zregistrationcostfunction.cpp
+    zregistrationnumericdiffcostfunction.h zregistrationnumericdiffcostfunction.cpp
+    zimgprocess.h zimgprocess.cpp
+    zassignpuncta.h zassignpuncta.cpp
+    zchromaticshiftcorrection.cpp zchromaticshiftcorrection.h
+    zpunctadetection.h zpunctadetection.cpp
+    zsectionsregistration.h zsectionsregistration.cpp
+    zstitchimage.cpp zstitchimage.h
+    zimginit.h zimginit.cpp
+    zjson.h zjson.cpp
+    zroiutils.cpp zroiutils.h
+    zlogcache.cpp zlogcache.h
+    zminimumspanningtree.cpp zminimumspanningtree.h
+    zsubrange.h
+    zmkl.h
+    zsaturateoperation.cpp
     zsaturateoperation_avx2.cpp zsaturateoperation_avx512.cpp zsaturateoperation_avx2.h zsaturateoperation_avx512.h
     zimageavx512.h zimageavx512.cpp
     zmesh.h zmesh.cpp
@@ -306,11 +231,18 @@ if (APPLE AND AARCH64)
 else ()
   target_compile_definitions(${LIBRARY_NAME} PUBLIC EIGEN_USE_BLAS EIGEN_USE_LAPACKE_STRICT) # EIGEN_USE_MKL_VML)
 endif ()
-target_compile_definitions(${LIBRARY_NAME} PUBLIC lapack_complex_float=std::complex<float> lapack_complex_double=std::complex<double>)
-target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY QT_NO_CAST_TO_ASCII QT_NO_VERSION_TAGGING)
+target_compile_definitions(${LIBRARY_NAME} PUBLIC lapack_complex_float=std::complex<float>
+                           lapack_complex_double=std::complex<double>)
+target_compile_definitions(${LIBRARY_NAME} PUBLIC QT_NO_KEYWORDS QT_USE_QSTRINGBUILDER QT_NO_CAST_FROM_BYTEARRAY
+                           QT_NO_CAST_TO_ASCII QT_NO_VERSION_TAGGING)
 target_compile_definitions(${LIBRARY_NAME} PUBLIC BOOST_CONTAINER_NO_LIB BOOST_JSON_NO_LIB)
 if (WIN32)
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE WINVER=0x0A00 _WIN32_WINNT=0x0A00 _USE_MATH_DEFINES _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING _HAS_DEPRECATED_RESULT_OF)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
+                             UNICODE _UNICODE WINVER=0x0A00 _WIN32_WINNT=0x0A00
+                             _USE_MATH_DEFINES
+                             _SILENCE_CXX17_RESULT_OF_DEPRECATION_WARNING
+                             _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+                             _HAS_DEPRECATED_RESULT_OF)
 
   target_compile_options(${LIBRARY_NAME} PUBLIC /GR) # Enable Run-Time Type Information
   target_compile_options(${LIBRARY_NAME} PUBLIC /EHsc) # exception handling model, https://msdn.microsoft.com/en-us/library/1deeycx5.aspx

@@ -209,11 +209,15 @@ if (MINGW)
 endif (MINGW)
 
 if (WIN32)
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN UNICODE
-                             _UNICODE WINVER=0x0A00 _WIN32_WINNT=0x0A00 _USE_MATH_DEFINES
-                             PCRE2_STATIC LIBXML_STATIC)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX WIN32_LEAN_AND_MEAN
+                             UNICODE _UNICODE WINVER=0x0A00 _WIN32_WINNT=0x0A00
+                             _USE_MATH_DEFINES
+                             PCRE2_STATIC
+                             LIBXML_STATIC)
   target_compile_options(${LIBRARY_NAME} PRIVATE /W4 /TP)
-  target_compile_options(${LIBRARY_NAME} PRIVATE /wd4100 /wd4244 /wd4267 /wd4245 /wd4701 /wd4703 /wd4459 /wd4505 /wd4018 /wd4027 /wd4456 /wd4130 /wd4996 /wd4702 /wd4706 /wd4477 /wd4127 /wd4334 /wd4101 /wd4700 /wd4457 /wd4710 /wd4711 /wd4820 /wd5045 /wd4774 /wd4365 /wd4388 /wd4389)
+  target_compile_options(${LIBRARY_NAME} PRIVATE /wd4100 /wd4244 /wd4267 /wd4245 /wd4701 /wd4703 /wd4459 /wd4505
+                         /wd4018 /wd4027 /wd4456 /wd4130 /wd4996 /wd4702 /wd4706 /wd4477 /wd4127 /wd4334 /wd4101
+                         /wd4700 /wd4457 /wd4710 /wd4711 /wd4820 /wd5045 /wd4774 /wd4365 /wd4388 /wd4389)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Waddress -Wdeprecated)
