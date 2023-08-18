@@ -286,6 +286,8 @@ void shutdownImgLib()
   fftw_cleanup_threads();
 #endif
 
+  folly::SingletonVault::singleton()->destroyInstancesFinal();
+
   shutdownLogging();
 }
 

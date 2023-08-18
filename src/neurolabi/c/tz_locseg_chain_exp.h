@@ -17,7 +17,7 @@ typedef struct _Pixel_Feature
   double eigen_vector3[3];
 } Pixel_Feature;
 
-Pixel_Feature *Get_Pixel_Feature(double pos[], const Stack *stack, const Trace_Workspace *tw);
+Pixel_Feature *Get_Pixel_Feature(double pos[3], const Stack *stack, const Trace_Workspace *tw);
 
 void Local_Neuroseg_Pixel_Feature(Local_Neuroseg *ln, const Stack *stack, const Trace_Workspace *tw);
 

@@ -200,10 +200,9 @@ add_library(${LIBRARY_NAME} STATIC ${NEULIB_SRCS} ${GENERATED_NEULIB_SRCS}
             ${GENELIB_SRCS} ${GENERATED_GENELIB_SRCS})
 
 #Set some flags
+target_compile_definitions(${LIBRARY_NAME} PUBLIC HAVE_CONFIG_H LIBMYERS_VERSION=2)
 if (CMAKE_BUILD_TYPE STREQUAL Debug)
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC _DEBUG_ _TEST_ HAVE_CONFIG_H LIBMYERS_VERSION=2)
-else (CMAKE_BUILD_TYPE STREQUAL Debug)
-  target_compile_definitions(${LIBRARY_NAME} PUBLIC HAVE_CONFIG_H LIBMYERS_VERSION=2)
+  target_compile_definitions(${LIBRARY_NAME} PUBLIC _DEBUG_ _TEST_)
 endif (CMAKE_BUILD_TYPE STREQUAL Debug)
 if (MINGW)
   target_compile_definitions(${LIBRARY_NAME} PUBLIC __USE_MINGW_ANSI_STDIO)
@@ -224,7 +223,8 @@ else (WIN32)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Waddress -Wdeprecated)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unused-parameter -Wno-sign-compare -Wno-unused-function
                          -Wno-unused-variable -Wno-sometimes-uninitialized -Wno-uninitialized -Wno-varargs
-                         -Wno-absolute-value -Wno-unused-but-set-variable)
+                         -Wno-absolute-value
+                         -Wno-unknown-warning-option -Wno-unused-but-set-variable -Wno-format)
 endif (WIN32)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${GENELIB_DIR})

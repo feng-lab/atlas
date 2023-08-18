@@ -227,7 +227,7 @@ void ZLocalNeuroseg::display(
       }
     }
     break;
-        
+
   case zstackobject::EDisplayStyle::SKELETON:
     {
       double top_position[3];
@@ -544,7 +544,7 @@ bool ZLocalNeuroseg::hitMask(const Stack *stack) const
   return false;
 }
 
-void ZLocalNeuroseg::topPosition(double pos[]) const
+void ZLocalNeuroseg::topPosition(double pos[3]) const
 {
   Neuroseg_Top(&(m_locseg->seg), pos);
   pos[0] += m_locseg->pos[0];
@@ -552,7 +552,7 @@ void ZLocalNeuroseg::topPosition(double pos[]) const
   pos[2] += m_locseg->pos[2];
 }
 
-void ZLocalNeuroseg::bottomPosition(double pos[]) const
+void ZLocalNeuroseg::bottomPosition(double pos[3]) const
 {
   Neuroseg_Bottom(&(m_locseg->seg), pos);
   pos[0] += m_locseg->pos[0];
