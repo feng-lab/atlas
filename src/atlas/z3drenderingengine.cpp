@@ -1007,6 +1007,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
   const int tileSize = 7680; // 2048;
   const int tileBorder = 128;
   const auto tileExpandSize = tileSize + tileBorder * 2;
+  ZImgRegion validRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize);
 
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
@@ -1045,15 +1046,12 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
         if (sst == Z3DScreenShotType::MonoView) {
-          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture())
-                          .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).crop(validRegion);
           img.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
         } else {
-          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture())
-                          .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).crop(validRegion);
           img.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
-          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture())
-                     .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).crop(validRegion);
           rightImg.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
         }
       }
@@ -1096,6 +1094,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   getGLFocus();
 
   auto tileExpandSize = tileSize + tileBorder * 2;
+  ZImgRegion validRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize);
 
   setOutputSize(glm::uvec2(tileExpandSize, tileExpandSize));
   m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
@@ -1114,7 +1113,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
   if (sst == Z3DScreenShotType::MonoView) {
-    textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).flip(Dimension::Y).save(filename);
+    textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format("Saved rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
                              width,
                              height,
@@ -1122,14 +1121,14 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
                              tileStartY,
                              filename);
   } else {
-    textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).flip(Dimension::Y).save(filename);
+    textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format("Saved left rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
                              width,
                              height,
                              tileStartX,
                              tileStartY,
                              filename);
-    textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).flip(Dimension::Y).save(rightFilename);
+    textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).crop(validRegion).save(rightFilename);
     LOG(INFO) << fmt::format("Saved right rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
                              width,
                              height,
