@@ -1004,9 +1004,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 {
   getGLFocus();
 
-  const int tileSize = 384; // 7680; // 2048;
-  const int tileBorder = 64; // 128;
-  const auto tileInnerSize = tileSize - 2 * tileBorder;
+  const int tileSize = 7680; // 2048;
+  const int tileBorder = 128;
+  const auto tileExpandSize = tileSize + tileBorder * 2;
 
   if (width <= tileSize && height <= tileSize) {
     // resize texture container to desired image dimensions and propagate change
@@ -1014,7 +1014,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
-    setOutputSize(glm::uvec2(tileSize, tileSize));
+    setOutputSize(glm::uvec2(tileExpandSize, tileExpandSize));
     m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
 
     ZImg img(ZImgInfo(width, height, 1, 4));
@@ -1025,16 +1025,16 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
       rightImg.infoRef().lastChannelIsAlphaChannel = true;
     }
 
-    auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
-    auto numRows = (height + tileInnerSize - 1) / tileInnerSize;
+    auto numCols = (width + tileSize - 1) / tileSize;
+    auto numRows = (height + tileSize - 1) / tileSize;
     for (auto c = 0; c < numCols; ++c) {
       for (auto r = 0; r < numRows; ++r) {
-        auto m_tileStartX = c * tileInnerSize - tileBorder;
-        auto m_tileStartY = r * tileInnerSize - tileBorder;
-        double left = m_tileStartX / 1.0 / width;
-        double right = (m_tileStartX + tileSize) / 1.0 / width;
-        double bottom = m_tileStartY / 1.0 / height;
-        double top = (m_tileStartY + tileSize) / 1.0 / height;
+        auto tileStartX = c * tileSize;
+        auto tileStartY = r * tileSize;
+        double left = (tileStartX - tileBorder) / 1.0 / width;
+        double right = (tileStartX + tileSize + tileBorder) / 1.0 / width;
+        double bottom = (tileStartY - tileBorder) / 1.0 / height;
+        double top = (tileStartY + tileSize + tileBorder) / 1.0 / height;
 
         // set camera frustum
         m_globalParas->camera.setTileFrustum(left, right, bottom, top);
@@ -1045,13 +1045,16 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
         m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 
         if (sst == Z3DScreenShotType::MonoView) {
-          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture());
-          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+          auto tmpImg = textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture())
+                          .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          img.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
         } else {
-          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture());
-          img.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
-          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture());
-          rightImg.pasteImg(tmpImg, ZVoxelCoordinate(m_tileStartX, m_tileStartY));
+          auto tmpImg = textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture())
+                          .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          img.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
+          tmpImg = textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture())
+                     .crop(ZImgRegion(tileBorder, tileBorder + tileSize, tileBorder, tileBorder + tileSize));
+          rightImg.pasteImg(tmpImg, ZVoxelCoordinate(tileStartX, tileStartY));
         }
       }
     }
@@ -1098,9 +1101,9 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
   m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
 
   double left = (tileStartX - tileBorder) / 1.0 / width;
-  double right = (tileStartX + tileExpandSize) / 1.0 / width;
+  double right = (tileStartX + tileSize + tileBorder) / 1.0 / width;
   double bottom = (tileStartY - tileBorder) / 1.0 / height;
-  double top = (tileStartY + tileExpandSize) / 1.0 / height;
+  double top = (tileStartY + tileSize + tileBorder) / 1.0 / height;
 
   // set camera frustum
   m_globalParas->camera.setTileFrustum(left, right, bottom, top);
