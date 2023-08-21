@@ -156,6 +156,7 @@ void Z3DCameraParameter::rotate90XZ()
 
 void Z3DCameraParameter::viewportChanged(const glm::uvec2& viewport)
 {
+  LOG(INFO) << viewport.x << " " << viewport.y;
   m_value.setWindowAspectRatio(static_cast<float>(viewport.x) / viewport.y);
   Q_EMIT windowsAspectRatioChanged(static_cast<float>(viewport.x) / viewport.y);
   Q_EMIT valueChanged();

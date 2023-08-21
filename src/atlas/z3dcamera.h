@@ -388,6 +388,11 @@ private:
   float m_bottom;
   float m_top;
 
+  float m_normalizedLeft = 0;
+  float m_normalizedRight = 1;
+  float m_normalizedBottom = 0;
+  float m_normalizedTop = 1;
+
   // derived matrices
   glm::mat4 m_viewMatrices[3];
   glm::mat4 m_projectionMatrices[3];

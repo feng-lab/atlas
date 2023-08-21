@@ -419,14 +419,17 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     Q_EMIT renderingError("does not support output size larger than 7680x4320");
     return;
   }
-  LOG(INFO) << fmt::format("fps: {} width: {} height: {} startFrame: {} endFrame: {} startTime: {} endTime: {}",
-                           framePerSecond,
-                           width,
-                           height,
-                           startFrame,
-                           endFrame,
-                           static_cast<double>(startFrame) / framePerSecond,
-                           static_cast<double>(endFrame) / framePerSecond);
+  LOG(INFO) << fmt::format(
+    "fps: {} width: {} height: {} startFrame: {} endFrame: {} startTime: {} endTime: {} tileSize: {} tileBorder: {}",
+    framePerSecond,
+    width,
+    height,
+    startFrame,
+    endFrame,
+    static_cast<double>(startFrame) / framePerSecond,
+    static_cast<double>(endFrame) / framePerSecond,
+    tileSize,
+    tileBorder);
 
   QDir dir(QFileInfo(fn).absolutePath());
   if (!dir.exists()) {
@@ -1001,8 +1004,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 {
   getGLFocus();
 
-  const int tileSize = 7680; // 2048;
-  const int tileBorder = 128;
+  const int tileSize = 384; // 7680; // 2048;
+  const int tileBorder = 64; // 128;
   const auto tileInnerSize = tileSize - 2 * tileBorder;
 
   if (width <= tileSize && height <= tileSize) {
@@ -1011,13 +1014,15 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
 
     takeScreenShotPrivate(filename, sst);
   } else {
-    m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
     setOutputSize(glm::uvec2(tileSize, tileSize));
+    m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
 
     ZImg img(ZImgInfo(width, height, 1, 4));
+    img.infoRef().lastChannelIsAlphaChannel = true;
     ZImg rightImg;
     if (sst != Z3DScreenShotType::MonoView) {
       rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+      rightImg.infoRef().lastChannelIsAlphaChannel = true;
     }
 
     auto numCols = (width + tileInnerSize - 1) / tileInnerSize;
@@ -1089,8 +1094,8 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 
   auto tileExpandSize = tileSize + tileBorder * 2;
 
-  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
   setOutputSize(glm::uvec2(tileExpandSize, tileExpandSize));
+  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
 
   double left = (tileStartX - tileBorder) / 1.0 / width;
   double right = (tileStartX + tileExpandSize) / 1.0 / width;
