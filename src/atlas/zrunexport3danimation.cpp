@@ -38,6 +38,8 @@ DEFINE_uint64(
   0,
   "limit memory usage to less than XX GB, has no effect if the available memory is less than the input value, "
   "only value larger than or equal to 32 will be accepted as valid limit, default is 0 means no limit");
+DEFINE_int32(output_tile_size, 0, "size (width and height) of tile when rendering output tile by tile, default is 0");
+DEFINE_int32(output_tile_border, 0, "border (tile size + tile border) of tile when rendering output tile by tile, default is 0");
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
@@ -128,7 +130,9 @@ int ZRunExport3DAnimation::run()
                                     Z3DScreenShotType::MonoView,
                                     nullptr,
                                     outputImageFolderName.isEmpty() ? nullptr : &outputImageFolderName,
-                                    FLAGS_skip_video_compression);
+                                    FLAGS_skip_video_compression,
+                                    FLAGS_output_tile_size,
+                                    FLAGS_output_tile_border);
 
   return m_hasError ? 1 : 0;
 }

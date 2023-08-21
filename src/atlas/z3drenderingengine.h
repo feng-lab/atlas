@@ -102,7 +102,9 @@ public:
                                   Z3DScreenShotType sst = Z3DScreenShotType::MonoView,
                                   std::atomic_bool* cancelFlag = nullptr,
                                   const QString* imageOuputFolder = nullptr,
-                                  bool skipVideoCompression = false);
+                                  bool skipVideoCompression = false,
+                                  int tileSize = 0,
+                                  int tileBorder = 0);
 
   const std::vector<std::unique_ptr<Z3DObjView>>& objViews() const
   {
@@ -293,6 +295,16 @@ private:
                                                             int width,
                                                             int height,
                                                             Z3DScreenShotType sst);
+
+  void takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
+                                                                  const QString& rightFilename,
+                                                                  int width,
+                                                                  int height,
+                                                                  Z3DScreenShotType sst,
+                                                                  int tileSize = 0,
+                                                                  int tileBorder = 0,
+                                                                  int tileStartX = 0,
+                                                                  int tileStartY = 0);
 
   // private version will throw exception on error
   void takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst);

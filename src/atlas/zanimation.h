@@ -165,7 +165,9 @@ Q_SIGNALS:
                                           Z3DScreenShotType sst,
                                           std::atomic_bool* cancelFlag,
                                           const QString* imageOuputFolder,
-                                          bool skipVideoCompression);
+                                          bool skipVideoCompression,
+                                          int tileSize,
+                                          int tileBorder);
 
 protected:
   void disableAnimationOf(size_t id);

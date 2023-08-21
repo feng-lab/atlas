@@ -10,6 +10,7 @@
 
 #include <glog/logging.h>
 #include <fmt/core.h>
+#include <fmt/format.h>
 #include <QDateTime>
 #include <QDebug>
 #include <QPoint>

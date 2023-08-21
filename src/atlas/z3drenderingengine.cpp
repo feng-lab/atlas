@@ -393,7 +393,9 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                     Z3DScreenShotType sst,
                                                     std::atomic_bool* cancelFlag,
                                                     const QString* imageOuputFolder,
-                                                    bool skipVideoCompression)
+                                                    bool skipVideoCompression,
+                                                    int tileSize,
+                                                    int tileBorder)
 {
   LOG(INFO) << "start exporting video";
   auto logGuard = folly::makeGuard([]() {
@@ -484,19 +486,77 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     auto tempdir = std::make_shared<QTemporaryDir>();
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
-    for (int i = startFrame; i < endFrame; ++i) {
-      Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 100));
-      if (cancelFlag && cancelFlag->load()) {
-        reportCancelError();
-        return;
+    if (tileSize == 0 || (tileSize >= width && tileSize >= height)) {
+      for (int i = startFrame; i < endFrame; ++i) {
+        Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 100));
+        if (cancelFlag && cancelFlag->load()) {
+          reportCancelError();
+          return;
+        }
+
+        animation->setCurrentTime(time);
+        time += timeIncrement;
+        QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+        QString filepath = tmpdir.filePath(filename);
+
+        takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
       }
+    } else {
+      auto numCols = (width + tileSize - 1) / tileSize;
+      auto numRows = (height + tileSize - 1) / tileSize;
+      for (auto c = 0; c < numCols; ++c) {
+        for (auto r = 0; r < numRows; ++r) {
+          auto tileStartX = c * tileSize;
+          auto tileStartY = r * tileSize;
+          time = static_cast<double>(startFrame) / framePerSecond;
+          for (int i = startFrame; i < endFrame; ++i) {
+            Q_EMIT progressChanged(std::clamp<int>(
+              std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
+              0,
+              100));
+            if (cancelFlag && cancelFlag->load()) {
+              reportCancelError();
+              return;
+            }
 
-      animation->setCurrentTime(time);
-      time += timeIncrement;
-      QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
-      QString filepath = tmpdir.filePath(filename);
+            animation->setCurrentTime(time);
+            time += timeIncrement;
+            QString filename = QString("_%1%2_%3_%4.png")
+                                 .arg(namePrefix)
+                                 .arg(i, fieldWidth, 10, QChar('0'))
+                                 .arg(tileStartX)
+                                 .arg(tileStartY);
+            QString filepath = tmpdir.filePath(filename);
 
-      takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
+            QString rightFilepath;
+
+            if (sst != Z3DScreenShotType::MonoView) {
+              filename = QString("_%1%2_%3_%4_left.png")
+                           .arg(namePrefix)
+                           .arg(i, fieldWidth, 10, QChar('0'))
+                           .arg(tileStartX)
+                           .arg(tileStartY);
+              filepath = tmpdir.filePath(filename);
+              filename = QString("_%1%2_%3_%4_right.png")
+                           .arg(namePrefix)
+                           .arg(i, fieldWidth, 10, QChar('0'))
+                           .arg(tileStartX)
+                           .arg(tileStartY);
+              rightFilepath = tmpdir.filePath(filename);
+            }
+
+            takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(filepath,
+                                                                       rightFilepath,
+                                                                       width,
+                                                                       height,
+                                                                       sst,
+                                                                       tileSize,
+                                                                       tileBorder,
+                                                                       tileStartX,
+                                                                       tileStartY);
+          }
+        }
+      }
     }
     resetOutputSizeToMatchCanvasSize();
 
@@ -1011,6 +1071,67 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
     m_globalParas->camera.setTileFrustum();
     m_compositor->setRenderingRegion();
   }
+}
+
+void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePrivate(const QString& filename,
+                                                                                    const QString& rightFilename,
+                                                                                    int width,
+                                                                                    int height,
+                                                                                    nim::Z3DScreenShotType sst,
+                                                                                    int tileSize,
+                                                                                    int tileBorder,
+                                                                                    int tileStartX,
+                                                                                    int tileStartY)
+{
+  CHECK(tileSize > 0);
+  CHECK(width > tileSize || height > tileSize);
+  getGLFocus();
+
+  auto tileExpandSize = tileSize + tileBorder * 2;
+
+  m_globalParas->camera.viewportChanged(glm::uvec2(width, height));
+  setOutputSize(glm::uvec2(tileExpandSize, tileExpandSize));
+
+  double left = (tileStartX - tileBorder) / 1.0 / width;
+  double right = (tileStartX + tileExpandSize) / 1.0 / width;
+  double bottom = (tileStartY - tileBorder) / 1.0 / height;
+  double top = (tileStartY + tileExpandSize) / 1.0 / height;
+
+  // set camera frustum
+  m_globalParas->camera.setTileFrustum(left, right, bottom, top);
+  m_compositor->setRenderingRegion(left, right, bottom, top);
+  // LOG(INFO) << globalCameraPara().get().left() << globalCameraPara().get().right() <<
+  // globalCameraPara().get().top() << globalCameraPara().get().bottom();
+
+  m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
+
+  if (sst == Z3DScreenShotType::MonoView) {
+    textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).flip(Dimension::Y).save(filename);
+    LOG(INFO) << fmt::format("Saved rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
+                             width,
+                             height,
+                             tileStartX,
+                             tileStartY,
+                             filename);
+  } else {
+    textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).flip(Dimension::Y).save(filename);
+    LOG(INFO) << fmt::format("Saved left rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
+                             width,
+                             height,
+                             tileStartX,
+                             tileStartY,
+                             filename);
+    textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).flip(Dimension::Y).save(rightFilename);
+    LOG(INFO) << fmt::format("Saved right rendering (width: {}, height: {}, X start: {}, Y start: {}) to file: {}",
+                             width,
+                             height,
+                             tileStartX,
+                             tileStartY,
+                             rightFilename);
+  }
+
+  m_globalParas->camera.setTileFrustum();
+  m_compositor->setRenderingRegion();
 }
 
 void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst)

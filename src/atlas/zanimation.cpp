@@ -413,7 +413,9 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             sst,
                                             &m_cancelFlag,
                                             nullptr,
-                                            false);
+                                            false,
+                                            0, // todo: add UI
+                                            0);
 
   progress->exec();
 }
