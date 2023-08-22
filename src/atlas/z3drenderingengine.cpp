@@ -484,8 +484,6 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
 
     int numFrame = endFrame - startFrame;
     int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
-    double time = static_cast<double>(startFrame) / framePerSecond;
-    double timeIncrement = totalNumFrames > 1 ? animation->duration() / totalNumFrames : 0.;
     QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
     auto tempdir = std::make_shared<QTemporaryDir>();
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
@@ -497,8 +495,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
           return;
         }
 
-        animation->setCurrentTime(time);
-        time += timeIncrement;
+        animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
         QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
         QString filepath = tmpdir.filePath(filename);
 
@@ -511,7 +508,6 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         for (auto r = 0; r < numRows; ++r) {
           auto tileStartX = c * tileSize;
           auto tileStartY = r * tileSize;
-          time = static_cast<double>(startFrame) / framePerSecond;
           for (int i = startFrame; i < endFrame; ++i) {
             Q_EMIT progressChanged(std::clamp<int>(
               std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
@@ -522,8 +518,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
               return;
             }
 
-            animation->setCurrentTime(time);
-            time += timeIncrement;
+            animation->setCurrentTime(static_cast<double>(i) / framePerSecond);
             QString filename = QString("_%1%2_%3_%4.png")
                                  .arg(namePrefix)
                                  .arg(i, fieldWidth, 10, QChar('0'))
@@ -1020,6 +1015,9 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   VLOG(1) << "renderFast";
   Q_EMIT progressChanged(10);
   m_isRendering = true;
+  auto renderingGuard = folly::makeGuard([this]() {
+    m_isRendering = false;
+  });
   getGLFocus();
   m_progress = m_networkEvaluator->process(stereo, true);
   Q_EMIT progressChanged(std::clamp<int>(m_progress * 100., 0, 100));
@@ -1028,8 +1026,6 @@ void Z3DRenderingEngine::renderFast(bool stereo)
   } else {
     Q_EMIT progressChanged(100);
   }
-
-  m_isRendering = false;
 }
 
 void Z3DRenderingEngine::render(bool stereo)
@@ -1078,6 +1074,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
                                                                               int height,
                                                                               Z3DScreenShotType sst)
 {
+  m_isRendering = true;
+  auto renderingGuard = folly::makeGuard([this]() {
+    m_isRendering = false;
+  });
+
   getGLFocus();
 
   const int tileSize = 7680; // 2048;
@@ -1165,6 +1166,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
                                                                                     int tileStartX,
                                                                                     int tileStartY)
 {
+  m_isRendering = true;
+  auto renderingGuard = folly::makeGuard([this]() {
+    m_isRendering = false;
+  });
+
   CHECK(tileSize > 0);
   CHECK(width > tileSize || height > tileSize);
   getGLFocus();
@@ -1219,6 +1225,11 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 
 void Z3DRenderingEngine::takeScreenShotPrivate(const QString& filename, Z3DScreenShotType sst)
 {
+  m_isRendering = true;
+  auto renderingGuard = folly::makeGuard([this]() {
+    m_isRendering = false;
+  });
+
   getGLFocus();
   m_networkEvaluator->process(sst != Z3DScreenShotType::MonoView);
 

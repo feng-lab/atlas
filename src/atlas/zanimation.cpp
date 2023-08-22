@@ -500,8 +500,6 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
   progress->setAttribute(Qt::WA_DeleteOnClose);
   progress->show();
   int fieldWidth = std::max(FLAGS_output_image_name_field_width, numDigits(totalNumFrames - 1));
-  double time = static_cast<double>(startFrame) / framePerSecond;
-  double timeIncrement = totalNumFrames > 1 ? m_duration / totalNumFrames : 0.;
   QString namePrefix = QString::fromStdString(FLAGS_output_image_name_prefix);
   auto tempdir = std::make_shared<QTemporaryDir>();
   QDir tmpdir(tempdir->path());
@@ -512,8 +510,7 @@ void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
       break;
     }
 
-    setCurrentTime(time);
-    time += timeIncrement;
+    setCurrentTime(static_cast<double>(i) / framePerSecond);
     QString filename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
     QString filepath = tmpdir.filePath(filename);
     if (!canvasPainter.renderToImage(filepath, width, height, &err)) {

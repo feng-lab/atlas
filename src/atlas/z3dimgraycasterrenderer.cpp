@@ -22,7 +22,7 @@ DEFINE_uint32(atlas_volume_rendering_maximum_round,
               100,
               "Maximum number of rounds for volume rendering, default is 100");
 
-#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
+#if defined(__linux__)
 DEFINE_bool(atlas_debug_texture_output, false, "produce debug intermediate texture to /data/testoutput");
 #endif
 
@@ -680,7 +680,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   CHECK(m_lastImageRenderTargets[to_underlying(eye)]->size() == m_blockIDsRenderTarget->size())
     << m_lastImageRenderTargets[to_underlying(eye)]->size() << " " << m_blockIDsRenderTarget->size();
 
-#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
+#if defined(__linux__)
   static int dummyidx = -1;
   if (FLAGS_atlas_debug_texture_output) {
     ++dummyidx;
@@ -745,7 +745,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
                                                   ze_to_zw_a,
                                                   ze_to_zw_b,
                                                   ze_to_screen_pixel_voxel_size);
-#if defined(ATLAS_SANITIZE_ADDRESS) && defined(__linux__)
+#if defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
           auto filen =
             QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
