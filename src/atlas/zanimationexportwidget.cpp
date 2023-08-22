@@ -22,6 +22,8 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_framePerSecond("Frames per Second", 30, 12, 60)
   , m_startFrame("Start Frame", 0, 0, 9999999)
   , m_endFrame("End Frame", -1, -1, 9999999)
+  , m_tileSize("Tile Size", 0, 0, 4096)
+  , m_tileBorder("Tile Border", 0, 0, 1024)
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");
@@ -32,6 +34,8 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   m_framePerSecond.setStyle("SPINBOX");
   m_startFrame.setStyle("SPINBOX");
   m_endFrame.setStyle("SPINBOX");
+  m_tileSize.setStyle("SPINBOX");
+  m_tileBorder.setStyle("SPINBOX");
   createWidget();
   connect(&m_captureStereoImage, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::adjustWidget);
   connect(&m_useWindowSize, &ZBoolParameter::valueChanged, this, &ZAnimationExportWidget::updateImageSizeWidget);
@@ -95,7 +99,9 @@ void ZAnimationExportWidget::captureButtonPressed()
                                         m_endFrame.get(),
                                         size.x,
                                         size.y,
-                                        sst);
+                                        sst,
+                                        m_tileSize.get(),
+                                        m_tileBorder.get());
     }
   }
 }
@@ -103,6 +109,8 @@ void ZAnimationExportWidget::captureButtonPressed()
 void ZAnimationExportWidget::updateImageSizeWidget()
 {
   m_customSize.setEnabled(!m_useWindowSize.get());
+  m_tileSize.setEnabled(!m_useWindowSize.get());
+  m_tileBorder.setEnabled(!m_useWindowSize.get());
 }
 
 void ZAnimationExportWidget::adjustWidget()
@@ -179,6 +187,24 @@ void ZAnimationExportWidget::createWidget()
   wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
   hlo->addWidget(wg);
   lo->addLayout(hlo);
+
+  if (!m_is2DAnimation) {
+    hlo = new QHBoxLayout;
+    hlo->addWidget(m_tileSize.createNameLabel());
+    wg = m_tileSize.createWidget();
+    wg->setMinimumWidth(125);
+    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    hlo->addWidget(wg);
+    lo->addLayout(hlo);
+
+    hlo = new QHBoxLayout;
+    hlo->addWidget(m_tileBorder.createNameLabel());
+    wg = m_tileBorder.createWidget();
+    wg->setMinimumWidth(125);
+    wg->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::Fixed);
+    hlo->addWidget(wg);
+    lo->addLayout(hlo);
+  }
 
   hlo = new QHBoxLayout;
   int left;

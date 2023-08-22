@@ -44,7 +44,9 @@ Q_SIGNALS:
                                   int endFrame,
                                   int width,
                                   int height,
-                                  Z3DScreenShotType sst);
+                                  Z3DScreenShotType sst,
+                                  int tileSize,
+                                  int tileBorder);
 
   void
   export3DAnimation(const QString& filename, int framePerSecond, int startFrame, int endFrame, Z3DScreenShotType sst);
@@ -79,6 +81,8 @@ private:
   ZIntParameter m_framePerSecond;
   ZIntParameter m_startFrame;
   ZIntParameter m_endFrame;
+  ZIntParameter m_tileSize;
+  ZIntParameter m_tileBorder;
 
   ZSelectFileWidget* m_filenameWidget = nullptr;
   QPushButton* m_captureButton = nullptr;

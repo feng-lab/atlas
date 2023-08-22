@@ -124,7 +124,9 @@ public:
                                   int endFrame,
                                   int width,
                                   int height,
-                                  Z3DScreenShotType sst);
+                                  Z3DScreenShotType sst,
+                                  int tileSize = 0,
+                                  int tileBorder = 0);
 
   void export3DAnimation(const QString& fn, int framePerSecond, int startFrame, int endFrame, Z3DScreenShotType sst);
 

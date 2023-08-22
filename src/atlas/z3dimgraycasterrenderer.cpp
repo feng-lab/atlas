@@ -915,7 +915,10 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   if (lastRound) {
     STOP_AND_LOG(btcb)
     LOG(INFO) << "no blocks to render";
-    return lastRound;
+    if (round > 0) {
+      // otherwise still need to render empty blocks
+      return lastRound;
+    }
   }
 
   bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);

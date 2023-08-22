@@ -333,7 +333,9 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             int endFrame,
                                             int width,
                                             int height,
-                                            Z3DScreenShotType sst)
+                                            Z3DScreenShotType sst,
+                                            int tileSize,
+                                            int tileBorder)
 {
   if (!m_engine) {
     QMessageBox::critical(QApplication::activeWindow(), QApplication::applicationName(), QString("View not ready"));
@@ -414,8 +416,8 @@ void ZAnimation::exportFixedSize3DAnimation(const QString& fn,
                                             &m_cancelFlag,
                                             nullptr,
                                             false,
-                                            0, // todo: add UI
-                                            0);
+                                            tileSize,
+                                            tileBorder);
 
   progress->exec();
 }
@@ -434,7 +436,15 @@ void ZAnimation::export3DAnimation(const QString& fn,
   CHECK(engine);
 
   auto engineOutputSize = engine->outputSize();
-  exportFixedSize3DAnimation(fn, framePerSecond, startFrame, endFrame, engineOutputSize.x, engineOutputSize.y, sst);
+  exportFixedSize3DAnimation(fn,
+                             framePerSecond,
+                             startFrame,
+                             endFrame,
+                             engineOutputSize.x,
+                             engineOutputSize.y,
+                             sst,
+                             0,
+                             0);
 }
 
 void ZAnimation::exportFixedSize2DAnimation(const QString& fn,
