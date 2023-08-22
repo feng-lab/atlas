@@ -491,7 +491,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     QDir tmpdir(imageOuputFolder ? *imageOuputFolder : tempdir->path());
     if (tileSize == 0 || (tileSize >= width && tileSize >= height)) {
       for (int i = startFrame; i < endFrame; ++i) {
-        Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 100));
+        Q_EMIT progressChanged(std::clamp<int>(std::floor((i - startFrame) * 1. / numFrame * 100.), 0, 99));
         if (cancelFlag && cancelFlag->load()) {
           reportCancelError();
           return;
@@ -516,7 +516,7 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
             Q_EMIT progressChanged(std::clamp<int>(
               std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
               0,
-              100));
+              98));
             if (cancelFlag && cancelFlag->load()) {
               reportCancelError();
               return;
@@ -557,6 +557,82 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
                                                                        tileBorder,
                                                                        tileStartX,
                                                                        tileStartY);
+          }
+        }
+      }
+
+      // compose images
+      for (int i = startFrame; i < endFrame; ++i) {
+        Q_EMIT progressChanged(99);
+        if (cancelFlag && cancelFlag->load()) {
+          reportCancelError();
+          return;
+        }
+        QString targetFilename = QString("%1%2.png").arg(namePrefix).arg(i, fieldWidth, 10, QChar('0'));
+        auto targetFilepath = tmpdir.filePath(targetFilename);
+        ZImg img(ZImgInfo(width, height, 1, 4));
+        img.infoRef().lastChannelIsAlphaChannel = true;
+        ZImg rightImg;
+        if (sst != Z3DScreenShotType::MonoView) {
+          rightImg = ZImg(ZImgInfo(width, height, 1, 4));
+          rightImg.infoRef().lastChannelIsAlphaChannel = true;
+        }
+        for (auto c = 0; c < numCols; ++c) {
+          for (auto r = 0; r < numRows; ++r) {
+            auto tileStartX = c * tileSize;
+            auto tileStartY = r * tileSize;
+            if (sst == Z3DScreenShotType::MonoView) {
+              QString filename = QString("_%1%2_%3_%4.png")
+                                   .arg(namePrefix)
+                                   .arg(i, fieldWidth, 10, QChar('0'))
+                                   .arg(tileStartX)
+                                   .arg(tileStartY);
+              QString filepath = tmpdir.filePath(filename);
+              if (tmpdir.exists(filename)) {
+                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+              } else {
+                LOG(ERROR) << "Could not find file: " << filepath;
+              }
+            } else {
+              QString filename = QString("_%1%2_%3_%4_left.png")
+                           .arg(namePrefix)
+                           .arg(i, fieldWidth, 10, QChar('0'))
+                           .arg(tileStartX)
+                           .arg(tileStartY);
+              QString filepath = tmpdir.filePath(filename);
+              if (tmpdir.exists(filename)) {
+                img.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+              } else {
+                LOG(ERROR) << "Could not find left file: " << filepath;
+              }
+              filename = QString("_%1%2_%3_%4_right.png")
+                           .arg(namePrefix)
+                           .arg(i, fieldWidth, 10, QChar('0'))
+                           .arg(tileStartX)
+                           .arg(tileStartY);
+              if (tmpdir.exists(filename)) {
+                rightImg.pasteImg(ZImg(filepath), ZVoxelCoordinate(tileStartX, tileStartY));
+              } else {
+                LOG(ERROR) << "Could not find right file: " << filepath;
+              }
+            }
+          }
+        }
+
+        if (sst == Z3DScreenShotType::MonoView) {
+          img.flip(Dimension::Y).save(targetFilepath);
+          LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << targetFilepath;
+        } else {
+          if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
+            ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(targetFilepath);
+            LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height() << ") to file: " << targetFilepath;
+          } else {
+            ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
+              .zoom(0.5, 1)
+              .flip(Dimension::Y)
+              .save(targetFilepath);
+            LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
+                      << ") to file:" << targetFilepath;
           }
         }
       }
