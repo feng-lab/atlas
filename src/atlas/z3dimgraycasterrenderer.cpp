@@ -741,7 +741,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
       auto c = visibleIdxs[channelIdx];
       for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
         bool lastRound = render3DImageForOneRound(eye,
-                                                  visibleIdxs[channelIdx],
+                                                  c,
                                                   round,
                                                   ze_to_zw_a,
                                                   ze_to_zw_b,

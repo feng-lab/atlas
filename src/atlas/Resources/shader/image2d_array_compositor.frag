@@ -15,52 +15,87 @@ void main()
 {
 #if NUM_VOLUMES < 2
 #if GLSL_VERSION < 130
-  FragData0 = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
+  vec4 color = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
+  if (color.a <= 0) {
+    discard;
+  }
   gl_FragDepth = texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
 #else
-  FragData0 = texelFetch(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
+  vec4 color = texelFetch(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
+  if (color.a <= 0) {
+    discard;
+  }
   gl_FragDepth = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
 #endif
+  FragData0 = color;
 #elif defined(MAX_PROJ_MERGE)
-#if GLSL_VERSION < 130
-  FragData0 = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
-  gl_FragDepth = texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
-  for (int i = 1; i < NUM_VOLUMES; ++i) {
-    FragData0 = max(FragData0, texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, i), 0));
+  vec4 color = vec4(0, 0, 0, 0);
 #ifdef RESULT_OPAQUE
-    gl_FragDepth = max(gl_FragDepth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+  float depth = 0;
 #else
-    gl_FragDepth = min(gl_FragDepth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+  float depth = 1;
+#endif
+#if GLSL_VERSION < 130
+  for (int i = 0; i < NUM_VOLUMES; ++i) {
+    vec4 tmpColor = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, i), 0);
+    if (tmpColor.a <= 0) {
+      continue;
+    }
+    color = max(color, tmpColor);
+#ifdef RESULT_OPAQUE
+    depth = max(depth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+#else
+    depth = min(depth, texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
 #endif
 #else
-  FragData0 = texelFetch(color_texture, ivec3(gl_FragCoord.xy, 0), 0);
-  gl_FragDepth = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, 0), 0).r;
-  for (int i = 1; i < NUM_VOLUMES; ++i) {
-    FragData0 = max(FragData0, texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0));
+  for (int i = 0; i < NUM_VOLUMES; ++i) {
+    vec4 tmpColor = texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0);
+    if (tmpColor.a <= 0) {
+      continue;
+    }
+    color = max(color, tmpColor);
 #ifdef RESULT_OPAQUE
-    gl_FragDepth = max(gl_FragDepth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+    depth = max(depth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
 #else
-    gl_FragDepth = min(gl_FragDepth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
+    depth = min(depth, texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r);
 #endif
 #endif
   }
+  if (color.a <= 0) {
+    discard;
+  }
+  FragData0 = color;
+  gl_FragDepth = depth;
 #else
   vec4 colors[NUM_VOLUMES];
   float depths[NUM_VOLUMES];
   vec4 color;
   float depth;
 
+  int numValidVolumes = 0;
   for (int i = 0; i < NUM_VOLUMES; ++i) {
 #if GLSL_VERSION < 130
-    colors[i] = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, i), 0);
-    depths[i] = texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r;
+    colors[numValidVolumes] = texelFetch2DArray(color_texture, ivec3(gl_FragCoord.xy, i), 0);
+    if (colors[numValidVolumes].a > 0) {
+      depths[numValidVolumes++] = texelFetch2DArray(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r;
+    }
 #else
-    colors[i] = texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0);
-    depths[i] = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r;
+    colors[numValidVolumes] = texelFetch(color_texture, ivec3(gl_FragCoord.xy, i), 0);
+    if (colors[numValidVolumes].a > 0) {
+      depths[numValidVolumes++] = texelFetch(depth_texture, ivec3(gl_FragCoord.xy, i), 0).r;
+    }
 #endif
   }
 
-  for (int j = 1; j < NUM_VOLUMES; ++j) {
+  if (numValidVolumes == 0) {
+    discard;
+  } else if (numValidVolumes == 1) {
+    FragData0 = colors[0];
+    gl_FragDepth = depths[0];
+    return;
+  }
+
+  for (int j = 1; j < numValidVolumes; ++j) {
     color = colors[j];
     depth = depths[j];
     int i = j-1;
@@ -78,7 +113,7 @@ void main()
   } else {
     color = colors[1] + (1 - colors[1].a) * colors[0];
   }
-  for (int i = 2; i < NUM_VOLUMES; ++i) {
+  for (int i = 2; i < numValidVolumes; ++i) {
     if (abs(depths[i] - depths[i-1]) < epsilon) {
       color = max(color, colors[i]);
     } else {
@@ -86,6 +121,6 @@ void main()
     }
   }
   FragData0 = color;
-  gl_FragDepth = depths[NUM_VOLUMES-1];
+  gl_FragDepth = depths[numValidVolumes-1];
 #endif
 }
