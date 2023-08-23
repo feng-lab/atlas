@@ -75,9 +75,12 @@ public:
     m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic");
   }
 
-  void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0)
+  void setTileFrustum(double normalizedLeft = 0.0,
+                      double normalizedRight = 1.0,
+                      double normalizedBottom = 0.0,
+                      double normalizedTop = 1.0)
   {
-    m_value.setTileFrustum(left, right, bottom, top);
+    m_value.setTileFrustum(normalizedLeft, normalizedRight, normalizedBottom, normalizedTop);
     Q_EMIT valueChanged();
   }
 

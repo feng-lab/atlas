@@ -174,7 +174,10 @@ public:
   void setFrustum(float fov, float ratio, float nearDist, float farDist);
 
   //
-  void setTileFrustum(double left = 0.0, double right = 1.0, double bottom = 0.0, double top = 1.0);
+  void setTileFrustum(double normalizedLeft = 0.0,
+                      double normalizedRight = 1.0,
+                      double normalizedBottom = 0.0,
+                      double normalizedTop = 1.0);
 
   // Automatically set up the camera based on a specified bounding box. Camera will reposition itself so
   // that its focal point is the center of the bounding box, and adjust its

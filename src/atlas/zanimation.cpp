@@ -18,11 +18,11 @@
 #include <QProgressDialog>
 #include <utility>
 
-DEFINE_string(output_image_name_prefix, "video", "name prefix of the output images, default is video");
+DEFINE_string(output_image_name_prefix, "video", "Prefix for naming output images. Default is video");
 
 DEFINE_int32(output_image_name_field_width,
              8,
-             "number of decimals used for the name of output images after name prefix, default is 8");
+             "Length of the numeric part in output image names following the prefix. Default: 8");
 
 namespace {
 // generic solution

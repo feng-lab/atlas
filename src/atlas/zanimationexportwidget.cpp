@@ -10,6 +10,11 @@
 #include <QScrollBar>
 #include <QApplication>
 
+DECLARE_int32(output_tile_size);
+DECLARE_int32(output_tile_border);
+DECLARE_int32(maximum_output_width);
+DECLARE_int32(maximum_output_height);
+
 namespace nim {
 
 ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
@@ -18,12 +23,15 @@ ZAnimationExportWidget::ZAnimationExportWidget(bool is2DAni, QWidget* parent)
   , m_captureStereoImage("Stereo", false)
   , m_stereoImageType("Stereo Type")
   , m_useWindowSize("Use Window Size", false)
-  , m_customSize("Custom Image Size", glm::ivec2(3840, 2160), glm::ivec2(128, 128), glm::ivec2(7680, 4320))
+  , m_customSize("Custom Image Size",
+                 glm::ivec2(3840, 2160),
+                 glm::ivec2(128, 128),
+                 glm::ivec2(FLAGS_maximum_output_width, FLAGS_maximum_output_height))
   , m_framePerSecond("Frames per Second", 30, 12, 60)
   , m_startFrame("Start Frame", 0, 0, 9999999)
   , m_endFrame("End Frame", -1, -1, 9999999)
-  , m_tileSize("Tile Size", 0, 0, 4096)
-  , m_tileBorder("Tile Border", 0, 0, 1024)
+  , m_tileSize("Tile Size", FLAGS_output_tile_size, 0, 4096)
+  , m_tileBorder("Tile Border", FLAGS_output_tile_border, 0, 1024)
   , m_is2DAnimation(is2DAni)
 {
   m_customSize.setStyle("SPINBOX");

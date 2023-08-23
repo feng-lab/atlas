@@ -28,15 +28,15 @@ void Z3DCamera::setFrustum(float fov, float ratio, float nearDist, float farDist
   updateFrustum();
 }
 
-void Z3DCamera::setTileFrustum(double left, double right, double bottom, double top)
+void Z3DCamera::setTileFrustum(double normalizedLeft, double normalizedRight, double normalizedBottom, double normalizedTop)
 {
   float halfheight = std::tan(0.5f * m_fieldOfView) * m_nearDist;
   float halfwidth = halfheight * m_aspectRatio * m_windowAspectRatio;
 
-  m_normalizedLeft = left;
-  m_normalizedRight = right;
-  m_normalizedBottom = bottom;
-  m_normalizedTop = top;
+  m_normalizedLeft = normalizedLeft;
+  m_normalizedRight = normalizedRight;
+  m_normalizedBottom = normalizedBottom;
+  m_normalizedTop = normalizedTop;
 
   m_left = -halfwidth + 2.f * halfwidth * m_normalizedLeft;
   m_right = -halfwidth + 2.f * halfwidth * m_normalizedRight;
