@@ -711,6 +711,7 @@ def build_glog(src_dir: str, install_dir: str):
                                        size_t message_len) {""",
                                            r'line, logmsgtime, message, message_len);',
                                            r'data_->num_prefix_chars_ - 1) );',
+                                           r'ColoredWriteToStderr(severity, message, message_len);',
                                            ],
                                to_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
                          const char* base_filename, int line,
@@ -724,6 +725,7 @@ def build_glog(src_dir: str, install_dir: str):
                                        size_t message_len, size_t prefix_len) {""",
                                          r'line, logmsgtime, message, message_len, prefix_len);',
                                          r'data_->num_prefix_chars_ - 1), data_->num_prefix_chars_ );',
+                                         r'ColoredWriteToStdout(severity, message, message_len);'
                                          ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
