@@ -6,7 +6,11 @@
 #include "z3danimationdoc.h"
 #include "zvideoencoder.h"
 #include "zcpuinfo.h"
+#include "zprocess.h"
 #include <folly/ScopeGuard.h>
+#include <folly/futures/Future.h>
+#include <folly/executors/CPUThreadPoolExecutor.h>
+#include <QCoreApplication>
 
 DEFINE_bool(run_export_3d_animation, false, "Enable exporting 3D animation via command line");
 DEFINE_string(filename, "", "Input file name (.animation3d format)");
@@ -25,7 +29,6 @@ DEFINE_int32(output_height, 2160, "Output video height. Default: 2160");
 DEFINE_bool(overwrite, false, "Overwrite existing output file. Default: false");
 DEFINE_string(output_image_folder_name, "", "Folder for output images. Uses temp folder if empty");
 DEFINE_bool(skip_video_compression, false, "Skip video compression. If true, specify --output_image_folder_name");
-DECLARE_uint32(use_gpu_device);
 DECLARE_string(output_image_name_prefix);
 DECLARE_int32(output_image_name_field_width);
 DEFINE_bool(only_compress_video,
@@ -43,6 +46,8 @@ DEFINE_int32(maximum_output_width, 15360, "Maximum possible output video width. 
 DEFINE_int32(maximum_output_height, 8640, "Maximum possible output video height. Default: 8640");
 
 #if defined(__linux__)
+DEFINE_string(use_gpu_devices, "", "Comma-separated list of GPU device IDs to use (e.g., '0,1,2,3'). Linux only.");
+DECLARE_uint32(use_gpu_device);
 DECLARE_bool(__use_EGL);
 #endif
 
@@ -83,27 +88,12 @@ int ZRunExport3DAnimation::run()
                         outputFilename);
     videoEncoder.waitForFinished(-1);
     LOG(INFO) << outputFilename << " saved";
-    return 0;
+    return m_hasError ? 1 : 0;
   }
-
-#if defined(__linux__)
-  FLAGS___use_EGL = true;
-#endif
-
-  ZDoc doc;
-  Z3DRenderingEngine engine(doc);
-  engine.init();
 
   auto filename = QString::fromStdString(FLAGS_filename);
   if (!QFile::exists(filename)) {
     LOG(ERROR) << fmt::format("input file ({}) does not exist", FLAGS_filename);
-    return 1;
-  }
-
-  QString errorMsg;
-  size_t id;
-  if (id = doc.animation3DDoc().loadFile(filename, errorMsg); id == 0) {
-    LOG(ERROR) << "load animation file error: " << errorMsg;
     return 1;
   }
 
@@ -114,6 +104,138 @@ int ZRunExport3DAnimation::run()
     if (FLAGS_output_end_time != -1.) {
       FLAGS_output_end_frame = FLAGS_output_end_time * FLAGS_output_fps;
     }
+  }
+
+#if defined(__linux__)
+  if (auto gpuDevices = QString::fromStdString(FLAGS_use_gpu_devices).trimmed(); !gpuDevices.isEmpty()) {
+    static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
+    QStringList numList = gpuDevices.split(rx, Qt::SkipEmptyParts);
+    std::vector<uint32_t> gpuList;
+    bool ok;
+    for (const auto& numStr : numList) {
+      auto v = numStr.toUInt(&ok);
+      if (!ok) {
+        LOG(ERROR) << fmt::format("invalid gpu device {}", numStr);
+        return 1;
+      }
+      gpuList.push_back(v);
+    }
+
+    int totalEndFrame = FLAGS_output_end_frame;
+    if (totalEndFrame <= 0) {
+      ZDoc doc;
+      QString errorMsg;
+      if (size_t id = doc.animation3DDoc().loadFile(filename, errorMsg); id == 0) {
+        LOG(ERROR) << "load animation file error: " << errorMsg;
+        return 1;
+      } else {
+        totalEndFrame =
+          std::max(1, static_cast<int>(std::ceil(doc.animation3DDoc().animation(id).duration() * FLAGS_output_fps)));
+      }
+    }
+
+    if (gpuList.size() == 1 || totalEndFrame <= FLAGS_output_fps) {
+      FLAGS_use_gpu_device = gpuList[0];
+    } else {
+      int nFramesForOneGPU = (totalEndFrame - FLAGS_output_start_frame) / static_cast<int>(gpuList.size());
+
+      auto tempdir = std::make_shared<QTemporaryDir>();
+      if (outputImageFolderName.isEmpty()) {
+        outputImageFolderName = tempdir->path();
+      }
+
+      auto cpuExecutor = folly::getGlobalCPUExecutor();
+      auto p = dynamic_cast<folly::CPUThreadPoolExecutor*>(cpuExecutor.get());
+      CHECK(p);
+      std::vector<folly::Future<folly::Unit>> gpuFutures;
+      gpuFutures.reserve(gpuList.size());
+      QString program = QCoreApplication::applicationFilePath();
+      for (size_t idx = 0; idx < gpuList.size(); ++idx) {
+        int startFrame = FLAGS_output_start_frame + int(idx) * nFramesForOneGPU;
+        int endFrame = (idx + 1 == gpuList.size()) ? -1 : (startFrame + nFramesForOneGPU);
+        gpuFutures.push_back(folly::via(cpuExecutor, [=]() {
+          QStringList arguments;
+          arguments << "--run_export_3d_animation"
+                    << "--use_gpu_device" << QString::number(gpuList[idx]) << "--filename" << filename
+                    << "--output_filename" << outputFilename << "--output_fps" << QString::number(FLAGS_output_fps)
+                    << "--output_start_frame" << QString::number(startFrame) << "--output_end_frame"
+                    << QString::number(endFrame) << "--output_width" << QString::number(FLAGS_output_width)
+                    << "--output_height" << QString::number(FLAGS_output_height) << "--output_image_folder_name"
+                    << outputImageFolderName << "--skip_video_compression"
+                    << "--limit_memory_usage_in_gb_to"
+                    << QString::number(FLAGS_limit_memory_usage_in_gb_to == 0
+                                         ? 0
+                                         : std::max<int>(32, FLAGS_limit_memory_usage_in_gb_to / gpuList.size()))
+                    << "--output_image_name_prefix" << QString::fromStdString(FLAGS_output_image_name_prefix)
+                    << "--output_image_name_field_width" << QString::number(FLAGS_output_image_name_field_width)
+                    << "--output_tile_size" << QString::number(FLAGS_output_tile_size) << "--output_tile_border"
+                    << QString::number(FLAGS_output_tile_border);
+          if (FLAGS_overwrite) {
+            arguments << "--overwrite";
+          }
+          arguments << "-platform"
+                    << "offscreen";
+
+          ZProcess renderingProcess;
+          renderingProcess.run(program, arguments);
+          if (renderingProcess.waitForFinished(-1)) {
+            LOG(INFO) << "rendering process finished";
+          } else {
+            throw ZException("rendering process error");
+          }
+        }));
+      }
+      auto f = folly::collect(gpuFutures).via(cpuExecutor).then([=](auto&&) {
+        LOG(INFO) << fmt::format("finish image rendering");
+        if (!FLAGS_skip_video_compression) {
+          QStringList arguments;
+          arguments << "--run_export_3d_animation"
+                    << "--only_compress_video"
+                    << "--output_filename" << outputFilename << "--output_image_folder_name" << outputImageFolderName
+                    << "--output_fps" << QString::number(FLAGS_output_fps) << "--output_image_name_prefix"
+                    << QString::fromStdString(FLAGS_output_image_name_prefix) << "--output_image_name_field_width"
+                    << QString::number(FLAGS_output_image_name_field_width);
+          if (FLAGS_overwrite) {
+            arguments << "--overwrite";
+          }
+          arguments << "-platform"
+                    << "offscreen";
+
+          ZProcess videoEncoderProcess;
+          videoEncoderProcess.run(program, arguments);
+          if (videoEncoderProcess.waitForFinished(-1)) {
+            LOG(INFO) << outputFilename << " saved";
+          } else {
+            throw ZException("video encoding error");
+          }
+        }
+      });
+
+      while (!f.wait(std::chrono::seconds(60)).isReady()) {
+        auto poolStats = p->getPoolStats();
+        LOG(INFO) << fmt::format("pending/total task count: {}/{}, active/idle thread count: {}/{}",
+                                 poolStats.pendingTaskCount,
+                                 poolStats.totalTaskCount,
+                                 poolStats.activeThreadCount,
+                                 poolStats.idleThreadCount);
+      }
+
+      return 0;
+    }
+  }
+
+  FLAGS___use_EGL = true;
+#endif
+
+  ZDoc doc;
+  Z3DRenderingEngine engine(doc);
+  engine.init();
+
+  QString errorMsg;
+  size_t id;
+  if (id = doc.animation3DDoc().loadFile(filename, errorMsg); id == 0) {
+    LOG(ERROR) << "load animation file error: " << errorMsg;
+    return 1;
   }
 
   doc.animation3DDoc().bindView(&engine);

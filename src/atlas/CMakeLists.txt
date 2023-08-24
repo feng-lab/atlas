@@ -48,7 +48,7 @@ include(gRPCGenerateCPP)
 set(PROTOS
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/helloworld.proto
     ${CMAKE_CURRENT_SOURCE_DIR}/../protos/imgprocess.proto
-    )
+)
 set(PROTO_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../protos)
 protobuf_generate(LANGUAGE cpp APPEND_PATH PROTOC_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR} OUT_VAR PROTO_SRCS PROTOS ${PROTOS})
 grpc_generate_cpp(GRPC_SRCS GRPC_HDRS ${CMAKE_CURRENT_BINARY_DIR} ${PROTOS})
@@ -122,12 +122,12 @@ set(LIBQXT_HEADERS
     ${LIBQXTDIR}/widgets/qxtspanslider.h
     ${LIBQXTDIR}/widgets/qxtspanslider_p.h
     ${LIBQXTDIR}/core/qxtnamespace.h
-    )
+)
 set(LIBQXT_SOURCES
     ${LIBQXTDIR}/core/qxtglobal.cpp
     ${LIBQXTDIR}/core/qxtcsvmodel.cpp
     ${LIBQXTDIR}/widgets/qxtspanslider.cpp
-    )
+)
 source_group(libqxt FILES ${LIBQXT_HEADERS} ${LIBQXT_SOURCES})
 
 #qtcsv srcs
@@ -143,14 +143,14 @@ set(QTCSV_HEADERS
     ${QTCSVDIR}/sources/filechecker.h
     ${QTCSVDIR}/sources/contentiterator.h
     ${QTCSVDIR}/sources/symbols.h
-    )
+)
 set(QTCSV_SOURCES
     ${QTCSVDIR}/sources/writer.cpp
     ${QTCSVDIR}/sources/variantdata.cpp
     ${QTCSVDIR}/sources/stringdata.cpp
     ${QTCSVDIR}/sources/reader.cpp
     ${QTCSVDIR}/sources/contentiterator.cpp
-    )
+)
 source_group(qtcsv FILES ${QTCSV_HEADERS} ${QTCSV_SOURCES})
 
 # video memory sources
@@ -161,15 +161,15 @@ if (WIN32)
       ${SYSDIR}/VidMemViaD3D9.cpp
       ${SYSDIR}/VidMemViaDDraw.cpp
       ${SYSDIR}/VidMemViaDxDiag.cpp
-      )
+  )
 elseif (APPLE)
   set(SYS_SOURCES
       ${SYSDIR}/VideoMemoryMac.cpp
-      )
+  )
 else (WIN32)
   set(SYS_SOURCES
       ${SYSDIR}/VideoMemoryLinux.cpp
-      )
+  )
 endif (WIN32)
 source_group(sys FILES ${SYS_SOURCES})
 
@@ -189,11 +189,11 @@ endif (WIN32)
 
 set(FORMS
     LogDialog.ui
-    )
+)
 
 set(RESOURCES
     atlas.qrc
-    )
+)
 
 set(SOURCES
     zimgdisplay.h zimgdisplay.cpp
@@ -414,7 +414,9 @@ set(SOURCES
     zcheckbox.cpp zcheckbox.h
     zrunexport3danimation.cpp zrunexport3danimation.h
     zcancellation.h
-    zrunneutucommand.cpp zrunneutucommand.h)
+    zrunneutucommand.cpp zrunneutucommand.h
+    zprocess.cpp zprocess.h
+)
 
 # our target
 set(APP_NAME Atlas)
@@ -515,7 +517,7 @@ else (WIN32)
                           MACOSX_BUNDLE_COPYRIGHT "${copyright_line}"
                           MACOSX_BUNDLE_GUI_IDENTIFIER "fenglab.${APP_NAME}"
                           RESOURCE "${ASSETS}"
-                          )
+    )
     add_custom_command(TARGET ${APP_NAME}
                        POST_BUILD
                        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jre/Contents/Home
@@ -586,7 +588,7 @@ target_link_libraries(${APP_NAME} PUBLIC img neutu
                       benchmark::benchmark
                       gRPC::grpc++ protobuf::libprotobuf
                       # RocksDB::rocksdb
-                      )
+)
 
 if (UNIX AND NOT APPLE)
   target_link_libraries(${APP_NAME} PRIVATE OpenGL::OpenGL OpenGL::EGL)
