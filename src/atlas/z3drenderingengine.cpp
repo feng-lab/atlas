@@ -513,14 +513,16 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
     } else {
       auto numCols = (width + tileSize - 1) / tileSize;
       auto numRows = (height + tileSize - 1) / tileSize;
-      bool forward = false;
+      bool forwardFrame = false;
+      bool forwardCol = false;
       for (auto r = 0; r < numRows; ++r) {
         auto tileStartY = r * tileSize;
-        for (auto c = 0; c < numCols; ++c) {
+        forwardCol = !forwardCol;
+        for (auto c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
           auto tileStartX = c * tileSize;
-          forward = !forward;
-          for (int i = forward ? startFrame : (endFrame - 1); forward ? (i < endFrame) : (i >= startFrame);
-               forward ? ++i : --i) {
+          forwardFrame = !forwardFrame;
+          for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
+               forwardFrame ? ++i : --i) {
             Q_EMIT progressChanged(std::clamp<int>(
               std::floor(((c * r + r) * numFrame + i - startFrame) * 1. / (numFrame * numCols * numRows) * 100.),
               0,
