@@ -2,7 +2,6 @@
 
 #include <QIODevice>
 #include <fstream>
-#include <iostream>
 #include <memory>
 
 namespace nim {
@@ -39,13 +38,9 @@ inline void writeStream(std::ostream& fs, const T* buf, size_t count)
 }
 
 #ifdef _MSC_VER
-
 std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const QString& mode);
-
 #else
-
 std::unique_ptr<std::FILE, decltype(&std::fclose)> openFile(const QString& filename, const char* mode);
-
 #endif
 
 QString getTemporaryFilename(const QString& filename);

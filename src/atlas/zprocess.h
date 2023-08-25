@@ -17,9 +17,24 @@ public:
 
   void cancel();
 
-  bool waitForFinished(int msecs = 3000)
+  bool waitForFinished(int msecs = 30000)
   {
     return m_process->waitForFinished(msecs);
+  }
+
+  bool waitForStarted(int msecs = 30000)
+  {
+    return m_process->waitForStarted(msecs);
+  }
+
+  [[nodiscard]] bool finishedWithoutError() const
+  {
+    return m_process->exitStatus() == QProcess::NormalExit && m_process->exitCode() == 0;
+  }
+
+  [[nodiscard]] auto processError() const
+  {
+    return m_process->readAllStandardError();
   }
 
 Q_SIGNALS:

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <chrono>
-#include <iostream>
+#include <string>
 
 namespace nim {
 
@@ -26,13 +26,13 @@ namespace nim {
       }                                                  \
       (TIMER).stop();                                    \
     }                                                    \
-    LOG(INFO) << (TIMER);                                \
+    LOG(INFO) << (TIMER).toString();                     \
   }
 
-#define STOP_AND_LOG(TIMER) \
-  {                         \
-    (TIMER).stop();         \
-    LOG(INFO) << (TIMER);   \
+#define STOP_AND_LOG(TIMER)          \
+  {                                  \
+    (TIMER).stop();                  \
+    LOG(INFO) << (TIMER).toString(); \
   }
 
 class ZBenchTimer
@@ -116,9 +116,9 @@ public:
     m_name = str;
   }
 
-protected:
-  friend std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
+  std::string toString() const;
 
+protected:
   std::chrono::time_point<std::chrono::high_resolution_clock> m_start;
   double m_time;
   double m_best;
@@ -133,7 +133,5 @@ protected:
   double m_averagePauseTime;
   bool m_paused;
 };
-
-std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m);
 
 } // namespace nim

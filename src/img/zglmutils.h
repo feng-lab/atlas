@@ -31,8 +31,7 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <QLocale>
-#include <iostream>
-#include <sstream>
+#include <iosfwd>
 #include <tuple>
 #include <utility>
 #include <type_traits>

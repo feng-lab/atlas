@@ -2,7 +2,6 @@
 
 #include "zpuncta.h"
 #include "zrandom.h"
-#include <iostream>
 
 namespace nim {
 

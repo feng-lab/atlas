@@ -11,7 +11,6 @@
 #include <boost/endian/conversion.hpp>
 #include <cmath>
 #include <set>
-#include <sstream>
 
 namespace {
 

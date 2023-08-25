@@ -20,7 +20,6 @@
 #include <QMessageBox>
 #include <folly/ScopeGuard.h>
 #include <gflags/gflags.h>
-#include <iostream>
 
 DECLARE_string(flagfile);
 DEFINE_bool(run_benchmarks, false, "run benchmarks");

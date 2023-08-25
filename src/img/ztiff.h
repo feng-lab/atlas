@@ -2,7 +2,6 @@
 
 #include "zimginterface.h"
 #include "zimgmetatag.h"
-#include <iostream>
 
 struct tiff;
 using TIFF = struct tiff;

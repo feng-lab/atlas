@@ -331,6 +331,51 @@ struct fmt::formatter<QString> : fmt::formatter<const char*>
   }
 };
 
+template<>
+struct fmt::formatter<QByteArray> : fmt::formatter<const char*>
+{
+  auto format(const QByteArray& s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.constData(), ctx);
+  }
+};
+
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+template<>
+struct fmt::formatter<QStringView> : fmt::formatter<const char*>
+{
+  auto format(QStringView s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.toUtf8().constData(), ctx);
+  }
+};
+template<>
+struct fmt::formatter<QUtf8StringView> : fmt::formatter<const char*>
+{
+  auto format(QUtf8StringView s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.data(), ctx);
+  }
+};
+template<>
+struct fmt::formatter<QByteArrayView> : fmt::formatter<const char*>
+{
+  auto format(QByteArrayView s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.constData(), ctx);
+  }
+};
+#else
+template<>
+struct fmt::formatter<QStringRef> : fmt::formatter<const char*>
+{
+  auto format(QStringRef s, format_context& ctx)
+  {
+    return formatter<const char*>::format(s.toUtf8().constData(), ctx);
+  }
+};
+#endif
+
 #if (QT_VERSION < QT_VERSION_CHECK(5, 14, 0))
 namespace std {
 

@@ -2,7 +2,6 @@
 
 #include "zrandom.h"
 #include "zlog.h"
-#include <iostream>
 
 namespace nim {
 

@@ -46,10 +46,10 @@ DEFINE_int32(maximum_output_width, 15360, "Maximum possible output video width. 
 DEFINE_int32(maximum_output_height, 8640, "Maximum possible output video height. Default: 8640");
 
 DEFINE_string(use_gpu_devices, "", "Comma-separated list of GPU device IDs to use (e.g., '0,1,2,3'). Linux only.");
+DECLARE_uint32(use_gpu_device);
 
 #if defined(__linux__)
 DECLARE_bool(__use_EGL);
-DECLARE_uint32(use_gpu_device);
 #endif
 
 namespace nim {
@@ -179,11 +179,13 @@ int ZRunExport3DAnimation::run()
 
           ZProcess renderingProcess;
           renderingProcess.run(program, arguments);
-          if (renderingProcess.waitForFinished(-1)) {
-            LOG(INFO) << "rendering process finished";
-          } else {
-            throw ZException("rendering process error");
+          if (!renderingProcess.waitForStarted(-1)) {
+            throw ZException("could not start rendering process");
           }
+          if (!renderingProcess.waitForFinished(-1) || !renderingProcess.finishedWithoutError()) {
+            throw ZException(fmt::format("rendering process error: {}", renderingProcess.processError()));
+          }
+          LOG(INFO) << "rendering process finished";
         }));
       }
       auto f = folly::collect(gpuFutures).via(cpuExecutor).then([=](auto&&) {
@@ -204,11 +206,13 @@ int ZRunExport3DAnimation::run()
 
           ZProcess videoEncoderProcess;
           videoEncoderProcess.run(program, arguments);
-          if (videoEncoderProcess.waitForFinished(-1)) {
-            LOG(INFO) << outputFilename << " saved";
-          } else {
-            throw ZException("video encoding error");
+          if (!videoEncoderProcess.waitForStarted(-1)) {
+            throw ZException("could not start video encoding process");
           }
+          if (!videoEncoderProcess.waitForFinished(-1) || !videoEncoderProcess.finishedWithoutError()) {
+            throw ZException(fmt::format("video encoding process error: {}", videoEncoderProcess.processError()));
+          }
+          LOG(INFO) << outputFilename << " saved";
         }
       });
 
@@ -228,7 +232,7 @@ int ZRunExport3DAnimation::run()
   FLAGS___use_EGL = true;
 #else
   if (auto gpuDevices = QString::fromStdString(FLAGS_use_gpu_devices).trimmed(); !gpuDevices.isEmpty()) {
-    LOG(WARNING) << "--use_gpu_devices is Linux only";
+    LOG(ERROR) << "Flag --use_gpu_devices is Linux only";
   }
 #endif
 

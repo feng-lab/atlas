@@ -3,7 +3,6 @@
 #include "zimg.h"
 #include "zbbox.h"
 #include "zvoxelcoordinate.h"
-#include <sstream>
 #include <vector>
 
 namespace nim {

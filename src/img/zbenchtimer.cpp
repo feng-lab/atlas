@@ -63,22 +63,23 @@ void ZBenchTimer::resume()
   m_start = std::chrono::high_resolution_clock::now();
 }
 
-std::ostream& operator<<(std::ostream& s, const ZBenchTimer& m)
+std::string ZBenchTimer::toString() const
 {
-  if (m.m_rep == 1) {
-    s << "Function " << m.m_name << " took " << m.m_time << " seconds.\n";
-    if (m.m_pauseTime > 0) {
-      s << "Function " << m.m_name << " pause " << m.m_pauseTime << " seconds.\n";
-    }
-  } else if (m.m_rep > 1) {
-    s << "Function " << m.m_name << " took on average " << m.m_average << " seconds.";
-    s << " (out of " << m.m_rep << " repeats. best: " << m.m_best << "  worst: ";
-    s << m.m_worst << ")\n";
-    if (m.m_averagePauseTime > 0) {
-      s << "Function " << m.m_name << " pause on average " << m.m_averagePauseTime << " seconds.\n";
-    }
+  if (m_rep == 1) {
+    return fmt::format("{} took {} seconds (paused {} seconds)",
+                       m_name.empty() ? "Function" : m_name,
+                       m_time,
+                       m_pauseTime);
+  } else if (m_rep > 1) {
+    return fmt::format("{} took on average {} seconds (out of {} repeats, best: {} worst: {} paused on average: {})",
+                       m_name.empty() ? "Function" : m_name,
+                       m_average,
+                       m_rep,
+                       m_best,
+                       m_worst,
+                       m_averagePauseTime);
   }
-  return s;
+  return {};
 }
 
 } // namespace nim

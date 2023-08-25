@@ -511,14 +511,14 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
         takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(filepath, width, height, sst);
       }
     } else {
-      auto numCols = (width + tileSize - 1) / tileSize;
-      auto numRows = (height + tileSize - 1) / tileSize;
+      int numCols = (width + tileSize - 1) / tileSize;
+      int numRows = (height + tileSize - 1) / tileSize;
       bool forwardFrame = false;
       bool forwardCol = false;
-      for (auto r = 0; r < numRows; ++r) {
+      for (int r = 0; r < numRows; ++r) {
         auto tileStartY = r * tileSize;
         forwardCol = !forwardCol;
-        for (auto c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
+        for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
           auto tileStartX = c * tileSize;
           forwardFrame = !forwardFrame;
           for (int i = forwardFrame ? startFrame : (endFrame - 1); forwardFrame ? (i < endFrame) : (i >= startFrame);
@@ -1113,11 +1113,13 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizePrivate(co
       rightImg.infoRef().lastChannelIsAlphaChannel = true;
     }
 
-    auto numCols = (width + tileSize - 1) / tileSize;
-    auto numRows = (height + tileSize - 1) / tileSize;
-    for (auto r = 0; r < numRows; ++r) {
+    int numCols = (width + tileSize - 1) / tileSize;
+    int numRows = (height + tileSize - 1) / tileSize;
+    bool forwardCol = false;
+    for (int r = 0; r < numRows; ++r) {
       auto tileStartY = r * tileSize;
-      for (auto c = 0; c < numCols; ++c) {
+      forwardCol = !forwardCol;
+      for (int c = forwardCol ? 0 : (numCols - 1); forwardCol ? (c < numCols) : (c >= 0); forwardCol ? ++c : --c) {
         auto tileStartX = c * tileSize;
 
         int left = tileStartX;

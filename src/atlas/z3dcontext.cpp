@@ -5,13 +5,14 @@
 #include <QSurfaceFormat>
 #include <QOffscreenSurface>
 
+DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering, default is 0 (the first one)");
+
 #if defined(__linux__)
 #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
 DEFINE_bool(__use_EGL, false, "use EGL in linux console mode");
-DEFINE_uint32(use_gpu_device, 0, "choose which gpu to use for rendering, default is 0 (the first one)");
 
 namespace {
 
@@ -150,6 +151,13 @@ Z3DContext::Z3DContext()
     checkEGLError();
     throw ZException("can not create EGL context");
   }
+}
+#else
+Z3DContext::Z3DContext() {
+  if (FLAGS_use_gpu_device != 0) {
+    throw ZException("Flag --use_gpu_device is Linux only");
+  }
+  LOG(FATAL) << "This initialization method is Linux only";
 }
 #endif
 

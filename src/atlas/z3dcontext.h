@@ -12,9 +12,8 @@ class Z3DContext
 public:
   explicit Z3DContext(QOffscreenSurface& offscreenSurface, QOpenGLContext* sharedContext = nullptr);
 
-#if defined(__linux__)
+  // note: Linux only
   Z3DContext();
-#endif
 
   ~Z3DContext();
 
