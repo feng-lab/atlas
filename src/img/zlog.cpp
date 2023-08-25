@@ -23,13 +23,11 @@ void initLogging(const char* argv0, const QString& filename)
 
   // Set whether log messages go to stderr instead of logfiles
   FLAGS_logtostderr = filename.isEmpty();
-  // Log messages at a level >= this flag are automatically sent to
-  // stderr in addition to log files.
-  FLAGS_stderrthreshold = google::GLOG_INFO;
   // Log messages at a level <= this flag are buffered.
   // Log messages at a higher level are flushed immediately.
   FLAGS_logbuflevel = google::GLOG_INFO - 1;
-
+  //
+  FLAGS_alsologtostderr = true;
   // Sets the maximum log file size (in MB).
   FLAGS_max_log_size = 1800;
   // Sets whether to avoid logging to the disk if the disk is full.
