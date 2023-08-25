@@ -45,10 +45,11 @@ DEFINE_int32(output_tile_border, 64, "Tile border size for segmented rendering. 
 DEFINE_int32(maximum_output_width, 15360, "Maximum possible output video width. Default: 15360");
 DEFINE_int32(maximum_output_height, 8640, "Maximum possible output video height. Default: 8640");
 
-#if defined(__linux__)
 DEFINE_string(use_gpu_devices, "", "Comma-separated list of GPU device IDs to use (e.g., '0,1,2,3'). Linux only.");
-DECLARE_uint32(use_gpu_device);
+
+#if defined(__linux__)
 DECLARE_bool(__use_EGL);
+DECLARE_uint32(use_gpu_device);
 #endif
 
 namespace nim {
@@ -165,7 +166,7 @@ int ZRunExport3DAnimation::run()
                     << "--limit_memory_usage_in_gb_to"
                     << QString::number(FLAGS_limit_memory_usage_in_gb_to == 0
                                          ? 0
-                                         : std::max<int>(32, FLAGS_limit_memory_usage_in_gb_to / gpuList.size()))
+                                         : static_cast<int>(FLAGS_limit_memory_usage_in_gb_to / gpuList.size()))
                     << "--output_image_name_prefix" << QString::fromStdString(FLAGS_output_image_name_prefix)
                     << "--output_image_name_field_width" << QString::number(FLAGS_output_image_name_field_width)
                     << "--output_tile_size" << QString::number(FLAGS_output_tile_size) << "--output_tile_border"
@@ -225,6 +226,10 @@ int ZRunExport3DAnimation::run()
   }
 
   FLAGS___use_EGL = true;
+#else
+  if (auto gpuDevices = QString::fromStdString(FLAGS_use_gpu_devices).trimmed(); !gpuDevices.isEmpty()) {
+    LOG(WARNING) << "--use_gpu_devices is Linux only";
+  }
 #endif
 
   ZDoc doc;
