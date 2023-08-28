@@ -630,19 +630,23 @@ void Z3DRenderingEngine::exportFixedSize3DAnimation(const ZAnimation* animation,
 
         if (sst == Z3DScreenShotType::MonoView) {
           img.flip(Dimension::Y).save(targetFilepath);
-          LOG(INFO) << "Saved rendering (" << img.width() << ", " << img.height() << ") to file: " << targetFilepath;
+          LOG(INFO) << fmt::format("Saved rendering ({}, {}) to file: {}", img.width(), img.height(), targetFilepath);
         } else {
           if (sst == Z3DScreenShotType::FullSideBySideStereoView) {
             ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X).flip(Dimension::Y).save(targetFilepath);
-            LOG(INFO) << "Saved stereo rendering (" << img.width() << " x 2, " << img.height()
-                      << ") to file: " << targetFilepath;
+            LOG(INFO) << fmt::format("Saved stereo rendering ({} x 2, {}) to file: {}",
+                                     img.width(),
+                                     img.height(),
+                                     targetFilepath);
           } else {
             ZImg::cat(std::vector<const ZImg*>{&img, &rightImg}, Dimension::X)
               .zoom(0.5, 1)
               .flip(Dimension::Y)
               .save(targetFilepath);
-            LOG(INFO) << "Saved half sbs stereo rendering (" << img.width() << ", " << img.height()
-                      << ") to file:" << targetFilepath;
+            LOG(INFO) << fmt::format("Saved half sbs stereo rendering ({}, {}) to file: {}",
+                                     img.width(),
+                                     img.height(),
+                                     targetFilepath);
           }
         }
       }
@@ -1224,19 +1228,18 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
 
   if (sst == Z3DScreenShotType::MonoView) {
     textureToRGBAImg(*m_compositor->monoReadyTarget()->colorTexture()).crop(validRegion).save(filename);
-    LOG(INFO) << fmt::format(
-      "Saved tiled rendering (width: {}, height: {}, XY start: ({}, {}), tile: (size {} border {})) to file: {}",
-      width,
-      height,
-      tileStartX,
-      tileStartY,
-      tileSize,
-      tileBorder,
-      filename);
+    LOG(INFO) << fmt::format("Saved tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
+                             width,
+                             height,
+                             tileStartX,
+                             tileStartY,
+                             tileSize,
+                             tileBorder,
+                             filename);
   } else {
     textureToRGBAImg(*m_compositor->leftReadyTarget()->colorTexture()).crop(validRegion).save(filename);
     LOG(INFO) << fmt::format(
-      "Saved left tiled rendering (width: {}, height: {}, XY start: ({}, {}), tile: (size {} border {})) to file: {}",
+      "Saved left tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
       width,
       height,
       tileStartX,
@@ -1246,7 +1249,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
       filename);
     textureToRGBAImg(*m_compositor->rightReadyTarget()->colorTexture()).crop(validRegion).save(rightFilename);
     LOG(INFO) << fmt::format(
-      "Saved right tiled rendering (width: {}, height: {}, XY start: ({}, {}), tile: (size {} border {})) to file: {}",
+      "Saved right tiled rendering (total: {} x {}, tile: X {}, Y {}, size {}, border {}) to file: {}",
       width,
       height,
       tileStartX,

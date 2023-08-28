@@ -740,12 +740,7 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
       auto c = visibleIdxs[channelIdx];
       for (uint32_t round = 0; round < FLAGS_atlas_volume_rendering_maximum_round; ++round) {
-        bool lastRound = render3DImageForOneRound(eye,
-                                                  c,
-                                                  round,
-                                                  ze_to_zw_a,
-                                                  ze_to_zw_b,
-                                                  ze_to_screen_pixel_voxel_size);
+        bool lastRound = render3DImageForOneRound(eye, c, round, ze_to_zw_a, ze_to_zw_b, ze_to_screen_pixel_voxel_size);
 #if defined(__linux__)
         if (FLAGS_atlas_debug_texture_output) {
           auto filen =
@@ -913,64 +908,65 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   CHECK(!ccSet.empty());
   bool lastRound = ccSet.size() == 1 && ccSet.find(0_u32) != ccSet.end(); // ccSet contains only 0
   if (lastRound) {
-    STOP_AND_LOG(btcb)
-    LOG(INFO) << "no blocks to render";
+    LOG(INFO) << "no (non-empty) blocks to render";
     if (round > 0) {
       // otherwise still need to render empty blocks
       return lastRound;
     }
-  }
+    STOP_AND_LOG(btcb)
+  } else {
+    // need to upload some image blocks to GPU
+    bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
 
-  bool hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
+    for (auto att = 1; !hasEnoughMissingIDs && !lastRound && att < 8; ++att) {
+      auto numberBlock = ccSet.size();
+      m_blockIDsRenderTarget->attachment(g_drawBuffers[att])
+        ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
 
-  for (auto att = 1; !hasEnoughMissingIDs && !lastRound && att < 8; ++att) {
-    auto numberBlock = ccSet.size();
-    m_blockIDsRenderTarget->attachment(g_drawBuffers[att])
-      ->downloadTextureToBuffer(GL_RGBA_INTEGER, GL_UNSIGNED_INT, m_blockIDs.data());
+      tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
+                        [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
+                          ccSet.insert(range.begin(), range.end()); // inserts a sequence
+                        });
 
-    tbb::parallel_for(tbb::blocked_range<std::vector<uint32_t>::iterator>(m_blockIDs.begin(), m_blockIDs.end()),
-                      [&](const tbb::blocked_range<std::vector<uint32_t>::iterator>& range) {
-                        ccSet.insert(range.begin(), range.end()); // inserts a sequence
-                      });
+      hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
 
-    hasEnoughMissingIDs = ccSet.size() > m_img->numCachedImages(c);
+      lastRound = !hasEnoughMissingIDs && numberBlock == ccSet.size();
+      if (lastRound) { // confirm
+        lastRound = *parallel_max_element(m_blockIDs.begin(), m_blockIDs.end()) == 0;
+      }
+      if (lastRound) {
+        VLOG(1) << "last att: " << att;
+      }
 
-    lastRound = !hasEnoughMissingIDs && numberBlock == ccSet.size();
-    if (lastRound) { // confirm
-      lastRound = *parallel_max_element(m_blockIDs.begin(), m_blockIDs.end()) == 0;
+      processEventsAndMaybeCancel(cancellationToken);
     }
-    if (lastRound) {
-      VLOG(1) << "last att: " << att;
+
+    std::vector<uint32_t> missingBlockIDs;
+
+    ccSet.unsafe_erase(0_u32);
+    if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end()) {
+      VLOG(1) << "use last block";
     }
+    ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
+    if (!ccSet.empty()) {
+      CHECK(ccSet.size() < m_img->numCachedImages(c) * 10);
+      missingBlockIDs.reserve(ccSet.size());
+      missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
+      if ((round % 2 == 1) && hasEnoughMissingIDs) {
+        std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
+      } else {
+        std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
+      }
+    }
+    // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
+    STOP_AND_LOG(btcb)
+
+    processEventsAndMaybeCancel(cancellationToken);
+
+    lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
 
     processEventsAndMaybeCancel(cancellationToken);
   }
-
-  std::vector<uint32_t> missingBlockIDs;
-
-  ccSet.unsafe_erase(0_u32);
-  if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end()) {
-    VLOG(1) << "use last block";
-  }
-  ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());
-  if (!ccSet.empty()) {
-    CHECK(ccSet.size() < m_img->numCachedImages(c) * 10);
-    missingBlockIDs.reserve(ccSet.size());
-    missingBlockIDs.insert(missingBlockIDs.end(), ccSet.begin(), ccSet.end());
-    if ((round % 2 == 1) && hasEnoughMissingIDs) {
-      std::sort(missingBlockIDs.begin(), missingBlockIDs.end(), std::greater<>());
-    } else {
-      std::sort(missingBlockIDs.begin(), missingBlockIDs.end());
-    }
-  }
-  // LOG(INFO) << missingBlockIDs.size() << " " << usedBlockIDs.size();
-  STOP_AND_LOG(btcb)
-
-  processEventsAndMaybeCancel(cancellationToken);
-
-  lastRound = m_img->updateAndUploadPageDirectoryCaches(missingBlockIDs, c, cancellationToken) && lastRound;
-
-  processEventsAndMaybeCancel(cancellationToken);
 
   ZBenchTimer btri("render image");
   // render channels one by one
