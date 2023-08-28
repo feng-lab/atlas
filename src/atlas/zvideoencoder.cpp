@@ -6,7 +6,7 @@
 namespace nim {
 
 ZVideoEncoder::ZVideoEncoder(QObject* parent)
-  : ZProcess(parent)
+  : ZProcess(parent, true)
 {}
 
 std::tuple<QString, QStringList> ZVideoEncoder::encodeDryRun(const QDir& dir,

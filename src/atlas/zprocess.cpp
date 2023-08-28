@@ -4,14 +4,17 @@
 
 namespace nim {
 
-ZProcess::ZProcess(QObject* parent)
+ZProcess::ZProcess(QObject* parent, bool logStderrAsInfo)
   : QObject(parent)
 {
   m_process = new QProcess(this);
   connect(m_process, &QProcess::errorOccurred, this, &ZProcess::onError);
   connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this, &ZProcess::onFinished);
   connect(m_process, &QProcess::readyReadStandardOutput, this, &ZProcess::logStandardOutput);
-  connect(m_process, &QProcess::readyReadStandardError, this, &ZProcess::logStandardError);
+  connect(m_process,
+          &QProcess::readyReadStandardError,
+          this,
+          logStderrAsInfo ? &ZProcess::logStandardOutput : &ZProcess::logStandardError);
 }
 
 void ZProcess::dryRun(const QString& program, const QStringList& arguments)

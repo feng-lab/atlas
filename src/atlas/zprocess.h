@@ -9,7 +9,7 @@ class ZProcess : public QObject
   Q_OBJECT
 
 public:
-  explicit ZProcess(QObject* parent = nullptr);
+  explicit ZProcess(QObject* parent = nullptr, bool logStderrAsInfo = false);
 
   static void dryRun(const QString& program, const QStringList& arguments);
 
