@@ -147,6 +147,26 @@ inline double parallel_mean(Iterator first, Iterator last)
   return sum / static_cast<ValueType>(size);
 }
 
+template<typename Iterator>
+inline double parallel_sum(Iterator first, Iterator last)
+{
+  CHECK(first != last) << "At least one sample is required";
+
+  // using OriginalType = typename std::iterator_traits<Iterator>::value_type;
+  // using ValueType = std::conditional_t<std::is_integral_v<OriginalType>, double, OriginalType>;
+  using ValueType = double;
+
+  ValueType sum = tbb::parallel_reduce(
+    tbb::blocked_range<Iterator>(first, last),
+    ValueType{},
+    [](const tbb::blocked_range<Iterator>& r, ValueType value) -> ValueType {
+      return std::accumulate(r.begin(), r.end(), value);
+    },
+    std::plus<>());
+
+  return sum;
+}
+
 template<class ForwardIterator>
 inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
 {
@@ -180,11 +200,18 @@ inline std::pair<double, double> parallel_mean_and_sample_standard_deviation(For
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
-template<typename Iterator>
-inline double mean(Iterator first, Iterator last)
+template<typename ForwardIterator>
+inline double mean(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   return boost::math::statistics::detail::mean_sequential_impl<double>(first, last);
+}
+
+template<typename ForwardIterator>
+inline double sum(ForwardIterator first, ForwardIterator last)
+{
+  CHECK(first != last) << "At least one sample is required";
+  return std::accumulate(first, last, 0.0);
 }
 
 template<class ForwardIterator>

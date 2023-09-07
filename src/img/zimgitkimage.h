@@ -14,7 +14,6 @@ public:
   ZImgITKImage();
 
   // ZImgFormat interface
-
 public:
   [[nodiscard]] QString shortName() const override;
 
@@ -51,7 +50,7 @@ protected:
 
   static void parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta);
 
-  static bool hasSCIFIOSupport() ;
+  static bool hasSCIFIOSupport();
 };
 
 } // namespace nim

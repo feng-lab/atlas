@@ -2014,9 +2014,10 @@ double ZImg::sum_Impl() const
   double res = 0.0;
   for (size_t t = 0; t < numTimes(); ++t) {
     auto data = timeData<TVoxel>(t);
-    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
-      res += data[v];
-    }
+    //    for (size_t v = 0; v < timeVoxelNumber(); ++v) {
+    //      res += data[v];
+    //    }
+    res += parallel_sum(data, data + timeVoxelNumber());
   }
   return res;
 }

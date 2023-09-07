@@ -71,7 +71,7 @@ int _TIFFgetMode(TIFFOpenOptions *opts, thandle_t clientdata, const char *mode,
     return (m);
 }
 
-TIFFOpenOptions *TIFFOpenOptionsAlloc(void)
+TIFFOpenOptions *TIFFOpenOptionsAlloc()
 {
     TIFFOpenOptions *opts =
         (TIFFOpenOptions *)_TIFFcalloc(1, sizeof(TIFFOpenOptions));

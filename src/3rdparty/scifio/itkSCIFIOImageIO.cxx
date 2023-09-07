@@ -825,6 +825,7 @@ void SCIFIOImageIO::Read(void* pData)
   MetaDataDictionary& dict = this->GetMetaDataDictionary();
   const long rgbChannelCount = GetTypedMetaData<long>(dict, "RGBChannelCount");
   size_t byteCount = this->GetComponentSize() * region.GetNumberOfPixels() * rgbChannelCount;
+  // VLOG(2) << byteCount;
 
   while (pos < byteCount) {
     int retcode = itksysProcess_WaitForData(m_Process, &pipedata, &pipedatalength, NULL);

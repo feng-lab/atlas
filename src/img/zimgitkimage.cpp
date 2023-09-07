@@ -17,6 +17,7 @@
 #include <QStringList>
 #include <QFileInfo>
 #include <QDir>
+#include <QRegularExpression>
 
 namespace nim {
 
@@ -175,7 +176,60 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
                            .arg(region.toQString()));
     }
 
-    if (region.containsWholeImg(imgInfo) || isNrrd) {
+    if (isNd2) {
+      ZImgRegion rgn = region;
+      rgn.resolveRegionEnd(imgInfo);
+
+      ZImgInfo clipInfo = rgn.clip(imgInfo);
+      img = ZImg(clipInfo);
+
+      itk::ImageIORegion ioRegion(5);
+      ioRegion.SetIndex(0, rgn.start.x);
+      ioRegion.SetIndex(1, rgn.start.y);
+      ioRegion.SetIndex(2, rgn.start.z);
+      ioRegion.SetIndex(3, rgn.start.t);
+      ioRegion.SetIndex(4, rgn.start.c);
+      ioRegion.SetSize(0, rgn.end.x - rgn.start.x);
+      ioRegion.SetSize(1, rgn.end.y - rgn.start.y);
+      ioRegion.SetSize(2, rgn.end.z - rgn.start.z);
+      ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
+      ioRegion.SetSize(4, rgn.end.c - rgn.start.c);
+
+      if (imageIO->GetNumberOfComponents() <= 1) {
+        imageIO->SetIORegion(ioRegion);
+        if (clipInfo.numTimes > 1 && clipInfo.numChannels > 1) {
+          auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
+          imageIO->Read(buf.get());
+          fixDimensionOrder(buf.get(), "XYZTC", img);
+        } else {
+          imageIO->Read(img.channelData(0));
+        }
+      } else {
+        ZImgInfo scClipInfo = clipInfo;
+        scClipInfo.numChannels = imageIO->GetNumberOfComponents();
+        scClipInfo.createDefaultDescriptions();
+        ZImg tmpScImg(scClipInfo);
+        auto buf = make_unique_for_overwrite<uint8_t[]>(tmpScImg.byteNumber());
+        // VLOG(2) << tmpScImg.byteNumber();
+        for (auto ch = rgn.start.c; ch < rgn.end.c; ++ch) {
+          ioRegion.SetIndex(4, ch);
+          ioRegion.SetSize(4, 1);
+          imageIO->SetIORegion(ioRegion);
+          imageIO->Read(buf.get());
+          fixDimensionOrder(buf.get(), "CXYZT", tmpScImg);
+          size_t bestChannel = 0;
+          double bestChannelSum = tmpScImg.createView(0, -1).sum();
+          for (size_t c = 1; c < tmpScImg.numChannels(); ++c) {
+            auto channelSum = tmpScImg.createView(c, -1).sum();
+            if (channelSum > bestChannelSum) {
+              bestChannel = c;
+              bestChannelSum = channelSum;
+            }
+          }
+          img.pasteImg(tmpScImg.createView(bestChannel, -1), ZVoxelCoordinate(0, 0, 0, ch, 0));
+        }
+      }
+    } else if (region.containsWholeImg(imgInfo) || isNrrd) {
       img = ZImg(imgInfo);
       itk::ImageIORegion ioRegion(4);
       ioRegion.SetIndex(0, 0);
@@ -190,14 +244,10 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (imgInfo.numTimes > 1) {
         auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
         imageIO->Read(buf.get());
-        if (isNd2) {
-          fixDimensionOrder(buf.get(), "XYZTC", img);
-        } else {
-          fixDimensionOrder(buf.get(), "CXYZT", img);
-        }
+        fixDimensionOrder(buf.get(), "CXYZT", img);
       } else {
         imageIO->Read(img.channelData(0));
-        if (imgInfo.numChannels > 1 && !isNd2) {
+        if (imgInfo.numChannels > 1) {
           // if numTimes > 1 or isNd2 then dimension order is already fixed
           ZImg tpImg(imgInfo);
           CXYZtoXYZC(img, tpImg);
@@ -234,14 +284,10 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (clipInfo.numTimes > 1) {
         auto buf = make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
         imageIO->Read(buf.get());
-        if (isNd2) {
-          fixDimensionOrder(buf.get(), "XYZTC", tmpImg);
-        } else {
-          fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
-        }
+        fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
       } else {
         imageIO->Read(tmpImg.channelData(0));
-        if (clipInfo.numChannels > 1 && !isNd2) {
+        if (clipInfo.numChannels > 1) {
           // if numTimes > 1 or isNd2 then dimension order is already fixed
           ZImg tpImg(clipInfo);
           CXYZtoXYZC(tmpImg, tpImg);
@@ -318,20 +364,23 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
     info.height = imageIO->GetDimensions(1);
     info.depth = imageIO->GetDimensions(2);
     info.numTimes = 1;
+    if (isNd2) {
+      info.numChannels = 1;
+    }
   } else if (ndims == 4) {
     info.width = imageIO->GetDimensions(0);
     info.height = imageIO->GetDimensions(1);
     info.depth = imageIO->GetDimensions(2);
     info.numTimes = imageIO->GetDimensions(3);
+    if (isNd2) {
+      info.numChannels = 1;
+    }
   } else if (ndims == 5 && isNd2) {
     info.width = imageIO->GetDimensions(0);
     info.height = imageIO->GetDimensions(1);
     info.depth = imageIO->GetDimensions(2);
     info.numTimes = imageIO->GetDimensions(3);
     info.numChannels = imageIO->GetDimensions(4);
-    if (imageIO->GetNumberOfComponents() > 1) {
-      throw ZIOException(QString("Can not handle this nd2"));
-    }
   } else {
     throw ZIOException(QString("NDims not supported: %1.").arg(ndims));
   }
@@ -390,7 +439,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   } else if (ndims == 2) {
     info.voxelSizeX = imageIO->GetSpacing(0);
     info.voxelSizeY = imageIO->GetSpacing(1);
-  } else if (ndims > 3) {
+  } else if (ndims >= 3) {
     info.voxelSizeX = imageIO->GetSpacing(0);
     info.voxelSizeY = imageIO->GetSpacing(1);
     info.voxelSizeZ = imageIO->GetSpacing(2);
@@ -412,36 +461,60 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
 
     using MetaDataStringType = itk::MetaDataObject<std::string>;
 
-    auto itr = dictionary.Begin();
-    auto end = dictionary.End();
+    std::vector<size_t> usedChannels;
+    std::string key = "sSpecSettings";
+    if (dictionary.HasKey(key)) {
+      if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
+        QString valueStr = QString::fromStdString(value->GetMetaDataObjectValue());
+        // VLOG(2) << valueStr;
 
-    while (itr != end) {
-      itk::MetaDataObjectBase::Pointer entry = itr->second;
-      MetaDataStringType::Pointer entryvalue = dynamic_cast<MetaDataStringType*>(entry.GetPointer());
-      if (entryvalue) {
-        std::string tagkey = itr->first;
-        for (size_t ch = 0; ch < info.numChannels; ++ch) {
-          if (tagkey == fmt::format("CH{}ChannelColor", ch + 1)) {
-            QString tagvalue = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
-            bool ok;
-            int32_t color = tagvalue.toInt(&ok);
-            if (!ok) {
-              throw ZIOException("Can not parse nd2 channel Color");
-            }
-            col4 col;
-            std::memcpy(static_cast<void*>(&col), &color, 3);
-            col.a = 255;
-            info.channelColors[ch] = col;
-            break;
-          }
-          if (tagkey == fmt::format("CH{}ChannelDyeName", ch + 1)) {
-            info.channelNames[ch] = QString::fromStdString(entryvalue->GetMetaDataObjectValue());
-            break;
+        static QRegularExpression channelInfo(R"(^CH(\d+)\s+{Laser Wavelength}:.*)");
+
+        QTextStream in(&valueStr, QIODevice::ReadOnly);
+
+        QString line;
+        bool ok1;
+        while (in.readLineInto(&line)) {
+          auto match = channelInfo.match(line);
+          if (match.hasMatch()) {
+            usedChannels.push_back(match.captured(1).toUInt(&ok1));
+            VLOG(2) << line << " " << usedChannels.back();
+            CHECK(ok1) << line << " " << ok1;
+            continue;
           }
         }
       }
-      ++itr;
     }
+    if (usedChannels.size() < info.numChannels) {
+      usedChannels.clear();
+    }
+
+    for (size_t ch = 0; ch < info.numChannels; ++ch) {
+      auto actualChannel = usedChannels.empty() ? ch + 1 : usedChannels[ch];
+      key = fmt::format("CH{}ChannelColor", actualChannel);
+      if (dictionary.HasKey(key)) {
+        if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
+          QString tagvalue = QString::fromStdString(value->GetMetaDataObjectValue());
+          bool ok;
+          int32_t color = tagvalue.toInt(&ok);
+          if (!ok) {
+            throw ZIOException("Can not parse nd2 channel Color");
+          }
+          col4 col;
+          std::memcpy(static_cast<void*>(&col), &color, 3);
+          col.a = 255;
+          info.channelColors[ch] = col;
+        }
+      }
+      key = fmt::format("CH{}ChannelDyeName", actualChannel);
+      if (dictionary.HasKey(key)) {
+        if (auto value = dynamic_cast<const MetaDataStringType*>(dictionary.Get(key)); value) {
+          info.channelNames[ch] = QString::fromStdString(value->GetMetaDataObjectValue());
+        }
+      }
+    }
+
+    VLOG(2) << info.toString();
   }
 }
 
