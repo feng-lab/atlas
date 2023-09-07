@@ -842,6 +842,7 @@ void SCIFIOImageIO::Read(void* pData)
       itkExceptionMacro(<< "SCIFIOImageIO: 'SCIFIOITKBridge read' exited abnormally. " << errorMessage);
     }
   }
+  LOG(INFO) << "SCIFIOImageIO::Read finished";
 }
 
 bool SCIFIOImageIO::CanWriteFile(const char* name)

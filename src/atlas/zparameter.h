@@ -235,7 +235,7 @@ void ZSingleValueParameter<T>::set(const T& valueIn)
       QMutexLocker locker(&m_mutex);
       beforeChange(value);
       m_value = value;
-      VLOG(1) << m_name;
+      VLOG(2) << m_name;
       Q_EMIT valueChanged();
       afterChange(value);
     }

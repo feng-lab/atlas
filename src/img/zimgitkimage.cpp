@@ -197,7 +197,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
 
       if (imageIO->GetNumberOfComponents() <= 1) {
         imageIO->SetIORegion(ioRegion);
-        if (clipInfo.numTimes > 1 && clipInfo.numChannels > 1) {
+        if (clipInfo.numTimes > 1) {
           auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
           imageIO->Read(buf.get());
           fixDimensionOrder(buf.get(), "XYZTC", img);
@@ -248,7 +248,6 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       } else {
         imageIO->Read(img.channelData(0));
         if (imgInfo.numChannels > 1) {
-          // if numTimes > 1 or isNd2 then dimension order is already fixed
           ZImg tpImg(imgInfo);
           CXYZtoXYZC(img, tpImg);
           img.swap(tpImg);
@@ -288,7 +287,6 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       } else {
         imageIO->Read(tmpImg.channelData(0));
         if (clipInfo.numChannels > 1) {
-          // if numTimes > 1 or isNd2 then dimension order is already fixed
           ZImg tpImg(clipInfo);
           CXYZtoXYZC(tmpImg, tpImg);
           tmpImg.swap(tpImg);
