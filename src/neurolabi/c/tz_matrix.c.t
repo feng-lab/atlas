@@ -1316,7 +1316,7 @@ void <2T>_Abs_Threshold(<2T> *dm, <1t> threshold)
       } else {
 	result->array[i] /= 1.0 +
 	  Cube_Root(MATRIX_ABS(a->array[i] * b->array[i] * c->array[i] + 
-			       2.0 * d->array[i] * e->array[i] * f->array[i] -
+			       2 * d->array[i] * e->array[i] * f->array[i] -
 			       a->array[i] * f->array[i] * f->array[i] - 
 			       c->array[i] * d->array[i] * d->array[i] - 
 			       b->array[i] * e->array[i] * e->array[i]));

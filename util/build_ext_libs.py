@@ -2093,6 +2093,7 @@ def build_freeimage(src_dir: str, install_dir: str):
     bak_file_4 = None
     orig_file = bak_file = None
     orig_file5 = bak_file5 = None
+    orig_file2 = bak_file2 = None
     try:
         orig_file = os.path.join(src_dir, 'fipMakefile.srcs')
         from_texts = [r'Source/LibTIFF4/tif_dir.c ']
@@ -2103,6 +2104,11 @@ def build_freeimage(src_dir: str, install_dir: str):
         from_texts = [r'#define WIN32_LEAN_AND_MEAN']
         to_texts = ['#ifndef WIN32_LEAN_AND_MEAN\n#define WIN32_LEAN_AND_MEAN\n#endif']
         bak_file5 = patch_file(orig_file5, from_texts=from_texts, to_texts=to_texts)
+
+        orig_file2 = os.path.join(src_dir, 'Source', 'OpenEXR', 'IlmImf', 'ImfAttribute.cpp')
+        from_texts = [r': std::binary_function <const char *, const char *, bool>']
+        to_texts = ['']
+        bak_file2 = patch_file(orig_file2, from_texts=from_texts, to_texts=to_texts)
 
         if os.path.exists(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION')):
             os.rename(os.path.join(src_dir, 'Source', 'LibTIFF4', 'VERSION'),
@@ -2180,6 +2186,7 @@ def build_freeimage(src_dir: str, install_dir: str):
     finally:
         os.replace(bak_file, orig_file)
         os.replace(bak_file5, orig_file5)
+        os.replace(bak_file2, orig_file2)
         if is_mac():
             os.remove(os.path.join(src_dir, 'Makefile_gnu'))
             os.remove(os.path.join(src_dir, 'Makefile_fip'))
@@ -2507,6 +2514,8 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
                 '-DBUILD_opencv_python3:BOOL=' + ('ON' if conda_build else 'OFF'),
                 '-DPYTHON3_EXECUTABLE=' + sys.executable,
                 '-DBUILD_opencv_java:BOOL=OFF',
+                '-DBUILD_opencv_calib3d:BOOL=OFF',
+                '-DBUILD_opencv_stereo:BOOL=OFF',
 
                 '-DBUILD_opencv_dnn_objdetect:BOOL=OFF',
                 '-DBUILD_opencv_hdf:BOOL=OFF',
