@@ -3035,8 +3035,6 @@ def build_proxygen(src_dir: str, install_dir: str):
         else:
             cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={os.path.dirname(sys.executable)}',
                              ])
-        cmakecmd.extend(['-DBUILD_QUIC:BOOL=ON',
-                         ])
 
         cmakecmd.extend([src_dir])
 
