@@ -32,9 +32,9 @@ ZObjWidget::ZObjWidget(ZDoc* doc, ZObjModel* objModel, QItemSelectionModel* sele
   setStyleSheet(QString("QTreeView::indicator:unchecked {image: url(%1);}"
                         "QTreeView::indicator:checked {image: url(%2);}"
                         "QTreeView::indicator:indeterminate {image: url(%3);}")
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon))
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeOpenIcon))
-                  .arg(ZTheme::instance().iconFile(ZTheme::EyeHalfIcon)));
+                  .arg(ZTheme::instance().iconFile(ZTheme::EyeCloseIcon),
+                       ZTheme::instance().iconFile(ZTheme::EyeOpenIcon),
+                       ZTheme::instance().iconFile(ZTheme::EyeHalfIcon)));
 
   connect(this, &ZObjWidget::customContextMenuRequested, this, &ZObjWidget::contextMenu);
   connect(this, &ZObjWidget::clicked, this, &ZObjWidget::indexClicked);

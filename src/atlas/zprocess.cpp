@@ -14,7 +14,7 @@ ZProcess::ZProcess(QObject* parent, bool logStderrAsInfo)
   connect(m_process,
           &QProcess::readyReadStandardError,
           this,
-          logStderrAsInfo ? &ZProcess::logStandardOutput : &ZProcess::logStandardError);
+          logStderrAsInfo ? &ZProcess::logStandardErrorAsInfo : &ZProcess::logStandardError);
 }
 
 void ZProcess::dryRun(const QString& program, const QStringList& arguments)
@@ -87,6 +87,11 @@ void ZProcess::logStandardError()
 void ZProcess::logStandardOutput()
 {
   LOG(INFO) << m_process->readAllStandardOutput();
+}
+
+void ZProcess::logStandardErrorAsInfo()
+{
+  LOG(INFO) << m_process->readAllStandardError();
 }
 
 } // namespace nim

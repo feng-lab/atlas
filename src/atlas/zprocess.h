@@ -53,6 +53,8 @@ protected:
 
   void logStandardOutput();
 
+  void logStandardErrorAsInfo();
+
 protected:
   QProcess* m_process = nullptr;
 };
