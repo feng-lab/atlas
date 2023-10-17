@@ -324,7 +324,7 @@ else (WIN32)
     target_compile_options(${LIBRARY_NAME} PUBLIC -Wno-c++98-c++11-c++14-c++17-compat)
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wundefined-reinterpret-cast)
 
-    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS -Wno-unused-parameter)
+    set_source_files_properties(${TIFF_SOURCES} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-command-line-argument")
 
     if (APPLE)
       target_compile_options(${LIBRARY_NAME} PUBLIC -stdlib=libc++)

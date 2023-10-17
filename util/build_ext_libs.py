@@ -2335,9 +2335,11 @@ def build_vtk(src_dir: str, install_dir: str):
         bak_file4 = patch_file(orig_file4,
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
+                                           r'-Werror -Wall',
                                            ],
                                to_texts=[r'-std=c++17',
                                          r'set(CMAKE_CXX_STANDARD 17)',
+                                         r'-Wall',
                                          ])
 
         if is_windows():
