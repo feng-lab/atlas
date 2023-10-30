@@ -17,7 +17,7 @@ MODULES = $(SRCS:.c=.o)
 MODULES := $(MODULES:.cpp=.o)
 
 # C flags
-CFLAGS ?= -std=c99 -O3 -fPIC -fexceptions -w -fvisibility=hidden -mavx
+CFLAGS ?= -std=c99 -O3 -fPIC -fexceptions -w -fvisibility=hidden -mavx -Wno-error=implicit-function-declaration
 # OpenJPEG
 CFLAGS += -DOPJ_STATIC
 # LibRaw
