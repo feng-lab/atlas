@@ -156,11 +156,13 @@ def remove_installed_dynamic_library(install_dir: str, libnames: list):
             glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.so*'))
         elif is_windows():
             filename = os.path.join(install_dir, 'lib', f'{libname}.lib')
-            print(f'deleting {filename}')
-            os.unlink(filename)
+            if os.path.exists(filename):
+                print(f'deleting {filename}')
+                os.unlink(filename)
             filename = os.path.join(install_dir, 'bin', f'{libname}.dll')
-            print(f'deleting {filename}')
-            os.unlink(filename)
+            if os.path.exists(filename):
+                print(f'deleting {filename}')
+                os.unlink(filename)
         else:
             glob_remove(os.path.join(install_dir, 'lib', f'lib{libname}.*dylib'))
 
@@ -1587,7 +1589,7 @@ include(libs)""",
                         cmakecmd.extend(cmakecmd_options)
                         cmakecmd.extend([module_src_dir])
                         build_and_install_cmakecmd(cmakecmd, build_dir)
-                        create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=True)
+                        create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=False)
                     finally:
                         shutil.rmtree(arm64_install_dir, ignore_errors=False)
             finally:
