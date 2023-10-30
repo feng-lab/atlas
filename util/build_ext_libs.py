@@ -2305,7 +2305,7 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file4 = orig_file4 = None
     bak_file5 = orig_file5 = None
     bak_file6 = orig_file6 = None
-    # bak_file7 = orig_file7 = None
+    bak_file7 = orig_file7 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -2357,6 +2357,14 @@ def build_vtk(src_dir: str, install_dir: str):
                                    from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
                                    to_texts=['bool __dummyIsParallelScope<1>()', ])
 
+        if is_linux():
+            orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail', 'macro_scope.hpp')
+            bak_file7 = patch_file(orig_file7,
+                                   from_texts=[r'#define JSON_HAS_CPP_17',
+                                               ],
+                                   to_texts=[r'//#define JSON_HAS_CPP_17',
+                                             ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DVTK_BUILD_EXAMPLES:BOOL=OFF',
@@ -2398,6 +2406,8 @@ def build_vtk(src_dir: str, install_dir: str):
         if is_windows():
             os.replace(bak_file5, orig_file5)
             os.replace(bak_file6, orig_file6)
+        if is_linux():
+            os.replace(bak_file7, orig_file7)
 
 
 def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_build: bool = False):
