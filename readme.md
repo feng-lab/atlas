@@ -9,9 +9,9 @@
 ```bash
 # install miniconda
 # then
-conda env remove -n pt10 -y
-conda create -n pt10 -y python=3.10
-conda activate pt10
+conda env remove -n pt11 -y
+conda create -n pt11 -y python=3.11
+conda activate pt11
 conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build conda-verify ninja
 ```
 
@@ -27,14 +27,14 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt10
+    conda activate pt11
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/
-    aqt install-qt --outputdir ~/Qt mac desktop 6.5.1 clang_64 --external 7z
+    aqt install-qt --outputdir ~/Qt mac desktop 6.6.0 clang_64 --external 7z
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/tools_ifw/
     aqt install-tool --outputdir ~/Qt mac desktop tools_ifw qt.tools.ifw.46
     # list modules
@@ -47,14 +47,15 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 * install visual studio 2022, intel oneapi basekit, git
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt10
+    conda activate pt11
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/
-    aqt install-qt --outputdir ~/Qt windows desktop 6.5.1 win64_msvc2019_64 --external 7z
+    aqt install-qt --outputdir ~/Qt windows desktop 6.6.0 win64_msvc2019_64 --external 7z
+    aqt install-qt --outputdir ~/Qt windows desktop 6.6.0 win64_mingw --external 7z
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/windows_x86/desktop/tools_ifw/
     aqt install-tool --outputdir ~/Qt windows desktop tools_ifw qt.tools.ifw.46
     # list modules
@@ -73,14 +74,14 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt10
+    conda activate pt11
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~
     rm -rf Qt
     mkdir Qt
     # refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/
-    aqt install-qt --outputdir ~/Qt linux desktop 6.5.1 clang_64 --external 7z
+    aqt install-qt --outputdir ~/Qt linux desktop 6.6.0 gcc_64 --external 7z
     # install tools: refer to https://download.qt.io/online/qtsdkrepository/linux_x64/desktop/tools_ifw/
     aqt install-tool --outputdir ~/Qt linux desktop tools_ifw qt.tools.ifw.46
     # list modules
