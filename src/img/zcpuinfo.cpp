@@ -224,6 +224,8 @@ const char* uarch_to_string(enum cpuinfo_uarch uarch)
       return "Neoverse V1";
     case cpuinfo_uarch_neoverse_n2:
       return "Neoverse N2";
+    case cpuinfo_uarch_neoverse_v2:
+      return "Neoverse V2";
     case cpuinfo_uarch_scorpion:
       return "Scorpion";
     case cpuinfo_uarch_krait:
@@ -499,6 +501,7 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tAVX512VP2INTERSECT: {}", cpuinfo_has_x86_avx512vp2intersect() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tAVX512_4VNNIW: {}", cpuinfo_has_x86_avx512_4vnniw() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tAVX512_4FMAPS: {}", cpuinfo_has_x86_avx512_4fmaps() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAVXVNNI: {}", cpuinfo_has_x86_avxvnni() ? "yes" : "no");
 
   LOG(INFO) << fmt::format("Multi-threading extensions:\n");
   LOG(INFO) << fmt::format("\tMONITOR/MWAIT: {}", cpuinfo_has_x86_mwait() ? "yes" : "no");
