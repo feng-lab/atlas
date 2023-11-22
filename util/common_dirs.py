@@ -113,16 +113,26 @@ def google_drive_dir() -> str:
     return res
 
 
+def dropbox_dir() -> str:
+    res = os.path.join(os.path.expanduser('~'), 'Dropbox')
+    assert os.path.exists(res)
+    return res
+
+
 def src_package_dir() -> str:
     res = os.path.join(os.path.expanduser('~'), 'atlas_deps')
     if not os.path.exists(res):
-        res = os.path.join(google_drive_dir(), 'code', 'my', 'atlas_deps')
+        res = os.path.join(dropbox_dir(), 'code', 'my', 'atlas_deps')
     assert os.path.exists(res)
     return res
 
 
 def atlas_test_data_dir() -> str:
-    res = os.path.normpath(os.path.join(src_package_dir(), '..', 'atlas_test_data'))
+    res = os.path.join(os.path.expanduser('~'), 'atlas_test_data')
+    if not os.path.exists(res):
+        res = os.path.join(dropbox_dir(), 'code', 'my', 'atlas_test_data')
+    if not os.path.exists(res):
+        res = os.path.normpath(os.path.join(src_package_dir(), '..', 'atlas_test_data'))
     assert os.path.exists(res)
     return res
 

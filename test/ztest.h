@@ -11,9 +11,12 @@ namespace nim {
 inline QDir getTestDataDir()
 {
 #ifdef _WIN32
-  QDir res("Z:\\Google Drive\\code\\my\\atlas_test_data");
+  auto res = QDir(QDir::homePath() + "\\atlas_test_data");
   if (!res.exists()) {
-    res = QDir(QDir::homePath() + "\\atlas_test_data");
+    res = QDir(QDir::homePath() + "\\Dropbox\\code\\my\\atlas_test_data");
+  }
+  if (!res.exists()) {
+    res = QDir("Z:\\Google Drive\\code\\my\\atlas_test_data");
   }
   if (!res.exists()) {
     res = QDir(QDir::homePath() + "\\GoogleDrive\\code\\my\\atlas_test_data");
@@ -26,12 +29,15 @@ inline QDir getTestDataDir()
   }
   return res;
 #elif defined(__APPLE__)
-  QDir res(QDir::homePath() + "/Google Drive/code/my/atlas_test_data");
+  auto res = QDir(QDir::homePath() + "/atlas_test_data");
+  if (!res.exists()) {
+    res = QDir(QDir::homePath() + "/Dropbox/code/my/atlas_test_data");
+  }
   if (!res.exists()) {
     res = QDir(QDir::homePath() + "/Google Drive/My Drive/code/my/atlas_test_data");
   }
   if (!res.exists()) {
-    res = QDir(QDir::homePath() + "/atlas_test_data");
+    res = QDir(QDir::homePath() + "/Google Drive/code/my/atlas_test_data");
   }
   return res;
 #else
