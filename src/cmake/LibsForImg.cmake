@@ -12,7 +12,7 @@ if (BUILD_WITH_CONDA)
   # qt
   set(QT_HOST_PATH ${CONDA_LIB_DIR})
   # tbb
-  set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/tbb)
+  set(TBB_DIR ${CONDA_LIB_DIR}/lib/cmake/TBB)
 else ()
   # qt
   include(${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/PathList.cmake)
