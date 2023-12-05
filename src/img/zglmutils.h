@@ -245,8 +245,8 @@ public:
   }
 };
 
-using Col3Compare = Vec3Compare<unsigned char, glm::highp>;
-using Col4Compare = Vec4Compare<unsigned char, glm::highp>;
+using Col3Compare = Vec3Compare<unsigned char, glm::defaultp>;
+using Col4Compare = Vec4Compare<unsigned char, glm::defaultp>;
 
 // serialization support
 
