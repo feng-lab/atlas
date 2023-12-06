@@ -39,7 +39,7 @@ void ZImgTiff::readInfo(const QString& filename,
   createDefaultSubBlocks(filename, infos, subBlocks);
 
   if (!m_imageDescription.isEmpty()) {
-    LOG(INFO) << m_imageDescription;
+    VLOG(1) << m_imageDescription;
   }
 }
 

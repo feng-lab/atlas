@@ -299,7 +299,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
             }
           }
 
-          LOG(INFO) << "image sequence reading finished.";
+          VLOG(1) << "image sequence reading finished.";
         })
         .thenError(folly::tag_t<ZException>{}, [](auto&& e) {
           LOG(ERROR) << "read image sequence error: " << e.what();

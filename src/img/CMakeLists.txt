@@ -178,7 +178,9 @@ set(IMG_SOURCES
     zmemorymappedfilecache.cpp zmemorymappedfilecache.h
     zh5zjpegxr.cpp zh5zjpegxr.h
     zhashutils.h
-    zfolly.cpp zfolly.h)
+    zfolly.cpp zfolly.h
+    zcachedimg.cpp zcachedimg.h
+)
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
 

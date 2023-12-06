@@ -6,7 +6,7 @@
 
 namespace nim {
 
-class ZImg;
+class ZCachedImg;
 
 class ZImageTransform;
 
@@ -121,22 +121,17 @@ private:
   };
 
   template<typename ImagePixelType>
-  void alignSection(const ZImg& srcImg,
+  void alignSection(const ZCachedImg& srcImg,
                     size_t fixedImageIndex,
                     size_t movingImageIndex,
                     double& cost,
                     ZImageTransform*& transform);
 
   template<typename ImagePixelType>
-  void transformSections(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>& tfmmap,
-                         const ZImg& srcImg,
-                         const QString& outImgFilename) const;
+  void calcRefCh(const ZCachedImg& srcImg);
 
   template<typename ImagePixelType>
-  void calcRefCh(const ZImg& srcImg);
-
-  template<typename ImagePixelType>
-  void calcSecInfs(const ZImg& srcImg);
+  void calcSecInfs(const ZCachedImg& srcImg);
 
 private:
   QStringList m_imgFilenames;
