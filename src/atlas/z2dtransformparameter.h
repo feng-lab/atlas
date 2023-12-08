@@ -36,9 +36,9 @@ public:
     m_rotation.set(glm::degrees(v));
   }
 
-  inline void setCenter(const glm::dvec2& v)
+  inline glm::dvec2 rotationCenter()
   {
-    return m_center.set(v);
+    return m_center.get();
   }
 
   inline glm::dvec2 scale() const

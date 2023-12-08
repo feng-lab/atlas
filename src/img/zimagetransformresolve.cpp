@@ -91,7 +91,7 @@ void ZImageTransformResolve::addImagePair(size_t fixedIdx,
   m_idxPairs[std::make_pair(fixedIdx, movingIdx)] = std::make_pair(tfm, transformCost);
 }
 
-std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResolve::resolve(QString* summary) const
+std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResolve::resolve() const
 {
   CHECK(!m_idxTransforms.empty());
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> res;
@@ -108,8 +108,6 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   for (const auto& imgImgTfmCost : m_idxPairs) {
     minCost = std::min(minCost, imgImgTfmCost.second.second);
   }
-
-  QString summ;
 
   using GraphT = boost::adjacency_list<boost::listS, boost::listS, boost::undirectedS, VertexInfo, EdgeInfo>;
   using Vertex = boost::graph_traits<GraphT>::vertex_descriptor;
@@ -177,6 +175,7 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
                               .vertex_index_map(boost::get(&VertexInfo::idx, fg))
                               .color_map(boost::get(&VertexInfo::m_algo_color, fg)));
 
+  LOG(INFO) << "transform resolve summary:";
   for (size_t i = 0; i < sortedEdges.size(); ++i) {
     size_t img1 = graph[boost::source(sortedEdges[i], graph)].img;
     size_t img2 = graph[boost::target(sortedEdges[i], graph)].img;
@@ -193,7 +192,11 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
         pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img2]->addTransform(pairIt->second.first->makeInverseTransform());
       }
-      summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
+      LOG(INFO) << QString("%1 connects to %2 with cost %3, transform: %4")
+                     .arg(img1)
+                     .arg(img2)
+                     .arg(pairIt->second.second)
+                     .arg(res[img2]->toQString());
     } else if (!img1HasLocation && img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
@@ -204,16 +207,14 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
         pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img1]->addTransform(*pairIt->second.first);
       }
-      summ += QString("%1 connects to %2 with cost %3\n").arg(img1).arg(img2).arg(pairIt->second.second);
+      LOG(INFO) << QString("%1 connects to %2 with cost %3, transform: %4\n")
+                     .arg(img1)
+                     .arg(img2)
+                     .arg(pairIt->second.second)
+                     .arg(res[img1]->toQString());
     } else {
       CHECK(img1HasLocation && img2HasLocation);
     }
-  }
-
-  LOG(INFO) << "transform resolve summary:";
-  LOG(INFO) << summ;
-  if (summary) {
-    summ.swap(*summary);
   }
 
   return res;

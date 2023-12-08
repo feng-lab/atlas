@@ -10,8 +10,6 @@ class ZImg;
 
 class ZImageTransform;
 
-class ZImageCompositeTransform;
-
 class ZChromaticShiftCorrection : public ZImgProcess
 {
   Q_OBJECT

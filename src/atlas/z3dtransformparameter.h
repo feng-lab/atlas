@@ -41,9 +41,9 @@ public:
     m_rotation.set(glm::vec4(glm::degrees(glm::angle(v)), glm::axis(v)));
   }
 
-  inline void setCenter(const glm::vec3& v)
+  inline glm::vec3 rotationCenter()
   {
-    return m_center.set(v);
+    return m_center.get();
   }
 
   [[nodiscard]] inline glm::vec3 scale() const

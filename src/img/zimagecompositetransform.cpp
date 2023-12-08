@@ -4,18 +4,25 @@ namespace nim {
 
 void ZImageCompositeTransform::addTransform(const ZImageTransform& tfm)
 {
-  m_tfms.emplace_back(tfm.clone());
-  constructParameters();
+  if (!m_tfms.empty() && m_tfms.back()->canMergeWith(&tfm)) {
+    m_tfms.back()->mergeWith(&tfm);
+  } else {
+    m_tfms.emplace_back(tfm.clone());
+  }
 }
 
 void ZImageCompositeTransform::addTransform(ZImageTransform* tfm)
 {
-  m_tfms.emplace_back(tfm);
-  constructParameters();
+  if (!m_tfms.empty() && m_tfms.back()->canMergeWith(tfm)) {
+    m_tfms.back()->mergeWith(tfm);
+  } else {
+    m_tfms.emplace_back(tfm);
+  }
 }
 
 size_t ZImageCompositeTransform::numParameters() const
 {
+  CHECK(false);
   size_t res = 0;
   for (const auto& tfm : m_tfms) {
     res += tfm->numParameters();
@@ -25,6 +32,7 @@ size_t ZImageCompositeTransform::numParameters() const
 
 void ZImageCompositeTransform::setParameters(const double* para)
 {
+  CHECK(false);
   m_parameters = std::vector<double>(para, para + numParameters());
   size_t idx = 0;
   for (const auto& tfm : m_tfms) {
@@ -45,6 +53,7 @@ bool ZImageCompositeTransform::is2DTransform() const
 
 void ZImageCompositeTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 {
+  CHECK(false);
   for (const auto& tfm : m_tfms) {
     tfm->adaptParameters(fromLevel, toLevel);
   }
@@ -52,6 +61,7 @@ void ZImageCompositeTransform::adaptParameters(size_t fromLevel, size_t toLevel)
 
 std::vector<double> ZImageCompositeTransform::estimateParameterScales(const double* dims) const
 {
+  CHECK(false);
   std::vector<double> res;
   for (const auto& tfm : m_tfms) {
     std::vector<double> tmpres = tfm->estimateParameterScales(dims);
@@ -69,6 +79,10 @@ void ZImageCompositeTransform::transformPoint(double* inoutCoords) const
 
 QString ZImageCompositeTransform::toQString() const
 {
+  if (m_tfms.size() == 1) {
+    return (*m_tfms.begin())->toQString();
+  }
+  CHECK(false);
   QString res;
   size_t idx = 1;
   for (const auto& tfm : m_tfms) {
@@ -93,15 +107,6 @@ ZImageTransform* ZImageCompositeTransform::makeInverseTransform() const
     res->addTransform(tfm->makeInverseTransform());
   }
   return res;
-}
-
-void ZImageCompositeTransform::constructParameters()
-{
-  m_parameters.clear();
-  for (const auto& tfm : m_tfms) {
-    const std::vector<double>& tmpres = tfm->parameters();
-    m_parameters.insert(m_parameters.end(), tmpres.begin(), tmpres.end());
-  }
 }
 
 } // namespace nim

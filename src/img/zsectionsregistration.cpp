@@ -95,10 +95,10 @@ void ZSectionsRegistration::doWork()
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> tfmmap = tfmResolve.resolve();
 
   for (size_t i = 0; i < srcImg.depth(); ++i) {
-    auto& tfm = tfmmap.at(i);
-    tfm->setImageInterpolation(ZImageInterpolation(Interpolant::Cubic,
-                                                   PadOption::Constant,
-                                                   m_brightBackground ? m_sectionInfos[i].max : m_sectionInfos[i].min));
+    tfmmap.at(i)->setImageInterpolation(
+      ZImageInterpolation(Interpolant::Cubic,
+                          PadOption::Constant,
+                          m_brightBackground ? m_sectionInfos[i].max : m_sectionInfos[i].min));
   }
   srcImg.setSliceTransform(&tfmmap);
   srcImg.save(m_resultFilename);
@@ -373,35 +373,67 @@ void ZSectionsRegistration::calcSecInfs(const ZCachedImg& srcImg)
   m_minValue = std::numeric_limits<double>::max();
   m_maxValue = std::numeric_limits<double>::lowest();
   size_t length = srcImg.info().planeVoxelNumber();
-  for (size_t i = 0; i < srcImg.depth(); ++i) {
-    auto image = srcImg.slice(i, m_referenceChannel, 0);
-    const auto* data = image.planeData<ImagePixelType>(0);
-    // std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
-    // m_sectionInfos[i].min = *minmax.first;
-    // m_sectionInfos[i].max = *minmax.second;
-    std::tie(m_sectionInfos[i].min, m_sectionInfos[i].max) = parallel_minmax(data, data + length);
-    m_minValue = std::min(m_minValue, m_sectionInfos[i].min);
-    m_maxValue = std::max(m_maxValue, m_sectionInfos[i].max);
-    std::vector<ImagePixelType> dataWithoutZero;
-    for (size_t j = 0; j < length; ++j) {
-      if (data[j] > 0) {
-        dataWithoutZero.push_back(data[j]);
+
+  tbb::parallel_for(tbb::blocked_range<size_t>(0, srcImg.depth()), [&](const tbb::blocked_range<size_t>& range) {
+    for (size_t i = range.begin(); i < range.end(); ++i) {
+      auto image = srcImg.slice(i, m_referenceChannel, 0);
+      const auto* data = image.planeData<ImagePixelType>(0);
+      // std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
+      // m_sectionInfos[i].min = *minmax.first;
+      // m_sectionInfos[i].max = *minmax.second;
+      std::tie(m_sectionInfos[i].min, m_sectionInfos[i].max) = parallel_minmax(data, data + length);
+      m_minValue = std::min(m_minValue, m_sectionInfos[i].min);
+      m_maxValue = std::max(m_maxValue, m_sectionInfos[i].max);
+      std::vector<ImagePixelType> dataWithoutZero;
+      for (size_t j = 0; j < length; ++j) {
+        if (data[j] > 0) {
+          dataWithoutZero.push_back(data[j]);
+        }
+      }
+      if (dataWithoutZero.empty()) {
+        m_sectionInfos[i].mean = 0;
+        m_sectionInfos[i].std = 0;
+        m_sectionInfos[i].median = 0;
+      } else {
+        //      meanAndStandardDeviation(dataWithoutZero.begin(),
+        //                               dataWithoutZero.end(),
+        //                               m_sectionInfos[i].mean,
+        //                               m_sectionInfos[i].std);
+        std::tie(m_sectionInfos[i].mean, m_sectionInfos[i].std) =
+          parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
+        m_sectionInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
       }
     }
-    if (dataWithoutZero.empty()) {
-      m_sectionInfos[i].mean = 0;
-      m_sectionInfos[i].std = 0;
-      m_sectionInfos[i].median = 0;
-    } else {
-      //      meanAndStandardDeviation(dataWithoutZero.begin(),
-      //                               dataWithoutZero.end(),
-      //                               m_sectionInfos[i].mean,
-      //                               m_sectionInfos[i].std);
-      std::tie(m_sectionInfos[i].mean, m_sectionInfos[i].std) =
-        parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
-      m_sectionInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
-    }
-  }
+  });
+  //  for (size_t i = 0; i < srcImg.depth(); ++i) {
+  //    auto image = srcImg.slice(i, m_referenceChannel, 0);
+  //    const auto* data = image.planeData<ImagePixelType>(0);
+  //    // std::pair<const ImagePixelType*, const ImagePixelType*> minmax = minMaxElement(data, data + length);
+  //    // m_sectionInfos[i].min = *minmax.first;
+  //    // m_sectionInfos[i].max = *minmax.second;
+  //    std::tie(m_sectionInfos[i].min, m_sectionInfos[i].max) = parallel_minmax(data, data + length);
+  //    m_minValue = std::min(m_minValue, m_sectionInfos[i].min);
+  //    m_maxValue = std::max(m_maxValue, m_sectionInfos[i].max);
+  //    std::vector<ImagePixelType> dataWithoutZero;
+  //    for (size_t j = 0; j < length; ++j) {
+  //      if (data[j] > 0) {
+  //        dataWithoutZero.push_back(data[j]);
+  //      }
+  //    }
+  //    if (dataWithoutZero.empty()) {
+  //      m_sectionInfos[i].mean = 0;
+  //      m_sectionInfos[i].std = 0;
+  //      m_sectionInfos[i].median = 0;
+  //    } else {
+  //      //      meanAndStandardDeviation(dataWithoutZero.begin(),
+  //      //                               dataWithoutZero.end(),
+  //      //                               m_sectionInfos[i].mean,
+  //      //                               m_sectionInfos[i].std);
+  //      std::tie(m_sectionInfos[i].mean, m_sectionInfos[i].std) =
+  //        parallel_mean_and_sample_standard_deviation(dataWithoutZero.begin(), dataWithoutZero.end());
+  //      m_sectionInfos[i].median = median(dataWithoutZero.begin(), dataWithoutZero.end());
+  //    }
+  //  }
 }
 
 } // namespace nim

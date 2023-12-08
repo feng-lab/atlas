@@ -1,5 +1,7 @@
 #include "zimagematrix2dtransform.h"
 
+#include <boost/math/constants/constants.hpp>
+
 namespace {
 
 void getAffineParameterScales(double width,
@@ -76,15 +78,7 @@ void ZImageMatrix2DTransform::transformRange(double inXMin,
 void ZImageMatrix2DTransform::transformPointInverse(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix3d& mat = m_tform.inverseTransformMatrix();
-
-  double inCoords[2];
-  inCoords[0] = inoutCoords[0];
-  inCoords[1] = inoutCoords[1];
-  inoutCoords[0] =
-    mat(0, 0) * (inCoords[0] - m_centerX) + mat(0, 1) * (inCoords[1] - m_centerY) + mat(0, 2) + m_centerX;
-  inoutCoords[1] =
-    mat(1, 0) * (inCoords[0] - m_centerX) + mat(1, 1) * (inCoords[1] - m_centerY) + mat(1, 2) + m_centerY;
+  m_tform.transformPointsInverse(inoutCoords[0], inoutCoords[1], inoutCoords[0], inoutCoords[1]);
 }
 
 size_t ZImageMatrix2DTransform::numParameters() const
@@ -112,18 +106,25 @@ void ZImageMatrix2DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   setParameters(m_parameters.data());
 }
 
+bool ZImageMatrix2DTransform::canMergeWith(const ZImageTransform* tfm) const
+{
+  CHECK(tfm);
+  auto m2dtfm = dynamic_cast<const ZImageMatrix2DTransform*>(tfm);
+  return m2dtfm != nullptr;
+}
+
+void ZImageMatrix2DTransform::mergeWith(const nim::ZImageTransform* tfm)
+{
+  CHECK(tfm);
+  auto m2dtfm = dynamic_cast<const ZImageMatrix2DTransform*>(tfm);
+  CHECK(m2dtfm);
+  m_tform.mergeWith(m2dtfm->m_tform);
+}
+
 void ZImageMatrix2DTransform::transformPoint(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix3d& mat = m_tform.transformMatrix();
-
-  double inCoords[2];
-  inCoords[0] = inoutCoords[0];
-  inCoords[1] = inoutCoords[1];
-  inoutCoords[0] =
-    mat(0, 0) * (inCoords[0] - m_centerX) + mat(0, 1) * (inCoords[1] - m_centerY) + mat(0, 2) + m_centerX;
-  inoutCoords[1] =
-    mat(1, 0) * (inCoords[0] - m_centerX) + mat(1, 1) * (inCoords[1] - m_centerY) + mat(1, 2) + m_centerY;
+  m_tform.transformPointsForward(inoutCoords[0], inoutCoords[1], inoutCoords[0], inoutCoords[1]);
 }
 
 ZImageTransform* ZImageMatrix2DTransform::clone() const
@@ -173,9 +174,9 @@ void ZImageYTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toL
 void ZImageYTranslation2DTransform::transformPoint(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix3d& mat = m_tform.transformMatrix();
+  const auto& mat = m_tform.transformMatrix();
 
-  inoutCoords[1] += mat(1, 2);
+  inoutCoords[1] += mat[2][1];
 }
 
 ZImageTransform* ZImageYTranslation2DTransform::clone() const
@@ -226,10 +227,10 @@ void ZImageTranslation2DTransform::adaptParameters(size_t fromLevel, size_t toLe
 void ZImageTranslation2DTransform::transformPoint(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix3d& mat = m_tform.transformMatrix();
+  const auto& mat = m_tform.transformMatrix();
 
-  inoutCoords[0] += mat(0, 2);
-  inoutCoords[1] += mat(1, 2);
+  inoutCoords[0] += mat[2][0];
+  inoutCoords[1] += mat[2][1];
 }
 
 ZImageTransform* ZImageTranslation2DTransform::clone() const
@@ -261,6 +262,7 @@ void ZImageRigid2DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1]);
   m_tform.setRotationAngle(para[2]);
+  m_tform.setRotationCenter(m_centerX, m_centerY);
   m_tform.makeMatrix();
   m_parameters = std::vector<double>(para, para + 3);
 }
@@ -315,6 +317,7 @@ void ZImageSimilarity2DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1]);
   m_tform.setRotationAngle(para[2]);
+  m_tform.setRotationCenter(m_centerX, m_centerY);
   m_tform.setScale(para[3], para[3]);
   m_tform.makeMatrix();
   m_parameters = std::vector<double>(para, para + 4);
@@ -371,6 +374,7 @@ void ZImageAffine2DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1]);
   m_tform.setRotationAngle(para[2]);
+  m_tform.setRotationCenter(m_centerX, m_centerY);
   m_tform.setScale(para[3], para[4]);
   m_tform.setShear(para[5], para[6]);
   m_tform.makeMatrix();

@@ -36,9 +36,6 @@ public:
   [[nodiscard]] ZImageTransform* makeInverseTransform() const override;
 
 protected:
-  void constructParameters();
-
-protected:
   std::deque<std::unique_ptr<ZImageTransform>> m_tfms;
 };
 

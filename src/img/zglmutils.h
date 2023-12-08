@@ -17,6 +17,9 @@
 
 #include "zglobal.h"
 #include "zjson.h"
+#include "zlog.h"
+#include <fmt/core.h>
+#include <fmt/format.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -409,5 +412,32 @@ inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
 }
 
 } // namespace nim
+
+template<size_t L, typename T, glm::qualifier Q>
+struct fmt::formatter<glm::vec<L, T, Q>> : fmt::formatter<QString>
+{
+  auto format(const glm::vec<L, T, Q>& v, format_context& ctx)
+  {
+    return formatter<QString>::format(nim::toQString(v), ctx);
+  }
+};
+
+template<size_t C, size_t R, typename T, glm::qualifier Q>
+struct fmt::formatter<glm::mat<C, R, T, Q>> : fmt::formatter<QString>
+{
+  auto format(const glm::mat<C, R, T, Q>& m, format_context& ctx)
+  {
+    return formatter<QString>::format(nim::toQString(m), ctx);
+  }
+};
+
+template<typename T, glm::qualifier Q>
+struct fmt::formatter<glm::tquat<T, Q>> : fmt::formatter<QString>
+{
+  auto format(const glm::tquat<T, Q>& q, format_context& ctx)
+  {
+    return formatter<QString>::format(nim::toQString(q), ctx);
+  }
+};
 
 //-------------------------------------------------------------------------------------------------------------------------

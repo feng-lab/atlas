@@ -177,7 +177,7 @@ public:
 
   inline void setRotationCenter(const glm::vec3& c)
   {
-    m_coordTransform.setCenter(c);
+    m_coordTransform.setRotationCenter(c);
   }
 
   inline void setOpacity(float o)

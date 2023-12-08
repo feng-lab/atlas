@@ -33,7 +33,6 @@ public:
   void transformPointInverse(double* inoutCoords) const;
 
   // ZImageTransform interface
-
 public:
   [[nodiscard]] size_t numParameters() const override;
 
@@ -47,6 +46,10 @@ public:
   }
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
+
+  bool canMergeWith(const ZImageTransform* tfm) const override;
+
+  void mergeWith(const ZImageTransform* tfm) override;
 
   void transformPoint(double* inoutCoords) const override;
 

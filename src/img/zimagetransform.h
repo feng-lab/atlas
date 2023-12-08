@@ -46,7 +46,19 @@ public:
     m_useMultithreading = v;
   }
 
-  // inoutCoords can not be nullptr, 2d transform cahnge first 2 elements of outCoords, 3d transform change first 3
+  // if input transform can be merged with this
+  virtual bool canMergeWith(const ZImageTransform* /*tfm*/) const
+  {
+    return false;
+  }
+
+  virtual void mergeWith(const ZImageTransform* /*tfm*/)
+  {
+    CHECK(false);
+  }
+
+  // transform output image coords to input image coords
+  // inoutCoords can not be nullptr, 2d transform change first 2 elements of outCoords, 3d transform change first 3
   // elements of outCoords
   virtual void transformPoint(double* inoutCoords) const = 0;
 

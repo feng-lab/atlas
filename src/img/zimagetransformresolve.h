@@ -19,7 +19,7 @@ public:
   void addImagePair(size_t fixedIdx, size_t movingIdx, const ZImageTransform* tfm, double transformCost = 0.);
 
   // return transform for each idx, throw ZException if error
-  std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> resolve(QString* summary = nullptr) const;
+  std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> resolve() const;
 
 private:
   std::map<size_t, const ZImageTransform*> m_idxTransforms;
