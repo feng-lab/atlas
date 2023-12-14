@@ -13,7 +13,7 @@ public:
 
   ~ZCachedImg() override = default;
 
-  inline const ZImgInfo& info() const
+  [[nodiscard]] inline const ZImgInfo& info() const
   {
     return m_imgInfo;
   }
@@ -47,9 +47,9 @@ public:
             FileFormat format = FileFormat::Unknown,
             const ZImgWriteParameters& paras = ZImgWriteParameters()) const;
 
-  ZImg slice(size_t z, size_t c, size_t t) const;
+  [[nodiscard]] ZImg slice(size_t z, size_t c, size_t t) const;
 
-  void setSliceTransform(std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>* sliceTransform = nullptr)
+  void setSliceTransform(const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>* sliceTransform)
   {
     m_sliceTransform = sliceTransform;
   }
@@ -57,17 +57,17 @@ public:
   // ZImgSliceProvider interface
 
 public:
-  ZImgInfo imgInfo() const override
+  [[nodiscard]] ZImgInfo imgInfo() const override
   {
     return m_imgInfo;
   }
 
-  ZImg slice(size_t z, size_t t) const override;
+  [[nodiscard]] ZImg slice(size_t z, size_t t) const override;
 
 private:
   ZImgInfo m_imgInfo;
   ZImgSource m_imgSource;
-  std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>* m_sliceTransform = nullptr;
+  const std::map<size_t, std::unique_ptr<ZImageCompositeTransform>>* m_sliceTransform = nullptr;
 };
 
 } // namespace nim
