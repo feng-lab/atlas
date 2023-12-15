@@ -28,7 +28,6 @@ ZCachedImg::ZCachedImg(ZImgSource imgSource)
 {
   CHECK(m_imgSource.region.isDefault()) << "region is not supported yet";
   ZImgIO::instance().readInfo(m_imgSource, m_imgInfo);
-  m_imgInfo.depth = 100;
 }
 
 ZImg ZCachedImg::slice(size_t z, size_t c, size_t t) const
