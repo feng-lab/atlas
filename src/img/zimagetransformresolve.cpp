@@ -192,11 +192,11 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
         pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img2]->addTransform(pairIt->second.first->makeInverseTransform());
       }
-      LOG(INFO) << QString("%1 connects to %2 with cost %3, transform: %4")
-                     .arg(img1)
-                     .arg(img2)
-                     .arg(pairIt->second.second)
-                     .arg(res[img2]->toQString());
+      LOG(INFO) << fmt::format("{} connects to {} with cost {}, transform: {}",
+                               img2,
+                               img1,
+                               pairIt->second.second,
+                               res[img2]->toString());
     } else if (!img1HasLocation && img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;
       pairIt = m_idxPairs.find(std::make_pair(img1, img2));
@@ -207,11 +207,11 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
         pairIt = m_idxPairs.find(std::make_pair(img2, img1)); // must exist
         res[img1]->addTransform(*pairIt->second.first);
       }
-      LOG(INFO) << QString("%1 connects to %2 with cost %3, transform: %4\n")
-                     .arg(img1)
-                     .arg(img2)
-                     .arg(pairIt->second.second)
-                     .arg(res[img1]->toQString());
+      LOG(INFO) << fmt::format("{} connects to {} with cost {}, transform: {}",
+                               img1,
+                               img2,
+                               pairIt->second.second,
+                               res[img1]->toString());
     } else {
       CHECK(img1HasLocation && img2HasLocation);
     }

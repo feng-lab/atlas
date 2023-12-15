@@ -49,18 +49,12 @@ void ZImageMatrix3DTransform::transformRange(double inXMin,
 void ZImageMatrix3DTransform::transformPointInverse(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix4d& mat = m_tform.inverseTransformMatrix();
-
-  double inCoords[3];
-  inCoords[0] = inoutCoords[0];
-  inCoords[1] = inoutCoords[1];
-  inCoords[2] = inoutCoords[2];
-  inoutCoords[0] = mat(0, 0) * (inCoords[0] - m_centerX) + mat(0, 1) * (inCoords[1] - m_centerY) +
-                   mat(0, 2) * (inCoords[2] - m_centerZ) + mat(0, 3) + m_centerX;
-  inoutCoords[1] = mat(1, 0) * (inCoords[0] - m_centerX) + mat(1, 1) * (inCoords[1] - m_centerY) +
-                   mat(1, 2) * (inCoords[2] - m_centerZ) + mat(1, 3) + m_centerY;
-  inoutCoords[2] = mat(2, 0) * (inCoords[0] - m_centerX) + mat(2, 1) * (inCoords[1] - m_centerY) +
-                   mat(2, 2) * (inCoords[2] - m_centerZ) + mat(2, 3) + m_centerZ;
+  m_tform.transformPointsInverse(inoutCoords[0],
+                                 inoutCoords[1],
+                                 inoutCoords[2],
+                                 inoutCoords[0],
+                                 inoutCoords[1],
+                                 inoutCoords[2]);
 }
 
 size_t ZImageMatrix3DTransform::numParameters() const
@@ -101,21 +95,30 @@ void ZImageMatrix3DTransform::adaptParameters(size_t fromLevel, size_t toLevel)
   setParameters(m_parameters.data());
 }
 
+bool ZImageMatrix3DTransform::canMergeWith(const ZImageTransform* tfm) const
+{
+  CHECK(tfm);
+  auto m3dtfm = dynamic_cast<const ZImageMatrix3DTransform*>(tfm);
+  return m3dtfm != nullptr;
+}
+
+void ZImageMatrix3DTransform::mergeWith(const nim::ZImageTransform* tfm)
+{
+  CHECK(tfm);
+  auto m3dtfm = dynamic_cast<const ZImageMatrix3DTransform*>(tfm);
+  CHECK(m3dtfm);
+  m_tform.mergeWith(m3dtfm->m_tform);
+}
+
 void ZImageMatrix3DTransform::transformPoint(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix4d& mat = m_tform.transformMatrix();
-
-  double inCoords[3];
-  inCoords[0] = inoutCoords[0];
-  inCoords[1] = inoutCoords[1];
-  inCoords[2] = inoutCoords[2];
-  inoutCoords[0] = mat(0, 0) * (inCoords[0] - m_centerX) + mat(0, 1) * (inCoords[1] - m_centerY) +
-                   mat(0, 2) * (inCoords[2] - m_centerZ) + mat(0, 3) + m_centerX;
-  inoutCoords[1] = mat(1, 0) * (inCoords[0] - m_centerX) + mat(1, 1) * (inCoords[1] - m_centerY) +
-                   mat(1, 2) * (inCoords[2] - m_centerZ) + mat(1, 3) + m_centerY;
-  inoutCoords[2] = mat(2, 0) * (inCoords[0] - m_centerX) + mat(2, 1) * (inCoords[1] - m_centerY) +
-                   mat(2, 2) * (inCoords[2] - m_centerZ) + mat(2, 3) + m_centerZ;
+  m_tform.transformPointsForward(inoutCoords[0],
+                                 inoutCoords[1],
+                                 inoutCoords[2],
+                                 inoutCoords[0],
+                                 inoutCoords[1],
+                                 inoutCoords[2]);
 }
 
 ZImageTransform* ZImageMatrix3DTransform::clone() const
@@ -168,11 +171,11 @@ void ZImageTranslation3DTransform::adaptParameters(size_t fromLevel, size_t toLe
 void ZImageTranslation3DTransform::transformPoint(double* inoutCoords) const
 {
   CHECK(inoutCoords);
-  const Eigen::Matrix4d& mat = m_tform.transformMatrix();
+  const auto& mat = m_tform.transformMatrix();
 
-  inoutCoords[0] += mat(0, 3);
-  inoutCoords[1] += mat(1, 3);
-  inoutCoords[2] += mat(2, 3);
+  inoutCoords[0] += mat[3][0];
+  inoutCoords[1] += mat[3][1];
+  inoutCoords[2] += mat[3][2];
 }
 
 ZImageTransform* ZImageTranslation3DTransform::clone() const
@@ -204,6 +207,7 @@ void ZImageRigid3DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1], para[2]);
   m_tform.setRotationAngle(para[3], para[4], para[5]);
+  m_tform.setRotationCenter(m_centerX, m_centerY, m_centerZ);
   m_tform.makeMatrix();
   m_parameters = std::vector<double>(para, para + 6);
 }
@@ -253,6 +257,7 @@ void ZImageSimilarity3DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1], para[2]);
   m_tform.setRotationAngle(para[3], para[4], para[5]);
+  m_tform.setRotationCenter(m_centerX, m_centerY, m_centerZ);
   m_tform.setScale(para[6], para[6], para[6]);
   m_tform.makeMatrix();
   m_parameters = std::vector<double>(para, para + 7);
@@ -305,6 +310,7 @@ void ZImageAffine3DTransform::setParameters(const double* para)
   m_tform.reset();
   m_tform.setTranslation(para[0], para[1], para[2]);
   m_tform.setRotationAngle(para[3], para[4], para[5]);
+  m_tform.setRotationCenter(m_centerX, m_centerY, m_centerZ);
   m_tform.setScale(para[6], para[7], para[8]);
   m_tform.setShear(para[9], para[10], para[11], para[12], para[13], para[14]);
   m_tform.makeMatrix();

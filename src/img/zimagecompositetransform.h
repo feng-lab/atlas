@@ -29,7 +29,7 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  [[nodiscard]] QString toQString() const override;
+  [[nodiscard]] std::string toString() const override;
 
   [[nodiscard]] ZImageTransform* clone() const override;
 

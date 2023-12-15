@@ -166,7 +166,7 @@ void atlasStep23()
   registration.run();
 
   ZImg res = fixedImg;
-  LOG(INFO) << transform.toQString();
+  LOG(INFO) << transform.toString();
   transform.transformImage(movingImg.channelData<uint8_t>(0),
                            movingImg.width(),
                            movingImg.height(),

@@ -100,7 +100,7 @@ public:
                       index_t ystart = 0,
                       index_t yend = -1) const;
 
-  [[nodiscard]] virtual QString toQString() const = 0;
+  [[nodiscard]] virtual std::string toString() const = 0;
 
   [[nodiscard]] virtual ZImageTransform* clone() const = 0;
 

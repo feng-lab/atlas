@@ -4,70 +4,50 @@ namespace nim {
 
 void ZAffine3D::makeMatrix()
 {
-  Eigen::Matrix4d matTrans;
-  matTrans << 1, 0, 0, m_translationX,
-    0, 1, 0, m_translationY,
-    0, 0, 1, m_translationZ,
-    0, 0, 0, 1;
-  Eigen::Matrix4d matScale;
-  matScale << m_scaleX, 0, 0, 0,
-    0, m_scaleY, 0, 0,
-    0, 0, m_scaleZ, 0,
-    0, 0, 0, 1;
-  Eigen::Matrix4d matRotationXY;
-  Eigen::Matrix4d matRotationXZ;
-  Eigen::Matrix4d matRotationYZ;
-  matRotationXY << std::cos(m_rotateAngleXY), std::sin(m_rotateAngleXY), 0, 0,
-    -std::sin(m_rotateAngleXY), std::cos(m_rotateAngleXY), 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1;
-  matRotationXZ << std::cos(m_rotateAngleXZ), 0, std::sin(m_rotateAngleXZ), 0,
-    0, 1, 0, 0,
-    -std::sin(m_rotateAngleXZ), 0, std::cos(m_rotateAngleXZ), 0,
-    0, 0, 0, 1;
-  matRotationYZ << 1, 0, 0, 0,
-    0, std::cos(m_rotateAngleYZ), std::sin(m_rotateAngleYZ), 0,
-    0, -std::sin(m_rotateAngleYZ), std::cos(m_rotateAngleYZ), 0,
-    0, 0, 0, 1;
-  Eigen::Matrix4d matShear;
-  matShear << 1, m_shearXY, m_shearXZ, 0,
-    m_shearYX, 1, m_shearYZ, 0,
-    m_shearZX, m_shearZY, 1, 0,
-    0, 0, 0, 1;
-  m_matrix = matTrans * matRotationYZ * matRotationXZ * matRotationXY * matScale * matShear;
+  auto shear = glm::shear(glm::dmat4(1), m_center, m_shearX, m_shearY, m_shearZ);
+  auto trans1 = glm::translate(glm::dmat4(1), -m_center * m_scale);
+  auto trans = glm::translate(glm::dmat4(1), m_translation + m_center * m_scale);
+  auto scale = glm::scale(glm::dmat4(1), m_scale);
+  auto rotX = glm::rotate(m_rotateAngle.x, glm::dvec3(1, 0, 0));
+  auto rotY = glm::rotate(m_rotateAngle.y, glm::dvec3(0, 1, 0));
+  auto rotZ = glm::rotate(m_rotateAngle.z, glm::dvec3(0, 0, 1));
+
+  m_matrix = trans * rotX * rotY * rotZ * trans1 * scale * shear;
   m_inverseMatrix = getInverseTransformMatrix();
 }
 
-void ZAffine3D::setMatrix(double m11, double m12, double m13, double m14,
-                          double m21, double m22, double m23, double m24,
-                          double m31, double m32, double m33, double m34)
+void ZAffine3D::setMatrix(double m11,
+                          double m12,
+                          double m13,
+                          double m14,
+                          double m21,
+                          double m22,
+                          double m23,
+                          double m24,
+                          double m31,
+                          double m32,
+                          double m33,
+                          double m34)
 {
-  m_matrix << m11, m12, m13, m14,
-    m21, m22, m23, m24,
-    m31, m32, m33, m34,
-    0, 0, 0, 1;
+  m_matrix = glm::dmat4(glm::dvec4(m11, m21, m31, 0),
+                        glm::dvec4(m12, m22, m32, 0),
+                        glm::dvec4(m13, m23, m33, 0),
+                        glm::dvec4(m14, m24, m34, 1));
   m_inverseMatrix = getInverseTransformMatrix();
 }
 
 void ZAffine3D::reset()
 {
-  m_matrix = Eigen::Matrix4d::Identity();
-  m_inverseMatrix = Eigen::Matrix4d::Identity();
-  m_translationX = 0;
-  m_translationY = 0;
-  m_translationZ = 0;
-  m_scaleX = 1;
-  m_scaleY = 1;
-  m_scaleZ = 1;
-  m_rotateAngleXY = 0;
-  m_rotateAngleXZ = 0;
-  m_rotateAngleYZ = 0;
-  m_shearXY = 0;
-  m_shearXZ = 0;
-  m_shearYX = 0;
-  m_shearYZ = 0;
-  m_shearZX = 0;
-  m_shearZY = 0;
+  m_matrix = glm::dmat4(1);
+  m_inverseMatrix = glm::dmat4(1);
+
+  m_shearX = glm::dvec2(0);
+  m_shearY = glm::dvec2(0);
+  m_shearZ = glm::dvec2(0);
+  m_scale = glm::dvec3(1, 1, 1);
+  m_translation = glm::dvec3(0);
+  m_center = glm::dvec3(0);
+  m_rotateAngle = glm::dvec3(0);
 }
 
 void ZAffine3D::invert()
@@ -77,37 +57,25 @@ void ZAffine3D::invert()
 
 void ZAffine3D::transformPointsForward(double u, double v, double w, double& x, double& y, double& z) const
 {
-  Eigen::Vector4d pt = m_matrix * Eigen::Vector4d(u, v, w, 1.0);
-  x = pt(0);
-  y = pt(1);
-  z = pt(2);
+  auto pt = m_matrix * glm::dvec4(u, v, w, 1.0);
+  x = pt.x;
+  y = pt.y;
+  z = pt.z;
 }
 
 void ZAffine3D::transformPointsInverse(double x, double y, double z, double& u, double& v, double& w) const
 {
-  Eigen::Vector4d pt = m_inverseMatrix * Eigen::Vector4d(x, y, z, 1.0);
-  u = pt(0);
-  v = pt(1);
-  w = pt(2);
+  auto pt = m_inverseMatrix * glm::dvec4(x, y, z, 1.0);
+  u = pt.x;
+  v = pt.y;
+  w = pt.z;
 }
 
-QString ZAffine3D::toQString() const
+glm::dmat4 ZAffine3D::getInverseTransformMatrix() const
 {
-  return QString("translation: %1 %2 %3 scale: %4 %5 %6 rotation: %7 %8 %9\nAffine Matrix:\n%10")
-    .arg(m_translationX).arg(m_translationY).arg(m_translationZ)
-    .arg(m_scaleX).arg(m_scaleY).arg(m_scaleZ)
-    .arg(m_rotateAngleXY).arg(m_rotateAngleXZ).arg(m_rotateAngleYZ)
-    .arg(matrixToQString(m_matrix));
-}
-
-Eigen::Matrix4d ZAffine3D::getInverseTransformMatrix() const
-{
-  Eigen::Matrix4d res;
-  Eigen::Matrix3d tl = m_matrix.topLeftCorner<3, 3>();
-  tl = tl.inverse();
-  Eigen::Vector3d r = m_matrix.topRightCorner<3, 1>();
-  res.topLeftCorner(3, 3) = tl;
-  res.topRightCorner(3, 1) = -tl * r;
+  auto tl = glm::inverse(glm::dmat3(m_matrix));
+  auto res = glm::dmat4(tl);
+  res[3] = glm::dvec4(-tl * glm::dvec3(m_matrix[3]), 1);
   return res;
 }
 

@@ -53,11 +53,15 @@ public:
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
+  bool canMergeWith(const ZImageTransform* tfm) const override;
+
+  void mergeWith(const ZImageTransform* tfm) override;
+
   void transformPoint(double* inoutCoords) const override;
 
-  inline QString toQString() const override
+  inline std::string toString() const override
   {
-    return m_tform.toQString();
+    return m_tform.toString();
   }
 
   ZImageTransform* clone() const override;

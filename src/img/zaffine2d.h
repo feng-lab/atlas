@@ -107,9 +107,16 @@ public:
 
   void transformPointsInverse(double x, double y, double& u, double& v) const;
 
-  [[nodiscard]] std::string toString() const;
-
-  [[nodiscard]] QString toQString() const;
+  [[nodiscard]] std::string toString() const
+  {
+    return fmt::format("translation: {} scale: {} rotation: {} center: {} shear: {}\nAffine Matrix:\n{}",
+                       m_translation,
+                       m_scale,
+                       m_rotateAngle,
+                       m_center,
+                       m_shear,
+                       m_matrix);
+  }
 
 protected:
   [[nodiscard]] glm::dmat3 getInverseTransformMatrix() const;

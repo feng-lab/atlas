@@ -55,22 +55,6 @@ void ZAffine2D::transformPointsInverse(double x, double y, double& u, double& v)
   v = pt.y;
 }
 
-std::string ZAffine2D::toString() const
-{
-  return fmt::format("translation: {} scale: {} rotation: {} center: {} shear: {}\nAffine Matrix:\n{}",
-                     m_translation,
-                     m_scale,
-                     m_rotateAngle,
-                     m_center,
-                     m_shear,
-                     m_matrix);
-}
-
-QString ZAffine2D::toQString() const
-{
-  return QString::fromStdString(toString());
-}
-
 glm::dmat3 ZAffine2D::getInverseTransformMatrix() const
 {
   auto tl = glm::inverse(glm::dmat2(m_matrix));

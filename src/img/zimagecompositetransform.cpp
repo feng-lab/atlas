@@ -77,16 +77,16 @@ void ZImageCompositeTransform::transformPoint(double* inoutCoords) const
   }
 }
 
-QString ZImageCompositeTransform::toQString() const
+std::string ZImageCompositeTransform::toString() const
 {
   if (m_tfms.size() == 1) {
-    return (*m_tfms.begin())->toQString();
+    return (*m_tfms.begin())->toString();
   }
   CHECK(false);
-  QString res;
+  std::string res;
   size_t idx = 1;
   for (const auto& tfm : m_tfms) {
-    res += QString("Transform %1: %2\n").arg(idx++).arg(tfm->toQString());
+    res += fmt::format("Transform {}: {}\n", idx++, tfm->toString());
   }
   return res;
 }

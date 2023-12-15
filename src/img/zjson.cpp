@@ -129,8 +129,10 @@ json::object loadJsonObject(const QString& file)
   auto fileString = readFileIntoByteArray(file);
 
   json::parse_options opt; // all extensions default to off
+  // opt.numbers = json::number_precision::precise;
   opt.allow_comments = true; // permit C and C++ style comments to appear in whitespace
   opt.allow_trailing_commas = true; // allow an additional trailing comma in object and array element lists
+  opt.allow_infinity_and_nan = true;
 
   auto jv = json::parse(json::string_view(fileString.data(), fileString.size()), json::storage_ptr(), opt);
   return jv.as_object();

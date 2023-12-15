@@ -18,7 +18,7 @@ std::vector<double> ZImageTransform::estimateParameterScales(const double*) cons
 
 std::ostream& operator<<(std::ostream& s, const ZImageTransform& tfm)
 {
-  return (s << qUtf8Printable(tfm.toQString()));
+  return (s << tfm.toString());
 }
 
 } // namespace nim

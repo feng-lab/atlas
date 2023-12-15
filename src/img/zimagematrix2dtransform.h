@@ -53,9 +53,9 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  [[nodiscard]] inline QString toQString() const override
+  [[nodiscard]] inline std::string toString() const override
   {
-    return m_tform.toQString();
+    return m_tform.toString();
   }
 
   [[nodiscard]] ZImageTransform* clone() const override;
