@@ -1269,6 +1269,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file6 = bak_file6 = None
+    orig_file7 = bak_file7 = None
     try:
         if is_mac() and macos_min_version().startswith('10.'):
             # preadv and pwritev are only available after macOS 11.0
@@ -1360,6 +1361,14 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                        r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
                                    ])
 
+            orig_file7 = os.path.join(src_dir, 'folly', 'memory', 'UninitializedMemoryHacks.h')
+            bak_file7 = patch_file(orig_file7,
+                                   from_texts=[r'template void std::basic_string<TYPE>::_Eos(std::size_t);',
+                                               ],
+                                   to_texts=[
+                                       r'template void std::basic_string<TYPE>::_Eos(std::size_t) noexcept;',
+                                   ])
+
         cmakecmd_options = ['-DBUILD_SHARED_LIBS:BOOL=OFF',
                             '-DPYTHON_EXTENSIONS:BOOL=OFF',
                             '-DBUILD_TESTS:BOOL=OFF',
@@ -1396,6 +1405,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         os.replace(bak_file3, orig_file3)
         if is_windows():
             os.replace(bak_file6, orig_file6)
+            os.replace(bak_file7, orig_file7)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
