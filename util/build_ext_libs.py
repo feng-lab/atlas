@@ -679,11 +679,11 @@ def build_glog(src_dir: str, install_dir: str):
     try:
         # subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
         #                cwd=src_dir, shell=False, check=True)
-        orig_file = os.path.join(src_dir, 'src', 'glog', 'logging.h.in')
+        orig_file = os.path.join(src_dir, 'src', 'glog', 'logging.h')
         bak_file = patch_file(orig_file,
                               from_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
                     const char* base_filename, int line,
-                    const LogMessageTime& logmsgtime, const char* message,
+                    const LogMessageTime& time, const char* message,
                     size_t message_len);""",
                                           ],
                               to_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
@@ -703,29 +703,31 @@ def build_glog(src_dir: str, install_dir: str):
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
                          const char* base_filename, int line,
-                         const LogMessageTime& logmsgtime, const char* message,
+                         const LogMessageTime& time, const char* message,
                          size_t message_len);""",
                                            r"""LogDestination::LogToSinks(LogSeverity severity,
                                        const char* full_filename,
                                        const char* base_filename, int line,
-                                       const LogMessageTime& logmsgtime,
+                                       const LogMessageTime& time,
                                        const char* message,
                                        size_t message_len) {""",
-                                           r'line, logmsgtime, message, message_len);',
-                                           r'data_->num_prefix_chars_ - 1) );',
+                                           r"""send(severity, full_filename, base_filename, line, time,
+                         message, message_len);""",
+                                           r'data_->num_prefix_chars_ - 1));',
                                            r'ColoredWriteToStderr(severity, message, message_len);',
                                            ],
                                to_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
                          const char* base_filename, int line,
-                         const LogMessageTime& logmsgtime, const char* message,
+                         const LogMessageTime& time, const char* message,
                          size_t message_len, size_t prefix_len);""",
                                          r"""LogDestination::LogToSinks(LogSeverity severity,
                                        const char* full_filename,
                                        const char* base_filename, int line,
-                                       const LogMessageTime& logmsgtime,
+                                       const LogMessageTime& time,
                                        const char* message,
                                        size_t message_len, size_t prefix_len) {""",
-                                         r'line, logmsgtime, message, message_len, prefix_len);',
+                                         r"""send(severity, full_filename, base_filename, line, time,
+                         message, message_len, prefix_len);""",
                                          r'data_->num_prefix_chars_ - 1), data_->num_prefix_chars_ );',
                                          r'ColoredWriteToStdout(severity, message, message_len);'
                                          ])
@@ -739,13 +741,13 @@ def build_glog(src_dir: str, install_dir: str):
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
-        patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'export.h'),
-                   from_texts=[r'#define GOOGLE_GLOG_DLL_DECL_H',
-                               ],
-                   to_texts=['#define GOOGLE_GLOG_DLL_DECL_H\n'
-                             '#define GLOG_STATIC_DEFINE\n'
-                             '#define HAVE_CXX11_ATOMIC\n',
-                             ])
+        # patch_file(os.path.join(ext_build_dir(), 'include', 'glog', 'export.h'),
+        #            from_texts=[r'#define GOOGLE_GLOG_DLL_DECL_H',
+        #                        ],
+        #            to_texts=['#define GOOGLE_GLOG_DLL_DECL_H\n'
+        #                      '#define GLOG_STATIC_DEFINE\n'
+        #                      '#define HAVE_CXX11_ATOMIC\n',
+        #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
