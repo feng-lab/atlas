@@ -86,37 +86,33 @@ add_subdirectory(../img condaimg)
 
 # pybind11
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/pybind11 pybind11)
-message(STATUS "PYTHON_VERSION_MAJOR: " ${PYTHON_VERSION_MAJOR})
-message(STATUS "PYTHON_EXECUTABLE: " ${PYTHON_EXECUTABLE})
 
 # build python extensions
-if (PYTHON_VERSION_MAJOR)
-  set(module_name _imgpy)
-  pybind11_add_module(${module_name} imgpy.cpp)
-  target_link_libraries(${module_name} PRIVATE condaimg)
-  if (APPLE)
-    target_compile_options(${module_name} PRIVATE -faligned-allocation)
-    set(freeimagelibname libfreeimageplus.dylib)
-    add_custom_command(TARGET ${module_name}
-                       POST_BUILD
-                       COMMAND install_name_tool -change
-                       @rpath/libfreeimageplus.dylib
-                       @loader_path/lib/libfreeimageplus.dylib
-                       $<TARGET_FILE:${module_name}>
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                       COMMAND install_name_tool -id ${freeimagelibname}
-                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                       )
-  endif ()
-  if (UNIX AND NOT APPLE)
-    set(freeimagelibname libfreeimageplus.so.3)
-    add_custom_command(TARGET ${module_name}
-                       POST_BUILD
-                       COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
-                       $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                       )
-  endif ()
+set(module_name _imgpy)
+pybind11_add_module(${module_name} imgpy.cpp)
+target_link_libraries(${module_name} PRIVATE condaimg)
+if (APPLE)
+  target_compile_options(${module_name} PRIVATE -faligned-allocation)
+  set(freeimagelibname libfreeimageplus.dylib)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND install_name_tool -change
+                     @rpath/libfreeimageplus.dylib
+                     @loader_path/lib/libfreeimageplus.dylib
+                     $<TARGET_FILE:${module_name}>
+                     COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+                     COMMAND install_name_tool -id ${freeimagelibname}
+                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+                     )
+endif ()
+if (UNIX AND NOT APPLE)
+  set(freeimagelibname libfreeimageplus.so.3)
+  add_custom_command(TARGET ${module_name}
+                     POST_BUILD
+                     COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
+                     $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
+                     )
 endif ()
 
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)

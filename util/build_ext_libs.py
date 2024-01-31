@@ -1310,6 +1310,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                            r'find_package(Gflags MODULE)',
                                            r'list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
                                            r'find_package(Glog MODULE)',
+                                           r'set(FOLLY_HAVE_LIBGLOG ${GLOG_FOUND})',
                                            r'list(APPEND FOLLY_LINK_LIBRARIES ${GLOG_LIBRARY})',
                                            r'find_package(LibDwarf)' + ('' if is_mac() else '_NONONO'),
                                            r'find_package(Libiberty)' + ('' if is_mac() else '_NONONO'),
@@ -1332,7 +1333,8 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                          f'find_package({"LIBSODIUM" if is_mac() else "Libsodium"} REQUIRED)',
                                          r'find_package(Gflags MODULE REQUIRED)',
                                          r'#list(APPEND FOLLY_LINK_LIBRARIES ${LIBGFLAGS_LIBRARY})',
-                                         r'find_package(Glog MODULE REQUIRED)',
+                                         r'find_package(Glog CONFIG REQUIRED)',
+                                         r'set(FOLLY_HAVE_LIBGLOG ON)',
                                          r'list(APPEND FOLLY_LINK_LIBRARIES glog::glog)',
                                          r'find_package(LIBDWARF)',
                                          r'find_package(LIBIBERTY)',
@@ -1581,6 +1583,8 @@ include(libs)""",
                             '-DNOPENMP:BOOL=ON',
                             '-DENABLE_CUDA:BOOL=OFF',
                             '-DNSTATIC:BOOL=OFF',
+                            '-DSUITESPARSE_USE_FORTRAN:BOOL=OFF',
+                            '-DSUITESPARSE_USE_CUDA:BOOL=OFF',
                             ]
 
         for module in ['SuiteSparse_config', 'COLAMD', 'AMD', 'CCOLAMD', 'CAMD', 'CHOLMOD', 'SPQR']:
@@ -1682,8 +1686,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
                                to_texts=[r'Eigen3_FOUND',
                                          r'if (gflags_FOUND AND TARGET gflags::gflags)'])
 
-        os.remove(os.path.join(src_dir, 'cmake', 'FindTBB.cmake'))
-
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd_options = ['-DBUILD_TESTING:BOOL=OFF',
                             '-DSUITESPARSE:BOOL=ON',
@@ -1753,7 +1755,8 @@ def build_libpng(src_dir: str, install_dir: str):
 
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
-                         '-DPNG_SHARED:BOOL=OFF'])
+                         '-DPNG_SHARED:BOOL=OFF',
+                         '-DPNG_FRAMEWORK:BOOL=OFF'])
 
         if is_windows():
             print('')
@@ -1783,7 +1786,8 @@ def build_libpng(src_dir: str, install_dir: str):
                 cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True)
 
                 cmakecmd.extend(['-DPNG_TESTS:BOOL=OFF',
-                                 '-DPNG_SHARED:BOOL=OFF'])
+                                 '-DPNG_SHARED:BOOL=OFF',
+                                 '-DPNG_FRAMEWORK:BOOL=OFF'])
                 cmakecmd.extend([src_dir])
 
                 build_and_install_cmakecmd(cmakecmd, build_dir)
@@ -2258,7 +2262,7 @@ def build_itk(src_dir: str, install_dir: str):
                          '-DITK_USE_SYSTEM_ZLIB:BOOL=ON',
                          # '-DGDCM_USE_SYSTEM_OPENJPEG:BOOL=ON',
 
-                         '-DModule_MorphologicalContourInterpolation=ON',  # example how to turn on a remote module
+                         '-DModule_MorphologicalContourInterpolation=OFF',  # example how to turn on a remote module
                          ],
                         )
 

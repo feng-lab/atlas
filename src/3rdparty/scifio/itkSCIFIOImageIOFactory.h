@@ -42,7 +42,8 @@ public:
   itkFactorylessNewMacro(Self);
 
   /** RTTI (and related methods) **/
-  itkTypeMacro(SCIFIOImageIOFactory, ObjectFactoryBase);
+  // itkTypeMacro(SCIFIOImageIOFactory, ObjectFactoryBase);
+  itkOverrideGetNameOfClassMacro(SCIFIOImageIOFactory);
 
   /** Register one factory of this type **/
   static void RegisterOneFactory(void)

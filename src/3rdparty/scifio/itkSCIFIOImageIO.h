@@ -88,7 +88,8 @@ public:
   itkNewMacro(Self);
 
   /** RTTI (and related methods) **/
-  itkTypeMacro(SCIFIOImageIO, Superclass);
+  // itkTypeMacro(SCIFIOImageIO, Superclass);
+  itkOverrideGetNameOfClassMacro(SCIFIOImageIO);
 
   bool SupportsDimension(unsigned long dim) override;
 

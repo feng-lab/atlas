@@ -33,7 +33,6 @@ const LogSeverity InfoLevel = google::GLOG_INFO;
 const LogSeverity WarningLevel = google::GLOG_WARNING;
 const LogSeverity ErrorLevel = google::GLOG_ERROR;
 const LogSeverity FatalLevel = google::GLOG_FATAL;
-const LogSeverity OffLevel = google::GLOG_FATAL + 1;
 
 struct LogData
 {
