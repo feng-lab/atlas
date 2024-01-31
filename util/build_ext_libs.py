@@ -2396,6 +2396,7 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
                          '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB',
                          '-DTBB_DIR:PATH=' + tbb_dir(),
+                         '-DVTK_WRAP_PYTHON:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])
