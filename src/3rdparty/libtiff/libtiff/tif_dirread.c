@@ -144,10 +144,11 @@ static void TIFFReadDirEntryCheckedFloat(TIFF *tif, TIFFDirEntry *direntry,
                                          float *value);
 static enum TIFFReadDirEntryErr
 TIFFReadDirEntryCheckedDouble(TIFF *tif, TIFFDirEntry *direntry, double *value);
+#if 0
 static enum TIFFReadDirEntryErr
 TIFFReadDirEntryCheckedRationalDirect(TIFF *tif, TIFFDirEntry *direntry,
                                       TIFFRational_t *value);
-
+#endif
 static enum TIFFReadDirEntryErr
 TIFFReadDirEntryCheckRangeByteSbyte(int8_t value);
 static enum TIFFReadDirEntryErr
@@ -1015,16 +1016,7 @@ TIFFReadDirEntryFloat(TIFF *tif, TIFFDirEntry *direntry, float *value)
             err = TIFFReadDirEntryCheckedLong8(tif, direntry, &m);
             if (err != TIFFReadDirEntryErrOk)
                 return (err);
-#if defined(__WIN32__) && (_MSC_VER < 1500)
-            /*
-             * XXX: MSVC 6.0 does not support conversion
-             * of 64-bit integers into floating point
-             * values.
-             */
-            *value = _TIFFUInt64ToFloat(m);
-#else
             *value = (float)m;
-#endif
             return (TIFFReadDirEntryErrOk);
         }
         case TIFF_SLONG8:
@@ -1129,16 +1121,7 @@ TIFFReadDirEntryDouble(TIFF *tif, TIFFDirEntry *direntry, double *value)
             err = TIFFReadDirEntryCheckedLong8(tif, direntry, &m);
             if (err != TIFFReadDirEntryErrOk)
                 return (err);
-#if defined(__WIN32__) && (_MSC_VER < 1500)
-            /*
-             * XXX: MSVC 6.0 does not support conversion
-             * of 64-bit integers into floating point
-             * values.
-             */
-            *value = _TIFFUInt64ToDouble(m);
-#else
             *value = (double)m;
-#endif
             return (TIFFReadDirEntryErrOk);
         }
         case TIFF_SLONG8:
@@ -2903,16 +2886,7 @@ TIFFReadDirEntryFloatArray(TIFF *tif, TIFFDirEntry *direntry, float **value)
             {
                 if (tif->tif_flags & TIFF_SWAB)
                     TIFFSwabLong8(ma);
-#if defined(__WIN32__) && (_MSC_VER < 1500)
-                /*
-                 * XXX: MSVC 6.0 does not support
-                 * conversion of 64-bit integers into
-                 * floating point values.
-                 */
-                *mb++ = _TIFFUInt64ToFloat(*ma++);
-#else
                 *mb++ = (float)(*ma++);
-#endif
             }
         }
         break;
@@ -3148,16 +3122,7 @@ TIFFReadDirEntryDoubleArray(TIFF *tif, TIFFDirEntry *direntry, double **value)
             {
                 if (tif->tif_flags & TIFF_SWAB)
                     TIFFSwabLong8(ma);
-#if defined(__WIN32__) && (_MSC_VER < 1500)
-                /*
-                 * XXX: MSVC 6.0 does not support
-                 * conversion of 64-bit integers into
-                 * floating point values.
-                 */
-                *mb++ = _TIFFUInt64ToDouble(*ma++);
-#else
                 *mb++ = (double)(*ma++);
-#endif
             }
         }
         break;
@@ -3490,6 +3455,7 @@ TIFFReadDirEntryCheckedSrational(TIFF *tif, TIFFDirEntry *direntry,
     return (TIFFReadDirEntryErrOk);
 }
 
+#if 0
 static enum TIFFReadDirEntryErr
 TIFFReadDirEntryCheckedRationalDirect(TIFF *tif, TIFFDirEntry *direntry,
                                       TIFFRational_t *value)
@@ -3530,6 +3496,7 @@ TIFFReadDirEntryCheckedRationalDirect(TIFF *tif, TIFFDirEntry *direntry,
     value->uDenom = m.i[1];
     return (TIFFReadDirEntryErrOk);
 } /*-- TIFFReadDirEntryCheckedRationalDirect() --*/
+#endif
 
 static void TIFFReadDirEntryCheckedFloat(TIFF *tif, TIFFDirEntry *direntry,
                                          float *value)
@@ -4585,7 +4552,8 @@ int TIFFReadDirectory(TIFF *tif)
                     }
                 }
                 break;
-                    /* END REV 4.0 COMPATIBILITY */
+                /* END REV 4.0 COMPATIBILITY */
+#if 0
                 case TIFFTAG_EP_BATTERYLEVEL:
                     /* TIFFTAG_EP_BATTERYLEVEL can be RATIONAL or ASCII.
                      * LibTiff defines it as ASCII and converts RATIONAL to an
@@ -4629,6 +4597,7 @@ int TIFFReadDirectory(TIFF *tif)
                             break;
                     }
                     break;
+#endif
                 default:
                     (void)TIFFFetchNormalTag(tif, dp, TRUE);
                     break;
@@ -6128,15 +6097,15 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                         fip->field_name);
                 else if (mb + 1 > (uint32_t)dp->tdir_count)
                 {
-                    uint8_t *o;
-                    TIFFWarningExtR(
-                        tif, module,
-                        "ASCII value for tag \"%s\" does not end in null byte",
-                        fip->field_name);
+                    TIFFWarningExtR(tif, module,
+                                    "ASCII value for tag \"%s\" does not end "
+                                    "in null byte. Forcing it to be null",
+                                    fip->field_name);
                     /* TIFFReadDirEntryArrayWithLimit() ensures this can't be
                      * larger than MAX_SIZE_TAG_DATA */
                     assert((uint32_t)dp->tdir_count + 1 == dp->tdir_count + 1);
-                    o = _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                    uint8_t *o =
+                        _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
                     if (o == NULL)
                     {
                         if (data != NULL)
@@ -6636,12 +6605,29 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                     if (data != 0 && dp->tdir_count > 0 &&
                         data[dp->tdir_count - 1] != '\0')
                     {
-                        TIFFWarningExtR(
-                            tif, module,
-                            "ASCII value for tag \"%s\" does not end in null "
-                            "byte. Forcing it to be null",
-                            fip->field_name);
-                        data[dp->tdir_count - 1] = '\0';
+                        TIFFWarningExtR(tif, module,
+                                        "ASCII value for ASCII array tag "
+                                        "\"%s\" does not end in null "
+                                        "byte. Forcing it to be null",
+                                        fip->field_name);
+                        /* Enlarge buffer and add terminating null. */
+                        uint8_t *o =
+                            _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                        if (o == NULL)
+                        {
+                            if (data != NULL)
+                                _TIFFfreeExt(tif, data);
+                            return (0);
+                        }
+                        if (dp->tdir_count > 0)
+                        {
+                            _TIFFmemcpy(o, data, (uint32_t)dp->tdir_count);
+                        }
+                        o[(uint32_t)dp->tdir_count] = 0;
+                        dp->tdir_count++; /* Increment for added null. */
+                        if (data != 0)
+                            _TIFFfreeExt(tif, data);
+                        data = o;
                     }
                     m = TIFFSetField(tif, dp->tdir_tag,
                                      (uint16_t)(dp->tdir_count), data);
@@ -6918,11 +6904,29 @@ static int TIFFFetchNormalTag(TIFF *tif, TIFFDirEntry *dp, int recover)
                 if (data != 0 && dp->tdir_count > 0 &&
                     data[dp->tdir_count - 1] != '\0')
                 {
-                    TIFFWarningExtR(tif, module,
-                                    "ASCII value for tag \"%s\" does not end "
-                                    "in null byte. Forcing it to be null",
-                                    fip->field_name);
-                    data[dp->tdir_count - 1] = '\0';
+                    TIFFWarningExtR(
+                        tif, module,
+                        "ASCII value for ASCII array tag \"%s\" does not end "
+                        "in null byte. Forcing it to be null",
+                        fip->field_name);
+                    /* Enlarge buffer and add terminating null. */
+                    uint8_t *o =
+                        _TIFFmallocExt(tif, (uint32_t)dp->tdir_count + 1);
+                    if (o == NULL)
+                    {
+                        if (data != NULL)
+                            _TIFFfreeExt(tif, data);
+                        return (0);
+                    }
+                    if (dp->tdir_count > 0)
+                    {
+                        _TIFFmemcpy(o, data, (uint32_t)dp->tdir_count);
+                    }
+                    o[(uint32_t)dp->tdir_count] = 0;
+                    dp->tdir_count++; /* Increment for added null. */
+                    if (data != 0)
+                        _TIFFfreeExt(tif, data);
+                    data = o;
                 }
                 m = TIFFSetField(tif, dp->tdir_tag, (uint32_t)(dp->tdir_count),
                                  data);
