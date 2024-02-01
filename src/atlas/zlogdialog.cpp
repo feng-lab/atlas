@@ -109,10 +109,10 @@ ZLogDialog::ZLogDialog(const LogSinkPtr& destination, QWidget* parent)
 #endif
 
   // Initialize log level selection
-  for (auto l = InfoLevel; l < OffLevel; ++l) {
-    const QString ln = levelToString(static_cast<LogSeverity>(l));
-    mUi->comboBoxLevel->addItem(ln, l);
-  }
+  mUi->comboBoxLevel->addItem("Info", InfoLevel);
+  mUi->comboBoxLevel->addItem("Warning", WarningLevel);
+  mUi->comboBoxLevel->addItem("Error", ErrorLevel);
+  mUi->comboBoxLevel->addItem("Fatal", FatalLevel);
   mUi->comboBoxLevel->setCurrentIndex(InfoLevel);
 }
 
