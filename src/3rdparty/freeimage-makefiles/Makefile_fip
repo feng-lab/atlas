@@ -72,7 +72,7 @@ $(STATICLIB): $(MODULES)
 	$(AR) r $@ $(MODULES)
 
 $(SHAREDLIB): $(MODULES)
-	$(CXX) -arch x86_64 -arch arm64 -dynamiclib -mmacosx-version-min=11.0 -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
+	$(CXX) -arch x86_64 -arch arm64 -dynamiclib -mmacosx-version-min=11.0 -Wl,-headerpad_max_install_names -install_name @rpath/$(LIBNAME) -current_version $(VER_MAJOR).$(VER_MINOR) -compatibility_version $(VER_MAJOR) $(LDFLAGS) -o $@ $(MODULES)
 
 install:
 	install -d $(INCDIR) $(INSTALLDIR)
