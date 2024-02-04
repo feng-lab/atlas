@@ -91,7 +91,8 @@ ZView::ZView(ZDoc& doc, QWidget* parent, Qt::WindowFlags f)
 
   m_roiMode = new ZStringIntOptionParameter("ROI Mode", this);
   m_roiMode->addOptions("RegionAnnotation", "ROI");
-  m_roiMode->select("RegionAnnotation");
+  // m_roiMode->select("RegionAnnotation");
+  m_roiMode->select("ROI");
 }
 
 ZView::~ZView()
