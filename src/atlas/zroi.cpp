@@ -1508,6 +1508,8 @@ void ZROI::save(const QString& filename) const
 
     save(allGrp);
 
+    file.close();
+
     renameFile(tfn, filename);
   }
   catch (H5::Exception const& e) {

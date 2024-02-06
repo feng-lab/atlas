@@ -804,6 +804,8 @@ void ZRegionAnnotation::save(const QString& filename) const
     H5::Attribute numRegionAttr = allGrp.createAttribute("RegionNumber", intType, attrDataSpace);
     numRegionAttr.write(intType, &idx);
 
+    file.close();
+
     renameFile(tfn, filename);
   }
   catch (H5::Exception const& e) {
