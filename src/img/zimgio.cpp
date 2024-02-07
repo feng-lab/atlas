@@ -1004,8 +1004,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
           return;
         }
         catch (const ZIOException& e) {
-          error +=
-            QString("Try write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
+          error += QString("Try write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
         }
       }
     }
@@ -1024,9 +1023,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
     }
     catch (const ZIOException& e) {
       error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+                .arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 
@@ -1060,8 +1057,7 @@ void ZImgIO::writeImg(const QString& filename,
           return;
         }
         catch (const ZIOException& e) {
-          error +=
-            QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
+          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
         }
       }
     }
@@ -1080,9 +1076,7 @@ void ZImgIO::writeImg(const QString& filename,
     }
     catch (const ZIOException& e) {
       error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+                .arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 
@@ -1116,8 +1110,7 @@ void ZImgIO::writeImg(const QString& filename,
           return;
         }
         catch (const ZIOException& e) {
-          error +=
-            QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename).arg(writer->fullName()).arg(e.what());
+          error += QString("\nTry write %1 as '%2' format, failed: %3 ").arg(filename, writer->fullName(), e.what());
         }
       }
     }
@@ -1136,9 +1129,7 @@ void ZImgIO::writeImg(const QString& filename,
     }
     catch (const ZIOException& e) {
       error = QString("Try write file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+                .arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 

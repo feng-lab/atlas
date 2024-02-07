@@ -1500,15 +1500,15 @@ void ZROI::save(const QString& filename) const
 {
   auto tfn = getTemporaryFilename(filename);
   try {
-    H5::Exception::dontPrint();
+    {
+      H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
+      H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
 
-    H5::Group allGrp = file.createGroup("ROI");
+      H5::Group allGrp = file.createGroup("ROI");
 
-    save(allGrp);
-
-    file.close();
+      save(allGrp);
+    }
 
     renameFile(tfn, filename);
   }

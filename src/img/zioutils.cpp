@@ -1,6 +1,7 @@
 #include "zioutils.h"
 
 #include "zglobal.h"
+#include "zlog.h"
 #include <QFile>
 #include <QTextStream>
 #include <QFileInfo>
@@ -100,13 +101,16 @@ QString getTemporaryFilename(const QString& filename)
 
 void renameFile(const QString& oldName, const QString& newName)
 {
+  if (!QFile::exists(oldName)) {
+    throw ZIOException(fmt::format("File {} does not exist", oldName));
+  }
   if (QFile::exists(newName)) {
     if (!QFile::remove(newName)) {
-      throw nim::ZIOException(fmt::format("Can not remove existing file {}", newName.toStdString()));
+      throw ZIOException(fmt::format("Can not remove existing file {}", newName));
     }
   }
   if (!QFile::rename(oldName, newName)) {
-    throw nim::ZIOException(fmt::format("Can not rename file {}", oldName.toStdString()));
+    throw ZIOException(fmt::format("Can not rename file {}", oldName));
   }
 }
 

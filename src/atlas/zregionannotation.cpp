@@ -739,72 +739,72 @@ void ZRegionAnnotation::save(const QString& filename) const
   auto tfn = getTemporaryFilename(filename);
 
   try {
-    H5::Exception::dontPrint();
+    {
+      H5::Exception::dontPrint();
 
-    H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
+      H5::H5File file(QFile::encodeName(tfn).constData(), H5F_ACC_TRUNC);
 
-    H5::Group allGrp = file.createGroup("RegionAnnotation");
+      H5::Group allGrp = file.createGroup("RegionAnnotation");
 
-    H5::IntType intType(H5::PredType::STD_I32LE);
-    H5::IntType int64Type(H5::PredType::STD_I64LE);
-    H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
-    H5::StrType strType(0, H5T_VARIABLE);
+      H5::IntType intType(H5::PredType::STD_I32LE);
+      H5::IntType int64Type(H5::PredType::STD_I64LE);
+      H5::FloatType doubleType(H5::PredType::IEEE_F64LE);
+      H5::StrType strType(0, H5T_VARIABLE);
 
-    H5::DataSpace attrDataSpace(H5S_SCALAR);
+      H5::DataSpace attrDataSpace(H5S_SCALAR);
 
-    H5::Attribute ver = allGrp.createAttribute("Version", intType, attrDataSpace);
-    int regionAnnotationVer = 100;
-    ver.write(intType, &regionAnnotationVer);
+      H5::Attribute ver = allGrp.createAttribute("Version", intType, attrDataSpace);
+      int regionAnnotationVer = 100;
+      ver.write(intType, &regionAnnotationVer);
 
-    //    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
-    //    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
-    //    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
-    allGrp.createAttribute("VoxelSizeXInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeX);
-    allGrp.createAttribute("VoxelSizeYInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeY);
-    allGrp.createAttribute("VoxelSizeZInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeZ);
+      //    allGrp.createAttribute("Width", intType, attrDataSpace).write(intType, &m_width);
+      //    allGrp.createAttribute("Height", intType, attrDataSpace).write(intType, &m_height);
+      //    allGrp.createAttribute("Depth", intType, attrDataSpace).write(intType, &m_depth);
+      allGrp.createAttribute("VoxelSizeXInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeX);
+      allGrp.createAttribute("VoxelSizeYInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeY);
+      allGrp.createAttribute("VoxelSizeZInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeZ);
 
-    int idx = 0;
-    for (auto it = m_ontology.cbegin(); it != m_ontology.cend(); ++it) {
-      H5::Group regionGrp = allGrp.createGroup(fmt::format("Region{}", idx + 1));
-      ++idx;
-      const RegionNode& p = *it;
+      int idx = 0;
+      for (auto it = m_ontology.cbegin(); it != m_ontology.cend(); ++it) {
+        H5::Group regionGrp = allGrp.createGroup(fmt::format("Region{}", idx + 1));
+        ++idx;
+        const RegionNode& p = *it;
 
-      H5::Attribute idAttr = regionGrp.createAttribute("ID", int64Type, attrDataSpace);
-      idAttr.write(int64Type, &p.id);
+        H5::Attribute idAttr = regionGrp.createAttribute("ID", int64Type, attrDataSpace);
+        idAttr.write(int64Type, &p.id);
 
-      H5::Attribute parentIDAttr = regionGrp.createAttribute("ParentID", int64Type, attrDataSpace);
-      parentIDAttr.write(int64Type, &p.parentID);
+        H5::Attribute parentIDAttr = regionGrp.createAttribute("ParentID", int64Type, attrDataSpace);
+        parentIDAttr.write(int64Type, &p.parentID);
 
-      H5::Attribute redAttr = regionGrp.createAttribute("Red", intType, attrDataSpace);
-      redAttr.write(intType, &p.red);
+        H5::Attribute redAttr = regionGrp.createAttribute("Red", intType, attrDataSpace);
+        redAttr.write(intType, &p.red);
 
-      H5::Attribute greenAttr = regionGrp.createAttribute("Green", intType, attrDataSpace);
-      greenAttr.write(intType, &p.green);
+        H5::Attribute greenAttr = regionGrp.createAttribute("Green", intType, attrDataSpace);
+        greenAttr.write(intType, &p.green);
 
-      H5::Attribute blueAttr = regionGrp.createAttribute("Blue", intType, attrDataSpace);
-      blueAttr.write(intType, &p.blue);
+        H5::Attribute blueAttr = regionGrp.createAttribute("Blue", intType, attrDataSpace);
+        blueAttr.write(intType, &p.blue);
 
-      H5::Attribute name = regionGrp.createAttribute("Name", strType, attrDataSpace);
-      name.write(strType, p.name.toStdString());
+        H5::Attribute name = regionGrp.createAttribute("Name", strType, attrDataSpace);
+        name.write(strType, p.name.toStdString());
 
-      H5::Attribute abbreviation = regionGrp.createAttribute("Abbreviation", strType, attrDataSpace);
-      abbreviation.write(strType, p.abbreviation.toStdString());
+        H5::Attribute abbreviation = regionGrp.createAttribute("Abbreviation", strType, attrDataSpace);
+        abbreviation.write(strType, p.abbreviation.toStdString());
 
-      if (p.roi && !p.roi->isEmpty()) {
-        H5::Group roiGrp = regionGrp.createGroup("ROI");
-        p.roi->save(roiGrp);
+        if (p.roi && !p.roi->isEmpty()) {
+          H5::Group roiGrp = regionGrp.createGroup("ROI");
+          p.roi->save(roiGrp);
+        }
+
+        if (p.mesh && !p.mesh->empty()) {
+          H5::Group meshGrp = regionGrp.createGroup("Mesh");
+          p.mesh->save(meshGrp);
+        }
       }
 
-      if (p.mesh && !p.mesh->empty()) {
-        H5::Group meshGrp = regionGrp.createGroup("Mesh");
-        p.mesh->save(meshGrp);
-      }
+      H5::Attribute numRegionAttr = allGrp.createAttribute("RegionNumber", intType, attrDataSpace);
+      numRegionAttr.write(intType, &idx);
     }
-
-    H5::Attribute numRegionAttr = allGrp.createAttribute("RegionNumber", intType, attrDataSpace);
-    numRegionAttr.write(intType, &idx);
-
-    file.close();
 
     renameFile(tfn, filename);
   }
