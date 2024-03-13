@@ -340,7 +340,9 @@ void Z3DImgFilter::setData(const ZImgPack& imgPack)
 
   try {
     std::vector<glm::dvec2> drs;
-    if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
+    if (imgPack.imgInfo().isType<uint8_t>()) {
+      drs = std::vector<glm::dvec2>(imgPack.imgInfo().numChannels, glm::dvec2(0, 255));
+    } else if (imgPack.hasMinMax() && imgPack.maxIntensity() > imgPack.minIntensity()) {
       drs = std::vector<glm::dvec2>(
         imgPack.imgInfo().numChannels,
         glm::dvec2(imgPack.minIntensity() + (imgPack.maxIntensity() - imgPack.minIntensity()) * 0.02,

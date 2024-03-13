@@ -100,6 +100,7 @@ ZImgPack::ZImgPack(ZImgSource imgSource, ZImgInfo* pInfo,
     m_img = ZImg(m_imgSource);
     m_img.computeMinMax(m_minIntensity, m_maxIntensity);
     m_minMaxState = MinMaxState::Complete;
+    buildFastReadIndex(sceneSubBlock);
   } else if (hasPyramidal) {
     VLOG(1) << fmt::format("has pyramidal: {}", hasPyramidal);
     buildFastReadIndex(sceneSubBlock);
