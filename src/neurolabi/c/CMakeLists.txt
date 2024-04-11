@@ -229,7 +229,8 @@ else (WIN32)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-sometimes-uninitialized)
   else ()
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-old-style-declaration -Wno-implicit-fallthrough -Wno-unused-result)
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-old-style-declaration -Wno-implicit-fallthrough
+                           -Wno-unused-result -Wno-address -Wno-format -Wno-maybe-uninitialized)
   endif ()
 endif (WIN32)
 
