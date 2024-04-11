@@ -526,7 +526,7 @@ public:
   };
 
   // create empty image
-  ZImg() noexcept = default;
+  ZImg() noexcept {};
 
   // create image with size and attribute specified by info and set all data to default value
   // see allocate() for default voxel value
