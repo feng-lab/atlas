@@ -19,7 +19,7 @@ def cpp_standard() -> int:
 
 
 def use_clang_in_linux() -> bool:
-    return False and is_linux()
+    return is_linux()
 
 
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
