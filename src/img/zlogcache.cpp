@@ -16,8 +16,7 @@ void ZLogCache::send(LogSeverity severity,
                      int line,
                      const google::LogMessageTime& logmsgtime,
                      const char* message,
-                     size_t message_len,
-                     size_t prefix_len)
+                     size_t message_len)
 {
   std::lock_guard<std::mutex> lock(m_mutex);
   if (m_logDatas.size() == m_maxNumItems) {
@@ -30,8 +29,14 @@ void ZLogCache::send(LogSeverity severity,
       m_logDatas.shrink_to_fit();
     }
   }
-  m_logDatas
-    .emplace_back(severity, full_filename, base_filename, line, logmsgtime.tm(), message, message_len, prefix_len);
+  m_logDatas.emplace_back(severity,
+                          full_filename,
+                          base_filename,
+                          line,
+                          logmsgtime.tm(),
+                          message,
+                          message_len,
+                          ToString(severity, base_filename, line, logmsgtime, message, message_len));
 }
 
 ZLogCache::ZLogCache(size_t maxNumItems)

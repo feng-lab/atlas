@@ -156,7 +156,6 @@ find_package(liblzma REQUIRED
 print_target_properties(liblzma::liblzma)
 
 find_package(zstd REQUIRED
-             COMPONENTS libzstd_static
              PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build NO_DEFAULT_PATH)
 print_target_properties(zstd::libzstd_static)
 

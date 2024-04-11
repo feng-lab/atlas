@@ -32,8 +32,7 @@ public:
             int line,
             const google::LogMessageTime& logmsgtime,
             const char* message,
-            size_t message_len,
-            size_t prefix_len) override;
+            size_t message_len) override;
 
   // receiver must be in ZLogCache's thread, which is the main gui thread
   template<typename Func1>

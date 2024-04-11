@@ -612,6 +612,7 @@ def build_tbb(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        print()
 
 
 def build_cpuinfo(src_dir: str, install_dir: str):
