@@ -2971,6 +2971,7 @@ def build_proxygen(src_dir: str, install_dir: str):
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
     bak_file4 = orig_file4 = None
+    bak_file5 = orig_file5 = None
     try:
         orig_file = os.path.join(src_dir, 'CMakeLists.txt')
         bak_file = patch_file(orig_file,
@@ -3038,6 +3039,17 @@ def build_proxygen(src_dir: str, install_dir: str):
                                        "PCHECK(pthread_sigmask(SIG_BLOCK, &ss, nullptr) == 0);\n#endif",
                                    ])
 
+        orig_file5 = os.path.join(src_dir, 'proxygen', 'httpserver', 'samples', 'hq', 'ConnIdLogger.h')
+        bak_file5 = patch_file(orig_file5,
+                               from_texts=[
+                                   r'const struct ::tm* tm_time,',
+                                   r'tm_time);',
+                               ],
+                               to_texts=[
+                                   r'const LogMessageTime& tm_time,',
+                                   "&(tm_time.tm()));",
+                               ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         if is_windows():
             cmakecmd.extend([f'-DCMAKE_PROGRAM_PATH={atlas_util_dir()};{os.path.dirname(sys.executable)}',
@@ -3058,6 +3070,7 @@ def build_proxygen(src_dir: str, install_dir: str):
             os.replace(bak_file1, orig_file1)
             os.replace(bak_file2, orig_file2)
             os.replace(bak_file3, orig_file3)
+        os.replace(bak_file5, orig_file5)
         print()
 
 
