@@ -228,9 +228,10 @@ else (WIN32)
                          -Wno-unused-but-set-variable -Wno-format)
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-sometimes-uninitialized)
-  else ()
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-old-style-declaration -Wno-implicit-fallthrough
-                           -Wno-unused-result -Wno-address -Wno-format -Wno-maybe-uninitialized)
+                           -Wno-unused-result -Wno-address -Wno-format -Wno-maybe-uninitialized -Wno-strict-aliasing
+                           -Wno-stringop-truncation)
   endif ()
 endif (WIN32)
 

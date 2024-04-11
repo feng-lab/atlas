@@ -1593,6 +1593,7 @@ include(libs)""",
                             '-DNSTATIC:BOOL=OFF',
                             '-DSUITESPARSE_USE_FORTRAN:BOOL=OFF',
                             '-DSUITESPARSE_USE_CUDA:BOOL=OFF',
+                            '-DSUITESPARSE_USE_OPENMP:BOOL=OFF',
                             ]
 
         for module in ['SuiteSparse_config', 'COLAMD', 'AMD', 'CCOLAMD', 'CAMD', 'CHOLMOD', 'SPQR']:
