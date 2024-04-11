@@ -462,7 +462,7 @@ ZSwcTree* ZSwcFactory::CreateSwc(const ZStroke2d &stroke)
   tree->resortId();
   return tree;
 #else
-  UNUSED_PARAMETER(stroke)
+  UNUSED_PARAMETER(stroke);
   return NULL;
 #endif
 }

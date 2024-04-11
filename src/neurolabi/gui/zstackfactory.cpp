@@ -268,7 +268,7 @@ ZStack* ZStackFactory::makePolygonPicture(const ZStroke2d &curve)
 
   return stack;
 #else
-  UNUSED_PARAMETER(curve)
+  UNUSED_PARAMETER(curve);
   return NULL;
 #endif
 }
@@ -785,7 +785,7 @@ ZStack* ZStackFactory::MakeColorStack(const ZObject3dScanArray &objArray)
     }
   }
 #else
-  UNUSED_PARAMETER(objArray)
+  UNUSED_PARAMETER(objArray);
 #endif
 
   return stack;
@@ -811,7 +811,7 @@ ZStack* ZStackFactory::MakeStrokeMask(const std::vector<ZStroke2d *> strokeList)
     stroke->labelStack(stack);
   }
 #else
-  UNUSED_PARAMETER(strokeList)
+  UNUSED_PARAMETER(strokeList);
 #endif
 
   return stack;
@@ -839,7 +839,7 @@ ZStack* ZStackFactory::MakeStrokeProjMask(const std::vector<ZStroke2d *> strokeL
     stroke->labelProjStack(stack);
   }
 #else
-  UNUSED_PARAMETER(strokeList)
+  UNUSED_PARAMETER(strokeList);
 #endif
 
   return stack;
@@ -868,8 +868,8 @@ ZStack* ZStackFactory::MakeStrokeProjMask(
     stroke->labelProjStack(stack, value);
   }
 #else
-  UNUSED_PARAMETER(strokeList)
-  UNUSED_PARAMETER(value)
+  UNUSED_PARAMETER(strokeList);
+  UNUSED_PARAMETER(value);
 #endif
 
   return stack;
@@ -902,8 +902,8 @@ ZStack* ZStackFactory::MakeStrokeMask(
     }
   }
 #else
-  UNUSED_PARAMETER(strokeList)
-  UNUSED_PARAMETER(z)
+  UNUSED_PARAMETER(strokeList);
+  UNUSED_PARAMETER(z);
 #endif
 
   return stack;
@@ -1038,7 +1038,7 @@ ZStack* ZStackFactory::MakeLabelColorStack(
     }
   }
 #else
-  UNUSED_PARAMETER(labelArray)
+  UNUSED_PARAMETER(labelArray);
 #endif
 
   return stack;

@@ -970,8 +970,8 @@ bool ZSwcTree::display_inner(QPainter *painter, const DisplayConfig &config) con
     return true;
   }
 #else
-  UNUSED_PARAMETER(painter)
-  UNUSED_PARAMETER(config)
+  UNUSED_PARAMETER(painter);
+  UNUSED_PARAMETER(config);
 #endif
 
   return false;
@@ -1576,10 +1576,10 @@ Swc_Tree_Node* ZSwcTree::hitTest(double x, double y, double z, double margin)
 
   return const_cast<Swc_Tree_Node*>(hit);
 #else
-  UNUSED_PARAMETER(x)
-  UNUSED_PARAMETER(y)
-  UNUSED_PARAMETER(z)
-  UNUSED_PARAMETER(margin)
+  UNUSED_PARAMETER(x);
+  UNUSED_PARAMETER(y);
+  UNUSED_PARAMETER(z);
+  UNUSED_PARAMETER(margin);
   return NULL;
 #endif
 }
