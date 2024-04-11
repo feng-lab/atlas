@@ -64,17 +64,18 @@ public:
   // LogSink interface
 
 public:
-  void send(LogSeverity,
+  void send(LogSeverity severity,
             const char*,
-            const char*,
-            int,
-            const google::LogMessageTime&,
+            const char* base_filename,
+            int line,
+            const google::LogMessageTime& time,
             const char* message,
-            size_t message_len,
-            size_t prefix_len) override
+            size_t message_len) override
   {
     if (isValid()) {
-      m_file.write(message - prefix_len, message_len + prefix_len + 1); // glog: after message_len is '\n'
+      auto str = ToString(severity, base_filename, line, time, message, message_len);
+      m_file.write(str.c_str(), str.length());
+      m_file.putChar('\n');
       m_file.flush();
     }
   }
@@ -103,12 +104,17 @@ public:
             int line,
             const google::LogMessageTime& logmsgtime,
             const char* message,
-            size_t message_len,
-            size_t prefix_len) override
+            size_t message_len) override
   {
     if (isValid()) {
-      m_logFunction(
-        LogData(severity, full_filename, base_filename, line, logmsgtime.tm(), message, message_len, prefix_len));
+      m_logFunction(LogData(severity,
+                            full_filename,
+                            base_filename,
+                            line,
+                            logmsgtime.tm(),
+                            message,
+                            message_len,
+                            ToString(severity, base_filename, line, logmsgtime, message, message_len)));
     }
   }
 };

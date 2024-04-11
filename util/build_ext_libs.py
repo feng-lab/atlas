@@ -975,7 +975,15 @@ def build_fmt(src_dir: str, install_dir: str):
 def build_libevent(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
+    orig_file = bak_file = None
     try:
+        orig_file = os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in')
+        bak_file = patch_file(orig_file,
+                              from_texts=[r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
+                                          ],
+                              to_texts=[r'if (0)',
+                                        ])
+
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DEVENT__DISABLE_DEBUG_MODE:BOOL=ON',
                          '-DEVENT__DISABLE_OPENSSL:BOOL=ON',
@@ -991,6 +999,7 @@ def build_libevent(src_dir: str, install_dir: str):
         build_and_install_cmakecmd(cmakecmd, build_dir)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
+        os.replace(bak_file, orig_file)
 
 
 def build_lz4(src_dir: str, install_dir: str):
