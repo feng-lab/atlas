@@ -674,62 +674,13 @@ def build_gflags(src_dir: str, install_dir: str):
 def build_glog(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
-    bak_file = orig_file = None
     bak_file1 = orig_file1 = None
     try:
-        # subprocess.run(['git', 'apply', '--stat', '--apply', os.path.join(ext_dir(), 'glog_patch.txt')],
-        #                cwd=src_dir, shell=False, check=True)
-        orig_file = os.path.join(src_dir, 'src', 'glog', 'logging.h')
-        bak_file = patch_file(orig_file,
-                              from_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
-                    const char* base_filename, int line,
-                    const LogMessageTime& time, const char* message,
-                    size_t message_len);""",
-                                          ],
-                              to_texts=[r"""virtual void send(LogSeverity severity, const char* full_filename,
-                    const char* base_filename, int line,
-                    const LogMessageTime& logmsgtime, const char* message,
-                    size_t message_len);
-  virtual void send(LogSeverity severity, const char* full_filename,
-                    const char* base_filename, int line,
-                    const LogMessageTime& logmsgtime, const char* message,
-                    size_t message_len, [[maybe_unused]] size_t prefix_len) {
-    send(severity, full_filename, base_filename, line,
-         logmsgtime, message, message_len);
-  }""",
-                                        ])
-
         orig_file1 = os.path.join(src_dir, 'src', 'logging.cc')
         bak_file1 = patch_file(orig_file1,
-                               from_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
-                         const char* base_filename, int line,
-                         const LogMessageTime& time, const char* message,
-                         size_t message_len);""",
-                                           r"""LogDestination::LogToSinks(LogSeverity severity,
-                                       const char* full_filename,
-                                       const char* base_filename, int line,
-                                       const LogMessageTime& time,
-                                       const char* message,
-                                       size_t message_len) {""",
-                                           r"""send(severity, full_filename, base_filename, line, time,
-                         message, message_len);""",
-                                           r'data_->num_prefix_chars_ - 1));',
-                                           r'ColoredWriteToStderr(severity, message, message_len);',
+                               from_texts=[r'ColoredWriteToStderr(severity, message, message_len);',
                                            ],
-                               to_texts=[r"""static void LogToSinks(LogSeverity severity, const char* full_filename,
-                         const char* base_filename, int line,
-                         const LogMessageTime& time, const char* message,
-                         size_t message_len, size_t prefix_len);""",
-                                         r"""LogDestination::LogToSinks(LogSeverity severity,
-                                       const char* full_filename,
-                                       const char* base_filename, int line,
-                                       const LogMessageTime& time,
-                                       const char* message,
-                                       size_t message_len, size_t prefix_len) {""",
-                                         r"""send(severity, full_filename, base_filename, line, time,
-                         message, message_len, prefix_len);""",
-                                         r'data_->num_prefix_chars_ - 1), data_->num_prefix_chars_ );',
-                                         r'ColoredWriteToStdout(severity, message, message_len);'
+                               to_texts=[r'ColoredWriteToStdout(severity, message, message_len);'
                                          ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
@@ -750,7 +701,6 @@ def build_glog(src_dir: str, install_dir: str):
         #                      ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
-        os.replace(bak_file, orig_file)
         os.replace(bak_file1, orig_file1)
 
 
