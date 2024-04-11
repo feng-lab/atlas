@@ -74,7 +74,7 @@ std::vector<int> ZHdf5Reader::readIntArray(const string &dataPath)
   H5Dclose(dset);
   H5Sclose(space);
 #else
-  UNUSED_PARAMETER(dataPath)
+  UNUSED_PARAMETER(dataPath);
 #endif
 
   return array;
@@ -158,7 +158,7 @@ mylib::Array* ZHdf5Reader::readArray(const std::string &dataPath)
   H5Dclose(dset);
   H5Sclose(space);
 #else
-  UNUSED_PARAMETER(dataPath)
+  UNUSED_PARAMETER(dataPath);
 #endif
 
   return array;
@@ -257,7 +257,7 @@ std::vector<std::string> ZHdf5Reader::getAllDatasetName(
     H5Giterate(m_file, group.c_str(), NULL, getDataSetName, &nameArray);
   }
 #else
-  UNUSED_PARAMETER(group)
+  UNUSED_PARAMETER(group);
 #endif
 
   return nameArray;

@@ -384,8 +384,8 @@ void ZLocsegChain::fixTerminal(const Stack *stack, const Trace_Workspace *tw)
   Trace_Locseg(stack, 1.0, m_chain, &tmptw);
   updateBufferChain();
 #else
-  UNUSED_PARAMETER(stack)
-  UNUSED_PARAMETER(tw)
+  UNUSED_PARAMETER(stack);
+  UNUSED_PARAMETER(tw);
 #endif
 }
 
