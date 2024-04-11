@@ -145,7 +145,7 @@ else (WIN32)
 
     set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS "-Wno-shadow -Wno-misleading-indentation")
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-implicit-fallthrough -Wno-stringop-truncation -Wno-address
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-implicit-fallthrough -Wno-stringop-truncation
                            -Wno-maybe-uninitialized -Wno-unused-result -Wno-misleading-indentation)
   endif ()
 endif (WIN32)

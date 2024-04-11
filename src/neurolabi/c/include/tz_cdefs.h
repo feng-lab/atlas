@@ -1,5 +1,5 @@
 /* tz_cdefs.h
- * 
+ *
  * Initial write: Ting Zhao
  */
 
@@ -29,7 +29,7 @@
 #    define __END_DECLS
 #  endif
 #  ifdef WIN32_DLL
-#    ifdef BUILD_DLL 
+#    ifdef BUILD_DLL
 #      define PUBLIC_API __declspec(dllexport)
 #      define PUBLIC_VAR extern __declspec(dllexport)
 #    else
@@ -45,7 +45,7 @@
 #endif
 
 #ifdef _DEBUG_
-#  define PRIVATE 
+#  define PRIVATE
 #else
 #  define PRIVATE static
 #endif
@@ -119,7 +119,7 @@
 #ifndef _NAN
 /* (big endian) 0x7FF8000000000000 */
 #  ifndef __cplusplus
-#    define _NAN (0.0 / 0.0) 
+#    define _NAN (0.0 / 0.0)
 #  else
 #    define _NAN (std::numeric_limits<double>::quiet_NaN())
 #  endif
@@ -136,7 +136,7 @@ static const double NaN = _NAN;
 static const double Infinity = _INFINITY;
 #endif
 
-#define UNUSED_PARAMETER(var) if (&var) {}
+#define UNUSED_PARAMETER(var) (void)var
 
 #ifdef _MSC_VER
 #define __func__ __FUNCTION__
