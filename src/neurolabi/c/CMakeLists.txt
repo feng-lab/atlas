@@ -221,12 +221,16 @@ if (WIN32)
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra)
   target_compile_options(${LIBRARY_NAME} PRIVATE -Waddress -Wdeprecated)
-  target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option
-                         -Wno-unused-parameter
+  target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unused-parameter
                          -Wno-sign-compare -Wno-unused-function
-                         -Wno-unused-variable -Wno-sometimes-uninitialized -Wno-uninitialized -Wno-varargs
+                         -Wno-unused-variable -Wno-uninitialized -Wno-varargs
                          -Wno-absolute-value
                          -Wno-unused-but-set-variable -Wno-format)
+  if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wno-sometimes-uninitialized)
+  else ()
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-old-style-declaration -Wno-implicit-fallthrough -Wno-unused-result)
+  endif ()
 endif (WIN32)
 
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${GENELIB_DIR})

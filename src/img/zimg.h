@@ -526,7 +526,8 @@ public:
   };
 
   // create empty image
-  ZImg() noexcept {};
+  ZImg() noexcept {}; // NOLINT   gcc error if you use = default, error: default member initializer for
+                      // ‘nim::ZImg::m_ownData’ required before the end of its enclosing class
 
   // create image with size and attribute specified by info and set all data to default value
   // see allocate() for default voxel value
