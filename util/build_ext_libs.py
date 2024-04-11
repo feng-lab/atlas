@@ -22,6 +22,14 @@ def use_clang_in_linux() -> bool:
     return is_linux()
 
 
+def get_clang_in_linux() -> str:
+    return 'clang-18'
+
+
+def get_clangplus_in_linux() -> str:
+    return 'clang++-18'
+
+
 def update_or_clone_git_repository(repository_folder: str, repository_url: str):
     if os.path.exists(repository_folder):
         print('git', 'pull', Path(repository_folder).name)
@@ -244,9 +252,9 @@ def get_common_build_flags(cpp_standard: int = cpp_standard(), with_optimization
         res['ASMFLAGS'] = f'-isysroot {osx_sysroot} -mmacosx-version-min={macos_min_version()}'
     elif is_linux():
         if use_clang_in_linux():
-            res['CC'] = 'clang'
+            res['CC'] = get_clang_in_linux()
             res['CFLAGS'] = f'-fPIC {"" if no_hidden_visibility else "-fvisibility=hidden"} -mavx' + optimization
-            res['CXX'] = 'clang++'
+            res['CXX'] = get_clangplus_in_linux()
             res['CXXFLAGS'] = f'-std=c++{cpp_standard} -fPIC ' \
                               f'{"" if no_hidden_visibility else "-fvisibility=hidden -fvisibility-inlines-hidden"} ' \
                               f'-mavx' + optimization

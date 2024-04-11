@@ -96,8 +96,8 @@ def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: 
     else:
         env = os.environ.copy()
         if is_linux() and build_ext_libs.use_clang_in_linux():
-            env['CC'] = 'clang'
-            env['CXX'] = 'clang++'
+            env['CC'] = build_ext_libs.get_clang_in_linux()
+            env['CXX'] = build_ext_libs.get_clangplus_in_linux()
         subprocess.run(cmakecmd, cwd=atlas_build_dir(arm64=arm64), shell=False, check=True, env=env)
         if use_ninja():
             subprocess.run([build_ext_libs.get_ninja_binary()],
