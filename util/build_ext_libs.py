@@ -3046,7 +3046,7 @@ def build_proxygen(src_dir: str, install_dir: str):
                                    r'tm_time);',
                                ],
                                to_texts=[
-                                   r'const LogMessageTime& tm_time,',
+                                   r'const google::LogMessageTime& tm_time,',
                                    "&(tm_time.tm()));",
                                ])
 
