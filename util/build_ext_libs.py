@@ -1339,6 +1339,8 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                        r'template void std::basic_string<TYPE>::_Eos(std::size_t) noexcept;',
                                    ])
 
+        os.remove(os.path.join(src_dir, 'folly', 'logging', 'BridgeFromGoogleLogging.cpp'))
+
         cmakecmd_options = ['-DBUILD_SHARED_LIBS:BOOL=OFF',
                             '-DPYTHON_EXTENSIONS:BOOL=OFF',
                             '-DBUILD_TESTS:BOOL=OFF',
@@ -1377,6 +1379,7 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
         if is_windows():
             os.replace(bak_file6, orig_file6)
             os.replace(bak_file7, orig_file7)
+        cleanup_git_submodule(src_dir)
 
 
 def build_glbinding(src_dir: str, install_dir: str):
