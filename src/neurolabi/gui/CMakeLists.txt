@@ -139,15 +139,14 @@ if (WIN32)
   set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS "/wd4774")
 else (WIN32)
   target_compile_options(${LIBRARY_NAME} PUBLIC -Wall -Wextra) # has to come before the following -W options
-  target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unused-parameter -Wno-unused-but-set-variable)
+  target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-format )
   if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option
-                           -Wno-format -Wundefined-reinterpret-cast)
+    target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-unknown-warning-option -Wundefined-reinterpret-cast)
 
     set_source_files_properties(mylib/array.cpp PROPERTIES COMPILE_FLAGS "-Wno-shadow -Wno-misleading-indentation")
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${LIBRARY_NAME} PRIVATE -Wno-implicit-fallthrough -Wno-stringop-truncation -Wno-address
-                           -Wno-maybe-uninitialized -Wno-unused-result)
+                           -Wno-maybe-uninitialized -Wno-unused-result -Wno-misleading-indentation)
   endif ()
 endif (WIN32)
 
