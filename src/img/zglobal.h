@@ -69,53 +69,53 @@ using index_t = std::ptrdiff_t;
 
 // literal
 // from c++23 literal 'uz'
-constexpr size_t operator"" _uz(unsigned long long int n) noexcept
+constexpr size_t operator""_uz(unsigned long long int n) noexcept
 {
   return static_cast<size_t>(n);
 }
 
 // from c++23 literal 'z'
-constexpr ptrdiff_t operator"" _z(unsigned long long int n) noexcept
+constexpr ptrdiff_t operator""_z(unsigned long long int n) noexcept
 {
   return static_cast<ptrdiff_t>(n);
 }
 
-constexpr uint8_t operator"" _u8(unsigned long long int n) noexcept
+constexpr uint8_t operator""_u8(unsigned long long int n) noexcept
 {
   return static_cast<uint8_t>(n);
 }
 
-constexpr int8_t operator"" _i8(unsigned long long int n) noexcept
+constexpr int8_t operator""_i8(unsigned long long int n) noexcept
 {
   return static_cast<int8_t>(n);
 }
 
-constexpr uint16_t operator"" _u16(unsigned long long int n) noexcept
+constexpr uint16_t operator""_u16(unsigned long long int n) noexcept
 {
   return static_cast<uint16_t>(n);
 }
 
-constexpr int16_t operator"" _i16(unsigned long long int n) noexcept
+constexpr int16_t operator""_i16(unsigned long long int n) noexcept
 {
   return static_cast<int16_t>(n);
 }
 
-constexpr uint32_t operator"" _u32(unsigned long long int n) noexcept
+constexpr uint32_t operator""_u32(unsigned long long int n) noexcept
 {
   return static_cast<uint32_t>(n);
 }
 
-constexpr int32_t operator"" _i32(unsigned long long int n) noexcept
+constexpr int32_t operator""_i32(unsigned long long int n) noexcept
 {
   return static_cast<int32_t>(n);
 }
 
-constexpr uint64_t operator"" _u64(unsigned long long int n) noexcept
+constexpr uint64_t operator""_u64(unsigned long long int n) noexcept
 {
   return static_cast<uint64_t>(n);
 }
 
-constexpr int64_t operator"" _i64(unsigned long long int n) noexcept
+constexpr int64_t operator""_i64(unsigned long long int n) noexcept
 {
   return static_cast<int64_t>(n);
 }
