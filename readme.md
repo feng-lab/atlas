@@ -27,7 +27,7 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt11
+    conda activate pt12
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~
@@ -47,7 +47,7 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 * install visual studio 2022, intel oneapi basekit, git
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt11
+    conda activate pt12
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~
@@ -74,7 +74,7 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
     ```
 * install qt6 (by aqt or installer from the qt website)
     ```bash
-    conda activate pt11
+    conda activate pt12
     # install qt by aqt
     pip install --upgrade --no-cache-dir aqtinstall
     cd ~

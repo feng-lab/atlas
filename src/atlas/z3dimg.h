@@ -10,10 +10,10 @@
 #include <folly/CancellationToken.h>
 #include <QObject>
 #include <set>
-#include <boost/unordered/unordered_flat_set_fwd.hpp>
 
 #if defined(ATLAS_SANITIZE_ADDRESS)
 #define ATLAS_CHECK_CACHE
+#include <boost/unordered/unordered_flat_set.hpp>
 #endif
 
 namespace nim {

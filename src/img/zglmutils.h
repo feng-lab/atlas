@@ -3,6 +3,10 @@
 // This file includes some commonly used headers from glm and defines some useful functions
 // for glm
 
+#include "zglobal.h"
+#include "zjson.h"
+#include "zlog.h"
+
 #define GLM_FORCE_CXX17
 #if defined(__aarch64__) || defined(_M_ARM64)
 #define GLM_FORCE_NEON
@@ -16,11 +20,6 @@
 #define GLM_FORCE_SWIZZLE
 #define GLM_ENABLE_EXPERIMENTAL
 
-#include "zglobal.h"
-#include "zjson.h"
-#include "zlog.h"
-#include <fmt/core.h>
-#include <fmt/ranges.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_precision.hpp>
 #include <glm/gtc/quaternion.hpp>

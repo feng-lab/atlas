@@ -1525,6 +1525,7 @@ def build_glm(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
 
         cmakecmd.extend(['-DGLM_BUILD_LIBRARY:BOOL=OFF',
+                         '-DGLM_BUILD_TESTS:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])

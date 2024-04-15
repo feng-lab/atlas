@@ -809,12 +809,15 @@ void Z3DImg::insertPageTableBlockToCache(size_t c,
 
 void Z3DImg::insertImageBlockToCache(size_t c, const glm::uvec4& pageTableEntryKey, glm::uvec4& pageTableEntryRef)
 {
+  // auto hasher = boost::hash<glm::uvec4>();
+  // LOG(INFO) << hasher(pageTableEntryKey);
 #ifdef ATLAS_CHECK_CACHE
   CHECK(!m_channelImageCacheManagers[c]->exists(pageTableEntryKey))
     << pageTableEntryKey << " " << m_channelImageCacheManagers[c]->get(pageTableEntryKey) << " " << pageTableEntryRef;
 #endif
   glm::uvec4 erasedKey;
   glm::uvec3 imageBlockCachePos = m_channelImageCacheManagers[c]->insert(pageTableEntryKey, erasedKey);
+  // LOG(INFO) << c << " " <<  pageTableEntryKey << " " << erasedKey << " " << imageBlockCachePos;
   pageTableEntryRef = glm::uvec4(imageBlockCachePos, 1);
   // LOG(INFO) << blockKey << " " << erasedKey << " " << m_posToBlockIDs[level] << " " << blockID << " " <<
   // level;
@@ -1129,7 +1132,7 @@ void Z3DImg::checkPageSystemError(size_t c, bool strict)
             ++numValidEntry;
             if (pageTableEntry.w != m_emptyFlag) {
               glm::uvec4 imageCacheKey(glm::uvec3(x, y, z) + pdLoc * m_pageTableBlockSize, level);
-              CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey));
+              CHECK(m_channelImageCacheManagers[c]->exists(imageCacheKey)) << imageCacheKey;
               CHECK(m_channelImageCacheManagers[c]->get(imageCacheKey) == pageTableEntry.xyz());
               CHECK(glm::all(glm::lessThanEqual(pageTableEntry.xyz() + imageBlockSize,
                                                 m_channelImageCacheTextures[c]->dimension())));
