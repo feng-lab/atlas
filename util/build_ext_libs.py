@@ -1518,6 +1518,38 @@ def build_eigen(src_dir: str, install_dir: str):
         os.replace(bak_file, orig_file)
 
 
+def build_glm(src_dir: str, install_dir: str):
+    build_dir = create_build_dir(src_dir)
+
+    try:
+        cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
+
+        cmakecmd.extend(['-DGLM_BUILD_LIBRARY:BOOL=OFF',
+                         ])
+
+        cmakecmd.extend([src_dir])
+        build_and_install_cmakecmd(cmakecmd, build_dir)
+
+        orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
+        patch_file(orig_file,
+                   from_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
+
+	template<qualifier Q, int E0, int E1, int E2, int E3>
+	struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
+                               r'return !compute_vec_equal<float, Q, false, 32, true>::call(v1, v2);',
+                               r'return !compute_vec_equal<uint, Q, false, 32, true>::call(v1, v2);',
+                               r'return !compute_vec_equal<int, Q, false, 32, true>::call(v1, v2);',
+                               ],
+                   to_texts=[r'',
+                             r'return !compute_vec_equal<L, float, Q, false, 32, true>::call(v1, v2);',
+                             r'return !compute_vec_equal<L, uint, Q, false, 32, true>::call(v1, v2);',
+                             r'return !compute_vec_equal<L, int, Q, false, 32, true>::call(v1, v2);',
+                             ])
+    finally:
+        shutil.rmtree(build_dir, ignore_errors=False)
+
+
 def build_pocketfft(src_dir: str, install_dir: str):
     shutil.copy2(os.path.join(src_dir, 'pocketfft_hdronly.h'), os.path.join(install_dir, 'include'))
 
@@ -3200,7 +3232,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
             print('pybind11')
 
         if lib_name == 'glm':
-            print('glm')
+            src_dir = os.path.join(ext_dir(), 'glm')
+            build_glm(src_dir, ext_build_dir())
 
         if lib_name == 'magic_enum':
             print('magic_enum')

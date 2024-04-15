@@ -188,10 +188,9 @@ set_target_properties(GeometricTools PROPERTIES
                       INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/GeometricTools/GTE")
 print_target_properties(GeometricTools)
 
-add_library(glm::glm INTERFACE IMPORTED)
-set_target_properties(glm::glm PROPERTIES
-                      INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_LIST_DIR}/../3rdparty/glm")
-print_target_properties(glm::glm)
+find_package(glm CONFIG REQUIRED
+             PATHS ${CMAKE_CURRENT_LIST_DIR}/../3rdparty/build/share NO_DEFAULT_PATH)
+print_target_properties(glm::glm-header-only)
 
 #add_library(range-v3::range-v3 INTERFACE IMPORTED)
 #set_target_properties(range-v3::range-v3 PROPERTIES

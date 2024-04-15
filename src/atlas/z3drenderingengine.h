@@ -8,6 +8,7 @@
 #include <QObject>
 #include <QEvent>
 #include <QMutexLocker>
+#include <QPointer>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 class QOffscreenSurface;
