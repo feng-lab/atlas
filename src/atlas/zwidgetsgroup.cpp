@@ -241,11 +241,6 @@ QLayout* ZWidgetsGroup::createLayout(bool createBasic)
   }
 }
 
-bool ZWidgetsGroup::operator<(const ZWidgetsGroup& other) const
-{
-  return m_visibleLevel < other.m_visibleLevel;
-}
-
 void ZWidgetsGroup::sortChildGroups()
 {
   std::stable_sort(m_childGroups.begin(), m_childGroups.end(), widgetGroupPtVisibleLevelLessThan);

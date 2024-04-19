@@ -25,11 +25,12 @@ public:
 
   ZColorMapKey(double i, const QColor& colorL, const QColor& colorR);
 
-  bool operator==(const ZColorMapKey& key) const;
+  bool operator==(const ZColorMapKey& key) const = default;
 
-  bool operator!=(const ZColorMapKey& key) const;
-
-  bool operator<(const ZColorMapKey& key) const;
+  bool operator<(const ZColorMapKey& key) const
+  {
+    return m_intensity < key.m_intensity;
+  }
 
   void setColorL(const glm::col4& color);
 
@@ -198,8 +199,6 @@ public:
              const QColor& maxColor = QColor(255, 255, 255, 255));
 
   bool operator==(const ZColorMap& cm) const;
-
-  bool operator!=(const ZColorMap& cm) const;
 
   double domainMin() const;
 

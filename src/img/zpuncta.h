@@ -43,11 +43,6 @@ public:
     return data == l.data;
   }
 
-  inline bool operator!=(const ZPuncta& l) const
-  {
-    return !(*this == l);
-  }
-
   // qt style read write name filter for filedialog
   static bool canReadFile(const QString& filename);
 

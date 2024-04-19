@@ -23,16 +23,16 @@ private:
   struct ShaderKey
   {
     ShaderKey(QString fn, QString hd, const Z3DContextGroup& ct)
-      : filename(std::move(fn))
+      : context(ct)
+      , filename(std::move(fn))
       , header(std::move(hd))
-      , context(ct)
     {}
 
+    Z3DContextGroup context;
     QString filename;
     QString header;
-    Z3DContextGroup context;
 
-    bool operator<(const ShaderKey& rhs) const;
+    auto operator<=>(const ShaderKey& rhs) const = default;
   };
 
   std::map<ShaderKey, std::unique_ptr<Z3DShader>> m_shaders;

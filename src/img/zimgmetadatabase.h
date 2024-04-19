@@ -18,19 +18,16 @@ protected:
   struct _AttachPoint
   {
     _AttachPoint(index_t z_, index_t c_, index_t t_)
-      : z(z_)
+      : t(t_)
       , c(c_)
-      , t(t_)
+      , z(z_)
     {}
 
-    index_t z = -1;
-    index_t c = -1;
     index_t t = -1;
+    index_t c = -1;
+    index_t z = -1;
 
-    bool operator<(const _AttachPoint& rhs) const
-    {
-      return t < rhs.t || (t == rhs.t && c < rhs.c) || (t == rhs.t && c == rhs.c && z < rhs.z);
-    }
+    auto operator<=>(const _AttachPoint& rhs) const = default;
   };
 
 public:

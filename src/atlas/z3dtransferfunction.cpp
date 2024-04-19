@@ -61,11 +61,6 @@ bool Z3DTransferFunction::operator==(const Z3DTransferFunction& tf) const
   return true;
 }
 
-bool Z3DTransferFunction::operator!=(const Z3DTransferFunction& tf) const
-{
-  return !(*this == tf);
-}
-
 void Z3DTransferFunction::resetToDefault()
 {
   reset(0., 1., glm::col4(0, 0, 0, 0), glm::col4(255, 255, 255, 255));

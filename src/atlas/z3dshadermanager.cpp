@@ -50,9 +50,4 @@ Z3DShader& Z3DShaderManager::shader(const QString& fn, const QString& header, co
   return *(lb->second);
 }
 
-bool Z3DShaderManager::ShaderKey::operator<(const Z3DShaderManager::ShaderKey& rhs) const
-{
-  return std::tie(filename, context, header) < std::tie(rhs.filename, rhs.context, rhs.header);
-}
-
 } // namespace nim

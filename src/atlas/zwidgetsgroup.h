@@ -95,7 +95,10 @@ public:
 
   QLayout* createLayout(bool createBasic = true);
 
-  bool operator<(const ZWidgetsGroup& other) const;
+  bool operator<(const ZWidgetsGroup& other) const
+  {
+    return m_visibleLevel < other.m_visibleLevel;
+  }
 
   void emitRequestAdvancedWidgetSignal();
 

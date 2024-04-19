@@ -178,11 +178,6 @@ bool Z3DCamera::operator==(const Z3DCamera& rhs) const
          (m_windowAspectRatio == rhs.m_windowAspectRatio) && (m_eyeSeparationAngle == rhs.m_eyeSeparationAngle);
 }
 
-bool Z3DCamera::operator!=(const Z3DCamera& rhs) const
-{
-  return !(*this == rhs);
-}
-
 void Z3DCamera::dolly(float value)
 {
   if (value <= 0.f || (m_centerDist < 0.01f && value > 1.f)) {

@@ -279,8 +279,6 @@ public:
 
   bool operator==(const Z3DCamera& rhs) const;
 
-  bool operator!=(const Z3DCamera& rhs) const;
-
   // Divide the camera's distance from the focal point by the given
   // dolly value.  Use a value greater than one to dolly-in toward
   // the focal point, and use a value less than one to dolly-out away

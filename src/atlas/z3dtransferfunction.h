@@ -39,8 +39,6 @@ public:
 
   bool operator==(const Z3DTransferFunction& tf) const;
 
-  bool operator!=(const Z3DTransferFunction& tf) const;
-
   void resetToDefault();
 
   QString samplerType() const;

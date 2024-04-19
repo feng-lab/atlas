@@ -219,19 +219,4 @@ Z3DContextGroup::Z3DContextGroup()
 }
 #endif
 
-bool Z3DContextGroup::operator<(const Z3DContextGroup& rhs) const
-{
-  return m_contextGroup < rhs.m_contextGroup;
-}
-
-bool Z3DContextGroup::operator==(const Z3DContextGroup& rhs) const
-{
-  return m_contextGroup == rhs.m_contextGroup;
-}
-
-bool Z3DContextGroup::operator!=(const Z3DContextGroup& rhs) const
-{
-  return m_contextGroup != rhs.m_contextGroup;
-}
-
 } // namespace nim

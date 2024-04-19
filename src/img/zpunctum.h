@@ -57,11 +57,6 @@ public:
            m_voxelLocations == rhs.m_voxelLocations && m_voxelIntensities == rhs.m_voxelIntensities;
   }
 
-  inline bool operator!=(const ZPunctum& rhs) const
-  {
-    return !(*this == rhs);
-  }
-
   // compute fields: x, y, z, sDevOfIntensity, maxIntensity, meanIntensity, volSize,
   // mass, radius, score from voxels list. voxelLocations and voxelIntensities must
   // not be empty and must have same number of elements.

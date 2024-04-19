@@ -85,11 +85,6 @@ public:
     return minCorner == other.minCorner && maxCorner == other.maxCorner;
   }
 
-  inline bool operator!=(const ZBBox& other) const
-  {
-    return minCorner != other.minCorner || maxCorner != other.maxCorner;
-  }
-
   // expand to contain
   inline void expand(const ZBBox& other)
   {

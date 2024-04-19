@@ -407,11 +407,6 @@ struct ZImgSource
     return false;
   }
 
-  inline bool operator!=(const ZImgSource& other) const
-  {
-    return !(*this == other);
-  }
-
   [[nodiscard]] inline QString toQString() const
   {
     return jsonToQString(*this);

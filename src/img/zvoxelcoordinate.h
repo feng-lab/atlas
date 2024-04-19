@@ -221,20 +221,7 @@ struct ZVoxelCoordinate
   }
 
   // operators
-  inline bool operator<(const ZVoxelCoordinate& other) const
-  {
-    return std::tie(x, y, z, c, t) < std::tie(other.x, other.y, other.z, other.c, other.t);
-  }
-
-  inline bool operator==(const ZVoxelCoordinate& other) const
-  {
-    return x == other.x && y == other.y && z == other.z && c == other.c && t == other.t;
-  }
-
-  inline bool operator!=(const ZVoxelCoordinate& other) const
-  {
-    return x != other.x || y != other.y || z != other.z || c != other.c || t != other.t;
-  }
+  auto operator<=>(const ZVoxelCoordinate& other) const = default;
 
   inline ZVoxelCoordinate& operator+=(value_type rhs)
   {

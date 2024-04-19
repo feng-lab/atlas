@@ -42,11 +42,6 @@ struct ZImgRegion
     return start == other.start && end == other.end;
   }
 
-  inline bool operator!=(const ZImgRegion& other) const
-  {
-    return !(*this == other);
-  }
-
   // return true if contained by img, can be an empty region
   // always return false for empty img
   [[nodiscard]] inline bool isValid(const ZImgInfo& info) const

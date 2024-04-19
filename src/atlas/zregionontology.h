@@ -48,7 +48,6 @@ struct RegionNode
   //        name == rhs.name &&
   //        abbreviation == rhs.abbreviation;
   //  }
-  //  inline bool operator!=(const RegionNode &rhs) const { return !(*this == rhs); }
 };
 
 // ZIOException

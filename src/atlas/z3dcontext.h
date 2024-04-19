@@ -1,5 +1,7 @@
 #pragma once
 
+#include <compare>
+
 class QOpenGLContext;
 class QOffscreenSurface;
 
@@ -39,11 +41,7 @@ public:
 
   Z3DContextGroup& operator=(const Z3DContextGroup&) = default;
 
-  bool operator<(const Z3DContextGroup& rhs) const;
-
-  bool operator==(const Z3DContextGroup& rhs) const;
-
-  bool operator!=(const Z3DContextGroup& rhs) const;
+  auto operator<=>(const Z3DContextGroup& rhs) const = default;
 
 private:
   void* m_contextGroup = nullptr;

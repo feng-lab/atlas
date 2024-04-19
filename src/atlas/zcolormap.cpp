@@ -53,22 +53,6 @@ ZColorMapKey::ZColorMapKey(double i, const QColor& colorL, const QColor& colorR)
   , m_split(true)
 {}
 
-bool ZColorMapKey::operator==(const ZColorMapKey& key) const
-{
-  return m_intensity == key.intensity() && m_colorL == key.colorL() && m_colorR == key.colorR() &&
-         m_split == key.isSplit();
-}
-
-bool ZColorMapKey::operator!=(const ZColorMapKey& key) const
-{
-  return !(*this == key);
-}
-
-bool ZColorMapKey::operator<(const ZColorMapKey& key) const
-{
-  return m_intensity < key.m_intensity;
-}
-
 void ZColorMapKey::setColorL(const glm::col4& color)
 {
   m_colorL = color;
@@ -325,11 +309,6 @@ void ZColorMap::reset(double min, double max, const QColor& minColor, const QCol
 bool ZColorMap::operator==(const ZColorMap& cm) const
 {
   return equalTo(cm);
-}
-
-bool ZColorMap::operator!=(const ZColorMap& cm) const
-{
-  return !(*this == cm);
 }
 
 double ZColorMap::domainMin() const
