@@ -21,25 +21,28 @@ struct is_flags : public std::false_type
 // in global namespace so it doesn't hide qt's operator
 // http://stackoverflow.com/questions/10755058/qflags-enum-type-conversion-fails-all-of-a-sudden
 // impl:
-#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(OP)                  \
-  template<typename TEnum>                                                                         \
-  constexpr std::enable_if_t<nim::is_flags<TEnum>::value, TEnum> operator OP(TEnum value) noexcept \
-  {                                                                                                \
-    using underlyingT = typename std::underlying_type<TEnum>::type;                                \
-    return static_cast<TEnum>(OP static_cast<underlyingT>(value));                                 \
+#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(OP) \
+  template<typename TEnum>                                                        \
+    requires nim::is_flags<TEnum>::value                                          \
+  constexpr TEnum operator OP(TEnum value) noexcept                               \
+  {                                                                               \
+    using underlyingT = typename std::underlying_type<TEnum>::type;               \
+    return static_cast<TEnum>(OP static_cast<underlyingT>(value));                \
   }
 
-#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(OP)                           \
-  template<typename TEnum>                                                                                   \
-  constexpr std::enable_if_t<nim::is_flags<TEnum>::value, TEnum> operator OP(TEnum l, TEnum r) noexcept      \
-  {                                                                                                          \
-    using underlyingT = typename std::underlying_type<TEnum>::type;                                          \
-    return static_cast<TEnum>(static_cast<underlyingT>(l) OP static_cast<underlyingT>(r));                   \
-  }                                                                                                          \
-  template<typename TEnum>                                                                                   \
-  constexpr std::enable_if_t<nim::is_flags<TEnum>::value, TEnum&> operator OP##=(TEnum& l, TEnum r) noexcept \
-  {                                                                                                          \
-    return l = l OP r;                                                                                       \
+#define INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(OP)         \
+  template<typename TEnum>                                                                 \
+    requires nim::is_flags<TEnum>::value                                                   \
+  constexpr TEnum operator OP(TEnum l, TEnum r) noexcept                                   \
+  {                                                                                        \
+    using underlyingT = typename std::underlying_type<TEnum>::type;                        \
+    return static_cast<TEnum>(static_cast<underlyingT>(l) OP static_cast<underlyingT>(r)); \
+  }                                                                                        \
+  template<typename TEnum>                                                                 \
+    requires nim::is_flags<TEnum>::value                                                   \
+  constexpr TEnum& operator OP##=(TEnum & l, TEnum r) noexcept                             \
+  {                                                                                        \
+    return l = l OP r;                                                                     \
   }
 
 INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_UNARY_OPERATOR(~)
@@ -55,44 +58,51 @@ INTERNAL_IMPLEMENTATION_DETAIL_DO_NOT_USE_DECLARE_ENUM_BINARY_OPERATOR(^)
 
 namespace nim {
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr bool is_flag_set(TEnum value, TEnum flag) noexcept
 {
   using underlyingT = typename std::underlying_type<TEnum>::type;
   return (static_cast<underlyingT>(value) & static_cast<underlyingT>(flag)) == static_cast<underlyingT>(flag);
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void set_flag(TEnum& value) noexcept
 {
   value |= ~value;
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void set_flag(TEnum& value, TEnum flag) noexcept
 {
   value |= flag;
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void reset_flag(TEnum& value) noexcept
 {
   value &= ~value;
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void reset_flag(TEnum& value, TEnum flag) noexcept
 {
   value &= ~flag;
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void flip_flag(TEnum& value) noexcept
 {
   value = ~value;
 }
 
-template<typename TEnum, std::enable_if_t<is_flags<TEnum>::value, int> = 0>
+template<typename TEnum>
+  requires is_flags<TEnum>::value
 constexpr void flip_flag(TEnum& value, TEnum flag) noexcept
 {
   value ^= flag;

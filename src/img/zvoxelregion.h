@@ -42,7 +42,8 @@ public:
     }
   }
 
-  template<typename OtherValue, typename E = std::enable_if_t<std::is_convertible_v<OtherValue*, TVoxelRegion*>>>
+  template<typename OtherValue>
+    requires std::is_convertible_v<OtherValue*, TVoxelRegion*>
   constexpr voxel_iter(const voxel_iter<OtherValue>& other) noexcept
     : m_region(other.m_region)
     , m_boxIdx(other.m_boxIdx)
@@ -55,7 +56,7 @@ public:
     return this->m_region == other.m_region && this->m_boxIdx == other.m_boxIdx && this->m_voxel == other.m_voxel;
   }
 
-  bool visited() const noexcept
+  [[nodiscard]] bool visited() const noexcept
   {
     for (size_t i = 0; i < m_boxIdx; ++i) {
       if (m_region->m_boxes[i].contains(m_voxel)) {

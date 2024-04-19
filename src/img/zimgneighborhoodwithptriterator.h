@@ -67,10 +67,8 @@ public:
     }
   }
 
-  template<typename OtherTImg,
-           typename OtherTVoxel,
-           typename E =
-             std::enable_if_t<std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>>>
+  template<typename OtherTImg, typename OtherTVoxel>
+    requires std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>
   constexpr img_neighborhood_with_ptr_iter(const img_neighborhood_with_ptr_iter<OtherTImg, OtherTVoxel>& other) noexcept
     : m_img(other.m_img)
     , m_region(other.m_region)

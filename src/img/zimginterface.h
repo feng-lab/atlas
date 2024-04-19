@@ -391,7 +391,8 @@ constexpr auto&& get(const col4&& v) noexcept
   return tuple_like_get_helper<Index, 4>(v);
 }
 
-template<class T, typename std::enable_if<std::is_same<json::detail::remove_cvref<T>, col4>::value>::type* = nullptr>
+template<class T>
+  requires std::is_same<json::detail::remove_cvref<T>, col4>::value
 inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 {
   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;

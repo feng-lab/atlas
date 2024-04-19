@@ -429,9 +429,8 @@ public:
     this->init(nullptr, nullptr);
   }
 
-  template<typename OtherTBaseIter,
-           typename E = std::enable_if_t<
-             std::is_convertible_v<typename OtherTBaseIter::ValueType*, typename TBaseIter::ValueType*>>>
+  template<typename OtherTBaseIter>
+    requires std::is_convertible_v<typename OtherTBaseIter::ValueType*, typename TBaseIter::ValueType*>
   constexpr Iterator(const Iterator<OtherTBaseIter>& other) noexcept
   {
     this->init(other.node, other.parent);
