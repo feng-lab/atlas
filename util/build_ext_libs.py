@@ -15,7 +15,7 @@ def macos_min_version():
 
 
 def cpp_standard() -> int:
-    return 17
+    return 20
 
 
 def use_clang_in_linux() -> bool:
