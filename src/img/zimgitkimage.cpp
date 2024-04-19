@@ -198,7 +198,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       if (imageIO->GetNumberOfComponents() <= 1) {
         imageIO->SetIORegion(ioRegion);
         if (clipInfo.numTimes > 1) {
-          auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
+          auto buf = std::make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
           imageIO->Read(buf.get());
           fixDimensionOrder(buf.get(), "XYZTC", img);
         } else {
@@ -209,7 +209,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
         scClipInfo.numChannels = imageIO->GetNumberOfComponents();
         scClipInfo.createDefaultDescriptions();
         ZImg tmpScImg(scClipInfo);
-        auto buf = make_unique_for_overwrite<uint8_t[]>(tmpScImg.byteNumber());
+        auto buf = std::make_unique_for_overwrite<uint8_t[]>(tmpScImg.byteNumber());
         // VLOG(2) << tmpScImg.byteNumber();
         for (auto ch = rgn.start.c; ch < rgn.end.c; ++ch) {
           ioRegion.SetIndex(4, ch);
@@ -242,7 +242,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, img.numTimes());
       imageIO->SetIORegion(ioRegion);
       if (imgInfo.numTimes > 1) {
-        auto buf = make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
+        auto buf = std::make_unique_for_overwrite<uint8_t[]>(img.byteNumber());
         imageIO->Read(buf.get());
         fixDimensionOrder(buf.get(), "CXYZT", img);
       } else {
@@ -281,7 +281,7 @@ void ZImgITKImage::readImg(const QString& filename, ZImg& img, const ZImgRegion&
       ioRegion.SetSize(3, rgn.end.t - rgn.start.t);
       imageIO->SetIORegion(ioRegion);
       if (clipInfo.numTimes > 1) {
-        auto buf = make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
+        auto buf = std::make_unique_for_overwrite<uint8_t[]>(tmpImg.byteNumber());
         imageIO->Read(buf.get());
         fixDimensionOrder(buf.get(), "CXYZT", tmpImg);
       } else {

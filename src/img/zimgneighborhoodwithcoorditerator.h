@@ -10,12 +10,13 @@ namespace impl {
 
 template<typename TImg, typename TVoxel>
 class img_neighborhood_with_coord_iter
-  : public boost::stl_interfaces::
-      iterator_interface<img_neighborhood_with_coord_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>
+  : public boost::stl_interfaces::iterator_interface<
+#if !BOOST_STL_INTERFACES_USE_DEDUCED_THIS
+      img_neighborhood_with_coord_iter<TImg, TVoxel>,
+#endif
+      std::random_access_iterator_tag,
+      TVoxel>
 {
-  using base_type = boost::stl_interfaces::
-    iterator_interface<img_neighborhood_with_coord_iter<TImg, TVoxel>, std::random_access_iterator_tag, TVoxel>;
-
   template<typename, typename>
   friend class img_neighborhood_with_coord_iter;
 
@@ -229,7 +230,6 @@ public:
     updateNbInfoOfCurrentVoxel();
     return *this;
   }
-  using base_type::operator++;
 
   __forceinline constexpr img_neighborhood_with_coord_iter& operator--() noexcept
   {
@@ -251,7 +251,6 @@ public:
     updateNbInfoOfCurrentVoxel();
     return *this;
   }
-  using base_type::operator--;
 
   __forceinline TVoxel& operator*() const noexcept
   {

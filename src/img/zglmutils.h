@@ -7,7 +7,7 @@
 #include "zjson.h"
 #include "zlog.h"
 
-#define GLM_FORCE_CXX17
+#define GLM_FORCE_CXX20
 #if defined(__aarch64__) || defined(_M_ARM64)
 #define GLM_FORCE_NEON
 #else

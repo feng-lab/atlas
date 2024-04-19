@@ -1,7 +1,6 @@
 #include "zh5zjpegxr.h"
 
 #include "zimgjpegxr.h"
-#include <folly/Bits.h>
 #include <QTemporaryFile>
 
 #define H5Z_class_t_vers 2
@@ -40,7 +39,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       if (cd_nelmts < 4) {
         throw ZIOException("not enough parameters");
       }
-      paras.jpegXRQuality = folly::bit_cast<float>(cd_values[0]);
+      paras.jpegXRQuality = std::bit_cast<float>(cd_values[0]);
       ZImgInfo info(cd_values[3], cd_values[2], 1, 1, 1, cd_values[1]);
       if (nbytes < info.byteNumber()) {
         throw ZIOException("not enough data to compress");
@@ -54,7 +53,7 @@ static size_t H5Z_filter_jpegxr(unsigned int flags,
       //        LOG(INFO) << QFile(tempFile.fileName()).size();
       //      }
 
-      auto memBuf = make_unique_for_overwrite<std::byte[]>(info.byteNumber());
+      auto memBuf = std::make_unique_for_overwrite<std::byte[]>(info.byteNumber());
       auto byteWritten = ZImgJpegXR::writeImgToMem(img, paras, memBuf.get(), info.byteNumber());
       // LOG(INFO) << byteWritten;
       if (byteWritten > info.byteNumber()) {

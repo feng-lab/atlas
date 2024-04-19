@@ -12,11 +12,19 @@ namespace impl {
 
 template<class TVoxelRegion>
 class voxel_iter
-  : public boost::stl_interfaces::
-      iterator_interface<voxel_iter<TVoxelRegion>, std::forward_iterator_tag, ZVoxelCoordinate>
+  : public boost::stl_interfaces::iterator_interface<
+#if !BOOST_STL_INTERFACES_USE_DEDUCED_THIS
+      voxel_iter<TVoxelRegion>,
+#enidf
+      std::forward_iterator_tag,
+      ZVoxelCoordinate>
 {
-  using base_type =
-    boost::stl_interfaces::iterator_interface<voxel_iter<TVoxelRegion>, std::forward_iterator_tag, ZVoxelCoordinate>;
+  using base_type = boost::stl_interfaces::iterator_interface<
+#if !BOOST_STL_INTERFACES_USE_DEDUCED_THIS
+    voxel_iter<TVoxelRegion>,
+#enidf
+    std::forward_iterator_tag,
+    ZVoxelCoordinate>;
 
 public:
   constexpr voxel_iter() noexcept

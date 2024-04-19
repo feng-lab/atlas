@@ -893,6 +893,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
 
     build_dir = create_build_dir(src_dir)
     orig_file = bak_file = None
+    orig_file1 = bak_file1 = None
     try:
         # if is_linux() and not use_clang_in_linux():
         #     orig_file = os.path.join(src_dir, 'src', 'core', 'ext', 'gcp', 'metadata_query.cc')
@@ -908,6 +909,18 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
                                               ],
                                   to_texts=[r'if(1)',
                                             ])
+        orig_file1 = os.path.join(src_dir, 'src', 'core', 'lib', 'promise', 'detail', 'promise_like.h')
+        bak_file1 = patch_file(orig_file1,
+                               from_texts=[r'typename std::result_of<F()>::type>::value>> {',
+                                           ],
+                               to_texts=[r"""#if (defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable >= 201703L) || \
+    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
+                         std::invoke_result_t<F>
+#else
+                         typename std::result_of<F()>::type
+#endif
+                         >::value>> {""",
+                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DgRPC_INSTALL:BOOL=ON',
@@ -931,6 +944,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         #     os.replace(bak_file, orig_file)
         if is_mac():
             os.replace(bak_file, orig_file)
+        os.replace(bak_file1, orig_file1)
 
 
 def build_bzip2(src_dir: str, install_dir: str):
@@ -988,8 +1002,9 @@ def build_libevent(src_dir: str, install_dir: str):
     try:
         orig_file = os.path.join(src_dir, 'cmake', 'LibeventConfig.cmake.in')
         bak_file = patch_file(orig_file,
-                              from_texts=[r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
-                                          ],
+                              from_texts=[
+                                  r'if (${CMAKE_VERSION} VERSION_LESS "3.15.0" AND ${LIBEVENT_STATIC_LINK} AND ${OPENSSL_FOUND} AND ${Threads_FOUND})',
+                              ],
                               to_texts=[r'if (0)',
                                         ])
 
@@ -1534,10 +1549,10 @@ def build_glm(src_dir: str, install_dir: str):
     #     orig_file = os.path.join(install_dir, 'include', 'glm', 'detail', 'type_vec_simd.inl')
     #     patch_file(orig_file,
     #                from_texts=[r"""template<qualifier Q, int E0, int E1, int E2, int E3>
-	# struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
+    # struct _swizzle_base1<2, float, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, float, Q, E0, E1, E2, E3, false> {};
     #
-	# template<qualifier Q, int E0, int E1, int E2, int E3>
-	# struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
+    # template<qualifier Q, int E0, int E1, int E2, int E3>
+    # struct _swizzle_base1<2, int, Q, E0, E1, E2, E3, true> : public _swizzle_base1<2, int, Q, E0, E1, E2, E3, false> {};""",
     #                            r'return !compute_vec_equal<float, Q, false, 32, true>::call(v1, v2);',
     #                            r'return !compute_vec_equal<uint, Q, false, 32, true>::call(v1, v2);',
     #                            r'return !compute_vec_equal<int, Q, false, 32, true>::call(v1, v2);',
@@ -2387,7 +2402,8 @@ def build_vtk(src_dir: str, install_dir: str):
                                    to_texts=['bool __dummyIsParallelScope<1>()', ])
 
         if is_linux():
-            orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail', 'macro_scope.hpp')
+            orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
+                                      'macro_scope.hpp')
             bak_file7 = patch_file(orig_file7,
                                    from_texts=[r'#define JSON_HAS_CPP_17',
                                                ],

@@ -699,7 +699,7 @@ bool Z3DImg::updateAndUploadPageDirectoryCaches(const std::vector<uint32_t>& mis
 
   size_t readEmptyBlockCount = 0;
   if (!pendingTasks.empty() || emptyBlockCount > 0) { // we have changed the cache system
-    auto uploadGuard = folly::makeGuard([=]() {
+    auto uploadGuard = folly::makeGuard([=, this]() {
       ZBenchTimer btu("upload page table");
       checkPageSystemError(c, false);
       m_channelPageDirectoryTextures[c]->updateImage(m_channelPageDirectories[c].data());
@@ -898,7 +898,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
       pboLocalBuffer.resize(blockSizeInByte * pendingTasks.size());
     }
   }
-  auto pboGuard = folly::makeGuard([=]() {
+  auto pboGuard = folly::makeGuard([=, this]() {
     m_PBO.release(GL_PIXEL_UNPACK_BUFFER);
   });
 
@@ -911,7 +911,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
     for (size_t i = 0; i < pendingTasks.size(); ++i) {
       const auto& pageTableEntryKey = std::get<0>(pendingTasks[i]);
       glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
-      blockFutures.push_back(folly::via(cpuExecutor, [=, &imgQueue, &resInfo]() {
+      blockFutures.push_back(folly::via(cpuExecutor, [=, this, &imgQueue, &resInfo]() {
         return m_imgPack
           .readRegionToImg(m_levelScales[blockImagePos.w].x,
                            m_levelScales[blockImagePos.w].z,
@@ -996,7 +996,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
           const auto& pageTableEntryKey = std::get<0>(pendingTasks[taskIdx]);
           auto pageTableEntryPtr = std::get<1>(pendingTasks[taskIdx]);
           glm::uvec4 blockImagePos = pageTableEntryKey * glm::uvec4(m_imageBlockSize, 1);
-          blockFutures.push_back(folly::via(cpuExecutor, [=, &resInfo, &pboLocalBuffer]() {
+          blockFutures.push_back(folly::via(cpuExecutor, [=, this, &resInfo, &pboLocalBuffer]() {
             return m_imgPack
               .readRegionToImg(m_levelScales[blockImagePos.w].x,
                                m_levelScales[blockImagePos.w].z,
@@ -1009,7 +1009,7 @@ size_t Z3DImg::readAndUploadImageBlocks(size_t c,
                                m_channelDisplayRanges[c].x,
                                m_channelDisplayRanges[c].y,
                                cancellationToken)
-              .thenValueInline([=, &pboLocalBuffer](std::shared_ptr<ZImg>&& img) {
+              .thenValueInline([=, this, &pboLocalBuffer](std::shared_ptr<ZImg>&& img) {
                 maybeCancel(cancellationToken);
                 if (!img) {
                   *pageTableEntryPtr = m_emptyPageTableEntry;

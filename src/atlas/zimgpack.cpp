@@ -552,7 +552,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
   CHECK(xyRatio >= 1 && zRatio >= 1);
   auto cpuExecutor = folly::getGlobalCPUExecutor();
   if (FLAGS_atlas_readRegionToImg_version == 0) {
-    return folly::via(cpuExecutor, [=, &resInfo]() {
+    return folly::via(cpuExecutor, [=, this, &resInfo]() {
       maybeCancel(cancellationToken);
 
       bool needToUpdateBlockInfo = false;
@@ -622,7 +622,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
       std::vector<folly::Future<folly::Unit>> tileFutures;
       for (auto tileIndex : queryResult) {
         const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
-        tileFutures.push_back(folly::via(cpuExecutor).then([=](auto&&) {
+        tileFutures.push_back(folly::via(cpuExecutor).then([=, this](auto&&) {
           maybeCancel(cancellationToken);
           auto imgPtr = ZImgCache::instance().getOrRead(ImageCacheHashKeyType(this, tileIndex), *tile);
           ZVoxelCoordinate start(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
@@ -635,7 +635,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
         }));
       }
 
-      return folly::collect(tileFutures).via(cpuExecutor).thenValue([=, &resInfo](auto&&) {
+      return folly::collect(tileFutures).via(cpuExecutor).thenValue([=, this, &resInfo](auto&&) {
         maybeCancel(cancellationToken);
 
         if (needToUpdateBlockInfo) {
@@ -730,7 +730,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
 
     auto readRatio = readRatioOf(xyRatio, xyRatio, zRatio);
     return folly::via(cpuExecutor,
-                      [=]() {
+                      [=, this]() {
                         maybeCancel(cancellationToken);
 
                         std::vector<folly::Future<std::tuple<ZVoxelCoordinate, std::shared_ptr<ZImg>>>> tileFutures;
@@ -752,7 +752,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                           for (auto tileIndex : queryResult) {
                             maybeCancel(cancellationToken);
                             const ZImgSubBlock* tile = m_allTiles[tileIndex].get();
-                            tileFutures.push_back(folly::via(cpuExecutor, [=]() {
+                            tileFutures.push_back(folly::via(cpuExecutor, [=, this]() {
                               maybeCancel(cancellationToken);
                               return std::make_tuple(
                                 ZVoxelCoordinate(std::round((tile->x * 1.0 / xyRatio - sx) * xyRatio / readRatio[0]),
@@ -767,7 +767,7 @@ folly::Future<std::shared_ptr<ZImg>> ZImgPack::readRegionToImg(index_t xyRatio,
                         return folly::collect(tileFutures);
                       })
       .via(cpuExecutor)
-      .thenValue([=, &resInfo](auto&& tiles) {
+      .thenValue([=, this, &resInfo](auto&& tiles) {
         maybeCancel(cancellationToken);
 
         if (tiles.empty()) {

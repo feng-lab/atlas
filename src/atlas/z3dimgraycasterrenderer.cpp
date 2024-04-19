@@ -505,7 +505,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
     std::vector<uint32_t> missingBlockIDs;
     { // scope for block id shader
       m_image3DSliceWithTransferfunBlockIDsShader.bind();
-      auto guard = folly::makeGuard([=]() {
+      auto guard = folly::makeGuard([=, this]() {
         m_image3DSliceWithTransferfunBlockIDsShader.release();
       });
 

@@ -14,15 +14,6 @@
 
 namespace nim {
 
-// c++20 feature
-template<class T>
-struct remove_cvref
-{
-  typedef std::remove_cv_t<std::remove_reference_t<T>> type;
-};
-template<class T>
-using remove_cvref_t = typename remove_cvref<T>::type;
-
 #ifdef _MSC_VER
 #else
 #define __forceinline inline __attribute__((always_inline))
@@ -197,21 +188,6 @@ __forceinline void removeAt(C& iterable, size_t idx)
   iterable.erase(iterable.begin() + idx);
 }
 
-// some c++20 lib functions
-template<class Container, class T>
-__forceinline Container& erase(Container& on, const T& val)
-{
-  on.erase(std::remove(std::begin(on), std::end(on), val), std::end(on));
-  return on;
-}
-
-template<class Container, class Pred>
-__forceinline Container& erase_if(Container& on, Pred pred)
-{
-  on.erase(std::remove_if(std::begin(on), std::end(on), pred), std::end(on));
-  return on;
-}
-
 template<class Container>
 __forceinline Container& unique(Container& on)
 {
@@ -232,13 +208,6 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
 {
   static_assert(Index < N, "Index out of bounds for tuple_like");
   return std::forward<T>(t)[Index];
-}
-
-template<class Tp>
-__forceinline auto make_unique_for_overwrite(size_t n)
-{
-  typedef typename std::remove_extent<Tp>::type Up;
-  return std::unique_ptr<Tp>(new Up[n]);
 }
 
 // c++23 utility

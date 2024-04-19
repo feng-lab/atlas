@@ -76,7 +76,7 @@ double unitSizeInMeter(VoxelSizeUnit vsu)
 template<typename TEnum>
 std::string_view enumToString(TEnum e)
 {
-  static_assert(std::is_enum_v<remove_cvref_t<TEnum>>, "Need Enum Type");
+  static_assert(std::is_enum_v<std::remove_cvref_t<TEnum>>, "Need Enum Type");
   auto res = magic_enum::enum_name(e);
   if (res.empty()) {
     throw ZIOException(fmt::format("invalid enum value: {}", to_underlying(e)));
@@ -87,7 +87,7 @@ std::string_view enumToString(TEnum e)
 template<typename TEnum>
 TEnum stringToEnum(std::string_view s)
 {
-  static_assert(std::is_enum_v<remove_cvref_t<TEnum>>, "Need Enum Type");
+  static_assert(std::is_enum_v<std::remove_cvref_t<TEnum>>, "Need Enum Type");
   auto e = magic_enum::enum_cast<TEnum>(s);
   if (!e.has_value()) {
     throw ZIOException(fmt::format("invalid enum string: {}", s));

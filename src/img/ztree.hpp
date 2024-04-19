@@ -409,11 +409,19 @@ protected:
 template<typename TBaseIter>
 class Iterator
   : public TBaseIter
-  , public boost::stl_interfaces::
-      iterator_interface<Iterator<TBaseIter>, std::bidirectional_iterator_tag, typename TBaseIter::ValueType>
+  , public boost::stl_interfaces::iterator_interface<
+#if !BOOST_STL_INTERFACES_USE_DEDUCED_THIS
+      Iterator<TBaseIter>,
+#endif
+      std::bidirectional_iterator_tag,
+      typename TBaseIter::ValueType>
 {
-  using BaseType = boost::stl_interfaces::
-    iterator_interface<Iterator<TBaseIter>, std::bidirectional_iterator_tag, typename TBaseIter::ValueType>;
+  using BaseType = boost::stl_interfaces::iterator_interface<
+#if !BOOST_STL_INTERFACES_USE_DEDUCED_THIS
+    Iterator<TBaseIter>,
+#endif
+    std::bidirectional_iterator_tag,
+    typename TBaseIter::ValueType>;
 
 public:
   constexpr Iterator() noexcept

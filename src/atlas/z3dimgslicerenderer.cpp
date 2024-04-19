@@ -186,7 +186,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
     std::vector<uint32_t> missingBlockIDs;
     { // scope for block id shader
       m_image3DSliceWithColorMapBlockIDsShader.bind();
-      auto guard = folly::makeGuard([=]() {
+      auto guard = folly::makeGuard([=, this]() {
         m_image3DSliceWithColorMapBlockIDsShader.release();
       });
 
