@@ -32,7 +32,12 @@ private:
     QString filename;
     QString header;
 
-    auto operator<=>(const ShaderKey& rhs) const = default;
+    bool operator==(const ShaderKey& rhs) const = default;
+
+    bool operator<(const ShaderKey& rhs) const
+    {
+      return std::tie(context, filename, header) < std::tie(rhs.context, rhs.filename, rhs.header);
+    }
   };
 
   std::map<ShaderKey, std::unique_ptr<Z3DShader>> m_shaders;
