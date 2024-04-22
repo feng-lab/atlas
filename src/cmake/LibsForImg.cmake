@@ -57,9 +57,9 @@ else (AARCH64)
     if (WIN32)
       # todo: fix, mkl_tbb_thread links to static version of msvc runtime so we can not use it now
       set(MKL_LIBRARIES ${MKL_LIBRARIES}
-          ${MKL_PATH}/lib/intel64/mkl_intel_lp64.lib
-          ${MKL_PATH}/lib/intel64/mkl_sequential.lib
-          ${MKL_PATH}/lib/intel64/mkl_core.lib)
+          ${MKL_PATH}/lib/mkl_intel_lp64.lib
+          ${MKL_PATH}/lib/mkl_sequential.lib
+          ${MKL_PATH}/lib/mkl_core.lib)
     elseif (APPLE)
       set(MKL_LIBRARIES ${MKL_LIBRARIES}
           ${MKL_PATH}/lib/libmkl_intel_lp64.a

@@ -2347,8 +2347,8 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
     bak_file4 = orig_file4 = None
-    bak_file5 = orig_file5 = None
-    bak_file6 = orig_file6 = None
+    # bak_file5 = orig_file5 = None
+    # bak_file6 = orig_file6 = None
     bak_file7 = orig_file7 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
@@ -2364,8 +2364,8 @@ def build_vtk(src_dir: str, install_dir: str):
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            ],
-                               to_texts=[r'-std=c++17',
-                                         r'set(CMAKE_CXX_STANDARD 17)',
+                               to_texts=[f'-std=c++{cpp_standard()}',
+                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
                                          ])
 
         orig_file3 = os.path.join(src_dir, 'CMake', 'vtkCompilerChecks.cmake')
@@ -2373,8 +2373,8 @@ def build_vtk(src_dir: str, install_dir: str):
                                from_texts=[r'-std=c++11',
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            ],
-                               to_texts=[r'-std=c++17',
-                                         r'set(CMAKE_CXX_STANDARD 17)',
+                               to_texts=[f'-std=c++{cpp_standard()}',
+                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
                                          ])
 
         orig_file4 = os.path.join(src_dir, 'ThirdParty', 'libproj', 'vtklibproj', 'CMakeLists.txt')
@@ -2383,23 +2383,23 @@ def build_vtk(src_dir: str, install_dir: str):
                                            r'set(CMAKE_CXX_STANDARD 11)',
                                            r'-Werror -Wall',
                                            ],
-                               to_texts=[r'-std=c++17',
-                                         r'set(CMAKE_CXX_STANDARD 17)',
+                               to_texts=[f'-std=c++{cpp_standard()}',
+                                         f'set(CMAKE_CXX_STANDARD {cpp_standard()})',
                                          r'-Wall',
                                          ])
 
-        if is_windows():
-            orig_file5 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.txx')
-            bak_file5 = patch_file(orig_file5,
-                                   from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope();', ],
-                                   to_texts=['bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()\n'
-                                             '{ return vtkSMPThreadPool::GetInstance().IsParallelScope(); }\n'
-                                             'template<int> bool __dummyIsParallelScope() { return false; }', ])
-
-            orig_file6 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.cxx')
-            bak_file6 = patch_file(orig_file6,
-                                   from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
-                                   to_texts=['bool __dummyIsParallelScope<1>()', ])
+        # if is_windows():
+        #     orig_file5 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.txx')
+        #     bak_file5 = patch_file(orig_file5,
+        #                            from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope();', ],
+        #                            to_texts=['bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()\n'
+        #                                      '{ return vtkSMPThreadPool::GetInstance().IsParallelScope(); }\n'
+        #                                      'template<int> bool __dummyIsParallelScope() { return false; }', ])
+        #
+        #     orig_file6 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.cxx')
+        #     bak_file6 = patch_file(orig_file6,
+        #                            from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
+        #                            to_texts=['bool __dummyIsParallelScope<1>()', ])
 
         if is_linux():
             orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
@@ -2429,7 +2429,7 @@ def build_vtk(src_dir: str, install_dir: str):
                          '-DVTK_LEGACY_REMOVE:BOOL=ON',
                          '-DVTK_MODULE_ENABLE_VTK_IOADIOS2:STRING=NO',
                          '-DVTK_MODULE_ENABLE_VTK_diy2:STRING=NO',
-                         '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=TBB',
+                         '-DVTK_SMP_IMPLEMENTATION_TYPE:STRING=STDThread',
                          '-DTBB_DIR:PATH=' + tbb_dir(),
                          '-DVTK_WRAP_PYTHON:BOOL=OFF',
                          ])
@@ -2449,9 +2449,9 @@ def build_vtk(src_dir: str, install_dir: str):
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
-        if is_windows():
-            os.replace(bak_file5, orig_file5)
-            os.replace(bak_file6, orig_file6)
+        # if is_windows():
+        #     os.replace(bak_file5, orig_file5)
+        #     os.replace(bak_file6, orig_file6)
         if is_linux():
             os.replace(bak_file7, orig_file7)
 
@@ -2462,7 +2462,16 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
     bak_file = orig_file = None
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
+    bak_file4 = orig_file4 = None
     try:
+        orig_file4 = os.path.join(src_dir, 'modules', 'videoio', 'src', 'cap_msmf.cpp')
+        bak_file4 = patch_file(orig_file4,
+                               from_texts=[r'#include <initguid.h>',
+                                           ],
+                               to_texts=['#include <initguid.h>\n'
+                                         '#include <ks.h>\n',
+                                         ])
+
         if conda_build:
             orig_file = os.path.join(src_dir, 'modules', 'imgcodecs', 'CMakeLists.txt')
             bak_file = patch_file(orig_file,
@@ -2693,6 +2702,7 @@ def build_opencv(src_dir: str, src_contrib_dir: str, install_dir: str, conda_bui
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
+        os.replace(bak_file4, orig_file4)
         if conda_build and is_windows():
             os.replace(bak_file2, orig_file2)
         if conda_build and is_mac():
