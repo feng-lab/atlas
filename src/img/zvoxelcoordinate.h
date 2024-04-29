@@ -58,29 +58,29 @@ struct ZVoxelCoordinate
     }
   }
 
-  inline constexpr ZVoxelCoordinate(value_type xin,
-                                    value_type yin,
-                                    value_type zin = value_type(0),
-                                    value_type cin = value_type(0),
-                                    value_type tin = value_type(0))
-    : x(xin)
-    , y(yin)
-    , z(zin)
-    , c(cin)
-    , t(tin)
+  inline constexpr ZVoxelCoordinate(value_type x_,
+                                    value_type y_,
+                                    value_type z_ = value_type(0),
+                                    value_type c_ = value_type(0),
+                                    value_type t_ = value_type(0))
+    : x(x_)
+    , y(y_)
+    , z(z_)
+    , c(c_)
+    , t(t_)
   {}
 
-  inline void set(value_type xin,
-                  value_type yin,
-                  value_type zin = value_type(0),
-                  value_type cin = value_type(0),
-                  value_type tin = value_type(0))
+  inline void set(value_type x_,
+                  value_type y_,
+                  value_type z_ = value_type(0),
+                  value_type c_ = value_type(0),
+                  value_type t_ = value_type(0))
   {
-    x = xin;
-    y = yin;
-    z = zin;
-    c = cin;
-    t = tin;
+    x = x_;
+    y = y_;
+    z = z_;
+    c = c_;
+    t = t_;
   }
 
   [[nodiscard]] static inline constexpr size_t size()

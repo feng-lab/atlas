@@ -191,16 +191,16 @@ namespace nim {
 template<typename T, glm::qualifier Q>
 class Vec2Compare
 {
-  bool less;
+  bool m_less;
 
 public:
-  explicit Vec2Compare(bool less_ = true)
-    : less(less_)
+  explicit Vec2Compare(bool less = true)
+    : m_less(less)
   {}
 
   bool operator()(const glm::vec<2, T, Q>& lhs, const glm::vec<2, T, Q>& rhs) const
   {
-    if (less) {
+    if (m_less) {
       return std::tie(lhs.y, lhs.x) < std::tie(rhs.y, rhs.x);
     } else {
       return std::tie(lhs.y, lhs.x) > std::tie(rhs.y, rhs.x);
@@ -211,16 +211,16 @@ public:
 template<typename T, glm::qualifier Q>
 class Vec3Compare
 {
-  bool less;
+  bool m_less;
 
 public:
-  explicit Vec3Compare(bool less_ = true)
-    : less(less_)
+  explicit Vec3Compare(bool less = true)
+    : m_less(less)
   {}
 
   bool operator()(const glm::vec<3, T, Q>& lhs, const glm::vec<3, T, Q>& rhs) const
   {
-    if (less) {
+    if (m_less) {
       return std::tie(lhs.z, lhs.y, lhs.x) < std::tie(rhs.z, rhs.y, rhs.x);
     } else {
       return std::tie(lhs.z, lhs.y, lhs.x) > std::tie(rhs.z, rhs.y, rhs.x);
@@ -231,16 +231,16 @@ public:
 template<typename T, glm::qualifier Q>
 class Vec4Compare
 {
-  bool less;
+  bool m_less;
 
 public:
-  explicit Vec4Compare(bool less_ = true)
-    : less(less_)
+  explicit Vec4Compare(bool less = true)
+    : m_less(less)
   {}
 
   bool operator()(const glm::vec<4, T, Q>& lhs, const glm::vec<4, T, Q>& rhs) const
   {
-    if (less) {
+    if (m_less) {
       return std::tie(lhs.w, lhs.z, lhs.y, lhs.x) < std::tie(rhs.w, rhs.z, rhs.y, rhs.x);
     } else {
       return std::tie(lhs.w, lhs.z, lhs.y, lhs.x) > std::tie(rhs.w, rhs.z, rhs.y, rhs.x);
