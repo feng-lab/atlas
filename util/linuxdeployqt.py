@@ -213,8 +213,6 @@ def create_desktop_file(path):
 
 def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, qt_lib_dir,
                  is_debug_version: bool = False):
-    from distutils.dir_util import copy_tree
-
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
 
@@ -269,7 +267,7 @@ def build_appdir(dest_dir, executable, dependencies, qt_plugin_dir, qt_qml_dir, 
             src_dir = os.path.dirname(src)
 
             debug("Copying qml plugin dir " + dep + ": " + src_dir + ' -> ' + dst_dir)
-            copy_tree(src_dir, dst_dir, update=1)
+            shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
             strip(dst)
         else:
             src = details['realpath']

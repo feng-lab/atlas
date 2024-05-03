@@ -178,30 +178,9 @@ inline json::value& JsonValuePath(json::value& jv, json::string_view key)
 }
 
 template<class Arg0, class Arg1, class... Args>
-inline json::value& JsonValuePath(json::value& jv, Arg0 const& arg0, Arg1 const& arg1, Args const&... args)
+inline json::value& JsonValuePath(json::value& jv, const Arg0& arg0, const Arg1& arg1, const Args&... args)
 {
   return JsonValuePath(JsonValuePath(jv, arg0), arg1, args...);
 }
 
 } // namespace nim
-
-namespace glm {
-
-//// tuple-like types
-// template<class T,
-//   typename std::enable_if<(std::tuple_size<json::detail::remove_cvref<T>>::value > 0)>::type* = nullptr>
-// inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
-//{
-//   constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
-//   const auto& ja = jv.as_array();
-//   if (ja.size() < n) {
-//     throw nim::ZIOException("json array too short");
-//   }
-//   T res;
-//   for (size_t i = 0; i < n; ++i) {
-//     res[i] = json::value_to<typename T::value_type>(ja[i]);
-//   }
-//   return res;
-// }
-
-} // namespace glm

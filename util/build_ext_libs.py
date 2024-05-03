@@ -1,6 +1,5 @@
 import argparse
 import difflib
-import distutils.dir_util
 import json
 import mmap
 import os.path
@@ -1194,8 +1193,8 @@ def build_libsodium(src_dir: str, install_dir: str):
             glob_copy(os.path.join(src_dir, 'src', 'libsodium', 'include', '*.h'),
                       os.path.join(install_dir, 'include'))
             shutil.rmtree(os.path.join(install_dir, 'include', 'sodium'), ignore_errors=True)
-            distutils.dir_util.copy_tree(os.path.join(src_dir, 'src', 'libsodium', 'include', 'sodium'),
-                                         os.path.join(install_dir, 'include', 'sodium'))
+            shutil.copytree(os.path.join(src_dir, 'src', 'libsodium', 'include', 'sodium'),
+                            os.path.join(install_dir, 'include', 'sodium'), dirs_exist_ok=True)
 
             glob_copy(os.path.join(src_dir, 'bin', 'x64', 'Release', 'v143', 'static', '*.lib'),
                       os.path.join(install_dir, 'lib'))
@@ -2168,10 +2167,10 @@ def build_freeimage(src_dir: str, install_dir: str):
                             '/property:WindowsTargetPlatformVersion=' + env['UCRTVERSION']  # like 10.0.16299.0
                             ],
                            cwd=src_dir, shell=True, check=True, env=env)
-            distutils.dir_util.copy_tree(os.path.join(src_dir, 'Dist', 'x64'),
-                                         os.path.join(install_dir, 'freeimage'))
-            distutils.dir_util.copy_tree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
-                                         os.path.join(install_dir, 'freeimage'))
+            shutil.copytree(os.path.join(src_dir, 'Dist', 'x64'),
+                            os.path.join(install_dir, 'freeimage'), dirs_exist_ok=True)
+            shutil.copytree(os.path.join(src_dir, 'Wrapper', 'FreeImagePlus', 'dist', 'x64'),
+                            os.path.join(install_dir, 'freeimage'), dirs_exist_ok=True)
         elif is_linux():
             if use_clang_in_linux():
                 env = get_env_for_config_make()
@@ -3491,7 +3490,8 @@ def build_libs(libs: OrderedDict, use_asan: bool):
 
         if lib_name == 'java':
             shutil.rmtree(os.path.join(ext_build_dir(), 'jars'), ignore_errors=True)
-            distutils.dir_util.copy_tree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'))
+            shutil.copytree(os.path.join(src_package_dir(), 'jars'), os.path.join(ext_build_dir(), 'jars'),
+                            dirs_exist_ok=True)
 
             if is_mac():
                 package_name = find_src_package_with_glob(os.path.join(src_package_dir(), '*-jre_x64*mac*'))
