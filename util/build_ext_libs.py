@@ -1098,8 +1098,6 @@ def build_xz(src_dir: str, install_dir: str):
     arm64_install_dir = None
 
     bak_file = orig_file = None
-    bak_file1 = orig_file1 = None
-    bak_file2 = orig_file2 = None
     try:
         orig_file = os.path.join(src_dir, 'src', 'liblzma', 'api', 'lzma.h')
         bak_file = patch_file(orig_file,
@@ -1111,25 +1109,11 @@ def build_xz(src_dir: str, install_dir: str):
                                         '#ifndef LZMA_API_IMPORT\n',
                                         ])
 
-        orig_file1 = os.path.join(src_dir, 'CMakeLists.txt')
-        bak_file1 = patch_file(orig_file1,
-                               from_texts=[r'target_compile_definitions(liblzma PRIVATE HAVE_SYMBOL_VERSIONS_LINUX)',
-                                           ],
-                               to_texts=[r'#target_compile_definitions(liblzma PRIVATE HAVE_SYMBOL_VERSIONS_LINUX)',
-                                         ])
-
-        if is_windows():
-            orig_file2 = os.path.join(src_dir, 'src', 'liblzma', 'common', 'stream_encoder_mt.c')
-            bak_file2 = patch_file(orig_file2,
-                                   from_texts=[r'mythread_condtime wait_abs = {};',
-                                               ],
-                                   to_texts=[r'mythread_condtime wait_abs;',
-                                             ])
-
         cmakecmd = get_cmake_cmd_common_part(install_dir)
         cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                          '-DCREATE_XZ_SYMLINKS:BOOL=OFF',
                          '-DCREATE_LZMA_SYMLINKS:BOOL=OFF',
+                         '-DENABLE_SMALL:BOOL=OFF',
                          src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir)
 
@@ -1142,6 +1126,7 @@ def build_xz(src_dir: str, install_dir: str):
                 cmakecmd.extend(['-DBUILD_SHARED_LIBS:BOOL=OFF',
                                  '-DCREATE_XZ_SYMLINKS:BOOL=OFF',
                                  '-DCREATE_LZMA_SYMLINKS:BOOL=OFF',
+                                 '-DENABLE_SMALL:BOOL=OFF',
                                  src_dir])
                 build_and_install_cmakecmd(cmakecmd, build_dir)
                 create_universal_binaries(arm64_install_dir, install_dir)
@@ -1150,9 +1135,6 @@ def build_xz(src_dir: str, install_dir: str):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
-        os.replace(bak_file1, orig_file1)
-        if is_windows():
-            os.replace(bak_file2, orig_file2)
 
 
 def build_zstd(src_dir: str, install_dir: str):

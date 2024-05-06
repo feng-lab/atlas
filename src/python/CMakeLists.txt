@@ -104,7 +104,7 @@ if (APPLE)
                      $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
                      COMMAND install_name_tool -id ${freeimagelibname}
                      $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                     )
+  )
 endif ()
 if (UNIX AND NOT APPLE)
   set(freeimagelibname libfreeimageplus.so.3)
@@ -112,7 +112,7 @@ if (UNIX AND NOT APPLE)
                      POST_BUILD
                      COMMAND ${CMAKE_COMMAND} -E copy ${FREEIMAGE_LIBRARIES}
                      $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname}
-                     )
+  )
 endif ()
 
 # target_include_directories(${module_name} SYSTEM BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/include)
@@ -123,7 +123,7 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/" # source directory
         FILES_MATCHING PATTERN "*.py"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE
-        )
+)
 install(TARGETS ${module_name} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
 if (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls.exe DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
@@ -132,16 +132,16 @@ else (WIN32)
   #  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/bin/h5ls DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg)
   install(FILES $<TARGET_FILE_DIR:${module_name}>/${freeimagelibname} DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib)
   # this fix will not work if other python module loads the lower version of libstdc++.so first, so load zimg first
-  #  if (UNIX AND NOT APPLE)
-  #    file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)
-  #    install(FILES ${gcc_stuff}
-  #            DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
-  #            )
-  #  endif ()
+  if (UNIX AND NOT APPLE)
+    file(GLOB gcc_stuff /lib/x86_64-linux-gnu/libstdc++.so* /lib/x86_64-linux-gnu/libgcc_s.so*)
+    install(FILES ${gcc_stuff}
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg/lib # target directory
+    )
+  endif ()
 endif (WIN32)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../3rdparty/build/jars" # source directory
         DESTINATION ${CMAKE_INSTALL_PREFIX}/zimg # target directory
         FILES_MATCHING PATTERN "*.jar"
         PATTERN "*idea*" EXCLUDE
         PATTERN "*cmake*" EXCLUDE
-        )
+)

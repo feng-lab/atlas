@@ -88,7 +88,7 @@
 	branch = main
 [submodule "src/3rdparty/xz"]
 	path = src/3rdparty/xz
-	url = https://github.com/xz-mirror/xz.git
+	url = https://github.com/tukaani-project/xz.git
 	branch = master
 [submodule "src/3rdparty/zstd"]
 	path = src/3rdparty/zstd
