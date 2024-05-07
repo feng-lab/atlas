@@ -22,7 +22,6 @@ struct SwcNode
     , z(z_)
     , radius(radius_)
     , parentID(parentID_)
-    , label(-1)
   {}
 
   int64_t id = -1;

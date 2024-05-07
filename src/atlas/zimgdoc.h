@@ -13,12 +13,12 @@ class ZImgDoc : public ZObjDoc
 public:
   explicit ZImgDoc(ZDoc& doc);
 
-  inline ZImgPack& imgPack(size_t id)
+  ZImgPack& imgPack(size_t id)
   {
     return *m_idToImgPacks.at(id);
   }
 
-  [[nodiscard]] inline const ZImgPack& imgPack(size_t id) const
+  [[nodiscard]] const ZImgPack& imgPack(size_t id) const
   {
     return *m_idToImgPacks.at(id);
   }

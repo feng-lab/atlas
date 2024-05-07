@@ -28,7 +28,7 @@ class ZParameter : public QObject
 public:
   explicit ZParameter(QString name, QObject* parent = nullptr);
 
-  [[nodiscard]] inline QString name() const
+  [[nodiscard]] QString name() const
   {
     return m_name;
   }
@@ -37,7 +37,7 @@ public:
 
   [[nodiscard]] QString type() const;
 
-  [[nodiscard]] inline QString style() const
+  [[nodiscard]] QString style() const
   {
     return m_style;
   }
@@ -82,7 +82,7 @@ public:
     setValueSameAs(rhs);
   }
 
-  [[nodiscard]] inline bool isSameType(const ZParameter& rhs) const
+  [[nodiscard]] bool isSameType(const ZParameter& rhs) const
   {
     return metaObject()->className() == rhs.metaObject()->className();
   }
@@ -138,7 +138,7 @@ protected:
 
   virtual void reservedSlot2() {}
 
-  inline void addStyle(const QString& style)
+  void addStyle(const QString& style)
   {
     m_allStyles.push_back(style);
   }
@@ -167,12 +167,12 @@ public:
 
   void set(const T& valueIn);
 
-  [[nodiscard]] inline const T& get() const
+  [[nodiscard]] const T& get() const
   {
     return m_value;
   }
 
-  [[nodiscard]] inline T& get()
+  [[nodiscard]] T& get()
   {
     return m_value;
   }

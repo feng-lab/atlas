@@ -102,7 +102,7 @@ public:
   explicit ZSwcSkeletonGraphicsItem(ZSwcPack& swcPack, QGraphicsItem* parent = nullptr);
 
   // item is not selectable (otherwise it will be hard to select swc nodes), we just fake some visual clue here
-  inline void setSelected_(bool v)
+  void setSelected_(bool v)
   {
     m_selected = v;
     update();
@@ -193,13 +193,13 @@ public:
 
   void updateRectSize();
 
-  inline void setTransform_(const QTransform& tfm)
+  void setTransform_(const QTransform& tfm)
   {
     m_transform = tfm;
     updateValue();
   }
 
-  inline void setSizeScale(double sizeScale)
+  void setSizeScale(double sizeScale)
   {
     if (m_sizeScale != sizeScale) {
       m_sizeScale = sizeScale;

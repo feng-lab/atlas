@@ -28,17 +28,17 @@ public:
 
   explicit ZWidgetsGroup(ZParameter& parameter, int visibleLevel);
 
-  inline bool isGroup() const
+  bool isGroup() const
   {
     return m_type == Type::Group;
   }
 
-  inline QString getGroupName() const
+  QString getGroupName() const
   {
     return m_groupName;
   }
 
-  inline void setGroupName(const QString& name)
+  void setGroupName(const QString& name)
   {
     m_groupName = name;
   }
@@ -61,22 +61,22 @@ public:
 
   void protectWidgetChildren();
 
-  inline int visibleLevel() const
+  int visibleLevel() const
   {
     return m_visibleLevel;
   }
 
-  inline void setVisibleLevel(int v)
+  void setVisibleLevel(int v)
   {
     m_visibleLevel = v;
   }
 
-  inline void setBasicAdvancedCutoff(int v)
+  void setBasicAdvancedCutoff(int v)
   {
     m_cutOffbetweenBasicAndAdvancedLevel = v;
   }
 
-  inline int basicAdvancedCutoff() const
+  int basicAdvancedCutoff() const
   {
     return m_cutOffbetweenBasicAndAdvancedLevel;
   }
@@ -86,7 +86,7 @@ public:
     m_isVisible = visible;
   }
 
-  inline bool isVisible()
+  bool isVisible()
   {
     return m_isVisible;
   }

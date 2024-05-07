@@ -28,17 +28,17 @@ public:
 
   const QString& info() const;
 
-  inline const QString& name() const
+  const QString& name() const
   {
     return m_name;
   }
 
-  inline const QString& tooltip() const
+  const QString& tooltip() const
   {
     return m_tooltip;
   }
 
-  inline const QString& path() const
+  const QString& path() const
   {
     return m_path;
   }
@@ -64,12 +64,12 @@ public:
 
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZROI& roi() const
+  const ZROI& roi() const
   {
     return *m_roi;
   }
 
-  inline ZROI& roi()
+  ZROI& roi()
   {
     return *m_roi;
   }

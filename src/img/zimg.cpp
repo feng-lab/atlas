@@ -264,7 +264,6 @@ ZImg::ZImg(const ZImg& other)
   , m_thumbnail(other.m_thumbnail)
   , m_info(other.m_info)
   , m_metadata(other.m_metadata)
-  , m_ownData(true)
 {
   if (m_ownData) { // deep copy
     allocate(false);

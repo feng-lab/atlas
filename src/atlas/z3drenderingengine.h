@@ -54,17 +54,17 @@ public:
     return m_globalParas->camera;
   }
 
-  inline Z3DCompositor& compositor()
+  Z3DCompositor& compositor()
   {
     return *m_compositor;
   }
 
-  inline Z3DNetworkEvaluator& networkEvaluator()
+  Z3DNetworkEvaluator& networkEvaluator()
   {
     return *m_networkEvaluator;
   }
 
-  inline Z3DGlobalParameters& globalParas()
+  Z3DGlobalParameters& globalParas()
   {
     return *m_globalParas;
   }

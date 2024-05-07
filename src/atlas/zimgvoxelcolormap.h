@@ -13,18 +13,18 @@ public:
     : m_min(0)
   {}
 
-  inline void setRange(TVoxel minData, TVoxel maxData)
+  void setRange(TVoxel minData, TVoxel maxData)
   {
     m_min = minData;
     m_colormap.resize(maxData - minData + 1);
   }
 
-  inline col4& color(TVoxel data)
+  col4& color(TVoxel data)
   {
     return m_colormap[data - m_min];
   }
 
-  inline const col4& color(TVoxel data) const
+  const col4& color(TVoxel data) const
   {
     return m_colormap[data - m_min];
   }
@@ -59,37 +59,37 @@ class ZQImagePack
   std::vector<double> m_scales;
 
 public:
-  inline size_t numImages() const
+  size_t numImages() const
   {
     return m_qimages.size();
   }
 
-  inline QImage& image(size_t n)
+  QImage& image(size_t n)
   {
     return m_qimages[n];
   }
 
-  inline QPoint& location(size_t n)
+  QPoint& location(size_t n)
   {
     return m_locations[n];
   }
 
-  inline const QImage& image(size_t n) const
+  const QImage& image(size_t n) const
   {
     return m_qimages[n];
   }
 
-  inline const QPoint& location(size_t n) const
+  const QPoint& location(size_t n) const
   {
     return m_locations[n];
   }
 
-  inline double scale(size_t n) const
+  double scale(size_t n) const
   {
     return m_scales[n];
   }
 
-  inline void addImage(const QImage& image, const QPoint& loc, double scale = 1.0)
+  void addImage(const QImage& image, const QPoint& loc, double scale = 1.0)
   {
     m_qimages.push_back(image);
     m_locations.push_back(loc);

@@ -28,17 +28,17 @@ public:
 
   const QString& info() const;
 
-  inline const QString& name() const
+  const QString& name() const
   {
     return m_name;
   }
 
-  inline const QString& tooltip() const
+  const QString& tooltip() const
   {
     return m_tooltip;
   }
 
-  inline const QString& path() const
+  const QString& path() const
   {
     return m_path;
   }
@@ -54,44 +54,44 @@ public:
 
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZSwc& swc() const
+  const ZSwc& swc() const
   {
     return m_swc;
   }
 
   ZBBox<glm::ivec4> boundBox() const;
 
-  inline const std::vector<ZSwc::SwcTreeNode>& rootNodes() const
+  const std::vector<ZSwc::SwcTreeNode>& rootNodes() const
   {
     return m_rootNodes;
   }
 
-  inline const std::map<ZSwc::SwcTreeNode, std::vector<ZSwc::SwcTreeNode>>& rootToChildrenNodes() const
+  const std::map<ZSwc::SwcTreeNode, std::vector<ZSwc::SwcTreeNode>>& rootToChildrenNodes() const
   {
     return m_rootToChildrenNodes;
   }
 
-  inline const std::set<ZSwc::SwcTreeNode>& selectedNodes() const
+  const std::set<ZSwc::SwcTreeNode>& selectedNodes() const
   {
     return m_selectedNodes;
   }
 
-  inline const std::vector<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>>& decompsedNodePairs() const
+  const std::vector<std::pair<ZSwc::SwcTreeNode, ZSwc::SwcTreeNode>>& decompsedNodePairs() const
   {
     return m_decompsedNodePairs;
   }
 
-  inline const std::vector<ZSwc::SwcTreeNode>& decomposedNodes() const
+  const std::vector<ZSwc::SwcTreeNode>& decomposedNodes() const
   {
     return m_decomposedNodes;
   }
 
-  inline const std::set<const ZSwc::SwcTreeNode*>& allNodesSet() const
+  const std::set<const ZSwc::SwcTreeNode*>& allNodesSet() const
   {
     return m_allNodesSet;
   }
 
-  inline const std::set<int>& allNodeType() const
+  const std::set<int>& allNodeType() const
   {
     return m_allNodeType;
   }

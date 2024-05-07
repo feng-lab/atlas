@@ -755,22 +755,22 @@ double vtkCCSPolygonBounds(const std::vector<int64_t>& poly, const std::vector<g
     p = vertices[poly[j]];
     if (p[0] < bounds[0]) {
       bounds[0] = p[0];
-    };
+    }
     if (p[0] > bounds[1]) {
       bounds[1] = p[0];
-    };
+    }
     if (p[1] < bounds[2]) {
       bounds[2] = p[1];
-    };
+    }
     if (p[1] > bounds[3]) {
       bounds[3] = p[1];
-    };
+    }
     if (p[2] < bounds[4]) {
       bounds[4] = p[2];
-    };
+    }
     if (p[2] > bounds[5]) {
       bounds[5] = p[2];
-    };
+    }
   }
 
   double bx = (bounds[1] - bounds[0]);

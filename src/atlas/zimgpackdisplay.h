@@ -47,39 +47,39 @@ public:
     return m_mip;
   }
 
-  inline void setSlice(size_t z)
+  void setSlice(size_t z)
   {
     m_z = std::min(z, m_imgPack.imgInfo().depth - 1);
   }
 
-  inline void setTime(size_t t)
+  void setTime(size_t t)
   {
     m_t = std::min(t, m_imgPack.imgInfo().numTimes - 1);
   }
 
-  inline void setScale(double s)
+  void setScale(double s)
   {
     m_scale = s;
   }
 
-  inline void setViewport(const QRectF& rect)
+  void setViewport(const QRectF& rect)
   {
     m_viewport = rect;
   }
 
-  inline void setAlpha(double a)
+  void setAlpha(double a)
   {
     m_alpha = std::min(1.0, std::max(0.0, a));
   }
 
-  inline void setMIP(bool v)
+  void setMIP(bool v)
   {
     if (m_imgPack.imgInfo().depth > 1) {
       m_mip = v;
     }
   }
 
-  inline void setMIPZRange(size_t s, size_t e)
+  void setMIPZRange(size_t s, size_t e)
   {
     if (m_imgPack.imgInfo().depth > 1) {
       CHECK(s <= e && e < m_imgPack.imgInfo().depth);
@@ -109,7 +109,7 @@ public:
   ZQImagePack toQImagePack(size_t tileWidth = 4096, size_t tileHeight = 4096) const;
 
 private:
-  inline ZImgInfo imgInfo() const
+  ZImgInfo imgInfo() const
   {
     return m_imgPack.imgInfo();
   }

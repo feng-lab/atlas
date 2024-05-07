@@ -16,61 +16,61 @@ public:
 
   Z3DCameraParameter(const QString& name, const Z3DCamera& value, QObject* parent = nullptr);
 
-  inline void setEye(const glm::vec3& pos)
+  void setEye(const glm::vec3& pos)
   {
     m_value.setEye(pos);
     updatePara();
   }
 
-  inline void setCenter(const glm::vec3& focus)
+  void setCenter(const glm::vec3& focus)
   {
     m_value.setCenter(focus);
     updatePara();
   }
 
-  inline void setUpVector(const glm::vec3& up)
+  void setUpVector(const glm::vec3& up)
   {
     m_value.setUpVector(up);
     updatePara();
   }
 
-  inline void setEyeSeparationAngle(float angle)
+  void setEyeSeparationAngle(float angle)
   {
     m_value.setEyeSeparationAngle(angle);
     updatePara();
   }
 
-  inline void setFrustum(float fov, float ratio, float ndist, float fdist)
+  void setFrustum(float fov, float ratio, float ndist, float fdist)
   {
     m_value.setFrustum(fov, ratio, ndist, fdist);
     updatePara();
   }
 
-  inline void setNearDist(float nd)
+  void setNearDist(float nd)
   {
     m_value.setNearDist(nd);
     updatePara();
   }
 
-  inline void setFarDist(float fd)
+  void setFarDist(float fd)
   {
     m_value.setFarDist(fd);
     updatePara();
   }
 
-  inline void setCamera(const glm::vec3& pos, const glm::vec3& focus, const glm::vec3& up)
+  void setCamera(const glm::vec3& pos, const glm::vec3& focus, const glm::vec3& up)
   {
     m_value.setCamera(pos, focus, up);
     updatePara();
   }
 
-  inline void setCamera(const glm::vec3& pos, const glm::vec3& focus)
+  void setCamera(const glm::vec3& pos, const glm::vec3& focus)
   {
     m_value.setCamera(pos, focus, m_value.upVector());
     updatePara();
   }
 
-  inline void setProjectionType(Z3DCamera::ProjectionType pt)
+  void setProjectionType(Z3DCamera::ProjectionType pt)
   {
     m_projectionType.select(pt == Z3DCamera::ProjectionType::Perspective ? "Perspective" : "Orthographic");
   }
@@ -88,104 +88,103 @@ public:
   void rotate90X();
   void rotate90XZ();
 
-  inline void resetCamera(const ZBBox<glm::dvec3>& bound,
-                          Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
+  void resetCamera(const ZBBox<glm::dvec3>& bound, Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(bound, options);
     updatePara();
   }
 
-  inline void resetCamera(double xmin,
-                          double xmax,
-                          double ymin,
-                          double ymax,
-                          double zmin,
-                          double zmax,
-                          Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
+  void resetCamera(double xmin,
+                   double xmax,
+                   double ymin,
+                   double ymax,
+                   double zmin,
+                   double zmax,
+                   Z3DCamera::ResetOption options = Z3DCamera::ResetOption::ResetAll)
   {
     m_value.resetCamera(xmin, xmax, ymin, ymax, zmin, zmax, options);
     updatePara();
   }
 
-  inline void resetCameraNearFarPlane(const ZBBox<glm::dvec3>& bound)
+  void resetCameraNearFarPlane(const ZBBox<glm::dvec3>& bound)
   {
     m_value.resetCameraNearFarPlane(bound);
     updatePara();
   }
 
-  inline void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax)
+  void resetCameraNearFarPlane(double xmin, double xmax, double ymin, double ymax, double zmin, double zmax)
   {
     m_value.resetCameraNearFarPlane(xmin, xmax, ymin, ymax, zmin, zmax);
     updatePara();
   }
 
-  inline void dolly(float value)
+  void dolly(float value)
   {
     m_value.dolly(value);
     updatePara();
   }
 
-  inline void dollyToCenterDistance(float cd)
+  void dollyToCenterDistance(float cd)
   {
     m_value.dollyToCenterDistance(cd);
     updatePara();
   }
 
-  inline void roll(float angle)
+  void roll(float angle)
   {
     m_value.roll(angle);
     updatePara();
   }
 
-  inline void azimuth(float angle)
+  void azimuth(float angle)
   {
     m_value.azimuth(angle);
     updatePara();
   }
 
-  inline void yaw(float angle)
+  void yaw(float angle)
   {
     m_value.yaw(angle);
     updatePara();
   }
 
-  inline void elevation(float angle)
+  void elevation(float angle)
   {
     m_value.elevation(angle);
     updatePara();
   }
 
-  inline void pitch(float angle)
+  void pitch(float angle)
   {
     m_value.pitch(angle);
     updatePara();
   }
 
-  inline void zoom(float factor)
+  void zoom(float factor)
   {
     m_value.zoom(factor);
     updatePara();
   }
 
-  inline void rotate(float angle, const glm::vec3& axis, const glm::vec3& point)
+  void rotate(float angle, const glm::vec3& axis, const glm::vec3& point)
   {
     m_value.rotate(angle, axis, point);
     updatePara();
   }
 
-  inline void rotate(const glm::quat& quat, const glm::vec3& point)
+  void rotate(const glm::quat& quat, const glm::vec3& point)
   {
     m_value.rotate(quat, point);
     updatePara();
   }
 
-  inline void rotate(float angle, const glm::vec3& axis)
+  void rotate(float angle, const glm::vec3& axis)
   {
     m_value.rotate(angle, axis);
     updatePara();
   }
 
-  inline void rotate(const glm::quat& quat)
+  void rotate(const glm::quat& quat)
   {
     m_value.rotate(quat);
     updatePara();
@@ -232,7 +231,7 @@ protected:
 
   void updateWidget(Z3DCamera& value);
 
-  inline void updatePara()
+  void updatePara()
   {
     updateWidget(m_value);
     Q_EMIT valueChanged();

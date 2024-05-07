@@ -829,7 +829,6 @@ void ZStitchImage::write(json::object& jo) const
   }
   if (!m_channelsToRemoveBackground.empty()) {
     jo["channels_to_remove_background"] = json::value_from(m_channelsToRemoveBackground);
-    ;
   }
   if (m_downsampleBlockDepth > 1 || m_downsampleBlockWidth > 1 || m_downsampleBlockHeight > 1) {
     jo["downsample_block_width"] = m_downsampleBlockWidth;

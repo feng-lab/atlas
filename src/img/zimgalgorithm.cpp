@@ -24,8 +24,8 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 
 void ZImgAlgorithmBaseWithProgressReporter::subOperationProgressChanged(double p, void* sender)
 {
-  auto it = m_subOperationsWeightProgress.find(sender);
-  if (it != m_subOperationsWeightProgress.end() &&
+  if (auto it = m_subOperationsWeightProgress.find(sender);
+      it != m_subOperationsWeightProgress.end() &&
       ((p - it->second.progress) * it->second.weight >= m_reportInterval || p == 1.0)) {
     it->second.progress = p;
     sendProgressSignal();

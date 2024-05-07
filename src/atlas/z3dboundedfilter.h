@@ -50,27 +50,27 @@ public:
     m_rendererBase.setViewport(viewport);
   }
 
-  inline Z3DCamera& camera()
+  Z3DCamera& camera()
   {
     return m_rendererBase.camera();
   }
 
-  inline Z3DCamera& globalCamera()
+  Z3DCamera& globalCamera()
   {
     return m_rendererBase.globalCamera();
   }
 
-  inline Z3DCameraParameter& globalCameraPara()
+  Z3DCameraParameter& globalCameraPara()
   {
     return m_rendererBase.globalCameraPara();
   }
 
-  inline Z3DPickingManager& pickingManager()
+  Z3DPickingManager& pickingManager()
   {
     return m_rendererBase.globalParas().pickingManager;
   }
 
-  inline Z3DTrackballInteractionHandler& interactionHandler()
+  Z3DTrackballInteractionHandler& interactionHandler()
   {
     return m_rendererBase.globalParas().interactionHandler;
   }
@@ -90,7 +90,7 @@ public:
     m_rendererBase.setShaderHookParaDDPFrontBlenderTexture(t);
   }
 
-  inline Z3DRendererBase::ShaderHookParameter& shaderHookPara()
+  Z3DRendererBase::ShaderHookParameter& shaderHookPara()
   {
     return m_rendererBase.shaderHookPara();
   }
@@ -105,12 +105,12 @@ public:
     return m_notTransformedBoundBox;
   }
 
-  [[nodiscard]] inline glm::mat4 coordTransform() const
+  [[nodiscard]] glm::mat4 coordTransform() const
   {
     return m_rendererBase.coordTransform();
   }
 
-  [[nodiscard]] inline glm::mat4 inverseCoordTransform() const
+  [[nodiscard]] glm::mat4 inverseCoordTransform() const
   {
     return m_rendererBase.inverseCoordTransform();
   }

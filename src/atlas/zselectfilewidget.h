@@ -59,12 +59,12 @@ public:
 
   void setFiles(const QStringList& fl);
 
-  inline void setSelectedFilter(const QString& f)
+  void setSelectedFilter(const QString& f)
   {
     m_selectedFilter = f;
   }
 
-  inline QString selectedFilter() const
+  QString selectedFilter() const
   {
     return m_selectedFilter;
   }

@@ -31,17 +31,17 @@ public:
     }
   }
 
-  inline void setSingleStep(T v)
+  void setSingleStep(T v)
   {
     m_step = v;
   }
 
-  inline void setTracking(bool t)
+  void setTracking(bool t)
   {
     m_tracking = t;
   }
 
-  inline void setDecimal(int d)
+  void setDecimal(int d)
   {
     m_decimal = d;
   }
@@ -254,23 +254,23 @@ public:
     }
   }
 
-  inline void setSingleStep(typename T::value_type v)
+  void setSingleStep(typename T::value_type v)
   {
     m_step = v;
   }
 
-  inline void setTracking(bool t)
+  void setTracking(bool t)
   {
     m_tracking = t;
   }
 
-  inline void setDecimal(int d)
+  void setDecimal(int d)
   {
     m_decimal = d;
   }
 
   // default is vertical
-  inline void setWidgetOrientation(Qt::Orientation o)
+  void setWidgetOrientation(Qt::Orientation o)
   {
     m_widgetOrientation = o;
   }
@@ -283,7 +283,7 @@ public:
 
   // for some widget style all subwidgets be bound by a groupbox
   // default is empty
-  inline void setGroupBoxName(const QString& name)
+  void setGroupBoxName(const QString& name)
   {
     m_groupBoxName = name;
   }
@@ -678,23 +678,23 @@ public:
     m_groupBoxName = "Range";
   }
 
-  inline void setSingleStep(typename T::value_type v)
+  void setSingleStep(typename T::value_type v)
   {
     m_step = v;
   }
 
-  inline void setTracking(bool t)
+  void setTracking(bool t)
   {
     m_tracking = t;
   }
 
-  inline void setDecimal(int d)
+  void setDecimal(int d)
   {
     m_decimal = d;
   }
 
   // default is horizonal
-  inline void setWidgetOrientation(Qt::Orientation o)
+  void setWidgetOrientation(Qt::Orientation o)
   {
     m_widgetOrientation = o;
   }
@@ -723,7 +723,8 @@ public:
       auto oldUpperValue = upperValue();
       bool keepLowerToMin = m_min == oldLowerValue;
       bool keepUpperToMax = m_max == oldUpperValue;
-      // VLOG(1) << m_min << " " << m_max << " " << oldLowerValue << " " << oldUpperValue << " " << keepLowerToMin << " " << keepUpperToMax;
+      // VLOG(1) << m_min << " " << m_max << " " << oldLowerValue << " " << oldUpperValue << " " << keepLowerToMin << "
+      // " << keepUpperToMax;
       m_min = min;
       m_max = max;
       changeRange();
@@ -761,7 +762,7 @@ public:
 
   // for some widget style all subwidgets be bound by a groupbox
   // default is empty
-  inline void setGroupBoxName(const QString& name)
+  void setGroupBoxName(const QString& name)
   {
     m_groupBoxName = name;
   }

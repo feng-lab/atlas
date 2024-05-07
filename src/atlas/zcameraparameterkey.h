@@ -19,17 +19,17 @@ public:
 
   ZCameraParameterKey(const ZCameraParameterKey& key);
 
-  inline Z3DCameraParameter* para()
+  Z3DCameraParameter* para()
   {
     return static_cast<Z3DCameraParameter*>(m_value.get());
   }
 
-  [[nodiscard]] inline glm::vec3 eye() const
+  [[nodiscard]] glm::vec3 eye() const
   {
     return static_cast<Z3DCameraParameter*>(m_value.get())->get().eye();
   }
 
-  [[nodiscard]] inline glm::quat rot() const
+  [[nodiscard]] glm::quat rot() const
   {
     return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono));
   }

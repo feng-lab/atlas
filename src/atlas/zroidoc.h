@@ -12,12 +12,12 @@ class ZROIDoc : public ZObjDoc
 public:
   explicit ZROIDoc(ZDoc& doc);
 
-  inline ZROIPack& roiPack(size_t id)
+  ZROIPack& roiPack(size_t id)
   {
     return *m_idToROIPacks.at(id);
   }
 
-  [[nodiscard]] inline const ZROIPack& roiPack(size_t id) const
+  [[nodiscard]] const ZROIPack& roiPack(size_t id) const
   {
     return *m_idToROIPacks.at(id);
   }

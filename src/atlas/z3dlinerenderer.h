@@ -33,18 +33,18 @@ public:
   void setDataPickingColors(std::vector<glm::vec4>* linePickingColorsInput = nullptr);
 
   // default true since glLineWidth only support 1 pixel width line from now on
-  inline void setUseSmoothLine(bool v)
+  void setUseSmoothLine(bool v)
   {
     m_useSmoothLine = v;
   }
 
-  inline void setLineWidth(float v)
+  void setLineWidth(float v)
   {
     m_srcLineWidth = std::max(1.f, v);
     updateLineWidth();
   }
 
-  inline void setEnableMultisample(bool v)
+  void setEnableMultisample(bool v)
   {
     m_enableMultisample = v;
     updateLineWidth();

@@ -29,37 +29,37 @@ public:
     return m_animation;
   }
 
-  inline int rowHeight() const
+  int rowHeight() const
   {
     return 30;
   }
 
-  inline double pixelsPerSecond() const
+  double pixelsPerSecond() const
   {
     return m_pixelsPerSecond;
   }
 
-  inline int objViewWidth() const
+  int objViewWidth() const
   {
     return 220;
   }
 
-  inline int minViewHeight() const
+  int minViewHeight() const
   {
     return 10;
   }
 
-  inline int eventViewWidth() const
+  int eventViewWidth() const
   {
     return m_eventViewWidth;
   }
 
-  inline double timeToX(double time) const
+  double timeToX(double time) const
   {
     return 10 + time * pixelsPerSecond();
   }
 
-  inline double xToTime(double x) const
+  double xToTime(double x) const
   {
     return std::max(0.0, (x - 10) / pixelsPerSecond());
   }

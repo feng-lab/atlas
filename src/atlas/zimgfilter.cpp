@@ -616,8 +616,8 @@ double ZImgFilter::getUpperChannelRange(size_t c) const
 
 void ZImgFilter::viewportChanged()
 {
-  QRectF vp = mapFromSceneRect(m_view.currentViewport());
-  if (m_imgPack->needUpdate(vp,
+  if (QRectF vp = mapFromSceneRect(m_view.currentViewport());
+      m_imgPack->needUpdate(vp,
                             m_view.currentScale() * std::max(getTransformScale().x, getTransformScale().y),
                             m_lastViewport,
                             m_lastScale,

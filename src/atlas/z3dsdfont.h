@@ -59,12 +59,12 @@ public:
 
   Z3DSDFont(QString imageFileName, QString txtFileName);
 
-  [[nodiscard]] inline QString fontName() const
+  [[nodiscard]] QString fontName() const
   {
     return m_fontName;
   }
 
-  [[nodiscard]] inline int maxFontHeight() const
+  [[nodiscard]] int maxFontHeight() const
   {
     return m_maxFontHeight;
   }

@@ -30,7 +30,6 @@ public:
   constexpr voxel_iter() noexcept
     : m_region(nullptr)
     , m_boxIdx(0)
-    , m_voxel()
   {}
 
   constexpr explicit voxel_iter(const TVoxelRegion* region, size_t boxIdx) noexcept

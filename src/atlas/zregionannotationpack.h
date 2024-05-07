@@ -23,7 +23,7 @@ public:
   ZRegionAnnotationPack(ZRegionAnnotation* ra,
                         const QString& path,
                         size_t id,
-                        ZRegionAnnotationDoc& pd,
+                        ZRegionAnnotationDoc& doc,
                         QObject* parent = nullptr);
 
   ~ZRegionAnnotationPack() override;
@@ -32,17 +32,17 @@ public:
 
   const QString& info() const;
 
-  inline const QString& name() const
+  const QString& name() const
   {
     return m_name;
   }
 
-  inline const QString& tooltip() const
+  const QString& tooltip() const
   {
     return m_tooltip;
   }
 
-  inline const QString& path() const
+  const QString& path() const
   {
     return m_path;
   }
@@ -58,12 +58,12 @@ public:
 
   // void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZRegionAnnotation& regionAnnotation() const
+  const ZRegionAnnotation& regionAnnotation() const
   {
     return *m_regionAnnotation;
   }
 
-  inline ZRegionAnnotation& regionAnnotation()
+  ZRegionAnnotation& regionAnnotation()
   {
     return *m_regionAnnotation;
   }

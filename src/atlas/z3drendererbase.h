@@ -43,69 +43,69 @@ public:
 
   explicit Z3DRendererBase(Z3DGlobalParameters& globalParas, QObject* parent = nullptr);
 
-  inline void setCamera(const Z3DCamera& c)
+  void setCamera(const Z3DCamera& c)
   {
     m_camera = c;
     m_hasCustomCamera = true;
     makeCoordTransformNormalMatrix();
   }
 
-  inline void unsetCamera()
+  void unsetCamera()
   {
     m_hasCustomCamera = false;
   }
 
-  inline Z3DCamera& camera()
+  Z3DCamera& camera()
   {
     return m_hasCustomCamera ? m_camera : m_globalParas.camera.get();
   }
 
-  inline Z3DCamera& globalCamera()
+  Z3DCamera& globalCamera()
   {
     return m_globalParas.camera.get();
   }
 
-  inline Z3DCameraParameter& globalCameraPara()
+  Z3DCameraParameter& globalCameraPara()
   {
     return m_globalParas.camera;
   }
 
-  inline const ZFloatSpanParameter& globalXCutPara() const
+  const ZFloatSpanParameter& globalXCutPara() const
   {
     return m_globalParas.globalXCut;
   }
 
-  inline const ZFloatSpanParameter& globalYCutPara() const
+  const ZFloatSpanParameter& globalYCutPara() const
   {
     return m_globalParas.globalYCut;
   }
 
-  inline const ZFloatSpanParameter& globalZCutPara() const
+  const ZFloatSpanParameter& globalZCutPara() const
   {
     return m_globalParas.globalZCut;
   }
 
-  inline Z3DGlobalParameters& globalParas()
+  Z3DGlobalParameters& globalParas()
   {
     return m_globalParas;
   }
 
-  inline const Z3DGlobalParameters& globalParas() const
+  const Z3DGlobalParameters& globalParas() const
   {
     return m_globalParas;
   }
 
-  inline ZStringIntOptionParameter& geometriesMultisampleModePara()
+  ZStringIntOptionParameter& geometriesMultisampleModePara()
   {
     return m_globalParas.geometriesMultisampleMode;
   }
 
-  inline ZStringIntOptionParameter& transparencyMethodPara()
+  ZStringIntOptionParameter& transparencyMethodPara()
   {
     return m_globalParas.transparencyMethod;
   }
 
-  inline void setViewport(const glm::uvec4& viewport)
+  void setViewport(const glm::uvec4& viewport)
   {
     if (m_viewport != viewport) {
       m_viewport = viewport;
@@ -113,7 +113,7 @@ public:
     }
   }
 
-  inline void setViewport(const glm::uvec2& viewport)
+  void setViewport(const glm::uvec2& viewport)
   {
     if (m_viewport.zw() != viewport) {
       m_viewport = glm::ivec4(0, 0, viewport);
@@ -121,7 +121,7 @@ public:
     }
   }
 
-  inline glm::uvec4 viewport() const
+  glm::uvec4 viewport() const
   {
     return m_viewport;
   }
@@ -145,52 +145,52 @@ public:
     return m_coordTransform;
   }
 
-  inline void setSizeScale(float s)
+  void setSizeScale(float s)
   {
     m_sizeScale.set(s);
   }
 
-  inline void setXScale(float s)
+  void setXScale(float s)
   {
     m_coordTransform.setXScale(s);
   }
 
-  inline void setYScale(float s)
+  void setYScale(float s)
   {
     m_coordTransform.setYScale(s);
   }
 
-  inline void setZScale(float s)
+  void setZScale(float s)
   {
     m_coordTransform.setZScale(s);
   }
 
-  inline void setScale(float x, float y, float z)
+  void setScale(float x, float y, float z)
   {
     m_coordTransform.setScale(glm::vec3(x, y, z));
   }
 
-  inline void setOffset(float x, float y, float z)
+  void setOffset(float x, float y, float z)
   {
     m_coordTransform.translate(x, y, z);
   }
 
-  inline void setRotationCenter(const glm::vec3& c)
+  void setRotationCenter(const glm::vec3& c)
   {
     m_coordTransform.setRotationCenter(c);
   }
 
-  inline void setOpacity(float o)
+  void setOpacity(float o)
   {
     m_opacity.set(o);
   }
 
-  inline void setMaterialSpecular(const glm::vec4& v)
+  void setMaterialSpecular(const glm::vec4& v)
   {
     m_materialSpecular.set(v);
   }
 
-  inline void setMaterialAmbient(const glm::vec4& v)
+  void setMaterialAmbient(const glm::vec4& v)
   {
     m_materialAmbient.set(v);
   }
@@ -224,22 +224,22 @@ public:
     return m_globalParas.parameters();
   }
 
-  inline glm::mat4 coordTransform() const
+  glm::mat4 coordTransform() const
   {
     return m_coordTransform.get();
   }
 
-  inline glm::mat4 inverseCoordTransform() const
+  glm::mat4 inverseCoordTransform() const
   {
     return glm::inverse(m_coordTransform.get());
   }
 
-  inline float opacity() const
+  float opacity() const
   {
     return m_opacity.get();
   }
 
-  inline float sizeScale() const
+  float sizeScale() const
   {
     return m_sizeScale.get();
   }
@@ -313,37 +313,37 @@ public:
 
   void renderPicking(Z3DEye eye, const std::vector<Z3DPrimitiveRenderer*>& renderers);
 
-  inline void setShaderHookType(ShaderHookType t)
+  void setShaderHookType(ShaderHookType t)
   {
     m_shaderHookType = t;
   }
 
-  inline ShaderHookType shaderHookType() const
+  ShaderHookType shaderHookType() const
   {
     return m_shaderHookType;
   }
 
-  inline ShaderHookParameter& shaderHookPara()
+  ShaderHookParameter& shaderHookPara()
   {
     return m_shaderHookPara;
   }
 
-  inline void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
+  void setShaderHookParaDDPDepthBlenderTexture(const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingDepthBlenderTexture = t;
   }
 
-  inline void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
+  void setShaderHookParaDDPFrontBlenderTexture(const Z3DTexture* t)
   {
     m_shaderHookPara.dualDepthPeelingFrontBlenderTexture = t;
   }
 
-  inline const glm::mat4& viewportMatrix() const
+  const glm::mat4& viewportMatrix() const
   {
     return m_viewportMatrix;
   }
 
-  inline const glm::mat4& inverseViewportMatrix() const
+  const glm::mat4& inverseViewportMatrix() const
   {
     return m_inverseViewportMatrix;
   }
@@ -372,7 +372,7 @@ protected:
   bool useDisplayList(const std::vector<Z3DPrimitiveRenderer*>& renderers) const;
 #endif
 
-  inline bool hasClipPlanes()
+  bool hasClipPlanes()
   {
     return !m_clipPlanes.empty();
   }

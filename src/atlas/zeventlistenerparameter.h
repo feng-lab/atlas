@@ -15,7 +15,7 @@ class ZEventListenerParameter : public ZParameter
 public:
   explicit ZEventListenerParameter(const QString& name, bool sharing = false, QObject* parent = nullptr);
 
-  inline void setSharing(bool s)
+  void setSharing(bool s)
   {
     if (m_sharing != s) {
       m_sharing = s;
@@ -23,7 +23,7 @@ public:
     }
   }
 
-  [[nodiscard]] inline bool isSharing() const
+  [[nodiscard]] bool isSharing() const
   {
     return m_sharing;
   }

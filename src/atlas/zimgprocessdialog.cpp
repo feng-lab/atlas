@@ -97,7 +97,6 @@ void ZImgProcessDialog::runWorker()
   }
   catch (const ZException& e) {
     QMessageBox::critical(this, QApplication::applicationName(), QString("%1 Error.\n").arg(m_workerName) + e.what());
-    return;
   }
 }
 

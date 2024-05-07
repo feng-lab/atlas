@@ -16,67 +16,67 @@ public:
 
   Z2DTransformParameter(const QString& name, const glm::dmat3& value, QObject* parent = nullptr);
 
-  inline void setScale(const glm::dvec2& v)
+  void setScale(const glm::dvec2& v)
   {
     m_scale.set(v);
   }
 
-  inline void setTranslation(const glm::dvec2& v)
+  void setTranslation(const glm::dvec2& v)
   {
     m_translation.set(v);
   }
 
-  inline void setRotationCenter(const glm::dvec2& c)
+  void setRotationCenter(const glm::dvec2& c)
   {
     m_center.set(c);
   }
 
-  inline void setRotation(double v)
+  void setRotation(double v)
   {
     m_rotation.set(glm::degrees(v));
   }
 
-  inline glm::dvec2 rotationCenter()
+  glm::dvec2 rotationCenter()
   {
     return m_center.get();
   }
 
-  inline glm::dvec2 scale() const
+  glm::dvec2 scale() const
   {
     return m_scale.get();
   }
 
-  inline glm::dvec2 translation() const
+  glm::dvec2 translation() const
   {
     return m_translation.get();
   }
 
-  inline double rotation() const
+  double rotation() const
   {
     return glm::radians(m_rotation.get());
   }
 
-  inline void setXScale(double s)
+  void setXScale(double s)
   {
     m_scale.set(glm::dvec2(s, m_scale.get().y));
   }
 
-  inline void setYScale(double s)
+  void setYScale(double s)
   {
     m_scale.set(glm::dvec2(m_scale.get().x, s));
   }
 
-  inline void setScale(double sx, double xy)
+  void setScale(double sx, double xy)
   {
     m_scale.set(glm::dvec2(sx, xy));
   }
 
-  inline void translate(double x, double y)
+  void translate(double x, double y)
   {
     m_translation.set(glm::dvec2(x, y) + m_translation.get());
   }
 
-  inline void translate(const glm::dvec2& t)
+  void translate(const glm::dvec2& t)
   {
     m_translation.set(t + m_translation.get());
   }

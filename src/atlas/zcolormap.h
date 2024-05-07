@@ -40,7 +40,7 @@ public:
 
   void setColorL(const QColor& color);
 
-  [[nodiscard]] inline glm::col4 colorL() const
+  [[nodiscard]] glm::col4 colorL() const
   {
     return m_colorL;
   }
@@ -55,14 +55,14 @@ public:
 
   void setColorR(const QColor& color);
 
-  [[nodiscard]] inline glm::col4 colorR() const
+  [[nodiscard]] glm::col4 colorR() const
   {
     return m_colorR;
   }
 
   [[nodiscard]] QColor qColorR() const;
 
-  [[nodiscard]] inline bool isSplit() const
+  [[nodiscard]] bool isSplit() const
   {
     return m_split;
   }
@@ -85,12 +85,12 @@ public:
 
   [[nodiscard]] uint8_t alphaL() const;
 
-  [[nodiscard]] inline double intensity() const
+  [[nodiscard]] double intensity() const
   {
     return m_intensity;
   }
 
-  inline void setIntensity(double i)
+  void setIntensity(double i)
   {
     m_intensity = i;
   }
@@ -295,45 +295,47 @@ public:
 
   QColor fractionMappedQColor(double fraction) const;
 
-  inline size_t numKeys() const
+  size_t numKeys() const
   {
     return m_keys.size();
   }
 
-  inline ZColorMapKey& key(size_t index)
+  ZColorMapKey& key(size_t index)
   {
     return m_keys[index].first;
   }
 
-  inline bool hasDataRange() const
+  bool hasDataRange() const
   {
     return m_hasDataRange;
   }
 
-  inline double dataMin() const
+  double dataMin() const
   {
     return m_dataMin;
   }
 
-  inline double dataMax() const
+  double dataMax() const
   {
     return m_dataMax;
   }
 
-  inline void setDataRange(double min, double max)
+  void setDataRange(double min, double max)
   {
     m_hasDataRange = true;
     m_dataMin = min;
     m_dataMax = max;
   }
 
-  inline void removeDataRange()
+  void removeDataRange()
   {
     m_hasDataRange = false;
   }
 
   bool setKey(size_t index, const ZColorMapKey& key, bool select = false); // might change domain
-  inline bool setKeys(const std::vector<ZColorMapKey>& keys); // might change domain
+
+  bool setKeys(const std::vector<ZColorMapKey>& keys); // might change domain
+
   ZColorMapKey& addKey(const ZColorMapKey& key, bool select = false);
 
   void addKeyAtIntensity(double intensity, bool select = false);
@@ -362,7 +364,7 @@ public:
 
   void removeKey(size_t index);
 
-  inline bool isEmpty() const
+  bool isEmpty() const
   {
     return m_keys.empty();
   }
@@ -382,7 +384,7 @@ protected:
 
   void update1DTexture() const;
 
-  inline void clearKeys()
+  void clearKeys()
   {
     m_keys.clear();
   }

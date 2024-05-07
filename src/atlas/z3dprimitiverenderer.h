@@ -27,7 +27,7 @@ public:
     m_useDisplayList = v;
   }
 
-  inline bool useDisplayList()
+  bool useDisplayList()
   {
     return m_useDisplayList;
   }
@@ -40,7 +40,7 @@ public:
     m_needLighting = v;
   }
 
-  [[nodiscard]] inline bool needLighting() const
+  [[nodiscard]] bool needLighting() const
   {
     return m_needLighting;
   }
@@ -64,7 +64,7 @@ public:
     m_followSizeScale = v;
   }
 
-  [[nodiscard]] inline glm::mat4 coordTransform() const
+  [[nodiscard]] glm::mat4 coordTransform() const
   {
     if (m_followCoordTransform) {
       return m_rendererBase.coordTransform();

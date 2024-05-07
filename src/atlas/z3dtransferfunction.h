@@ -43,7 +43,7 @@ public:
 
   QString samplerType() const;
 
-  inline glm::uvec3 textureDimensions() const
+  glm::uvec3 textureDimensions() const
   {
     return m_dimensions;
   }
@@ -90,7 +90,7 @@ public:
 
   void setVolume(Z3DVolume* volume);
 
-  [[nodiscard]] inline Z3DVolume* volume() const
+  [[nodiscard]] Z3DVolume* volume() const
   {
     return m_volume;
   }

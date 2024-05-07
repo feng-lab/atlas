@@ -76,7 +76,7 @@ const void* Z3DPickingManager::objectAtWidgetPos(glm::ivec2 pos)
   pos[0] = pos[0] * m_devicePixelRatio;
   pos[1] = pos[1] * m_devicePixelRatio;
 
-  glm::ivec3 texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
+  auto texSize = glm::ivec3(m_renderTarget->attachment(GL_COLOR_ATTACHMENT0)->dimension());
   pos[1] = texSize[1] - pos[1];
   return objectOfColor(m_renderTarget->colorAtPos(pos));
 }
@@ -90,7 +90,7 @@ std::vector<const void*> Z3DPickingManager::sortObjectsByDistanceToPos(const glm
   auto buf =
     std::make_unique_for_overwrite<glm::col4[]>(Z3DTexture::bypePerPixel(dataFormat, dataType) * tex->numPixels() / 4);
   tex->downloadTextureToBuffer(dataFormat, dataType, buf.get());
-  glm::ivec2 texSize = glm::ivec2(m_renderTarget->size());
+  auto texSize = glm::ivec2(m_renderTarget->size());
   if (radius < 0) {
     radius = std::max(texSize.x, texSize.y);
   }
@@ -139,8 +139,7 @@ void Z3DPickingManager::clearTarget()
 
 void Z3DPickingManager::increaseColor()
 {
-  auto col = std::bit_cast<uint32_t>(m_currentColor);
-  if (col != 0xffffffff) {
+  if (auto col = std::bit_cast<uint32_t>(m_currentColor); col != 0xffffffff) {
     ++col;
     m_currentColor = std::bit_cast<glm::col4>(col);
   } else {

@@ -138,13 +138,13 @@ public:
 
   ZImgCache();
 
-  inline void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
+  void insert(const ZImgPack::HashKeyType& key, std::shared_ptr<ZImg>&& object)
   {
     ZSharedCache<ZImgPack::HashKeyType, ZImg>::insert(key, std::move(object), object->byteNumber());
   }
 
   // never return nullptr, throw ZException on error
-  inline std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock)
+  std::shared_ptr<ZImg> getOrRead(const ZImgPack::HashKeyType& key, const ZImgSubBlock& imgBlock)
   {
     std::shared_ptr<ZImg> res = get(key);
     if (!res) {
@@ -166,12 +166,12 @@ struct ImageCacheHashKeyType
 
   ImageCacheHashKeyType() {}
 
-  inline size_t index() const
+  size_t index() const
   {
     return std::get<1>(m_storage->m_data);
   }
 
-  inline size_t hash() const
+  size_t hash() const
   {
     return m_storage->hash();
   }
@@ -243,15 +243,15 @@ public:
 
   explicit ZImgCache(bool canSkipDestructor = false);
 
-  inline void insert(const ImageCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
+  void insert(const ImageCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
   {
     ZThreadSafeScalableImageCache::insert(key, object, object->byteNumber());
   }
 
   // never return nullptr, throw ZException on error
-  inline std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key,
-                                         const ZImgSubBlock& imgBlock,
-                                         FindStategy findStategy = FindStategy::UpdateLRUList)
+  std::shared_ptr<ZImg> getOrRead(const ImageCacheHashKeyType& key,
+                                  const ZImgSubBlock& imgBlock,
+                                  FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     if (ZThreadSafeScalableImageCache::ConstAccessor ca; find(ca, key, findStategy)) {
       return *ca;
@@ -262,8 +262,7 @@ public:
     }
   }
 
-  inline std::shared_ptr<ZImg> get(const ImageCacheHashKeyType& key,
-                                   FindStategy findStategy = FindStategy::UpdateLRUList)
+  std::shared_ptr<ZImg> get(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     if (ZThreadSafeScalableImageCache::ConstAccessor ca; find(ca, key, findStategy)) {
       return *ca;
@@ -272,7 +271,7 @@ public:
     }
   }
 
-  inline bool contains(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
+  bool contains(const ImageCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageCache::ConstAccessor ca;
     return find(ca, key, findStategy);

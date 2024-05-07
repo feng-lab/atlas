@@ -13,7 +13,7 @@ class ZTimelineEventView : public QGraphicsView
 public:
   explicit ZTimelineEventView(ZTimelineWidget& parent);
 
-  inline void removeSelectedKeys()
+  void removeSelectedKeys()
   {
     m_scene->removeSelectedKeys();
   }

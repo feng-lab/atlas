@@ -86,12 +86,12 @@ private:
 
     const QString& detailedInfo() const;
 
-    inline const QString& name() const
+    const QString& name() const
     {
       return m_name;
     }
 
-    inline const QString& tooltip() const
+    const QString& tooltip() const
     {
       return m_tooltip;
     }

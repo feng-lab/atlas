@@ -272,7 +272,7 @@ public:
   }
 
   // other matrix
-  [[nodiscard]] inline glm::mat3 rotateMatrix(Z3DEye eye = Z3DEye::Mono) const
+  [[nodiscard]] glm::mat3 rotateMatrix(Z3DEye eye = Z3DEye::Mono) const
   {
     return glm::mat3(viewMatrix(eye));
   }
@@ -305,7 +305,7 @@ public:
   // of the scene.
   void yaw(float angle);
 
-  inline void pan(float angle)
+  void pan(float angle)
   {
     yaw(angle);
   }
@@ -322,7 +322,7 @@ public:
   // as the center of rotation.  The result is a vertical rotation of the camera.
   void pitch(float angle);
 
-  inline void tilt(float angle)
+  void tilt(float angle)
   {
     pitch(angle);
   }

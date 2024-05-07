@@ -29,17 +29,17 @@ public:
 
   const QString& info() const;
 
-  inline const QString& name() const
+  const QString& name() const
   {
     return m_name;
   }
 
-  inline const QString& tooltip() const
+  const QString& tooltip() const
   {
     return m_tooltip;
   }
 
-  inline const QString& path() const
+  const QString& path() const
   {
     return m_path;
   }
@@ -53,24 +53,24 @@ public:
 
   void save(const QString& fileName, const QString& format = "");
 
-  inline const std::vector<const ZPunctum*>& punctaPts() const
+  const std::vector<const ZPunctum*>& punctaPts() const
   {
     return m_punctaPts;
   }
 
-  inline const std::set<const ZPunctum*>& selectedPuncta() const
+  const std::set<const ZPunctum*>& selectedPuncta() const
   {
     return m_selectedPuncta;
   }
 
-  inline const std::map<const ZPunctum*, int>& punctumToRow() const
+  const std::map<const ZPunctum*, int>& punctumToRow() const
   {
     return m_punctumToRow;
   }
 
   void setSelectedPuncta(const std::set<const ZPunctum*>& sp);
 
-  inline const ZPuncta& puncta() const
+  const ZPuncta& puncta() const
   {
     return m_puncta;
   }

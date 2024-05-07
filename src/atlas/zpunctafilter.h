@@ -100,13 +100,13 @@ public:
 
   void updateRectSize();
 
-  inline void setTransform_(const QTransform& tfm)
+  void setTransform_(const QTransform& tfm)
   {
     m_transform = tfm;
     updateValue();
   }
 
-  inline void setUseSameSize(bool v)
+  void setUseSameSize(bool v)
   {
     if (m_useSameSize != v) {
       m_useSameSize = v;
@@ -114,7 +114,7 @@ public:
     }
   }
 
-  inline void setSizeScale(double sizeScale)
+  void setSizeScale(double sizeScale)
   {
     if (m_sizeScale != sizeScale) {
       m_sizeScale = sizeScale;

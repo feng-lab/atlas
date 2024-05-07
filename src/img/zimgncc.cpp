@@ -354,15 +354,15 @@ void normXCorrPart(ZImg& fixedImg,
   checkInputImgs(fixedImg, movingImg, "normXCorrPart");
   if (xStart >= xEnd || yStart >= yEnd || zStart >= zEnd || xEnd > fixedImg.width() + movingImg.width() - 1 ||
       yEnd > fixedImg.height() + movingImg.height() - 1 || zEnd > fixedImg.depth() + movingImg.depth() - 1) {
-    throw ZException(QString("normXCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                       .arg(xStart)
-                       .arg(xEnd)
-                       .arg(yStart)
-                       .arg(yEnd)
-                       .arg(zStart)
-                       .arg(zEnd)
-                       .arg(fixedImg.info().toQString())
-                       .arg(movingImg.info().toQString()));
+    throw ZException(fmt::format("normXCorrPart: invalid part ({}:{},{}:{},{}:{}) of fixedImg <{}> and movingImg <{}>",
+                                 xStart,
+                                 xEnd,
+                                 yStart,
+                                 yEnd,
+                                 zStart,
+                                 zEnd,
+                                 fixedImg.info().toString(),
+                                 movingImg.info().toString()));
   }
 
   if (!fixedImg.isType<double>()) {
@@ -506,15 +506,15 @@ ZImg xCorrPart(const ZImg& fixedImg,
   checkInputImgs(fixedImg, movingImg, "xCorrPart");
   if (xStart >= xEnd || yStart >= yEnd || zStart >= zEnd || xEnd > fixedImg.width() + movingImg.width() - 1 ||
       yEnd > fixedImg.height() + movingImg.height() - 1 || zEnd > fixedImg.depth() + movingImg.depth() - 1) {
-    throw ZException(QString("xCorrPart: invalid part (%1:%2,%3:%4,%5:%6) of fixedImg <%7> and movingImg <%8>")
-                       .arg(xStart)
-                       .arg(xEnd)
-                       .arg(yStart)
-                       .arg(yEnd)
-                       .arg(zStart)
-                       .arg(zEnd)
-                       .arg(fixedImg.info().toQString())
-                       .arg(movingImg.info().toQString()));
+    throw ZException(fmt::format("xCorrPart: invalid part ({}:{},{}:{},{}:{}) of fixedImg <{}> and movingImg <{}>",
+                                 xStart,
+                                 xEnd,
+                                 yStart,
+                                 yEnd,
+                                 zStart,
+                                 zEnd,
+                                 fixedImg.info().toString(),
+                                 movingImg.info().toString()));
   }
 
   ZImgInfo info = fixedImg.info();

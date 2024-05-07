@@ -33,7 +33,7 @@ public:
     }
   }
 
-  inline glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
+  glm::uvec3 insert(const KeyType& key, KeyType& erasedKey)
   {
     if (exists(key)) {
       erasedKey = m_invalidKey;
@@ -56,7 +56,7 @@ public:
     return last->second;
   }
 
-  //  inline void remove(const KeyType& key)
+  //   void remove(const KeyType& key)
   //  {
   //    auto it = m_cacheItemsMap.find(key);
   //    m_cacheItemsList.splice(m_cacheItemsList.end(), m_cacheItemsList, it->second);
@@ -67,7 +67,7 @@ public:
   //    }
   //  }
   //
-  //  inline void popFront()
+  //   void popFront()
   //  {
   //    auto first = m_cacheItemsList.begin();
   //    m_cacheItemsMap.erase(first->first);
@@ -78,22 +78,22 @@ public:
   //    }
   //  }
 
-  inline const glm::uvec3& get(const KeyType& key) const
+  const glm::uvec3& get(const KeyType& key) const
   {
     return m_cacheItemsMap.at(key)->second;
   }
 
-  inline void touch(const KeyType& key)
+  void touch(const KeyType& key)
   {
     m_cacheItemsList.splice(m_cacheItemsList.begin(), m_cacheItemsList, m_cacheItemsMap.at(key));
   }
 
-  inline bool exists(const KeyType& key) const
+  bool exists(const KeyType& key) const
   {
     return m_cacheItemsMap.contains(key);
   }
 
-  [[nodiscard]] inline size_t size() const
+  [[nodiscard]] size_t size() const
   {
     return m_size;
   }

@@ -48,7 +48,7 @@ public:
     m_interactionMode = mode;
   }
 
-  inline InteractionMode interactionMode()
+  InteractionMode interactionMode()
   {
     return m_interactionMode;
   }

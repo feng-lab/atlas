@@ -26,12 +26,12 @@ public:
   QWidget* createScaleWidget(QWidget* parent);
 
   // do not use other scale functions because we need to sync scale with our widget
-  inline double currentScale() const
+  double currentScale() const
   {
     return m_scale.get() / 100.;
   }
 
-  inline void setScale(double s)
+  void setScale(double s)
   {
     m_scale.set(s * 100.);
     Q_EMIT scaleChanged(currentScale());

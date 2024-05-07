@@ -73,7 +73,7 @@ public:
 
   void addKeyFrame(double time);
 
-  [[nodiscard]] inline double duration() const
+  [[nodiscard]] double duration() const
   {
     return m_duration;
   }

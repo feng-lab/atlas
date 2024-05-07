@@ -68,54 +68,54 @@ public:
 
   ~ZView() override;
 
-  inline QAction* copyAction()
+  QAction* copyAction()
   {
     return m_copyAction;
   }
 
-  inline QAction* pasteAction()
+  QAction* pasteAction()
   {
     return m_pasteAction;
   }
 
-  inline QAction* zoomInAction()
+  QAction* zoomInAction()
   {
     return m_zoomInAction;
   }
 
-  inline QAction* zoomOutAction()
+  QAction* zoomOutAction()
   {
     return m_zoomOutAction;
   }
 
   QWidget* createScaleWidget(QWidget* parent);
 
-  inline QAction* normalViewAction()
+  QAction* normalViewAction()
   {
     return m_normalViewAction;
   }
 
-  inline QAction* maxZProjViewAction()
+  QAction* maxZProjViewAction()
   {
     return m_maxZProjViewAction;
   }
 
-  inline QAction* montageViewAction()
+  QAction* montageViewAction()
   {
     return m_montageViewAction;
   }
 
-  inline QAction* fitIntoWindowAction()
+  QAction* fitIntoWindowAction()
   {
     return m_fitIntoWindowAction;
   }
 
-  inline QAction* scrollHandDragAction()
+  QAction* scrollHandDragAction()
   {
     return m_scrollHandDragAction;
   }
 
-  inline QAction* rubberBandDragAction()
+  QAction* rubberBandDragAction()
   {
     return m_rubberBandDragAction;
   }
@@ -124,7 +124,7 @@ public:
 
   QWidget* createROIModeWidget(QWidget* parent);
 
-  inline bool isMaxZProjView() const
+  bool isMaxZProjView() const
   {
     return currentViewStyle() == ViewStyle::MIP;
   }
@@ -162,22 +162,22 @@ public:
     return *m_viewport;
   }
 
-  inline ZGraphicsScene& scene()
+  ZGraphicsScene& scene()
   {
     return *m_scene;
   }
 
-  inline const ZGraphicsScene& scene() const
+  const ZGraphicsScene& scene() const
   {
     return *m_scene;
   }
 
-  inline ZGraphicsView& graphicsView()
+  ZGraphicsView& graphicsView()
   {
     return *m_view;
   }
 
-  inline const ZGraphicsView& graphicsView() const
+  const ZGraphicsView& graphicsView() const
   {
     return *m_view;
   }

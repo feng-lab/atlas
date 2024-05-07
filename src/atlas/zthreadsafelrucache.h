@@ -400,7 +400,7 @@ void ZThreadSafeLRUCache<TKey, TValue, THash>::snapshotKeys(std::vector<TKey>& k
 }
 
 template<class TKey, class TValue, class THash>
-inline void ZThreadSafeLRUCache<TKey, TValue, THash>::delink(ListNode* node)
+void ZThreadSafeLRUCache<TKey, TValue, THash>::delink(ListNode* node)
 {
   ListNode* prev = node->m_prev;
   ListNode* next = node->m_next;
@@ -410,7 +410,7 @@ inline void ZThreadSafeLRUCache<TKey, TValue, THash>::delink(ListNode* node)
 }
 
 template<class TKey, class TValue, class THash>
-inline void ZThreadSafeLRUCache<TKey, TValue, THash>::pushFront(ListNode* node)
+void ZThreadSafeLRUCache<TKey, TValue, THash>::pushFront(ListNode* node)
 {
   ListNode* oldRealHead = m_head.m_next;
   node->m_prev = &m_head;

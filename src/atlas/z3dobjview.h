@@ -57,12 +57,12 @@ protected:
 
   virtual void onObjVisibleChangedFromView(bool v) = 0;
 
-  inline void resetBoundBox()
+  void resetBoundBox()
   {
     m_boundBox.reset();
   }
 
-  inline void expandBoundBox(const ZBBox<glm::dvec3>& boundBox)
+  void expandBoundBox(const ZBBox<glm::dvec3>& boundBox)
   {
     m_boundBox.expand(boundBox);
   }

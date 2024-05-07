@@ -37,27 +37,27 @@ public:
     return m_boundPara;
   }
 
-  [[nodiscard]] inline QString name() const
+  [[nodiscard]] QString name() const
   {
     return m_name;
   }
 
-  inline void setName(const QString& n)
+  void setName(const QString& n)
   {
     m_name = n;
   }
 
-  [[nodiscard]] inline QString type() const
+  [[nodiscard]] QString type() const
   {
     return m_type;
   }
 
-  [[nodiscard]] inline QColor color() const
+  [[nodiscard]] QColor color() const
   {
     return m_color;
   }
 
-  inline void setColor(const QColor& c)
+  void setColor(const QColor& c)
   {
     if (m_color != c) {
       m_color = c;
@@ -117,7 +117,7 @@ Q_SIGNALS:
 protected:
   virtual void updateParaToTime(double secs, ZParameter* para) const;
 
-  [[nodiscard]] inline const ZParameterKey& lastKey() const
+  [[nodiscard]] const ZParameterKey& lastKey() const
   {
     return *m_keys.back();
   }

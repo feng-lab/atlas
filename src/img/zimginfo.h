@@ -84,7 +84,7 @@ struct ZImgInfo
     return {
       {Dimension::X, Dimension::Y, Dimension::Z, Dimension::C, Dimension::T}
     };
-  };
+  }
 
   // access
   void setSize(Dimension dim, size_t size)

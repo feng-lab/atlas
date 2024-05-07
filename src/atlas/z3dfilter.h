@@ -122,7 +122,7 @@ public:
 
   void write(json::object& json) const;
 
-  inline void invalidateResult()
+  void invalidateResult()
   {
     invalidate(State::AllResultInvalid);
   }

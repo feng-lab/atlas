@@ -19,32 +19,32 @@ class ZObjDoc : public QObject
 public:
   explicit ZObjDoc(ZDoc& doc);
 
-  [[nodiscard]] inline bool hasObj() const
+  [[nodiscard]] bool hasObj() const
   {
     return !objs().empty();
   }
 
-  [[nodiscard]] inline bool hasObjWithID(size_t id) const
+  [[nodiscard]] bool hasObjWithID(size_t id) const
   {
     return contains(m_doc.objsOfDoc(this), id);
   }
 
-  [[nodiscard]] inline std::vector<size_t> objs() const
+  [[nodiscard]] std::vector<size_t> objs() const
   {
     return m_doc.objsOfDoc(this);
   }
 
-  [[nodiscard]] inline std::vector<size_t> selectedObjs() const
+  [[nodiscard]] std::vector<size_t> selectedObjs() const
   {
     return m_doc.selectedObjsOfDoc(this);
   }
 
-  [[nodiscard]] inline bool isObjSelected(size_t id) const
+  [[nodiscard]] bool isObjSelected(size_t id) const
   {
     return m_doc.isObjSelected(id);
   }
 
-  [[nodiscard]] inline bool isObjVisible(size_t id) const
+  [[nodiscard]] bool isObjVisible(size_t id) const
   {
     return m_doc.isObjVisible(id);
   }
@@ -107,7 +107,7 @@ public:
 
   [[nodiscard]] virtual QString objTooltip(size_t id) const = 0;
 
-  inline QUndoStack* objUndoStack(size_t id)
+  QUndoStack* objUndoStack(size_t id)
   {
     return const_cast<QUndoStack*>(const_cast<const ZObjDoc*>(this)->objUndoStack(id));
   }

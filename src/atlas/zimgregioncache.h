@@ -33,13 +33,13 @@ public:
 
   explicit ZImgRegionCache(bool canSkipDestructor = false);
 
-  inline void insert(const ImageRegionCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
+  void insert(const ImageRegionCacheHashKeyType& key, const std::shared_ptr<ZImg>& object)
   {
     ZThreadSafeScalableImageRegionCache::insert(key, object, object->byteNumber());
   }
 
-  inline std::shared_ptr<ZImg> get(const ImageRegionCacheHashKeyType& key,
-                                   FindStategy findStategy = FindStategy::UpdateLRUList)
+  std::shared_ptr<ZImg> get(const ImageRegionCacheHashKeyType& key,
+                            FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     if (ZThreadSafeScalableImageRegionCache::ConstAccessor ca; find(ca, key, findStategy)) {
       return *ca;
@@ -48,7 +48,7 @@ public:
     }
   }
 
-  inline bool contains(const ImageRegionCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
+  bool contains(const ImageRegionCacheHashKeyType& key, FindStategy findStategy = FindStategy::UpdateLRUList)
   {
     ZThreadSafeScalableImageRegionCache::ConstAccessor ca;
     return find(ca, key, findStategy);

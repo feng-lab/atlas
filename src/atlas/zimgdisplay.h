@@ -32,17 +32,17 @@ public:
     return m_alpha;
   }
 
-  inline void setSlice(size_t z)
+  void setSlice(size_t z)
   {
     m_z = std::min(z, m_img.depth() - 1);
   }
 
-  inline void setTime(size_t t)
+  void setTime(size_t t)
   {
     m_t = std::min(t, m_img.numTimes() - 1);
   }
 
-  inline void setAlpha(double a)
+  void setAlpha(double a)
   {
     m_alpha = std::min(1.0, std::max(0.0, a));
   }
@@ -73,7 +73,7 @@ public:
   ZQImagePack toQImagePack(size_t tileWidth = 4096, size_t tileHeight = 4096) const;
 
 private:
-  inline const ZImgInfo& imgInfo() const
+  const ZImgInfo& imgInfo() const
   {
     return m_img.info();
   }

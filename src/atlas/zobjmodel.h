@@ -63,7 +63,7 @@ public:
 
   [[nodiscard]] int columnCount(const QModelIndex& parent) const override;
 
-  [[nodiscard]] inline bool hasObj() const
+  [[nodiscard]] bool hasObj() const
   {
     return !m_rootItem->children.empty();
   }

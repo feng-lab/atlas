@@ -64,44 +64,44 @@ public:
 
   const QString& detailedInfo() const;
 
-  inline double rangeMin() const
+  double rangeMin() const
   {
     return m_rangeMin;
   }
 
-  inline double rangeMax() const
+  double rangeMax() const
   {
     return m_rangeMax;
   }
 
-  inline bool hasMinMax() const
+  bool hasMinMax() const
   {
     return m_minMaxState != MinMaxState::Invalid;
   }
 
-  inline double minIntensity() const
+  double minIntensity() const
   {
     CHECK(hasMinMax());
     return m_minIntensity;
   }
 
-  inline double maxIntensity() const
+  double maxIntensity() const
   {
     CHECK(hasMinMax());
     return m_maxIntensity;
   }
 
-  inline bool isSequence() const
+  bool isSequence() const
   {
     return m_imgSource.filenames.size() > 1;
   }
 
-  inline const QString& name() const
+  const QString& name() const
   {
     return m_name;
   }
 
-  inline const QString& tooltip() const
+  const QString& tooltip() const
   {
     return m_tooltip;
   }
@@ -200,8 +200,7 @@ public:
   {
     if (auto it = m_blockInfo.find(std::make_tuple(xyRatio, zRatio, sx, sy, sz, sc, t, width, height, depth));
         it != m_blockInfo.end()) {
-      const auto [minv, maxv] = it->second;
-      if (maxv <= displayRangeMin) {
+      if (const auto [minv, maxv] = it->second; maxv <= displayRangeMin) {
         return true;
       }
     }

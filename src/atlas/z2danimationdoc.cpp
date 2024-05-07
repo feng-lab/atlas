@@ -89,11 +89,10 @@ size_t Z2DAnimationDoc::loadFile(const QString& fileName, QString& errorMsg)
       return idPack.first;
     }
   }
-  size_t id;
   try {
     auto animation = std::make_unique<Z2DAnimation>(m_doc);
     animation->load(fileName);
-    id = addAnimation(animation.release(), fileName);
+    size_t id = addAnimation(animation.release(), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -116,11 +115,10 @@ size_t Z2DAnimationDoc::loadFile(const json::value& jValue, QString& errorMsg)
         return idPack.first;
       }
     }
-    size_t id;
     QString fileName = asQString(jValue);
     auto animation = std::make_unique<Z2DAnimation>(m_doc);
     animation->load(fileName);
-    id = addAnimation(animation.release(), fileName);
+    size_t id = addAnimation(animation.release(), fileName);
     ZSystemInfo::instance().addFileToRecentFileList(fileName);
     setLastOpenedObjPath(fileName);
     return id;
@@ -202,7 +200,7 @@ size_t Z2DAnimationDoc::makeAlias(size_t /*id*/)
 
 bool Z2DAnimationDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+  CHECK(m_idToAnimationPacks.contains(id));
 
   return std::any_of(m_idToAnimationPacks.begin(), m_idToAnimationPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToAnimationPacks.at(id);
@@ -211,7 +209,7 @@ bool Z2DAnimationDoc::isAlias(size_t id) const
 
 QWidget* Z2DAnimationDoc::createObjEditWidget(size_t id)
 {
-  CHECK(m_idToAnimationPacks.find(id) != m_idToAnimationPacks.end());
+  CHECK(m_idToAnimationPacks.contains(id));
 
   auto& pack = m_idToAnimationPacks.at(id);
   return new ZAnimationWidget(*pack->animation);

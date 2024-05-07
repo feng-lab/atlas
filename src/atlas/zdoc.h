@@ -98,34 +98,34 @@ public:
 
   std::vector<size_t> selectedObjsOfDoc(const ZObjDoc* objD) const;
 
-  inline QUndoGroup* undoGroup()
+  QUndoGroup* undoGroup()
   {
     return m_undoGroup;
   }
 
   void activateEmptyUndoStack();
 
-  inline QAction* undoAction()
+  QAction* undoAction()
   {
     return m_undoAction;
   }
 
-  inline QAction* redoAction()
+  QAction* redoAction()
   {
     return m_redoAction;
   }
 
-  inline QAction* make2DAnimationAction()
+  QAction* make2DAnimationAction()
   {
     return m_make2DAnimationAction;
   }
 
-  inline QAction* make3DAnimationAction()
+  QAction* make3DAnimationAction()
   {
     return m_make3DAnimationAction;
   }
 
-  inline QAction* changeAnimationSettingAction()
+  QAction* changeAnimationSettingAction()
   {
     return m_changeAnimationSettingAction;
   }
@@ -146,7 +146,7 @@ public:
   void registerObjDoc(ZObjDoc* objD);
 
   // get a unique id for new object
-  inline size_t getNewObjId()
+  size_t getNewObjId()
   {
     return m_nextObjId++;
   }

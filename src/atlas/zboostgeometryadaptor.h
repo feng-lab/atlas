@@ -36,7 +36,7 @@ struct point_type<QRectF>
 template<size_t C, size_t D>
 struct indexed_access<QRectF, C, D>
 {
-  static inline double get(const QRectF& qr)
+  static double get(const QRectF& qr)
   {
     return C == min_corner && D == 0   ? qr.x()
            : C == min_corner && D == 1 ? qr.y()
@@ -45,7 +45,7 @@ struct indexed_access<QRectF, C, D>
                                        : 0;
   }
 
-  static inline void set(QRectF& qr, const double& value)
+  static void set(QRectF& qr, const double& value)
   {
     if (C == min_corner && D == 0) {
       qr.setX(value);
@@ -88,12 +88,12 @@ template<> struct dimension< nim::ZVoxelCoordinate > : boost::mpl::int_<6>
 template <std::size_t I>
 struct access<nim::ZVoxelCoordinate, I>
 {
-  static inline nim::CoordinateType get(nim::ZVoxelCoordinate const& p)
+  static nim::CoordinateType get(nim::ZVoxelCoordinate const& p)
   {
     return p.get<I>();
   }
 
-  static inline void set(nim::ZVoxelCoordinate & p, nim::CoordinateType const& v)
+  static void set(nim::ZVoxelCoordinate & p, nim::CoordinateType const& v)
   {
     p.set<I>(v);
   }

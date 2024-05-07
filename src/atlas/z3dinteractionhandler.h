@@ -18,7 +18,7 @@ public:
     m_name = name;
   }
 
-  [[nodiscard]] inline QString name() const
+  [[nodiscard]] QString name() const
   {
     return m_name;
   }

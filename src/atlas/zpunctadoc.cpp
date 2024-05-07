@@ -52,8 +52,8 @@ bool ZPunctaDoc::saveAs(size_t id)
   if (dialog.exec()) {
     QString err;
     auto& pack = m_idToPunctaPacks.at(id);
-    auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
-    if (savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
+    if (auto fmtIdx = filters.indexOf(dialog.selectedNameFilter());
+        savePuncta(pack.get(), dialog.selectedFiles().at(0), err, formats[fmtIdx])) {
       m_doc.updateObjInfo(id);
       return true;
     }

@@ -52,7 +52,7 @@ public:
   void broadcastEvent(QEvent* e, int w, int h);
 
   // Set the opengl context of this canvas as the current one.
-  inline void getGLFocus()
+  void getGLFocus()
   {
     makeCurrent();
   }

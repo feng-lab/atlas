@@ -53,7 +53,7 @@ protected:
 
   void mouseMoveEvent(QGraphicsSceneMouseEvent* event) override;
 
-  [[nodiscard]] static inline bool isScenePtOverlap(const QPointF& p1, const QPointF& p2)
+  [[nodiscard]] static bool isScenePtOverlap(const QPointF& p1, const QPointF& p2)
   {
     return p1 == p2 || p1.toPoint() == p2.toPoint();
   }
