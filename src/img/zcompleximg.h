@@ -33,42 +33,42 @@ public:
 
   [[nodiscard]] bool isSameSize(const ZComplexImg& rhs) const;
 
-  [[nodiscard]] inline size_t width() const
+  [[nodiscard]] size_t width() const
   {
     return m_width;
   }
 
-  [[nodiscard]] inline size_t height() const
+  [[nodiscard]] size_t height() const
   {
     return m_height;
   }
 
-  [[nodiscard]] inline size_t depth() const
+  [[nodiscard]] size_t depth() const
   {
     return m_depth;
   }
 
-  inline std::complex<double>* rawData()
+  std::complex<double>* rawData()
   {
     return m_data.data();
   }
 
-  [[nodiscard]] static constexpr inline size_t voxelByteNumber()
+  [[nodiscard]] static constexpr size_t voxelByteNumber()
   {
     return sizeof(std::complex<double>);
   }
 
-  [[nodiscard]] inline size_t rowByteNumber()
+  [[nodiscard]] size_t rowByteNumber() const
   {
     return voxelByteNumber() * m_width;
   }
 
-  [[nodiscard]] inline size_t planeByteNumber()
+  [[nodiscard]] size_t planeByteNumber() const
   {
     return voxelByteNumber() * m_width * m_height;
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return QString("width:%1, height:%2, depth:%3").arg(m_width).arg(m_height).arg(m_depth);
   }

@@ -116,13 +116,12 @@ void ZChromaticShiftCorrection::alignChannelWithPresetTransform(const ZImg& srcI
 
   std::unique_ptr<ZImageTransform> transform;
   if (srcImg.depth() > 1) {
-    transform.reset(new ZImageTranslation3DTransform());
+    transform = std::make_unique<ZImageTranslation3DTransform>();
   } else {
-    transform.reset(new ZImageTranslation2DTransform());
+    transform = std::make_unique<ZImageTranslation2DTransform>();
   }
 
-  auto it = presetNameToParameters.find(presetName);
-  if (it == presetNameToParameters.end()) {
+  if (auto it = presetNameToParameters.find(presetName); it == presetNameToParameters.end()) {
     throw ZException(QString("Unknown preset name: %1. Abort").arg(presetName));
   } else {
     LOG(INFO) << "Use " << it->first << " preset: " << json::value_from(it->second);
@@ -300,9 +299,9 @@ void ZChromaticShiftCorrection::alignChannel(const ZImg& srcImg, size_t fixedCha
   std::unique_ptr<ZImageTransform> transform;
   if (m_transform == "Translation") {
     if (srcImg.depth() > 1) {
-      transform.reset(new ZImageTranslation3DTransform());
+      transform = std::make_unique<ZImageTranslation3DTransform>();
     } else {
-      transform.reset(new ZImageTranslation2DTransform());
+      transform = std::make_unique<ZImageTranslation2DTransform>();
     }
   } else if (m_transform == "Rigid") {
     if (srcImg.depth() > 1) {

@@ -50,9 +50,9 @@ class ZMemoryMappedFile
 public:
   explicit ZMemoryMappedFile(const QString&) {}
 
-  inline void readToBuffer(size_t, size_t, void*) const {}
+  void readToBuffer(size_t, size_t, void*) const {}
 
-  inline void prefetch(size_t, size_t) const {}
+  void prefetch(size_t, size_t) const {}
 };
 
 #endif

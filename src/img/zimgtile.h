@@ -38,39 +38,39 @@ public:
     m_imgCache.reset();
   }
 
-  inline const ZImgSubBlock& imgBlock() const
+  const ZImgSubBlock& imgBlock() const
   {
     return m_img;
   }
 
-  inline const ZImg& img() const
+  const ZImg& img() const
   {
     return *m_imgCache;
   }
 
-  inline const ZImgInfo& imgInfo() const
+  const ZImgInfo& imgInfo() const
   {
     return m_info;
   }
 
-  inline const ZVoxelCoordinate& location() const
+  const ZVoxelCoordinate& location() const
   {
     return m_box.minCorner;
   }
 
-  inline const ZVoxelCoordinate& maxCoord() const
+  const ZVoxelCoordinate& maxCoord() const
   {
     return m_box.maxCorner;
   }
 
-  inline bool contains(const ZVoxelCoordinate& v) const
+  bool contains(const ZVoxelCoordinate& v) const
   {
     return m_box.contains(v);
   }
 
   // this function does not check whether coordinate or type of voxel is valid
   template<typename TVoxel>
-  inline TVoxel value(const ZVoxelCoordinate& v) const
+  TVoxel value(const ZVoxelCoordinate& v) const
   {
     return *(m_imgCache->data<TVoxel>(v - m_box.minCorner));
   }

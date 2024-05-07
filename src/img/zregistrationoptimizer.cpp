@@ -22,7 +22,7 @@ struct ScalarCostFunctor
     for (size_t i = 0; i < parameters.size(); ++i) {
       parameters[i] = x[i] * m_scales[i];
     }
-    m_costFunc.evaluate(parameters.data(), residuals);
+    m_costFunc.evaluate(parameters.data(), residuals, nullptr);
     return true;
   }
 
@@ -48,7 +48,7 @@ public:
     set_num_residuals(1);
   }
 
-  bool Evaluate(double const* const* para, double* residuals, double** jacobians) const override
+  bool Evaluate(const double* const* para, double* residuals, double** jacobians) const override
   {
     std::vector<double> parameters(m_costFunc.numParameters());
     double fallbackdelta = 0.0;
@@ -57,7 +57,7 @@ public:
       fallbackdelta += std::abs(para[0][i]) * m_relativeStepSize;
     }
 
-    m_costFunc.evaluate(parameters.data(), residuals);
+    m_costFunc.evaluate(parameters.data(), residuals, nullptr);
 
     if (jacobians) {
       fallbackdelta = (fallbackdelta == 0) ? m_relativeStepSize : (fallbackdelta / parameters.size());
@@ -69,7 +69,7 @@ public:
         }
         paraPlusDelta[i] += delta * m_scales[i];
         double newValue;
-        m_costFunc.evaluate(paraPlusDelta.data(), &newValue);
+        m_costFunc.evaluate(paraPlusDelta.data(), &newValue, nullptr);
         jacobians[0][i] = (newValue - residuals[0]) / delta;
         paraPlusDelta[i] = parameters[i];
       }

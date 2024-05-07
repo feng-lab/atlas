@@ -34,8 +34,7 @@ ZAssignPuncta::ZAssignPuncta(QString filename,
   , m_t(t)
   , m_scene(scene)
 {
-  auto infos = ZImg::readImgInfos(m_filename);
-  if (m_scene >= infos.size()) {
+  if (auto infos = ZImg::readImgInfos(m_filename); m_scene >= infos.size()) {
     throw ZException("invalid scene");
   }
 }
@@ -120,8 +119,7 @@ void ZAssignPuncta::doWork()
 
 ZPuncta ZAssignPuncta::getPunctaOfTree(const ZSwc* tree) const
 {
-  auto it = m_swcTreeToPuncta.find(tree);
-  if (it != m_swcTreeToPuncta.end()) {
+  if (auto it = m_swcTreeToPuncta.find(tree); it != m_swcTreeToPuncta.end()) {
     return it->second;
   } else {
     throw ZException("getPunctaOfTree: Input tree not found.");
@@ -130,8 +128,7 @@ ZPuncta ZAssignPuncta::getPunctaOfTree(const ZSwc* tree) const
 
 ZPuncta ZAssignPuncta::getSomaPunctaOfTree(const ZSwc* tree) const
 {
-  auto it = m_swcTreeToSomaPuncta.find(tree);
-  if (it != m_swcTreeToSomaPuncta.end()) {
+  if (auto it = m_swcTreeToSomaPuncta.find(tree); it != m_swcTreeToSomaPuncta.end()) {
     return it->second;
   } else {
     throw ZException("getSomaPunctaOfTree: Input tree not found.");
@@ -152,8 +149,7 @@ void ZAssignPuncta::separatePuncta()
     std::vector<ZSwc::ConstSwcTreeNode> nodes;
     size_t numTreeInRange = 0;
     for (const auto& treePuncta : m_swcTreeToPuncta) {
-      std::vector<ZSwc::ConstSwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first);
-      if (!tmpNodes.empty()) {
+      if (std::vector<ZSwc::ConstSwcTreeNode> tmpNodes = nodesNearbyPuncta(p, treePuncta.first); !tmpNodes.empty()) {
         ++numTreeInRange;
         for (auto tmpNode : tmpNodes) {
           nodeToTree[tmpNode] = treePuncta.first;
@@ -194,8 +190,7 @@ void ZAssignPuncta::separateSomaPuncta()
     double min_dist = std::numeric_limits<double>::max();
     const ZSwc* tree = nullptr;
     for (const auto& treePuncta : m_swcTreeToSomaPuncta) {
-      double dist = punctaSomaDist(p, treePuncta.first);
-      if (dist < min_dist) {
+      if (double dist = punctaSomaDist(p, treePuncta.first); dist < min_dist) {
         min_dist = dist;
         tree = treePuncta.first;
       }
@@ -267,9 +262,8 @@ double ZAssignPuncta::punctaSomaDist(const ZPunctum& punctum, const ZSwc* tree) 
     if (ZSwc::isRoot(tn) || tn->type == m_somaType) {
       glm::dvec3 node(tn->x, tn->y, tn->z);
       node *= res;
-      double dist = glm::length(node - pt);
       // typical soma diameter would be 10-15um
-      if (dist < 20 && dist < min_dist) {
+      if (double dist = glm::length(node - pt); dist < 20 && dist < min_dist) {
         min_dist = dist;
       }
     }
@@ -295,8 +289,7 @@ double ZAssignPuncta::pointFrustumConeDist(double x,
   double normbp = glm::dot(bot - pt, bot - pt);
   double normtp = glm::dot(top - pt, top - pt);
   double dotbptb = glm::dot(bot - pt, top - bot);
-  double frac = -dotbptb / normtb;
-  if (frac < 0) {
+  if (double frac = -dotbptb / normtb; frac < 0) {
     dist = std::sqrt(normbp) - tn->radius * m_imgInfo.voxelSizeXInUm();
   } else if (frac > 1) {
     dist = std::sqrt(normtp) - ptn->radius * m_imgInfo.voxelSizeXInUm();
@@ -395,8 +388,7 @@ ZAssignPuncta::nearestNode(double x, double y, double z, const std::vector<ZSwc:
   double dist = std::numeric_limits<double>::max();
   ZSwc::ConstSwcTreeNode res;
   for (auto node : nodes) {
-    double nodeDist = pointFrustumConeDist(x, y, z, node, ZSwc::parent(node));
-    if (nodeDist < dist) {
+    if (double nodeDist = pointFrustumConeDist(x, y, z, node, ZSwc::parent(node)); nodeDist < dist) {
       dist = nodeDist;
       res = node;
     }

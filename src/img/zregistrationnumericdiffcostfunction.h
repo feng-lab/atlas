@@ -19,11 +19,11 @@ public:
 
   void setUseMultithreading(bool i) override;
 
-  bool evaluate(const double* const parameters, double* cost, double* gradient = nullptr) const override;
+  bool evaluate(const double* parameters, double* cost, double* gradient) const override;
 
 private:
   template<typename TFixed, typename TMoving>
-  void evaluate_Impl(const double* const parameters, double* value) const;
+  void evaluate_Impl(const double* parameters, double* value) const;
 
 private:
   ZImageToImageMetric* m_metric = nullptr;

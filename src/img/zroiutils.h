@@ -17,12 +17,12 @@ public:
 
   static std::tuple<ZImg, index_t, index_t> qPainterPathToStroke(const QPainterPath& path, double width = 2.);
 
-  inline static std::tuple<ZImg, index_t, index_t> splineToMask(const QPolygonF& spline)
+  static std::tuple<ZImg, index_t, index_t> splineToMask(const QPolygonF& spline)
   {
     return qPainterPathToMask(splineToQPainterPath(spline));
   }
 
-  inline static QPainterPath rectToQPainterPath(const QPolygonF& rect)
+  static QPainterPath rectToQPainterPath(const QPolygonF& rect)
   {
     CHECK(rect.size() == 2);
     QPainterPath path;
@@ -30,12 +30,12 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, index_t, index_t> rectToMask(const QPolygonF& rect)
+  static std::tuple<ZImg, index_t, index_t> rectToMask(const QPolygonF& rect)
   {
     return qPainterPathToMask(rectToQPainterPath(rect));
   }
 
-  inline static QPainterPath ellipseToQPainterPath(const QPolygonF& ellipse)
+  static QPainterPath ellipseToQPainterPath(const QPolygonF& ellipse)
   {
     CHECK(ellipse.size() == 2);
     QPainterPath path;
@@ -43,12 +43,12 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, index_t, index_t> ellipseToMask(const QPolygonF& ellipse)
+  static std::tuple<ZImg, index_t, index_t> ellipseToMask(const QPolygonF& ellipse)
   {
     return qPainterPathToMask(ellipseToQPainterPath(ellipse));
   }
 
-  inline static QPainterPath polygonToQPainterPath(const QPolygonF& poly)
+  static QPainterPath polygonToQPainterPath(const QPolygonF& poly)
   {
     CHECK(poly.isClosed());
     QPainterPath path;
@@ -56,12 +56,12 @@ public:
     return path;
   }
 
-  inline static std::tuple<ZImg, index_t, index_t> polygonToMask(const QPolygonF& poly)
+  static std::tuple<ZImg, index_t, index_t> polygonToMask(const QPolygonF& poly)
   {
     return qPainterPathToMask(polygonToQPainterPath(poly));
   }
 
-  inline static std::tuple<ZImg, index_t, index_t>
+  static std::tuple<ZImg, index_t, index_t>
   shapeToMask(const std::vector<std::tuple<QPolygonF, std::string, bool>>& shapeOps)
   {
     QPainterPath pp;

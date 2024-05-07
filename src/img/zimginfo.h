@@ -23,12 +23,12 @@ struct ZImgInfo
 
   void swap(ZImgInfo& other) noexcept;
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return jsonToQString(*this);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);
   }
@@ -58,18 +58,18 @@ struct ZImgInfo
   void createDefaultDescriptions();
 
   // return true if one dimension is zero
-  [[nodiscard]] inline bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   {
     return width == 0 || height == 0 || depth == 0 || numChannels == 0 || numTimes == 0;
   }
 
-  [[nodiscard]] inline bool isSameSize(const ZImgInfo& other) const
+  [[nodiscard]] bool isSameSize(const ZImgInfo& other) const
   {
     return width == other.width && height == other.height && depth == other.depth && numChannels == other.numChannels &&
            numTimes == other.numTimes;
   }
 
-  [[nodiscard]] inline bool isSameType(const ZImgInfo& other) const
+  [[nodiscard]] bool isSameType(const ZImgInfo& other) const
   {
     return voxelFormat == other.voxelFormat && bytesPerVoxel == other.bytesPerVoxel;
   }
@@ -87,7 +87,7 @@ struct ZImgInfo
   };
 
   // access
-  inline void setSize(Dimension dim, size_t size)
+  void setSize(Dimension dim, size_t size)
   {
     switch (to_underlying(dim)) {
       case 0:
@@ -114,7 +114,7 @@ struct ZImgInfo
     }
   }
 
-  [[nodiscard]] inline size_t size(Dimension dim) const
+  [[nodiscard]] size_t size(Dimension dim) const
   {
     switch (to_underlying(dim)) {
       case 0:
@@ -132,7 +132,7 @@ struct ZImgInfo
     }
   }
 
-  [[nodiscard]] inline size_t size(size_t dim) const
+  [[nodiscard]] size_t size(size_t dim) const
   {
     switch (dim) {
       case 0:
@@ -151,7 +151,7 @@ struct ZImgInfo
   }
 
   // note: time stride is meaningless since the memory is not contiguous
-  [[nodiscard]] inline size_t stride(Dimension dim) const
+  [[nodiscard]] size_t stride(Dimension dim) const
   {
     size_t res = 1;
     auto ddim = to_underlying(dim);
@@ -170,7 +170,7 @@ struct ZImgInfo
     return res;
   }
 
-  [[nodiscard]] inline size_t stride(size_t dim) const
+  [[nodiscard]] size_t stride(size_t dim) const
   {
     size_t res = 1;
     if (dim > 0) {
@@ -188,7 +188,7 @@ struct ZImgInfo
     return res;
   }
 
-  inline size_t& operator[](size_t i)
+  size_t& operator[](size_t i)
   {
     switch (i) {
       case 0:
@@ -206,7 +206,7 @@ struct ZImgInfo
     }
   }
 
-  inline const size_t& operator[](size_t i) const
+  const size_t& operator[](size_t i) const
   {
     switch (i) {
       case 0:
@@ -224,7 +224,7 @@ struct ZImgInfo
     }
   }
 
-  inline size_t& operator[](Dimension i)
+  size_t& operator[](Dimension i)
   {
     switch (to_underlying(i)) {
       case 0:
@@ -242,7 +242,7 @@ struct ZImgInfo
     }
   }
 
-  inline const size_t& operator[](Dimension i) const
+  const size_t& operator[](Dimension i) const
   {
     switch (to_underlying(i)) {
       case 0:
@@ -260,7 +260,7 @@ struct ZImgInfo
     }
   }
 
-  [[nodiscard]] inline bool isAlphaChannel(size_t ch) const
+  [[nodiscard]] bool isAlphaChannel(size_t ch) const
   {
     return lastChannelIsAlphaChannel && ch + 1 == numChannels;
   }
@@ -272,17 +272,17 @@ struct ZImgInfo
 
   [[nodiscard]] double voxelSizeZInUnit(VoxelSizeUnit unit) const;
 
-  [[nodiscard]] inline double voxelSizeXInUm() const
+  [[nodiscard]] double voxelSizeXInUm() const
   {
     return voxelSizeXInUnit(VoxelSizeUnit::um);
   }
 
-  [[nodiscard]] inline double voxelSizeYInUm() const
+  [[nodiscard]] double voxelSizeYInUm() const
   {
     return voxelSizeYInUnit(VoxelSizeUnit::um);
   }
 
-  [[nodiscard]] inline double voxelSizeZInUm() const
+  [[nodiscard]] double voxelSizeZInUm() const
   {
     return voxelSizeZInUnit(VoxelSizeUnit::um);
   }
@@ -328,60 +328,60 @@ struct ZImgInfo
   std::vector<double> position;
   bool lastChannelIsAlphaChannel = false;
 
-  [[nodiscard]] inline size_t voxelByteNumber() const
+  [[nodiscard]] size_t voxelByteNumber() const
   {
     return bytesPerVoxel;
   } // voxel of one channel
 
-  [[nodiscard]] inline size_t rowVoxelNumber() const
+  [[nodiscard]] size_t rowVoxelNumber() const
   {
     return width;
   }
 
-  [[nodiscard]] inline size_t rowByteNumber() const
+  [[nodiscard]] size_t rowByteNumber() const
   {
     return width * bytesPerVoxel;
   }
 
-  [[nodiscard]] inline size_t planeVoxelNumber() const
+  [[nodiscard]] size_t planeVoxelNumber() const
   {
     return width * height;
   }
 
-  [[nodiscard]] inline size_t planeByteNumber() const
+  [[nodiscard]] size_t planeByteNumber() const
   {
     return width * height * bytesPerVoxel;
   }
 
-  [[nodiscard]] inline size_t channelVoxelNumber() const
+  [[nodiscard]] size_t channelVoxelNumber() const
   {
     return width * height * depth;
   }
 
-  [[nodiscard]] inline size_t channelByteNumber() const
+  [[nodiscard]] size_t channelByteNumber() const
   {
     return width * height * depth * bytesPerVoxel;
   }
 
-  [[nodiscard]] inline size_t timeVoxelNumber() const
+  [[nodiscard]] size_t timeVoxelNumber() const
   {
     return width * height * depth * numChannels;
   }
 
-  [[nodiscard]] inline size_t timeByteNumber() const
+  [[nodiscard]] size_t timeByteNumber() const
   {
     return width * height * depth * numChannels * bytesPerVoxel;
   }
 
-  // inline size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
-  // inline size_t locationByteNumber() const { return width * height * depth * numChannels * numTimes * bytesPerVoxel;
+  //  size_t locationVoxelNumber() const { return width * height * depth * numChannels * numTimes; }
+  //  size_t locationByteNumber() const { return width * height * depth * numChannels * numTimes * bytesPerVoxel;
   // }
-  [[nodiscard]] inline size_t voxelNumber() const
+  [[nodiscard]] size_t voxelNumber() const
   {
     return width * height * depth * numChannels * numTimes;
   }
 
-  [[nodiscard]] inline size_t byteNumber() const
+  [[nodiscard]] size_t byteNumber() const
   {
     return width * height * depth * numChannels * numTimes * bytesPerVoxel;
   }

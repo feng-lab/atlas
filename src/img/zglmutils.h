@@ -312,7 +312,7 @@ __forceinline QString toQString(const QString& v)
 }
 
 template<size_t L, typename T, glm::qualifier Q>
-inline QString toQString(const glm::vec<L, T, Q>& v)
+QString toQString(const glm::vec<L, T, Q>& v)
 {
   QString res = "[" + QString::number(v[0]);
   for (size_t i = 1; i < L; ++i) {
@@ -324,7 +324,7 @@ inline QString toQString(const glm::vec<L, T, Q>& v)
 }
 
 template<size_t L, typename T, glm::qualifier Q>
-inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
+void toVal(const QString& str, glm::vec<L, T, Q>& v)
 {
   static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
@@ -338,7 +338,7 @@ inline void toVal(const QString& str, glm::vec<L, T, Q>& v)
 }
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
-inline QString toQString(const glm::mat<C, R, T, Q>& m)
+QString toQString(const glm::mat<C, R, T, Q>& m)
 {
   QString res = "[";
   for (size_t r = 0; r < R; ++r) {
@@ -357,7 +357,7 @@ inline QString toQString(const glm::mat<C, R, T, Q>& m)
 }
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
-inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
+void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 {
   static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
@@ -371,13 +371,13 @@ inline void toVal(const QString& str, glm::mat<C, R, T, Q>& m)
 }
 
 template<typename T, glm::qualifier Q>
-inline QString toQString(const glm::tquat<T, Q>& v)
+QString toQString(const glm::tquat<T, Q>& v)
 {
   return "[" + toQString(v[0]) + ", " + toQString(v[1]) + ", " + toQString(v[2]) + ", " + toQString(v[3]) + "]";
 }
 
 template<typename T, glm::qualifier Q>
-inline void toVal(const QString& str, glm::tquat<T, Q>& q)
+void toVal(const QString& str, glm::tquat<T, Q>& q)
 {
   static QRegularExpression rx(R"((\ |\,|\[|\]|\;))"); // RegEx for ' ' or ',' or '[' or ']' or ';'
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
@@ -393,19 +393,19 @@ inline void toVal(const QString& str, glm::tquat<T, Q>& q)
 // std iostream print
 
 template<size_t L, typename T, glm::qualifier Q>
-inline std::ostream& operator<<(std::ostream& s, const glm::vec<L, T, Q>& v)
+std::ostream& operator<<(std::ostream& s, const glm::vec<L, T, Q>& v)
 {
   return (s << json::value_from(v));
 }
 
 template<size_t C, size_t R, typename T, glm::qualifier Q>
-inline std::ostream& operator<<(std::ostream& s, const glm::mat<C, R, T, Q>& m)
+std::ostream& operator<<(std::ostream& s, const glm::mat<C, R, T, Q>& m)
 {
   return (s << json::value_from(m));
 }
 
 template<typename T, glm::qualifier Q>
-inline std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
+std::ostream& operator<<(std::ostream& s, const glm::tquat<T, Q>& q)
 {
   return (s << json::value_from(q));
 }

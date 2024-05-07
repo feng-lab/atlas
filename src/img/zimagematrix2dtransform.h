@@ -38,7 +38,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   [[nodiscard]] bool is2DTransform() const override
   {
@@ -53,7 +53,7 @@ public:
 
   void transformPoint(double* inoutCoords) const override;
 
-  [[nodiscard]] inline std::string toString() const override
+  [[nodiscard]] std::string toString() const override
   {
     return m_tform.toString();
   }
@@ -80,7 +80,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
@@ -103,7 +103,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
@@ -126,7 +126,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
@@ -149,7 +149,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 
@@ -172,7 +172,7 @@ public:
 
   using ZImageTransform::setParameters;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   void adaptParameters(size_t fromLevel, size_t toLevel) override;
 

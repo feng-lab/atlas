@@ -60,7 +60,8 @@ public:
   template<typename OtherTImg, typename OtherTVoxel>
     requires std::is_convertible_v<OtherTImg*, TImg*> && std::is_convertible_v<OtherTVoxel*, TVoxel*>
   constexpr img_neighborhood_iter(const img_neighborhood_iter<OtherTImg, OtherTVoxel>& other) noexcept
-    : m_img(other.m_img)
+    : m_neighborhood(other.m_neighborhood)
+    , m_img(other.m_img)
     , m_region(other.m_region)
     , m_regionInfo(other.m_regionInfo)
     , m_endIdx(other.m_endIdx)
@@ -68,7 +69,6 @@ public:
     , m_coord(other.m_coord)
     , m_padOption(other.m_padOption)
     , m_padValue(other.m_padValue)
-    , m_neighborhood(other.m_neighborhood)
     , m_nbIndexOffsets(other.m_nbIndexOffsets)
     , m_innerBoundLow(other.m_innerBoundLow)
     , m_innerBoundHigh(other.m_innerBoundHigh)
@@ -206,7 +206,7 @@ public:
   }
 
   template<typename OtherTImg, typename OtherTVoxel>
-  __forceinline constexpr bool operator==(img_neighborhood_iter<OtherTImg, OtherTVoxel> const& other) const noexcept
+  __forceinline constexpr bool operator==(const img_neighborhood_iter<OtherTImg, OtherTVoxel>& other) const noexcept
   {
     return this->m_img == other.m_img && this->m_region == other.m_region && this->m_regionInfo == other.m_regionInfo &&
            this->m_endIdx == other.m_endIdx && this->m_idx == other.m_idx && this->m_coord == other.m_coord &&
@@ -380,7 +380,7 @@ protected:
   std::vector<ZVoxelCoordinate> m_nbCoords;
   bool m_nbCoordsIsValid;
   std::vector<bool> m_isNbInBound;
-  std::vector<typename std::remove_cv<TVoxel>::type>
+  std::vector<std::remove_cv_t<TVoxel>>
     m_nbValues; // out of bound data are stored here so we can provide a reference when needed
 };
 

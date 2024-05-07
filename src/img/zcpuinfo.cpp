@@ -19,7 +19,7 @@ namespace {
 
 using namespace nim;
 
-const char* vendor_to_string(enum cpuinfo_vendor vendor)
+const char* vendor_to_string(cpuinfo_vendor vendor)
 {
   switch (vendor) {
     case cpuinfo_vendor_unknown:
@@ -61,7 +61,7 @@ const char* vendor_to_string(enum cpuinfo_vendor vendor)
   }
 }
 
-const char* uarch_to_string(enum cpuinfo_uarch uarch)
+const char* uarch_to_string(cpuinfo_uarch uarch)
 {
   switch (uarch) {
     case cpuinfo_uarch_unknown:
@@ -317,7 +317,7 @@ void logCPUInfo()
   LOG(INFO) << message;
   message = "Microarchitectures:\n";
   for (uint32_t i = 0; i < cpuinfo_get_uarchs_count(); i++) {
-    const struct cpuinfo_uarch_info* uarch_info = cpuinfo_get_uarch(i);
+    const cpuinfo_uarch_info* uarch_info = cpuinfo_get_uarch(i);
     const char* uarch_string = uarch_to_string(uarch_info->uarch);
     if (uarch_string == nullptr) {
       message += fmt::format("\t{}x Unknown (0x{:08x})\n", uarch_info->core_count, (uint32_t)uarch_info->uarch);
@@ -328,7 +328,7 @@ void logCPUInfo()
   LOG(INFO) << message;
   message = "Cores:\n";
   for (uint32_t i = 0; i < cpuinfo_get_cores_count(); i++) {
-    const struct cpuinfo_core* core = cpuinfo_get_core(i);
+    const cpuinfo_core* core = cpuinfo_get_core(i);
     message += fmt::format(
       "\t{}: {} processor{} ({}{})",
       i,
@@ -354,7 +354,7 @@ void logCPUInfo()
 #endif
   message += ":\n";
   for (uint32_t i = 0; i < cpuinfo_get_processors_count(); i++) {
-    [[maybe_unused]] const struct cpuinfo_processor* processor = cpuinfo_get_processor(i);
+    [[maybe_unused]] const cpuinfo_processor* processor = cpuinfo_get_processor(i);
     message += fmt::format("\t{}", i);
 
 #if defined(__linux__)
@@ -370,7 +370,7 @@ void logCPUInfo()
   LOG(INFO) << message;
 }
 
-void report_cache(uint32_t count, const struct cpuinfo_cache* cache, uint32_t level, const char* nonunified_type)
+void report_cache(uint32_t count, const cpuinfo_cache* cache, uint32_t level, const char* nonunified_type)
 {
   const char* type = (cache->flags & CPUINFO_CACHE_UNIFIED) ? "unified" : nonunified_type;
 

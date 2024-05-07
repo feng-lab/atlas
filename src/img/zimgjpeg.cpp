@@ -211,7 +211,7 @@ void readImgFromJpeg(jpeg_decompress_struct& cinfo, ZImg& img, const ZImgRegion&
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
   }
 
   ZImgInfo partialImgInfo = region.clip(imgInfo);

@@ -28,7 +28,7 @@ namespace nim {
 
 ZImgIO& ZImgIO::instance()
 {
-  thread_local static ZImgIO imgIO;
+  thread_local ZImgIO imgIO;
   return imgIO;
 }
 
@@ -77,14 +77,12 @@ void ZImgIO::readInfos(const QString& filename,
           }
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
-                     .arg(filename)
-                     .arg(reader->fullName())
-                     .arg(e.what());
+          error +=
+            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportRead()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
     error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
@@ -100,10 +98,8 @@ void ZImgIO::readInfos(const QString& filename,
       throw ZIOException("empty image");
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+      error =
+        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 
@@ -148,7 +144,7 @@ void ZImgIO::readInfos(const QStringList& fileList,
         std::vector<std::vector<std::shared_ptr<ZImgSubBlock>>> tmpSubBlocks;
         ZImgIO::instance().readInfos(fileList[i], tmpInfo, subBlocks ? &tmpSubBlocks : nullptr, format);
         if (tmpInfo.empty()) {
-          throw ZIOException(QString("Read sequence failed: img %1 is empty").arg(i));
+          throw ZIOException(fmt::format("Read sequence failed: img {} is empty", i));
         }
         return std::make_tuple(std::move(tmpInfo), std::move(tmpSubBlocks));
       }));
@@ -169,26 +165,26 @@ void ZImgIO::readInfos(const QStringList& fileList,
               // check whether type match
               if (!res[s].isSameType(res[0])) {
                 throw ZIOException(
-                  QString("Read sequence failed: image type don't match, can not cat Img <%1> to Img 0 <%2>")
-                    .arg(res[s].toQString())
-                    .arg(res[0].toQString()));
+                  fmt::format("Read sequence failed: image type don't match, can not cat Img <{}> to Img 0 <{}>",
+                              res[s].toString(),
+                              res[0].toString()));
               }
               // check whether dimension size match
               for (auto dim : ZImgInfo::dimensions()) {
                 if (expandXY) {
                   if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                       res[s].size(dim) != res[0].size(dim)) {
-                    throw ZIOException(
-                      QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                        .arg(res[s].toQString())
-                        .arg(res[0].toQString()));
+                    throw ZIOException(fmt::format(
+                      "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                      res[s].toString(),
+                      res[0].toString()));
                   }
                 } else {
                   if (dim != catDim && res[s].size(dim) != res[0].size(dim)) {
-                    throw ZIOException(
-                      QString("Read sequence failed: image dimension don't match, can not cat Img <%1> to Img 0 <%2>")
-                        .arg(res[s].toQString())
-                        .arg(res[0].toQString()));
+                    throw ZIOException(fmt::format(
+                      "Read sequence failed: image dimension don't match, can not cat Img <{}> to Img 0 <{}>",
+                      res[s].toString(),
+                      res[0].toString()));
                   }
                 }
                 if (dim == catDim) {
@@ -238,31 +234,29 @@ void ZImgIO::readInfos(const QStringList& fileList,
                 // check whether type match
                 if (!tmpInfo[s].isSameType(res[s])) {
                   throw ZIOException(
-                    QString("Read sequence failed: image type don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                      .arg(i)
-                      .arg(tmpInfo[s].toQString())
-                      .arg(res[s].toQString()));
+                    fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                                i,
+                                tmpInfo[s].toString(),
+                                res[s].toString()));
                 }
                 // check whether dimension size match
                 for (auto dim : ZImgInfo::dimensions()) {
                   if (expandXY) {
                     if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                         res[s].size(dim) != tmpInfo[s].size(dim)) {
-                      throw ZIOException(
-                        QString(
-                          "Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                          .arg(i)
-                          .arg(tmpInfo[s].toQString())
-                          .arg(res[s].toQString()));
+                      throw ZIOException(fmt::format(
+                        "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                        i,
+                        tmpInfo[s].toQString(),
+                        res[s].toQString()));
                     }
                   } else {
                     if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-                      throw ZIOException(
-                        QString(
-                          "Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                          .arg(i)
-                          .arg(tmpInfo[s].toQString())
-                          .arg(res[s].toQString()));
+                      throw ZIOException(fmt::format(
+                        "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                        i,
+                        tmpInfo[s].toQString(),
+                        res[s].toQString()));
                     }
                   }
                   if (dim == catDim) {
@@ -407,29 +401,29 @@ void ZImgIO::readInfos(const QStringList& fileList,
           // check whether type match
           if (!tmpInfo[s].isSameType(res[s])) {
             throw ZIOException(
-              QString("Read sequence failed: image type don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                .arg(i)
-                .arg(tmpInfo[s].toQString())
-                .arg(res[s].toQString()));
+              fmt::format("Read sequence failed: image type don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                          i,
+                          tmpInfo[s].toString(),
+                          res[s].toString()));
           }
           // check whether dimension size match
           for (auto dim : ZImgInfo::dimensions()) {
             if (expandXY) {
               if (dim != Dimension::X && dim != Dimension::Y && dim != catDim &&
                   res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZIOException(
-                  QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                    .arg(i)
-                    .arg(tmpInfo[s].toQString())
-                    .arg(res[s].toQString()));
+                throw ZIOException(fmt::format(
+                  "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                  i,
+                  tmpInfo[s].toString(),
+                  res[s].toString()));
               }
             } else {
               if (dim != catDim && res[s].size(dim) != tmpInfo[s].size(dim)) {
-                throw ZIOException(
-                  QString("Read sequence failed: image dimension don't match, can not cat Img %1 <%2> to Img 0 <%3>")
-                    .arg(i)
-                    .arg(tmpInfo[s].toQString())
-                    .arg(res[s].toQString()));
+                throw ZIOException(fmt::format(
+                  "Read sequence failed: image dimension don't match, can not cat Img {} <{}> to Img 0 <{}>",
+                  i,
+                  tmpInfo[s].toString(),
+                  res[s].toString()));
               }
             }
             if (dim == catDim) {
@@ -554,7 +548,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       if (res[i].empty()) {
         ZVoxelCoordinate startC(x, y, z, 0, t);
         ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
-        res[i].push_back(ZImgRegion(startC, endC));
+        res[i].emplace_back(startC, endC);
         lastTile = tile;
         continue;
       }
@@ -569,7 +563,7 @@ std::vector<std::vector<ZImgRegion>> ZImgIO::getInternalSubRegions(const QString
       } else {
         ZVoxelCoordinate startC(x, y, z, 0, t);
         ZVoxelCoordinate endC(x + width, y + height, z + depth, info.numChannels, t + 1);
-        res[i].push_back(ZImgRegion(startC, endC));
+        res[i].emplace_back(startC, endC);
         lastTile = tile;
       }
     }
@@ -596,15 +590,13 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
             return;
           }
           catch (const ZIOException& e) {
-            error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
-                       .arg(filename)
-                       .arg(reader->fullName())
-                       .arg(e.what());
+            error +=
+              QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
           }
         }
       }
     }
-  } else if (m_ioFormats.find(imgSource.format) == m_ioFormats.end() || !m_ioFormats[imgSource.format]->supportRead()) {
+  } else if (!m_ioFormats.contains(imgSource.format) || !m_ioFormats[imgSource.format]->supportRead()) {
     error = QString("Read format '%1' is not supported").arg(m_ioFormats[imgSource.format]->fullName());
   } else {
     for (const auto& filename : imgSource.filenames) {
@@ -616,9 +608,7 @@ void ZImgIO::readMetadata(const ZImgSource& imgSource, ZImgMetadata& meta)
       }
       catch (const ZIOException& e) {
         error = QString("Try read file %1 as '%2' format, failed: %3")
-                  .arg(filename)
-                  .arg(m_ioFormats[imgSource.format]->fullName())
-                  .arg(e.what());
+                  .arg(filename, m_ioFormats[imgSource.format]->fullName(), e.what());
       }
     }
   }
@@ -648,14 +638,12 @@ void ZImgIO::readThumbnail(const QString& filename,
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
-                     .arg(filename)
-                     .arg(reader->fullName())
-                     .arg(e.what());
+          error +=
+            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportRead()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
     error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
@@ -665,10 +653,8 @@ void ZImgIO::readThumbnail(const QString& filename,
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+      error =
+        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 
@@ -700,14 +686,12 @@ void ZImgIO::readImg(const QString& filename,
           return;
         }
         catch (const ZIOException& e) {
-          error += QString("\nTry read file %1 as '%2' format, failed: %3 ")
-                     .arg(filename)
-                     .arg(reader->fullName())
-                     .arg(e.what());
+          error +=
+            QString("\nTry read file %1 as '%2' format, failed: %3 ").arg(filename, reader->fullName(), e.what());
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportRead()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportRead()) {
     error = QString("Read format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
@@ -717,10 +701,8 @@ void ZImgIO::readImg(const QString& filename,
       return;
     }
     catch (const ZIOException& e) {
-      error = QString("Try read file %1 as '%2' format, failed: %3")
-                .arg(filename)
-                .arg(m_ioFormats[format]->fullName())
-                .arg(e.what());
+      error =
+        QString("Try read file %1 as '%2' format, failed: %3").arg(filename, m_ioFormats[format]->fullName(), e.what());
     }
   }
 
@@ -847,7 +829,7 @@ void ZImgIO::readImg(const QStringList& fileList,
   ZImgInfo& info = infos[scene];
   if (regionIn.isEmpty() || !regionIn.isValid(info)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(regionIn.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), regionIn.toQString()));
   }
   ZImgRegion region = regionIn;
   region.resolveRegionEnd(info);
@@ -1008,7 +990,7 @@ void ZImgIO::writeImg(const QString& filename, const ZImg& img, FileFormat forma
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportWrite()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
@@ -1061,7 +1043,7 @@ void ZImgIO::writeImg(const QString& filename,
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportWrite()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {
@@ -1114,7 +1096,7 @@ void ZImgIO::writeImg(const QString& filename,
         }
       }
     }
-  } else if (m_ioFormats.find(format) == m_ioFormats.end() || !m_ioFormats[format]->supportWrite()) {
+  } else if (!m_ioFormats.contains(format) || !m_ioFormats[format]->supportWrite()) {
     error = QString("Write format '%1' is not supported").arg(m_ioFormats[format]->fullName());
   } else {
     try {

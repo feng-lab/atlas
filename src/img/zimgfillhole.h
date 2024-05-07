@@ -11,13 +11,13 @@ class ZImgFillHole : public ZImgAlgorithm<ReportProgress>
 {
 public:
   // default true
-  inline void setFullyConnected(bool v)
+  void setFullyConnected(bool v)
   {
     m_fullyConnected = v;
   }
 
   // Defaults to maximum value of InputPixelType.
-  inline void setForegroundValue(uint64_t v)
+  void setForegroundValue(uint64_t v)
   {
     m_foregroundValue = v;
   }

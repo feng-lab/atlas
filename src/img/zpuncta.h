@@ -28,17 +28,17 @@ public:
 
   ZPuncta& operator=(const ZPuncta&) = default;
 
-  inline void clear() noexcept
+  void clear() noexcept
   {
     data.clear();
   }
 
-  inline void swap(ZPuncta& other) noexcept
+  void swap(ZPuncta& other) noexcept
   {
     data.swap(other.data);
   }
 
-  inline bool operator==(const ZPuncta& l) const
+  bool operator==(const ZPuncta& l) const
   {
     return data == l.data;
   }
@@ -57,12 +57,12 @@ public:
 
   void save(const QString& filename, const QString& format = "") const;
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return QString("%1 puncta").arg(data.size());
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return fmt::format("{} puncta", data.size());
   }

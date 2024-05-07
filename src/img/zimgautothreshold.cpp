@@ -302,8 +302,8 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
 
     locmaxMask.fill(0);
     auto locmaxMaskData = locmaxMask.timeData<uint8_t>(0);
-    for (size_t i = 0; i < CC.voxelIdxList.size(); ++i) {
-      auto index = CC.voxelIdxList[i][0];
+    for (auto& idxList : CC.voxelIdxList) {
+      auto index = idxList[0];
       ZVoxelCoordinate coord = img.indexToCoord(index);
       if (validRgn.xInRegion(coord.x + rgn.xStart()) && validRgn.yInRegion(coord.y + rgn.yStart())) {
         locmaxMaskData[index] = 1;

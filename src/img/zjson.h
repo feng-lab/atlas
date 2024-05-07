@@ -51,13 +51,13 @@ QString jsonToFormattedQString(const json::value& jv);
 std::string jsonToFormattedString(const json::value& jv);
 
 template<typename T>
-inline QString jsonToFormattedQString(const T& v)
+QString jsonToFormattedQString(const T& v)
 {
   return jsonToFormattedQString(json::value_from(v));
 }
 
 template<typename T>
-inline std::string jsonToFormattedString(const T& v)
+std::string jsonToFormattedString(const T& v)
 {
   return jsonToFormattedString(json::value_from(v));
 }
@@ -67,13 +67,13 @@ QString jsonToQString(const json::value& jv);
 std::string jsonToString(const json::value& jv);
 
 template<typename T>
-inline QString jsonToQString(const T& v)
+QString jsonToQString(const T& v)
 {
   return jsonToQString(json::value_from(v));
 }
 
 template<typename T>
-inline std::string jsonToString(const T& v)
+std::string jsonToString(const T& v)
 {
   return jsonToString(json::value_from(v));
 }
@@ -118,7 +118,7 @@ public:
     : jv_(jv)
   {}
 
-  inline JsonValueProxy operator[](json::string_view key)
+  JsonValueProxy operator[](json::string_view key)
   {
     json::object* obj;
     if (jv_.is_null()) {
@@ -129,7 +129,7 @@ public:
     return JsonValueProxy((*obj)[key]);
   }
 
-  inline JsonValueProxy operator[](std::size_t index)
+  JsonValueProxy operator[](std::size_t index)
   {
     json::array* arr;
     if (jv_.is_null()) {
@@ -178,7 +178,7 @@ inline json::value& JsonValuePath(json::value& jv, json::string_view key)
 }
 
 template<class Arg0, class Arg1, class... Args>
-inline json::value& JsonValuePath(json::value& jv, const Arg0& arg0, const Arg1& arg1, const Args&... args)
+json::value& JsonValuePath(json::value& jv, const Arg0& arg0, const Arg1& arg1, const Args&... args)
 {
   return JsonValuePath(JsonValuePath(jv, arg0), arg1, args...);
 }

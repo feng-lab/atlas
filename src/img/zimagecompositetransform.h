@@ -19,7 +19,7 @@ public:
 public:
   [[nodiscard]] size_t numParameters() const override;
 
-  void setParameters(double const* para) override;
+  void setParameters(const double* para) override;
 
   [[nodiscard]] bool is2DTransform() const override;
 

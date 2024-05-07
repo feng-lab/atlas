@@ -13,32 +13,32 @@ public:
 
   ~ZCachedImg() override = default;
 
-  [[nodiscard]] inline const ZImgInfo& info() const
+  [[nodiscard]] const ZImgInfo& info() const
   {
     return m_imgInfo;
   }
 
-  [[nodiscard]] inline size_t width() const
+  [[nodiscard]] size_t width() const
   {
     return m_imgInfo.width;
   }
 
-  [[nodiscard]] inline size_t height() const
+  [[nodiscard]] size_t height() const
   {
     return m_imgInfo.height;
   }
 
-  [[nodiscard]] inline size_t depth() const
+  [[nodiscard]] size_t depth() const
   {
     return m_imgInfo.depth;
   }
 
-  [[nodiscard]] inline size_t numChannels() const
+  [[nodiscard]] size_t numChannels() const
   {
     return m_imgInfo.numChannels;
   }
 
-  [[nodiscard]] inline size_t numTimes() const
+  [[nodiscard]] size_t numTimes() const
   {
     return m_imgInfo.numTimes;
   }

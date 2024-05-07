@@ -21,17 +21,17 @@ DEFINE_bool(zimg_use_mmap_file_for_hdf5, false, "Whether to create mmap file for
 
 namespace {
 
-inline size_t chunkSize()
+size_t chunkSize()
 {
   return size_t(512);
 }
 
-inline size_t cacheSize()
+size_t cacheSize()
 {
   return size_t(1024) * 1024 * 4000;
 }
 
-inline H5::FileAccPropList accPropList()
+H5::FileAccPropList accPropList()
 {
   H5::FileAccPropList accPropList = H5::FileAccPropList::DEFAULT;
   accPropList.setCache(1000000, cacheSize() / chunkSize() / chunkSize() * 100, cacheSize(), 0.75);
@@ -517,7 +517,7 @@ parseHDF5Chunks(const QString& filename)
   QString line;
   bool dataSetStarted = false;
   std::tuple<size_t, size_t, size_t, size_t> currentDataset;
-  Compression currentCompression = Compression::AUTO;
+  auto currentCompression = Compression::AUTO;
   bool ok1, ok2, ok3, ok4;
   while (in.readLineInto(&line)) {
     auto match = dataset.match(line);
@@ -705,7 +705,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
       return res;
     }
   }
-  catch (std::exception const& e) {
+  catch (const std::exception& e) {
     throw ZIOException(QString("read %1 folly:%2").arg(m_filename, e.what()));
   }
 
@@ -736,7 +736,7 @@ std::shared_ptr<ZImg> ZImgHDF5SubBlock::read() const
 
     return res;
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(QString("read %1 hdf5:%2").arg(m_filename, QString::fromStdString(e.getDetailMsg())));
   }
 }
@@ -901,10 +901,10 @@ void ZImgHDF5::readInfo(const QString& filename,
       }
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
-  catch (std::exception const& e) {
+  catch (const std::exception& e) {
     throw ZIOException(fmt::format("std:{}", e.what()));
   }
 }
@@ -1016,7 +1016,7 @@ void ZImgHDF5::readImg(const QString& filename,
       img.zoom(1.0 * readRatio / xRatio, 1.0 * readRatio / yRatio, 1.0 / zRatio);
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
@@ -1079,7 +1079,7 @@ void ZImgHDF5::writeImg(const QString& filename, const ZImg& img, const ZImgWrit
       }
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(filename);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
@@ -1151,7 +1151,7 @@ void ZImgHDF5::writeImg(const QString& filename,
       LOG(INFO) << "Finish time " << t << "/" << imgSliceProvider.imgInfo().numTimes;
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(filename);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
@@ -1255,7 +1255,7 @@ void ZImgHDF5::writeImg(const QString& filename,
       }
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(filename);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }

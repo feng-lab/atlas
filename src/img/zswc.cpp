@@ -88,7 +88,7 @@ void ZSwc::resortPyramidal(int64_t basalType, int64_t apicalType, int64_t somaTy
 
 void ZSwc::resortID()
 {
-  size_t id = 1;
+  int64_t id = 1;
   for (BreadthFirstIterator it = beginBreadthFirst(); it != endBreadthFirst(); ++it) {
     it->id = id++;
     it->parentID = parentID(it);
@@ -105,7 +105,7 @@ void ZSwc::load(const QString& filename)
       throw ZIOException("Can not read file.");
     }
 
-    std::map<int, SwcNode> nodeMap;
+    std::map<int64_t, SwcNode> nodeMap;
 
     QTextStream stream(&qFile);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
@@ -160,16 +160,15 @@ void ZSwc::load(const QString& filename)
       }
     }
 
-    std::map<int, Iterator> itMap;
+    std::map<int64_t, Iterator> itMap;
     while (!nodeMap.empty()) {
       auto it = nodeMap.begin();
       while (it != nodeMap.end()) {
         auto parentID = it->second.parentID;
-        auto nodeIt = itMap.find(parentID);
-        if (nodeIt != itMap.end()) {
+        if (auto nodeIt = itMap.find(parentID); nodeIt != itMap.end()) {
           itMap[it->first] = appendChild(nodeIt->second, it->second);
           it = nodeMap.erase(it);
-        } else if (nodeMap.find(parentID) == nodeMap.end()) {
+        } else if (!nodeMap.contains(parentID)) {
           itMap[it->first] = appendRoot(it->second);
           it = nodeMap.erase(it);
         } else {

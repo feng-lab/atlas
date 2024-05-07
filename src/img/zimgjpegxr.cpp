@@ -288,7 +288,7 @@ void ZImgJpegXR::readImg(const QString& filename, ZImg& img, const ZImgRegion& r
 
   if (region.isEmpty() || !region.isValid(info)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
   }
 
   if (PI.grBit & PK_pixfmtHasAlpha) {

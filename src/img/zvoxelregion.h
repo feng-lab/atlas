@@ -122,31 +122,31 @@ class ZVoxelRegion
 {
 public:
   // using iterator = impl::voxel_iter<ZVoxelRegion>;
-  using const_iterator = impl::voxel_iter<ZVoxelRegion const>;
+  using const_iterator = impl::voxel_iter<const ZVoxelRegion>;
 
-  inline void addBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord)
+  void addBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord)
   {
     addBox(BoxType(minCoord, maxCoord));
   }
 
-  inline void clear()
+  void clear()
   {
     m_boxes.clear();
   }
 
-  [[nodiscard]] inline bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   {
     return m_boxes.empty();
   }
 
   void getBoundBox(ZVoxelCoordinate& minCoord, ZVoxelCoordinate& maxCoord) const;
 
-  [[nodiscard]] inline const_iterator begin() const
+  [[nodiscard]] const_iterator begin() const
   {
     return const_iterator(this, 0);
   }
 
-  [[nodiscard]] inline const_iterator end() const
+  [[nodiscard]] const_iterator end() const
   {
     return const_iterator(this, m_boxes.size());
   }
@@ -164,14 +164,14 @@ public:
 protected:
   using BoxType = ZBBox<ZVoxelCoordinate>;
 
-  inline void addBox(const BoxType& box)
+  void addBox(const BoxType& box)
   {
     if (!containsBox(box)) {
       m_boxes.push_back(box);
     }
   }
 
-  inline bool containsBox(const BoxType& box)
+  [[nodiscard]] bool containsBox(const BoxType& box) const
   {
     if (box.empty()) {
       return true;
@@ -185,7 +185,7 @@ protected:
     return false;
   }
 
-  inline bool containsBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord)
+  bool containsBox(const ZVoxelCoordinate& minCoord, const ZVoxelCoordinate& maxCoord)
   {
     return containsBox(BoxType(minCoord, maxCoord));
   }

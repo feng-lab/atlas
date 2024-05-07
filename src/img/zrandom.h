@@ -16,21 +16,21 @@ public:
   static ZRandom& instance();
 
   template<typename IntType = int>
-  inline IntType randInt(IntType maxValue = std::numeric_limits<IntType>::max(), IntType minValue = 0)
+  IntType randInt(IntType maxValue = std::numeric_limits<IntType>::max(), IntType minValue = 0)
   {
     std::uniform_int_distribution<IntType> dist(minValue, maxValue);
     return dist(m_eng);
   }
 
   template<typename Real = double>
-  inline Real randReal(Real maxValue = 1.0, Real minValue = 0.0)
+  Real randReal(Real maxValue = 1.0, Real minValue = 0.0)
   {
     std::uniform_real_distribution<Real> dist(minValue, maxValue);
     return dist(m_eng);
   }
 
   template<typename IntType>
-  inline std::vector<IntType> randPermutation(IntType maxValue, IntType minValue = 0)
+  std::vector<IntType> randPermutation(IntType maxValue, IntType minValue = 0)
   {
     static_assert(std::is_integral_v<IntType>, "randPermutation requires integer type");
     std::vector<IntType> res;

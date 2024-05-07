@@ -25,7 +25,7 @@ void removeComment(QString& line, const QString& commentStart = "#", bool checkS
 class QStringNaturalCompare
 {
 public:
-  inline bool operator()(const QString& s1, const QString& s2) const
+  bool operator()(const QString& s1, const QString& s2) const
   {
     return naturalSortLessThan(s1, s2);
   }

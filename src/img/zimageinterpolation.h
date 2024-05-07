@@ -62,7 +62,7 @@ public:
     m_interpolant = ip;
   }
 
-  PadOption padOption() const
+  [[nodiscard]] PadOption padOption() const
   {
     return m_padOption;
   }
@@ -72,7 +72,7 @@ public:
     m_fillValue = v;
   }
 
-  Interpolant interpolant() const
+  [[nodiscard]] Interpolant interpolant() const
   {
     return m_interpolant;
   }
@@ -82,9 +82,9 @@ public:
 
   static double bicubicInterpolate(double p[4][4], double x, double y) ;
 
-  double tricubicInterpolate(double p[4][4][4], double x, double y, double z) const;
+  static double tricubicInterpolate(double p[4][4][4], double x, double y, double z);
 
-  double nCubicInterpolate(int32_t n, double* p, double coordinates[]) const;
+  static double nCubicInterpolate(int32_t n, double* p, double coordinates[]);
 
   template<typename TPixel>
   double sample(const TPixel* img, size_t width, size_t height, double x, double y) const;
@@ -93,12 +93,12 @@ public:
   double sample(const TPixel* img, size_t width, size_t height, size_t depth, double x, double y, double z) const;
 
 protected:
-  [[nodiscard]] inline bool inBound(size_t width, size_t height, double x, double y) const
+  [[nodiscard]] static bool inBound(size_t width, size_t height, double x, double y)
   {
     return x >= 0. && x < static_cast<double>(width) && y >= 0. && y < static_cast<double>(height);
   }
 
-  inline bool inBound(size_t width, size_t height, size_t depth, double x, double y, double z) const
+  static bool inBound(size_t width, size_t height, size_t depth, double x, double y, double z)
   {
     return x >= 0. && x < static_cast<double>(width) && y >= 0. && y < static_cast<double>(height) && z >= 0. &&
            z < static_cast<double>(depth);

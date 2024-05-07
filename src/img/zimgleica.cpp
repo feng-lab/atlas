@@ -66,7 +66,7 @@ struct MemoryBlock64
 
 namespace nim {
 
-static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable<QUuid>::value, "wrong uuid type");
+static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable_v<QUuid>, "wrong uuid type");
 
 bool ZImgLeica::supportRead() const
 {
@@ -158,7 +158,7 @@ void ZImgLeica::readImg(const QString& filename, ZImg& img, const ZImgRegion& re
 
   if (region.isEmpty() || !region.isValid(info)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
   }
 
   ZImgRegion rgn = region;
@@ -813,7 +813,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
 
     if (!hasSceneDim) {
       ImageInfo info = ii;
-      erase_if(info.dimensions, [](const auto& ddd) { return ddd.dimID >= 5; });
+      erase_if(info.dimensions, [](const auto& ddd) {
+        return ddd.dimID >= 5;
+      });
       res.push_back(info);
     } else {
       if (ii.channels.size() > 1) {
@@ -877,7 +879,9 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
             }
           }
         }
-        erase_if(info.dimensions, [](const auto& ddd) { return ddd.dimID >= 5; });
+        erase_if(info.dimensions, [](const auto& ddd) {
+          return ddd.dimID >= 5;
+        });
         res.push_back(info);
 
         // advance to next scene

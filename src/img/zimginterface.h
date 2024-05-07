@@ -27,7 +27,7 @@ template<typename TEnum>
 TEnum stringToEnum(std::string_view s);
 
 template<typename TEnum>
-inline QString enumToQString(TEnum e)
+QString enumToQString(TEnum e)
 {
   auto str = enumToString(e);
   return QString::fromUtf8(str.data(), str.size());
@@ -35,7 +35,7 @@ inline QString enumToQString(TEnum e)
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
 template<typename TEnum>
-inline TEnum stringToEnum(QStringView s)
+TEnum stringToEnum(QStringView s)
 {
   auto str = s.toUtf8();
   return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
@@ -214,7 +214,7 @@ struct col4
   }
 
   // access
-  inline value_type& operator[](size_t i)
+  value_type& operator[](size_t i)
   {
     switch (i) {
       case 0:
@@ -230,7 +230,7 @@ struct col4
     }
   }
 
-  inline const value_type& operator[](size_t i) const
+  const value_type& operator[](size_t i) const
   {
     switch (i) {
       case 0:
@@ -246,12 +246,12 @@ struct col4
     }
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return jsonToQString(*this);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);
   }
@@ -392,10 +392,10 @@ constexpr auto&& get(const col4&& v) noexcept
 }
 
 template<class T>
-  requires std::is_same<json::detail::remove_cvref<T>, col4>::value
-inline T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
+  requires std::is_same_v<json::detail::remove_cvref<T>, col4>
+T tag_invoke(const json::value_to_tag<T>&, const json::value& jv)
 {
-  constexpr std::size_t n = std::tuple_size<json::detail::remove_cvref<T>>::value;
+  constexpr std::size_t n = std::tuple_size_v<json::detail::remove_cvref<T>>;
   const auto& ja = jv.as_array();
   if (ja.size() < n) {
     throw ZIOException("json array too short");

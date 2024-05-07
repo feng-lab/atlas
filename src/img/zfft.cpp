@@ -25,7 +25,7 @@ namespace {
 
 #ifdef ZIMG_USE_MKL
 
-inline void MKL_DFTI_CHECK(MKL_LONG status)
+void MKL_DFTI_CHECK(MKL_LONG status)
 {
   if (status && !DftiErrorClass(status, DFTI_NO_ERROR)) {
     throw nim::ZException(fmt::format("MKL FFT error: {}", DftiErrorMessage(status)));

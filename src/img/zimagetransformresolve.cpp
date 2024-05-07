@@ -95,9 +95,9 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
 {
   CHECK(!m_idxTransforms.empty());
   std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> res;
-  for (const auto& idxTfm : m_idxTransforms) {
-    res[idxTfm.first] = std::make_unique<ZImageCompositeTransform>();
-    res[idxTfm.first]->addTransform(*idxTfm.second);
+  for (const auto& [idx, tfm] : m_idxTransforms) {
+    res[idx] = std::make_unique<ZImageCompositeTransform>();
+    res[idx]->addTransform(*tfm);
   }
   if (m_idxPairs.empty()) {
     return res;
@@ -105,8 +105,8 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
 
   size_t refIdx = m_idxTransforms.cbegin()->first;
   double minCost = std::numeric_limits<double>::max();
-  for (const auto& imgImgTfmCost : m_idxPairs) {
-    minCost = std::min(minCost, imgImgTfmCost.second.second);
+  for (const auto& [imgImg, tfmCost] : m_idxPairs) {
+    minCost = std::min(minCost, tfmCost.second);
   }
 
   using GraphT = boost::adjacency_list<boost::listS, boost::listS, boost::undirectedS, VertexInfo, EdgeInfo>;
@@ -116,16 +116,15 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
   GraphT graph;
 
   size_t vIdx = 0;
-  for (const auto& idxTfm : m_idxTransforms) {
-    if (idxToVertexMapper.find(idxTfm.first) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(idxTfm.first, vIdx++), graph);
-      idxToVertexMapper[idxTfm.first] = v;
+  for (const auto& [idx, tfm] : m_idxTransforms) {
+    if (!idxToVertexMapper.contains(idx)) {
+      Vertex v = boost::add_vertex(VertexInfo(idx, vIdx++), graph);
+      idxToVertexMapper[idx] = v;
     }
   }
   {
     // use low cost to connect imgs with absolute location
-    auto it = m_idxTransforms.cbegin();
-    if (it != m_idxTransforms.cend()) {
+    if (auto it = m_idxTransforms.cbegin(); it != m_idxTransforms.cend()) {
       auto nextIt = it;
       ++nextIt;
       for (; nextIt != m_idxTransforms.cend(); ++nextIt, ++it) {
@@ -134,19 +133,16 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
     }
   }
 
-  for (const auto& imgImgTfmCost : m_idxPairs) {
-    if (idxToVertexMapper.find(imgImgTfmCost.first.first) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(imgImgTfmCost.first.first, vIdx++), graph);
-      idxToVertexMapper[imgImgTfmCost.first.first] = v;
+  for (const auto& [imgImg, tfmCost] : m_idxPairs) {
+    if (!idxToVertexMapper.contains(imgImg.first)) {
+      Vertex v = boost::add_vertex(VertexInfo(imgImg.first, vIdx++), graph);
+      idxToVertexMapper[imgImg.first] = v;
     }
-    if (idxToVertexMapper.find(imgImgTfmCost.first.second) == idxToVertexMapper.end()) {
-      Vertex v = boost::add_vertex(VertexInfo(imgImgTfmCost.first.second, vIdx++), graph);
-      idxToVertexMapper[imgImgTfmCost.first.second] = v;
+    if (!idxToVertexMapper.contains(imgImg.second)) {
+      Vertex v = boost::add_vertex(VertexInfo(imgImg.second, vIdx++), graph);
+      idxToVertexMapper[imgImg.second] = v;
     }
-    boost::add_edge(idxToVertexMapper[imgImgTfmCost.first.first],
-                    idxToVertexMapper[imgImgTfmCost.first.second],
-                    EdgeInfo(imgImgTfmCost.second.second),
-                    graph);
+    boost::add_edge(idxToVertexMapper[imgImg.first], idxToVertexMapper[imgImg.second], EdgeInfo(tfmCost.second), graph);
   }
 
   std::vector<int> c(boost::num_vertices(graph));
@@ -176,11 +172,11 @@ std::map<size_t, std::unique_ptr<ZImageCompositeTransform>> ZImageTransformResol
                               .color_map(boost::get(&VertexInfo::m_algo_color, fg)));
 
   LOG(INFO) << "transform resolve summary:";
-  for (size_t i = 0; i < sortedEdges.size(); ++i) {
-    size_t img1 = graph[boost::source(sortedEdges[i], graph)].img;
-    size_t img2 = graph[boost::target(sortedEdges[i], graph)].img;
-    bool img1HasLocation = res.find(img1) != res.end();
-    bool img2HasLocation = res.find(img2) != res.end();
+  for (const auto& sortedEdge : sortedEdges) {
+    size_t img1 = graph[boost::source(sortedEdge, graph)].img;
+    size_t img2 = graph[boost::target(sortedEdge, graph)].img;
+    bool img1HasLocation = res.contains(img1);
+    bool img2HasLocation = res.contains(img2);
 
     if (img1HasLocation && !img2HasLocation) {
       std::map<std::pair<size_t, size_t>, std::pair<const ZImageTransform*, double>>::const_iterator pairIt;

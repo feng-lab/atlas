@@ -535,9 +535,7 @@ void ZImg::wrapData(void* data, const ZImgInfo& info)
   m_data.resize(m_info.numTimes);
 
   for (size_t i = 0; i < m_info.numTimes; ++i) {
-    // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
-    // examination of the object representation of any object as an array of unsigned char.)
-    m_data[i] = reinterpret_cast<uint8_t*>(data) + i * info.timeVoxelNumber();
+    m_data[i] = static_cast<uint8_t*>(data) + i * info.timeVoxelNumber();
   }
 }
 
@@ -554,9 +552,7 @@ void ZImg::wrapData(const std::vector<void*>& data, const ZImgInfo& info)
   CHECK(m_data.size() == data.size());
 
   for (size_t i = 0; i < m_info.numTimes; ++i) {
-    // reinterpret_cast allowed (AliasedType is char or unsigned char: this permits
-    // examination of the object representation of any object as an array of unsigned char.)
-    m_data[i] = reinterpret_cast<uint8_t*>(data[i]);
+    m_data[i] = static_cast<uint8_t*>(data[i]);
   }
 }
 
@@ -1254,7 +1250,7 @@ ZImg ZImg::combine(const std::vector<const ZImg*>& imgsIn, ImgMergeMode mode)
   }
 
   if (imgs.empty()) {
-    return ZImg();
+    return {};
   }
   if (imgs.size() == 1) {
     return *(imgs[0]);
@@ -1993,7 +1989,7 @@ ZImg ZImg::fromQImage(const QImage& image)
   info.lastChannelIsAlphaChannel = true;
   res = ZImg(info);
   for (auto h = 0; h < image.height(); ++h) {
-    QRgb* qimData = reinterpret_cast<QRgb*>(qimg.scanLine(h));
+    auto qimData = reinterpret_cast<QRgb*>(qimg.scanLine(h));
     for (auto w = 0; w < qimg.width(); ++w) {
       auto rgb = qimData[w];
       res.setValue(qRed(rgb), w, h, 0, 0);

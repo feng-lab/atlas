@@ -395,7 +395,7 @@ struct ZImgSource
              bool expandXY_ = true,
              bool expandWithMaxValue_ = false);
 
-  inline bool operator==(const ZImgSource& other) const
+  bool operator==(const ZImgSource& other) const
   {
     if (filenames == other.filenames) {
       if (filenames.size() == 1) {
@@ -407,12 +407,12 @@ struct ZImgSource
     return false;
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return jsonToQString(*this);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);
   }
@@ -690,42 +690,42 @@ public:
 
   void wrapData(const std::vector<void*>& data, const ZImgInfo& info);
 
-  [[nodiscard]] inline bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   {
     return m_data.empty() || m_info.isEmpty();
   }
 
-  [[nodiscard]] inline bool hasThumbnail() const
+  [[nodiscard]] bool hasThumbnail() const
   {
     return !m_thumbnail.isEmpty();
   }
 
-  [[nodiscard]] inline const ZImgThumbernail& thumbnail() const
+  [[nodiscard]] const ZImgThumbernail& thumbnail() const
   {
     return m_thumbnail;
   }
 
-  [[nodiscard]] inline const ZImgInfo& info() const
+  [[nodiscard]] const ZImgInfo& info() const
   {
     return m_info;
   }
 
-  [[nodiscard]] inline const ZImgMetadata& metadata() const
+  [[nodiscard]] const ZImgMetadata& metadata() const
   {
     return m_metadata;
   }
 
-  inline ZImgThumbernail& thumbnailRef()
+  ZImgThumbernail& thumbnailRef()
   {
     return m_thumbnail;
   }
 
-  inline ZImgInfo& infoRef()
+  ZImgInfo& infoRef()
   {
     return m_info;
   }
 
-  inline ZImgMetadata& metadataRef()
+  ZImgMetadata& metadataRef()
   {
     return m_metadata;
   }
@@ -736,252 +736,252 @@ public:
     return m_info.isType<TVoxel>();
   }
 
-  [[nodiscard]] inline bool isSameType(const ZImg& other) const
+  [[nodiscard]] bool isSameType(const ZImg& other) const
   {
     return m_info.isSameType(other.m_info);
   }
 
-  [[nodiscard]] inline bool isSameType(const ZImgInfo& otherInfo) const
+  [[nodiscard]] bool isSameType(const ZImgInfo& otherInfo) const
   {
     return m_info.isSameType(otherInfo);
   }
 
-  [[nodiscard]] inline bool isSameSize(const ZImg& other) const
+  [[nodiscard]] bool isSameSize(const ZImg& other) const
   {
     return m_info.isSameSize(other.m_info);
   }
 
-  [[nodiscard]] inline bool contains(size_t x, size_t y, size_t z, size_t c, size_t t = 0) const
+  [[nodiscard]] bool contains(size_t x, size_t y, size_t z, size_t c, size_t t = 0) const
   {
     return !isEmpty() && x < m_info.width && y < m_info.height && z < m_info.depth && c < m_info.numChannels &&
            t < m_info.numTimes;
   }
 
-  [[nodiscard]] inline size_t size(Dimension dim) const
+  [[nodiscard]] size_t size(Dimension dim) const
   {
     return m_info.size(dim);
   }
 
-  [[nodiscard]] inline size_t size(size_t dim) const
+  [[nodiscard]] size_t size(size_t dim) const
   {
     return m_info.size(dim);
   }
 
   // inline bool isMultiLocationsImg() const { return m_info.numLocations > 1; }
-  [[nodiscard]] inline bool isTimeSeries() const
+  [[nodiscard]] bool isTimeSeries() const
   {
     return m_info.numTimes > 1;
   }
 
-  [[nodiscard]] inline bool isMultiChannelsImg() const
+  [[nodiscard]] bool isMultiChannelsImg() const
   {
     return m_info.numChannels > 1;
   }
 
   // imgs that have x,y,z dimensions and don't have t,l dimensions are 3D Img, x,y dimensions can be singleton
-  [[nodiscard]] inline bool is3DImg() const
+  [[nodiscard]] bool is3DImg() const
   {
     return !isEmpty() && m_info.numTimes == 1 && m_info.depth > 1;
   }
 
   // imgs that have x,y dimensions and don't have z,t,l dimensions are 2D Img, x,y dimensions can be singleton
-  [[nodiscard]] inline bool is2DImg() const
+  [[nodiscard]] bool is2DImg() const
   {
     return !isEmpty() && m_info.numTimes == 1 && m_info.depth == 1;
   }
 
-  [[nodiscard]] inline size_t voxelByteNumber() const
+  [[nodiscard]] size_t voxelByteNumber() const
   {
     return m_info.voxelByteNumber();
   }
 
-  [[nodiscard]] inline size_t rowVoxelNumber() const
+  [[nodiscard]] size_t rowVoxelNumber() const
   {
     return m_info.rowVoxelNumber();
   }
 
-  [[nodiscard]] inline size_t rowByteNumber() const
+  [[nodiscard]] size_t rowByteNumber() const
   {
     return m_info.rowByteNumber();
   }
 
-  [[nodiscard]] inline size_t planeVoxelNumber() const
+  [[nodiscard]] size_t planeVoxelNumber() const
   {
     return m_info.planeVoxelNumber();
   }
 
-  [[nodiscard]] inline size_t planeByteNumber() const
+  [[nodiscard]] size_t planeByteNumber() const
   {
     return m_info.planeByteNumber();
   }
 
-  [[nodiscard]] inline size_t channelVoxelNumber() const
+  [[nodiscard]] size_t channelVoxelNumber() const
   {
     return m_info.channelVoxelNumber();
   }
 
-  [[nodiscard]] inline size_t channelByteNumber() const
+  [[nodiscard]] size_t channelByteNumber() const
   {
     return m_info.channelByteNumber();
   }
 
-  [[nodiscard]] inline size_t timeVoxelNumber() const
+  [[nodiscard]] size_t timeVoxelNumber() const
   {
     return m_info.timeVoxelNumber();
   }
 
-  [[nodiscard]] inline size_t timeByteNumber() const
+  [[nodiscard]] size_t timeByteNumber() const
   {
     return m_info.timeByteNumber();
   }
 
   // inline size_t locationVoxelNumber() const { return m_info.locationVoxelNumber(); }
   // inline size_t locationByteNumber() const { return m_info.locationByteNumber(); }
-  [[nodiscard]] inline size_t voxelNumber() const
+  [[nodiscard]] size_t voxelNumber() const
   {
     return m_info.voxelNumber();
   }
 
-  [[nodiscard]] inline size_t byteNumber() const
+  [[nodiscard]] size_t byteNumber() const
   {
     return m_info.byteNumber();
   }
 
-  [[nodiscard]] inline size_t width() const
+  [[nodiscard]] size_t width() const
   {
     return m_info.width;
   }
 
-  [[nodiscard]] inline size_t height() const
+  [[nodiscard]] size_t height() const
   {
     return m_info.height;
   }
 
-  [[nodiscard]] inline size_t depth() const
+  [[nodiscard]] size_t depth() const
   {
     return m_info.depth;
   }
 
-  [[nodiscard]] inline size_t numChannels() const
+  [[nodiscard]] size_t numChannels() const
   {
     return m_info.numChannels;
   }
 
-  [[nodiscard]] inline size_t numTimes() const
+  [[nodiscard]] size_t numTimes() const
   {
     return m_info.numTimes;
   }
 
   // inline size_t numLocations() const { return m_info.numLocations; }
-  [[nodiscard]] inline VoxelFormat voxelFormat() const
+  [[nodiscard]] VoxelFormat voxelFormat() const
   {
     return m_info.voxelFormat;
   }
 
-  [[nodiscard]] inline size_t bytesPerVoxel() const
+  [[nodiscard]] size_t bytesPerVoxel() const
   {
     return m_info.bytesPerVoxel;
   }
 
-  [[nodiscard]] inline size_t validBitCount() const
+  [[nodiscard]] size_t validBitCount() const
   {
     return m_info.validBitCount;
   }
 
-  [[nodiscard]] inline VoxelSizeUnit voxelSizeUnit() const
+  [[nodiscard]] VoxelSizeUnit voxelSizeUnit() const
   {
     return m_info.voxelSizeUnit;
   }
 
-  [[nodiscard]] inline double voxelSizeX() const
+  [[nodiscard]] double voxelSizeX() const
   {
     return m_info.voxelSizeX;
   }
 
-  [[nodiscard]] inline double voxelSizeY() const
+  [[nodiscard]] double voxelSizeY() const
   {
     return m_info.voxelSizeY;
   }
 
-  [[nodiscard]] inline double voxelSizeZ() const
+  [[nodiscard]] double voxelSizeZ() const
   {
     return m_info.voxelSizeZ;
   }
 
   //  // if current or result voxelSizeUnit is Voxel, throw exception
-  //  inline double voxelSizeXInUnit(VoxelSizeUnit unit) const
+  //   double voxelSizeXInUnit(VoxelSizeUnit unit) const
   //  { return m_info.voxelSizeXInUnit(unit); }
   //
-  //  inline double voxelSizeYInUnit(VoxelSizeUnit unit) const
+  //   double voxelSizeYInUnit(VoxelSizeUnit unit) const
   //  { return m_info.voxelSizeYInUnit(unit); }
   //
-  //  inline double voxelSizeZInUnit(VoxelSizeUnit unit) const
+  //   double voxelSizeZInUnit(VoxelSizeUnit unit) const
   //  { return m_info.voxelSizeZInUnit(unit); }
   //
-  //  inline double voxelSizeXInUm() const
+  //   double voxelSizeXInUm() const
   //  { return voxelSizeXInUnit(VoxelSizeUnit::um); }
   //
-  //  inline double voxelSizeYInUm() const
+  //   double voxelSizeYInUm() const
   //  { return voxelSizeYInUnit(VoxelSizeUnit::um); }
   //
-  //  inline double voxelSizeZInUm() const
+  //   double voxelSizeZInUm() const
   //  { return voxelSizeZInUnit(VoxelSizeUnit::um); }
 
-  [[nodiscard]] inline col4 channelColor(size_t c) const
+  [[nodiscard]] col4 channelColor(size_t c) const
   {
     return m_info.channelColors[c];
   }
 
   // inline Location location(size_t l) const { return m_info.locations[l]; }
-  [[nodiscard]] inline const QString& channelName(size_t c) const
+  [[nodiscard]] const QString& channelName(size_t c) const
   {
     return m_info.channelNames[c];
   }
 
-  [[nodiscard]] inline QString displayChannelName(size_t c) const
+  [[nodiscard]] QString displayChannelName(size_t c) const
   {
     return m_info.displayChannelName(c);
   }
 
-  [[nodiscard]] inline double timeStamp(size_t t) const
+  [[nodiscard]] double timeStamp(size_t t) const
   {
     return m_info.timeStamps[t];
   }
 
   template<typename T = uint8_t>
-  inline T* timeData(size_t t)
+  T* timeData(size_t t)
   {
     return reinterpret_cast<T*>(m_data[t]);
   }
 
   template<typename T = uint8_t>
-  inline T* channelData(size_t c, size_t t = 0)
+  T* channelData(size_t c, size_t t = 0)
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline T* planeData(size_t z, size_t c = 0, size_t t = 0)
+  T* planeData(size_t z, size_t c = 0, size_t t = 0)
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
+  T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() +
                                 y * m_info.rowByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
+  T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0)
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() +
                                 y * m_info.rowByteNumber() + x * m_info.voxelByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline T* data(const ZVoxelCoordinate& coord)
+  T* data(const ZVoxelCoordinate& coord)
   {
     return reinterpret_cast<T*>(m_data[coord.t] + coord.c * m_info.channelByteNumber() +
                                 coord.z * m_info.planeByteNumber() + coord.y * m_info.rowByteNumber() +
@@ -989,7 +989,7 @@ public:
   }
 
   template<typename T = uint8_t>
-  inline T* data(size_t idx)
+  T* data(size_t idx)
   {
     // size_t l = idx / m_info.locationVoxelNumber();
     // idx -= l * m_info.locationVoxelNumber();
@@ -999,39 +999,39 @@ public:
   }
 
   template<typename T = uint8_t>
-  [[nodiscard]] inline const T* timeData(size_t t) const
+  [[nodiscard]] const T* timeData(size_t t) const
   {
     return reinterpret_cast<T*>(m_data[t]);
   }
 
   template<typename T = uint8_t>
-  inline const T* channelData(size_t c, size_t t = 0) const
+  const T* channelData(size_t c, size_t t = 0) const
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline const T* planeData(size_t z, size_t c = 0, size_t t = 0) const
+  const T* planeData(size_t z, size_t c = 0, size_t t = 0) const
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline const T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
+  const T* rowData(size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() +
                                 y * m_info.rowByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline const T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
+  const T* data(size_t x, size_t y, size_t z = 0, size_t c = 0, size_t t = 0) const
   {
     return reinterpret_cast<T*>(m_data[t] + c * m_info.channelByteNumber() + z * m_info.planeByteNumber() +
                                 y * m_info.rowByteNumber() + x * m_info.voxelByteNumber());
   }
 
   template<typename T = uint8_t>
-  inline const T* data(const ZVoxelCoordinate& coord) const
+  const T* data(const ZVoxelCoordinate& coord) const
   {
     return reinterpret_cast<T*>(m_data[coord.t] + coord.c * m_info.channelByteNumber() +
                                 coord.z * m_info.planeByteNumber() + coord.y * m_info.rowByteNumber() +
@@ -1039,7 +1039,7 @@ public:
   }
 
   template<typename T = uint8_t>
-  inline const T* data(size_t idx) const
+  const T* data(size_t idx) const
   {
     // size_t l = idx / m_info.locationVoxelNumber();
     // idx -= l * m_info.locationVoxelNumber();
@@ -1051,8 +1051,7 @@ public:
   // return out bound voxel value based on boundary condition (padOption)
   // img must be type T otherwise might crash
   template<typename T>
-  inline T
-  outBoundValue(const ZVoxelCoordinate& coord, PadOption padOption = PadOption::Constant, T padValue = T(0)) const
+  T outBoundValue(const ZVoxelCoordinate& coord, PadOption padOption = PadOption::Constant, T padValue = T(0)) const
   {
     if (padOption == PadOption::Constant) {
       return padValue;
@@ -1063,13 +1062,13 @@ public:
   }
 
   template<typename T>
-  inline T outBoundValue(index_t x,
-                         index_t y,
-                         index_t z,
-                         index_t c = 0,
-                         index_t t = 0,
-                         PadOption padOption = PadOption::Constant,
-                         T padValue = T(0)) const
+  T outBoundValue(index_t x,
+                  index_t y,
+                  index_t z,
+                  index_t c = 0,
+                  index_t t = 0,
+                  PadOption padOption = PadOption::Constant,
+                  T padValue = T(0)) const
   {
     if (padOption == PadOption::Constant) {
       return padValue;
@@ -1097,7 +1096,7 @@ public:
 
   [[nodiscard]] ZImg createView(size_t z, size_t c, size_t t) const;
 
-  [[nodiscard]] inline bool isImgView() const
+  [[nodiscard]] bool isImgView() const
   {
     return !m_ownData;
   }
@@ -1116,7 +1115,7 @@ public:
 
   // given an bin index, return data range this bin represent
   // not very accurate for 64-bit integer type
-  [[nodiscard]] inline std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const
+  [[nodiscard]] std::pair<double, double> binRange(size_t binIdx, size_t nbins = 0) const
   {
     return m_info.binRange(binIdx, nbins);
   }
@@ -1148,7 +1147,7 @@ public:
 
   // overload
   template<typename TRange>
-  inline std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
+  std::pair<double, double> binRange(size_t binIdx, TRange minData, TRange maxData, size_t nbins = 0) const
   {
     return m_info.binRange<TRange>(binIdx, minData, maxData, nbins);
   }
@@ -1158,13 +1157,13 @@ public:
   // use template return type because img can be any type, and even double type can not represent all 64-bit integer
   // type value
   template<typename TValue = double>
-  inline TValue dataRangeMin() const
+  TValue dataRangeMin() const
   {
     return m_info.dataRangeMin<TValue>();
   }
 
   template<typename TValue = double>
-  inline TValue dataRangeMax() const
+  TValue dataRangeMax() const
   {
     return m_info.dataRangeMax<TValue>();
   }
@@ -1455,8 +1454,7 @@ public:
                bool useMultithreading = true);
 
   // intel ipp version, will crash if interpolant or data type is not supported
-  inline ZImg&
-  resizeIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic)
+  ZImg& resizeIPP(size_t desWidth, size_t desHeight, size_t desDepth, Interpolant interpolant = Interpolant::Cubic)
   {
     if (width() == desWidth && height() == desHeight && depth() == desDepth) {
       return *this;
@@ -1544,7 +1542,7 @@ public:
 
   // return a uint8_t img with 1 and 0
   // for all img type, if voxel > 0, result mask voxel = 1
-  [[nodiscard]] inline ZImg binarized() const
+  [[nodiscard]] ZImg binarized() const
   {
     return binarized(0, ThresholdMode::ExcludeThreshold);
   }
@@ -1778,24 +1776,24 @@ public:
   // if only last dimension of coord is invalid, result can still be meaningful
   static index_t coordToIndex(const ZVoxelCoordinate& coord, const ZImgInfo& info);
 
-  [[nodiscard]] inline ZVoxelCoordinate indexToCoord(index_t idx) const
+  [[nodiscard]] ZVoxelCoordinate indexToCoord(index_t idx) const
   {
     return indexToCoord(idx, m_info);
   }
 
-  [[nodiscard]] inline index_t coordToIndex(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] index_t coordToIndex(const ZVoxelCoordinate& coord) const
   {
     return coordToIndex(coord, m_info);
   }
 
   // coord of one voxel pass each dimension
-  [[nodiscard]] inline ZVoxelCoordinate endCoord() const
+  [[nodiscard]] ZVoxelCoordinate endCoord() const
   {
     return ZVoxelCoordinate(m_info.width, m_info.height, m_info.depth, m_info.numChannels, m_info.numTimes);
   }
 
   // max valid coord, **note** throw ZException for empty img
-  [[nodiscard]] inline ZVoxelCoordinate maxCoord() const
+  [[nodiscard]] ZVoxelCoordinate maxCoord() const
   {
     if (isEmpty()) {
       throw ZException("No max coord for empty img");
@@ -1808,7 +1806,7 @@ public:
   }
 
   // coord will always be invalid if img is empty
-  [[nodiscard]] inline bool isCoordValid(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] bool isCoordValid(const ZVoxelCoordinate& coord) const
   {
     return !isEmpty() && coord.allGreaterEqual(0) && coord.allLessThan(endCoord());
   }
@@ -1907,13 +1905,13 @@ public:
 
   // overload
   template<typename TValue = double>
-  inline TValue valueWithPad(index_t x,
-                             index_t y,
-                             index_t z,
-                             index_t c = 0,
-                             index_t t = 0,
-                             PadOption padOption = PadOption::Constant,
-                             TValue padValue = TValue(0)) const
+  TValue valueWithPad(index_t x,
+                      index_t y,
+                      index_t z,
+                      index_t c = 0,
+                      index_t t = 0,
+                      PadOption padOption = PadOption::Constant,
+                      TValue padValue = TValue(0)) const
   {
     return valueWithPad(ZVoxelCoordinate(x, y, z, c, t), padOption, padValue);
   }
@@ -2234,7 +2232,7 @@ private:
   void histogram_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData) const;
 
   template<typename TVoxel>
-  inline void histogram_Impl(std::vector<size_t>& res) const
+  void histogram_Impl(std::vector<size_t>& res) const
   {
     histogram_Impl(res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>());
   }
@@ -2243,7 +2241,7 @@ private:
   void histogramMask_Impl(std::vector<size_t>& res, TVoxel minData, TVoxel maxData, const ZImg& mask) const;
 
   template<typename TVoxel, typename TMaskVoxel>
-  inline void histogramMask_Impl(std::vector<size_t>& res, const ZImg& mask) const
+  void histogramMask_Impl(std::vector<size_t>& res, const ZImg& mask) const
   {
     histogramMask_Impl<TVoxel, TMaskVoxel>(res, dataRangeMin<TVoxel>(), dataRangeMax<TVoxel>(), mask);
   }
@@ -2380,25 +2378,25 @@ private:
   }
 
   template<typename TVoxel>
-  [[nodiscard]] inline TVoxel value_Impl(const ZVoxelCoordinate& coord) const
+  [[nodiscard]] TVoxel value_Impl(const ZVoxelCoordinate& coord) const
   {
     return *(data<TVoxel>(coord));
   }
 
   template<typename TVoxel>
-  [[nodiscard]] inline TVoxel value_Impl(size_t x, size_t y, size_t z, size_t c, size_t t) const
+  [[nodiscard]] TVoxel value_Impl(size_t x, size_t y, size_t z, size_t c, size_t t) const
   {
     return *(data<TVoxel>(x, y, z, c, t));
   }
 
   template<typename TVoxel>
-  [[nodiscard]] inline TVoxel value_Impl(size_t idx) const
+  [[nodiscard]] TVoxel value_Impl(size_t idx) const
   {
     return *(data<TVoxel>(idx));
   }
 
   template<typename TVoxel>
-  inline TVoxel valueWithPad_Impl(const ZVoxelCoordinate& coord, PadOption padOption, TVoxel padValue) const
+  TVoxel valueWithPad_Impl(const ZVoxelCoordinate& coord, PadOption padOption, TVoxel padValue) const
   {
     return (coord.allGreaterEqual(0) && coord.allLessThan(endCoord()))
              ? (*(data<TVoxel>(coord)))
@@ -2406,19 +2404,19 @@ private:
   }
 
   template<typename TVoxel>
-  inline void setValue_Impl(TVoxel value, const ZVoxelCoordinate& coord)
+  void setValue_Impl(TVoxel value, const ZVoxelCoordinate& coord)
   {
     *(data<TVoxel>(coord)) = value;
   }
 
   template<typename TVoxel>
-  inline void setValue_Impl(TVoxel value, size_t x, size_t y, size_t z, size_t c, size_t t)
+  void setValue_Impl(TVoxel value, size_t x, size_t y, size_t z, size_t c, size_t t)
   {
     *(data<TVoxel>(x, y, z, c, t)) = value;
   }
 
   template<typename TVoxel>
-  inline void setValue_Impl(TVoxel value, size_t idx)
+  void setValue_Impl(TVoxel value, size_t idx)
   {
     *(data<TVoxel>(idx)) = value;
   }

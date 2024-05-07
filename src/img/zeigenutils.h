@@ -99,10 +99,10 @@ struct MaxFloatType
   using T1NonIntegerType = typename Eigen::NumTraits<T1>::NonInteger;
   using T2NonIntegerType = typename Eigen::NumTraits<T2>::NonInteger;
   // get larger type of two float type, use this type for all calculations
-  using type = typename std::conditional<(std::numeric_limits<T1NonIntegerType>::digits10 >
-                                          std::numeric_limits<T2NonIntegerType>::digits10),
-                                         T1NonIntegerType,
-                                         T2NonIntegerType>::type;
+  using type = std::conditional_t<(std::numeric_limits<T1NonIntegerType>::digits10 >
+                                   std::numeric_limits<T2NonIntegerType>::digits10),
+                                  T1NonIntegerType,
+                                  T2NonIntegerType>;
 };
 
 class ZEigenUtils
@@ -253,15 +253,15 @@ public:
   static Eigen::MatrixXd removeRowsContainNaNOrInF(const Eigen::MatrixXd& srcMat);
 
   template<typename Derived>
-  inline static Derived
+  static Derived
   clampMatrix(const Eigen::MatrixBase<Derived>& srcMat, typename Derived::Scalar inf, typename Derived::Scalar sup)
   {
     return srcMat.unaryExpr(CwiseClampOp<typename Derived::Scalar>(inf, sup));
   }
 
   template<typename Real>
-  inline static bool matrixIsPositiveDefinite(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                              Real thre = Eigen::NumTraits<Real>::dummy_precision())
+  static bool matrixIsPositiveDefinite(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& x,
+                                       Real thre = Eigen::NumTraits<Real>::dummy_precision())
   {
     Eigen::SelfAdjointEigenSolver<Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>> es;
     es.compute(x);
@@ -269,33 +269,36 @@ public:
   }
 
   template<typename Derived>
-  inline static Derived matrixDigamma(const Eigen::MatrixBase<Derived>& x)
+  static Derived matrixDigamma(const Eigen::MatrixBase<Derived>& x)
   {
-    return x.unaryExpr([](typename Derived::Scalar v) { return boost::math::digamma(v); });
+    return x.unaryExpr([](typename Derived::Scalar v) {
+      return boost::math::digamma(v);
+    });
   }
 
   template<class T>
-  inline static typename Eigen::NumTraits<T>::NonInteger digamma(const T x)
+  static typename Eigen::NumTraits<T>::NonInteger digamma(const T x)
   {
     return boost::math::digamma(static_cast<typename Eigen::NumTraits<T>::NonInteger>(x));
   }
 
   template<typename Derived>
-  inline static Derived matrixGammaln(const Eigen::MatrixBase<Derived>& x)
+  static Derived matrixGammaln(const Eigen::MatrixBase<Derived>& x)
   {
-    return x.unaryExpr([](typename Derived::Scalar v) { return boost::math::lgamma(v); });
+    return x.unaryExpr([](typename Derived::Scalar v) {
+      return boost::math::lgamma(v);
+    });
   }
 
   template<class T>
-  inline static typename Eigen::NumTraits<T>::NonInteger gammaln(const T x)
+  static typename Eigen::NumTraits<T>::NonInteger gammaln(const T x)
   {
     return boost::math::lgamma(static_cast<typename Eigen::NumTraits<T>::NonInteger>(x));
   }
 
   // Compute log(det(x)) where x is positive-definite
   template<class T>
-  inline static typename Eigen::NumTraits<T>::NonInteger
-  logdet(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  static typename Eigen::NumTraits<T>::NonInteger logdet(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     using MatrixXni = Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, Eigen::Dynamic, Eigen::Dynamic>;
     MatrixXni floatx = x.template cast<typename Eigen::NumTraits<T>::NonInteger>();
@@ -312,7 +315,7 @@ public:
 
   // returns the log of multivariate gamma(n, alpha) value.
   template<class Real>
-  inline static Real mvtGammaln(Real n, Real alpha)
+  static Real mvtGammaln(Real n, Real alpha)
   {
     using namespace boost::math::constants;
     Eigen::Matrix<Real, Eigen::Dynamic, 1> tmp =
@@ -322,8 +325,7 @@ public:
 
   // return log(sum(exp(x))) along each row
   template<class T>
-  inline static Eigen::Matrix<T, Eigen::Dynamic, 1>
-  logsumexpRow(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  static Eigen::Matrix<T, Eigen::Dynamic, 1> logsumexpRow(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     Eigen::Matrix<T, Eigen::Dynamic, 1> y = x.rowwise().maxCoeff();
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
@@ -339,8 +341,7 @@ public:
 
   // return log(sum(exp(x))) along each col
   template<class T>
-  inline static Eigen::Matrix<T, 1, Eigen::Dynamic>
-  logsumexpCol(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
+  static Eigen::Matrix<T, 1, Eigen::Dynamic> logsumexpCol(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     Eigen::Matrix<T, 1, Eigen::Dynamic> y = x.colwise().maxCoeff();
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> xdiff =
@@ -355,7 +356,7 @@ public:
   }
 
   template<class T>
-  inline static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
+  static size_t rank(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x, double thre = -1)
   {
     Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> svd(x);
     if (thre > 0) {
@@ -365,8 +366,8 @@ public:
   }
 
   template<class T>
-  inline static bool allNearZero(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
-                                 T thre = std::numeric_limits<T>::epsilon())
+  static bool allNearZero(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
+                          T thre = std::numeric_limits<T>::epsilon())
   {
     CHECK(thre >= T(0));
     return (x.array().abs() < std::numeric_limits<T>::epsilon()).all();
@@ -374,7 +375,7 @@ public:
 
   // replicate features based on weight
   template<class T, class WeightT>
-  inline static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
+  static Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>
   replicateFeature(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
                    const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
   {
@@ -389,7 +390,7 @@ public:
 
   // similar to matlab mean, get mean of each column
   template<class T>
-  inline static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
+  static Eigen::Matrix<typename Eigen::NumTraits<T>::NonInteger, 1, Eigen::Dynamic>
   featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x)
   {
     if constexpr (std::is_integral_v<std::remove_reference_t<T>>) {
@@ -402,7 +403,7 @@ public:
   }
 
   template<typename T, typename WeightT>
-  inline static Eigen::Matrix<typename MaxFloatType<T, WeightT>::type, 1, Eigen::Dynamic>
+  static Eigen::Matrix<typename MaxFloatType<T, WeightT>::type, 1, Eigen::Dynamic>
   featureMean(const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& x,
               const Eigen::Matrix<WeightT, Eigen::Dynamic, 1>& weight)
   {
@@ -469,7 +470,7 @@ public:
 
   // The shrunk Ledoit-Wolf covariance, return invertible covariance matrix estimator
   //"A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices", Journal of Multivariate Analysis, Volume
-  //88,
+  // 88,
   // Issue 2, February 2004, pages 365-411.
   // if inputShrink is specified, then this const. is used for shrinkage. inputShrink should be range [0 1]
   // shrink from biased sample covariance to I.*(trace(cov)/p)

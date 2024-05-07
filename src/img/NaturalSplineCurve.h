@@ -91,12 +91,12 @@ namespace gte
         virtual ~NaturalSplineCurve() = default;
 
         // Member access.
-        inline int32_t GetNumPoints() const
+        [[nodiscard]] int32_t GetNumPoints() const
         {
             return static_cast<int32_t>((mCoefficients.size() - 1) / 4);
         }
 
-        inline Vector<N, Real> const* GetPoints() const
+        const Vector<N, Real>* GetPoints() const
         {
             return &mA[0];
         }
@@ -108,7 +108,7 @@ namespace gte
         // output array 'jet' must have enough storage to support the maximum
         // order.  The values are ordered as: position, first derivative,
         // second derivative, third derivative.
-        virtual void Evaluate(Real t, uint32_t order, Vector<N, Real>* jet) const override
+        void Evaluate(Real t, uint32_t order, Vector<N, Real>* jet) const override
         {
             uint32_t const supOrder = ParametricCurve<N, Real>::SUP_ORDER;
             if (!this->mConstructed || order >= supOrder)

@@ -286,8 +286,8 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
       double overlap = std::max(overlaparea / areaf, overlaparea / aream);
       allOverlaps.push_back(overlap);
       conn[std::make_pair(f, m)] = std::make_pair(rgnm.start - rgnf.start, overlap);
-      idxToConn[f].push_back(std::make_pair(m, overlap));
-      idxToConn[m].push_back(std::make_pair(f, overlap));
+      idxToConn[f].emplace_back(m, overlap);
+      idxToConn[m].emplace_back(f, overlap);
     }
   }
 
@@ -311,7 +311,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
     }
     std::vector<std::pair<size_t, double>> valC = val;
     for (auto& p : valC) {
-      CHECK(overlapToCentroid.find(p.second) != overlapToCentroid.end());
+      CHECK(overlapToCentroid.contains(p.second));
       p.second = overlapToCentroid[p.second];
     }
     // LOG(INFO) << valC.size();
@@ -331,8 +331,7 @@ void buildConnectionFromRegions(const std::vector<ZImgRegion>& rgns,
 
   // prune
   for (const auto& [key, val] : conn) {
-    if (idxToPrunedConn[key.first].find(key.second) != idxToPrunedConn[key.first].end() ||
-        idxToPrunedConn[key.second].find(key.first) != idxToPrunedConn[key.second].end()) {
+    if (idxToPrunedConn[key.first].contains(key.second) || idxToPrunedConn[key.second].contains(key.first)) {
       connRes[key] = val.first;
     }
   }

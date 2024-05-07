@@ -7,7 +7,7 @@
 
 namespace {
 
-inline bool isNumber(QChar c)
+bool isNumber(QChar c)
 {
   return c >= QChar('0') && c <= QChar('9');
 }

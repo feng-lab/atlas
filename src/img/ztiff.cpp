@@ -322,11 +322,11 @@ void LibtiffErrorHandlerIgnoreColormapError(const char* /*module*/, const char* 
   throw nim::ZIOException(str);
 }
 
-const uint8_t bitmasks1[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+constexpr uint8_t bitmasks1[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
-const uint8_t bitmasks2[] = {0xC0, 0x30, 0x0C, 0x03};
+constexpr uint8_t bitmasks2[] = {0xC0, 0x30, 0x0C, 0x03};
 
-const uint8_t bitmasks4[] = {0xF0, 0x0F};
+constexpr uint8_t bitmasks4[] = {0xF0, 0x0F};
 
 } // namespace
 
@@ -683,7 +683,7 @@ std::vector<ZImgMetatag> ZTiffIFD::extractMetadata() const
 
   std::vector<ZImgMetatag> res;
   for (const auto& entry : m_entries) {
-    if (tags.find(entry.tag()) != tags.end()) {
+    if (tags.contains(entry.tag())) {
       res.push_back(entry);
     }
   }
@@ -1353,7 +1353,7 @@ void ZTiff::readIFDs(std::istream& fs, std::vector<ZTiffIFD>& ifds, bool& isNati
 
   std::set<uint64_t> visitedDiroffs;
   while (diroff != 0) {
-    if (visitedDiroffs.find(diroff) != visitedDiroffs.end()) {
+    if (visitedDiroffs.contains(diroff)) {
       throw ZIOException(QString("Cycle detected in chaining of TIFF directories"));
     }
     visitedDiroffs.insert(diroff);
@@ -1965,7 +1965,7 @@ void ZTiffWriter::writeIFD(const ZImg& img,
 
 Compression ZTiffWriter::defaultCompression(const ZImg* img)
 {
-  const Compression list[] = {Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS};
+  constexpr Compression list[] = {Compression::LZW, Compression::ADOBE_DEFLATE, Compression::PACKBITS};
   for (auto comp : list) {
     if (checkCompression(img, comp)) {
       return comp;

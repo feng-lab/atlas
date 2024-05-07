@@ -33,7 +33,7 @@ public:
 
   ZBBox& operator=(const ZBBox&) = default;
 
-  inline void reset()
+  void reset()
   {
     for (size_t i = 0; i < minCorner.length(); ++i) {
       minCorner[i] = std::numeric_limits<typename Point::value_type>::max();
@@ -41,18 +41,18 @@ public:
     }
   }
 
-  inline void setMinCorner(const Point& mc)
+  void setMinCorner(const Point& mc)
   {
     minCorner = mc;
   }
 
-  inline void setMaxCorner(const Point& mc)
+  void setMaxCorner(const Point& mc)
   {
     maxCorner = mc;
   }
 
   //
-  [[nodiscard]] inline bool empty() const
+  [[nodiscard]] bool empty() const
   {
     for (size_t i = 0; i < minCorner.length(); ++i) {
       if (minCorner[i] > maxCorner[i]) {
@@ -63,13 +63,13 @@ public:
   }
 
   //
-  inline Point size() const
+  Point size() const
   {
     return maxCorner - minCorner;
   }
 
   //
-  inline typename Point::value_type volume() const
+  typename Point::value_type volume() const
   {
     Point sz = size();
     typename Point::value_type res = 1;
@@ -80,44 +80,44 @@ public:
   }
 
   // comparison
-  inline bool operator==(const ZBBox& other) const
+  bool operator==(const ZBBox& other) const
   {
     return minCorner == other.minCorner && maxCorner == other.maxCorner;
   }
 
   // expand to contain
-  inline void expand(const ZBBox& other)
+  void expand(const ZBBox& other)
   {
     minCorner = min(minCorner, other.minCorner);
     maxCorner = max(maxCorner, other.maxCorner);
   }
 
-  inline void expand(const Point& other)
+  void expand(const Point& other)
   {
     minCorner = min(minCorner, other);
     maxCorner = max(maxCorner, other);
   }
 
-  inline void expand(typename Point::value_type v)
+  void expand(typename Point::value_type v)
   {
     minCorner -= v;
     maxCorner += v;
   }
 
-  inline ZBBox& operator+=(const ZBBox& other)
+  ZBBox& operator+=(const ZBBox& other)
   {
     expand(other);
     return *this;
   }
 
-  inline ZBBox& operator+=(const Point& other)
+  ZBBox& operator+=(const Point& other)
   {
     expand(other);
     return *this;
   }
 
   // intersect
-  inline ZBBox& intersect(const ZBBox& other)
+  ZBBox& intersect(const ZBBox& other)
   {
     minCorner = max(minCorner, other.minCorner);
     maxCorner = min(maxCorner, other.maxCorner);
@@ -125,7 +125,7 @@ public:
   }
 
   //
-  inline bool contains(const ZBBox& other) const
+  bool contains(const ZBBox& other) const
   {
     for (size_t i = 0; i < minCorner.length(); ++i) {
       if (other.minCorner[i] < minCorner[i] || other.maxCorner[i] > maxCorner[i]) {
@@ -135,7 +135,7 @@ public:
     return true;
   }
 
-  inline bool contains(const Point& other) const
+  bool contains(const Point& other) const
   {
     for (size_t i = 0; i < minCorner.length(); ++i) {
       if (other[i] < minCorner[i] || other[i] > maxCorner[i]) {
@@ -145,13 +145,13 @@ public:
     return true;
   }
 
-  inline bool containedBy(const ZBBox& other) const
+  bool containedBy(const ZBBox& other) const
   {
     return other.contains(*this);
   }
 
   // tests if bounding boxes (and points) are disjoint (empty intersection)
-  inline bool disjoint(const ZBBox& other) const
+  bool disjoint(const ZBBox& other) const
   {
     const Point sz = min(other.maxCorner, maxCorner) - max(other.minCorner, minCorner);
     for (size_t i = 0; i < sz.length(); ++i) {
@@ -162,7 +162,7 @@ public:
     return false;
   }
 
-  inline bool disjoint(const Point& other) const
+  bool disjoint(const Point& other) const
   {
     const Point sz = min(other, maxCorner) - max(other, minCorner);
     for (size_t i = 0; i < sz.length(); ++i) {
@@ -174,12 +174,12 @@ public:
   }
 
   // tests if bounding boxes (and points) are conjoint (non-empty intersection)
-  inline bool conjoint(const ZBBox& other) const
+  bool conjoint(const ZBBox& other) const
   {
     return !disjoint(other);
   }
 
-  inline bool conjoint(const Point& other) const
+  bool conjoint(const Point& other) const
   {
     return !disjoint(other);
   }
@@ -190,76 +190,76 @@ public:
 
 // merges bounding boxes and points, same as expand
 template<typename T>
-inline ZBBox<T> merge(const ZBBox<T>& a, const T& b)
+ZBBox<T> merge(const ZBBox<T>& a, const T& b)
 {
   return ZBBox<T>(min(a.minCorner, b), max(a.maxCorner, b));
 }
 
 template<typename T>
-inline ZBBox<T> merge(const ZBBox<T>& a, const ZBBox<T>& b)
+ZBBox<T> merge(const ZBBox<T>& a, const ZBBox<T>& b)
 {
   return ZBBox<T>(min(a.minCorner, b.minCorner), max(a.maxCorner, b.maxCorner));
 }
 
 template<typename T>
-inline ZBBox<T> merge(const ZBBox<T>& a, const ZBBox<T>& b, const ZBBox<T>& c)
+ZBBox<T> merge(const ZBBox<T>& a, const ZBBox<T>& b, const ZBBox<T>& c)
 {
   return merge(a, merge(b, c));
 }
 
 //
 template<typename T>
-inline ZBBox<T> intersect(const ZBBox<T>& a, const ZBBox<T>& b)
+ZBBox<T> intersect(const ZBBox<T>& a, const ZBBox<T>& b)
 {
   return ZBBox<T>(max(a.minCorner, b.minCorner), min(a.maxCorner, b.maxCorner));
 }
 
 template<typename T>
-inline ZBBox<T> intersect(const ZBBox<T>& a, const ZBBox<T>& b, const ZBBox<T>& c)
+ZBBox<T> intersect(const ZBBox<T>& a, const ZBBox<T>& b, const ZBBox<T>& c)
 {
   return intersect(a, intersect(b, c));
 }
 
 //
 template<typename T>
-inline bool disjoint(const ZBBox<T>& a, const ZBBox<T>& b)
+bool disjoint(const ZBBox<T>& a, const ZBBox<T>& b)
 {
   return a.disjoint(b);
 }
 
 template<typename T>
-inline bool disjoint(const ZBBox<T>& a, const T& b)
+bool disjoint(const ZBBox<T>& a, const T& b)
 {
   return a.disjoint(b);
 }
 
 template<typename T>
-inline bool disjoint(const T& a, const ZBBox<T>& b)
+bool disjoint(const T& a, const ZBBox<T>& b)
 {
   return b.disjoint(a);
 }
 
 //
 template<typename T>
-inline bool conjoint(const ZBBox<T>& a, const ZBBox<T>& b)
+bool conjoint(const ZBBox<T>& a, const ZBBox<T>& b)
 {
   return a.conjoint(b);
 }
 
 template<typename T>
-inline bool conjoint(const ZBBox<T>& a, const T& b)
+bool conjoint(const ZBBox<T>& a, const T& b)
 {
   return a.conjoint(b);
 }
 
 template<typename T>
-inline bool conjoint(const T& a, const ZBBox<T>& b)
+bool conjoint(const T& a, const ZBBox<T>& b)
 {
   return b.conjoint(a);
 }
 
 template<typename T>
-inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZBBox<T>& box)
+void tag_invoke(const json::value_from_tag&, json::value& jv, const ZBBox<T>& box)
 {
   auto& jo = jv.emplace_object();
   jo["min"] = json::value_from(box.minCorner);
@@ -267,7 +267,7 @@ inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZBBox
 }
 
 template<typename T>
-inline ZBBox<T> tag_invoke(const json::value_to_tag<ZBBox<T>>&, const json::value& jv)
+ZBBox<T> tag_invoke(const json::value_to_tag<ZBBox<T>>&, const json::value& jv)
 {
   ZBBox<T> res;
   res.minCorner = json::value_to<T>(jv.at("min"));

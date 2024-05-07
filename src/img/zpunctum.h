@@ -63,7 +63,7 @@ public:
   // parameter conf is used to estimate radius of punctum (model punctum as gaussian)
   void updateFromVoxelsList(double conf = 0.95);
 
-  [[nodiscard]] inline bool containsSignal() const
+  [[nodiscard]] bool containsSignal() const
   {
     return m_voxelLocations.rows() > 0 && m_voxelLocations.rows() == m_voxelIntensities.size();
   }
@@ -83,187 +83,187 @@ public:
   // otherwise return empty list. depends on image signal, returned list size might be less than num
   [[nodiscard]] std::list<ZPunctum> split(size_t num, double conf = 0.95) const;
 
-  [[nodiscard]] inline double x() const
+  [[nodiscard]] double x() const
   {
     return m_x;
   }
 
-  [[nodiscard]] inline double y() const
+  [[nodiscard]] double y() const
   {
     return m_y;
   }
 
-  [[nodiscard]] inline double z() const
+  [[nodiscard]] double z() const
   {
     return m_z;
   }
 
-  [[nodiscard]] inline double sDevOfIntensity() const
+  [[nodiscard]] double sDevOfIntensity() const
   {
     return m_sDevOfIntensity;
   }
 
-  [[nodiscard]] inline double maxIntensity() const
+  [[nodiscard]] double maxIntensity() const
   {
     return m_maxIntensity;
   }
 
-  [[nodiscard]] inline double meanIntensity() const
+  [[nodiscard]] double meanIntensity() const
   {
     return m_meanIntensity;
   }
 
-  [[nodiscard]] inline size_t volSize() const
+  [[nodiscard]] size_t volSize() const
   {
     return m_volSize;
   }
 
-  [[nodiscard]] inline double mass() const
+  [[nodiscard]] double mass() const
   {
     return m_mass;
   }
 
-  [[nodiscard]] inline double radius() const
+  [[nodiscard]] double radius() const
   {
     return m_radius;
   }
 
-  [[nodiscard]] inline const QString& name() const
+  [[nodiscard]] const QString& name() const
   {
     return m_name;
   }
 
-  [[nodiscard]] inline const QString& comment() const
+  [[nodiscard]] const QString& comment() const
   {
     return m_comment;
   }
 
-  [[nodiscard]] inline const QString& property1() const
+  [[nodiscard]] const QString& property1() const
   {
     return m_property1;
   }
 
-  [[nodiscard]] inline const QString& property2() const
+  [[nodiscard]] const QString& property2() const
   {
     return m_property2;
   }
 
-  [[nodiscard]] inline const QString& property3() const
+  [[nodiscard]] const QString& property3() const
   {
     return m_property3;
   }
 
-  [[nodiscard]] inline const col4& color() const
+  [[nodiscard]] const col4& color() const
   {
     return m_color;
   }
 
-  [[nodiscard]] inline double score() const
+  [[nodiscard]] double score() const
   {
     return m_score;
   }
 
-  [[nodiscard]] inline const Eigen::MatrixXi& voxelLocations() const
+  [[nodiscard]] const Eigen::MatrixXi& voxelLocations() const
   {
     return m_voxelLocations;
   }
 
-  [[nodiscard]] inline const Eigen::VectorXd& voxelIntensities() const
+  [[nodiscard]] const Eigen::VectorXd& voxelIntensities() const
   {
     return m_voxelIntensities;
   }
 
-  inline void setX(double n)
+  void setX(double n)
   {
     m_x = n;
   }
 
-  inline void setY(double n)
+  void setY(double n)
   {
     m_y = n;
   }
 
-  inline void setZ(double n)
+  void setZ(double n)
   {
     m_z = n;
   }
 
-  inline void setSDevOfIntensity(double n)
+  void setSDevOfIntensity(double n)
   {
     m_sDevOfIntensity = n;
   }
 
-  inline void setMaxIntensity(double n)
+  void setMaxIntensity(double n)
   {
     m_maxIntensity = n;
   }
 
-  inline void setMeanIntensity(double n)
+  void setMeanIntensity(double n)
   {
     m_meanIntensity = n;
   }
 
-  inline void setVolSize(size_t n)
+  void setVolSize(size_t n)
   {
     m_volSize = std::max(0_uz, n);
   }
 
-  inline void setMass(double n)
+  void setMass(double n)
   {
     m_mass = n;
   }
 
-  inline void setRadius(double n)
+  void setRadius(double n)
   {
     m_radius = n;
   }
 
-  inline void setName(const QString& n)
+  void setName(const QString& n)
   {
     m_name = n;
   }
 
-  inline void setComment(const QString& n)
+  void setComment(const QString& n)
   {
     m_comment = n;
   }
 
-  inline void setProperty1(const QString& n)
+  void setProperty1(const QString& n)
   {
     m_property1 = n;
   }
 
-  inline void setProperty2(const QString& n)
+  void setProperty2(const QString& n)
   {
     m_property2 = n;
   }
 
-  inline void setProperty3(const QString& n)
+  void setProperty3(const QString& n)
   {
     m_property3 = n;
   }
 
-  inline void setColor(const col4& n)
+  void setColor(const col4& n)
   {
     m_color = n;
   }
 
-  inline void setVoxelLocations(const Eigen::MatrixXi& l)
+  void setVoxelLocations(const Eigen::MatrixXi& l)
   {
     m_voxelLocations = l;
   }
 
-  inline void setVoxelIntensities(const Eigen::VectorXd& i)
+  void setVoxelIntensities(const Eigen::VectorXd& i)
   {
     m_voxelIntensities = i;
   }
 
-  inline void setScore(double s)
+  void setScore(double s)
   {
     m_score = s;
   }
 
-  inline void translate(double dx, double dy, double dz)
+  void translate(double dx, double dy, double dz)
   {
     m_x += dx;
     m_y += dy;
@@ -271,41 +271,41 @@ public:
   }
 
   // update radius from volSize
-  inline void updateRadius()
+  void updateRadius()
   {
     using namespace boost::math::double_constants;
     m_radius = std::pow(m_volSize / four_thirds_pi, 1.0 / 3.0);
   }
 
   // update volSize from radius
-  inline void updateVolSize()
+  void updateVolSize()
   {
     using namespace boost::math::double_constants;
     m_volSize = four_thirds_pi * m_radius * m_radius * m_radius;
   }
 
   // update mass
-  inline void updateMass()
+  void updateMass()
   {
     m_mass = m_volSize * m_meanIntensity;
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return QString("Puncta (%1): (%2, %3, %4, %5)").arg(m_name).arg(m_x).arg(m_y).arg(m_z).arg(m_radius);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return fmt::format("Puncta ({}): ({}, {}, {}, {})", m_name.toStdString(), m_x, m_y, m_z, m_radius);
   }
 
-  [[nodiscard]] inline bool isSelected() const
+  [[nodiscard]] bool isSelected() const
   {
     return m_selected;
   }
 
-  inline void setSelected(bool v)
+  void setSelected(bool v)
   {
     m_selected = v;
   }

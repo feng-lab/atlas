@@ -24,7 +24,7 @@ struct WeightNCCTing
     : m_overlapThre(overlapThre)
   {}
 
-  inline double operator()(double v, double numOverlap)
+  double operator()(double v, double numOverlap)
   {
     return numOverlap < m_overlapThre ? 0
            : v <= 0                   ? v
@@ -382,11 +382,11 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& off
       offset.z < 1 - static_cast<int>(m_movingImg.depth()) || offset.z > static_cast<int>(m_fixedImg.depth()) - 1) {
     throw ZException("invalid offset");
   }
-  ZVoxelCoordinate res;
   double tmpMaxNCC;
   double tmpMaxWeightedNCC;
   double tmpNumOverlapVoxels;
-  res = refineMovingImgOffset(offset, radiusX, radiusY, radiusZ, tmpMaxNCC, tmpMaxWeightedNCC, tmpNumOverlapVoxels);
+  ZVoxelCoordinate res =
+    refineMovingImgOffset(offset, radiusX, radiusY, radiusZ, tmpMaxNCC, tmpMaxWeightedNCC, tmpNumOverlapVoxels);
   if (maxNCC) {
     *maxNCC = tmpMaxNCC;
   }
@@ -650,7 +650,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
   if (rgn.containsWholeImg(info)) {
     if (m_fixedImgChannelsToUse.size() == 1) {
       size_t ch = *(m_fixedImgChannelsToUse.begin());
-      if (m_fixedImgChannelsToRemoveBackground.find(ch) == m_fixedImgChannelsToRemoveBackground.end()) {
+      if (!m_fixedImgChannelsToRemoveBackground.contains(ch)) {
         fixedImg = m_fixedImg.createView(ch, m_fixedT); // virtual img
       } else {
         fixedImg = m_fixedImg.extractChannel(ch, m_fixedT);
@@ -660,7 +660,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
       std::vector<ZImg> imgs(m_fixedImgChannelsToUse.size());
       size_t idx = 0;
       for (auto ch : m_fixedImgChannelsToUse) {
-        if (m_fixedImgChannelsToRemoveBackground.find(ch) == m_fixedImgChannelsToRemoveBackground.end()) {
+        if (!m_fixedImgChannelsToRemoveBackground.contains(ch)) {
           imgs[idx] = m_fixedImg.createView(ch, m_fixedT); // virtual img
         } else {
           imgs[idx] = m_fixedImg.extractChannel(ch, m_fixedT);
@@ -679,7 +679,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
       tmpRgn.start.t = m_fixedT;
       tmpRgn.end.t = m_fixedT + 1;
       fixedImg = m_fixedImg.crop(tmpRgn);
-      if (m_fixedImgChannelsToRemoveBackground.find(ch) != m_fixedImgChannelsToRemoveBackground.end()) {
+      if (m_fixedImgChannelsToRemoveBackground.contains(ch)) {
         removeBackground(fixedImg);
       }
     } else if (m_fixedImgChannelsToUse.size() > 1) {
@@ -692,7 +692,7 @@ void ZImgNCCMatch::constructSingleChannelFixedImg(const ZImgRegion& rgn, ZImg& f
         tmpRgn.start.t = m_fixedT;
         tmpRgn.end.t = m_fixedT + 1;
         imgs[idx] = m_fixedImg.crop(tmpRgn);
-        if (m_fixedImgChannelsToRemoveBackground.find(ch) != m_fixedImgChannelsToRemoveBackground.end()) {
+        if (m_fixedImgChannelsToRemoveBackground.contains(ch)) {
           removeBackground(imgs[idx]);
         }
         idx++;
@@ -710,7 +710,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
   if (rgn.containsWholeImg(info)) {
     if (m_movingImgChannelsToUse.size() == 1) {
       size_t ch = *(m_movingImgChannelsToUse.begin());
-      if (m_movingImgChannelsToRemoveBackground.find(ch) == m_movingImgChannelsToRemoveBackground.end()) {
+      if (!m_movingImgChannelsToRemoveBackground.contains(ch)) {
         movingImg = m_movingImg.createView(ch, m_movingT); // virtual img
       } else {
         movingImg = m_movingImg.extractChannel(ch, m_movingT);
@@ -720,7 +720,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
       std::vector<ZImg> imgs(m_movingImgChannelsToUse.size());
       size_t idx = 0;
       for (auto ch : m_movingImgChannelsToUse) {
-        if (m_movingImgChannelsToRemoveBackground.find(ch) == m_movingImgChannelsToRemoveBackground.end()) {
+        if (!m_movingImgChannelsToRemoveBackground.contains(ch)) {
           imgs[idx] = m_movingImg.createView(ch, m_movingT); // virtual img
         } else {
           imgs[idx] = m_movingImg.extractChannel(ch, m_movingT);
@@ -739,7 +739,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
       tmpRgn.start.t = m_movingT;
       tmpRgn.end.t = m_movingT + 1;
       movingImg = m_movingImg.crop(tmpRgn);
-      if (m_movingImgChannelsToRemoveBackground.find(ch) != m_movingImgChannelsToRemoveBackground.end()) {
+      if (m_movingImgChannelsToRemoveBackground.contains(ch)) {
         removeBackground(movingImg);
       }
     } else if (m_movingImgChannelsToUse.size() > 1) {
@@ -752,7 +752,7 @@ void ZImgNCCMatch::constructSingleChannelMovingImg(const ZImgRegion& rgn, ZImg& 
         tmpRgn.start.t = m_movingT;
         tmpRgn.end.t = m_movingT + 1;
         imgs[idx] = m_movingImg.crop(tmpRgn);
-        if (m_movingImgChannelsToRemoveBackground.find(ch) != m_movingImgChannelsToRemoveBackground.end()) {
+        if (m_movingImgChannelsToRemoveBackground.contains(ch)) {
           removeBackground(imgs[idx]);
         }
         idx++;
@@ -1080,9 +1080,7 @@ ZVoxelCoordinate ZImgNCCMatch::computeMovingImgOffset(const PositionHint& moving
 {
   ZVoxelCoordinate res;
 
-  ZImgRegion fixedRgn;
-  ZImgRegion movingRgn;
-  std::tie(fixedRgn, movingRgn) = getRequiredSrcImgRegion(movingImgPosHint, m_fixedImg, m_movingImg, maxOverlapRate);
+  auto [fixedRgn, movingRgn] = getRequiredSrcImgRegion(movingImgPosHint, m_fixedImg, m_movingImg, maxOverlapRate);
 
   ZImg fixedImg;
   ZImg movingImg;
@@ -1255,10 +1253,7 @@ ZVoxelCoordinate ZImgNCCMatch::refineMovingImgOffset(const ZVoxelCoordinate& iof
 #else
   ZVoxelCoordinate res;
 
-  ZImgRegion fixedRgn;
-  ZImgRegion movingRgn;
-  ZImgRegion validNccRgn;
-  std::tie(fixedRgn, movingRgn, validNccRgn) =
+  auto [fixedRgn, movingRgn, validNccRgn] =
     getRequiredSrcImgRegionAndValidNccRegion(ioffset, radiusX, radiusY, radiusZ, m_fixedImg, m_movingImg);
 
   ZImg fixedImg;

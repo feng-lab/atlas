@@ -15,9 +15,9 @@ void ZImgAlgorithmBaseWithProgressReporter::setProgressReportInterval(double int
 {
   if (interval != m_reportInterval) {
     m_reportInterval = interval;
-    for (const auto& soWP : m_subOperationsWeightProgress) {
-      auto* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(soWP.first);
-      sub->setProgressReportInterval(m_reportInterval / soWP.second.weight);
+    for (const auto& [so, wp] : m_subOperationsWeightProgress) {
+      auto* sub = static_cast<ZImgAlgorithmBaseWithProgressReporter*>(so);
+      sub->setProgressReportInterval(m_reportInterval / wp.weight);
     }
   }
 }
@@ -70,8 +70,8 @@ void ZImgAlgorithmBaseWithProgressReporter::clearRegisteredSubOperations()
 void ZImgAlgorithmBaseWithProgressReporter::sendProgressSignal()
 {
   double currentProgress = m_weight * m_progress;
-  for (const auto& soWP : m_subOperationsWeightProgress) {
-    currentProgress += soWP.second.weight * soWP.second.progress;
+  for (const auto& [so, wp] : m_subOperationsWeightProgress) {
+    currentProgress += wp.weight * wp.progress;
   }
   if (m_parent) {
     m_parent->subOperationProgressChanged(currentProgress, this);

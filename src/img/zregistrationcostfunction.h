@@ -26,7 +26,7 @@ public:
   virtual void setUseMultithreading(bool i);
 
   // given transform parameters, calc cost and gradient (if not nullptr), return true if success
-  virtual bool evaluate(const double* parameters, double* cost, double* gradient = nullptr) const = 0;
+  virtual bool evaluate(const double* parameters, double* cost, double* gradient) const = 0;
 
 protected:
   ZImageTransform* m_transform = nullptr;

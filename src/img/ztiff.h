@@ -26,7 +26,7 @@ public:
 
   [[nodiscard]] bool isTransparencyMask() const;
 
-  [[nodiscard]] inline bool containsTag(uint64_t tag) const
+  [[nodiscard]] bool containsTag(uint64_t tag) const
   {
     return indexOf(tag) != -1;
   }
@@ -93,22 +93,22 @@ public:
     return m_nextIFDOffset;
   }
 
-  inline void addField(const ZImgMetatag& fd)
+  void addField(const ZImgMetatag& fd)
   {
     m_entries.push_back(fd);
   }
 
-  inline void addSubIFD(const ZTiffIFD& sub)
+  void addSubIFD(const ZTiffIFD& sub)
   {
     m_subIFDs.push_back(sub);
   }
 
-  inline void setOffset(uint64_t off)
+  void setOffset(uint64_t off)
   {
     m_offset = off;
   }
 
-  inline void setNextIFDOffset(uint64_t off)
+  void setNextIFDOffset(uint64_t off)
   {
     m_nextIFDOffset = off;
   }
@@ -120,13 +120,13 @@ public:
     return m_subIFDs;
   }
 
-  inline void setExifIFD(const ZTiffIFD& exif)
+  void setExifIFD(const ZTiffIFD& exif)
   {
     m_exifIFD.clear();
     m_exifIFD.push_back(exif);
   }
 
-  [[nodiscard]] inline bool hasExifIFD() const
+  [[nodiscard]] bool hasExifIFD() const
   {
     return !m_exifIFD.empty();
   }
@@ -140,13 +140,13 @@ public:
     }
   }
 
-  inline void setGpsIFD(const ZTiffIFD& gps)
+  void setGpsIFD(const ZTiffIFD& gps)
   {
     m_gpsIFD.clear();
     m_gpsIFD.push_back(gps);
   }
 
-  [[nodiscard]] inline bool hasGpsIFD() const
+  [[nodiscard]] bool hasGpsIFD() const
   {
     return !m_gpsIFD.empty();
   }
@@ -160,13 +160,13 @@ public:
     }
   }
 
-  inline void setInteroperabilityIFD(const ZTiffIFD& interop)
+  void setInteroperabilityIFD(const ZTiffIFD& interop)
   {
     m_interoperabilityIFD.clear();
     m_interoperabilityIFD.push_back(interop);
   }
 
-  [[nodiscard]] inline bool hasInteroperabilityIFD() const
+  [[nodiscard]] bool hasInteroperabilityIFD() const
   {
     return !m_interoperabilityIFD.empty();
   }
@@ -203,7 +203,7 @@ class ZTiff
 public:
   ZTiff();
 
-  inline void addIFD(const ZTiffIFD& ifd)
+  void addIFD(const ZTiffIFD& ifd)
   {
     m_ifds.push_back(ifd);
   }
@@ -254,7 +254,7 @@ public:
   [[nodiscard]] const ZImgMetatag& lsmInfoTag() const;
 
   // read
-  inline void readInfoFromIFD(size_t ifdIdx, ZImgInfo& info)
+  void readInfoFromIFD(size_t ifdIdx, ZImgInfo& info)
   {
     readInfoFromIFD(m_ifds[ifdIdx], info);
   }

@@ -82,7 +82,7 @@ public:
 
   ZSwc& operator=(const ZSwc&) = default;
 
-  inline void swap(ZSwc& other) noexcept
+  void swap(ZSwc& other) noexcept
   {
     ZTree<SwcNode>::swap(other);
   }

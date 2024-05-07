@@ -30,7 +30,7 @@ QPainterPath ZROIUtils::splineToQPainterPath(const QPolygonF& spline, bool showL
 
   gte::NaturalSplineCurve<2, double> splineCurve(!isClosed,
                                                  spline.size(),
-                                                 (gte::Vector<2, double> const*)spline.data(),
+                                                 (const gte::Vector<2, double>*)spline.data(),
                                                  times.data());
   res.moveTo(spline[0]);
   auto endSeg = showLastSeg ? numSegments : numSegments - 1;

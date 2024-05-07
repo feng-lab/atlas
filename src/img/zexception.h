@@ -14,15 +14,15 @@ namespace nim {
 class ZException : public std::exception
 {
 public:
-  explicit inline ZException(const char* what)
+  explicit ZException(const char* what)
     : m_what(what)
   {}
 
-  explicit inline ZException(std::string_view what)
+  explicit ZException(std::string_view what)
     : m_what(what)
   {}
 
-  explicit inline ZException(const QString& what)
+  explicit ZException(const QString& what)
     : m_what(what.toStdString())
   {}
 
@@ -36,7 +36,7 @@ public:
 
   ~ZException() noexcept override;
 
-  [[nodiscard]] inline const char* what() const noexcept override
+  [[nodiscard]] const char* what() const noexcept override
   {
     return m_what.c_str();
   }
@@ -49,7 +49,7 @@ protected:
 class ZIOException : public ZException
 {
 public:
-  explicit inline ZIOException(const char* what)
+  explicit ZIOException(const char* what)
     : ZException(what)
   {
     if (errno != 0) {
@@ -58,7 +58,7 @@ public:
     }
   }
 
-  explicit inline ZIOException(std::string_view what)
+  explicit ZIOException(std::string_view what)
     : ZException(what)
   {
     if (errno != 0) {
@@ -67,7 +67,7 @@ public:
     }
   }
 
-  explicit inline ZIOException(const QString& what)
+  explicit ZIOException(const QString& what)
     : ZException(what)
   {
     if (errno != 0) {

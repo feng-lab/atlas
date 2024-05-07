@@ -344,7 +344,7 @@ void image2DTranspose(TPixel* img, size_t width, size_t height)
       }
     }
   } else {
-    const size_t blockSize = 32;
+    constexpr size_t blockSize = 32;
     std::vector<TPixel> buf(width * height);
     for (size_t i = 0; i < height; i += blockSize) {
       for (size_t j = 0; j < width; j += blockSize) {

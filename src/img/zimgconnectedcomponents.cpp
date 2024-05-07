@@ -14,7 +14,7 @@ struct EqualToLabel
   {}
 
   template<typename TVoxel>
-  inline bool operator()(TVoxel v) const
+  bool operator()(TVoxel v) const
   {
     return v == static_cast<TVoxel>(m_label);
   }
@@ -197,7 +197,7 @@ void ZImgConnectedComponents<ReportProgress>::getConnectedComponents_Impl(ZImg& 
   std::stack<index_t, std::vector<index_t>> stk;
   size_t conn = res.connectivity;
   size_t voxelNumber = markerImg.voxelNumber();
-  ZImgNeighborhoodConstIterator<uint8_t> nit = ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
+  auto nit = ZImgNeighborhoodConstIterator<uint8_t>(ZNeighborhood(conn), markerImg);
   auto marker = markerImg.timeData<uint8_t>(0);
 
   std::vector<size_t> idxList;

@@ -246,14 +246,14 @@ protected:
   void logLsmInfo(const QString& filename);
 
 protected:
-  CZ_LsmInfo m_lsmInfo;
-  CZ_TimeStamps m_lsmTimeStamps;
-  CZ_ChannelColors m_lsmChannelColors;
+  CZ_LsmInfo m_lsmInfo{};
+  CZ_TimeStamps m_lsmTimeStamps{};
+  CZ_ChannelColors m_lsmChannelColors{};
   std::vector<uint32_t> m_channelDataTypes;
   std::vector<Location> m_positions;
   std::vector<Location> m_tilePositions;
   ZImgInfo m_lsmImgInfo;
-  size_t m_numScenes;
+  size_t m_numScenes = 0;
 };
 
 } // namespace nim

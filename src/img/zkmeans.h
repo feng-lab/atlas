@@ -67,37 +67,37 @@ public:
     return true;
   }
 
-  inline bool willTestEPS() const
+  [[nodiscard]] bool willTestEPS() const
   {
     return m_type == Type::Eps || m_type == Type::MaxIterAndEps;
   }
 
-  inline bool willTestMaxIter() const
+  [[nodiscard]] bool willTestMaxIter() const
   {
     return m_type == Type::MaxIter || m_type == Type::MaxIterAndEps;
   }
 
-  inline Type type() const
+  Type type() const
   {
     return m_type;
   }
 
-  inline size_t maxIter() const
+  [[nodiscard]] size_t maxIter() const
   {
     return m_maxIter;
   }
 
-  inline NonInteger epsilon() const
+  NonInteger epsilon() const
   {
     return m_epsilon;
   }
 
-  inline void setEpsilon(NonInteger eps)
+  void setEpsilon(NonInteger eps)
   {
     m_epsilon = eps;
   }
 
-  inline void setMaxIter(size_t iter)
+  void setMaxIter(size_t iter)
   {
     m_maxIter = iter;
   }
@@ -160,7 +160,7 @@ struct ZDistanceEuclideanSquared
     Eigen::Matrix<Real, Eigen::Dynamic, 1> counts(centroids.rows());
     counts.setZero();
     for (Eigen::Index r = 0; r < mat.rows(); ++r) {
-      counts(labels(r))++;
+      ++counts(labels(r));
       centroids.row(labels(r)) += mat.row(r);
     }
 
@@ -187,9 +187,9 @@ struct ZDistanceEuclideanSquared
     }
   }
 
-  Eigen::Matrix<Real, Eigen::Dynamic, 1>
+  static Eigen::Matrix<Real, Eigen::Dynamic, 1>
   pairDistance(const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat1,
-               const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat2) const
+               const Eigen::Matrix<Real, Eigen::Dynamic, Eigen::Dynamic>& mat2)
   {
     CHECK(mat1.rows() == mat2.rows() && mat1.cols() == mat2.cols());
     // return (mat1-mat2).rowwise().squaredNorm();
@@ -289,7 +289,7 @@ struct ZDistanceManhattan
 
     counts.setZero();
     for (Eigen::Index r = 0; r < labels.rows(); ++r) {
-      counts(labels(r))++;
+      ++counts(labels(r));
     }
 
     for (Eigen::Index i = 0; i < counts.rows(); ++i) {
@@ -323,7 +323,7 @@ struct ZDistanceManhattan
 
     counts.setZero();
     for (Eigen::Index r = 0; r < labels.rows(); ++r) {
-      counts(labels(r))++;
+      ++counts(labels(r));
     }
 
     for (Eigen::Index i = 0; i < counts.rows(); ++i) {
@@ -436,7 +436,7 @@ public:
       : compactness(std::numeric_limits<ResultDataType>::max())
     {}
 
-    inline void swap(InterResult& other)
+    void swap(InterResult& other) noexcept
     {
       std::swap(compactness, other.compactness);
       labels.swap(other.labels);
@@ -662,17 +662,17 @@ public:
     return bestCompactness;
   }
 
-  inline size_t numOfClusters() const
+  [[nodiscard]] size_t numOfClusters() const
   {
     return m_nclasses;
   }
 
-  inline MatrixXrt centroids() const
+  MatrixXrt centroids() const
   {
     return m_centroids;
   }
 
-  inline Eigen::VectorXi labels() const
+  [[nodiscard]] Eigen::VectorXi labels() const
   {
     return m_labels;
   }
@@ -886,7 +886,7 @@ private:
   Distance m_distanceFun;
 
   initCentersFunction m_initCentersFunPtr;
-  bool m_hasEnoughData; //
+  bool m_hasEnoughData = false; //
   MatrixXrt m_uniqueDatas; // This will be the centroids if we don't have enough data
   Eigen::VectorXi m_uniqueLabels; // see above
   IterAlgorithmLogLevel m_logLevel;

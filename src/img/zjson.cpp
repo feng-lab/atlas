@@ -17,7 +17,7 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
     case json::kind::object: {
       os << "{\n";
       indent->append(4, ' ');
-      auto const& obj = jv.get_object();
+      const auto& obj = jv.get_object();
       if (!obj.empty()) {
         auto it = obj.begin();
         for (;;) {
@@ -38,7 +38,7 @@ void pretty_print(std::ostream& os, const json::value& jv, std::string* indent =
     case json::kind::array: {
       os << "[\n";
       indent->append(4, ' ');
-      auto const& arr = jv.get_array();
+      const auto& arr = jv.get_array();
       if (!arr.empty()) {
         auto it = arr.begin();
         for (;;) {

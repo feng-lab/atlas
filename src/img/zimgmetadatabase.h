@@ -38,168 +38,168 @@ public:
     return {};
   }
 
-  inline void swap(ZImgMetadataBase& other) noexcept
+  void swap(ZImgMetadataBase& other) noexcept
   {
     m_data.swap(other.m_data);
   }
 
-  inline void merge(const ZImgMetadataBase& other) noexcept
+  void merge(const ZImgMetadataBase& other) noexcept
   {
     for (auto& [k, v] : other.m_data) {
       m_data[k].insert(m_data[k].end(), v.begin(), v.end());
     }
   }
 
-  inline void clear()
+  void clear()
   {
     m_data.clear();
   }
 
-  [[nodiscard]] inline bool isEmpty() const
+  [[nodiscard]] bool isEmpty() const
   {
     return m_data.empty();
   }
 
-  inline void attachToTopLevel(const T& d)
+  void attachToTopLevel(const T& d)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, -1, -1)];
     list.push_back(d);
   }
 
-  inline void attachToTime(const T& d, size_t t)
+  void attachToTime(const T& d, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, -1, t)];
     list.push_back(d);
   }
 
-  inline void attachToChannel(const T& d, size_t c, size_t t)
+  void attachToChannel(const T& d, size_t c, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, c, t)];
     list.push_back(d);
   }
 
-  inline void attachToPlane(const T& d, size_t z, size_t t)
+  void attachToPlane(const T& d, size_t z, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(z, -1, t)];
     list.push_back(d);
   }
 
-  inline void attachToSingleChannelPlane(const T& d, size_t z, size_t c, size_t t)
+  void attachToSingleChannelPlane(const T& d, size_t z, size_t c, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(z, c, t)];
     list.push_back(d);
   }
 
-  inline void attachToTopLevel(const std::vector<T>& d)
+  void attachToTopLevel(const std::vector<T>& d)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, -1, -1)];
     list.insert(list.end(), d.begin(), d.end());
   }
 
-  inline void attachToTime(const std::vector<T>& d, size_t t)
+  void attachToTime(const std::vector<T>& d, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, -1, t)];
     list.insert(list.end(), d.begin(), d.end());
   }
 
-  inline void attachToChannel(const std::vector<T>& d, size_t c, size_t t)
+  void attachToChannel(const std::vector<T>& d, size_t c, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(-1, c, t)];
     list.insert(list.end(), d.begin(), d.end());
   }
 
-  inline void attachToPlane(const std::vector<T>& d, size_t z, size_t t)
+  void attachToPlane(const std::vector<T>& d, size_t z, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(z, -1, t)];
     list.insert(list.end(), d.begin(), d.end());
   }
 
-  inline void attachToSingleChannelPlane(const std::vector<T>& d, size_t z, size_t c, size_t t)
+  void attachToSingleChannelPlane(const std::vector<T>& d, size_t z, size_t c, size_t t)
   {
     std::vector<T>& list = m_data[AttachPoint(z, c, t)];
     list.insert(list.end(), d.begin(), d.end());
   }
 
-  inline void clearTopLevelAttachments()
+  void clearTopLevelAttachments()
   {
     m_data.erase(AttachPoint(-1, -1, -1));
   }
 
-  inline void clearTimeAttachments(size_t t)
+  void clearTimeAttachments(size_t t)
   {
     m_data.erase(AttachPoint(-1, -1, t));
   }
 
-  inline void clearChannelAttachments(size_t c, size_t t)
+  void clearChannelAttachments(size_t c, size_t t)
   {
     m_data.erase(AttachPoint(-1, c, t));
   }
 
-  inline void clearPlaneAttachments(size_t z, size_t t)
+  void clearPlaneAttachments(size_t z, size_t t)
   {
     m_data.erase(AttachPoint(z, -1, t));
   }
 
-  inline void clearSingleChannelPlaneAttachments(size_t z, size_t c, size_t t)
+  void clearSingleChannelPlaneAttachments(size_t z, size_t c, size_t t)
   {
     m_data.erase(AttachPoint(z, c, t));
   }
 
-  [[nodiscard]] inline bool hasTopLevelAttachment() const
+  [[nodiscard]] bool hasTopLevelAttachment() const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, -1, -1));
     return it != m_data.end() && !it->second.empty();
   }
 
-  [[nodiscard]] inline bool hasTimeAttachment(size_t t) const
+  [[nodiscard]] bool hasTimeAttachment(size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, -1, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  [[nodiscard]] inline bool hasChannelAttachment(size_t c, size_t t) const
+  [[nodiscard]] bool hasChannelAttachment(size_t c, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, c, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  [[nodiscard]] inline bool hasPlaneAttachment(size_t z, size_t t) const
+  [[nodiscard]] bool hasPlaneAttachment(size_t z, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(z, -1, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  [[nodiscard]] inline bool hasSingleChannelPlaneAttachment(size_t z, size_t c, size_t t) const
+  [[nodiscard]] bool hasSingleChannelPlaneAttachment(size_t z, size_t c, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(z, c, t));
     return it != m_data.end() && !it->second.empty();
   }
 
-  inline const std::vector<T>& topLevelAttachments() const
+  const std::vector<T>& topLevelAttachments() const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, -1, -1));
     return it != m_data.end() ? it->second : m_empty;
   }
 
-  inline const std::vector<T>& timeAttachments(size_t t) const
+  const std::vector<T>& timeAttachments(size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, -1, t));
     return it != m_data.end() ? it->second : m_empty;
   }
 
-  inline const std::vector<T>& channelAttachments(size_t c, size_t t) const
+  const std::vector<T>& channelAttachments(size_t c, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(-1, c, t));
     return it != m_data.end() ? it->second : m_empty;
   }
 
-  inline const std::vector<T>& planeAttachments(size_t z, size_t t) const
+  const std::vector<T>& planeAttachments(size_t z, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(z, -1, t));
     return it != m_data.end() ? it->second : m_empty;
   }
 
-  inline const std::vector<T>& singleChannelPlaneAttachments(size_t z, size_t c, size_t t) const
+  const std::vector<T>& singleChannelPlaneAttachments(size_t z, size_t c, size_t t) const
   {
     typename std::map<AttachPoint, std::vector<T>>::const_iterator it = m_data.find(AttachPoint(z, c, t));
     return it != m_data.end() ? it->second : m_empty;

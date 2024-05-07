@@ -53,67 +53,67 @@ public:
   void removeCenter();
 
   // access
-  inline ZVoxelCoordinate& operator[](size_t n)
+  ZVoxelCoordinate& operator[](size_t n)
   {
     return m_offsets[n];
   }
 
-  inline const ZVoxelCoordinate& operator[](size_t n) const
+  const ZVoxelCoordinate& operator[](size_t n) const
   {
     return m_offsets[n];
   }
 
-  inline ZVoxelCoordinate& offset(size_t n)
+  ZVoxelCoordinate& offset(size_t n)
   {
     return m_offsets[n];
   }
 
-  [[nodiscard]] inline const ZVoxelCoordinate& offset(size_t n) const
+  [[nodiscard]] const ZVoxelCoordinate& offset(size_t n) const
   {
     return m_offsets[n];
   }
 
-  [[nodiscard]] inline const std::vector<ZVoxelCoordinate>& offsets() const
+  [[nodiscard]] const std::vector<ZVoxelCoordinate>& offsets() const
   {
     return m_offsets;
   }
 
-  [[nodiscard]] inline size_t size() const
+  [[nodiscard]] size_t size() const
   {
     return m_offsets.size();
   }
 
-  [[nodiscard]] inline bool empty() const
+  [[nodiscard]] bool empty() const
   {
     return m_offsets.empty();
   }
 
-  [[nodiscard]] inline size_t leftExtend() const
+  [[nodiscard]] size_t leftExtend() const
   {
     return m_leftExtend;
   }
 
-  [[nodiscard]] inline size_t rightExtend() const
+  [[nodiscard]] size_t rightExtend() const
   {
     return m_rightExtend;
   }
 
-  [[nodiscard]] inline size_t upExtend() const
+  [[nodiscard]] size_t upExtend() const
   {
     return m_upExtend;
   }
 
-  [[nodiscard]] inline size_t downExtend() const
+  [[nodiscard]] size_t downExtend() const
   {
     return m_downExtend;
   }
 
-  [[nodiscard]] inline size_t frontExtend() const
+  [[nodiscard]] size_t frontExtend() const
   {
     return m_frontExtend;
   }
 
-  [[nodiscard]] inline size_t backExtend() const
+  [[nodiscard]] size_t backExtend() const
   {
     return m_backExtend;
   }

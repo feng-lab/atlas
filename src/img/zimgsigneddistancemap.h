@@ -13,13 +13,13 @@ class ZImgSignedDistanceMap : public ZImgAlgorithm<ReportProgress>
 {
 public:
   // default false
-  inline void setInsideIsPositive(bool v)
+  void setInsideIsPositive(bool v)
   {
     m_insideIsPositive = v;
   }
 
   // default false
-  inline void setUseSquaredDistance(bool v)
+  void setUseSquaredDistance(bool v)
   {
     m_useSquaredDistance = v;
   }

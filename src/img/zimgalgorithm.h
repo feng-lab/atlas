@@ -35,7 +35,7 @@ public:
   // The reason for this function is that sub operation can be registered in any stage of the
   // algorithm, but we must know it before the algorithm start to calculate correct progress
   // change this in the middle of operation will cause a little bump
-  inline void setTotalSubOperationWeight(double w)
+  void setTotalSubOperationWeight(double w)
   {
     m_weight = 1 - w;
   }
@@ -66,7 +66,7 @@ protected:
 
   void clearRegisteredSubOperations();
 
-  [[nodiscard]] inline bool hasParent() const
+  [[nodiscard]] bool hasParent() const
   {
     return m_parent;
   }
@@ -85,12 +85,12 @@ private:
 
   CommandPointer m_CallbackCommand;
 
-  inline void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
+  void setParent(ZImgAlgorithmBaseWithProgressReporter* p)
   {
     m_parent = p;
   }
 
-  inline void setNumberOfThreads(size_t n)
+  void setNumberOfThreads(size_t n)
   {
     m_numThreads = n;
   }
@@ -121,22 +121,22 @@ public:
 protected:
   virtual ~ZImgAlgorithmBase() = default;
 
-  inline void setCancelFlag(bool*) {}
+  void setCancelFlag(bool*) {}
 
-  inline void setProgressReportInterval(double) {}
+  void setProgressReportInterval(double) {}
 
-  inline void setTotalSubOperationWeight(double) {}
+  void setTotalSubOperationWeight(double) {}
 
-  inline void reportProgress(double) {}
+  void reportProgress(double) {}
 
   // will change the progress interval of internal operation
-  inline void registerSubOperation(void*, double) {}
+  void registerSubOperation(void*, double) {}
 
-  inline void registerSubOperation(itk::ProcessObject*, double) {}
+  void registerSubOperation(itk::ProcessObject*, double) {}
 
-  inline void clearRegisteredSubOperations() {}
+  void clearRegisteredSubOperations() {}
 
-  inline void setNumberOfThreads(size_t n)
+  void setNumberOfThreads(size_t n)
   {
     m_numThreads = n;
   }

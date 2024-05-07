@@ -30,7 +30,7 @@ double ZImageInterpolation::bicubicInterpolate(double p[4][4], double x, double 
   return cubicInterpolate(arr, x);
 }
 
-double ZImageInterpolation::tricubicInterpolate(double p[4][4][4], double x, double y, double z) const
+double ZImageInterpolation::tricubicInterpolate(double p[4][4][4], double x, double y, double z)
 {
   double arr[4];
   arr[0] = bicubicInterpolate(p[0], y, z);
@@ -40,7 +40,7 @@ double ZImageInterpolation::tricubicInterpolate(double p[4][4][4], double x, dou
   return cubicInterpolate(arr, x);
 }
 
-double ZImageInterpolation::nCubicInterpolate(int32_t n, double* p, double coordinates[]) const
+double ZImageInterpolation::nCubicInterpolate(int32_t n, double* p, double coordinates[])
 {
   CHECK(n > 0);
   if (n == 1) {
@@ -72,15 +72,14 @@ double ZImageInterpolation::sample(const TPixel* img, size_t width, size_t heigh
                                 TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[4];
-    double xCom, yCom;
     index_t xBas0 = std::floor(x);
     index_t xBas1 = xBas0 + 1;
     index_t yBas0 = std::floor(y);
     index_t yBas1 = yBas0 + 1;
 
     // Linear interpolation constants (percentages)
-    xCom = x - xBas0;
-    yCom = y - yBas0;
+    double xCom = x - xBas0;
+    double yCom = y - yBas0;
     perc[0] = (1 - xCom) * (1 - yCom);
     perc[1] = (1 - xCom) * yCom;
     perc[2] = xCom * (1 - yCom);
@@ -169,8 +168,6 @@ ZImageInterpolation::sample(const TPixel* img, size_t width, size_t height, size
                                 TPixel(m_fillValue));
   } else if (m_interpolant == Interpolant::Linear) {
     double perc[8];
-    double xCom, yCom, zCom;
-    double xComi, yComi, zComi;
     index_t xBas0 = std::floor(x);
     index_t xBas1 = xBas0 + 1;
     index_t yBas0 = std::floor(y);
@@ -179,12 +176,12 @@ ZImageInterpolation::sample(const TPixel* img, size_t width, size_t height, size
     index_t zBas1 = zBas0 + 1;
 
     // Linear interpolation constants (percentages)
-    xCom = x - xBas0;
-    yCom = y - yBas0;
-    zCom = z - zBas0;
-    xComi = 1 - xCom;
-    yComi = 1 - yCom;
-    zComi = 1 - zCom;
+    double xCom = x - xBas0;
+    double yCom = y - yBas0;
+    double zCom = z - zBas0;
+    double xComi = 1 - xCom;
+    double yComi = 1 - yCom;
+    double zComi = 1 - zCom;
     perc[0] = xComi * yComi;
     perc[1] = perc[0] * zCom;
     perc[0] = perc[0] * zComi;

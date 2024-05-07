@@ -18,7 +18,7 @@
 namespace nim {
 
 template<typename T, typename Float>
-inline T roundTo(Float x)
+T roundTo(Float x)
 {
   static_assert(std::is_integral_v<T> && std::is_floating_point_v<Float>,
                 "T must be integer type and Float must be float type");
@@ -36,67 +36,67 @@ inline T roundTo(Float x)
 ///
 
 template<typename _Tp>
-static inline _Tp saturate_cast(uint8_t v)
+static _Tp saturate_cast(uint8_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(int8_t v)
+static _Tp saturate_cast(int8_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(uint16_t v)
+static _Tp saturate_cast(uint16_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(int16_t v)
+static _Tp saturate_cast(int16_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(uint32_t v)
+static _Tp saturate_cast(uint32_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(int32_t v)
+static _Tp saturate_cast(int32_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(uint64_t v)
+static _Tp saturate_cast(uint64_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(int64_t v)
+static _Tp saturate_cast(int64_t v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(float v)
+static _Tp saturate_cast(float v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(double v)
+static _Tp saturate_cast(double v)
 {
   return static_cast<_Tp>(v);
 }
 
 template<typename _Tp>
-static inline _Tp saturate_cast(long double v)
+static _Tp saturate_cast(long double v)
 {
   return static_cast<_Tp>(v);
 }
@@ -2715,7 +2715,7 @@ inline double saturate_div(double x, double y)
 
 // array version add
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_add(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+void saturate_add(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_add(x[i], y[i]);
@@ -2723,7 +2723,7 @@ inline void saturate_add(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 }
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_add(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
+void saturate_add(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_add(x[i], y);
@@ -2757,7 +2757,7 @@ void saturate_add<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, i
 // array version sub
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_sub(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+void saturate_sub(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_sub(x[i], y[i]);
@@ -2765,7 +2765,7 @@ inline void saturate_sub(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 }
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_sub(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
+void saturate_sub(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_sub(x[i], y);
@@ -2799,7 +2799,7 @@ void saturate_sub<int16_t, int16_t>(const int16_t* x, int16_t y, size_t count, i
 // array version mul
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_mul(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+void saturate_mul(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_mul(x[i], y[i]);
@@ -2807,7 +2807,7 @@ inline void saturate_mul(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 }
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_mul(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
+void saturate_mul(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_mul(x[i], y);
@@ -2817,7 +2817,7 @@ inline void saturate_mul(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res
 // array version div
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_div(x[i], y[i]);
@@ -2825,7 +2825,7 @@ inline void saturate_div(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* re
 }
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
+void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = y[i] == TVoxel2(0) ? TVoxel1(0) : saturate_div(x[i], y[i]);
@@ -2833,7 +2833,7 @@ inline void saturate_div_secure(const TVoxel1* x, TVoxel2* y, size_t count, TVox
 }
 
 template<typename TVoxel1, typename TVoxel2>
-inline void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
+void saturate_div(const TVoxel1* x, TVoxel2 y, size_t count, TVoxel1* res)
 {
   for (size_t i = 0; i < count; ++i) {
     res[i] = saturate_div(x[i], y);

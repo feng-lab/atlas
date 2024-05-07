@@ -56,7 +56,7 @@ public:
     }
   }
 
-  [[nodiscard]] inline bool isValid() const
+  [[nodiscard]] bool isValid() const
   {
     return m_file.isOpen();
   }
@@ -90,7 +90,7 @@ public:
     : m_logFunction(std::move(f))
   {}
 
-  [[nodiscard]] inline bool isValid() const
+  [[nodiscard]] bool isValid() const
   {
     return m_logFunction.operator bool();
   }

@@ -15,7 +15,7 @@ namespace nim {
 class ZImgMerge : public ZImgBlockProvider
 {
 public:
-  virtual ~ZImgMerge() = default;
+  ~ZImgMerge() override = default;
 
   // img has absolute location, if img already exist, update its location
   void addImg(const ZImgSubBlock& img, const ZVoxelCoordinate& loc, const QString& imgName = "");

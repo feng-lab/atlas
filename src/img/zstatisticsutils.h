@@ -18,7 +18,7 @@ namespace nim {
 #define MULTITHREAD_THRESHOLD 1e7
 
 template<typename Iterator, typename Compare>
-inline Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
+Iterator parallel_min_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return first; // handle empty range
@@ -37,13 +37,13 @@ inline Iterator parallel_min_element(Iterator first, Iterator last, Compare comp
 }
 
 template<typename Iterator>
-inline Iterator parallel_min_element(Iterator first, Iterator last)
+Iterator parallel_min_element(Iterator first, Iterator last)
 {
   return parallel_min_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-inline Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
+Iterator parallel_max_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return first; // handle empty range
@@ -62,13 +62,13 @@ inline Iterator parallel_max_element(Iterator first, Iterator last, Compare comp
 }
 
 template<typename Iterator>
-inline Iterator parallel_max_element(Iterator first, Iterator last)
+Iterator parallel_max_element(Iterator first, Iterator last)
 {
   return parallel_max_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-inline std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
+std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last, Compare comp)
 {
   if (first == last) {
     return std::make_pair(first, first); // handle empty range
@@ -89,14 +89,13 @@ inline std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Ite
 }
 
 template<typename Iterator>
-inline std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
+std::pair<Iterator, Iterator> parallel_minmax_element(Iterator first, Iterator last)
 {
   return parallel_minmax_element(first, last, std::less<>());
 }
 
 template<typename Iterator, typename Compare>
-inline std::pair<typename std::iterator_traits<Iterator>::value_type,
-                 typename std::iterator_traits<Iterator>::value_type>
+std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last, Compare comp)
 {
   CHECK(first != last) << "At least one sample is required";
@@ -119,15 +118,14 @@ parallel_minmax(Iterator first, Iterator last, Compare comp)
 }
 
 template<typename Iterator>
-inline std::pair<typename std::iterator_traits<Iterator>::value_type,
-                 typename std::iterator_traits<Iterator>::value_type>
+std::pair<typename std::iterator_traits<Iterator>::value_type, typename std::iterator_traits<Iterator>::value_type>
 parallel_minmax(Iterator first, Iterator last)
 {
   return parallel_minmax(first, last, std::less<>());
 }
 
 template<typename Iterator>
-inline double parallel_mean(Iterator first, Iterator last)
+double parallel_mean(Iterator first, Iterator last)
 {
   CHECK(first != last) << "At least one sample is required";
 
@@ -148,7 +146,7 @@ inline double parallel_mean(Iterator first, Iterator last)
 }
 
 template<typename Iterator>
-inline double parallel_sum(Iterator first, Iterator last)
+double parallel_sum(Iterator first, Iterator last)
 {
   CHECK(first != last) << "At least one sample is required";
 
@@ -168,7 +166,7 @@ inline double parallel_sum(Iterator first, Iterator last)
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
+std::pair<double, double> parallel_mean_and_variance(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
@@ -177,7 +175,7 @@ inline std::pair<double, double> parallel_mean_and_variance(ForwardIterator firs
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
+std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   const auto results = boost::math::statistics::detail::first_four_moments_parallel_impl<
@@ -186,36 +184,35 @@ inline std::pair<double, double> parallel_mean_and_sample_variance(ForwardIterat
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+std::pair<double, double> parallel_mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = parallel_mean_and_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> parallel_mean_and_sample_standard_deviation(ForwardIterator first,
-                                                                             ForwardIterator last)
+std::pair<double, double> parallel_mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = parallel_mean_and_sample_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
 template<typename ForwardIterator>
-inline double mean(ForwardIterator first, ForwardIterator last)
+double mean(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   return boost::math::statistics::detail::mean_sequential_impl<double>(first, last);
 }
 
 template<typename ForwardIterator>
-inline double sum(ForwardIterator first, ForwardIterator last)
+double sum(ForwardIterator first, ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   return std::accumulate(first, last, 0.0);
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
+std::pair<double, double> mean_and_variance(const ForwardIterator first, const ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   const auto results =
@@ -224,7 +221,7 @@ inline std::pair<double, double> mean_and_variance(const ForwardIterator first, 
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
+std::pair<double, double> mean_and_sample_variance(const ForwardIterator first, const ForwardIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
   const auto results =
@@ -234,14 +231,14 @@ inline std::pair<double, double> mean_and_sample_variance(const ForwardIterator 
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
+std::pair<double, double> mean_and_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = mean_and_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
 }
 
 template<class ForwardIterator>
-inline std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
+std::pair<double, double> mean_and_sample_standard_deviation(ForwardIterator first, ForwardIterator last)
 {
   const auto result = mean_and_sample_variance(first, last);
   return std::make_pair(result.first, std::sqrt(result.second));
@@ -249,7 +246,7 @@ inline std::pair<double, double> mean_and_sample_standard_deviation(ForwardItera
 
 // will change input data
 template<class RandomAccessIterator>
-inline double median(RandomAccessIterator first, RandomAccessIterator last)
+double median(RandomAccessIterator first, RandomAccessIterator last)
 {
   CHECK(first != last) << "At least one sample is required";
 

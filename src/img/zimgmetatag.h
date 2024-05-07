@@ -37,80 +37,80 @@ public:
 
   [[nodiscard]] QString toQString() const;
 
-  [[nodiscard]] inline const QString& name() const
+  [[nodiscard]] const QString& name() const
   {
     return m_name;
   }
 
-  inline void setName(const QString& n)
+  void setName(const QString& n)
   {
     m_name = n;
   }
 
-  [[nodiscard]] inline uint32_t tag() const
+  [[nodiscard]] uint32_t tag() const
   {
     return m_tag;
   }
 
-  inline void setTag(uint32_t t)
+  void setTag(uint32_t t)
   {
     m_tag = t;
   }
 
-  [[nodiscard]] inline DataType dataType() const
+  [[nodiscard]] DataType dataType() const
   {
     return m_dataType;
   }
 
-  inline void setDataType(DataType dt)
+  void setDataType(DataType dt)
   {
     m_dataType = dt;
     allocateData();
   }
 
-  [[nodiscard]] inline uint64_t count() const
+  [[nodiscard]] uint64_t count() const
   {
     return m_count;
   }
 
-  inline void setCount(uint64_t c)
+  void setCount(uint64_t c)
   {
     m_count = c;
     allocateData();
   }
 
-  [[nodiscard]] inline size_t dataByteNumber() const
+  [[nodiscard]] size_t dataByteNumber() const
   {
     return byteNumber(m_dataType) * m_count;
   }
 
   // read data as array of T, you need to know the correct dataType before calling this
   template<typename T = uint8_t>
-  inline const T* dataArray() const
+  const T* dataArray() const
   {
     return reinterpret_cast<const T*>(m_data.data());
   }
 
   template<typename T = uint8_t>
-  inline T* dataArray()
+  T* dataArray()
   {
     return reinterpret_cast<T*>(m_data.data());
   }
 
   template<typename T>
-  inline T dataAt(size_t idx) const
+  T dataAt(size_t idx) const
   {
     return *(reinterpret_cast<const T*>(m_data.data()) + idx);
   }
 
   template<typename T>
-  inline T& dataAt(size_t idx)
+  T& dataAt(size_t idx)
   {
     return *(reinterpret_cast<T*>(m_data.data()) + idx);
   }
 
 private:
-  inline void allocateData()
+  void allocateData()
   {
     m_data.resize(dataByteNumber());
   }

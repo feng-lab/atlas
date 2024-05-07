@@ -40,7 +40,7 @@ class ZBenchTimer
 public:
   explicit ZBenchTimer(std::string funName = "");
 
-  inline void reset()
+  void reset()
   {
     m_best = std::numeric_limits<double>::max();
     m_worst = -1;
@@ -54,14 +54,14 @@ public:
     m_averagePauseTime = 0;
   }
 
-  inline void resetAndStart(const std::string& newName)
+  void resetAndStart(const std::string& newName)
   {
     setName(newName);
     reset();
     start();
   }
 
-  inline void resetAndStart()
+  void resetAndStart()
   {
     reset();
     start();
@@ -76,47 +76,47 @@ public:
   void resume();
 
   // elapsed time in seconds
-  [[nodiscard]] inline double time() const
+  [[nodiscard]] double time() const
   {
     return m_time;
   }
 
   // average elapsed time in seconds.
-  [[nodiscard]] inline double average() const
+  [[nodiscard]] double average() const
   {
     return m_average;
   }
 
   // best elapsed time in seconds
-  [[nodiscard]] inline double best() const
+  [[nodiscard]] double best() const
   {
     return m_best;
   }
 
   // total elapsed time in seconds.
-  [[nodiscard]] inline double total() const
+  [[nodiscard]] double total() const
   {
     return m_total;
   }
 
   // elapsed pause time in seconds
-  [[nodiscard]] inline double pauseTime() const
+  [[nodiscard]] double pauseTime() const
   {
     return m_pauseTime;
   }
 
   // total elapsed pause time in seconds.
-  [[nodiscard]] inline double totalPauseTime() const
+  [[nodiscard]] double totalPauseTime() const
   {
     return m_totalPauseTime;
   }
 
-  inline void setName(const std::string& str)
+  void setName(const std::string& str)
   {
     m_name = str;
   }
 
-  std::string toString() const;
+  [[nodiscard]] std::string toString() const;
 
 protected:
   std::chrono::time_point<std::chrono::high_resolution_clock> m_start;

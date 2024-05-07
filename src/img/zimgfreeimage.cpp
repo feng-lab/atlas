@@ -17,7 +17,7 @@ void FreeImageErrorHandler(FREE_IMAGE_FORMAT fif, const char* message)
 {
   QString msg;
   if (fif != FIF_UNKNOWN) {
-    msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif)).arg(message);
+    msg = QString("FreeImage %1 Format: %2").arg(FreeImage_GetFormatFromFIF(fif), message);
   }
   msg = QString("FreeImage: %1").arg(message);
   LOG(WARNING) << msg;
@@ -41,8 +41,6 @@ ZImgInfo readInfoFromFIPImage(fipImage& fipImg)
           }
           break;
         case 16:
-          info.numChannels = 3;
-          break;
         case 24:
           info.numChannels = 3;
           break;
@@ -310,7 +308,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
 
   if (region.isEmpty() || !region.isValid(info)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(info.toQString(), region.toQString()));
   }
 
   img = ZImg(info);
@@ -354,7 +352,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
         break;
     }
 
-    uint8_t* imgBuf = img.timeData<uint8_t>(0);
+    auto imgBuf = img.timeData<uint8_t>(0);
     for (size_t i = 0; i < img.height(); ++i) {
       uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
       std::memcpy(imgBuf, scanline, fipImg.getLine());
@@ -400,7 +398,7 @@ void ZImgFreeImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
           break;
       }
 
-      uint8_t* imgBuf = img.timeData<uint8_t>(t);
+      auto imgBuf = img.timeData<uint8_t>(t);
       for (size_t i = 0; i < img.height(); ++i) {
         uint8_t* scanline = fipImg.getScanLine(img.height() - i - 1);
         std::memcpy(imgBuf, scanline, fipImg.getLine());

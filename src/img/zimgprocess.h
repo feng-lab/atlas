@@ -11,7 +11,7 @@ class ZImgProcess : public ZImgAlgorithmBaseWithProgressReporter
 
 public:
   // log output
-  inline void setLogFile(const QString& logFile)
+  void setLogFile(const QString& logFile)
   {
     m_logFile = logFile;
   }
@@ -20,14 +20,14 @@ public:
 
   void runInPython();
 
-  inline void loadTask(const QString& file)
+  void loadTask(const QString& file)
   {
     auto jo = loadJsonObject(file);
     m_logFile = json::value_to<QString>(jo.at("log_file"));
     read(jo);
   }
 
-  inline void saveTask(const QString& file) const
+  void saveTask(const QString& file) const
   {
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);
@@ -35,7 +35,7 @@ public:
     saveJsonObject(jo, file);
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);
@@ -43,7 +43,7 @@ public:
     return jsonToFormattedQString(jo);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     json::object jo;
     jo["log_file"] = json::value_from(m_logFile);

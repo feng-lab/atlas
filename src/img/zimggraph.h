@@ -16,7 +16,7 @@ public:
   void setConnectivity(size_t n);
 
   // whether to use voxel size of img to calcuate voxel distance, default is true
-  inline void setUseVoxelSize(bool v)
+  void setUseVoxelSize(bool v)
   {
     m_useVoxelSize = v;
     m_graphIsValid = false;
@@ -129,7 +129,7 @@ private:
 public:
   struct EdgeWeight1
   {
-    inline double operator()(double dist, double v1, double v2) const
+    double operator()(double dist, double v1, double v2) const
     {
       return dist * (1.0 / (v1 + 1.0) + 1.0 / (v2 + 1.0));
     }
@@ -142,7 +142,7 @@ public:
       , m_scale(scale)
     {}
 
-    inline double operator()(double dist, double v1, double v2) const
+    double operator()(double dist, double v1, double v2) const
     {
       return dist * (1.0 / (1.0 + std::exp((v1 - m_thre) / m_scale)) + 1.0 / (1.0 + std::exp((v2 - m_thre) / m_scale)) +
                      0.00001);
@@ -160,7 +160,7 @@ public:
       , m_scale(scale)
     {}
 
-    inline double operator()(double dist, double v1, double v2) const
+    double operator()(double dist, double v1, double v2) const
     {
       if (v1 < m_thre || v2 < m_thre) {
         return 1000;

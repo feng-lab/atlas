@@ -47,7 +47,7 @@ class BaseIterator
 public:
   using NodeType = TNode;
   using ValueType =
-    typename std::conditional<std::is_const_v<TNode>, const typename TNode::ValueType, typename TNode::ValueType>::type;
+    std::conditional_t<std::is_const_v<TNode>, const typename TNode::ValueType, typename TNode::ValueType>;
   NodeType* node;
   NodeType* parent;
 
@@ -569,7 +569,7 @@ public:
     std::swap(m_tail, rhs.m_tail);
   }
 
-  inline void clear() noexcept
+  void clear() noexcept
   {
     m_nodes.resize(2);
     m_head = &m_nodes.front();
@@ -2200,7 +2200,7 @@ protected:
   }
 
   template<typename Iter>
-  inline bool isValid(Iter it) const
+  bool isValid(Iter it) const
   {
     return it.node && it.node != m_head && it.node != m_tail;
   }
@@ -2224,7 +2224,7 @@ protected:
 
   // return true if other is child's ancestor (or equal to child)
   template<typename Iter>
-  inline bool isAncestor(const Iter& child, const Iter& other)
+  bool isAncestor(const Iter& child, const Iter& other)
   {
     CHECK(isValid(child) && isValid(other));
     for (auto it = beginAncestor(child); it != endAncestor(child); ++it) {

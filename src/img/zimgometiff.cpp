@@ -33,8 +33,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
       m_imgInfo[0].numChannels != 1 || m_imgInfo[0].bytesPerVoxel != m_omeImgInfo.bytesPerVoxel ||
       m_imgInfo[0].voxelFormat != m_omeImgInfo.voxelFormat) {
     throw ZIOException(QString("ome meta info <%1> doesn't match image data <%2>")
-                         .arg(m_omeImgInfo.toQString())
-                         .arg(m_imgInfo[0].toQString()));
+                         .arg(m_omeImgInfo.toQString(), m_imgInfo[0].toQString()));
   }
 
   m_imgInfo[0].numChannels = m_omeImgInfo.numChannels;
@@ -58,7 +57,7 @@ void ZImgOmeTiff::detectImgInfo(ZTiff& tiff)
 
 bool ZImgOmeTiff::mapIFDToImgLocation(size_t ifdIdx, index_t& z, index_t& c, index_t& t, index_t& l)
 {
-  if (m_ifdIdxPosMap.find(ifdIdx) == m_ifdIdxPosMap.end()) {
+  if (!m_ifdIdxPosMap.contains(ifdIdx)) {
     return false;
   }
   IFDPos pos = m_ifdIdxPosMap[ifdIdx];

@@ -57,7 +57,7 @@ public:
       , iter(0)
     {}
 
-    inline void swap(Params& other)
+    void swap(Params& other) noexcept
     {
       alpha.swap(other.alpha);
       beta.swap(other.beta);
@@ -313,27 +313,27 @@ public:
     return bestLogLikHist;
   }
 
-  inline size_t numOfClusters() const
+  size_t numOfClusters() const
   {
     return m_result.m.rows();
   }
 
-  inline MatrixXrt centroids() const
+  MatrixXrt centroids() const
   {
     return m_result.m;
   }
 
-  inline MatrixXrt covar(size_t compIdx) const
+  MatrixXrt covar(size_t compIdx) const
   {
     return m_result.invW[compIdx] / (m_result.v(compIdx) - m_dimension - 1);
   }
 
-  Eigen::VectorXi labels() const
+  [[nodiscard]] Eigen::VectorXi labels() const
   {
     return m_resultLabels;
   }
 
-  inline MatrixXrt responsiblities() const
+  MatrixXrt responsiblities() const
   {
     return m_resultRnk;
   }
@@ -739,7 +739,7 @@ protected:
       allLabels.insert(index);
     }
     for (size_t k = 0; k < m_nclasses; ++k) {
-      if (post.v(k) > m_prior.v(k) && allLabels.find(k) != allLabels.end()) {
+      if (post.v(k) > m_prior.v(k) && allLabels.contains(k)) {
         m_result.alpha(idx) = post.alpha(k);
         m_result.beta(idx) = post.beta(k);
         m_result.W.push_back(post.W[k]);

@@ -367,27 +367,27 @@ public:
     return e;
   }
 
-  inline size_t numOfClusters() const
+  [[nodiscard]] size_t numOfClusters() const
   {
     return m_nclasses;
   }
 
-  inline MatrixXrt centroids() const
+  MatrixXrt centroids() const
   {
     return m_centroids;
   }
 
-  inline VectorXrt priors() const
+  VectorXrt priors() const
   {
     return m_priors.transpose();
   }
 
-  inline MatrixXrt covar(size_t compIdx) const
+  MatrixXrt covar(size_t compIdx) const
   {
     return m_covars[compIdx];
   }
 
-  inline std::vector<MatrixXrt> covars() const
+  std::vector<MatrixXrt> covars() const
   {
     return m_covars;
   }
@@ -405,7 +405,7 @@ public:
     return m_labels;
   }
 
-  inline MatrixXrt responsiblities() const
+  MatrixXrt responsiblities() const
   {
     return m_responsibilities;
   }

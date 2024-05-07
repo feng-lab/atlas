@@ -23,4 +23,4 @@ ZStack* readZStack(const QStringList& fileList, Dimension catDim = Dimension::Z,
 
 } // namespace nim
 
-#endif // STACK_INTERFACE
+#endif

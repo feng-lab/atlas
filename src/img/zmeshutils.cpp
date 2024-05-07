@@ -146,7 +146,7 @@ int InterpolateEdge(std::vector<glm::dvec3>& vertices,
 
   // Check to see if this point has already been computed
   int64_t* iptr = locator->InsertUniqueEdge(i0, i1, i);
-  if (iptr == 0) {
+  if (!iptr) {
     return 0;
   }
 
@@ -289,7 +289,7 @@ void vtkCCSInsertTriangle(std::vector<glm::i64vec3>& polys,
                           const std::vector<int64_t>& polyEdges,
                           std::vector<std::vector<int64_t>>& originalEdges)
 {
-  static const size_t nextVert[3] = {1, 2, 0};
+  static constexpr size_t nextVert[3] = {1, 2, 0};
 
   // To store how many of originalEdges match
   int edgeCount = 0;
@@ -1076,7 +1076,7 @@ void vtkCCSJoinLooseEnds(std::vector<std::vector<int64_t>>& polys,
                          const glm::dvec3 normal)
 {
   // Relative tolerance for checking whether an edge is on the hull
-  const double tol = VTK_CCS_POLYGON_TOLERANCE;
+  constexpr double tol = VTK_CCS_POLYGON_TOLERANCE;
 
   // A list of polys to remove when everything is done
   std::vector<size_t> removePolys;
@@ -1389,7 +1389,7 @@ void vtkCCSFindTrueEdges(std::vector<std::vector<int64_t>>& polys,
                          std::vector<std::vector<int64_t>>& originalEdges)
 {
   // Tolerance^2 for angle to see if line segments are parallel
-  const double atol2 = (VTK_CCS_POLYGON_TOLERANCE * VTK_CCS_POLYGON_TOLERANCE);
+  constexpr double atol2 = (VTK_CCS_POLYGON_TOLERANCE * VTK_CCS_POLYGON_TOLERANCE);
 
   for (size_t polyId = 0; polyId < polys.size(); polyId++) {
     std::vector<int64_t>& oldPoly = polys[polyId];
@@ -1795,7 +1795,7 @@ int vtkCCSCheckCut(const std::vector<std::vector<int64_t>>& polys,
   int64_t ptId1 = polys[outerPolyId][outerIdx];
   int64_t ptId2 = polys[innerPolyId][innerIdx];
 
-  const double tol = VTK_CCS_POLYGON_TOLERANCE;
+  constexpr double tol = VTK_CCS_POLYGON_TOLERANCE;
 
   glm::dvec3 p1 = vertices[ptId1];
   glm::dvec3 p2 = vertices[ptId2];

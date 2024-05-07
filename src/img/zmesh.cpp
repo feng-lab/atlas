@@ -278,7 +278,7 @@ void ZMesh::load(H5::Group& allGrp)
     m_indices.resize(indicesDim);
     indices.read(m_indices.data(), uintType);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
@@ -336,7 +336,7 @@ void ZMesh::save(H5::Group& allGrp) const
     H5::DataSet indices = allGrp.createDataSet("Indices", uintType, indiceDataspace);
     indices.write(m_indices.data(), uintType);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }

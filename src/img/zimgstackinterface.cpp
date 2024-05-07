@@ -164,4 +164,4 @@ ZStack* readZStack(const QStringList& fileList, Dimension catDim, QString* error
 
 } // namespace nim
 
-#endif // STACK_INTERFACE
+#endif

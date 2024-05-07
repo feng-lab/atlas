@@ -28,7 +28,7 @@ template<bool ReportProgress>
 template<typename TITKImg, typename TVoxelOut>
 void ZImgSignedDistanceMap<ReportProgress>::run_Impl(TITKImg* itkimg, bool useVoxelSize, ZImg& res, size_t c, size_t t)
 {
-  using TOutputITKImg = typename itk::Image<TVoxelOut, TITKImg::ImageDimension>;
+  using TOutputITKImg = itk::Image<TVoxelOut, TITKImg::ImageDimension>;
   using DistanceMapFilterType = itk::SignedMaurerDistanceMapImageFilter<TITKImg, TOutputITKImg>;
   typename DistanceMapFilterType::Pointer dmFilter = DistanceMapFilterType::New();
   dmFilter->SetInput(itkimg);

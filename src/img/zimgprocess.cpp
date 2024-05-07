@@ -23,7 +23,7 @@ void ZImgProcess::run()
     doWork();
     Q_EMIT finished();
   }
-  catch (itk::ProcessAborted const& e) {
+  catch (const itk::ProcessAborted& e) {
     QString errMsg = QString("Cancelled by user: %1").arg(e.what());
     LOG(ERROR) << errMsg;
     Q_EMIT processError(errMsg);
@@ -32,7 +32,7 @@ void ZImgProcess::run()
       throw; // notify parent
     }
   }
-  catch (itk::ExceptionObject const& e) {
+  catch (const itk::ExceptionObject& e) {
     QString errMsg = QString("Caught itk exception: %1").arg(e.what());
     LOG(ERROR) << errMsg;
     Q_EMIT processError(errMsg);
@@ -41,7 +41,7 @@ void ZImgProcess::run()
       throw; // notify parent
     }
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     QString errMsg = QString("Caught exception: %1").arg(e.what());
     LOG(ERROR) << errMsg;
     Q_EMIT processError(errMsg);
@@ -69,21 +69,21 @@ void ZImgProcess::runInPython()
     doWork();
     Q_EMIT finished();
   }
-  catch (itk::ProcessAborted const& e) {
+  catch (const itk::ProcessAborted& e) {
     LOG(ERROR) << "Process Aborted by User. " << e.what();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
     }
     throw ZException(e.what());
   }
-  catch (itk::ExceptionObject const& excp) {
+  catch (const itk::ExceptionObject& excp) {
     LOG(ERROR) << "Caught itk exception: " << excp.what();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";
     }
     throw ZException(excp.what());
   }
-  catch (ZException const& e) {
+  catch (const ZException& e) {
     LOG(ERROR) << "Caught exception: " << e.what();
     if (hasParent()) {
       LOG(ERROR) << "notifying parent operation..";

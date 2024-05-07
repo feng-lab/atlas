@@ -207,7 +207,7 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
       puncta.data.push_back(std::move(p));
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
@@ -299,7 +299,7 @@ void ZPunctaIO::writeNimpFile(const ZPuncta& puncta, const QString& filename)
     H5::Attribute numPunctaAttr = allGrp.createAttribute("Number", intType, attrDataSpace);
     numPunctaAttr.write(intType, &idx);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(filename);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }

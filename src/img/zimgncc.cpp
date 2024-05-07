@@ -26,12 +26,12 @@ size_t findClosestValidDimension(size_t n)
   return n;
 }
 
-inline double removeNegative(double v)
+double removeNegative(double v)
 {
   return std::max(0.0, v);
 }
 
-inline double secureDivideSqrt(double v1, double v2)
+double secureDivideSqrt(double v1, double v2)
 {
   v2 = std::sqrt(v2);
   if (v2 > 1e-8) {
@@ -40,7 +40,7 @@ inline double secureDivideSqrt(double v1, double v2)
   return 0.0;
 }
 
-inline double secureDivideSqrt2(double v1, double v2)
+double secureDivideSqrt2(double v1, double v2)
 {
   v2 = std::sqrt(v2);
   if (v2 > 1e-8) {
@@ -128,9 +128,7 @@ void checkInputImgs(const ZImg& fixedImg, const ZImg& movingImg, const QString& 
   if (fixedImg.isEmpty() || movingImg.isEmpty() || fixedImg.numChannels() != 1 || fixedImg.numTimes() != 1 ||
       movingImg.numChannels() != 1 || movingImg.numTimes() != 1) {
     throw ZException(QString("%1 input img dimension is not supported: fixed img <%1>, moving img <%2>")
-                       .arg(name)
-                       .arg(fixedImg.info().toQString())
-                       .arg(movingImg.info().toQString()));
+                       .arg(name, fixedImg.info().toQString(), movingImg.info().toQString()));
   }
 }
 
@@ -554,9 +552,7 @@ void cropOverlapSubImg(const ZImg& fixedImgIn,
   ZVoxelCoordinate fixedEnd = min(offset + movingImgIn.endCoord(), fixedImgIn.endCoord());
   if (fixedEnd.anyLessEqual(fixedStart)) {
     throw ZException(QString("Trying to crop overlap region of non-overlap img1 <%1> and img2 <%2> with offset: %3")
-                       .arg(fixedImgIn.info().toQString())
-                       .arg(movingImgIn.info().toQString())
-                       .arg(offset.toQString()));
+                       .arg(fixedImgIn.info().toQString(), movingImgIn.info().toQString(), offset.toQString()));
   }
   ZImgRegion fixedRegion(fixedStart, fixedEnd);
   subFixedImg = fixedImgIn.crop(fixedRegion);

@@ -23,7 +23,7 @@ struct ZVoxelCoordinate
 
   value_type x, y, z, c, t;
 
-  inline constexpr ZVoxelCoordinate()
+  constexpr ZVoxelCoordinate()
     : x(0)
     , y(0)
     , z(0)
@@ -31,7 +31,7 @@ struct ZVoxelCoordinate
     , t(0)
   {}
 
-  inline explicit ZVoxelCoordinate(Init init)
+  explicit ZVoxelCoordinate(Init init)
   {
     switch (init) {
       case Init::Minimum:
@@ -58,11 +58,11 @@ struct ZVoxelCoordinate
     }
   }
 
-  inline constexpr ZVoxelCoordinate(value_type x_,
-                                    value_type y_,
-                                    value_type z_ = value_type(0),
-                                    value_type c_ = value_type(0),
-                                    value_type t_ = value_type(0))
+  constexpr ZVoxelCoordinate(value_type x_,
+                             value_type y_,
+                             value_type z_ = value_type(0),
+                             value_type c_ = value_type(0),
+                             value_type t_ = value_type(0))
     : x(x_)
     , y(y_)
     , z(z_)
@@ -70,11 +70,11 @@ struct ZVoxelCoordinate
     , t(t_)
   {}
 
-  inline void set(value_type x_,
-                  value_type y_,
-                  value_type z_ = value_type(0),
-                  value_type c_ = value_type(0),
-                  value_type t_ = value_type(0))
+  void set(value_type x_,
+           value_type y_,
+           value_type z_ = value_type(0),
+           value_type c_ = value_type(0),
+           value_type t_ = value_type(0))
   {
     x = x_;
     y = y_;
@@ -83,18 +83,18 @@ struct ZVoxelCoordinate
     t = t_;
   }
 
-  [[nodiscard]] static inline constexpr size_t size()
+  [[nodiscard]] static constexpr size_t size()
   {
     return 5;
   }
 
-  [[nodiscard]] static inline constexpr size_t length()
+  [[nodiscard]] static constexpr size_t length()
   {
     return 5;
   }
 
   // access
-  inline value_type& operator[](size_t i)
+  value_type& operator[](size_t i)
   {
     switch (i) {
       case 0:
@@ -112,7 +112,7 @@ struct ZVoxelCoordinate
     }
   }
 
-  inline const value_type& operator[](size_t i) const
+  const value_type& operator[](size_t i) const
   {
     switch (i) {
       case 0:
@@ -130,92 +130,92 @@ struct ZVoxelCoordinate
     }
   }
 
-  [[nodiscard]] inline bool allGreaterThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool allGreaterThan(const ZVoxelCoordinate& other) const
   {
     return x > other.x && y > other.y && z > other.z && c > other.c && t > other.t;
   }
 
-  [[nodiscard]] inline bool allGreaterEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool allGreaterEqual(const ZVoxelCoordinate& other) const
   {
     return x >= other.x && y >= other.y && z >= other.z && c >= other.c && t >= other.t;
   }
 
-  [[nodiscard]] inline bool allLessThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool allLessThan(const ZVoxelCoordinate& other) const
   {
     return other.allGreaterThan(*this);
   }
 
-  [[nodiscard]] inline bool allLessEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool allLessEqual(const ZVoxelCoordinate& other) const
   {
     return other.allGreaterEqual(*this);
   }
 
-  [[nodiscard]] inline bool allGreaterThan(value_type other) const
+  [[nodiscard]] bool allGreaterThan(value_type other) const
   {
     return x > other && y > other && z > other && c > other && t > other;
   }
 
-  [[nodiscard]] inline bool allGreaterEqual(value_type other) const
+  [[nodiscard]] bool allGreaterEqual(value_type other) const
   {
     return x >= other && y >= other && z >= other && c >= other && t >= other;
   }
 
-  [[nodiscard]] inline bool allLessThan(value_type other) const
+  [[nodiscard]] bool allLessThan(value_type other) const
   {
     return x < other && y < other && z < other && c < other && t < other;
   }
 
-  [[nodiscard]] inline bool allLessEqual(value_type other) const
+  [[nodiscard]] bool allLessEqual(value_type other) const
   {
     return x <= other && y <= other && z <= other && c <= other && t <= other;
   }
 
-  [[nodiscard]] inline bool anyGreaterThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool anyGreaterThan(const ZVoxelCoordinate& other) const
   {
     return !allLessEqual(other);
   }
 
-  [[nodiscard]] inline bool anyGreaterEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool anyGreaterEqual(const ZVoxelCoordinate& other) const
   {
     return !allLessThan(other);
   }
 
-  [[nodiscard]] inline bool anyLessThan(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool anyLessThan(const ZVoxelCoordinate& other) const
   {
     return !allGreaterEqual(other);
   }
 
-  [[nodiscard]] inline bool anyLessEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool anyLessEqual(const ZVoxelCoordinate& other) const
   {
     return !allGreaterThan(other);
   }
 
-  [[nodiscard]] inline bool anyGreaterThan(value_type other) const
+  [[nodiscard]] bool anyGreaterThan(value_type other) const
   {
     return !allLessEqual(other);
   }
 
-  [[nodiscard]] inline bool anyGreaterEqual(value_type other) const
+  [[nodiscard]] bool anyGreaterEqual(value_type other) const
   {
     return !allLessThan(other);
   }
 
-  [[nodiscard]] inline bool anyLessThan(value_type other) const
+  [[nodiscard]] bool anyLessThan(value_type other) const
   {
     return !allGreaterEqual(other);
   }
 
-  [[nodiscard]] inline bool anyLessEqual(value_type other) const
+  [[nodiscard]] bool anyLessEqual(value_type other) const
   {
     return !allGreaterThan(other);
   }
 
-  [[nodiscard]] inline bool anyEqual(const ZVoxelCoordinate& other) const
+  [[nodiscard]] bool anyEqual(const ZVoxelCoordinate& other) const
   {
     return x == other.x || y == other.y || z == other.z || c == other.c || t == other.t;
   }
 
-  [[nodiscard]] inline bool anyEqual(value_type other) const
+  [[nodiscard]] bool anyEqual(value_type other) const
   {
     return x == other || y == other || z == other || c == other || t == other;
   }
@@ -223,7 +223,7 @@ struct ZVoxelCoordinate
   // operators
   auto operator<=>(const ZVoxelCoordinate& other) const = default;
 
-  inline ZVoxelCoordinate& operator+=(value_type rhs)
+  ZVoxelCoordinate& operator+=(value_type rhs)
   {
     x += rhs;
     y += rhs;
@@ -233,7 +233,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator+=(const ZVoxelCoordinate& rhs)
+  ZVoxelCoordinate& operator+=(const ZVoxelCoordinate& rhs)
   {
     x += rhs.x;
     y += rhs.y;
@@ -243,7 +243,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator-=(value_type rhs)
+  ZVoxelCoordinate& operator-=(value_type rhs)
   {
     x -= rhs;
     y -= rhs;
@@ -253,7 +253,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator-=(const ZVoxelCoordinate& rhs)
+  ZVoxelCoordinate& operator-=(const ZVoxelCoordinate& rhs)
   {
     x -= rhs.x;
     y -= rhs.y;
@@ -263,12 +263,12 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate operator-() const
+  ZVoxelCoordinate operator-() const
   {
     return {-x, -y, -z, -c, -t};
   }
 
-  inline ZVoxelCoordinate& operator*=(value_type rhs)
+  ZVoxelCoordinate& operator*=(value_type rhs)
   {
     x *= rhs;
     y *= rhs;
@@ -278,7 +278,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator*=(const ZVoxelCoordinate& rhs)
+  ZVoxelCoordinate& operator*=(const ZVoxelCoordinate& rhs)
   {
     x *= rhs.x;
     y *= rhs.y;
@@ -288,7 +288,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator/=(value_type rhs)
+  ZVoxelCoordinate& operator/=(value_type rhs)
   {
     x /= rhs;
     y /= rhs;
@@ -298,7 +298,7 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  inline ZVoxelCoordinate& operator/=(const ZVoxelCoordinate& rhs)
+  ZVoxelCoordinate& operator/=(const ZVoxelCoordinate& rhs)
   {
     x /= rhs.x;
     y /= rhs.y;
@@ -308,12 +308,12 @@ struct ZVoxelCoordinate
     return *this;
   }
 
-  [[nodiscard]] inline QString toQString() const
+  [[nodiscard]] QString toQString() const
   {
     return jsonToQString(*this);
   }
 
-  [[nodiscard]] inline std::string toString() const
+  [[nodiscard]] std::string toString() const
   {
     return jsonToString(*this);
   }
@@ -321,7 +321,7 @@ struct ZVoxelCoordinate
   // ttsize[0] to ttsize[4] are the sizes of x to t, advance current coord to next valid coord,
   // return false if reach the end
   template<typename T>
-  inline bool advance(const T& ttsize)
+  bool advance(const T& ttsize)
   {
     ++(*this)[0];
     for (size_t i = 0; (i < 4) && ((*this)[i] >= ttsize[i]); ++i) {
@@ -338,7 +338,7 @@ struct ZVoxelCoordinate
 
   // return a valid coord within size, ttsize[0] to ttsize[4] are the sizes of x to t
   template<typename T>
-  static inline ZVoxelCoordinate random(const T& ttsize)
+  static ZVoxelCoordinate random(const T& ttsize)
   {
     CHECK(ttsize[0] > 0 && ttsize[1] > 0 && ttsize[2] > 0 && ttsize[3] > 0 && ttsize[4] > 0);
     value_type resx = ttsize[0] == 1 ? 0 : ZRandom::instance().randInt<value_type>(ttsize[0] - 1);
@@ -351,7 +351,7 @@ struct ZVoxelCoordinate
 
   // return the last valid coord within size, ttsize[0] to ttsize[4] are the sizes of x to t
   template<typename T>
-  static inline ZVoxelCoordinate lastCoordinate(const T& ttsize)
+  static ZVoxelCoordinate lastCoordinate(const T& ttsize)
   {
     CHECK(ttsize[0] > 0 && ttsize[1] > 0 && ttsize[2] > 0 && ttsize[3] > 0 && ttsize[4] > 0);
     return ZVoxelCoordinate(ttsize[0] - 1, ttsize[1] - 1, ttsize[2] - 1, ttsize[3] - 1, ttsize[4] - 1);

@@ -128,8 +128,6 @@ void _resizeContributions(size_t inLength,
       kernelWidth = 2;
       break;
     case Interpolant::Cubic:
-      kernelWidth = 4;
-      break;
     case Interpolant::Lanczos2:
       kernelWidth = 4;
       break;

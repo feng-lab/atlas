@@ -28,7 +28,7 @@ public:
 
   void setParameters(const std::vector<double>& para);
 
-  virtual void setParameters(double const* para) = 0;
+  virtual void setParameters(const double* para) = 0;
 
   [[nodiscard]] virtual bool is2DTransform() const = 0;
 

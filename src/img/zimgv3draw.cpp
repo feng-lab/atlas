@@ -214,7 +214,7 @@ void ZImgV3DRaw::writeImg(const QString& filename, const ZImg& img, const ZImgWr
   std::ofstream outputFileStream;
   openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
-  const char formatkey[] = "raw_image_stack_by_hpeng";
+  constexpr char formatkey[] = "raw_image_stack_by_hpeng";
   writeStream(outputFileStream, formatkey, std::strlen(formatkey));
 
   char endian = 'L';
@@ -242,7 +242,7 @@ void ZImgV3DRaw::writeImg(const QString& filename,
   std::ofstream outputFileStream;
   openFileStream(outputFileStream, filename, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc);
 
-  const char formatkey[] = "raw_image_stack_by_hpeng";
+  constexpr char formatkey[] = "raw_image_stack_by_hpeng";
   writeStream(outputFileStream, formatkey, std::strlen(formatkey));
 
   char endian = 'L';

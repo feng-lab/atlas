@@ -22,7 +22,7 @@ typename itk::Image<TVoxel, 3>::Pointer wrapZImgChannelAsITKImg(const ZImg& img,
                        .arg(t)
                        .arg(img.info().toQString()));
   }
-  using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 3>;
+  using ImportFilterType = itk::ImportImageFilter<TVoxel, 3>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
   using OutputImageType = itk::Image<TVoxel, 3>;
@@ -75,7 +75,7 @@ typename itk::Image<TVoxel, 2>::Pointer wrapZImgPlaneAsITKImg(const ZImg& img, s
                        .arg(t)
                        .arg(img.info().toQString()));
   }
-  using ImportFilterType = typename itk::ImportImageFilter<TVoxel, 2>;
+  using ImportFilterType = itk::ImportImageFilter<TVoxel, 2>;
   typename ImportFilterType::Pointer importFilter = ImportFilterType::New();
   typename ImportFilterType::SizeType size;
   using OutputImageType = itk::Image<TVoxel, 2>;

@@ -192,7 +192,7 @@ ZImgInfo ZImgInfoIO::load(const H5::Group& grp)
 
     return info;
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
@@ -305,7 +305,7 @@ void ZImgInfoIO::save(H5::Group& grp, const ZImgInfo& info)
     H5::Attribute lciacAttr = grp.createAttribute("LastChannelIsAlphaChannel", int32Type, attrDataSpace);
     lciacAttr.write(int32Type, &lastChannelIsAlphaChannel);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }

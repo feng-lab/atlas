@@ -69,7 +69,7 @@ void ZImgMetaImage::readImg(const QString& filename, ZImg& img, const ZImgRegion
 
   if (region.isEmpty() || !region.isValid(imgInfo)) {
     throw ZIOException(
-      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString()).arg(region.toQString()));
+      QString("Invalid image region. Image info: '%1', region: '%2'").arg(imgInfo.toQString(), region.toQString()));
   }
 
   if (region.containsWholeImg(imgInfo)) {
@@ -227,8 +227,7 @@ void ZImgMetaImage::writeImg(const QString& filename, const ZImg& img, const ZIm
                       elementSpacing,
                       elementType,
                       img.numChannels(),
-                      multipleChannel ? const_cast<uint8_t*>(tmpImg.channelData(0))
-                                      : const_cast<uint8_t*>(img.channelData(0)));
+                      multipleChannel ? tmpImg.channelData(0) : const_cast<uint8_t*>(img.channelData(0)));
 
   metaImage.DistanceUnits(distanceUnitType);
   metaImage.CompressedData(paras.compression != Compression::NONE);
