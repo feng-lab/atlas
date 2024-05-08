@@ -157,7 +157,7 @@ public:
 
   bool addCtrlPoint(const QPointF& pt, std::set<size_t>& editedShapes);
 
-  void addCtrlPointToShape(const QPointF& pt, size_t id);
+  void addCtrlPointToShape(const QPointF& pt, size_t shapeID);
 
   void setTopLeft(double x, double y);
 
@@ -202,7 +202,7 @@ public:
                                double scaleX = 1.0,
                                double scaleY = 1.0,
                                bool keepOnlyInterpolatedSlices = false,
-                               int intepolationMethod = 0) const;
+                               int interpolationMethod = 0) const;
 
   [[nodiscard]] const ZBBox<glm::ivec4>& boundBox() const
   {
@@ -405,7 +405,7 @@ public:
 
   [[nodiscard]] bool hasSlice(int slice) const
   {
-    return m_sliceROIs.find(slice) != m_sliceROIs.end();
+    return m_sliceROIs.contains(slice);
   }
 
   [[nodiscard]] std::vector<size_t> sliceShapeIDs(int slice) const
@@ -586,8 +586,7 @@ class ZROICommand : public QUndoCommand
 {
 public:
   explicit ZROICommand(ZROI& roi)
-    : QUndoCommand()
-    , m_roi(roi)
+    : m_roi(roi)
     , m_oldSliceROIs(m_roi.m_sliceROIs)
   {}
 

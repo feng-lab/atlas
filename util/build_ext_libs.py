@@ -1451,15 +1451,9 @@ def build_eigen(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=[r'add_subdirectory(blas',
                                           r'add_subdirectory(lapack',
-                                          r'set(CMAKEPACKAGE_INSTALL_DIR',
                                           ],
                               to_texts=[r'set(blas',
                                         r'set(lapack',
-                                        r"""target_include_directories (eigen INTERFACE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  $<INSTALL_INTERFACE:${INCLUDE_INSTALL_DIR}>
-)
-set(CMAKEPACKAGE_INSTALL_DIR""",  # temporary fix
                                         ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
@@ -2887,10 +2881,13 @@ def build_fizz(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=[
                                   r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
+                                  r'extensions/delegatedcred/DelegatedCredentialUtils.cpp',
                               ],
                               to_texts=[
                                   'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
+                                  r"""extensions/delegatedcred/DelegatedCredentialPemUtils.cpp
+extensions/delegatedcred/DelegatedCredentialUtils.cpp""",
                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)

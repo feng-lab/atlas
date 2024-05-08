@@ -196,7 +196,7 @@ bool ZRegionAnnotationDoc::isSameObj(const json::value& v1, const json::value& v
 
 size_t ZRegionAnnotationDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToRegionAnnotationPacks[aliasId] = m_idToRegionAnnotationPacks[id];
@@ -208,7 +208,7 @@ size_t ZRegionAnnotationDoc::makeAlias(size_t id)
 
 bool ZRegionAnnotationDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.contains(id));
 
   return std::any_of(m_idToRegionAnnotationPacks.begin(),
                      m_idToRegionAnnotationPacks.end(),
@@ -219,7 +219,7 @@ bool ZRegionAnnotationDoc::isAlias(size_t id) const
 
 QWidget* ZRegionAnnotationDoc::createObjEditWidget(size_t id)
 {
-  CHECK(m_idToRegionAnnotationPacks.find(id) != m_idToRegionAnnotationPacks.end());
+  CHECK(m_idToRegionAnnotationPacks.contains(id));
 
   auto& pack = m_idToRegionAnnotationPacks.at(id);
   return new ZRegionAnnotationWidget(*pack, m_doc);

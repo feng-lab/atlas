@@ -56,7 +56,7 @@ void ZPunctaPack::setSelectedPuncta(const std::set<const ZPunctum*>& sp)
   }
   m_selectedPuncta = sp;
   for (auto& mp : m_puncta.data) {
-    mp.setSelected(m_selectedPuncta.find(&mp) != m_selectedPuncta.end());
+    mp.setSelected(m_selectedPuncta.contains(&mp));
   }
   Q_EMIT selectionChanged();
 }
@@ -81,7 +81,7 @@ void ZPunctaPack::onPunctumSelected(const ZPunctum* p, bool append)
     if (!p && m_selectedPuncta.empty()) {
       return;
     }
-    if (p && m_selectedPuncta.size() == 1 && m_selectedPuncta.find(p) != m_selectedPuncta.end()) {
+    if (p && m_selectedPuncta.size() == 1 && m_selectedPuncta.contains(p)) {
       return;
     }
     for (auto& mp : m_puncta.data) {

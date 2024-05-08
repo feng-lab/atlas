@@ -869,7 +869,7 @@ void ZAnimation::readContent(const QString& fn, const QString& jsonKey)
       err += QString("%1 %2 contains zero valid objects.\n").arg(jsonKey).arg(fn);
     } else {
       for (auto& i : m_objList) {
-        if (idmap.find(i->uniqueId) != idmap.end()) {
+        if (idmap.contains(i->uniqueId)) {
           i->boundId = idmap.at(i->uniqueId);
           // original jsonvalue might be relative path, we need to convert them to absolute path (if file exist)
           i->objJsonValue = m_doc.idToDoc(i->boundId)->jsonValue(i->boundId);

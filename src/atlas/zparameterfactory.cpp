@@ -17,7 +17,7 @@ template<typename T>
 class ZParameterMaker : public ZParameterMakerInterface
 {
 public:
-  ZParameter* create(const QString& name, QObject* parent = nullptr) const
+  ZParameter* create(const QString& name, QObject* parent) const override
   {
     return new T(name, parent);
   }
@@ -60,7 +60,7 @@ ZParameterFactory::ZParameterFactory()
 
 bool ZParameterFactory::isTypeValid(const QString& type)
 {
-  return m_makers.find(type) != m_makers.end();
+  return m_makers.contains(type);
 }
 
 ZParameter* ZParameterFactory::create(const QString& name, const QString& type, QObject* parent) const
@@ -74,7 +74,7 @@ ZParameter* ZParameterFactory::create(const QString& name, const QString& type, 
 
 void ZParameterFactory::registerMaker(const QString& typeName, ZParameterMakerInterface* maker)
 {
-  if (m_makers.find(typeName) != m_makers.end()) {
+  if (m_makers.contains(typeName)) {
     LOG(WARNING) << "Multiple makers for type " << typeName;
   }
   m_makers[typeName].reset(maker);

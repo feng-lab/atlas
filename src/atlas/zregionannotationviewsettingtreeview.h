@@ -53,7 +53,7 @@ private:
   ZRegionAnnotationViewSettingTreeModel& m_ratModel;
   ZRegionAnnotation& m_regionAnnotation;
   QSortFilterProxyModel* m_ratProxyModel;
-  QMenu* m_contextMenu;
+  QMenu* m_contextMenu = nullptr;
 };
 
 } // namespace nim

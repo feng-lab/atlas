@@ -239,7 +239,7 @@ size_t ZROIDoc::makeAlias(size_t /*id*/)
 
 bool ZROIDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
+  CHECK(m_idToROIPacks.contains(id));
 
   return std::any_of(m_idToROIPacks.begin(), m_idToROIPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToROIPacks.at(id);
@@ -248,7 +248,7 @@ bool ZROIDoc::isAlias(size_t id) const
 
 QWidget* ZROIDoc::createObjEditWidget(size_t id)
 {
-  CHECK(m_idToROIPacks.find(id) != m_idToROIPacks.end());
+  CHECK(m_idToROIPacks.contains(id));
 
   auto& pack = m_idToROIPacks.at(id);
   return new ZROIWidget(*pack, m_doc);

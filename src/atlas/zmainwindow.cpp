@@ -907,7 +907,7 @@ bool ZMainWindow::loadJsonSceneImpl(const QString& fn, QString& err)
         bool ok;
         size_t objectId = qkey.toLongLong(&ok);
         if (ok) {
-          if (idmap.find(objectId) != idmap.end()) {
+          if (idmap.contains(objectId)) {
             size_t id = idmap.at(objectId);
             // LOG(INFO) << id;
             const auto& viewObj = value.as_object();

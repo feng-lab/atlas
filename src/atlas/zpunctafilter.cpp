@@ -373,7 +373,7 @@ void ZPunctaFilter::updateItemSelectedState()
   m_skipSelectionChangedProcessing = true;
   // LOG(INFO) << m_puncta->selectedPuncta().size();
   for (auto& [p, item] : m_punctumToItem) {
-    item->setSelected(m_punctaPack->selectedPuncta().find(p) != m_punctaPack->selectedPuncta().end());
+    item->setSelected(m_punctaPack->selectedPuncta().contains(p));
   }
   m_skipSelectionChangedProcessing = false;
 }

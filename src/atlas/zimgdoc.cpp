@@ -173,7 +173,7 @@ bool ZImgDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
 size_t ZImgDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToImgPacks[aliasId] = m_idToImgPacks[id];
@@ -185,7 +185,7 @@ size_t ZImgDoc::makeAlias(size_t id)
 
 bool ZImgDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.contains(id));
 
   return std::any_of(m_idToImgPacks.begin(), m_idToImgPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToImgPacks.at(id);
@@ -395,7 +395,7 @@ size_t ZImgDoc::loadImg(const ZImgSource& imgSource, QString& errorMsg)
 
 void ZImgDoc::sendChangedSignal(size_t id)
 {
-  CHECK(m_idToImgPacks.find(id) != m_idToImgPacks.end());
+  CHECK(m_idToImgPacks.contains(id));
 
   auto& pack = m_idToImgPacks.at(id);
   for (const auto& idPack : m_idToImgPacks) {

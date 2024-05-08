@@ -179,7 +179,7 @@ void Z3DNetworkEvaluator::updateNetwork()
       const std::vector<Z3DOutputPortBase*> connected = inport->connected();
       for (auto j : connected) {
         Z3DFilter* outFilter = j->filter();
-        if (m_filterToVertexMapper.find(outFilter) == m_filterToVertexMapper.end()) {
+        if (!m_filterToVertexMapper.contains(outFilter)) {
           filterQueue.push(outFilter);
           v = boost::add_vertex(VertexInfo(outFilter), m_filterGraph);
           m_filterToVertexMapper[outFilter] = v;

@@ -64,8 +64,8 @@ private:
 
   void valueChangedFromSpinBox(int v);
 
-  ZSlider2* m_slider;
-  ZSpinBox* m_spinBox;
+  ZSlider2* m_slider = nullptr;
+  ZSpinBox* m_spinBox = nullptr;
 };
 
 class ZDoubleSpinBoxWithSlider : public QWidget
@@ -99,8 +99,8 @@ private:
   void valueChangedFromSpinBox(double v);
 
 private:
-  ZSlider2* m_slider;
-  ZDoubleSpinBox* m_spinBox;
+  ZSlider2* m_slider = nullptr;
+  ZDoubleSpinBox* m_spinBox = nullptr;
   double m_value;
   double m_min;
   double m_max;

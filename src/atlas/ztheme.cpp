@@ -105,7 +105,7 @@ void ZTheme::loadTheme(const QString& fn)
 
 std::pair<QColor, QString> ZTheme::readNamedColor(const QString& color) const
 {
-  if (m_palette.find(color) != m_palette.end()) {
+  if (m_palette.contains(color)) {
     return std::make_pair(m_palette.at(color), color);
   }
 

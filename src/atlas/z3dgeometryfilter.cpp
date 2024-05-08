@@ -6,7 +6,6 @@ Z3DGeometryFilter::Z3DGeometryFilter(Z3DGlobalParameters& globalPara, QObject* p
   : Z3DBoundedFilter(globalPara, parent)
   , m_outPort("GeometryFilter", this)
   , m_stayOnTop("Stay On Top", false)
-  , m_pickingManager(nullptr)
   , m_pickingObjectsRegistered(false)
 {
   addPort(m_outPort);

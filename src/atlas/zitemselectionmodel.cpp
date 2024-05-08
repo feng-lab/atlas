@@ -122,7 +122,7 @@ void ZItemSelectionModel::convertSelectionChangedSignal(const QItemSelection& se
     ZObjDoc* doc = m_model->indexToDoc(index);
     size_t id = m_model->indexToId(index);
     docDeselected[doc].push_back(id);
-    if (docSelected.find(doc) == docSelected.end()) {
+    if (!docSelected.contains(doc)) {
       docSelected.emplace(doc, std::vector<size_t>());
     }
   }

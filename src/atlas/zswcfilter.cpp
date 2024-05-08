@@ -554,7 +554,7 @@ void ZSwcFilter::updateItemSelectedState()
   }
   m_skipSelectionChangedProcessing = true;
   for (auto& [p, item] : m_swcNodeToItem) {
-    item->setSelected(m_swcPack->selectedNodes().find(p) != m_swcPack->selectedNodes().end());
+    item->setSelected(m_swcPack->selectedNodes().contains(p));
   }
   m_skipSelectionChangedProcessing = false;
 }

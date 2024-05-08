@@ -622,7 +622,7 @@ void Z3DSwcFilter::selectSwc(QMouseEvent* e, int /*w*/, int /*h*/)
     }
     bool hit = obj == m_swcPack;
     if (isNodeRendering()) {
-      hit = m_swcPack->allNodesSet().find(static_cast<const ZSwc::SwcTreeNode*>(obj)) != m_swcPack->allNodesSet().end();
+      hit = m_swcPack->allNodesSet().contains(static_cast<const ZSwc::SwcTreeNode*>(obj));
     }
     if (hit) {
       Q_EMIT objSelected(appending);

@@ -151,7 +151,7 @@ public:
     }
     CHECK(m_addedPuncta.empty());
     for (auto it = m_punctaPack.m_puncta.data.begin(); it != m_punctaPack.m_puncta.data.end();) {
-      if (m_addedSet.find(&*it) != m_addedSet.end()) {
+      if (m_addedSet.contains(&*it)) {
         auto itCopy = it;
         ++it;
         m_addedPuncta.splice(m_addedPuncta.end(), m_punctaPack.m_puncta.data, itCopy);
@@ -175,7 +175,7 @@ public:
     }
     CHECK(m_deletedPuncta.empty());
     for (auto it = m_punctaPack.m_puncta.data.begin(); it != m_punctaPack.m_puncta.data.end();) {
-      if (m_deletedSet.find(&*it) != m_deletedSet.end()) {
+      if (m_deletedSet.contains(&*it)) {
         auto itCopy = it;
         ++it;
         m_deletedPuncta.splice(m_deletedPuncta.end(), m_punctaPack.m_puncta.data, itCopy);

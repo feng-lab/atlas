@@ -69,9 +69,9 @@ bool ZPunctaDoc::canReadFile(const QString& fileName) const
 
 size_t ZPunctaDoc::loadFile(const QString& fileName, QString& errorMsg)
 {
-  for (const auto& idPack : m_idToPunctaPacks) {
-    if (idPack.second->path() == fileName) {
-      return idPack.first;
+  for (const auto& [id, pack] : m_idToPunctaPacks) {
+    if (pack->path() == fileName) {
+      return id;
     }
   }
   try {
@@ -93,9 +93,9 @@ size_t ZPunctaDoc::loadFile(const json::value& jValue, QString& errorMsg)
       errorMsg = QString("File path is not string or is empty");
       return 0;
     }
-    for (const auto& idPack : m_idToPunctaPacks) {
-      if (isSameObj(jValue, jsonValue(idPack.first))) {
-        return idPack.first;
+    for (const auto& [id, pack] : m_idToPunctaPacks) {
+      if (isSameObj(jValue, jsonValue(id))) {
+        return id;
       }
     }
     QString fileName = asQString(jValue);
@@ -185,7 +185,7 @@ bool ZPunctaDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
 size_t ZPunctaDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+  CHECK(m_idToPunctaPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToPunctaPacks[aliasId] = m_idToPunctaPacks[id];
@@ -197,7 +197,7 @@ size_t ZPunctaDoc::makeAlias(size_t id)
 
 bool ZPunctaDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+  CHECK(m_idToPunctaPacks.contains(id));
 
   return std::any_of(m_idToPunctaPacks.begin(), m_idToPunctaPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToPunctaPacks.at(id);
@@ -206,7 +206,7 @@ bool ZPunctaDoc::isAlias(size_t id) const
 
 QWidget* ZPunctaDoc::createObjEditWidget(size_t id)
 {
-  CHECK(m_idToPunctaPacks.find(id) != m_idToPunctaPacks.end());
+  CHECK(m_idToPunctaPacks.contains(id));
 
   return new ZPunctaWidget(punctaPack(id), m_doc);
 }
@@ -257,10 +257,10 @@ size_t ZPunctaDoc::addPuncta(ZPuncta puncta, const QString& path)
 void ZPunctaDoc::setModified(bool)
 {
   if (auto ra = qobject_cast<ZPunctaPack*>(sender())) {
-    for (const auto& idPack : m_idToPunctaPacks) {
-      if (idPack.second.get() == ra) {
-        idPack.second->updateDerivedData();
-        m_doc.updateObjInfo(idPack.first);
+    for (const auto& [id, pack] : m_idToPunctaPacks) {
+      if (pack.get() == ra) {
+        pack->updateDerivedData();
+        m_doc.updateObjInfo(id);
         return;
       }
     }
@@ -299,9 +299,9 @@ bool ZPunctaDoc::savePuncta(ZPunctaPack* pack, const QString& fileName, QString&
 
 void ZPunctaDoc::packInfoUpdated(ZPunctaPack* pack)
 {
-  for (const auto& idPack : m_idToPunctaPacks) {
-    if (idPack.second.get() == pack) {
-      m_doc.updateObjInfo(idPack.first);
+  for (const auto& [id, ppack] : m_idToPunctaPacks) {
+    if (ppack.get() == pack) {
+      m_doc.updateObjInfo(id);
     }
   }
 }

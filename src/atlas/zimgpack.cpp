@@ -1112,7 +1112,7 @@ void ZImgPack::createTileIndexStructure()
 
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
 {
-  CHECK(m_pyramidalRatios.find(ratio) != m_pyramidalRatios.end());
+  CHECK(m_pyramidalRatios.contains(ratio));
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
@@ -1146,7 +1146,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio) const
 
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 {
-  CHECK(m_pyramidalRatios.find(ratio) != m_pyramidalRatios.end());
+  CHECK(m_pyramidalRatios.contains(ratio));
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];
@@ -1179,7 +1179,7 @@ ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t) const
 
 ZImg ZImgPack::assembleImg(std::array<size_t, 3> ratio, size_t t, size_t z) const
 {
-  CHECK(m_pyramidalRatios.find(ratio) != m_pyramidalRatios.end() && ratio[2] == 1);
+  CHECK(m_pyramidalRatios.contains(ratio) && ratio[2] == 1);
   ZImgInfo info = m_imgInfo;
   info.width = (m_imgInfo.width + ratio[0] - 1) / ratio[0];
   info.height = (m_imgInfo.height + ratio[1] - 1) / ratio[1];

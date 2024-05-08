@@ -38,7 +38,7 @@ public:
 
   [[nodiscard]] bool hasObj(size_t id) const override
   {
-    return m_idToFilter.find(id) != m_idToFilter.end();
+    return m_idToFilter.contains(id);
   }
 
   void read(size_t id, const json::object& json) override

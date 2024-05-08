@@ -694,7 +694,7 @@ void ZSliceROI::save(H5::Group& sliceGrp) const
       }
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 }
@@ -723,7 +723,7 @@ ZROI::ZROI(QUndoStack* undoStack, QObject* parent)
   connect(m_undoStack, &QUndoStack::cleanChanged, this, &ZROI::undoStackCleanChanged);
 }
 
-void ZROI::importMaskImage(const QString& fn, nim::FileFormat format)
+void ZROI::importMaskImage(const QString& fn, FileFormat format)
 {
   ZBenchTimer bt;
 
@@ -781,11 +781,10 @@ ZImg ZROI::toMaskImg(int outWidth,
     ZImgSignedDistanceMap<> distMap;
     distMap.setInsideIsPositive(false);
     ZImgInterpolate<> interpolator;
-    for (const auto& sliceROI : m_sliceROIs) {
-      if (sliceROI.first < 0) {
+    for (const auto& [slice, ROI] : m_sliceROIs) {
+      if (slice < 0) {
         continue;
       }
-      size_t slice = sliceROI.first;
       // LOG(INFO) << slice;
       const QPainterPath& path = slicePaintPath(slice, scaleX, scaleY);
       auto [mask, x_start, y_start] = ZROIUtils::qPainterPathToMask(path);
@@ -809,10 +808,10 @@ ZImg ZROI::toMaskImg(int outWidth,
           if (prevSlice + 1 == nextSlice) {
             continue;
           }
-          if (distMapImgs.find(prevSlice) == distMapImgs.end()) {
+          if (!distMapImgs.contains(prevSlice)) {
             distMapImgs[prevSlice] = distMap.run<double>(img.createView(prevSlice, 0, 0), false);
           }
-          if (distMapImgs.find(nextSlice) == distMapImgs.end()) {
+          if (!distMapImgs.contains(nextSlice)) {
             distMapImgs[nextSlice] = distMap.run<double>(img.createView(nextSlice, 0, 0), false);
           }
           auto prevData = distMapImgs[prevSlice].channelData<double>(0);
@@ -864,8 +863,8 @@ ZImg ZROI::toMaskImg(int outWidth,
 
 void ZROI::clear()
 {
-  for (const auto& sliceROI : m_sliceROIs) {
-    Q_EMIT roiDeleted(sliceROI.first);
+  for (const auto& [slice, ROI] : m_sliceROIs) {
+    Q_EMIT roiDeleted(slice);
   }
   m_sliceROIs.clear();
   resetBoundBox();
@@ -873,7 +872,7 @@ void ZROI::clear()
 
 void ZROI::deleteSliceROI(int slice)
 {
-  if (m_sliceROIs.find(slice) != m_sliceROIs.end()) {
+  if (m_sliceROIs.contains(slice)) {
     m_undoStack->push(new ZROIDeleteSliceROICommand(*this, slice));
   }
 }
@@ -923,7 +922,7 @@ void ZROI::subtractROI(const ZROI& other, int64_t slice, int64_t shapeID)
 std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, int64_t slice, int64_t shapeID)
 {
   std::set<int> changedSlices;
-  if (shapeID >= 0 && m_sliceROIs.find(slice) != m_sliceROIs.end() && !m_sliceROIs.at(slice).isEmpty() &&
+  if (shapeID >= 0 && m_sliceROIs.contains(slice) && !m_sliceROIs.at(slice).isEmpty() &&
       sliceROIs.at(slice).m_idToShapeOperations.at(shapeID)[0].type != ROIType::Line) { // subtract one shape
     changedSlices.insert(slice);
     const auto& sliceROI = sliceROIs.at(slice);
@@ -947,7 +946,7 @@ std::set<int> ZROI::subtractROI_Impl(const std::map<int, ZSliceROI>& sliceROIs, 
     onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>(), editedShapes);
   } else { // all
     for (const auto& [s, sliceROI] : sliceROIs) {
-      if (!sliceROI.isEmpty() && m_sliceROIs.find(s) != m_sliceROIs.end() && !m_sliceROIs.at(s).isEmpty()) {
+      if (!sliceROI.isEmpty() && m_sliceROIs.contains(s) && !m_sliceROIs.at(s).isEmpty()) {
         changedSlices.insert(s);
         std::set<size_t> editedShapes;
 
@@ -1082,12 +1081,12 @@ ZROI::rotateROIControlPoints_Impl(const std::vector<ZROIControlPoint>& controlPo
     sliceToShapeIDToControlPoints[controlPoint.slice][controlPoint.shapeID].push_back(controlPoint);
     slices.insert(controlPoint.slice);
   }
-  for (const auto& sliceOthers : sliceToShapeIDToControlPoints) {
-    auto sit = m_sliceROIs.find(sliceOthers.first);
+  for (const auto& [slice, shapeIDToControlPoints] : sliceToShapeIDToControlPoints) {
+    auto sit = m_sliceROIs.find(slice);
     if (sit != m_sliceROIs.end()) {
       std::set<size_t> editedShapes;
-      sit->second.rotateCtrlPoints(sliceOthers.second, angle, x, y, editedShapes);
-      onSliceROIMoved(sliceOthers.first, editedShapes);
+      sit->second.rotateCtrlPoints(shapeIDToControlPoints, angle, x, y, editedShapes);
+      onSliceROIMoved(slice, editedShapes);
     }
   }
   return slices;
@@ -1108,13 +1107,13 @@ std::set<int> ZROI::deleteROIControlPoints_Impl(const std::vector<ZROIControlPoi
     sliceToShapeIDToControlPoints[controlPoint.slice][controlPoint.shapeID].push_back(controlPoint);
     slices.insert(controlPoint.slice);
   }
-  for (const auto& sliceOthers : sliceToShapeIDToControlPoints) {
-    auto sit = m_sliceROIs.find(sliceOthers.first);
+  for (const auto& [slice, shapeIDToControlPoints] : sliceToShapeIDToControlPoints) {
+    auto sit = m_sliceROIs.find(slice);
     if (sit != m_sliceROIs.end()) {
       std::set<size_t> removedShapes;
       std::set<size_t> editedShapes;
-      sit->second.deleteCtrlPoints(sliceOthers.second, removedShapes, editedShapes);
-      onSliceROIUpdated(sliceOthers.first, std::set<size_t>(), removedShapes, editedShapes);
+      sit->second.deleteCtrlPoints(shapeIDToControlPoints, removedShapes, editedShapes);
+      onSliceROIUpdated(slice, std::set<size_t>(), removedShapes, editedShapes);
     }
   }
   return slices;
@@ -1125,11 +1124,11 @@ void ZROI::deleteROIShape(int slice, size_t shapeID)
   m_undoStack->push(new ZROIDeleteROIShapeCommand(*this, slice, shapeID));
 }
 
-void ZROI::deleteROIShape_Impl(int slice, size_t shapeId)
+void ZROI::deleteROIShape_Impl(int slice, size_t shapeID)
 {
-  m_sliceROIs.at(slice).m_idToPainterPath.erase(shapeId);
-  m_sliceROIs.at(slice).m_idToShapeOperations.erase(shapeId);
-  onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>{shapeId}, std::set<size_t>());
+  m_sliceROIs.at(slice).m_idToPainterPath.erase(shapeID);
+  m_sliceROIs.at(slice).m_idToShapeOperations.erase(shapeID);
+  onSliceROIUpdated(slice, std::set<size_t>(), std::set<size_t>{shapeID}, std::set<size_t>());
 }
 
 void ZROI::copyROIFromControlPoints(const std::vector<ZROIControlPoint>& controlPoints)
@@ -1151,10 +1150,10 @@ void ZROI::copyROIFromControlPoints(const std::vector<ZROIControlPoint>& control
 ZBBox<glm::ivec4> ZROI::copiedItemBoundBox() const
 {
   ZBBox<glm::ivec4> boundBox;
-  for (const auto& sliceROI : m_sliceROICopy) {
-    QRectF rect = sliceROI.second.boundingRect();
-    boundBox.expand(glm::ivec4(roundTo<int>(rect.left()), roundTo<int>(rect.top()), sliceROI.first, 0));
-    boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1), sliceROI.first, 0));
+  for (const auto& [slice, ROI] : m_sliceROICopy) {
+    QRectF rect = ROI.boundingRect();
+    boundBox.expand(glm::ivec4(roundTo<int>(rect.left()), roundTo<int>(rect.top()), slice, 0));
+    boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1), slice, 0));
   }
   return boundBox;
 }
@@ -1451,10 +1450,10 @@ void ZROI::changeSliceROIs(const std::map<int, ZSliceROI>& sliceROIs, const std:
     return;
   }
   for (auto slice : changedSlices) {
-    if (m_sliceROIs.find(slice) != m_sliceROIs.end()) {
+    if (m_sliceROIs.contains(slice)) {
       Q_EMIT roiDeleted(slice);
     }
-    if (sliceROIs.find(slice) != sliceROIs.end()) {
+    if (sliceROIs.contains(slice)) {
       m_sliceROIs[slice] = sliceROIs.at(slice);
       Q_EMIT roiChanged(slice, std::set<size_t>(), std::set<size_t>(), std::set<size_t>());
     }
@@ -1496,7 +1495,7 @@ void ZROI::save(const QString& filename) const
 
     renameFile(tfn, filename);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(tfn);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
@@ -1550,8 +1549,8 @@ void ZROI::save(H5::Group& allGrp) const
     ver.write(intType, &roiVer);
 
     int idx = 0;
-    for (const auto& sliceROI : m_sliceROIs) {
-      if (sliceROI.second.isEmpty()) {
+    for (const auto& [slice, ROI] : m_sliceROIs) {
+      if (ROI.isEmpty()) {
         continue;
       }
 
@@ -1559,9 +1558,9 @@ void ZROI::save(H5::Group& allGrp) const
       ++idx;
 
       H5::Attribute sliceAttr = sliceGrp.createAttribute("Slice", intType, attrDataSpace);
-      sliceAttr.write(intType, &sliceROI.first);
+      sliceAttr.write(intType, &slice);
 
-      sliceROI.second.save(sliceGrp);
+      ROI.save(sliceGrp);
     }
 
     H5::Attribute numSliceAttr = allGrp.createAttribute("SliceNumber", intType, attrDataSpace);
@@ -1575,10 +1574,10 @@ void ZROI::save(H5::Group& allGrp) const
 void ZROI::resetBoundBox()
 {
   m_boundBox.reset();
-  for (const auto& sliceROI : m_sliceROIs) {
-    QRectF rect = sliceROI.second.boundingRect();
-    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.left()), roundTo<int>(rect.top()), sliceROI.first, 0));
-    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1), sliceROI.first, 0));
+  for (const auto& [slice, ROI] : m_sliceROIs) {
+    QRectF rect = ROI.boundingRect();
+    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.left()), roundTo<int>(rect.top()), slice, 0));
+    m_boundBox.expand(glm::ivec4(roundTo<int>(rect.right() - 1), roundTo<int>(rect.bottom() - 1), slice, 0));
   }
   Q_EMIT boundBoxChanged();
 }

@@ -226,7 +226,7 @@ bool Z3DRenderTarget::resize(const glm::uvec2& newsize)
 
 void Z3DRenderTarget::changeColorAttachmentFormat(GLint internalColorFormat, GLenum attachment)
 {
-  if (m_attachments.find(attachment) == m_attachments.end() || !m_attachments[attachment] ||
+  if (!m_attachments.contains(attachment) || !m_attachments[attachment] ||
       m_attachments[attachment]->internalFormat() == internalColorFormat) {
     return;
   }
@@ -247,7 +247,7 @@ void Z3DRenderTarget::changeColorAttachmentFormat(GLint internalColorFormat, GLe
 
 void Z3DRenderTarget::changeDepthAttachmentFormat(GLint internalDepthFormat)
 {
-  if (m_attachments.find(GL_DEPTH_ATTACHMENT) == m_attachments.end() || !m_attachments[GL_DEPTH_ATTACHMENT] ||
+  if (!m_attachments.contains(GL_DEPTH_ATTACHMENT) || !m_attachments[GL_DEPTH_ATTACHMENT] ||
       m_attachments[GL_DEPTH_ATTACHMENT]->internalFormat() == internalDepthFormat) {
     return;
   }

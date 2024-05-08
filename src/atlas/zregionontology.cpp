@@ -220,10 +220,9 @@ void cgalMeshToVerticesIndices(const C2t3 &c2t3, std::vector<glm::vec3> &vertice
   while (oriented_set.size() != number_of_facets)
   {
     while ( fit->first->is_facet_on_surface(fit->second) == false ||
-            oriented_set.find(*fit) != oriented_set.end() ||
+            oriented_set.contains(*fit) ||
 
-            oriented_set.find(c2t3.opposite_facet(*fit)) !=
-            oriented_set.end() )
+            oriented_set.contains(c2t3.opposite_facet(*fit)) )
     {
       ++fit;
     }
@@ -241,8 +240,8 @@ void cgalMeshToVerticesIndices(const C2t3 &c2t3, std::vector<glm::vec3> &vertice
             = c2t3.face_status(Edge(f.first, i1, i2));
         if(face_status == C2t3::REGULAR) {
           Facet fn = c2t3.neighbor(f, ih);
-          if (oriented_set.find(fn) == oriented_set.end()) {
-            if(oriented_set.find(c2t3.opposite_facet(fn)) == oriented_set.end())
+          if (!oriented_set.contains(fn)) {
+            if(!oriented_set.contains(c2t3.opposite_facet(fn)))
             {
               oriented_set.insert(fn);
               stack.push(fn);
@@ -535,7 +534,7 @@ void binaryImgToROI(const ZImg& img, ZROI& roi, double scaleX, double scaleY, do
           if (nodeIt != itMap.end()) {
             itMap[it->first] = contoursTree.appendChild(nodeIt->second, it->second);
             it = nodeMap.erase(it);
-          } else if (nodeMap.find(parentID) == nodeMap.end()) {
+          } else if (!nodeMap.contains(parentID)) {
             itMap[it->first] = contoursTree.appendRoot(it->second);
             it = nodeMap.erase(it);
           } else {

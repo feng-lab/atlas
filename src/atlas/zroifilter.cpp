@@ -852,7 +852,7 @@ void ZROIFilter::mousePressed(const QPointF& scenePos, Qt::KeyboardModifiers mod
         break;
       }
     }
-  } else if (m_sliceToCtrlPtItems.find(realZ()) != m_sliceToCtrlPtItems.end()) {
+  } else if (m_sliceToCtrlPtItems.contains(realZ())) {
     for (auto& [id, ctrlItems] : m_sliceToCtrlPtItems.at(realZ())) {
       for (auto& item : ctrlItems) {
         if (item->isSelected()) {
@@ -1198,8 +1198,7 @@ void ZROIFilter::selectCtrlPtItems(int slice, size_t shapeID, bool append)
       item->setSelected(false);
     }
   }
-  if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end() &&
-      m_sliceToCtrlPtItems[slice].find(shapeID) != m_sliceToCtrlPtItems[slice].end()) {
+  if (m_sliceToCtrlPtItems.contains(slice) && m_sliceToCtrlPtItems[slice].contains(shapeID)) {
     for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
       item->setSelected(true);
     }
@@ -1216,8 +1215,7 @@ void ZROIFilter::deselectCtrlPtItems(int slice, size_t shapeID)
   if (!m_ROI) {
     return;
   }
-  if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end() &&
-      m_sliceToCtrlPtItems[slice].find(shapeID) != m_sliceToCtrlPtItems[slice].end()) {
+  if (m_sliceToCtrlPtItems.contains(slice) && m_sliceToCtrlPtItems[slice].contains(shapeID)) {
     for (auto& item : m_sliceToCtrlPtItems[slice][shapeID]) {
       item->setSelected(false);
     }
@@ -1369,18 +1367,17 @@ void ZROIFilter::onRoiChanged(int slice,
   } else {
     if (!deletedShapes.empty()) {
       for (auto shapeID : deletedShapes) {
-        if (m_sliceToROIItem.find(slice) != m_sliceToROIItem.end()) {
+        if (m_sliceToROIItem.contains(slice)) {
           m_sliceToROIItem[slice].erase(shapeID);
         }
-        if (m_sliceToCtrlPtItems.find(slice) != m_sliceToCtrlPtItems.end()) {
+        if (m_sliceToCtrlPtItems.contains(slice)) {
           m_sliceToCtrlPtItems[slice].erase(shapeID);
         }
       }
     }
     if (!changedShapes.empty()) {
       for (auto shapeID : changedShapes) {
-        if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end() ||
-            m_sliceToROIItem[slice].find(shapeID) == m_sliceToROIItem[slice].end()) {
+        if (!m_sliceToROIItem.contains(slice) || !m_sliceToROIItem[slice].contains(shapeID)) {
           continue;
         }
         m_sliceToROIItem[slice][shapeID]->updateValue();
@@ -1402,8 +1399,7 @@ void ZROIFilter::onRoiMoved(int slice, const std::set<size_t>& changedShapes)
   if (!m_ROI) {
     return;
   }
-  if (m_sliceToROIItem.find(slice) == m_sliceToROIItem.end() ||
-      m_sliceToCtrlPtItems.find(slice) == m_sliceToCtrlPtItems.end()) {
+  if (!m_sliceToROIItem.contains(slice) || !m_sliceToCtrlPtItems.contains(slice)) {
     return;
   }
   if (changedShapes.empty()) {

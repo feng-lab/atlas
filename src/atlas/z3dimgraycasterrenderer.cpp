@@ -906,7 +906,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   processEventsAndMaybeCancel(cancellationToken);
 
   CHECK(!ccSet.empty());
-  bool lastRound = ccSet.size() == 1 && ccSet.find(0_u32) != ccSet.end(); // ccSet contains only 0
+  bool lastRound = ccSet.size() == 1 && ccSet.contains(0_u32); // ccSet contains only 0
   if (lastRound) {
     LOG(INFO) << "no (non-empty) blocks to render";
     if (round > 0) {
@@ -944,7 +944,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
     std::vector<uint32_t> missingBlockIDs;
 
     ccSet.unsafe_erase(0_u32);
-    if (ccSet.find(std::numeric_limits<uint32_t>::max()) != ccSet.end()) {
+    if (ccSet.contains(std::numeric_limits<uint32_t>::max())) {
       VLOG(1) << "use last block";
     }
     ccSet.unsafe_erase(std::numeric_limits<uint32_t>::max());

@@ -177,7 +177,7 @@ bool ZSwcDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
 size_t ZSwcDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+  CHECK(m_idToSwcPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToSwcPacks[aliasId] = m_idToSwcPacks[id];
@@ -189,7 +189,7 @@ size_t ZSwcDoc::makeAlias(size_t id)
 
 bool ZSwcDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+  CHECK(m_idToSwcPacks.contains(id));
 
   return std::any_of(m_idToSwcPacks.begin(), m_idToSwcPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToSwcPacks.at(id);
@@ -198,7 +198,7 @@ bool ZSwcDoc::isAlias(size_t id) const
 
 QWidget* ZSwcDoc::createObjEditWidget(size_t id)
 {
-  CHECK(m_idToSwcPacks.find(id) != m_idToSwcPacks.end());
+  CHECK(m_idToSwcPacks.contains(id));
 
   return new ZSwcWidget(swcPack(id), m_doc);
 }

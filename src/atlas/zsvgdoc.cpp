@@ -136,7 +136,7 @@ bool ZSvgDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
 size_t ZSvgDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToSvgPacks.find(id) != m_idToSvgPacks.end());
+  CHECK(m_idToSvgPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToSvgPacks[aliasId] = m_idToSvgPacks[id];
@@ -148,7 +148,7 @@ size_t ZSvgDoc::makeAlias(size_t id)
 
 bool ZSvgDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToSvgPacks.find(id) != m_idToSvgPacks.end());
+  CHECK(m_idToSvgPacks.contains(id));
 
   return std::any_of(m_idToSvgPacks.begin(), m_idToSvgPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToSvgPacks.at(id);

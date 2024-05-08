@@ -178,7 +178,7 @@ QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
     return QVariant();
   }
   if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
-    if (index.row() < 0 || index.column() < 0 || m_rowToInput.find(index.row()) == m_rowToInput.end() ||
+    if (index.row() < 0 || index.column() < 0 || !m_rowToInput.contains(index.row()) ||
         index.column() >= columnCount()) {
       return QVariant();
     }
@@ -231,7 +231,7 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& d
       return false;
     }
     ZAnalysisTextFileInput* input;
-    if (m_rowToInput.find(index.row()) == m_rowToInput.end()) {
+    if (!m_rowToInput.contains(index.row())) {
       m_inputs.push_back(ZAnalysisTextFileInput());
       input = &m_inputs.back();
       m_rowToInput[index.row()] = input;

@@ -76,7 +76,7 @@ void ZSwcPack::setSelectedNodes(const std::set<ZSwc::SwcTreeNode>& sn)
   m_selectedNodes = sn;
   m_extentedSelectionAnchor = m_selectedNodes.empty() ? m_selectedNodes.end() : m_selectedNodes.begin();
   for (auto it = m_swc.begin(); it != m_swc.end(); ++it) {
-    it->selected = m_selectedNodes.find(it) != m_selectedNodes.end();
+    it->selected = m_selectedNodes.contains(it);
   }
   Q_EMIT selectionChanged();
 }
@@ -132,7 +132,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
     if (ZSwc::isNull(root)) {
       return;
     }
-    bool hasChange = m_selectedNodes.find(root) == m_selectedNodes.end();
+    bool hasChange = !m_selectedNodes.contains(root);
     if (hasChange) {
       root->selected = true;
       m_selectedNodes.insert(root);
@@ -170,7 +170,7 @@ void ZSwcPack::onTreeNodeSelected(const ZSwc::SwcTreeNode* p, bool append, bool 
     if (!p && m_selectedNodes.empty()) {
       return;
     }
-    if (p && (m_selectedNodes.size() == 1) && (m_selectedNodes.find(*p) != m_selectedNodes.end())) {
+    if (p && (m_selectedNodes.size() == 1) && m_selectedNodes.contains(*p)) {
       return;
     }
     if (p) {

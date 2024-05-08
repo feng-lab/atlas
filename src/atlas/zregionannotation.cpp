@@ -169,9 +169,9 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
   }
   std::set<int64_t> ancestorLabels;
   for (auto it = m_ontology.cbeginBreadthFirst(); it != m_ontology.cendBreadthFirst(); ++it) {
-    if (labels.find(it->id) != labels.end()) {
+    if (labels.contains(it->id)) {
       for (auto pit = m_ontology.cbeginAncestor(it); pit != m_ontology.cendAncestor(it); ++pit) {
-        if (labels.find(pit->id) == labels.end()) {
+        if (!labels.contains(pit->id)) {
           ancestorLabels.insert(pit->id);
         }
       }
@@ -191,12 +191,12 @@ void ZRegionAnnotation::importLabelImage(const QString& fn,
       continue;
     }
 
-    if (labels.find(it->id) == labels.end()) {
+    if (!labels.contains(it->id)) {
       continue;
     }
 
-    bool processMesh = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
-    bool processROI = labels.find(it->id) != labels.end() || ancestorLabels.find(it->id) != ancestorLabels.end();
+    bool processMesh = labels.contains(it->id) || ancestorLabels.contains(it->id);
+    bool processROI = labels.contains(it->id) || ancestorLabels.contains(it->id);
 
     if (!processMesh && !processROI) {
       continue;
@@ -489,7 +489,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
       continue;
     }
 
-    bool processROI = labels.find(it->id) != labels.end();
+    bool processROI = labels.contains(it->id);
 
     if (!processROI) {
       continue;
@@ -716,7 +716,7 @@ void ZRegionAnnotation::load(const QString& filename)
         if (nodeIt != itMap.end()) {
           itMap[it->first] = m_ontology.appendChild(nodeIt->second, it->second);
           it = nodeMap.erase(it);
-        } else if (nodeMap.find(parentID) == nodeMap.end()) {
+        } else if (!nodeMap.contains(parentID)) {
           itMap[it->first] = m_ontology.appendRoot(it->second);
           it = nodeMap.erase(it);
         } else {
@@ -725,7 +725,7 @@ void ZRegionAnnotation::load(const QString& filename)
       }
     }
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }
 
@@ -808,7 +808,7 @@ void ZRegionAnnotation::save(const QString& filename) const
 
     renameFile(tfn, filename);
   }
-  catch (H5::Exception const& e) {
+  catch (const H5::Exception& e) {
     QFile::remove(tfn);
     throw ZIOException(fmt::format("hdf5:{}", e.getDetailMsg()));
   }

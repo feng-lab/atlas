@@ -585,7 +585,7 @@ void ZStitchImage::doWork()
     auto stitch_pair = [&](size_t i) {
       size_t f = std::get<0>(allPairs[i]);
       size_t m = std::get<1>(allPairs[i]);
-      if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+      if (offsets.contains(std::make_pair(m, f))) {
         return;
       }
       ZImg fixedImg(inputStackSources[f]);
@@ -978,7 +978,7 @@ void ZStitchImage::doRestitch()
     auto stitch_pair = [&](size_t i) {
       size_t f = std::get<0>(allPairs[i]);
       size_t m = std::get<1>(allPairs[i]);
-      if (offsets.find(std::make_pair(m, f)) != offsets.end()) {
+      if (offsets.contains(std::make_pair(m, f))) {
         return;
       }
       ZImg fixedImg(inputStackSources[f]);

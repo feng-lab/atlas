@@ -153,7 +153,7 @@ void ZSwcColorParameters::initTypeColor()
 void ZSwcColorParameters::initSubclassTypeColor()
 {
   // subclass type color
-  QString name = QString("Soma Color");
+  QString name("Soma Color");
   subclassTypeColorMapper[1] = colorsForSubclassType.size();
   colorsForSubclassType.emplace_back(
     std::make_unique<ZVec4Parameter>(name, glm::vec4(0 / 255.f, 0 / 255.f, 0 / 255.f, 1.f)));
@@ -198,7 +198,7 @@ glm::vec4 ZSwcColorParameters::colorByType(const ZSwc::ConstSwcTreeNode& n)
       return colorsForDifferentType.back()->get();
     }
   } else if (colorMode.isSelected("Subclass")) {
-    if (subclassTypeColorMapper.find(n->type) != subclassTypeColorMapper.end()) {
+    if (subclassTypeColorMapper.contains(n->type)) {
       return colorsForSubclassType[subclassTypeColorMapper[n->type]]->get();
     } else {
       return colorsForSubclassType.back()->get();
@@ -240,8 +240,7 @@ void ZSwcColorParameters::adjustWidgets()
   swcTreeColor.setVisible(colorMode.isSelected("Single Color"));
 
   for (size_t i = 0; i < colorsForDifferentType.size(); ++i) {
-    colorsForDifferentType[i]->setVisible(m_swcPack &&
-                                          m_swcPack->allNodeType().find(i) != m_swcPack->allNodeType().end() &&
+    colorsForDifferentType[i]->setVisible(m_swcPack && m_swcPack->allNodeType().contains(i) &&
                                           colorMode.isSelected("Branch Type"));
   }
   for (const auto& color : colorsForSubclassType) {

@@ -212,7 +212,7 @@ bool ZMeshDoc::isSameObj(const json::value& v1, const json::value& v2) const
 
 size_t ZMeshDoc::makeAlias(size_t id)
 {
-  CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
+  CHECK(m_idToMeshPacks.contains(id));
 
   size_t aliasId = m_doc.getNewObjId();
   m_idToMeshPacks[aliasId] = m_idToMeshPacks[id];
@@ -224,7 +224,7 @@ size_t ZMeshDoc::makeAlias(size_t id)
 
 bool ZMeshDoc::isAlias(size_t id) const
 {
-  CHECK(m_idToMeshPacks.find(id) != m_idToMeshPacks.end());
+  CHECK(m_idToMeshPacks.contains(id));
 
   return std::any_of(m_idToMeshPacks.begin(), m_idToMeshPacks.end(), [&, this](const auto& idPack) {
     return idPack.first != id && idPack.second == m_idToMeshPacks.at(id);

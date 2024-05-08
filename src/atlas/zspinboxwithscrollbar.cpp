@@ -70,7 +70,7 @@ void ZSpinBoxWithScrollBar::createWidget(int value,
   m_spinBox->setSingleStep(step);
   m_spinBox->setPrefix(prefix);
   m_spinBox->setSuffix(suffix);
-  QHBoxLayout* lo = new QHBoxLayout(this);
+  auto lo = new QHBoxLayout(this);
   lo->setContentsMargins(0, 0, 0, 0);
   lo->addWidget(m_spinBox);
   m_label = new QLabel(QString("/ (%1 to %2)").arg(min).arg(max));
