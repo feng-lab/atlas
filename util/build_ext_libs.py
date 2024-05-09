@@ -2887,13 +2887,10 @@ def build_fizz(src_dir: str, install_dir: str):
         bak_file = patch_file(orig_file,
                               from_texts=[
                                   r'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)',
-                                  r'extensions/delegatedcred/DelegatedCredentialUtils.cpp',
                               ],
                               to_texts=[
                                   'list(APPEND FIZZ_SHINY_DEPENDENCIES gflags)\n'
                                   'add_library(gflags::gflags ALIAS gflags)',
-                                  r"""extensions/delegatedcred/DelegatedCredentialPemUtils.cpp
-extensions/delegatedcred/DelegatedCredentialUtils.cpp""",
                               ])
 
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
