@@ -21,35 +21,26 @@ def get_cmake_cmd_common_part(arm64: bool = False):
                     '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'host=x64'
                     ]
     elif is_linux():
+        res = [get_cmake_binary(),  # '-E', 'echo',
+               '-DCMAKE_BUILD_TYPE=Release',
+               '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
+               ]
         if use_ninja():
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-DCMAKE_BUILD_TYPE=Release',
-                    '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
-                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()
-                    ]
-        else:
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-DCMAKE_BUILD_TYPE=Release',
-                    '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
-                    ]
+            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()
+                        ])
+        return res
     elif is_mac():
+        res = [get_cmake_binary(),  # '-E', 'echo',
+               '-DCMAKE_BUILD_TYPE=Release',
+               '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
+               '' if not arm64 else '-DCMAKE_SYSTEM_NAME=Darwin',
+               '' if not arm64 else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
+               '' if not arm64 else '-DCMAKE_OSX_ARCHITECTURES=arm64',
+               ]
         if use_ninja():
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-DCMAKE_BUILD_TYPE=Release',
-                    '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
-                    '-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary(),
-                    '' if not arm64 else '-DCMAKE_SYSTEM_NAME=Darwin',
-                    '' if not arm64 else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
-                    '' if not arm64 else '-DCMAKE_OSX_ARCHITECTURES=arm64',
-                    ]
-        else:
-            return [get_cmake_binary(),  # '-E', 'echo',
-                    '-DCMAKE_BUILD_TYPE=Release',
-                    '-DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON',
-                    '' if not arm64 else '-DCMAKE_SYSTEM_NAME=Darwin',
-                    '' if not arm64 else '-DCMAKE_SYSTEM_PROCESSOR=arm64',
-                    '' if not arm64 else '-DCMAKE_OSX_ARCHITECTURES=arm64',
-                    ]
+            res.extend(['-G', 'Ninja', '-DCMAKE_MAKE_PROGRAM=' + get_ninja_binary()
+                        ])
+        return res
 
 
 def build_atlas(use_asan: bool = False, skip_test: bool = False, debug_version: bool = False, arm64: bool = False):

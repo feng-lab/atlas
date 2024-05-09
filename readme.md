@@ -125,7 +125,6 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_fip: change all -mmacosx-version-min=11.0
 * $Repository_DIR/src/3rdparty/freeimage-makefiles/Makefile_gun: change all -mmacosx-version-min=11.0
 * $Repository_DIR/src/python/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
-* $SuiteSparse_Repo/CMakeLists.txt: set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
 
 ## Visual Studio Update
 * $Repository_DIR/util/common_dirs.py: 200: def vs_install_dir() -> str ...
@@ -137,8 +136,8 @@ conda install tbb-devel mkl-devel qt numpy python mkl numpy tbb conda-build cond
 
 ## Python Package Build
 ```bash
-conda-build purge-all
-conda-build zimg-recipe
+conda build purge
+conda build zimg-recipe
 conda remove zimg -y
 conda install zimg -c fenglab -y
 ```
