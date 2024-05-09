@@ -1551,6 +1551,7 @@ include(libs)""",
                             '-DBLA_STATIC:BOOL=ON',
                             '-DSUITESPARSE_USE_64BIT_BLAS:BOOL=OFF',
                             '-DSUITESPARSE_USE_FORTRAN:BOOL=OFF',
+                            '-DBUILD_TESTING:BOOL=OFF',
                             ]
 
         cmakecmd.extend(cmakecmd_options)
