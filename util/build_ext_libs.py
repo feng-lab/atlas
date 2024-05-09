@@ -115,6 +115,8 @@ def create_universal_binaries(arm64_install_dir, final_install_dir, remove_dylib
                     continue
                 if name == 'libpng16-config':
                     continue
+                if name == 'xzdiff' or name == 'xzgrep' or name == 'xzless' or name == 'xzmore':  # text file
+                    continue
                 target_filename = filename.replace(arm64_install_dir, final_install_dir)
                 if name.startswith('libtegra_hal.a'):
                     print(f'copy {filename} to {target_filename}')
@@ -338,6 +340,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
         res = [get_cmake_binary(),  # '-E', 'echo',
                '-DCMAKE_BUILD_TYPE=Release',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+               '-DCMAKE_IGNORE_PREFIX_PATH=/usr/local',
+               '-DCMAKE_IGNORE_PATH=/usr/local/bin',
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
@@ -369,6 +373,8 @@ def get_cmake_cmd_common_part(install_dir: str, *, use_ninja: bool = use_ninja()
                # '' if universal else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
                '' if not arm64_only else f'-DCMAKE_SYSTEM_PROCESSOR={arch}',
                '-DCMAKE_PREFIX_PATH=' + ext_build_dir(),
+               '-DCMAKE_IGNORE_PREFIX_PATH=/usr/local',
+               '-DCMAKE_IGNORE_PATH=/usr/local/bin',
                '-DCMAKE_MODULE_PATH=' + ext_build_dir(),
                '-DCMAKE_INSTALL_PREFIX=' + install_dir,
                '' if no_hidden_visibility else '-DCMAKE_VISIBILITY_INLINES_HIDDEN=ON',
