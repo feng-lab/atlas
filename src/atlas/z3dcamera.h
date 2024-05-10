@@ -4,8 +4,6 @@
 #include "zflags.h"
 #include "zglmutils.h"
 #include "zbbox.h"
-#include <map>
-#include <vector>
 
 namespace nim {
 
@@ -343,18 +341,18 @@ public:
   void rotate(const glm::quat& quat);
 
   // convert between eye space and world space
-  glm::vec3 vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono) const;
 
-  glm::vec3 vectorWorldToEye(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 vectorWorldToEye(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono) const;
 
-  glm::vec3 pointEyeToWorld(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 pointEyeToWorld(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono) const;
 
-  glm::vec3 pointWorldToEye(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 pointWorldToEye(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono) const;
 
   // world to screen, if point is clipped, its screen coord will be (-1,-1,-1)
-  glm::vec3 worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono) const;
 
-  glm::vec3 screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono);
+  glm::vec3 screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono) const;
 
 protected:
   void updateCamera();

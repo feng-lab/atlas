@@ -311,7 +311,7 @@ private:
 
   void registerHandlePickingColors();
 
-  int selectedHandle(const void* obj);
+  int selectedHandle(const void* obj) const;
 
   void updateSelectedHandle(int handleIdx);
 

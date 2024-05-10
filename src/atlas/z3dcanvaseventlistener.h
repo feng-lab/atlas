@@ -13,6 +13,8 @@ namespace nim {
 class Z3DCanvasEventListener
 {
 public:
+  virtual ~Z3DCanvasEventListener() = default;
+
   virtual void onEvent(QEvent* e, int w, int h) = 0;
 
   virtual void rotateX() {}

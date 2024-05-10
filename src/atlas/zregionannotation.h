@@ -47,7 +47,7 @@ public:
                         bool keepOnlyInterpolatedSlices = false,
                         int interpolationMethod = 0) const;
 
-  void exportSvgImage(const QString& fn, double scaleX = 1.0, double scaleY = 1.0) const;
+  void exportSvgImage(const QString& filename, double scaleX = 1.0, double scaleY = 1.0) const;
 
   double getOptimizedScale() const;
 
@@ -67,7 +67,7 @@ public:
 
   // void mergeROIToRegion(const ZROI& roi, int slice, size_t id, int64_t regionID);
 
-  void changeROIRegion(ZROI& roi, int slice, size_t id, int64_t regionID);
+  void changeROIRegion(ZROI& roi, int slice, size_t shapeId, int64_t regionID);
 
   // return nullptr if not exist
   [[nodiscard]] const ZMesh* meshOfRegion(int64_t regionID) const;
@@ -184,8 +184,7 @@ class ZRegionAnnotationInterpolateCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationInterpolateCommand(ZRegionAnnotation& ra)
-    : QUndoCommand()
-    , m_regionAnnotation(ra)
+    : m_regionAnnotation(ra)
     , m_oldOntology(m_regionAnnotation.copyAnnotationTree())
     , m_firstRun(true)
   {}
@@ -213,8 +212,7 @@ class ZRegionAnnotationUpdateMeshCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationUpdateMeshCommand(ZRegionAnnotation& ra)
-    : QUndoCommand()
-    , m_regionAnnotation(ra)
+    : m_regionAnnotation(ra)
     , m_oldOntology(m_regionAnnotation.m_ontology)
     , m_firstRun(true)
   {}
@@ -242,8 +240,7 @@ class ZRegionAnnotationTransformMeshCommand : public QUndoCommand
 {
 public:
   explicit ZRegionAnnotationTransformMeshCommand(ZRegionAnnotation& ra, const glm::mat4& trans)
-    : QUndoCommand()
-    , m_regionAnnotation(ra)
+    : m_regionAnnotation(ra)
     , m_trans(trans)
     , m_oldOntology(m_regionAnnotation.copyAnnotationTree())
   {}

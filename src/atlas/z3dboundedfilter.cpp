@@ -132,12 +132,10 @@ Z3DBoundedFilter::Z3DBoundedFilter(Z3DGlobalParameters& globalPara, QObject* par
   addEventListener(m_handleEvent);
   m_handleEvent.setEnabled(m_isSelected);
 
-  const std::vector<ZParameter*>& globalParas = m_rendererBase.globalParameters();
-  for (auto para : globalParas) {
+  for (auto para : m_rendererBase.globalParameters()) {
     connect(para, &ZParameter::valueChanged, this, &Z3DBoundedFilter::invalidateResult);
   }
-  const std::vector<ZParameter*>& paras = m_rendererBase.parameters();
-  for (auto para : paras) {
+  for (auto para : m_rendererBase.parameters()) {
     addParameter(*para);
   }
 }
@@ -262,8 +260,8 @@ void Z3DBoundedFilter::rotateZM()
 ZBBox<glm::dvec3> Z3DBoundedFilter::axisAlignedBoundBoxAfterClipping() const
 {
   ZBBox<glm::dvec3> res;
-  auto notTransformedBBAfterCutting = notTransformedBoundBoxAfterClipping();
-  if (!notTransformedBBAfterCutting.empty()) {
+  if (auto notTransformedBBAfterCutting = notTransformedBoundBoxAfterClipping();
+      !notTransformedBBAfterCutting.empty()) {
     glm::dmat4 tfm(m_rendererBase.coordTransform());
     auto physicalLUF = notTransformedBBAfterCutting.minCorner;
     auto physicalRDB = notTransformedBBAfterCutting.maxCorner;
@@ -656,9 +654,9 @@ void Z3DBoundedFilter::updateHandle()
     Z3DCamera& camera = m_rendererBase.globalCamera();
     glm::mat4 mat =
       m_rendererBase.viewportMatrix() * camera.projectionMatrix(Z3DEye::Mono) * camera.viewMatrix(Z3DEye::Mono);
-    glm::vec3 rightVector = glm::vec3(camera.viewMatrix(Z3DEye::Mono)[0][0],
-                                      camera.viewMatrix(Z3DEye::Mono)[1][0],
-                                      camera.viewMatrix(Z3DEye::Mono)[2][0]);
+    glm::vec3 rightVector(camera.viewMatrix(Z3DEye::Mono)[0][0],
+                          camera.viewMatrix(Z3DEye::Mono)[1][0],
+                          camera.viewMatrix(Z3DEye::Mono)[2][0]);
     glm::vec3 centerScreen = glm::applyMatrix(mat, m_center);
     glm::vec3 rightScreen = glm::applyMatrix(mat, m_center + rightVector);
     float size = m_manipulatorSize.get() / (rightScreen.x - centerScreen.x);
@@ -691,11 +689,8 @@ void Z3DBoundedFilter::registerHandlePickingColors()
   m_handleArrowRenderer.setArrowPickingColors(&m_handleArrowPickingColors);
 }
 
-int Z3DBoundedFilter::selectedHandle(const void* obj)
+int Z3DBoundedFilter::selectedHandle(const void* obj) const
 {
-  if (!obj) {
-    return 0;
-  }
   if (obj == &m_handleCenterRenderer) {
     return 1;
   }

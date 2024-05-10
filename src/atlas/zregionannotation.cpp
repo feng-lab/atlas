@@ -281,24 +281,28 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn,
     maxID = std::max(maxID, it->id);
   }
   LOG(INFO) << minID << " " << maxID;
-  size_t bytePerVoxel = 1;
+  size_t bytePerVoxel;
   VoxelFormat vf = VoxelFormat::Unsigned;
   if (minID < 0) {
     vf = VoxelFormat::Signed;
     maxID = std::max(maxID, -minID);
-    if (maxID > std::numeric_limits<int8_t>::max()) {
+    if (maxID <= std::numeric_limits<int8_t>::max()) {
+      bytePerVoxel = 1;
+    } else if (maxID <= std::numeric_limits<int16_t>::max()) {
       bytePerVoxel = 2;
-    } else if (maxID > std::numeric_limits<int16_t>::max()) {
+    } else if (maxID <= std::numeric_limits<int32_t>::max()) {
       bytePerVoxel = 4;
-    } else if (maxID > std::numeric_limits<int32_t>::max()) {
+    } else {
       bytePerVoxel = 8;
     }
   } else {
-    if (maxID > std::numeric_limits<uint8_t>::max()) {
+    if (maxID <= std::numeric_limits<uint8_t>::max()) {
+      bytePerVoxel = 1;
+    } else if (maxID <= std::numeric_limits<uint16_t>::max()) {
       bytePerVoxel = 2;
-    } else if (maxID > std::numeric_limits<uint16_t>::max()) {
+    } else if (maxID <= std::numeric_limits<uint32_t>::max()) {
       bytePerVoxel = 4;
-    } else if (maxID > std::numeric_limits<uint32_t>::max()) {
+    } else {
       bytePerVoxel = 8;
     }
   }
@@ -385,7 +389,7 @@ void ZRegionAnnotation::exportLabelImage(const QString& fn,
   LOG(INFO) << "Finish exporting label image";
 }
 
-void ZRegionAnnotation::exportSvgImage(const QString& fn_, double scaleX, double scaleY) const
+void ZRegionAnnotation::exportSvgImage(const QString& filename, double scaleX, double scaleY) const
 {
   LOG(INFO) << "Exporting Svg Image...";
 
@@ -394,7 +398,7 @@ void ZRegionAnnotation::exportSvgImage(const QString& fn_, double scaleX, double
   pen.setColor(QColor(0, 0, 0));
   pen.setWidth(1);
   for (int z = m_boundBox.minCorner.z; z <= m_boundBox.maxCorner.z; ++z) {
-    QString fn = fn_;
+    QString fn = filename;
     QFileInfo fi(fn);
     if (m_boundBox.maxCorner.z > m_boundBox.minCorner.z) {
       fn = QString("%1_slice%2.svg").arg(fi.dir().filePath(fi.completeBaseName())).arg(z);
@@ -485,13 +489,7 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
   LOG(INFO) << "Importing Label Image...";
   for (auto it = m_ontology.beginPostOrder(); it != m_ontology.endPostOrder(); ++it) {
     LOG(INFO) << "Processing region " << it->abbreviation << " " << it->id << "...";
-    if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg) {
-      continue;
-    }
-
-    bool processROI = labels.contains(it->id);
-
-    if (!processROI) {
+    if (it->id > maxPossibleLabelInImg || it->id < minPossibleLabelInImg || !labels.contains(it->id)) {
       continue;
     }
 
@@ -529,21 +527,21 @@ void ZRegionAnnotation::importLabelImageForSlicesWithoutAnnotation(const QString
 void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 {
   m_undoStack.beginMacro("Add Region");
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID) {
-      if (!it->roi) {
-        it->roi = createROI();
-        Q_EMIT regionROIAdded(it->id, it->roi.get());
+  for (auto& region : m_ontology) {
+    if (region.id == regionID) {
+      if (!region.roi) {
+        region.roi = createROI();
+        Q_EMIT regionROIAdded(region.id, region.roi.get());
       }
       if (regionID >= 0) {
-        it->roi->mergeWith(roi);
+        region.roi->mergeWith(roi);
       } else {
-        it->roi->subtractROI(roi);
-        it->roi->mergeWith(roi);
+        region.roi->subtractROI(roi);
+        region.roi->mergeWith(roi);
       }
     } else {
-      if (it->roi) {
-        it->roi->subtractROI(roi);
+      if (region.roi) {
+        region.roi->subtractROI(roi);
       }
     }
   }
@@ -553,13 +551,13 @@ void ZRegionAnnotation::mergeROIToRegion(const ZROI& roi, int64_t regionID)
 void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
 {
   m_undoStack.beginMacro("Add Lines");
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == -1) {
-      if (!it->roi) {
-        it->roi = createROI();
-        Q_EMIT regionROIAdded(it->id, it->roi.get());
+  for (auto& region : m_ontology) {
+    if (region.id == -1) {
+      if (!region.roi) {
+        region.roi = createROI();
+        Q_EMIT regionROIAdded(region.id, region.roi.get());
       }
-      it->roi->mergeWith(roi);
+      region.roi->mergeWith(roi);
     }
   }
   m_undoStack.endMacro();
@@ -582,18 +580,18 @@ void ZRegionAnnotation::mergeLineROI(const ZROI& roi)
 
 void ZRegionAnnotation::changeROIRegion(ZROI& roi, int slice, size_t shapeId, int64_t regionID)
 {
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID && it->roi.get() == &roi) {
+  for (auto& region : m_ontology) {
+    if (region.id == regionID && region.roi.get() == &roi) {
       return;
     }
   }
-  for (auto it = m_ontology.begin(); it != m_ontology.end(); ++it) {
-    if (it->id == regionID) {
-      if (!it->roi) {
-        it->roi = createROI();
-        Q_EMIT regionROIAdded(it->id, it->roi.get());
+  for (auto& region : m_ontology) {
+    if (region.id == regionID) {
+      if (!region.roi) {
+        region.roi = createROI();
+        Q_EMIT regionROIAdded(region.id, region.roi.get());
       }
-      it->roi->mergeWith(roi, slice, shapeId);
+      region.roi->mergeWith(roi, slice, shapeId);
       roi.deleteROIShape(slice, shapeId);
       return;
     }
@@ -712,8 +710,7 @@ void ZRegionAnnotation::load(const QString& filename)
       auto it = nodeMap.begin();
       while (it != nodeMap.end()) {
         int64_t parentID = it->second.parentID;
-        auto nodeIt = itMap.find(parentID);
-        if (nodeIt != itMap.end()) {
+        if (auto nodeIt = itMap.find(parentID); nodeIt != itMap.end()) {
           itMap[it->first] = m_ontology.appendChild(nodeIt->second, it->second);
           it = nodeMap.erase(it);
         } else if (!nodeMap.contains(parentID)) {
@@ -765,40 +762,38 @@ void ZRegionAnnotation::save(const QString& filename) const
       allGrp.createAttribute("VoxelSizeZInUM", doubleType, attrDataSpace).write(doubleType, &m_voxelSizeZ);
 
       int idx = 0;
-      for (auto it = m_ontology.cbegin(); it != m_ontology.cend(); ++it) {
+      for (const auto& region : m_ontology) {
         H5::Group regionGrp = allGrp.createGroup(fmt::format("Region{}", idx + 1));
         ++idx;
-        const RegionNode& p = *it;
-
         H5::Attribute idAttr = regionGrp.createAttribute("ID", int64Type, attrDataSpace);
-        idAttr.write(int64Type, &p.id);
+        idAttr.write(int64Type, &region.id);
 
         H5::Attribute parentIDAttr = regionGrp.createAttribute("ParentID", int64Type, attrDataSpace);
-        parentIDAttr.write(int64Type, &p.parentID);
+        parentIDAttr.write(int64Type, &region.parentID);
 
         H5::Attribute redAttr = regionGrp.createAttribute("Red", intType, attrDataSpace);
-        redAttr.write(intType, &p.red);
+        redAttr.write(intType, &region.red);
 
         H5::Attribute greenAttr = regionGrp.createAttribute("Green", intType, attrDataSpace);
-        greenAttr.write(intType, &p.green);
+        greenAttr.write(intType, &region.green);
 
         H5::Attribute blueAttr = regionGrp.createAttribute("Blue", intType, attrDataSpace);
-        blueAttr.write(intType, &p.blue);
+        blueAttr.write(intType, &region.blue);
 
         H5::Attribute name = regionGrp.createAttribute("Name", strType, attrDataSpace);
-        name.write(strType, p.name.toStdString());
+        name.write(strType, region.name.toStdString());
 
         H5::Attribute abbreviation = regionGrp.createAttribute("Abbreviation", strType, attrDataSpace);
-        abbreviation.write(strType, p.abbreviation.toStdString());
+        abbreviation.write(strType, region.abbreviation.toStdString());
 
-        if (p.roi && !p.roi->isEmpty()) {
+        if (region.roi && !region.roi->isEmpty()) {
           H5::Group roiGrp = regionGrp.createGroup("ROI");
-          p.roi->save(roiGrp);
+          region.roi->save(roiGrp);
         }
 
-        if (p.mesh && !p.mesh->empty()) {
+        if (region.mesh && !region.mesh->empty()) {
           H5::Group meshGrp = regionGrp.createGroup("Mesh");
-          p.mesh->save(meshGrp);
+          region.mesh->save(meshGrp);
         }
       }
 
@@ -816,8 +811,7 @@ void ZRegionAnnotation::save(const QString& filename) const
 
 void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
 {
-  QTemporaryDir dir;
-  if (dir.isValid()) {
+  if (QTemporaryDir dir; dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
     exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, scale, 1.0, true, 0);
     auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
@@ -826,14 +820,13 @@ void ZRegionAnnotation::interpolateRegionAnnotation(double scale)
     m_undoStack.push(cmd);
     // Q_EMIT modified();
   } else {
-    throw ZException(QString("can not create temporary file for region interpolation"));
+    throw ZException("can not create temporary file for region interpolation");
   }
 }
 
 void ZRegionAnnotation::interpolateRegionAnnotation2(double scale)
 {
-  QTemporaryDir dir;
-  if (dir.isValid()) {
+  if (QTemporaryDir dir; dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
     exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scale, scale, 1.0, true, 1);
     auto cmd = new ZRegionAnnotationInterpolateCommand(*this);
@@ -842,14 +835,13 @@ void ZRegionAnnotation::interpolateRegionAnnotation2(double scale)
     m_undoStack.push(cmd);
     // Q_EMIT modified();
   } else {
-    throw ZException(QString("can not create temporary file for region interpolation"));
+    throw ZException("can not create temporary file for region interpolation");
   }
 }
 
 void ZRegionAnnotation::updateMesh(double scaleX, double scaleY, double scaleZ)
 {
-  QTemporaryDir dir;
-  if (dir.isValid()) {
+  if (QTemporaryDir dir; dir.isValid()) {
     QString fn = QDir(dir.path()).filePath("temp_region_annotation_label_image.nim");
     exportLabelImage(fn, FileFormat::Unknown, ZImgWriteParameters(), scaleX, scaleY, scaleZ);
     auto cmd = new ZRegionAnnotationUpdateMeshCommand(*this);
@@ -858,7 +850,7 @@ void ZRegionAnnotation::updateMesh(double scaleX, double scaleY, double scaleZ)
     m_undoStack.push(cmd);
     // Q_EMIT modified();
   } else {
-    throw ZException(QString("can not create temporary file for mesh updating"));
+    throw ZException("can not create temporary file for mesh updating");
   }
 }
 

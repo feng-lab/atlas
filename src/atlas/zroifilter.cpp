@@ -683,7 +683,7 @@ ZBBox<glm::ivec4> ZROIFilter::boundBox() const
     updateBoundBoxWithOffsetPara(res);
     return res;
   }
-  return ZBBox<glm::ivec4>();
+  return {};
 }
 
 std::shared_ptr<ZWidgetsGroup> ZROIFilter::viewSettingWidgetsGroup()

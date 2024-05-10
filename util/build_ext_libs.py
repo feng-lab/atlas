@@ -1516,7 +1516,6 @@ def build_suitesparse(src_dir: str, install_dir: str):
     build_dir = create_build_dir(src_dir)
 
     orig_file = bak_file = None
-    # orig_file1 = bak_file1 = None
     try:
         orig_file = os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'SuiteSparseBLAS.cmake')
         bak_file = patch_file(orig_file,
@@ -1529,13 +1528,6 @@ set ( BLA_SIZEOF_INTEGER 4 )
 # find_package ( BLAS )
 include(libs)""",
                                         ])
-
-        # orig_file1 = os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'SuiteSparseLAPACK.cmake')
-        # bak_file1 = patch_file(orig_file1,
-        #                        from_texts=[r'find_package ( LAPACK REQUIRED )',
-        #                                    ],
-        #                        to_texts=[r'# find_package ( LAPACK REQUIRED )',
-        #                                  ])
 
         shutil.copy2(os.path.join(ext_dir(), 'suitesparse-cmake', 'libs.cmake'),
                      os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules'))
@@ -1573,51 +1565,10 @@ include(libs)""",
                 create_universal_binaries(arm64_install_dir, install_dir)
             finally:
                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
-
-        # cmakecmd_options = ['-DBLA_STATIC:BOOL=ON',
-        #                     '-DNFORTRAN:BOOL=ON',
-        #                     '-DNOPENMP:BOOL=ON',
-        #                     '-DENABLE_CUDA:BOOL=OFF',
-        #                     '-DNSTATIC:BOOL=OFF',
-        #                     '-DSUITESPARSE_USE_FORTRAN:BOOL=OFF',
-        #                     '-DSUITESPARSE_USE_CUDA:BOOL=OFF',
-        #                     '-DSUITESPARSE_USE_OPENMP:BOOL=OFF',
-        #                     ]
-        #
-        # for module in ['SuiteSparse_config', 'COLAMD', 'AMD', 'CCOLAMD', 'CAMD', 'CHOLMOD', 'SPQR']:
-        #     module_src_dir = os.path.join(src_dir, module)
-        #     build_dir = create_build_dir(module_src_dir)
-        #     try:
-        #         cmakecmd = get_cmake_cmd_common_part(install_dir, no_hidden_visibility=True)
-        #         cmakecmd.extend(cmakecmd_options)
-        #         cmakecmd.extend([module_src_dir])
-        #         build_and_install_cmakecmd(cmakecmd, build_dir)
-        #
-        #         if is_mac():
-        #             build_dir = create_build_dir(module_src_dir)
-        #             arm64_install_dir = create_arm64_install_dir(module_src_dir)
-        #             try:
-        #                 cmakecmd = get_cmake_cmd_common_part(arm64_install_dir, arm64_only=True,
-        #                                                      no_hidden_visibility=True)
-        #                 cmakecmd.extend(cmakecmd_options)
-        #                 cmakecmd.extend([module_src_dir])
-        #                 build_and_install_cmakecmd(cmakecmd, build_dir)
-        #                 create_universal_binaries(arm64_install_dir, install_dir, remove_dylib=False)
-        #             finally:
-        #                 shutil.rmtree(arm64_install_dir, ignore_errors=False)
-        #     finally:
-        #         shutil.rmtree(build_dir, ignore_errors=False)
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
-        # os.replace(bak_file1, orig_file1)
         os.unlink(os.path.join(src_dir, 'SuiteSparse_config', 'cmake_modules', 'libs.cmake'))
-
-        # remove_installed_dynamic_library(install_dir,
-        #                                  ['amd', 'camd', 'ccolamd', 'cholmod_cuda', 'cholmod', 'colamd', 'spqr_cuda',
-        #                                   'spqr', 'suitesparseconfig'])
-        # if is_windows():
-        #     cleanup_git_submodule(src_dir)
 
 
 def build_ceres_solver(src_dir: str, install_dir: str):
@@ -1626,7 +1577,6 @@ def build_ceres_solver(src_dir: str, install_dir: str):
     orig_file = bak_file = None
     orig_file1 = bak_file1 = None
     orig_file2 = bak_file2 = None
-    orig_file3 = bak_file3 = None
     orig_file4 = bak_file4 = None
     orig_file5 = bak_file5 = None
     try:
