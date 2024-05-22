@@ -176,9 +176,8 @@ __forceinline ptrdiff_t indexOf(const C& iterable, const V& v)
 {
   if (auto it = std::find(std::begin(iterable), std::end(iterable), v); it != std::end(iterable)) {
     return std::distance(std::begin(iterable), it);
-  } else {
-    return -1;
   }
+  return -1;
 }
 
 template<typename C>

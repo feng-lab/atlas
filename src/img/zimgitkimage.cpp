@@ -428,7 +428,6 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
       break;
     default:
       throw ZIOException("Not supported ElementType");
-      break;
   }
 
   info.voxelSizeUnit = VoxelSizeUnit::mm;
