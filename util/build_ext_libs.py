@@ -2228,7 +2228,7 @@ def build_itk(src_dir: str, install_dir: str):
 
         # duplicated call to find_package cause cmake error
         # remove tbb from itk interface to make it work with conda tbb
-        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.4', 'Modules', 'ITKTBB.cmake')
+        orig_file_2 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-6.0', 'Modules', 'ITKTBB.cmake')
         patch_file(orig_file_2,
                    from_texts=[r'find_package(TBB REQUIRED CONFIG)',
                                r'set(ITKTBB_INCLUDE_DIRS',
@@ -2238,19 +2238,6 @@ def build_itk(src_dir: str, install_dir: str):
                              r'#set(ITKTBB_INCLUDE_DIRS',
                              r'#set(ITKTBB_LIBRARIES',
                              r'#set(TBB_DIR'])
-
-        # ITKZLIB_INCLUDE_DIRS includes
-        # /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
-        # which cause conda compilation errors
-        # orig_file_3 = os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'Modules', 'ITKZLIB.cmake')
-        # patch_file(orig_file_3,
-        #            from_texts=[r'set(ITKZLIB_INCLUDE_DIRS',
-        #                        ],
-        #            to_texts=[r'#set(ITKZLIB_INCLUDE_DIRS',
-        #                      ])
-
-        # shutil.copy2(os.path.join(src_dir, 'CMake', 'ITKInitializeCXXStandard.cmake'),
-        #              os.path.join(install_dir, 'lib', 'cmake', 'ITK-5.3', 'ITKInitializeCXXStandard.cmake'))
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
