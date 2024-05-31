@@ -2266,8 +2266,6 @@ def build_vtk(src_dir: str, install_dir: str):
     bak_file2 = orig_file2 = None
     bak_file3 = orig_file3 = None
     bak_file4 = orig_file4 = None
-    # bak_file5 = orig_file5 = None
-    # bak_file6 = orig_file6 = None
     bak_file7 = orig_file7 = None
     try:
         orig_file = os.path.join(src_dir, 'ThirdParty', 'netcdf', 'vtknetcdf', 'CMakeLists.txt')
@@ -2307,19 +2305,6 @@ def build_vtk(src_dir: str, install_dir: str):
                                          r'-Wall',
                                          ])
 
-        # if is_windows():
-        #     orig_file5 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.txx')
-        #     bak_file5 = patch_file(orig_file5,
-        #                            from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope();', ],
-        #                            to_texts=['bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()\n'
-        #                                      '{ return vtkSMPThreadPool::GetInstance().IsParallelScope(); }\n'
-        #                                      'template<int> bool __dummyIsParallelScope() { return false; }', ])
-        #
-        #     orig_file6 = os.path.join(src_dir, 'Common', 'Core', 'SMP', 'STDThread', 'vtkSMPToolsImpl.cxx')
-        #     bak_file6 = patch_file(orig_file6,
-        #                            from_texts=[r'bool vtkSMPToolsImpl<BackendType::STDThread>::IsParallelScope()', ],
-        #                            to_texts=['bool __dummyIsParallelScope<1>()', ])
-
         if is_linux():
             orig_file7 = os.path.join(src_dir, 'ThirdParty', 'nlohmannjson/vtknlohmannjson/include/vtknlohmann/detail',
                                       'macro_scope.hpp')
@@ -2355,22 +2340,12 @@ def build_vtk(src_dir: str, install_dir: str):
 
         cmakecmd.extend([src_dir])
         build_and_install_cmakecmd(cmakecmd, build_dir, additional_env=get_tbb_env())
-
-        # orig_file7 = os.path.join(install_dir, 'lib', 'cmake', 'vtk-9.2', 'VTK-targets.cmake')
-        # bak_file7 = patch_file(orig_file7,
-        #                        from_texts=[r';TBB::tbb',
-        #                                    ],
-        #                        to_texts=[r'',
-        #                                  ])
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file, orig_file)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         os.replace(bak_file4, orig_file4)
-        # if is_windows():
-        #     os.replace(bak_file5, orig_file5)
-        #     os.replace(bak_file6, orig_file6)
         if is_linux():
             os.replace(bak_file7, orig_file7)
 
