@@ -2835,6 +2835,7 @@ def build_fizz(src_dir: str, install_dir: str):
         cmakecmd = get_cmake_cmd_common_part(install_dir, universal=True)
         cmakecmd.extend(['-DFIZZ_BUILD_AEGIS:BOOL=OFF',
                          '-DBUILD_TESTS:BOOL=OFF',
+                         '-DBUILD_EXAMPLES:BOOL=OFF',
                          ])
 
         cmakecmd.extend([src_dir])
