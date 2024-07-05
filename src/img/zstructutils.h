@@ -13,17 +13,18 @@ void printStruct(const T& t = {})
 {
   reflect::for_each(
     [&](auto I) {
-      fmt::print("{}.{}:{}={} ({}/{}/{})\n",
-                 reflect::type_name(t),
-                 reflect::member_name<I>(t),
-                 reflect::type_name(reflect::get<I>(t)),
-                 reflect::get<I>(t),
-                 reflect::size_of<I>(t),
-                 reflect::align_of<I>(t),
-                 reflect::offset_of<I>(t));
       if constexpr (std::is_aggregate_v<std::remove_cvref_t<decltype(reflect::get<I>(t))>> &&
                     !IsStdArray<std::remove_cvref_t<decltype(reflect::get<I>(t))>>::value) {
         printStruct(reflect::get<I>(t));
+      } else {
+        fmt::print("{}.{}:{}={} ({}/{}/{})\n",
+                   reflect::type_name(t),
+                   reflect::member_name<I>(t),
+                   reflect::type_name(reflect::get<I>(t)),
+                   reflect::get<I>(t),
+                   reflect::size_of<I>(t),
+                   reflect::align_of<I>(t),
+                   reflect::offset_of<I>(t));
       }
     },
     t);

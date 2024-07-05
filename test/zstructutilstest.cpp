@@ -38,6 +38,15 @@ TEST(CompactStructTest, WriteAndReadStruct)
   ASSERT_EQ(compactSize<MyStruct>(), 37);
 
   uint8_t buffer[256];
+
+  MySubStruct subS = {'e', -8, 2, 41.f, 52.};
+  printStruct(subS);
+  auto memSize = compactStructToMemory(buffer, sizeof(buffer), subS);
+  ASSERT_EQ(memSize, 19);
+  MySubStruct restoredSubS;
+  readStructFromCompactMemory(restoredSubS, buffer, sizeof(buffer));
+  ASSERT_EQ(subS, restoredSubS);
+
   MyStruct original = {
     'a',
     {'b', -98, 32, 4.f, 5.},
@@ -46,11 +55,12 @@ TEST(CompactStructTest, WriteAndReadStruct)
     2.0f,
     3.0
   };
-  auto memSize = compactStructToMemory(buffer, sizeof(buffer), original);
-  ASSERT_EQ(memSize, 37);
+  fmt::print("\n");
+  printStruct(original);
 
+  memSize = compactStructToMemory(buffer, sizeof(buffer), original);
+  ASSERT_EQ(memSize, 37);
   MyStruct restored;
   readStructFromCompactMemory(restored, buffer, sizeof(buffer));
-
   ASSERT_EQ(original, restored);
 }
