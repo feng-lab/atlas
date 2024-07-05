@@ -222,4 +222,12 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
 #endif
 }
 
+template<typename T>
+struct IsStdArray : std::false_type
+{};
+
+template<typename T, std::size_t N>
+struct IsStdArray<std::array<T, N>> : std::true_type
+{};
+
 } // namespace nim

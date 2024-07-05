@@ -180,6 +180,7 @@ set(IMG_SOURCES
     zhashutils.h
     zfolly.cpp zfolly.h
     zcachedimg.cpp zcachedimg.h
+    zstructutils.h
 )
 
 message(STATUS "CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")

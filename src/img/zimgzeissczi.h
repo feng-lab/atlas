@@ -11,12 +11,11 @@ namespace nim {
 
 static_assert(sizeof(QUuid) == 16 && std::is_trivially_copyable_v<QUuid>, "wrong uuid type");
 
-#pragma pack(push, 1)
 struct SegmentHeader
 {
   // A sequence of up to 15 Ansi – characters 'A'...'Z', e.g. "ZISSUBBLOCK".
   // The special name "DELETED" marks a segment as deleted - readers should ignore or skip this segment.
-  char id[16];
+  std::array<char, 16> id;
   int64_t allocatedSize; // The total numer of bytes allocated for this segment.
   int64_t usedSize; // The currently used number of bytes.
 };
@@ -48,13 +47,13 @@ struct MetaDataSegment
 {
   int32_t xmlSize; // Size of the XML data.
   int32_t attachmentSize; // Size of the the (binary) attachments. NOT USED CURRENTLY.
-  uint8_t spare[248];
+  std::array<uint8_t, 248> spare;
 };
 
 // 20 bytes
 struct DimensionEntryDV1
 {
-  char dimension[4]; // Typically 1 Byte ANSI e.g. 'X', see Dimensions / dimensions indices
+  std::array<char, 4> dimension; // Typically 1 Byte ANSI e.g. 'X', see Dimensions / dimensions indices
   int32_t start; // Start position / index. May be < 0.
   int32_t size; // Size in units of pixels (logical size). Must be > 0.
   float startCoordinate; // Physical start coordinate (units e.g. micrometers or seconds)
@@ -64,7 +63,7 @@ struct DimensionEntryDV1
 // 32 bytes + EntryCount * 20
 struct DirectoryEntryDV
 {
-  char schemaType[2]; // "DV"
+  std::array<char, 2> schemaType; // "DV"
   int32_t pixelType; // The type of the image pixels, see PixelTypes.
   int64_t filePosition; // Seek offset of the referenced SubBlockSegment relative to the first byte of the file
   int32_t filePart; // Reserved.
@@ -73,7 +72,7 @@ struct DirectoryEntryDV
   // current values are: None=0, SingleSubblock=1, MultiSubblock=2.
   uint8_t pyramidType;
   uint8_t spare1;
-  uint8_t spare2[4];
+  std::array<uint8_t, 4> spare2;
   // Number of entries. Minimum is 1.
   int32_t dimensionCount;
   // DimensionEntries of type DimensionEntryDV1[dimensionCount] follows
@@ -93,7 +92,7 @@ struct SubBlockSegment
 struct subBlockDirectorySegment
 {
   int32_t entryCount; // The number of entries
-  uint8_t reserved[124];
+  std::array<uint8_t, 124> reserved;
   // List of EntryCount DirectoryEntryDV follows.
   // Each item is a copy of the DirectoryEntry in the referenced SubBlock segment.
 };
@@ -101,26 +100,26 @@ struct subBlockDirectorySegment
 // 128 bytes
 struct AttachmentEntryA1
 {
-  char schemaType[2]; // "A1"
-  uint8_t reserved[10];
+  std::array<char, 2> schemaType; // "A1"
+  std::array<uint8_t, 10> reserved;
   int64_t filePosition; // Seek offset relative to the first byte of the file
   int32_t filePart; // Reserved;
   QUuid contentGuid; // Unique Id to be used in strong, fully qualified references
-  char contentFileType[8]; // Unique file type Identifier (see table below)
+  std::array<char, 8> contentFileType; // Unique file type Identifier (see table below)
   // Null terminated (80-1) character UTF8 encoded string defining a name for this item.
   // May be used in references instead of GUID.
-  char name[80];
+  std::array<char, 80> name;
 };
 
 // SID = ZISRAWATTACH
 struct AttachmentSegment
 {
   int32_t dataSize; // Size of the data section.
-  uint8_t spare1[12];
+  std::array<uint8_t, 12> spare1;
   // Core information, an 1:1 copy will be stored as part of the
   // File's AttachmentDirectory Segment.
   AttachmentEntryA1 attachmentEntry;
-  uint8_t spare2[112];
+  std::array<uint8_t, 112> spare2;
   // [Data] follows
 };
 
@@ -173,11 +172,9 @@ struct EventListSegment
 struct AttachmentDirectorySegment
 {
   int32_t entryCount;
-  uint8_t reserved[252];
+  std::array<uint8_t, 252> reserved;
   // AttachmentEntryA1[entryCount] follows
 };
-
-#pragma pack(pop)
 
 struct CZITile
 {

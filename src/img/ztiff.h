@@ -272,6 +272,7 @@ public:
   // write a 16 + 8 + 20 * 8 + 8 = 192 bytes tiff header to mem, mem+stripOffset is the start of image data
   // mem+stripOffset+stripByteCount is the end of image data, stripOffset should be bigger than 192
   static void writeTiffHeader(uint8_t* mem,
+                              size_t memSize,
                               size_t width,
                               size_t height,
                               size_t bitsPerSample,

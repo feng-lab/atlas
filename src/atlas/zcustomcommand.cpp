@@ -26,6 +26,7 @@
 #include "z3dmeshview.h"
 #include "z3dpunctaview.h"
 #include "z3dswcview.h"
+//#include "zstructutils.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -1882,10 +1883,7 @@ void imgResizeBenchmark()
 
 void someTest()
 {
-  glm::uvec4 pageTableEntryKey(67,44,9,1);
-  glm::uvec3 m_pageTableBlockSize(32, 32, 32);
-  glm::uvec4 pageDirectoryEntryKey = pageTableEntryKey / glm::uvec4(m_pageTableBlockSize, 1);
-  LOG(INFO) << pageDirectoryEntryKey;
+  // printStruct<EventListSegment>();
 }
 
 } // namespace nim

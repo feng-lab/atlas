@@ -3,6 +3,7 @@
 #include "ztiff.h"
 #include "zlog.h"
 #include "zioutils.h"
+#include "zstructutils.h"
 
 namespace nim {
 
@@ -102,7 +103,7 @@ void ZImgZeissLsm::detectImgInfo(ZTiff& tiff)
 void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 {
   const ZImgMetatag& lsmInfoTag = tiff.lsmInfoTag();
-  std::memcpy(&m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
+  readStructFromCompactMemory(m_lsmInfo, lsmInfoTag.dataArray(), lsmInfoTag.dataByteNumber());
 
   if (m_lsmInfo.u16ScanType == 3 || m_lsmInfo.u16ScanType == 5 || m_lsmInfo.u16ScanType == 7 ||
       m_lsmInfo.u16ScanType == 9) {
@@ -116,7 +117,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 
   if (m_lsmInfo.u32OffsetChannelColors != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
-    readStream(inputFileStream, &m_lsmChannelColors, sizeof(CZ_ChannelColors));
+    readStructFromFileStream(m_lsmChannelColors, inputFileStream);
 
     std::vector<char> chStruct(m_lsmChannelColors.s32BlockSize);
     inputFileStream.seekg(m_lsmInfo.u32OffsetChannelColors);
@@ -139,7 +140,7 @@ void ZImgZeissLsm::readLsmInfo(const QString& filename, ZTiff& tiff)
 
   if (m_lsmInfo.u32OffsetTimeStamps != 0) {
     inputFileStream.seekg(m_lsmInfo.u32OffsetTimeStamps);
-    readStream(inputFileStream, &m_lsmTimeStamps, sizeof(CZ_TimeStamps));
+    readStructFromFileStream(m_lsmTimeStamps, inputFileStream);
     m_lsmImgInfo.timeStamps.resize(m_lsmTimeStamps.s32NumberTimeStamps);
     readStream(inputFileStream, m_lsmImgInfo.timeStamps.data(), sizeof(double) * m_lsmTimeStamps.s32NumberTimeStamps);
   }

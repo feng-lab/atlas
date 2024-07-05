@@ -3,15 +3,15 @@
 #include "zlog.h"
 #include "zioutils.h"
 #include "zimgio.h"
+#include "zstructutils.h"
 #include <QUuid>
 #include <QXmlStreamReader>
 #include <QFile>
 #include <QTextStream>
 #include <QUrl>
+#include <boost/iostreams/categories.hpp>
 
 namespace {
-
-#pragma pack(push, 1)
 
 // Info for the next block to read out of the file
 struct NextBlock
@@ -59,8 +59,6 @@ struct MemoryBlock64
   int32_t textLength; // Number of Unicode characters
   // QChar text[]; // Short image description (Name)
 };
-
-#pragma pack(pop)
 
 } // namespace
 
@@ -330,14 +328,14 @@ void ZImgLeica::readXml(const QString& filename,
     std::ifstream inputFileStream;
     openFileStream(inputFileStream, filename, std::ios_base::in | std::ios_base::binary);
 
-    NextBlock nb{};
-    readStream(inputFileStream, &nb, sizeof(NextBlock));
+    NextBlock nb;
+    readStructFromFileStream(nb, inputFileStream);
     if (nb.test != 0x70) {
       throw ZIOException("incorrect leica file header");
     }
 
-    XMLOrTypeContent xtc{};
-    readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
+    XMLOrTypeContent xtc;
+    readStructFromFileStream(xtc, inputFileStream);
     if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
       throw ZIOException("incorrect lecia xml or type content");
     }
@@ -348,32 +346,32 @@ void ZImgLeica::readXml(const QString& filename,
 
     int majorVersion = 0;
     if (isLOF) {
-      Int32Block majorVersionBlock{};
-      readStream(inputFileStream, &majorVersionBlock, sizeof(majorVersionBlock));
+      Int32Block majorVersionBlock;
+      readStructFromFileStream(majorVersionBlock, inputFileStream);
       if (majorVersionBlock.test == 0x2A) {
         majorVersion = majorVersionBlock.number;
       } else {
         throw ZIOException("incorrect lecia LOF major version");
       }
-      Int32Block minorVersionBlock{};
-      readStream(inputFileStream, &minorVersionBlock, sizeof(minorVersionBlock));
+      Int32Block minorVersionBlock;
+      readStructFromFileStream(minorVersionBlock, inputFileStream);
       if (minorVersionBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF minor version");
       }
-      UInt64Block memorySizeBlock{};
-      readStream(inputFileStream, &memorySizeBlock, sizeof(memorySizeBlock));
+      UInt64Block memorySizeBlock;
+      readStructFromFileStream(memorySizeBlock, inputFileStream);
       if (memorySizeBlock.test != 0x2A) {
         throw ZIOException("incorrect lecia LOF memory size");
       }
       memoryOffsetNameLength.emplace_back(size_t(inputFileStream.tellg()), QString(""), size_t(memorySizeBlock.Number));
       inputFileStream.seekg(memorySizeBlock.Number, std::ios_base::cur);
 
-      readStream(inputFileStream, &nb, sizeof(NextBlock));
+      readStructFromFileStream(nb, inputFileStream);
       if (nb.test != 0x70) {
         throw ZIOException("incorrect leica LOF xml header");
       }
 
-      readStream(inputFileStream, &xtc, sizeof(XMLOrTypeContent));
+      readStructFromFileStream(xtc, inputFileStream);
       if (xtc.test != 0x2A || nb.length != 5 + xtc.textLength * 2) {
         throw ZIOException("incorrect lecia LOF xml content");
       }
@@ -383,13 +381,13 @@ void ZImgLeica::readXml(const QString& filename,
     } else { // LIF
       majorVersion = parseLIFVersion(xml);
       do {
-        if (!inputFileStream.read(reinterpret_cast<char*>(&nb), sizeof(NextBlock))) {
+        if (!readStructFromFileStreamNoThrow(nb, inputFileStream)) {
           break;
         }
 
         if (majorVersion == 1) {
-          MemoryBlock32 md{};
-          readStream(inputFileStream, &md, sizeof(MemoryBlock32));
+          MemoryBlock32 md;
+          readStructFromFileStream(md, inputFileStream);
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 10 + md.textLength * 2) {
             throw ZIOException("incorrect lecia LOF xml content");
           }
@@ -400,8 +398,8 @@ void ZImgLeica::readXml(const QString& filename,
 
           inputFileStream.seekg(md.memorySize, std::ios_base::cur);
         } else if (majorVersion == 2) {
-          MemoryBlock64 md{};
-          readStream(inputFileStream, &md, sizeof(MemoryBlock64));
+          MemoryBlock64 md;
+          readStructFromFileStream(md, inputFileStream);
           if (md.test1 != 0x2A || md.test2 != 0x2A || nb.length != 14 + md.textLength * 2) {
             throw ZIOException("incorrect lecia LOF xml content");
           }

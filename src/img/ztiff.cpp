@@ -4,6 +4,8 @@
 #include "zlog.h"
 #include "zimage2dutils.h"
 #include "zioutils.h"
+#include "zstructutils.h"
+
 #include <tiff.h>
 #include <tiffio.h>
 #include <tiffio.hxx>
@@ -950,8 +952,6 @@ ZImg ZTiff::readThumbnailFromIFD(const ZTiffIFD& ifd)
   return res;
 }
 
-#pragma pack(push, 1)
-
 struct ZTiffHeader
 {
   TIFFHeaderBig header = {TIFF_LITTLEENDIAN, 43, 8, 0, 16};
@@ -1010,9 +1010,8 @@ struct ZTiffHeader
   uint64_t nextdiroff = 0;
 };
 
-#pragma pack(pop)
-
 void ZTiff::writeTiffHeader(uint8_t* mem,
+                            size_t memSize,
                             size_t width,
                             size_t height,
                             size_t bitsPerSample,
@@ -1021,7 +1020,6 @@ void ZTiff::writeTiffHeader(uint8_t* mem,
                             uint64_t stripOffset,
                             uint64_t stripByteCount)
 {
-  static_assert(sizeof(ZTiffHeader) == 192, "wrong tiff header size");
   CHECK(stripOffset >= 192);
   ZTiffHeader header;
   header.width = width;
@@ -1031,7 +1029,7 @@ void ZTiff::writeTiffHeader(uint8_t* mem,
   header.compression = compression;
   header.stripOffset = stripOffset;
   header.stripByteCount = stripByteCount;
-  std::memcpy(mem, &header, sizeof(header));
+  compactStructToMemory(mem, memSize, header);
 }
 
 uint64_t ZTiff::readIFD(std::istream& fs, ZTiffIFD& ifd, uint64_t off, bool bigtiff, bool swabflag) const

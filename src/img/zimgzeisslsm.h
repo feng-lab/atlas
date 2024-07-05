@@ -5,7 +5,6 @@
 
 namespace nim {
 
-#pragma pack(push, 1)
 struct CZ_LsmInfo
 {
   uint32_t u32MagicNumber; // 0x00300494C (release 1.3) or 0x00400494C (release 1.5 to 6.0).
@@ -142,13 +141,13 @@ struct CZ_LsmInfo
     s32DimensionP; // Number of intensity values in position-direction. (new for release 5.5; can be 0, if not present).
   int32_t s32DimensionM; // Number of intensity values in tile (mosaic)-direction.(new for release 5.5; can be 0, if not
                          // present).
-  int32_t s32DimensionsReserved[16]; // 16 reserved 32-bit words, must be 0.
+  std::array<int32_t, 16> s32DimensionsReserved; // 16 reserved 32-bit words, must be 0.
   uint32_t u32OffsetTilePositions; // File offset to a block with the positions of the tiles in (new for release 5.5;
                                    // can be 0, if not present).
-  uint32_t u32Reserved[9]; // 9 reserved 32-bit words, must be 0.
+  std::array<uint32_t, 9> u32Reserved; // 9 reserved 32-bit words, must be 0.
   uint32_t u32OffsetPositions; // File offset to a block with the positions of the acquisition regions
   //(new in release 6.2, can be 0, if not present, release 6.2 is NOT released yet! beta and special built only).
-  uint32_t u32Reserved2[21]; // 21 reserved 32-bit words, must be 0.
+  std::array<uint32_t, 21> u32Reserved2; // 21 reserved 32-bit words, must be 0.
 };
 
 struct CZ_ChannelColors
@@ -162,7 +161,7 @@ struct CZ_ChannelColors
   int32_t s32NamesOffset; // Offset relative ti the start of the structure to the list of channel names. The list of
                           // channel names is a series of "\0"-terminated ANSI character strings.
   int32_t s32Mono; // If unequal zero the "Mono" button in the LSM-imagefenster window was peressed
-  int32_t s32Reserved[4]; // Four 32-bit words reserved for use in the future. The values are set to "0".
+  std::array<int32_t, 4> s32Reserved; // Four 32-bit words reserved for use in the future. The values are set to "0".
 };
 
 struct CZ_TimeStamps
@@ -170,7 +169,6 @@ struct CZ_TimeStamps
   int32_t s32Size; // Size, in bytes, of the whole block used for time stamps.
   int32_t s32NumberTimeStamps; // Number of time stamps in the following list.
 };
-#pragma pack(pop)
 
 // Data types
 #define TYPE_SUBBLOCK 0
@@ -246,9 +244,9 @@ protected:
   void logLsmInfo(const QString& filename);
 
 protected:
-  CZ_LsmInfo m_lsmInfo{};
-  CZ_TimeStamps m_lsmTimeStamps{};
-  CZ_ChannelColors m_lsmChannelColors{};
+  CZ_LsmInfo m_lsmInfo;
+  CZ_TimeStamps m_lsmTimeStamps;
+  CZ_ChannelColors m_lsmChannelColors;
   std::vector<uint32_t> m_channelDataTypes;
   std::vector<Location> m_positions;
   std::vector<Location> m_tilePositions;
