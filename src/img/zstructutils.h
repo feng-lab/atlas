@@ -9,22 +9,29 @@ namespace nim {
 
 template<class T>
   requires std::is_aggregate_v<T>
-void printStruct(const T& t = {})
+void printStruct(const T& t = {}, const std::string& memberName = "", size_t memberOffset = 0)
 {
   reflect::for_each(
     [&](auto I) {
       if constexpr (std::is_aggregate_v<std::remove_cvref_t<decltype(reflect::get<I>(t))>> &&
                     !IsStdArray<std::remove_cvref_t<decltype(reflect::get<I>(t))>>::value) {
-        printStruct(reflect::get<I>(t));
+        printStruct(reflect::get<I>(t),
+                    fmt::format("{}{}.{}",
+                                memberName.empty() ? "" : memberName + " ",
+                                reflect::type_name(t),
+                                reflect::member_name<I>(t)),
+                    memberOffset + reflect::offset_of<I>(t));
       } else {
-        fmt::print("{}.{}:{}={} ({}/{}/{})\n",
+        fmt::print("{}{}.{}: {} = {} ({}/{}/{}) {}\n",
+                   memberName.empty() ? "" : memberName + " ",
                    reflect::type_name(t),
                    reflect::member_name<I>(t),
                    reflect::type_name(reflect::get<I>(t)),
                    reflect::get<I>(t),
                    reflect::size_of<I>(t),
                    reflect::align_of<I>(t),
-                   reflect::offset_of<I>(t));
+                   memberOffset + reflect::offset_of<I>(t),
+                   reinterpret_cast<std::uintptr_t>(&reflect::get<I>(t)));
       }
     },
     t);

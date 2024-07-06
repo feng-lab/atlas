@@ -1,17 +1,48 @@
 #include "zstructutils.h"
 #include "ztest.h"
+#include <fmt/ostream.h>
+
+enum class E : int16_t
+{
+  unknown = -1,
+  A = 0,
+  B = 1,
+};
+
+std::ostream& operator<<(std::ostream& os, const E& e)
+{
+  return os << nim::to_underlying(e);
+}
+
+template<>
+struct fmt::formatter<E> : ostream_formatter
+{};
+
+struct foobar
+{
+  int8_t a;
+  E b;
+
+  bool operator==(const foobar& other) const
+  {
+    return a == other.a && b == other.b;
+  }
+};
 
 struct MySubStruct
 {
   char ch;
+  foobar fb;
   int16_t a;
   int32_t b;
   float c;
+  char ch2;
   double d;
 
   bool operator==(const MySubStruct& other) const
   {
-    return ch == other.ch && a == other.a && b == other.b && c == other.c && d == other.d;
+    return ch == other.ch && fb == other.fb && a == other.a && b == other.b && c == other.c && ch2 == other.ch2 &&
+           d == other.d;
   }
 };
 
@@ -34,22 +65,34 @@ TEST(CompactStructTest, WriteAndReadStruct)
 {
   using namespace nim;
 
-  ASSERT_EQ(compactSize<MySubStruct>(), 19);
-  ASSERT_EQ(compactSize<MyStruct>(), 37);
+  fmt::print("size of foobar: {}\n", sizeof(foobar));
+  fmt::print("size of MySubStruct: {}\n", sizeof(MySubStruct));
+  fmt::print("size of MyStruct: {}\n", sizeof(MyStruct));
+
+  ASSERT_EQ(compactSize<MySubStruct>(), 23);
+  ASSERT_EQ(compactSize<MyStruct>(), 41);
 
   uint8_t buffer[256];
 
-  MySubStruct subS = {'e', -8, 2, 41.f, 52.};
+  MySubStruct subS = {
+    'e',
+    {127, E::B},
+    -8,
+    2,
+    41.f,
+    '2',
+    52.
+  };
   printStruct(subS);
   auto memSize = compactStructToMemory(buffer, sizeof(buffer), subS);
-  ASSERT_EQ(memSize, 19);
+  ASSERT_EQ(memSize, 23);
   MySubStruct restoredSubS;
   readStructFromCompactMemory(restoredSubS, buffer, sizeof(buffer));
   ASSERT_EQ(subS, restoredSubS);
 
   MyStruct original = {
     'a',
-    {'b', -98, 32, 4.f, 5.},
+    {'b', {-128, E::unknown}, -98, 32, 4.f, 't', 5.},
     1,
     'c',
     2.0f,
@@ -59,7 +102,7 @@ TEST(CompactStructTest, WriteAndReadStruct)
   printStruct(original);
 
   memSize = compactStructToMemory(buffer, sizeof(buffer), original);
-  ASSERT_EQ(memSize, 37);
+  ASSERT_EQ(memSize, 41);
   MyStruct restored;
   readStructFromCompactMemory(restored, buffer, sizeof(buffer));
   ASSERT_EQ(original, restored);

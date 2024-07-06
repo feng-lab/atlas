@@ -122,7 +122,7 @@ public:
 
   bool renderingStarted(Z3DEye eye)
   {
-    return m_channelIdx[to_underlying(eye)] > -1;
+    return m_channelIdx[std::to_underlying(eye)] > -1;
   }
 
 protected:
@@ -163,8 +163,8 @@ private:
 
   void resetProgress(Z3DEye eye)
   {
-    m_channelIdx[to_underlying(eye)] = -1;
-    m_round[to_underlying(eye)] = 0;
+    m_channelIdx[std::to_underlying(eye)] = -1;
+    m_round[std::to_underlying(eye)] = 0;
   }
 
 protected:

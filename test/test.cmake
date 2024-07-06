@@ -85,3 +85,7 @@ gtest_discover_tests(zstatisticsutilstest DISCOVERY_TIMEOUT 600)
 add_executable(zstructutilstest ${CMAKE_CURRENT_LIST_DIR}/zstructutilstest.cpp)
 target_link_libraries(zstructutilstest GTest::gtest_main img)
 gtest_discover_tests(zstructutilstest DISCOVERY_TIMEOUT 600)
+
+add_executable(zenumtest ${CMAKE_CURRENT_LIST_DIR}/zenumtest.cpp)
+target_link_libraries(zenumtest GTest::gtest_main img)
+gtest_discover_tests(zenumtest DISCOVERY_TIMEOUT 600)

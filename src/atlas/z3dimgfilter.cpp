@@ -936,8 +936,8 @@ double Z3DImgFilter::renderImage(Z3DEye eye)
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
     m_layerTarget.resize(currentOutport.size());
     m_blockIDsRenderTarget.resize(currentOutport.size());
-    m_imageRenderTarget1s[to_underlying(eye)]->resize(currentOutport.size());
-    m_imageRenderTarget2s[to_underlying(eye)]->resize(currentOutport.size());
+    m_imageRenderTarget1s[std::to_underlying(eye)]->resize(currentOutport.size());
+    m_imageRenderTarget2s[std::to_underlying(eye)]->resize(currentOutport.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();

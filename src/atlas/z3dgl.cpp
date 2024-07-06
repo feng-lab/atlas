@@ -68,7 +68,7 @@ bool checkGLState(GLenum pname, const glm::vec4& value)
 
 GLenum toGLType(ZMesh::Type type)
 {
-  return static_cast<GLenum>(to_underlying(type));
+  return static_cast<GLenum>(std::to_underlying(type));
 }
 
 } // namespace nim

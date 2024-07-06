@@ -12,12 +12,12 @@
 #include <vector>
 #include <numeric>
 
-namespace nim {
-
 #ifdef _MSC_VER
 #else
 #define __forceinline inline __attribute__((always_inline))
 #endif
+
+namespace std {
 
 // c++23 feature
 template<typename Enum>
@@ -25,6 +25,23 @@ constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept
 {
   return static_cast<std::underlying_type_t<Enum>>(e);
 }
+
+// c++23 utility
+[[noreturn]] __forceinline void unreachable()
+{
+  // Uses compiler specific extensions if possible.
+  // Even if no extension is used, undefined behavior is still raised by
+  // an empty function body and the noreturn attribute.
+#ifdef __GNUC__ // GCC, Clang, ICC
+  __builtin_unreachable();
+#elif defined(_MSC_VER) // MSVC
+  __assume(false);
+#endif
+}
+
+} // namespace std
+
+namespace nim {
 
 template<typename Type>
 __forceinline bool is_aligned(Type* ptr)
@@ -207,19 +224,6 @@ constexpr auto&& tuple_like_get_helper(T&& t) noexcept
 {
   static_assert(Index < N, "Index out of bounds for tuple_like");
   return std::forward<T>(t)[Index];
-}
-
-// c++23 utility
-[[noreturn]] __forceinline void unreachable()
-{
-  // Uses compiler specific extensions if possible.
-  // Even if no extension is used, undefined behavior is still raised by
-  // an empty function body and the noreturn attribute.
-#ifdef __GNUC__ // GCC, Clang, ICC
-  __builtin_unreachable();
-#elif defined(_MSC_VER) // MSVC
-  __assume(false);
-#endif
 }
 
 template<typename T>

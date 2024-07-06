@@ -202,32 +202,32 @@ public:
 
   [[nodiscard]] const glm::mat4& viewMatrix(Z3DEye eye) const
   {
-    return m_viewMatrices[to_underlying(eye)];
+    return m_viewMatrices[std::to_underlying(eye)];
   }
 
   [[nodiscard]] const glm::mat4& projectionMatrix(Z3DEye eye) const
   {
-    return m_projectionMatrices[to_underlying(eye)];
+    return m_projectionMatrices[std::to_underlying(eye)];
   }
 
   [[nodiscard]] const glm::mat4& inverseViewMatrix(Z3DEye eye) const
   {
-    return m_inverseViewMatrices[to_underlying(eye)];
+    return m_inverseViewMatrices[std::to_underlying(eye)];
   }
 
   [[nodiscard]] const glm::mat4& inverseProjectionMatrix(Z3DEye eye) const
   {
-    return m_inverseProjectionMatrices[to_underlying(eye)];
+    return m_inverseProjectionMatrices[std::to_underlying(eye)];
   }
 
   [[nodiscard]] const glm::mat3& normalMatrix(Z3DEye eye) const
   {
-    return m_normalMatrices[to_underlying(eye)];
+    return m_normalMatrices[std::to_underlying(eye)];
   }
 
   [[nodiscard]] const glm::mat4& projectionViewMatrix(Z3DEye eye) const
   {
-    return m_projectionViewMatrices[to_underlying(eye)];
+    return m_projectionViewMatrices[std::to_underlying(eye)];
   }
 
   // dist from eye to center

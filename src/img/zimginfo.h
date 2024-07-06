@@ -89,7 +89,7 @@ struct ZImgInfo
   // access
   void setSize(Dimension dim, size_t size)
   {
-    switch (to_underlying(dim)) {
+    switch (std::to_underlying(dim)) {
       case 0:
         width = size;
         break;
@@ -116,7 +116,7 @@ struct ZImgInfo
 
   [[nodiscard]] size_t size(Dimension dim) const
   {
-    switch (to_underlying(dim)) {
+    switch (std::to_underlying(dim)) {
       case 0:
         return width;
       case 1:
@@ -154,7 +154,7 @@ struct ZImgInfo
   [[nodiscard]] size_t stride(Dimension dim) const
   {
     size_t res = 1;
-    auto ddim = to_underlying(dim);
+    auto ddim = std::to_underlying(dim);
     if (ddim > 0) {
       res = width;
     }
@@ -226,7 +226,7 @@ struct ZImgInfo
 
   size_t& operator[](Dimension i)
   {
-    switch (to_underlying(i)) {
+    switch (std::to_underlying(i)) {
       case 0:
         return width;
       case 1:
@@ -244,7 +244,7 @@ struct ZImgInfo
 
   const size_t& operator[](Dimension i) const
   {
-    switch (to_underlying(i)) {
+    switch (std::to_underlying(i)) {
       case 0:
         return width;
       case 1:

@@ -195,7 +195,7 @@ void Z3DCompositor::invalidate(State inv)
   if (is_flag_set(m_state, inv)) {
     return;
   }
-  // LOG(INFO) << to_underlying(m_state) << " " << to_underlying(inv);
+  // LOG(INFO) << std::to_underlying(m_state) << " " << to_underlying(inv);
   set_flag(m_state, inv);
 
   Q_EMIT sceneParaUpdated();
