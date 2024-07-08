@@ -868,6 +868,7 @@ def build_grpc(src_dir: str, install_dir: str, nasm_dir: str):
         cmakecmd.extend(['-DABSL_USE_EXTERNAL_GOOGLETEST:BOOL=ON',
                          '-DABSL_BUILD_TESTING:BOOL=OFF',
                          '-DBUILD_TESTING:BOOL=OFF',
+                         '-DABSL_BUILD_TEST_HELPERS:BOOL=OFF',
                          '-DCMAKE_POSITION_INDEPENDENT_CODE=TRUE', ])
 
         cmakecmd.extend([sub_src_dir])
