@@ -98,9 +98,6 @@
 	path = src/3rdparty/bzip2
 	url = https://gitlab.com/federicomenaquintero/bzip2.git
 	branch = master
-[submodule "src/3rdparty/magic_enum"]
-	path = src/3rdparty/magic_enum
-	url = https://github.com/Neargye/magic_enum.git
 [submodule "src/3rdparty/ceres-solver"]
 	path = src/3rdparty/ceres-solver
 	url = https://github.com/ceres-solver/ceres-solver.git
