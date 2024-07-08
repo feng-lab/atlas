@@ -39,7 +39,7 @@ ZChromaticShiftCorrectionDialog::ZChromaticShiftCorrectionDialog(QWidget* parent
   logUsageInfo();
 }
 
-void ZChromaticShiftCorrectionDialog::createWorker(nim::ZImgProcess*& worker, QString& workerName)
+void ZChromaticShiftCorrectionDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 {
   focusNextChild();
 

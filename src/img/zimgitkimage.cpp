@@ -515,7 +515,7 @@ void ZImgITKImage::parseInfo(const itk::ImageIOBase* imageIO, ZImgInfo& info, bo
   }
 }
 
-void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, nim::ZImgMetadata& meta)
+void ZImgITKImage::parseMetadata(const itk::ImageIOBase* imageIO, ZImgMetadata& meta)
 {
   using DictionaryType = itk::MetaDataDictionary;
   const DictionaryType& dictionary = imageIO->GetMetaDataDictionary();

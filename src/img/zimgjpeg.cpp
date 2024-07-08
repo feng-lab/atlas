@@ -69,7 +69,7 @@ void my_error_exit(j_common_ptr cinfo)
 
   /* Create the message */
   (cinfo->err->format_message)(cinfo, errbuffer);
-  throw nim::ZIOException(QString("Libjpeg-turbo error: %1").arg(errbuffer));
+  throw ZIOException(QString("Libjpeg-turbo error: %1").arg(errbuffer));
 }
 
 void createcinfo(jpeg_decompress_struct& cinfo, my_error_mgr& jerr)

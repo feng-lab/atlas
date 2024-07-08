@@ -7,7 +7,7 @@
 
 namespace nim {
 
-Z3DVolume::Z3DVolume(nim::ZImg& img,
+Z3DVolume::Z3DVolume(ZImg& img,
                      const glm::vec3& spacing,
                      const glm::vec3& offset,
                      const glm::mat4& transformation,

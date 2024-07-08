@@ -433,7 +433,7 @@ private:
   void computeHistogramMaxValue();
 
 protected:
-  nim::ZImg m_img;
+  ZImg m_img;
   glm::uvec3 m_dimensions;
   glm::uvec3 m_parentVolumeDimensions;
   glm::vec3 m_parentVolumeOffset;

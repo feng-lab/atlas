@@ -804,7 +804,7 @@ void ZROIFilter::pasteKeyPressed(int slice, QPointF point, bool hFlip, bool vFli
 
 void ZROIFilter::pasteKeyPressed(int slice,
                                  QPointF point,
-                                 const nim::ZBBox<glm::ivec4>& srcBoundBox,
+                                 const ZBBox<glm::ivec4>& srcBoundBox,
                                  bool hFlip,
                                  bool vFlip)
 {

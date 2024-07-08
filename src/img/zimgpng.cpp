@@ -19,7 +19,7 @@ struct PngPack
 
 void pngReadErrorFunction(png_structp, const char* message)
 {
-  throw nim::ZIOException(QString("Libpng error: %1").arg(message));
+  throw ZIOException(QString("Libpng error: %1").arg(message));
 }
 
 void pngReadWarningFunction(png_structp, const char* message)
@@ -80,7 +80,7 @@ void readInfoFromBuf(png_const_structrp pngPtr, png_const_inforp infoPtr, ZImgIn
   info.depth = 1;
   auto bitDepth = png_get_bit_depth(pngPtr, infoPtr);
   if (bitDepth != 16 && bitDepth != 8 && bitDepth != 4 && bitDepth != 2 && bitDepth != 1) {
-    throw nim::ZIOException(QString("invalid bit depth").arg(bitDepth));
+    throw ZIOException(QString("invalid bit depth").arg(bitDepth));
   }
   png_byte colorType = png_get_color_type(pngPtr, infoPtr);
   switch (colorType) {

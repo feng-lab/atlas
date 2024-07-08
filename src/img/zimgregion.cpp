@@ -4,7 +4,7 @@
 
 namespace nim {
 
-bool ZImgRegion::containsCoord(const nim::ZVoxelCoordinate& coord, const nim::ZImgInfo& info) const
+bool ZImgRegion::containsCoord(const ZVoxelCoordinate& coord, const ZImgInfo& info) const
 {
   ZImgRegion rgn = *this;
   rgn.resolveRegionEnd(info);

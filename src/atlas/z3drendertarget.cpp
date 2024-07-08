@@ -392,7 +392,7 @@ void Z3DRenderTarget::saveAsColorImage(const QString& filename)
     img.wrapData(colorBuffer.data(), m_size.x, m_size.y, 1, 4);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg, true);
-    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.flip(Dimension::Y);
     tmpImg.infoRef().lastChannelIsAlphaChannel = true;
     tmpImg.save(filename);
   }
@@ -416,7 +416,7 @@ void Z3DRenderTarget::saveAsDepthImage(const QString& filename)
     glReadPixels(0, 0, m_size.x, m_size.y, dataFormat, dataType, depthBuffer.data());
     ZImg img;
     img.wrapData(depthBuffer.data(), m_size.x, m_size.y, 1);
-    img.flip(nim::Dimension::Y);
+    img.flip(Dimension::Y);
     img.save(filename);
   }
   catch (ZException const& e) {

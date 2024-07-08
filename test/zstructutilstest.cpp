@@ -11,7 +11,7 @@ enum class E : int16_t
 
 std::ostream& operator<<(std::ostream& os, const E& e)
 {
-  return os << nim::to_underlying(e);
+  return os << std::to_underlying(e);
 }
 
 template<>

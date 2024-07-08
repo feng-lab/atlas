@@ -250,7 +250,7 @@ uint8_t ZImgAutoThreshold<ReportProgress>::u8TriangleThre(const QString& filenam
                                                           size_t c,
                                                           size_t t,
                                                           size_t scene,
-                                                          const std::vector<nim::ZVoxelCoordinate>& mask)
+                                                          const std::vector<ZVoxelCoordinate>& mask)
 {
   std::vector<ZImgInfo> infos = ZImg::readImgInfos(filename);
   if (scene >= infos.size()) {

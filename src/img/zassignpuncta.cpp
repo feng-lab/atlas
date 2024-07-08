@@ -40,7 +40,7 @@ ZAssignPuncta::ZAssignPuncta(QString filename,
 }
 
 ZAssignPuncta::ZAssignPuncta(QString filename,
-                             const nim::ZImgInfo& imgInfo,
+                             const ZImgInfo& imgInfo,
                              double minValue,
                              double maxValue,
                              size_t dendriteChannel,

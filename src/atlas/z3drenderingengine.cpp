@@ -1185,7 +1185,7 @@ void Z3DRenderingEngine::takeFixedSizeScreenShotWithoutResetCanvasSizeByTilePriv
                                                                                     const QString& rightFilename,
                                                                                     int width,
                                                                                     int height,
-                                                                                    nim::Z3DScreenShotType sst,
+                                                                                    Z3DScreenShotType sst,
                                                                                     int tileSize,
                                                                                     int tileBorder,
                                                                                     int tileStartX,

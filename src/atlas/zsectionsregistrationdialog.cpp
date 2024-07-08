@@ -36,7 +36,7 @@ ZSectionsRegistrationDialog::ZSectionsRegistrationDialog(QWidget* parent)
   init();
 }
 
-void ZSectionsRegistrationDialog::createWorker(nim::ZImgProcess*& worker, QString& workerName)
+void ZSectionsRegistrationDialog::createWorker(ZImgProcess*& worker, QString& workerName)
 {
   focusNextChild();
 

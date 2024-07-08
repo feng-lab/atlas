@@ -271,7 +271,7 @@ QString Z3DImgRaycasterRenderer::generateHeader()
   return headerSource;
 }
 
-double Z3DImgRaycasterRenderer::renderProgressively(nim::Z3DEye eye)
+double Z3DImgRaycasterRenderer::renderProgressively(Z3DEye eye)
 {
   double progress = 1;
 
@@ -903,7 +903,7 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
             img.wrapData(m_blockIDs.data(), missingBlockIDsTexture->width(), missingBlockIDsTexture->height(), 1, 4);
             ZImg outImg = img;
             ZImgFormat::CXYZtoXYZC(img, outImg);
-            outImg.flip(nim::Dimension::Y);
+            outImg.flip(Dimension::Y);
             outImg.save("/Users/feng/Downloads/test_missid.tif");
           }
 #endif

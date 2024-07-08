@@ -1389,7 +1389,7 @@ ZImg ZPunctaDetection::cropZImg(const Eigen::MatrixXi& voxelLocations,
                                 const Eigen::RowVectorXi& minLoc,
                                 const Eigen::RowVectorXi& size)
 {
-  ZImg res(nim::ZImgInfo(size(0), size(1), size(2)));
+  ZImg res(ZImgInfo(size(0), size(1), size(2)));
   size_t numZeros = 0;
   auto minCoord = ZVoxelCoordinate(minLoc(0), minLoc(1), minLoc(2), c, t);
   for (Eigen::Index i = 0; i < voxelLocations.rows(); ++i) {

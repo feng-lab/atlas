@@ -103,7 +103,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
 }
 
 size_t buildConnectionFromGrid(const ZImg& grid,
-                               std::map<std::pair<size_t, size_t>, nim::ZImgNCCMatch::PositionHint>& connRes)
+                               std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint>& connRes)
 {
   size_t nStacks = 0;
 
@@ -120,7 +120,7 @@ size_t buildConnectionFromGrid(const ZImg& grid,
     }
   }
 
-  std::map<std::pair<size_t, size_t>, nim::ZImgNCCMatch::PositionHint> conn;
+  std::map<std::pair<size_t, size_t>, ZImgNCCMatch::PositionHint> conn;
   std::map<std::pair<size_t, size_t>, int> connDist;
   for (size_t z = 0; z < grid.depth(); ++z) {
     for (size_t y = 0; y < grid.height(); ++y) {

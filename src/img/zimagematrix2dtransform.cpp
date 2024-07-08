@@ -113,7 +113,7 @@ bool ZImageMatrix2DTransform::canMergeWith(const ZImageTransform* tfm) const
   return m2dtfm != nullptr;
 }
 
-void ZImageMatrix2DTransform::mergeWith(const nim::ZImageTransform* tfm)
+void ZImageMatrix2DTransform::mergeWith(const ZImageTransform* tfm)
 {
   CHECK(tfm);
   auto m2dtfm = dynamic_cast<const ZImageMatrix2DTransform*>(tfm);

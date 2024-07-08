@@ -1138,7 +1138,7 @@ bool Z3DImgFilter::onlyBoundBox() const
   return !hasImage() && !m_boundBoxMode.isSelected("No Bound Box");
 }
 
-void Z3DImgFilter::renderOnlyBoundBox(nim::Z3DEye eye)
+void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
 {
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

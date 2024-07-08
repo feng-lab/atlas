@@ -413,7 +413,7 @@ void Z3DTexture::saveAsColorImage(const QString& filename) const
     img.wrapData(colorBuffer.data(), width(), height(), depth(), 4);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg, true);
-    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.flip(Dimension::Y);
     tmpImg.infoRef().lastChannelIsAlphaChannel = true;
     tmpImg.save(filename);
   }
@@ -431,7 +431,7 @@ void Z3DTexture::saveAsDepthImage(const QString& filename) const
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
     ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), 1);
-    img.flip(nim::Dimension::Y);
+    img.flip(Dimension::Y);
     img.save(filename);
   }
   catch (ZException const& e) {
@@ -450,7 +450,7 @@ void Z3DTexture::saveAsRGBFloatImage(const QString& filename) const
     img.wrapData(depthBuffer.data(), width(), height(), depth(), 3);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg);
-    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.flip(Dimension::Y);
     tmpImg.save(filename);
   }
   catch (ZException const& e) {
@@ -465,11 +465,11 @@ void Z3DTexture::saveAsRGBAFloatImage(const QString& filename) const
     GLenum dataType = GL_FLOAT;
     std::vector<float, boost::alignment::aligned_allocator<float, 64>> depthBuffer(numPixels() * 4);
     downloadTextureToBuffer(dataFormat, dataType, depthBuffer.data());
-    nim::ZImg img;
+    ZImg img;
     img.wrapData(depthBuffer.data(), width(), height(), depth(), 4);
     ZImg tmpImg(img.info());
     ZImgFormat::CXYZtoXYZC(img, tmpImg);
-    tmpImg.flip(nim::Dimension::Y);
+    tmpImg.flip(Dimension::Y);
     tmpImg.save(filename);
   }
   catch (ZException const& e) {
