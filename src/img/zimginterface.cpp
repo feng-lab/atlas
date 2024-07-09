@@ -73,90 +73,25 @@ std::string_view enumToString(TEnum e)
   return res;
 }
 
-template<class E>
-  requires(std::is_enum_v<E>)
-constexpr auto enumNameValue = []() {
-  constexpr auto enumCases = reflect::detail::enum_cases<E, reflect::enum_min(E{}), reflect::enum_max(E{})>;
-  reflect::detail::static_vector<std::tuple<std::string_view, E>, enumCases.size_> nameValue{};
-  for (size_t i = 0; i < enumCases.size_; ++i) {
-    nameValue.push_back(
-      std::make_tuple(reflect::enum_name(static_cast<E>(enumCases[i])), static_cast<E>(enumCases[i])));
-  }
-  return nameValue;
-}();
-
 template<typename TEnum>
 TEnum stringToEnum(std::string_view s)
 {
   static_assert(std::is_enum_v<std::remove_cvref_t<TEnum>>, "Need Enum Type");
-  static constexpr auto enumNameValues = enumNameValue<TEnum>;
-  for (size_t i = 0; i < enumNameValues.size_; ++i) {
-    if (s == std::get<0>(enumNameValues[i])) {
-      return std::get<1>(enumNameValues[i]);
+  static constexpr auto enumerators =
+    reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
+  for (size_t i = 0; i < enumerators.size(); ++i) {
+    if (s == enumerators[i].second) {
+      return static_cast<TEnum>(enumerators[i].first);
     }
   }
   throw ZIOException(fmt::format("invalid enum string: {}", s));
-}
-
-template<>
-std::string_view enumToString<Compression>(Compression e)
-{
-  static const std::unordered_map<Compression, std::string_view> compressionToStringMap = {
-    {Compression::AUTO,          "AUTO"         },
-    {Compression::NONE,          "NONE"         },
-    {Compression::LZW,           "LZW"          },
-    {Compression::JPEG,          "JPEG"         },
-    {Compression::T85,           "T85"          },
-    {Compression::T43,           "T43"          },
-    {Compression::PACKBITS,      "PACKBITS"     },
-    {Compression::DEFLATE,       "DEFLATE"      },
-    {Compression::ADOBE_DEFLATE, "ADOBE_DEFLATE"},
-    {Compression::DCS,           "DCS"          },
-    {Compression::JP2000,        "JP2000"       },
-    {Compression::LZMA,          "LZMA"         },
-    {Compression::ZSTD,          "ZSTD"         },
-    {Compression::WEBP,          "WEBP"         },
-    {Compression::JPEGXR,        "JPEGXR"       }
-  };
-
-  auto it = compressionToStringMap.find(e);
-  if (it != compressionToStringMap.end()) {
-    return it->second;
-  }
-  throw ZIOException(fmt::format("invalid Compression: {}", std::to_underlying(e)));
-}
-
-template<>
-Compression stringToEnum<Compression>(std::string_view s)
-{
-  static const std::unordered_map<std::string_view, Compression> stringToCompressionMap = {
-    {"AUTO",          Compression::AUTO         },
-    {"NONE",          Compression::NONE         },
-    {"LZW",           Compression::LZW          },
-    {"JPEG",          Compression::JPEG         },
-    {"T85",           Compression::T85          },
-    {"T43",           Compression::T43          },
-    {"PACKBITS",      Compression::PACKBITS     },
-    {"DEFLATE",       Compression::DEFLATE      },
-    {"ADOBE_DEFLATE", Compression::ADOBE_DEFLATE},
-    {"DCS",           Compression::DCS          },
-    {"JP2000",        Compression::JP2000       },
-    {"LZMA",          Compression::LZMA         },
-    {"ZSTD",          Compression::ZSTD         },
-    {"WEBP",          Compression::WEBP         },
-    {"JPEGXR",        Compression::JPEGXR       },
-  };
-  auto it = stringToCompressionMap.find(s);
-  if (it != stringToCompressionMap.end()) {
-    return it->second;
-  }
-  throw ZIOException(fmt::format("invalid Compression string: {}", s));
 }
 
 template std::string_view enumToString<DataType>(DataType);
 template std::string_view enumToString<VoxelFormat>(VoxelFormat);
 template std::string_view enumToString<VoxelSizeUnit>(VoxelSizeUnit);
 template std::string_view enumToString<FileFormat>(FileFormat);
+template std::string_view enumToString<Compression>(Compression);
 template std::string_view enumToString<PadOption>(PadOption);
 template std::string_view enumToString<Interpolant>(Interpolant);
 template std::string_view enumToString<Dimension>(Dimension);
@@ -166,6 +101,7 @@ template DataType stringToEnum<DataType>(std::string_view);
 template VoxelFormat stringToEnum<VoxelFormat>(std::string_view);
 template VoxelSizeUnit stringToEnum<VoxelSizeUnit>(std::string_view);
 template FileFormat stringToEnum<FileFormat>(std::string_view);
+template Compression stringToEnum<Compression>(std::string_view);
 template PadOption stringToEnum<PadOption>(std::string_view);
 template Interpolant stringToEnum<Interpolant>(std::string_view);
 template Dimension stringToEnum<Dimension>(std::string_view);

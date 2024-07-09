@@ -12,6 +12,8 @@ class ZImg;
 
 struct ZImgInfo;
 
+uint16_t getTiffCompressionTag(Compression comp);
+
 class ZTiffIFD
 {
 public:
@@ -277,7 +279,7 @@ public:
                               size_t height,
                               size_t bitsPerSample,
                               size_t samplesPerPixel,
-                              size_t compression,
+                              Compression compression,
                               uint64_t stripOffset,
                               uint64_t stripByteCount);
 

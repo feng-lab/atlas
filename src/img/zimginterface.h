@@ -300,27 +300,20 @@ enum class FileFormat
 enum class Compression : std::uint16_t
 {
   AUTO = 0, // choose based on image type
-  NONE = 1, /* dump mode */
-  LZW = 5, /* Lempel-Ziv  & Welch */
-  JPEG = 7,
-  /* %JPEG DCT compression */ // lossy [default for YCBCR]
-  T85 = 9, /* !TIFF/FX T.85 JBIG compression */
-  T43 = 10, /* !TIFF/FX T.43 colour by layered JBIG compression */
-  PACKBITS = 32773,
-  /* Macintosh RLE */ // [default for MAP]
-
-  DEFLATE = 32946,
-  /* Deflate compression */ // zip
-  ADOBE_DEFLATE = 8, /* Deflate compression,
-         as recognized by Adobe */
-  /* compression code 32947 is reserved for Oceana Matrix <dev@oceana.com> */
-  DCS = 32947, /* Kodak DCS encoding */
-  JP2000 = 34712, /* Leadtools JPEG2000 */
-  /* compression codes 34887-34889 are reserved for ESRI */
-  LZMA = 34925, /* LZMA2 */
-  ZSTD = 50000, /* ZSTD: WARNING not registered in Adobe-maintained registry */
-  WEBP = 50001, /* WEBP: WARNING not registered in Adobe-maintained registry */
-  JPEGXR = 60000,
+  NONE, /* dump mode */
+  LZW, /* Lempel-Ziv  & Welch */
+  JPEG, /* %JPEG DCT compression */
+  T85, /* !TIFF/FX T.85 JBIG compression */
+  T43, /* !TIFF/FX T.43 colour by layered JBIG compression */
+  PACKBITS, /* Macintosh RLE */
+  DEFLATE, /* Deflate compression, legacy tag */
+  ADOBE_DEFLATE, /* Deflate compression, as recognized by Adobe */
+  DCS, /* Kodak DCS encoding */
+  JP2000, /* Leadtools JPEG2000 */
+  LZMA, /* LZMA2 */
+  ZSTD, /* ZSTD: WARNING not registered in Adobe-maintained registry */
+  WEBP, /* WEBP: WARNING not registered in Adobe-maintained registry */
+  JPEGXR,
 };
 
 enum class PadOption

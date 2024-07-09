@@ -334,6 +334,31 @@ constexpr uint8_t bitmasks4[] = {0xF0, 0x0F};
 
 namespace nim {
 
+uint16_t getTiffCompressionTag(Compression comp)
+{
+  static const std::unordered_map<Compression, std::uint16_t> compressionToTiffCompressionMap = {
+    {Compression::NONE,          COMPRESSION_NONE         },
+    {Compression::LZW,           COMPRESSION_LZW          },
+    {Compression::JPEG,          COMPRESSION_JPEG         },
+    {Compression::T85,           COMPRESSION_T85          },
+    {Compression::T43,           COMPRESSION_T43          },
+    {Compression::PACKBITS,      COMPRESSION_PACKBITS     },
+    {Compression::DEFLATE,       COMPRESSION_DEFLATE      },
+    {Compression::ADOBE_DEFLATE, COMPRESSION_ADOBE_DEFLATE},
+    {Compression::DCS,           COMPRESSION_DCS          },
+    {Compression::JP2000,        COMPRESSION_JP2000       },
+    {Compression::LZMA,          COMPRESSION_LZMA         },
+    {Compression::ZSTD,          COMPRESSION_ZSTD         },
+    {Compression::WEBP,          COMPRESSION_WEBP         },
+  };
+
+  auto it = compressionToTiffCompressionMap.find(comp);
+  if (it != compressionToTiffCompressionMap.end()) {
+    return it->second;
+  }
+  throw ZIOException(fmt::format("invalid Compression for Tiff: {}", std::to_underlying(comp)));
+}
+
 bool ZTiffIFD::isReducedResolutionImage() const
 {
   return subfileTypeData() & FILETYPE_REDUCEDIMAGE;
@@ -1016,7 +1041,7 @@ void ZTiff::writeTiffHeader(uint8_t* mem,
                             size_t height,
                             size_t bitsPerSample,
                             size_t samplesPerPixel,
-                            size_t compression,
+                            Compression compression,
                             uint64_t stripOffset,
                             uint64_t stripByteCount)
 {
@@ -1026,7 +1051,7 @@ void ZTiff::writeTiffHeader(uint8_t* mem,
   header.height = height;
   header.bitPerSample = bitsPerSample;
   header.samplesPerPixel = samplesPerPixel;
-  header.compression = compression;
+  header.compression = getTiffCompressionTag(compression);
   header.stripOffset = stripOffset;
   header.stripByteCount = stripByteCount;
   compactStructToMemory(mem, memSize, header);
@@ -1837,8 +1862,9 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
     comp = defaultCompression(nullptr);
   } else {
     if (!checkCompression(nullptr, comp)) {
-      LOG(WARNING) << QString("Compression %1 is not supported or not applicable, switch to default compression.")
-                        .arg(std::to_underlying(comp));
+      LOG(WARNING) << fmt::format(
+        "Compression {} is not supported or not applicable, switching to default compression.",
+        enumToString(comp));
       comp = defaultCompression(nullptr);
     }
   }
@@ -1897,7 +1923,7 @@ void ZTiffWriter::writeIFD(const ZImg& img,
   }
   TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, planarconfigSeparate ? PLANARCONFIG_SEPARATE : PLANARCONFIG_CONTIG);
   TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
-  TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, m_compression);
+  TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, getTiffCompressionTag(m_compression));
   if (m_compression != Compression::NONE) {
     if (img.voxelFormat() == VoxelFormat::Float) {
       TIFFSetField(m_tif.get(), TIFFTAG_PREDICTOR, PREDICTOR_FLOATINGPOINT);
@@ -1946,7 +1972,7 @@ void ZTiffWriter::writeIFD(const ZImg& img,
     TIFFSetField(m_tif.get(), TIFFTAG_IMAGELENGTH, thumbnail.height());
     TIFFSetField(m_tif.get(), TIFFTAG_BITSPERSAMPLE, thumbnail.voxelByteNumber() * 8);
     TIFFSetField(m_tif.get(), TIFFTAG_SAMPLESPERPIXEL, thumbnail.numChannels());
-    TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, m_compression);
+    TIFFSetField(m_tif.get(), TIFFTAG_COMPRESSION, getTiffCompressionTag(m_compression));
     TIFFSetField(m_tif.get(), TIFFTAG_PHOTOMETRIC, photo);
     TIFFSetField(m_tif.get(), TIFFTAG_PLANARCONFIG, PLANARCONFIG_SEPARATE);
     TIFFSetField(m_tif.get(), TIFFTAG_ROWSPERSTRIP, thumbnail.height());
@@ -1978,7 +2004,7 @@ bool ZTiffWriter::checkCompression(const ZImg*, Compression comp)
     return true;
   }
   // check exist first
-  if (TIFFIsCODECConfigured(std::to_underlying(comp)) != 1) {
+  if (TIFFIsCODECConfigured(getTiffCompressionTag(comp)) != 1) {
     return false;
   }
   //  if (comp == Compression::CCITTFAX3 ||

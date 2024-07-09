@@ -250,7 +250,7 @@ ZImg readCZITile(std::ifstream& inputFileStream, const CZITile& tile)
                                info.height * info.depth * info.numTimes * info.numChannels,
                                info.bytesPerVoxel * 8,
                                1,
-                               5,
+                               Compression::LZW,
                                192,
                                sb.dataSize);
 

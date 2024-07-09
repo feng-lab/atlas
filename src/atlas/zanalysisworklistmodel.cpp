@@ -131,7 +131,7 @@ QString ZAnalysisWorklistModel::toCSV(const QString& filename,
     vd.addRow(m_header);
   }
   for (size_t row = 0; row < static_cast<size_t>(rowCount()); ++row) {
-    std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(row);
+    auto it = m_rowToInput.find(row);
     if (it != m_rowToInput.end()) {
       const ZAnalysisTextFileInput* input = it->second;
       QList<QVariant> values;
@@ -153,7 +153,7 @@ QString ZAnalysisWorklistModel::toCSV(const QString& filename,
                             encoding)) {
     return QString("Can not write csv to file (%1).").arg(filename);
   }
-  return QString();
+  return {};
 }
 
 int ZAnalysisWorklistModel::rowCount(const QModelIndex& parent) const
@@ -175,14 +175,14 @@ int ZAnalysisWorklistModel::columnCount(const QModelIndex& parent) const
 QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
 {
   if (index.parent() != QModelIndex()) {
-    return QVariant();
+    return {};
   }
   if (role == Qt::DisplayRole || role == Qt::EditRole || role == Qt::UserRole) {
     if (index.row() < 0 || index.column() < 0 || !m_rowToInput.contains(index.row()) ||
         index.column() >= columnCount()) {
-      return QVariant();
+      return {};
     }
-    std::map<size_t, ZAnalysisTextFileInput*>::const_iterator it = m_rowToInput.find(index.row());
+    auto it = m_rowToInput.find(index.row());
     const ZAnalysisTextFileInput* input = it->second;
     switch (index.column()) {
       case 0:
@@ -217,7 +217,7 @@ QVariant ZAnalysisWorklistModel::data(const QModelIndex& index, int role) const
         break;
     }
   }
-  return QVariant();
+  return {};
 }
 
 bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& data, int role)
@@ -232,7 +232,7 @@ bool ZAnalysisWorklistModel::setData(const QModelIndex& index, const QVariant& d
     }
     ZAnalysisTextFileInput* input;
     if (!m_rowToInput.contains(index.row())) {
-      m_inputs.push_back(ZAnalysisTextFileInput());
+      m_inputs.emplace_back();
       input = &m_inputs.back();
       m_rowToInput[index.row()] = input;
     } else {
