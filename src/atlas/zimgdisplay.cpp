@@ -207,16 +207,16 @@ void ZImgDisplay::setQImageDataCM(const ZImg& img, QImage& qim) const
     channels[idx] = ch;
     colormaps[idx].setRange(minimum, maximum);
     if (imgInfo().isAlphaChannel(ch)) {
-      double da;
-      TVoxel v = minimum;
-      for (; v < maximum; ++v) {
-        da = (v - minValue) / (maxValue - minValue);
-        da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
-        colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
+      for (auto v = minimum; v <= maximum; ++v) {
+        double da = (v - minValue) / (maxValue - minValue);
+        da = std::clamp(da, 0.0, 1.0);
+        auto value = static_cast<uint8_t>(m_alpha * da * 255 + 0.5);
+        colormaps[idx].color(v) = col4{value, value, value, value};
+        // Check if the next increment would cause an overflow
+        if (v == maximum) {
+          break; // Stop the loop if 'v' has reached 'maximum' to prevent incrementing beyond
+        }
       }
-      da = (v - minValue) / (maxValue - minValue);
-      da = da < 0.0 ? 0.0 : da > 1.0 ? 1.0 : da;
-      colormaps[idx].color(v) = col4(static_cast<uint8_t>(m_alpha * da * 255 + 0.5));
     } else {
       col4 maxCol(m_channelColors.at(ch));
       if (alphaChannelIdx < 0) { // no alpha channel, encode global alpha into colormap

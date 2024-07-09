@@ -170,7 +170,9 @@ void ZPunctaIO::readNimpFile(const QString& filename, ZPuncta& puncta)
       p.setVolSize(punctaInfo[6]);
       p.setMass(punctaInfo[7]);
       p.setRadius(punctaInfo[8]);
-      p.setColor(col4(punctaInfo[9], punctaInfo[10], punctaInfo[11]));
+      p.setColor(col4{static_cast<col4::value_type>(punctaInfo[9]),
+                      static_cast<col4::value_type>(punctaInfo[10]),
+                      static_cast<col4::value_type>(punctaInfo[11])});
       p.setScore(punctaInfo[12]);
 
       if (H5Lexists(punctumGrp.getId(), "VoxelIntensities", H5P_DEFAULT) > 0 &&
@@ -380,10 +382,12 @@ void ZPunctaIO::readV3DApoFile(const QString& file, ZPuncta& puncta)
       if (fieldList.size() >= 18) {
         bool ok1, ok2;
 
-        punctum.setColor(col4(fieldList[15].toInt(&ok), fieldList[16].toInt(&ok1), fieldList[17].toInt(&ok2)));
+        punctum.setColor(col4{static_cast<col4::value_type>(fieldList[15].toInt(&ok)),
+                              static_cast<col4::value_type>(fieldList[16].toInt(&ok1)),
+                              static_cast<col4::value_type>(fieldList[17].toInt(&ok2))});
         if (!ok || !ok1 || !ok2) {
           if (fieldList[15].isEmpty() && fieldList[16].isEmpty() && fieldList[17].isEmpty()) {
-            punctum.setColor(col4(0, 0, 0));
+            punctum.setColor(col4{0, 0, 0});
           } else {
             throw ZIOException(QString("Wrong Vaa3d Apo format: %1.").arg(line));
           }
@@ -495,10 +499,12 @@ void ZPunctaIO::readV3DMarkerFile(const QString& file, ZPuncta& puncta)
 
       bool ok1, ok2;
 
-      punctum.setColor(col4(fieldList[7].toInt(&ok), fieldList[8].toInt(&ok1), fieldList[9].toInt(&ok2)));
+      punctum.setColor(col4{static_cast<col4::value_type>(fieldList[7].toInt(&ok)),
+                            static_cast<col4::value_type>(fieldList[8].toInt(&ok1)),
+                            static_cast<col4::value_type>(fieldList[9].toInt(&ok2))});
       if (!ok || !ok1 || !ok2) {
         if (fieldList[7].isEmpty() && fieldList[8].isEmpty() && fieldList[9].isEmpty()) {
-          punctum.setColor(col4(0, 0, 0));
+          punctum.setColor(col4{0, 0, 0});
         } else {
           throw ZIOException(QString("Wrong Vaa3d Marker format: %1.").arg(line));
         }

@@ -104,45 +104,7 @@ struct col4
 {
   using value_type = uint8_t;
 
-  value_type r, g, b, a;
-
-  col4()
-    : r(0)
-    , g(0)
-    , b(0)
-    , a(255)
-  {}
-
-  template<typename A>
-  explicit col4(A v)
-    : r(v)
-    , g(v)
-    , b(v)
-    , a(v)
-  {}
-
-  col4(std::initializer_list<value_type> il)
-  {
-    r = il.begin()[0];
-    g = il.begin()[1];
-    b = il.begin()[2];
-    a = il.begin()[3];
-  }
-
-  col4(uint8_t r_, uint8_t g_, uint8_t b_, uint8_t a_ = 255_u8)
-    : r(r_)
-    , g(g_)
-    , b(b_)
-    , a(a_)
-  {}
-
-  template<typename A, typename B, typename C, typename D>
-  col4(A r_, B g_, C b_, D a_ = D(255))
-    : r(r_)
-    , g(g_)
-    , b(b_)
-    , a(a_)
-  {}
+  value_type r, g, b, a = 255_u8;
 
   bool operator==(const col4& c) const
   {
@@ -257,20 +219,10 @@ struct col4
   }
 };
 
+static_assert(sizeof(col4) == sizeof(col4::value_type) * 4, "col4 is not compact");
+
 struct Location
 {
-  Location()
-    : x(0)
-    , y(0)
-    , z(0)
-  {}
-
-  Location(double x_, double y_, double z_)
-    : x(x_)
-    , y(y_)
-    , z(z_)
-  {}
-
   bool operator==(const Location& l) const
   {
     return (x == l.x && y == l.y && z == l.z);
@@ -278,6 +230,8 @@ struct Location
 
   double x, y, z;
 };
+
+static_assert(sizeof(Location) == sizeof(double) * 3, "Location is not compact");
 
 enum class FileFormat
 {

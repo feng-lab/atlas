@@ -116,27 +116,28 @@ void ZImgInfo::createDefaultChannelColors()
     for (size_t i = 0; i < numChannels; ++i) {
       if (i == 0) {
         if (numChannels == 1 || (numChannels == 2 && lastChannelIsAlphaChannel)) {
-          channelColors[i] = col4(255, 255, 255);
+          channelColors[i] = col4{255, 255, 255};
         } else {
-          channelColors[i] = col4(255, 0, 0);
+          channelColors[i] = col4{255, 0, 0};
         }
       } else if (i == 1) {
-        channelColors[i] = col4(0, 255, 0);
+        channelColors[i] = col4{0, 255, 0};
       } else if (i == 2) {
-        channelColors[i] = col4(0, 0, 255);
+        channelColors[i] = col4{0, 0, 255};
       } else if (i == 3) {
-        channelColors[i] = col4(255, 255, 0);
+        channelColors[i] = col4{255, 255, 0};
       } else if (i == 4) {
-        channelColors[i] = col4(255, 0, 255);
+        channelColors[i] = col4{255, 0, 255};
       } else if (i == 5) {
-        channelColors[i] = col4(0, 255, 255);
+        channelColors[i] = col4{0, 255, 255};
       } else {
-        channelColors[i] =
-          col4(ZRandom::instance().randInt(255), ZRandom::instance().randInt(255), ZRandom::instance().randInt(255));
+        channelColors[i] = col4{static_cast<col4::value_type>(ZRandom::instance().randInt(255)),
+                                static_cast<col4::value_type>(ZRandom::instance().randInt(255)),
+                                static_cast<col4::value_type>(ZRandom::instance().randInt(255))};
       }
     }
     if (lastChannelIsAlphaChannel && numChannels > 0) {
-      channelColors[numChannels - 1] = col4(0, 0, 0);
+      channelColors[numChannels - 1] = col4{0, 0, 0};
     }
   }
 }

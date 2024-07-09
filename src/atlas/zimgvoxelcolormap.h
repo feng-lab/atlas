@@ -39,14 +39,14 @@ col4 scaleDownColorRGB(const col4& c, Real scale)
 {
   col4 res;
   if (scale <= Real(0)) {
-    res = col4(0, 0, 0, c.a);
+    res = col4{0, 0, 0, c.a};
   } else if (scale >= Real(1)) {
     res = c;
   } else {
-    res = col4(static_cast<uint8_t>(scale * c.r + Real(0.5)),
+    res = col4{static_cast<uint8_t>(scale * c.r + Real(0.5)),
                static_cast<uint8_t>(scale * c.g + Real(0.5)),
                static_cast<uint8_t>(scale * c.b + Real(0.5)),
-               c.a);
+               c.a};
   }
   return res;
 }

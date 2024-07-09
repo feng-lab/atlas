@@ -26,7 +26,7 @@
 #include "z3dmeshview.h"
 #include "z3dpunctaview.h"
 #include "z3dswcview.h"
-//#include "zstructutils.h"
+// #include "zstructutils.h"
 #include <qtcsv/reader.h>
 #include <itkMath.h>
 #include <QDir>
@@ -247,12 +247,12 @@ void convertRawToNim()
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
     if (fileInfo.baseName().startsWith("Py")) {
-      img.infoRef().channelColors[0] = col4(0, 255, 0);
-      img.infoRef().channelColors[1] = col4(255, 0, 0);
+      img.infoRef().channelColors[0] = col4{0, 255, 0};
+      img.infoRef().channelColors[1] = col4{255, 0, 0};
     } else if (fileInfo.baseName().startsWith("PV")) {
-      img.infoRef().channelColors[0] = col4(0, 0, 255);
-      img.infoRef().channelColors[1] = col4(0, 255, 0);
-      img.infoRef().channelColors[2] = col4(255, 0, 0);
+      img.infoRef().channelColors[0] = col4{0, 0, 255};
+      img.infoRef().channelColors[1] = col4{0, 255, 0};
+      img.infoRef().channelColors[2] = col4{255, 0, 0};
     } else {
       CHECK(false);
     }
@@ -449,7 +449,9 @@ void stnTrajectory()
 #if 1
       projection = ZImg(dir.filePath(str + "_" + resolution + "um_projection_energy.nrrd"));
       projection *= mask;
-      projection.typedUnaryOperation<float>([](float proj) { return std::max(255.f, proj); });
+      projection.typedUnaryOperation<float>([](float proj) {
+        return std::max(255.f, proj);
+      });
       // projection.typedBinaryOperation<float, float>(injection, [](float proj, float inj) { return inj > 0.f ? 0.f :
       // proj; });
       projection.normalize();
@@ -467,8 +469,8 @@ void stnTrajectory()
           scale = 1.0;
         scale /= 9.2;
 #else
-        double scale = 0.5;
-        thre1 = 0.15;
+      double scale = 0.5;
+      thre1 = 0.15;
 #endif
       LOG(INFO) << str << " " << scale << " " << thre1;
       imgGraph.build(ZImgGraph::EdgeWeight3(thre1, scale));
@@ -484,24 +486,24 @@ void stnTrajectory()
             line.push_back(glm::dvec3(coord.x, coord.y, coord.z));
           }
 #else
-          std::vector<size_t> predecessor;
-          std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
-          std::vector<double> injectionMinDists;
-          for (size_t injectionIdx : injectionIdxs) {
-            injectionMinDists.push_back(dist[injectionIdx]);
+        std::vector<size_t> predecessor;
+        std::vector<double> dist = imgGraph.shortestPaths(idx, &predecessor);
+        std::vector<double> injectionMinDists;
+        for (size_t injectionIdx : injectionIdxs) {
+          injectionMinDists.push_back(dist[injectionIdx]);
+        }
+        size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) -
+                                      injectionMinDists.begin()];
+        std::vector<glm::dvec3> line;
+        while (true) {
+          ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
+          line.emplace_back(coord.x, coord.y, coord.z);
+          if (curIdx == idx) {
+            break;
           }
-          size_t curIdx = injectionIdxs[std::min_element(injectionMinDists.begin(), injectionMinDists.end()) -
-                                        injectionMinDists.begin()];
-          std::vector<glm::dvec3> line;
-          while (true) {
-            ZVoxelCoordinate coord = ZImg::indexToCoord(curIdx, projection.info());
-            line.emplace_back(coord.x, coord.y, coord.z);
-            if (curIdx == idx) {
-              break;
-            }
-            CHECK(predecessor[curIdx] != curIdx);
-            curIdx = predecessor[curIdx];
-          }
+          CHECK(predecessor[curIdx] != curIdx);
+          curIdx = predecessor[curIdx];
+        }
 #endif
         if (line.empty()) {
           LOG(WARNING) << "WTF";
@@ -1219,9 +1221,9 @@ void convertPVRawToNim()
 
     ZImg img(fileInfo.absoluteFilePath());
     if (fileInfo.baseName().startsWith("Py")) {
-      img.infoRef().channelColors[0] = col4(0, 255, 0);
-      img.infoRef().channelColors[1] = col4(255, 0, 0);
-      img.infoRef().channelColors[2] = col4(0, 0, 255);
+      img.infoRef().channelColors[0] = col4{0, 255, 0};
+      img.infoRef().channelColors[1] = col4{255, 0, 0};
+      img.infoRef().channelColors[2] = col4{0, 0, 255};
       img.infoRef().channelNames[0] = refPYImg.channelName(0);
       img.infoRef().channelNames[1] = refPYImg.channelName(1);
       img.infoRef().channelNames[2] = refPYImg.channelName(2);
@@ -1230,9 +1232,9 @@ void convertPVRawToNim()
       img.infoRef().voxelSizeY = refPYImg.voxelSizeY();
       img.infoRef().voxelSizeZ = refPYImg.voxelSizeZ();
     } else if (fileInfo.baseName().startsWith("PV")) {
-      img.infoRef().channelColors[0] = col4(0, 0, 255);
-      img.infoRef().channelColors[1] = col4(0, 255, 0);
-      img.infoRef().channelColors[2] = col4(255, 0, 0);
+      img.infoRef().channelColors[0] = col4{0, 0, 255};
+      img.infoRef().channelColors[1] = col4{0, 255, 0};
+      img.infoRef().channelColors[2] = col4{255, 0, 0};
       img.infoRef().channelNames[0] = refPVImg.channelName(0);
       img.infoRef().channelNames[1] = refPVImg.channelName(1);
       img.infoRef().channelNames[2] = refPVImg.channelName(2);
@@ -1265,9 +1267,9 @@ void convertPYRawToNim()
     LOG(INFO) << i << " " << list.size() << " " << fileInfo.absoluteFilePath();
     ZImg img(fileInfo.absoluteFilePath());
     if (fileInfo.baseName().startsWith("Py")) {
-      img.infoRef().channelColors[0] = col4(0, 255, 0);
-      img.infoRef().channelColors[1] = col4(255, 0, 0);
-      img.infoRef().channelColors[2] = col4(0, 0, 255);
+      img.infoRef().channelColors[0] = col4{0, 255, 0};
+      img.infoRef().channelColors[1] = col4{255, 0, 0};
+      img.infoRef().channelColors[2] = col4{0, 0, 255};
       img.infoRef().channelNames[0] = refPYImg.channelName(0);
       img.infoRef().channelNames[1] = refPYImg.channelName(1);
       img.infoRef().channelNames[2] = refPYImg.channelName(2);
@@ -1279,9 +1281,9 @@ void convertPYRawToNim()
       auto tmpimg = ZImg::cat(std::vector<ZImg>{img.createView(2), img.createView(0), img.createView(1)}, Dimension::C);
       img.swap(tmpimg);
     } else if (fileInfo.baseName().startsWith("PV")) {
-      img.infoRef().channelColors[0] = col4(0, 0, 255);
-      img.infoRef().channelColors[1] = col4(0, 255, 0);
-      img.infoRef().channelColors[2] = col4(255, 0, 0);
+      img.infoRef().channelColors[0] = col4{0, 0, 255};
+      img.infoRef().channelColors[1] = col4{0, 255, 0};
+      img.infoRef().channelColors[2] = col4{255, 0, 0};
       img.infoRef().channelNames[0] = refPVImg.channelName(0);
       img.infoRef().channelNames[1] = refPVImg.channelName(1);
       img.infoRef().channelNames[2] = refPVImg.channelName(2);

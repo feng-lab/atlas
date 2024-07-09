@@ -1055,26 +1055,26 @@ void ZImgLeica::detectInfos(std::vector<ZImgInfo>& infos, const std::vector<Imag
     for (size_t i = 0; i < info.channelColors.size(); ++i) {
       const auto& cd = ii.channels[channelOffsetOrder[i]];
       if (cd.channelTag == 1) {
-        info.channelColors[i] = col4(255, 0, 0);
+        info.channelColors[i] = col4{255, 0, 0};
       } else if (cd.channelTag == 2) {
-        info.channelColors[i] = col4(0, 255, 0);
+        info.channelColors[i] = col4{0, 255, 0};
       } else if (cd.channelTag == 3) {
-        info.channelColors[i] = col4(0, 0, 255);
+        info.channelColors[i] = col4{0, 0, 255};
       } else if (cd.channelTag == 0) {
         if (cd.LUTName.compare("Gray", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(255, 255, 255);
+          info.channelColors[i] = col4{255, 255, 255};
         } else if (cd.LUTName.compare("red", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(255, 0, 0);
+          info.channelColors[i] = col4{255, 0, 0};
         } else if (cd.LUTName.compare("green", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(0, 255, 0);
+          info.channelColors[i] = col4{0, 255, 0};
         } else if (cd.LUTName.compare("blue", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(0, 0, 255);
+          info.channelColors[i] = col4{0, 0, 255};
         } else if (cd.LUTName.compare("cyan", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(0, 255, 255);
+          info.channelColors[i] = col4{0, 255, 255};
         } else if (cd.LUTName.compare("magenta", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(255, 0, 255);
+          info.channelColors[i] = col4{255, 0, 255};
         } else if (cd.LUTName.compare("yellow", Qt::CaseInsensitive) == 0) {
-          info.channelColors[i] = col4(255, 255, 0);
+          info.channelColors[i] = col4{255, 255, 0};
         } else if (!cd.LUTName.isEmpty()) {
           throw ZIOException(
             QString("unhandled LUT name: %1, please send this message to flq@live.com").arg(cd.LUTName));

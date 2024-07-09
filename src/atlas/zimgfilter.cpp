@@ -485,8 +485,11 @@ void ZImgFilter::channelColorChanged()
         break;
       }
     }
-    if (m_channelVisibleParas[c]->get()) { // only redraw if this channel is visible
-      col4 col(para->get().r * 255, para->get().g * 255, para->get().b * 255);
+    if (m_channelVisibleParas[c]->get()) {
+      // only redraw if this channel is visible
+      col4 col{static_cast<uint8_t>(para->get().r * 255),
+               static_cast<uint8_t>(para->get().g * 255),
+               static_cast<uint8_t>(para->get().b * 255)};
       m_display->setChannelColor(c, col);
       m_displayValid = false;
     }
