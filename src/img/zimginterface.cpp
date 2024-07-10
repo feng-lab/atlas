@@ -1,9 +1,7 @@
 #include "zimginterface.h"
 
-#define REFLECT_ENUM_MIN (-1)
-#define REFLECT_ENUM_MAX 100
 #include <reflect>
-#include <map>
+#include <unordered_map>
 
 namespace nim {
 
