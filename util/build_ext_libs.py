@@ -1244,7 +1244,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     orig_file5 = bak_file5 = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
-    orig_file4 = bak_file4 = None
     orig_file6 = bak_file6 = None
     orig_file7 = bak_file7 = None
     try:
@@ -1331,12 +1330,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                    r'/EHsc #',
                                ])
 
-        orig_file4 = os.path.join(src_dir, 'folly', 'experimental', 'symbolizer', 'Elf.cpp')
-        bak_file4 = patch_file(orig_file4,
-                               from_texts=[r'#include <folly/portability/SysMman.h>'],
-                               to_texts=['#include <folly/portability/SysMman.h>\n'
-                                         '#include <folly/portability/Unistd.h>'])
-
         if is_windows():
             orig_file6 = os.path.join(src_dir, 'CMake', 'FindLibsodium.cmake')
             bak_file6 = patch_file(orig_file6,
@@ -1390,7 +1383,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
             os.replace(bak_file5, orig_file5)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
-        os.replace(bak_file4, orig_file4)
         if is_windows():
             os.replace(bak_file6, orig_file6)
             os.replace(bak_file7, orig_file7)
