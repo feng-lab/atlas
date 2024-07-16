@@ -48,7 +48,7 @@ void ConnComp::removeSmallObject(size_t sizeThre, bool includeThre)
   if (includeThre) {
     sizeThre++;
   }
-  erase_if(voxelIdxList, [sizeThre](const auto& v) { return v.size() < sizeThre; });
+  std::erase_if(voxelIdxList, [sizeThre](const auto& v) { return v.size() < sizeThre; });
 }
 
 size_t ConnComp::toatalNumVoxels() const

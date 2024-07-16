@@ -36,7 +36,7 @@ size_t byteNumber(DataType dt)
   if (it != dataTypeToByteNumber.end()) {
     return it->second;
   }
-  throw ZException(QString("Invalid DataType %1").arg(std::to_underlying(dt)));
+  throw ZException(fmt::format("Invalid DataType {}", std::to_underlying(dt)));
 }
 
 double unitSizeInMeter(VoxelSizeUnit vsu)
@@ -57,7 +57,7 @@ double unitSizeInMeter(VoxelSizeUnit vsu)
   if (it != voxelSizeUnitToMeter.end()) {
     return it->second;
   }
-  throw ZException(QString("Invalid VoxelSizeUnit %1").arg(std::to_underlying(vsu)));
+  throw ZException(fmt::format("Invalid VoxelSizeUnit {}", std::to_underlying(vsu)));
 }
 
 template<typename TEnum>

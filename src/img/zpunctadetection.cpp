@@ -1548,7 +1548,7 @@ void ZPunctaDetection::vbgmmSplit(const Eigen::MatrixXi& voxelLocs,
       }
     }
     // remove empty group
-    erase_if(modelGroups, [](const auto& v) {
+    std::erase_if(modelGroups, [](const auto& v) {
       return v.empty();
     });
     // create new group

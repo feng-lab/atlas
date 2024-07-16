@@ -24,7 +24,7 @@ struct WeightNCCTing
     : m_overlapThre(overlapThre)
   {}
 
-  double operator()(double v, double numOverlap)
+  double operator()(double v, double numOverlap) const
   {
     return numOverlap < m_overlapThre ? 0
            : v <= 0                   ? v

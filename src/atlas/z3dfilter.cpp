@@ -163,7 +163,7 @@ void Z3DFilter::addPort(Z3DOutputPortBase& port)
 
 void Z3DFilter::removePort(Z3DInputPortBase& port)
 {
-  erase(m_inputPorts, &port);
+  std::erase(m_inputPorts, &port);
 
   if (m_inputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -172,7 +172,7 @@ void Z3DFilter::removePort(Z3DInputPortBase& port)
 
 void Z3DFilter::removePort(Z3DOutputPortBase& port)
 {
-  erase(m_outputPorts, &port);
+  std::erase(m_outputPorts, &port);
 
   if (m_outputPortMap.erase(port.name()) == 0) {
     LOG(FATAL) << className() << " port " << port.name() << " was not found!";
@@ -197,7 +197,7 @@ void Z3DFilter::removeParameter(ZParameter& para)
     LOG(ERROR) << className() << " parameter " << para.name() << " cannot be removed, it does not exist";
   }
   para.disconnect(this);
-  erase(m_parameters, &para);
+  std::erase(m_parameters, &para);
   m_parameterNames.erase(para.name());
 }
 

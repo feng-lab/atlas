@@ -811,7 +811,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
 
     if (!hasSceneDim) {
       ImageInfo info = ii;
-      erase_if(info.dimensions, [](const auto& ddd) {
+      std::erase_if(info.dimensions, [](const auto& ddd) {
         return ddd.dimID >= 5;
       });
       res.push_back(info);
@@ -877,7 +877,7 @@ std::vector<ImageInfo> ZImgLeica::splitLeciaImageInfos(const std::vector<ImageIn
             }
           }
         }
-        erase_if(info.dimensions, [](const auto& ddd) {
+        std::erase_if(info.dimensions, [](const auto& ddd) {
           return ddd.dimID >= 5;
         });
         res.push_back(info);

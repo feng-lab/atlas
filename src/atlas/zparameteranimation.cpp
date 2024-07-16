@@ -38,7 +38,7 @@ void ZParameterAnimation::releaseParameter()
 void ZParameterAnimation::deleteKey(ZParameterKey* key)
 {
   Q_EMIT keyAboutToDelete(key);
-  erase_if(m_keys, [key](const auto& ckey) { return ckey.get() == key; });
+  std::erase_if(m_keys, [key](const auto& ckey) { return ckey.get() == key; });
 }
 
 void ZParameterAnimation::addKey(std::unique_ptr<ZParameterKey> key, bool keepRedundant)

@@ -96,14 +96,14 @@
 	branch = dev
 [submodule "src/3rdparty/bzip2"]
 	path = src/3rdparty/bzip2
-	url = https://gitlab.com/federicomenaquintero/bzip2.git
+	url = https://gitlab.com/bzip2/bzip2
 	branch = master
 [submodule "src/3rdparty/ceres-solver"]
 	path = src/3rdparty/ceres-solver
 	url = https://github.com/ceres-solver/ceres-solver.git
 [submodule "src/3rdparty/pocketfft"]
 	path = src/3rdparty/pocketfft
-	url = https://gitlab.mpcdf.mpg.de/mtr/pocketfft.git
+	url = https://github.com/mreineck/pocketfft.git
 	branch = cpp
 [submodule "src/3rdparty/rocksdb"]
 	path = src/3rdparty/rocksdb

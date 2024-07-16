@@ -347,6 +347,37 @@ void logCPUInfo()
       message += fmt::format(", {} {}\n", vendor_string, uarch_string);
     }
   }
+  message += "Clusters:\n";
+  for (uint32_t i = 0; i < cpuinfo_get_clusters_count(); i++) {
+    const struct cpuinfo_cluster* cluster = cpuinfo_get_cluster(i);
+    if (cluster->processor_count == 1) {
+      message += fmt::format("\t{}: 1 processor ({})", i, cluster->processor_start);
+    } else {
+      message += fmt::format("\t{}: {} processors ({}-{})",
+                             i,
+                             cluster->processor_count,
+                             cluster->processor_start,
+                             cluster->processor_start + cluster->processor_count - 1);
+    }
+    if (cluster->core_count == 1) {
+      message += fmt::format(",\t{}: 1 core ({})", i, cluster->core_start);
+    } else {
+      message += fmt::format(",\t{}: {} cores ({}-{})",
+                             i,
+                             cluster->core_count,
+                             cluster->core_start,
+                             cluster->core_start + cluster->core_count - 1);
+    }
+    const char* vendor_string = vendor_to_string(cluster->vendor);
+    const char* uarch_string = uarch_to_string(cluster->uarch);
+    if (vendor_string == nullptr) {
+      message += fmt::format(", vendor 0x{:08x} uarch 0x{:08x}\n", (uint32_t)cluster->vendor, (uint32_t)cluster->uarch);
+    } else if (uarch_string == nullptr) {
+      message += fmt::format(", {} uarch 0x{:08x}\n", vendor_string, (uint32_t)cluster->uarch);
+    } else {
+      message += fmt::format(", {} {}\n", vendor_string, uarch_string);
+    }
+  }
   LOG(INFO) << message;
   message = "Logical processors";
 #if defined(__linux__)
@@ -455,14 +486,14 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tBMI2: {}", cpuinfo_has_x86_bmi2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tADCX/ADOX: {}", cpuinfo_has_x86_adx() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Memory instructions:\n");
+  LOG(INFO) << fmt::format("Memory instructions:");
   LOG(INFO) << fmt::format("\tMOVBE: {}", cpuinfo_has_x86_movbe() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPREFETCH: {}", cpuinfo_has_x86_prefetch() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPREFETCHW: {}", cpuinfo_has_x86_prefetchw() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPREFETCHWT1: {}", cpuinfo_has_x86_prefetchwt1() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tCLZERO: {}", cpuinfo_has_x86_clzero() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("SIMD extensions:\n");
+  LOG(INFO) << fmt::format("SIMD extensions:");
   LOG(INFO) << fmt::format("\tMMX: {}", cpuinfo_has_x86_mmx() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tMMX+: {}", cpuinfo_has_x86_mmx_plus() ? "yes" : "no");
   LOG(INFO) << fmt::format("\t3dnow!: {}", cpuinfo_has_x86_3dnow() ? "yes" : "no");
@@ -501,9 +532,16 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tAVX512VP2INTERSECT: {}", cpuinfo_has_x86_avx512vp2intersect() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tAVX512_4VNNIW: {}", cpuinfo_has_x86_avx512_4vnniw() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tAVX512_4FMAPS: {}", cpuinfo_has_x86_avx512_4fmaps() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAMX_BF16: {}", cpuinfo_has_x86_amx_bf16() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAMX_TILE: {}", cpuinfo_has_x86_amx_tile() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAMX_INT8: {}", cpuinfo_has_x86_amx_int8() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAMX_FP16: {}", cpuinfo_has_x86_amx_fp16() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tAVXVNNI: {}", cpuinfo_has_x86_avxvnni() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAVX_VNNI_INT8: {}", cpuinfo_has_x86_avx_vnni_int8() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAVX_VNNI_INT16: {}", cpuinfo_has_x86_avx_vnni_int16() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAVX_NE_CONVERT: {}", cpuinfo_has_x86_avx_ne_convert() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Multi-threading extensions:\n");
+  LOG(INFO) << fmt::format("Multi-threading extensions:");
   LOG(INFO) << fmt::format("\tMONITOR/MWAIT: {}", cpuinfo_has_x86_mwait() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tMONITORX/MWAITX: {}", cpuinfo_has_x86_mwaitx() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tCMPXCHG16B: {}", cpuinfo_has_x86_cmpxchg16b() ? "yes" : "no");
@@ -512,7 +550,7 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tXTEST: {}", cpuinfo_has_x86_xtest() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tRDPID: {}", cpuinfo_has_x86_rdpid() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Cryptography extensions:\n");
+  LOG(INFO) << fmt::format("Cryptography extensions:");
   LOG(INFO) << fmt::format("\tAES: {}", cpuinfo_has_x86_aes() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tVAES: {}", cpuinfo_has_x86_vaes() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPCLMULQDQ: {}", cpuinfo_has_x86_pclmulqdq() ? "yes" : "no");
@@ -522,18 +560,18 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tRDSEED: {}", cpuinfo_has_x86_rdseed() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tSHA: {}", cpuinfo_has_x86_sha() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Profiling instructions:\n");
+  LOG(INFO) << fmt::format("Profiling instructions:");
   LOG(INFO) << fmt::format("\tRDTSCP: {}", cpuinfo_has_x86_rdtscp() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tMPX: {}", cpuinfo_has_x86_mpx() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("System instructions:\n");
+  LOG(INFO) << fmt::format("System instructions:");
   LOG(INFO) << fmt::format("\tCLWB: {}", cpuinfo_has_x86_clwb() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tFXSAVE/FXSTOR: {}", cpuinfo_has_x86_fxsave() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tXSAVE/XSTOR: {}", cpuinfo_has_x86_xsave() ? "yes" : "no");
 #endif /* CPUINFO_ARCH_X86 || CPUINFO_ARCH_X86_64 */
 
 #if CPUINFO_ARCH_ARM
-  LOG(INFO) << fmt::format("Instruction sets:\n");
+  LOG(INFO) << fmt::format("Instruction sets:");
   LOG(INFO) << fmt::format("\tThumb: {}", cpuinfo_has_arm_thumb() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tThumb 2: {}", cpuinfo_has_arm_thumb2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARMv5E: {}", cpuinfo_has_arm_v5e() ? "yes" : "no");
@@ -544,7 +582,7 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tARMv8: {}", cpuinfo_has_arm_v8() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tIDIV: {}", cpuinfo_has_arm_idiv() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Floating-Point support:\n");
+  LOG(INFO) << fmt::format("Floating-Point support:");
   LOG(INFO) << fmt::format("\tVFPv2: {}", cpuinfo_has_arm_vfpv2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tVFPv3: {}", cpuinfo_has_arm_vfpv3() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tVFPv3+D32: {}", cpuinfo_has_arm_vfpv3_d32() ? "yes" : "no");
@@ -554,7 +592,7 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tVFPv4+D32: {}", cpuinfo_has_arm_vfpv4_d32() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tVJCVT: {}", cpuinfo_has_arm_jscvt() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("SIMD extensions:\n");
+  LOG(INFO) << fmt::format("SIMD extensions:");
   LOG(INFO) << fmt::format("\tWMMX: {}", cpuinfo_has_arm_wmmx() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tWMMX 2: {}", cpuinfo_has_arm_wmmx2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tNEON: {}", cpuinfo_has_arm_neon() ? "yes" : "no");
@@ -566,7 +604,7 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tNEON VSDOT/VUDOT: {}", cpuinfo_has_arm_neon_dot() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tNEON VFMLAL/VFMLSL: {}", cpuinfo_has_arm_fhm() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Cryptography extensions:\n");
+  LOG(INFO) << fmt::format("Cryptography extensions:");
   LOG(INFO) << fmt::format("\tAES: {}", cpuinfo_has_arm_aes() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tSHA1: {}", cpuinfo_has_arm_sha1() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tSHA2: {}", cpuinfo_has_arm_sha2() ? "yes" : "no");
@@ -575,7 +613,7 @@ void logISAInfo()
 #endif /* CPUINFO_ARCH_ARM */
 
 #if CPUINFO_ARCH_ARM64
-  LOG(INFO) << fmt::format("Instruction sets:\n");
+  LOG(INFO) << fmt::format("Instruction sets:");
   LOG(INFO) << fmt::format("\tARM v8.1 atomics: {}", cpuinfo_has_arm_atomics() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.1 SQRDMLxH: {}", cpuinfo_has_arm_neon_rdm() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.2 FP16 arithmetics: {}", cpuinfo_has_arm_fp16_arith() ? "yes" : "no");
@@ -586,16 +624,27 @@ void logISAInfo()
   LOG(INFO) << fmt::format("\tARM v8.3 JS conversion: {}", cpuinfo_has_arm_jscvt() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM v8.3 complex: {}", cpuinfo_has_arm_fcma() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("SIMD extensions:\n");
+  LOG(INFO) << fmt::format("SIMD extensions:");
   LOG(INFO) << fmt::format("\tARM SVE: {}", cpuinfo_has_arm_sve() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tARM SVE 2: {}", cpuinfo_has_arm_sve2() ? "yes" : "no");
 
-  LOG(INFO) << fmt::format("Cryptography extensions:\n");
+  LOG(INFO) << fmt::format("Cryptography extensions:");
   LOG(INFO) << fmt::format("\tAES: {}", cpuinfo_has_arm_aes() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tSHA1: {}", cpuinfo_has_arm_sha1() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tSHA2: {}", cpuinfo_has_arm_sha2() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tPMULL: {}", cpuinfo_has_arm_pmull() ? "yes" : "no");
   LOG(INFO) << fmt::format("\tCRC32: {}", cpuinfo_has_arm_crc32() ? "yes" : "no");
+#endif
+
+#if CPUINFO_ARCH_RISCV32 || CPUINFO_ARCH_RISCV64
+  LOG(INFO) << fmt::format("Instruction sets:");
+  LOG(INFO) << fmt::format("\tBase Integer: {}", cpuinfo_has_riscv_i() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tInteger Multiply/Divide: {}", cpuinfo_has_riscv_m() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tAtomics: {}", cpuinfo_has_riscv_a() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tSingle-Precision Floating-Point: {}", cpuinfo_has_riscv_f() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tDouble-Precision Floating-Point: {}", cpuinfo_has_riscv_d() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tCompressed: {}", cpuinfo_has_riscv_c() ? "yes" : "no");
+  LOG(INFO) << fmt::format("\tVector: {}", cpuinfo_has_riscv_v() ? "yes" : "no");
 #endif
 }
 

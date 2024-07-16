@@ -171,7 +171,7 @@ public:
 
   void removeEventListener(Z3DCanvasEventListener& e)
   {
-    erase(m_listeners, &e);
+    std::erase(m_listeners, &e);
   }
 
   void clearEventListeners()

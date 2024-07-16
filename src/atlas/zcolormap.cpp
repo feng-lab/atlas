@@ -828,7 +828,7 @@ bool ZColorMap::removeDuplicatedKeys()
 bool ZColorMap::removeSelectedKeys()
 {
   size_t sizeBefore = m_keys.size();
-  erase_if(m_keys, [](const auto& key) { return key.second; });
+  std::erase_if(m_keys, [](const auto& key) { return key.second; });
   if (m_keys.size() != sizeBefore) {
     Q_EMIT changed();
   }
@@ -842,8 +842,8 @@ void ZColorMap::updateKeys()
 
 void ZColorMap::removeKey(const ZColorMapKey& key)
 {
-  erase(m_keys, std::make_pair(key, false));
-  erase(m_keys, std::make_pair(key, true));
+  std::erase(m_keys, std::make_pair(key, false));
+  std::erase(m_keys, std::make_pair(key, true));
   Q_EMIT changed();
 }
 
