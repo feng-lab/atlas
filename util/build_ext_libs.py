@@ -1241,34 +1241,16 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     build_dir = create_build_dir(src_dir)
 
     orig_file1 = bak_file1 = None
-    orig_file5 = bak_file5 = None
     orig_file2 = bak_file2 = None
     orig_file3 = bak_file3 = None
     orig_file6 = bak_file6 = None
-    orig_file7 = bak_file7 = None
     try:
-        if is_mac() and macos_min_version().startswith('10.'):
-            # preadv and pwritev are only available after macOS 11.0
-            orig_file5 = os.path.join(src_dir, 'CMake', 'FollyConfigChecks.cmake')
-            bak_file5 = patch_file(orig_file5,
-                                   from_texts=[r'check_symbol_exists(preadv',
-                                               r'check_symbol_exists(pwritev'],
-                                   to_texts=[r'#check_symbol_exists(preadv',
-                                             r'#check_symbol_exists(pwritev'])
-
         orig_file1 = os.path.join(src_dir, 'CMake', 'folly-config.cmake.in')
         bak_file1 = patch_file(orig_file1,
                                from_texts=[r'find_dependency(fmt)'],
                                to_texts=['find_dependency(fmt)\n'
                                          'find_dependency(gflags CONFIG)\n'
                                          'find_dependency(glog CONFIG)'])
-
-        # orig_file7 = os.path.join(src_dir, 'CMake', 'folly-config.h.cmake')
-        # bak_file7 = patch_file(orig_file7,
-        #                        from_texts=[r'#cmakedefine FOLLY_USE_JEMALLOC 1'],
-        #                        to_texts=['#cmakedefine FOLLY_USE_JEMALLOC 1\n'
-        #                                  '#define FOLLY_ASSUME_NO_JEMALLOC\n'
-        #                                  '#define FOLLY_ASSUME_NO_TCMALLOC'])
 
         orig_file2 = os.path.join(src_dir, 'CMake', 'folly-deps.cmake')
         bak_file2 = patch_file(orig_file2,
@@ -1339,14 +1321,6 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
                                        r'find_library(LIBSODIUM_LIBRARY NAMES sodium libsodium)',
                                    ])
 
-            orig_file7 = os.path.join(src_dir, 'folly', 'memory', 'UninitializedMemoryHacks.h')
-            bak_file7 = patch_file(orig_file7,
-                                   from_texts=[r'template void std::basic_string<TYPE>::_Eos(std::size_t);',
-                                               ],
-                                   to_texts=[
-                                       r'template void std::basic_string<TYPE>::_Eos(std::size_t) noexcept;',
-                                   ])
-
         os.remove(os.path.join(src_dir, 'folly', 'logging', 'BridgeFromGoogleLogging.cpp'))
 
         cmakecmd_options = ['-DBUILD_SHARED_LIBS:BOOL=OFF',
@@ -1379,13 +1353,10 @@ def build_folly(src_dir: str, install_dir: str, use_asan: bool = False):
     finally:
         shutil.rmtree(build_dir, ignore_errors=False)
         os.replace(bak_file1, orig_file1)
-        if is_mac() and macos_min_version().startswith('10.'):
-            os.replace(bak_file5, orig_file5)
         os.replace(bak_file2, orig_file2)
         os.replace(bak_file3, orig_file3)
         if is_windows():
             os.replace(bak_file6, orig_file6)
-            os.replace(bak_file7, orig_file7)
         cleanup_git_submodule(src_dir)
 
 
