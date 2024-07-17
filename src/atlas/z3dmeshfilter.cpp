@@ -85,9 +85,9 @@ double Z3DMeshFilter::process(Z3DEye eye)
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-    Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_monoEyeOutport
-                                          : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                  : m_rightEyeOutport;
+    Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_monoEyeOutport
+                                          : (eye == LeftEye) ? m_leftEyeOutport
+                                                             : m_rightEyeOutport;
     currentOutport.resize(m_outPort.size());
 
     currentOutport.bindTarget();
@@ -97,9 +97,9 @@ double Z3DMeshFilter::process(Z3DEye eye)
     CHECK_GL_ERROR
     currentOutport.releaseTarget();
 
-    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono)   ? m_monoEyeOutport2
-                                           : (eye == Z3DEye::Left) ? m_leftEyeOutport2
-                                                                   : m_rightEyeOutport2;
+    Z3DRenderOutputPort& currentOutport2 = (eye == MonoEye)   ? m_monoEyeOutport2
+                                           : (eye == LeftEye) ? m_leftEyeOutport2
+                                                              : m_rightEyeOutport2;
     currentOutport2.resize(m_outPort.size());
 
     currentOutport2.bindTarget();
@@ -236,9 +236,9 @@ void Z3DMeshFilter::renderOpaque(Z3DEye eye)
 void Z3DMeshFilter::renderTransparent(Z3DEye eye)
 {
   if (m_glow.get()) {
-    Z3DRenderOutputPort& currentOutport2 = (eye == Z3DEye::Mono)   ? m_monoEyeOutport2
-                                           : (eye == Z3DEye::Left) ? m_leftEyeOutport2
-                                                                   : m_rightEyeOutport2;
+    Z3DRenderOutputPort& currentOutport2 = (eye == MonoEye)   ? m_monoEyeOutport2
+                                           : (eye == LeftEye) ? m_leftEyeOutport2
+                                                              : m_rightEyeOutport2;
     m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
     m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
     m_rendererBase.render(eye, m_textureCopyRenderer);

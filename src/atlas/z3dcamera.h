@@ -202,32 +202,32 @@ public:
 
   [[nodiscard]] const glm::mat4& viewMatrix(Z3DEye eye) const
   {
-    return m_viewMatrices[std::to_underlying(eye)];
+    return m_viewMatrices[eye];
   }
 
   [[nodiscard]] const glm::mat4& projectionMatrix(Z3DEye eye) const
   {
-    return m_projectionMatrices[std::to_underlying(eye)];
+    return m_projectionMatrices[eye];
   }
 
   [[nodiscard]] const glm::mat4& inverseViewMatrix(Z3DEye eye) const
   {
-    return m_inverseViewMatrices[std::to_underlying(eye)];
+    return m_inverseViewMatrices[eye];
   }
 
   [[nodiscard]] const glm::mat4& inverseProjectionMatrix(Z3DEye eye) const
   {
-    return m_inverseProjectionMatrices[std::to_underlying(eye)];
+    return m_inverseProjectionMatrices[eye];
   }
 
   [[nodiscard]] const glm::mat3& normalMatrix(Z3DEye eye) const
   {
-    return m_normalMatrices[std::to_underlying(eye)];
+    return m_normalMatrices[eye];
   }
 
   [[nodiscard]] const glm::mat4& projectionViewMatrix(Z3DEye eye) const
   {
-    return m_projectionViewMatrices[std::to_underlying(eye)];
+    return m_projectionViewMatrices[eye];
   }
 
   // dist from eye to center
@@ -270,7 +270,7 @@ public:
   }
 
   // other matrix
-  [[nodiscard]] glm::mat3 rotateMatrix(Z3DEye eye = Z3DEye::Mono) const
+  [[nodiscard]] glm::mat3 rotateMatrix(Z3DEye eye = MonoEye) const
   {
     return glm::mat3(viewMatrix(eye));
   }
@@ -341,18 +341,18 @@ public:
   void rotate(const glm::quat& quat);
 
   // convert between eye space and world space
-  glm::vec3 vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 vectorEyeToWorld(const glm::vec3& vec, Z3DEye eye = MonoEye) const;
 
-  glm::vec3 vectorWorldToEye(const glm::vec3& vec, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 vectorWorldToEye(const glm::vec3& vec, Z3DEye eye = MonoEye) const;
 
-  glm::vec3 pointEyeToWorld(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 pointEyeToWorld(const glm::vec3& pt, Z3DEye eye = MonoEye) const;
 
-  glm::vec3 pointWorldToEye(const glm::vec3& pt, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 pointWorldToEye(const glm::vec3& pt, Z3DEye eye = MonoEye) const;
 
   // world to screen, if point is clipped, its screen coord will be (-1,-1,-1)
-  glm::vec3 worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 worldToScreen(const glm::vec3& wpt, const glm::ivec4& viewport, Z3DEye eye = MonoEye) const;
 
-  glm::vec3 screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye = Z3DEye::Mono) const;
+  glm::vec3 screenToWorld(const glm::vec3& spt, const glm::ivec4& viewport, Z3DEye eye = MonoEye) const;
 
 protected:
   void updateCamera();

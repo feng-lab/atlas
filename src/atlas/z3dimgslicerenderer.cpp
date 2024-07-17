@@ -158,10 +158,10 @@ void Z3DImgSliceRenderer::render(Z3DEye eye)
 
 double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 {
-  if (progressive && m_progress[std::to_underlying(eye)] == 0) {
+  if (progressive && m_progress[eye] == 0) {
     renderSliceFast( eye);
-    m_progress[std::to_underlying(eye)] = 0.5;
-    return m_progress[std::to_underlying(eye)];
+    m_progress[eye] = 0.5;
+    return m_progress[eye];
   }
 
   auto cancellationToken = m_rendererBase.globalParas().cancellationSource
@@ -292,7 +292,7 @@ double Z3DImgSliceRenderer::renderSlice(Z3DEye eye, bool progressive)
 
   CHECK_GL_ERROR
 
-  m_progress[std::to_underlying(eye)] = 0;
+  m_progress[eye] = 0;
   return 1;
 }
 

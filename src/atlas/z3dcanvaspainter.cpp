@@ -11,8 +11,7 @@ Z3DCanvasPainter::Z3DCanvasPainter(Z3DCanvas& canvas)
   , m_rendererBase(m_globalParas)
   , m_textureCopyRenderer(m_rendererBase, Z3DTextureCopyRenderer::OutputColorOption::DivideByAlpha)
   , m_canvas(canvas)
-{
-}
+{}
 
 void Z3DCanvasPainter::paint(bool stereo)
 {
@@ -27,12 +26,12 @@ void Z3DCanvasPainter::paint(bool stereo)
     glDrawBuffer(GL_BACK_LEFT);
     m_textureCopyRenderer.setColorTexture(m_engine->leftReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->leftReadyTarget()->depthTexture());
-    m_rendererBase.render(Z3DEye::Left, m_textureCopyRenderer);
+    m_rendererBase.render(LeftEye, m_textureCopyRenderer);
 
     glDrawBuffer(GL_BACK_RIGHT);
     m_textureCopyRenderer.setColorTexture(m_engine->rightReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->rightReadyTarget()->depthTexture());
-    m_rendererBase.render(Z3DEye::Right, m_textureCopyRenderer);
+    m_rendererBase.render(RightEye, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();
   } else {
@@ -40,7 +39,7 @@ void Z3DCanvasPainter::paint(bool stereo)
     m_textureCopyRenderer.setColorTexture(m_engine->monoReadyTarget()->colorTexture());
     m_textureCopyRenderer.setDepthTexture(m_engine->monoReadyTarget()->depthTexture());
     auto endTarget = m_engine->monoReadyTarget();
-    m_rendererBase.render(Z3DEye::Mono, m_textureCopyRenderer);
+    m_rendererBase.render(MonoEye, m_textureCopyRenderer);
 
     m_engine->clearNewRenderingFlag();
     VLOG(1) << startTarget << " " << endTarget << " " << m_canvas.physicalSize();

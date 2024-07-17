@@ -261,12 +261,12 @@ double Z3DCompositor::process(Z3DEye eye)
     m_tempRenderTarget5.resize(m_monoCurrentTarget->size());
   }
   auto& currentOutRenderTarget = (!showHandleFilters.empty()) ? m_tempRenderTarget5
-                                 : (eye == Z3DEye::Mono)      ? *m_monoCurrentTarget
-                                 : (eye == Z3DEye::Left)      ? *m_leftCurrentTarget
+                                 : (eye == MonoEye)           ? *m_monoCurrentTarget
+                                 : (eye == LeftEye)           ? *m_leftCurrentTarget
                                                               : *m_rightCurrentTarget;
-  Z3DRenderInputPort& currentInport = (eye == Z3DEye::Mono)   ? m_inport
-                                      : (eye == Z3DEye::Left) ? m_leftEyeInport
-                                                              : m_rightEyeInport;
+  Z3DRenderInputPort& currentInport = (eye == MonoEye)   ? m_inport
+                                      : (eye == LeftEye) ? m_leftEyeInport
+                                                         : m_rightEyeInport;
 
   glEnable(GL_DEPTH_TEST);
 
@@ -621,9 +621,9 @@ double Z3DCompositor::process(Z3DEye eye)
   }
 
   if (!showHandleFilters.empty()) {
-    auto& finalOutRenderTarget = (eye == Z3DEye::Mono)   ? *m_monoCurrentTarget
-                                 : (eye == Z3DEye::Left) ? *m_leftCurrentTarget
-                                                         : *m_rightCurrentTarget;
+    auto& finalOutRenderTarget = (eye == MonoEye)   ? *m_monoCurrentTarget
+                                 : (eye == LeftEye) ? *m_leftCurrentTarget
+                                                    : *m_rightCurrentTarget;
     m_tempRenderTarget4.resize(finalOutRenderTarget.size());
 
     m_tempRenderTarget4.bind();

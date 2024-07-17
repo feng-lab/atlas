@@ -112,9 +112,9 @@ void Z3DFilter::write(json::object& json) const
 
 void Z3DFilter::setValid(Z3DEye eye)
 {
-  if (eye == Z3DEye::Mono) {
+  if (eye == MonoEye) {
     reset_flag(m_state, State::MonoViewResultInvalid);
-  } else if (eye == Z3DEye::Left) {
+  } else if (eye == LeftEye) {
     reset_flag(m_state, State::LeftEyeResultInvalid);
   } else {
     reset_flag(m_state, State::RightEyeResultInvalid);
@@ -123,9 +123,9 @@ void Z3DFilter::setValid(Z3DEye eye)
 
 bool Z3DFilter::isValid(Z3DEye eye) const
 {
-  if (eye == Z3DEye::Mono) {
+  if (eye == MonoEye) {
     return !is_flag_set(m_state, State::MonoViewResultInvalid);
-  } else if (eye == Z3DEye::Left) {
+  } else if (eye == LeftEye) {
     return !is_flag_set(m_state, State::LeftEyeResultInvalid);
   } else {
     return !is_flag_set(m_state, State::RightEyeResultInvalid);
@@ -134,9 +134,13 @@ bool Z3DFilter::isValid(Z3DEye eye) const
 
 bool Z3DFilter::isReady(Z3DEye) const
 {
-  bool isReady = std::all_of(m_inputPorts.begin(), m_inputPorts.end(), [](auto port) { return port->isReady(); });
+  bool isReady = std::all_of(m_inputPorts.begin(), m_inputPorts.end(), [](auto port) {
+    return port->isReady();
+  });
   if (isReady) {
-    isReady = std::all_of(m_outputPorts.begin(), m_outputPorts.end(), [](auto port) { return port->isReady(); });
+    isReady = std::all_of(m_outputPorts.begin(), m_outputPorts.end(), [](auto port) {
+      return port->isReady();
+    });
   }
   return isReady;
 }

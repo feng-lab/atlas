@@ -114,24 +114,6 @@ struct ZImgInfo
     }
   }
 
-  [[nodiscard]] size_t size(Dimension dim) const
-  {
-    switch (std::to_underlying(dim)) {
-      case 0:
-        return width;
-      case 1:
-        return height;
-      case 2:
-        return depth;
-      case 3:
-        return numChannels;
-      case 4:
-        return numTimes;
-      default:
-        CHECK(false);
-    }
-  }
-
   [[nodiscard]] size_t size(size_t dim) const
   {
     switch (dim) {
@@ -146,30 +128,16 @@ struct ZImgInfo
       case 4:
         return numTimes;
       default:
-        CHECK(false);
+        throw ZException(fmt::format("invalid dimension {}", dim));
     }
+  }
+
+  [[nodiscard]] size_t size(Dimension dim) const
+  {
+    return size(std::to_underlying(dim));
   }
 
   // note: time stride is meaningless since the memory is not contiguous
-  [[nodiscard]] size_t stride(Dimension dim) const
-  {
-    size_t res = 1;
-    auto ddim = std::to_underlying(dim);
-    if (ddim > 0) {
-      res = width;
-    }
-    if (ddim > 1) {
-      res *= height;
-    }
-    if (ddim > 2) {
-      res *= depth;
-    }
-    if (ddim > 3) {
-      res *= numChannels;
-    }
-    return res;
-  }
-
   [[nodiscard]] size_t stride(size_t dim) const
   {
     size_t res = 1;
@@ -188,6 +156,11 @@ struct ZImgInfo
     return res;
   }
 
+  [[nodiscard]] size_t stride(Dimension dim) const
+  {
+    return stride(std::to_underlying(dim));
+  }
+
   size_t& operator[](size_t i)
   {
     switch (i) {
@@ -202,7 +175,7 @@ struct ZImgInfo
       case 4:
         return numTimes;
       default:
-        CHECK(false);
+        throw ZException(fmt::format("invalid dimension {}", i));
     }
   }
 
@@ -220,44 +193,18 @@ struct ZImgInfo
       case 4:
         return numTimes;
       default:
-        CHECK(false);
+        throw ZException(fmt::format("invalid dimension {}", i));
     }
   }
 
   size_t& operator[](Dimension i)
   {
-    switch (std::to_underlying(i)) {
-      case 0:
-        return width;
-      case 1:
-        return height;
-      case 2:
-        return depth;
-      case 3:
-        return numChannels;
-      case 4:
-        return numTimes;
-      default:
-        CHECK(false);
-    }
+    return operator[](std::to_underlying(i));
   }
 
   const size_t& operator[](Dimension i) const
   {
-    switch (std::to_underlying(i)) {
-      case 0:
-        return width;
-      case 1:
-        return height;
-      case 2:
-        return depth;
-      case 3:
-        return numChannels;
-      case 4:
-        return numTimes;
-      default:
-        CHECK(false);
-    }
+    return operator[](std::to_underlying(i));
   }
 
   [[nodiscard]] bool isAlphaChannel(size_t ch) const

@@ -61,7 +61,7 @@ public:
 
   bool renderingStarted(Z3DEye eye)
   {
-    return m_progress[std::to_underlying(eye)] > 0;
+    return m_progress[eye] > 0;
   }
 
 protected:
@@ -80,7 +80,7 @@ private:
 
   void resetProgress(Z3DEye eye)
   {
-    m_progress[std::to_underlying(eye)] = 0;
+    m_progress[eye] = 0;
   }
 
 protected:

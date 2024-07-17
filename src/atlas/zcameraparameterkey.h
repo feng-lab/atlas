@@ -31,7 +31,7 @@ public:
 
   [[nodiscard]] glm::quat rot() const
   {
-    return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(Z3DEye::Mono));
+    return glm::quat_cast(static_cast<Z3DCameraParameter*>(m_value.get())->get().viewMatrix(MonoEye));
   }
 
   [[nodiscard]] float posTension() const

@@ -140,8 +140,8 @@ double Z3DPunctaFilter::process(Z3DEye /*eye*/)
   //    glEnable(GL_BLEND);
   //    glBlendFunc(GL_ONE,GL_ONE_MINUS_SRC_ALPHA);
 
-  //    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
+  //    Z3DRenderOutputPort &currentOutport = (eye == Mono) ?
+  //          m_monoEyeOutport : (eye == Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
 
   //    currentOutport.bindTarget();
   //    currentOutport.clearTarget();
@@ -150,8 +150,8 @@ double Z3DPunctaFilter::process(Z3DEye /*eye*/)
   //    CHECK_GL_ERROR
   //    currentOutport.releaseTarget();
 
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
+  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
   //    currentOutport2.bindTarget();
   //    currentOutport2.clearTarget();
   //    m_rendererBase.setViewport(currentOutport2.size());
@@ -253,8 +253,8 @@ std::shared_ptr<ZWidgetsGroup> Z3DPunctaFilter::widgetsGroup()
 void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 {
   //  if (m_randomGlow.get()) {
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
+  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
   //    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
   //    m_textureCopyRenderer.setDepthTexture(currentOutport2.depthTexture());
   //    m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -268,10 +268,10 @@ void Z3DPunctaFilter::renderOpaque(Z3DEye eye)
 void Z3DPunctaFilter::renderTransparent(Z3DEye eye)
 {
   //  if (m_randomGlow.get()) {
-  //    Z3DRenderOutputPort &currentOutport = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport : (eye == Z3DEye::Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
-  //    Z3DRenderOutputPort &currentOutport2 = (eye == Z3DEye::Mono) ?
-  //          m_monoEyeOutport2 : (eye == Z3DEye::Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
+  //    Z3DRenderOutputPort &currentOutport = (eye == Mono) ?
+  //          m_monoEyeOutport : (eye == Left) ? m_leftEyeOutRenderTarget1 : m_rightEyeOutRenderTarget1;
+  //    Z3DRenderOutputPort &currentOutport2 = (eye == Mono) ?
+  //          m_monoEyeOutport2 : (eye == Left) ? m_leftEyeOutport2 : m_rightEyeOutport2;
   //    m_textureCopyRenderer.setColorTexture(currentOutport2.colorTexture());
   //    m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   //    m_rendererBase.render(eye, m_textureCopyRenderer);

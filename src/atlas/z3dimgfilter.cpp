@@ -560,9 +560,9 @@ bool Z3DImgFilter::hasOpaque(Z3DEye) const
 
 void Z3DImgFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
-                                        : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
-                                                                : m_opaqueRightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
+                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
+                                                           : m_opaqueRightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -572,17 +572,17 @@ void Z3DImgFilter::renderOpaque(Z3DEye eye)
 
 bool Z3DImgFilter::hasTransparent(Z3DEye eye) const
 {
-  const Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                              : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                      : m_rightEyeOutport;
+  const Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
+                                              : (eye == LeftEye) ? m_leftEyeOutport
+                                                                 : m_rightEyeOutport;
   return currentOutport.hasValidData();
 }
 
 void Z3DImgFilter::renderTransparent(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                        : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                : m_rightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
+                                        : (eye == LeftEye) ? m_leftEyeOutport
+                                                           : m_rightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
   m_rendererBase.render(eye, m_textureCopyRenderer);
@@ -808,9 +808,9 @@ bool Z3DImgFilter::hasSlices() const
 
 double Z3DImgFilter::renderSlices(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
-                                        : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
-                                                                : m_opaqueRightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_opaqueOutport
+                                        : (eye == LeftEye) ? m_opaqueLeftEyeOutport
+                                                           : m_opaqueRightEyeOutport;
 
   if (!(m_progressiveRendering && m_imgSliceRenderer.renderingStarted(eye))) {
     currentOutport.resize(m_outport.size());
@@ -929,15 +929,15 @@ bool Z3DImgFilter::hasImage() const
 
 double Z3DImgFilter::renderImage(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                        : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                : m_rightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
+                                        : (eye == LeftEye) ? m_leftEyeOutport
+                                                           : m_rightEyeOutport;
 
   if (!(m_progressiveRendering && m_imgRaycasterRenderer.renderingStarted(eye))) {
     m_layerTarget.resize(currentOutport.size());
     m_blockIDsRenderTarget.resize(currentOutport.size());
-    m_imageRenderTarget1s[std::to_underlying(eye)]->resize(currentOutport.size());
-    m_imageRenderTarget2s[std::to_underlying(eye)]->resize(currentOutport.size());
+    m_imageRenderTarget1s[eye]->resize(currentOutport.size());
+    m_imageRenderTarget2s[eye]->resize(currentOutport.size());
 
     glm::uvec3 volDim = glm::max(glm::uvec3(2, 2, 2), m_3dImg->dimensions());
     glm::vec3 coordLuf = m_3dImg->physicalLUF();
@@ -1143,9 +1143,9 @@ void Z3DImgFilter::renderOnlyBoundBox(Z3DEye eye)
   glEnable(GL_BLEND);
   glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                        : (eye == Z3DEye::Left) ? m_leftEyeOutport
-                                                                : m_rightEyeOutport;
+  Z3DRenderOutputPort& currentOutport = (eye == MonoEye)   ? m_outport
+                                        : (eye == LeftEye) ? m_leftEyeOutport
+                                                           : m_rightEyeOutport;
 
   currentOutport.bindTarget();
   currentOutport.clearTarget();
@@ -1263,8 +1263,8 @@ glm::vec3 Z3DImgFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, int 
 
 glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
-  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+  glm::mat4 projection = globalCamera().projectionMatrix(MonoEye);
+  glm::mat4 modelview = globalCamera().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -1286,8 +1286,8 @@ glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z
 
 glm::vec3 Z3DImgFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
-  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+  glm::mat4 projection = globalCamera().projectionMatrix(MonoEye);
+  glm::mat4 modelview = globalCamera().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;

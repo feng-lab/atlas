@@ -140,7 +140,7 @@ void Z3DRendererBase::setGlobalShaderParameters(Z3DShaderProgram& shader, Z3DEye
 
   shader.setSizeScaleUniform(m_sizeScale.get());
   shader.setPosTransformUniform(m_coordTransform.get());
-  shader.setPosTransformNormalMatrixUniform(m_coordTransformNormalMatrices[std::to_underlying(eye)]);
+  shader.setPosTransformNormalMatrixUniform(m_coordTransformNormalMatrices[eye]);
 
   shader.setLightsPositionUniform(m_globalParas.lightPositionArray(), m_globalParas.lightCount.get());
   shader.setLightsAmbientUniform(m_globalParas.lightAmbientArray(), m_globalParas.lightCount.get());
@@ -745,12 +745,12 @@ void Z3DRendererBase::compile()
 
 void Z3DRendererBase::makeCoordTransformNormalMatrix()
 {
-  m_coordTransformNormalMatrices[std::to_underlying(Z3DEye::Left)] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Left) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[std::to_underlying(Z3DEye::Mono)] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Mono) * m_coordTransform.get())));
-  m_coordTransformNormalMatrices[std::to_underlying(Z3DEye::Right)] =
-    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(Z3DEye::Right) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[LeftEye] =
+    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(LeftEye) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[MonoEye] =
+    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(MonoEye) * m_coordTransform.get())));
+  m_coordTransformNormalMatrices[RightEye] =
+    glm::transpose(glm::inverse(glm::mat3(camera().viewMatrix(RightEye) * m_coordTransform.get())));
 }
 
 } // namespace nim

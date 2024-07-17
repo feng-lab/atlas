@@ -475,9 +475,9 @@ void Z3DImgRaycasterRenderer::render2DImage(Z3DEye eye, const std::vector<size_t
 double
 Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive)
 {
-  if (progressive && m_channelIdx[std::to_underlying(eye)] < 0) {
+  if (progressive && m_channelIdx[eye] < 0) {
     render2DSliceOf3DImageFast(eye, visibleIdxs);
-    m_channelIdx[std::to_underlying(eye)] = 0;
+    m_channelIdx[eye] = 0;
     return 0.5;
   }
 
@@ -599,7 +599,7 @@ Z3DImgRaycasterRenderer::render2DSliceOf3DImage(Z3DEye eye, const std::vector<si
 
   CHECK_GL_ERROR
 
-  m_channelIdx[std::to_underlying(eye)] = -1;
+  m_channelIdx[eye] = -1;
   return 1;
 }
 
@@ -645,9 +645,9 @@ void Z3DImgRaycasterRenderer::render2DSliceOf3DImageFast(Z3DEye eye, const std::
 
 double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size_t>& visibleIdxs, bool progressive)
 {
-  if (progressive && m_channelIdx[std::to_underlying(eye)] < 0) {
+  if (progressive && m_channelIdx[eye] < 0) {
     render3DImageFast(eye, visibleIdxs);
-    m_channelIdx[std::to_underlying(eye)] = 0;
+    m_channelIdx[eye] = 0;
     for (size_t idx = 0; idx < visibleIdxs.size(); ++idx) {
       m_layerTarget->attachSlice(idx);
       m_layerTarget->bind();
@@ -675,10 +675,9 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
   VLOG(1) << n << " " << f << " " << ze_to_screen_pixel_voxel_size << " " << pixelEyeSpaceSize << " " << ze_to_zw_a
           << " " << ze_to_zw_b;
 
-  CHECK(m_lastImageRenderTargets[std::to_underlying(eye)]->size() == m_layerTarget->size())
-    << m_lastImageRenderTargets[std::to_underlying(eye)]->size();
-  CHECK(m_lastImageRenderTargets[std::to_underlying(eye)]->size() == m_blockIDsRenderTarget->size())
-    << m_lastImageRenderTargets[std::to_underlying(eye)]->size() << " " << m_blockIDsRenderTarget->size();
+  CHECK(m_lastImageRenderTargets[eye]->size() == m_layerTarget->size()) << m_lastImageRenderTargets[eye]->size();
+  CHECK(m_lastImageRenderTargets[eye]->size() == m_blockIDsRenderTarget->size())
+    << m_lastImageRenderTargets[eye]->size() << " " << m_blockIDsRenderTarget->size();
 
 #if defined(__linux__)
   static int dummyidx = -1;
@@ -688,11 +687,10 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 #endif
 
   if (progressive) {
-    CHECK(m_channelIdx[std::to_underlying(eye)] < static_cast<int>(visibleIdxs.size()))
-      << m_channelIdx[std::to_underlying(eye)] << " " << visibleIdxs.size();
+    CHECK(m_channelIdx[eye] < static_cast<int>(visibleIdxs.size())) << m_channelIdx[eye] << " " << visibleIdxs.size();
     bool lastRound = render3DImageForOneRound(eye,
-                                              visibleIdxs[m_channelIdx[std::to_underlying(eye)]],
-                                              m_round[std::to_underlying(eye)],
+                                              visibleIdxs[m_channelIdx[eye]],
+                                              m_round[eye],
                                               ze_to_zw_a,
                                               ze_to_zw_b,
                                               ze_to_screen_pixel_voxel_size);
@@ -700,26 +698,18 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
     if (visibleIdxs.size() == 1) {
       m_copyTextureShader.bind();
-      m_copyTextureShader.bindTexture(
-        "color_texture",
-        m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader.bindTexture(
-        "depth_texture",
-        m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+      m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
+      m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
       renderScreenQuad(m_VAO, m_copyTextureShader);
       m_copyTextureShader.release();
     } else {
-      m_layerTarget->attachSlice(m_channelIdx[std::to_underlying(eye)]);
+      m_layerTarget->attachSlice(m_channelIdx[eye]);
       m_layerTarget->bind();
       m_layerTarget->clear();
 
       m_copyTextureShader.bind();
-      m_copyTextureShader.bindTexture(
-        "color_texture",
-        m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT0));
-      m_copyTextureShader.bindTexture(
-        "depth_texture",
-        m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+      m_copyTextureShader.bindTexture("color_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
+      m_copyTextureShader.bindTexture("depth_texture", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
       renderScreenQuad(m_VAO, m_copyTextureShader);
       m_copyTextureShader.release();
 
@@ -727,18 +717,17 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
     }
 
     if (lastRound) {
-      ++m_channelIdx[std::to_underlying(eye)];
-      m_round[std::to_underlying(eye)] = 0;
+      ++m_channelIdx[eye];
+      m_round[eye] = 0;
     } else {
-      ++m_round[std::to_underlying(eye)];
+      ++m_round[eye];
     }
     int totalRound = visibleIdxs.size() * FLAGS_atlas_volume_rendering_maximum_round;
-    int currentRound = m_channelIdx[std::to_underlying(eye)] * FLAGS_atlas_volume_rendering_maximum_round +
-                       m_round[std::to_underlying(eye)];
+    int currentRound = m_channelIdx[eye] * FLAGS_atlas_volume_rendering_maximum_round + m_round[eye];
     progress = currentRound >= totalRound ? 1 : (static_cast<double>(currentRound) / totalRound * 0.5 + 0.5);
     if (progress == 1) {
-      m_channelIdx[std::to_underlying(eye)] = -1;
-      m_round[std::to_underlying(eye)] = 0;
+      m_channelIdx[eye] = -1;
+      m_round[eye] = 0;
     }
   } else {
     for (size_t channelIdx = 0; channelIdx < visibleIdxs.size(); ++channelIdx) {
@@ -749,14 +738,10 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         if (FLAGS_atlas_debug_texture_output) {
           auto filen =
             QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att0.tif", dummyidx, c, round));
-          m_lastImageRenderTargets[std::to_underlying(eye)]
-            ->attachment(GL_COLOR_ATTACHMENT0)
-            ->saveAsRGBAFloatImage(filen);
+          m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0)->saveAsRGBAFloatImage(filen);
           filen =
             QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_round{}_att1.tif", dummyidx, c, round));
-          m_lastImageRenderTargets[std::to_underlying(eye)]
-            ->attachment(GL_COLOR_ATTACHMENT1)
-            ->saveAsRGBFloatImage(filen);
+          m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1)->saveAsRGBFloatImage(filen);
           if (round == 0) {
             filen = QString::fromStdString(fmt::format("/data/testoutput/tex_{}_ch{}_entry.tif", dummyidx, c));
             m_entryExitTexCoordAndZeTexture->saveAsRGBAFloatImage(filen);
@@ -772,12 +757,10 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
 
       if (visibleIdxs.size() == 1) {
         m_copyTextureShader.bind();
-        m_copyTextureShader.bindTexture(
-          "color_texture",
-          m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT0));
-        m_copyTextureShader.bindTexture(
-          "depth_texture",
-          m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+        m_copyTextureShader.bindTexture("color_texture",
+                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
+        m_copyTextureShader.bindTexture("depth_texture",
+                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
         renderScreenQuad(m_VAO, m_copyTextureShader);
         m_copyTextureShader.release();
       } else {
@@ -786,12 +769,10 @@ double Z3DImgRaycasterRenderer::render3DImage(Z3DEye eye, const std::vector<size
         m_layerTarget->clear();
 
         m_copyTextureShader.bind();
-        m_copyTextureShader.bindTexture(
-          "color_texture",
-          m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT0));
-        m_copyTextureShader.bindTexture(
-          "depth_texture",
-          m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+        m_copyTextureShader.bindTexture("color_texture",
+                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
+        m_copyTextureShader.bindTexture("depth_texture",
+                                        m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
         renderScreenQuad(m_VAO, m_copyTextureShader);
         m_copyTextureShader.release();
 
@@ -865,10 +846,10 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   };
 
   if (round == 0) {
-    m_lastImageRenderTargets[std::to_underlying(eye)]->bind();
+    m_lastImageRenderTargets[eye]->bind();
     glDrawBuffers(2, g_drawBuffers);
-    m_lastImageRenderTargets[std::to_underlying(eye)]->clear();
-    m_lastImageRenderTargets[std::to_underlying(eye)]->release();
+    m_lastImageRenderTargets[eye]->clear();
+    m_lastImageRenderTargets[eye]->release();
   }
 
   m_blockIDsRenderTarget->bind();
@@ -876,9 +857,8 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   glClear(GL_COLOR_BUFFER_BIT);
 
   m_img->bindFullResBlockIDsShader(m_image3DRaycasterBlockIDsShader, c);
-  m_image3DRaycasterBlockIDsShader.bindTexture(
-    "last_ray_depth",
-    m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+  m_image3DRaycasterBlockIDsShader.bindTexture("last_ray_depth",
+                                               m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
   renderScreenQuad(m_VAO, m_image3DRaycasterBlockIDsShader);
 
   m_blockIDsRenderTarget->release();
@@ -991,12 +971,9 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
   // entry exit points
   m_image3DRaycasterShader.bindTexture("ray_entry_exit_tex_coord", m_entryExitTexCoordAndZeTexture);
 
-  m_image3DRaycasterShader.bindTexture(
-    "last_color",
-    m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT0));
-  m_image3DRaycasterShader.bindTexture(
-    "last_ray_depth",
-    m_lastImageRenderTargets[std::to_underlying(eye)]->attachment(GL_COLOR_ATTACHMENT1));
+  m_image3DRaycasterShader.bindTexture("last_color", m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT0));
+  m_image3DRaycasterShader.bindTexture("last_ray_depth",
+                                       m_lastImageRenderTargets[eye]->attachment(GL_COLOR_ATTACHMENT1));
 
   if (m_compositingMode.get() == "ISO Surface") {
     m_image3DRaycasterShader.setUniform("iso_value", m_isoValue.get());
@@ -1008,21 +985,21 @@ bool Z3DImgRaycasterRenderer::render3DImageForOneRound(Z3DEye eye,
 
   m_image3DRaycasterShader.setUniform("sampling_rate", m_samplingRate.get());
 
-  m_currentImageRenderTargets[std::to_underlying(eye)]->bind();
+  m_currentImageRenderTargets[eye]->bind();
   glDrawBuffers(2, g_drawBuffers);
-  m_currentImageRenderTargets[std::to_underlying(eye)]->clear();
+  m_currentImageRenderTargets[eye]->clear();
 
   m_img->bindFullResRenderShader(m_image3DRaycasterShader, c);
   m_image3DRaycasterShader.bindTexture("transfer_function", m_transferFuncParas[c]->get().texture());
   renderScreenQuad(m_VAO, m_image3DRaycasterShader);
 
-  m_currentImageRenderTargets[std::to_underlying(eye)]->release();
+  m_currentImageRenderTargets[eye]->release();
 
   m_image3DRaycasterShader.release();
   glFinish();
   STOP_AND_LOG(btri)
 
-  std::swap(m_lastImageRenderTargets[std::to_underlying(eye)], m_currentImageRenderTargets[std::to_underlying(eye)]);
+  std::swap(m_lastImageRenderTargets[eye], m_currentImageRenderTargets[eye]);
 
   return lastRound;
 }

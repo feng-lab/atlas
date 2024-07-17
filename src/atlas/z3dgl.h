@@ -9,11 +9,11 @@ namespace nim {
 
 using namespace gl;
 
-enum class Z3DEye
+enum Z3DEye
 {
-  Left = 0,
-  Mono,
-  Right
+  LeftEye = 0,
+  MonoEye = 1,
+  RightEye = 2
 };
 
 enum class Z3DScreenShotType

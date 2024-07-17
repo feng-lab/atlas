@@ -356,7 +356,7 @@ uint16_t getTiffCompressionTag(Compression comp)
   if (it != compressionToTiffCompressionMap.end()) {
     return it->second;
   }
-  throw ZIOException(fmt::format("invalid Compression for Tiff: {}", std::to_underlying(comp)));
+  throw ZIOException(fmt::format("invalid Compression for Tiff: {}", comp));
 }
 
 bool ZTiffIFD::isReducedResolutionImage() const

@@ -458,8 +458,8 @@ bool Z3DVolumeFilter::hasOpaque(Z3DEye) const
 
 void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
-                                        : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
+  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
+                                        : (eye == Left) ? m_opaqueLeftEyeOutport
                                                                 : m_opaqueRightEyeOutport;
   currentOutport.resize(m_outport.size());
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
@@ -469,16 +469,16 @@ void Z3DVolumeFilter::renderOpaque(Z3DEye eye)
 
 bool Z3DVolumeFilter::hasTransparent(Z3DEye eye) const
 {
-  const Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                              : (eye == Z3DEye::Left) ? m_leftEyeOutport
+  const Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
+                                              : (eye == Left) ? m_leftEyeOutport
                                                                       : m_rightEyeOutport;
   return currentOutport.hasValidData();
 }
 
 void Z3DVolumeFilter::renderTransparent(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                        : (eye == Z3DEye::Left) ? m_leftEyeOutport
+  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
+                                        : (eye == Left) ? m_leftEyeOutport
                                                                 : m_rightEyeOutport;
   m_textureCopyRenderer.setColorTexture(currentOutport.colorTexture());
   m_textureCopyRenderer.setDepthTexture(currentOutport.depthTexture());
@@ -667,8 +667,8 @@ void Z3DVolumeFilter::process(Z3DEye eye)
                    m_zCut.upperValue() < m_zCut.minimum() + 1 || m_xCut.lowerValue() > m_xCut.maximum() - 1 ||
                    m_yCut.lowerValue() > m_yCut.maximum() - 1 || m_zCut.lowerValue() > m_zCut.maximum() - 1;
 
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_outport
-                                        : (eye == Z3DEye::Left) ? m_leftEyeOutport
+  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_outport
+                                        : (eye == Left) ? m_leftEyeOutport
                                                                 : m_rightEyeOutport;
 
   currentOutport.bindTarget();
@@ -708,8 +708,8 @@ bool Z3DVolumeFilter::hasSlices() const
 
 void Z3DVolumeFilter::renderSlices(Z3DEye eye)
 {
-  Z3DRenderOutputPort& currentOutport = (eye == Z3DEye::Mono)   ? m_opaqueOutport
-                                        : (eye == Z3DEye::Left) ? m_opaqueLeftEyeOutport
+  Z3DRenderOutputPort& currentOutport = (eye == Mono)   ? m_opaqueOutport
+                                        : (eye == Left) ? m_opaqueLeftEyeOutport
                                                                 : m_opaqueRightEyeOutport;
   currentOutport.resize(m_outport.size());
 
@@ -1268,8 +1268,8 @@ glm::vec3 Z3DVolumeFilter::getMaxInten3DPositionUnderScreenPoint(int x, int y, i
 
 glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height, Z3DRenderOutputPort& port)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
-  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+  glm::mat4 projection = globalCamera().projectionMatrix(Mono);
+  glm::mat4 modelview = globalCamera().viewMatrix(Mono);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -1291,8 +1291,8 @@ glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, int width, int height
 
 glm::vec3 Z3DVolumeFilter::get3DPosition(glm::ivec2 pos2D, double depth, int width, int height)
 {
-  glm::mat4 projection = globalCamera().projectionMatrix(Z3DEye::Mono);
-  glm::mat4 modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+  glm::mat4 projection = globalCamera().projectionMatrix(Mono);
+  glm::mat4 modelview = globalCamera().viewMatrix(Mono);
 
   glm::ivec4 viewport;
   viewport[0] = 0;

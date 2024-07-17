@@ -470,8 +470,8 @@ void Z3DBoundedFilter::appendBoundboxLines(const ZBBox<glm::dvec3>& bound, std::
 
 void Z3DBoundedFilter::rayUnderScreenPoint(glm::vec3& v1, glm::vec3& v2, int x, int y, int width, int height)
 {
-  const glm::mat4& projection = globalCamera().projectionMatrix(Z3DEye::Mono);
-  const glm::mat4& modelview = globalCamera().viewMatrix(Z3DEye::Mono);
+  const glm::mat4& projection = globalCamera().projectionMatrix(MonoEye);
+  const glm::mat4& modelview = globalCamera().viewMatrix(MonoEye);
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -486,8 +486,8 @@ void Z3DBoundedFilter::rayUnderScreenPoint(glm::vec3& v1, glm::vec3& v2, int x, 
 
 void Z3DBoundedFilter::rayUnderScreenPoint(glm::dvec3& v1, glm::dvec3& v2, int x, int y, int width, int height)
 {
-  const glm::dmat4& projection = glm::dmat4(globalCamera().projectionMatrix(Z3DEye::Mono));
-  const glm::dmat4& modelview = glm::dmat4(globalCamera().viewMatrix(Z3DEye::Mono));
+  const glm::dmat4& projection = glm::dmat4(globalCamera().projectionMatrix(MonoEye));
+  const glm::dmat4& modelview = glm::dmat4(globalCamera().viewMatrix(MonoEye));
 
   glm::ivec4 viewport;
   viewport[0] = 0;
@@ -652,11 +652,10 @@ void Z3DBoundedFilter::updateHandle()
 {
   if (!m_handleValid) {
     Z3DCamera& camera = m_rendererBase.globalCamera();
-    glm::mat4 mat =
-      m_rendererBase.viewportMatrix() * camera.projectionMatrix(Z3DEye::Mono) * camera.viewMatrix(Z3DEye::Mono);
-    glm::vec3 rightVector(camera.viewMatrix(Z3DEye::Mono)[0][0],
-                          camera.viewMatrix(Z3DEye::Mono)[1][0],
-                          camera.viewMatrix(Z3DEye::Mono)[2][0]);
+    glm::mat4 mat = m_rendererBase.viewportMatrix() * camera.projectionMatrix(MonoEye) * camera.viewMatrix(MonoEye);
+    glm::vec3 rightVector(camera.viewMatrix(MonoEye)[0][0],
+                          camera.viewMatrix(MonoEye)[1][0],
+                          camera.viewMatrix(MonoEye)[2][0]);
     glm::vec3 centerScreen = glm::applyMatrix(mat, m_center);
     glm::vec3 rightScreen = glm::applyMatrix(mat, m_center + rightVector);
     float size = m_manipulatorSize.get() / (rightScreen.x - centerScreen.x);

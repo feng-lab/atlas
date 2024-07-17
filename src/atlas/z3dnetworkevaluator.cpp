@@ -72,7 +72,7 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
 
     currentFilter->setProgressiveRenderingMode(progressiveRendering);
 
-    Z3DEye eye = stereo ? Z3DEye::Left : Z3DEye::Mono;
+    Z3DEye eye = stereo ? LeftEye : MonoEye;
 
     // execute the filter, if it needs processing and is ready
     if (!currentFilter->isValid(eye) && currentFilter->isReady(eye)) {
@@ -106,7 +106,7 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
       CHECK_GL_ERROR
     }
 
-    if (stereo && !currentFilter->isValid(Z3DEye::Right) && currentFilter->isReady(Z3DEye::Right)) {
+    if (stereo && !currentFilter->isValid(RightEye) && currentFilter->isReady(RightEye)) {
       // notify filter wrappers
       for (const auto& filterWrapper : m_filterWrappers) {
         filterWrapper->beforeFilterProcess(currentFilter);
@@ -114,15 +114,15 @@ Z3DNetworkEvaluator::process(bool stereo, bool progressiveRendering, const folly
       CHECK_GL_ERROR
 
       {
-        double progress = currentFilter->process(Z3DEye::Right);
-        // currentFilter->setValid(Z3DEye::Right);
+        double progress = currentFilter->process(RightEye);
+        // currentFilter->setValid(Right);
         if (progress == 1.0) {
           if (currentFilter == &m_compositor) {
             if (totalProgress == currentProgress) {
-              currentFilter->setValid(Z3DEye::Right);
+              currentFilter->setValid(RightEye);
             }
           } else {
-            currentFilter->setValid(Z3DEye::Right);
+            currentFilter->setValid(RightEye);
           }
         }
         currentProgress += progress;
