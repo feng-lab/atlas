@@ -118,11 +118,7 @@ void ZSwc::load(const QString& filename)
       }
       removeComment(line, QString("#"), true);
       static QRegularExpression rx("\\s+");
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
       QStringList fieldList = line.split(rx, Qt::SkipEmptyParts);
-#else
-      QStringList fieldList = line.split(rx, QString::SkipEmptyParts);
-#endif
       if (fieldList.size() >= 7) {
         SwcNode node;
         bool ok;

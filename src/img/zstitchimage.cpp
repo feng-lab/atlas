@@ -55,11 +55,7 @@ size_t buildConnectionFromTextFile(const QString& filename,
     QTextStream in(&inputFile);
     while (!in.atEnd()) {
       QString line = in.readLine();
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
       QStringList list = line.split(rx, Qt::SkipEmptyParts);
-#else
-      QStringList list = line.split(rx, QString::SkipEmptyParts);
-#endif
 
       if (list.empty() || list.at(0).startsWith("#")) {
         continue;
@@ -834,9 +830,9 @@ void ZStitchImage::write(json::object& jo) const
     jo["downsample_block_width"] = m_downsampleBlockWidth;
     jo["downsample_block_height"] = m_downsampleBlockHeight;
     jo["downsample_block_depth"] = m_downsampleBlockDepth;
-    jo["downsample_block_merge_mode"] = json::value_from(enumToString(m_downsampleMergeMode));
+    jo["downsample_block_merge_mode"] = enumToString(m_downsampleMergeMode);
   }
-  jo["merge_mode"] = json::value_from(enumToString(m_mergeMode));
+  jo["merge_mode"] = enumToString(m_mergeMode);
   if (m_concatenateOnly) {
     jo["concatenate_only"] = m_concatenateOnly;
   }

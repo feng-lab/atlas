@@ -135,11 +135,7 @@ ZMeshIO::ZMeshIO()
   importer.GetExtensionList(tmp);
   QString exts = QString::fromStdString(tmp);
   exts.replace("*.", "");
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
   m_readExts = exts.split(";", Qt::SkipEmptyParts);
-#else
-  m_readExts = exts.split(";", QString::SkipEmptyParts);
-#endif
   m_readExts.push_back("msh");
   m_readExts.push_back("vtp");
   m_readExts.push_back("precomputed_mesh");

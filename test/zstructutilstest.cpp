@@ -2,21 +2,18 @@
 #include "ztest.h"
 #include <fmt/ostream.h>
 
+namespace nim {
+
 enum class E : int16_t
 {
-  unknown = -1,
-  A = 0,
-  B = 1,
+  unknown = 0,
+  A = 1,
+  B = 2,
 };
 
-std::ostream& operator<<(std::ostream& os, const E& e)
-{
-  return os << std::to_underlying(e);
-}
+} // namespace nim
 
-template<>
-struct fmt::formatter<E> : ostream_formatter
-{};
+using namespace nim;
 
 struct foobar
 {
@@ -63,8 +60,6 @@ struct MyStruct
 
 TEST(CompactStructTest, WriteAndReadStruct)
 {
-  using namespace nim;
-
   fmt::print("size of foobar: {}\n", sizeof(foobar));
   fmt::print("size of MySubStruct: {}\n", sizeof(MySubStruct));
   fmt::print("size of MyStruct: {}\n", sizeof(MyStruct));

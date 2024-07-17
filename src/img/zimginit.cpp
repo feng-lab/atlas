@@ -78,11 +78,7 @@ void initImgLib(const char* argv0,
     QDir jreD;
     QString javahome = jreDIR;
     if (javahome.isEmpty()) {
-#if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
       javahome = qEnvironmentVariable("JAVA_HOME");
-#else
-      javahome = qgetenv("JAVA_HOME");
-#endif
       if (javahome.isEmpty()) {
         ZImgGlobal::instance().jarsDIR = jarsD.absolutePath();
         VLOG(1) << "jarsDIR: " << ZImgGlobal::instance().jarsDIR;

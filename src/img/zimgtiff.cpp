@@ -253,11 +253,7 @@ void ZImgTiff::detectImgInfo(ZTiff& tiff)
       size_t slices = 1;
       size_t frames = 1;
       bool hyperstack = false;
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 14, 0))
       QStringList fields = m_imageDescription.split("\n", Qt::SkipEmptyParts);
-#else
-      QStringList fields = m_imageDescription.split("\n", QString::SkipEmptyParts);
-#endif
       for (auto& field : fields) {
         if (field.startsWith("images=")) {
           images = field.remove(0, 7).toInt();

@@ -145,11 +145,11 @@ void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgSource& 
 {
   auto& jo = jv.emplace_object();
   jo["filenames"] = json::value_from(imgSource.filenames);
-  jo["catDim"] = json::value_from(enumToString(imgSource.catDim));
+  jo["catDim"] = enumToString(imgSource.catDim);
   jo["catScenes"] = imgSource.catScenes;
   jo["region"] = json::value_from(imgSource.region);
   jo["scene"] = imgSource.scene;
-  jo["format"] = json::value_from(enumToString(imgSource.format));
+  jo["format"] = enumToString(imgSource.format);
   jo["expandXY"] = imgSource.expandXY;
   jo["expandWithMaxValue"] = imgSource.expandWithMaxValue;
 }
@@ -1465,8 +1465,7 @@ template ZImg ZImg::castTo<double>() const;
       (vf == VoxelFormat::Signed && bytePerVoxel != 1 && bytePerVoxel != 2 && bytePerVoxel != 4 && bytePerVoxel != 8) ||
       ((vf == VoxelFormat::Unsigned) && bytePerVoxel != 1 && bytePerVoxel != 2 && bytePerVoxel != 4 &&
        bytePerVoxel != 8)) {
-    throw ZException(
-      fmt::format("Invalid combination of voxel format {} and bytesPerVoxel {}", enumToString(vf), bytePerVoxel));
+    throw ZException(fmt::format("Invalid combination of voxel format {} and bytesPerVoxel {}", vf, bytePerVoxel));
   }
   ZImgInfo info = m_info;
   info.voxelFormat = vf;
@@ -1526,7 +1525,7 @@ ZImg ZImg::resizedIPP([[maybe_unused]] size_t desWidth,
   } else if (interpolant == Interpolant::Cubic) {
     interpolation = IPPI_INTER_CUBIC;
   } else {
-    LOG(FATAL) << "interpolant " << enumToString(interpolant) << " is not supported";
+    LOG(FATAL) << fmt::format("interpolant {} is not supported", interpolant);
   }
 
   ZImg res;

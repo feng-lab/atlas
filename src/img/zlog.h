@@ -16,7 +16,7 @@
 #include <QDebug>
 #include <QPoint>
 #include <QRect>
-#include <memory>
+#include <reflect>
 #include <functional>
 #include <iosfwd>
 #include <type_traits>
@@ -44,7 +44,7 @@ struct LogData
           const std::tm& tm,
           const char* msg,
           size_t message_len,
-          std::string formatted_msg)
+          const std::string& formatted_msg)
     : level(severity)
     , fullFilename(full_filename)
     , baseFilename(base_filename)
@@ -104,6 +104,55 @@ QString levelToString(LogSeverity theLevel);
 #define LWARNF(file, line) google::LogMessage(file, line, google::GLOG_WARNING).stream()
 #define LERRORF(file, line) google::LogMessage(file, line, google::GLOG_ERROR).stream()
 #define LFATALF(file, line) google::LogMessage(file, line, google::GLOG_FATAL).stream()
+
+// enum related
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+std::string_view enumToString(TEnum e)
+{
+  auto res = reflect::enum_name(e);
+  if (res.empty()) {
+    throw ZIOException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
+  }
+  return res;
+}
+
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+TEnum stringToEnum(std::string_view s)
+{
+  static constexpr auto enumerators =
+    reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
+  for (size_t i = 0; i < enumerators.size(); ++i) {
+    if (s == enumerators[i].second) {
+      return static_cast<TEnum>(enumerators[i].first);
+    }
+  }
+  throw ZIOException(fmt::format("invalid enum string: {}", s));
+}
+
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+QString enumToQString(TEnum e)
+{
+  auto str = enumToString(e);
+  return QString::fromUtf8(str.data(), str.size());
+}
+
+template<typename TEnum>
+  requires std::is_enum_v<TEnum>
+TEnum stringToEnum(QStringView s)
+{
+  auto str = s.toUtf8();
+  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
+}
+
+template<typename TEnum>
+  requires std::is_scoped_enum_v<TEnum>
+auto format_as(TEnum f)
+{
+  return enumToString(f);
+}
 
 inline std::ostream& operator<<(std::ostream& s, const QByteArray& q)
 {
@@ -373,19 +422,4 @@ struct fmt::formatter<QStringRef> : fmt::formatter<const char*>
     return formatter<const char*>::format(s.toUtf8().constData(), ctx);
   }
 };
-#endif
-
-#if (QT_VERSION < QT_VERSION_CHECK(5, 14, 0))
-namespace std {
-
-template<>
-struct hash<QString>
-{
-  size_t operator()(const QString& s) const noexcept
-  {
-    return qHash(s, qHash(std::hash<int>{}(0)));
-  }
-};
-
-} // namespace std
 #endif

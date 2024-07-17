@@ -200,7 +200,7 @@ void ZImgV3DRaw::checkImgBeforeWriting(const QString& filename, const ZImgInfo& 
 {
   ZImgFormat::checkImgBeforeWriting(filename, info, paras);
   if (paras.compression != Compression::AUTO && paras.compression != Compression::NONE) {
-    throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
+    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1) {
     throw ZIOException("time sequence is not supported");

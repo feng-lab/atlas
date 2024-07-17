@@ -1,6 +1,5 @@
 #include "zimginterface.h"
 
-#include <reflect>
 #include <unordered_map>
 
 namespace nim {
@@ -59,50 +58,5 @@ double unitSizeInMeter(VoxelSizeUnit vsu)
   }
   throw ZException(fmt::format("Invalid VoxelSizeUnit {}", std::to_underlying(vsu)));
 }
-
-template<typename TEnum>
-std::string_view enumToString(TEnum e)
-{
-  static_assert(std::is_enum_v<std::remove_cvref_t<TEnum>>, "Need Enum Type");
-  auto res = reflect::enum_name(e);
-  if (res.empty()) {
-    throw ZIOException(fmt::format("invalid enum value: {}", std::to_underlying(e)));
-  }
-  return res;
-}
-
-template<typename TEnum>
-TEnum stringToEnum(std::string_view s)
-{
-  static_assert(std::is_enum_v<std::remove_cvref_t<TEnum>>, "Need Enum Type");
-  static constexpr auto enumerators =
-    reflect::enumerators<TEnum, reflect::enum_min(TEnum{}), reflect::enum_max(TEnum{})>;
-  for (size_t i = 0; i < enumerators.size(); ++i) {
-    if (s == enumerators[i].second) {
-      return static_cast<TEnum>(enumerators[i].first);
-    }
-  }
-  throw ZIOException(fmt::format("invalid enum string: {}", s));
-}
-
-template std::string_view enumToString<DataType>(DataType);
-template std::string_view enumToString<VoxelFormat>(VoxelFormat);
-template std::string_view enumToString<VoxelSizeUnit>(VoxelSizeUnit);
-template std::string_view enumToString<FileFormat>(FileFormat);
-template std::string_view enumToString<Compression>(Compression);
-template std::string_view enumToString<PadOption>(PadOption);
-template std::string_view enumToString<Interpolant>(Interpolant);
-template std::string_view enumToString<Dimension>(Dimension);
-template std::string_view enumToString<ImgMergeMode>(ImgMergeMode);
-
-template DataType stringToEnum<DataType>(std::string_view);
-template VoxelFormat stringToEnum<VoxelFormat>(std::string_view);
-template VoxelSizeUnit stringToEnum<VoxelSizeUnit>(std::string_view);
-template FileFormat stringToEnum<FileFormat>(std::string_view);
-template Compression stringToEnum<Compression>(std::string_view);
-template PadOption stringToEnum<PadOption>(std::string_view);
-template Interpolant stringToEnum<Interpolant>(std::string_view);
-template Dimension stringToEnum<Dimension>(std::string_view);
-template ImgMergeMode stringToEnum<ImgMergeMode>(std::string_view);
 
 } // namespace nim

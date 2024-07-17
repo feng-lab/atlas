@@ -437,9 +437,9 @@ inline void tag_invoke(const json::value_from_tag&, json::value& jv, const ZImgI
   jo["numChannels"] = info.numChannels;
   jo["numTimes"] = info.numTimes;
   jo["bytesPerVoxel"] = info.bytesPerVoxel;
-  jo["voxelFormat"] = json::value_from(enumToString(info.voxelFormat));
+  jo["voxelFormat"] = enumToString(info.voxelFormat);
   jo["validBitCount"] = info.validBitCount;
-  jo["voxelSizeUnit"] = json::value_from(enumToString(info.voxelSizeUnit));
+  jo["voxelSizeUnit"] = enumToString(info.voxelSizeUnit);
   jo["voxelSizeX"] = info.voxelSizeX;
   jo["voxelSizeY"] = info.voxelSizeY;
   jo["voxelSizeZ"] = info.voxelSizeZ;

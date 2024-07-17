@@ -26,6 +26,16 @@ constexpr std::underlying_type_t<Enum> to_underlying(Enum e) noexcept
   return static_cast<std::underlying_type_t<Enum>>(e);
 }
 
+// c++23
+template<typename E>
+  struct is_scoped_enum : std::bool_constant < requires
+{
+  requires std::is_enum_v<E>;
+  requires !std::is_convertible_v<E, std::underlying_type_t<E>>;
+} > {};
+template<class T>
+inline constexpr bool is_scoped_enum_v = is_scoped_enum<T>::value;
+
 // c++23 utility
 [[noreturn]] __forceinline void unreachable()
 {

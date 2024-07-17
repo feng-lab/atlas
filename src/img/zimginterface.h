@@ -20,34 +20,6 @@ private:
   ZImgGlobal() = default;
 };
 
-template<typename TEnum>
-std::string_view enumToString(TEnum e);
-
-template<typename TEnum>
-TEnum stringToEnum(std::string_view s);
-
-template<typename TEnum>
-QString enumToQString(TEnum e)
-{
-  auto str = enumToString(e);
-  return QString::fromUtf8(str.data(), str.size());
-}
-
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
-template<typename TEnum>
-TEnum stringToEnum(QStringView s)
-{
-  auto str = s.toUtf8();
-  return stringToEnum<TEnum>(std::string_view(str.data(), str.size()));
-}
-#else
-template<typename TEnum>
-inline TEnum stringToEnum(const QString& s)
-{
-  return stringToEnum<TEnum>(s.toStdString());
-}
-#endif
-
 // same as tif
 enum class DataType : std::uint16_t
 {

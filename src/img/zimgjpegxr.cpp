@@ -709,7 +709,7 @@ size_t ZImgJpegXR::writeImgToMem(const ZImg& img, const ZImgWriteParameters& par
 void ZImgJpegXR::checkBeforeWriting(const ZImgInfo& info, const ZImgWriteParameters& paras)
 {
   if (paras.compression != Compression::AUTO) {
-    throw ZIOException(fmt::format("compression {} is not supported", enumToString(paras.compression)));
+    throw ZIOException(fmt::format("compression {} is not supported", paras.compression));
   }
   if (info.numTimes != 1 || info.depth != 1) {
     throw ZIOException(QString("only 2d image is supported: %1").arg(info.toQString()));

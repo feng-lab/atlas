@@ -1864,7 +1864,7 @@ void ZTiffWriter::startWriting(const QString& filename, Compression comp, int32_
     if (!checkCompression(nullptr, comp)) {
       LOG(WARNING) << fmt::format(
         "Compression {} is not supported or not applicable, switching to default compression.",
-        enumToString(comp));
+        comp);
       comp = defaultCompression(nullptr);
     }
   }
